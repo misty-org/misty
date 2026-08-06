@@ -13,17 +13,15 @@ export function SpaceInvitationSidebar({ invitation }: { invitation: SpaceInvita
         <div className="flex min-w-0 flex-1 items-center gap-2.5 px-1 py-2">
           <SpaceAvatar space={space} className="size-8" />
           <div className="min-w-0">
-            <p className="m-0 truncate text-[13px] font-semibold text-sidebar-accent-foreground">
-              {space.name}
-            </p>
-            <p className="mb-0 mt-0.5 text-[10px] text-muted-foreground">Invited</p>
+            <p className="m-0 truncate text-[13px] font-semibold text-cream-bright">{space.name}</p>
+            <p className="mb-0 mt-0.5 text-[10px] text-cream-muted">Invited</p>
           </div>
         </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
-        <LockKeyhole className="size-4 text-muted-foreground" aria-hidden="true" />
+        <LockKeyhole className="size-4 text-cream-muted" aria-hidden="true" />
         <p className="mb-0 mt-2 text-xs font-medium">Invitation pending</p>
-        <p className="mb-0 mt-1 text-[11px] leading-4 text-muted-foreground">
+        <p className="mb-0 mt-1 text-[11px] leading-4 text-cream-muted">
           Accept to open this Space.
         </p>
       </div>
@@ -54,23 +52,23 @@ export function SpaceInvitationView({
 
   return (
     <section
-      className="grid h-full min-h-0 place-items-center bg-background px-6 py-10 text-center"
+      className="grid h-full min-h-0 place-items-center bg-charcoal-bg px-6 py-10 text-center"
       aria-label={`${space.name} invitation`}
     >
       <div className="flex w-full max-w-md flex-col items-center">
         <div className="relative">
-          <SpaceAvatar space={space} className="size-14 ring-1 ring-border" />
-          <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full border-2 border-background bg-foreground text-background">
+          <SpaceAvatar space={space} className="size-14 ring-1 ring-charcoal-border" />
+          <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full border-2 border-charcoal-bg bg-cream text-charcoal-bg">
             <LockKeyhole className="size-3" strokeWidth={2.2} aria-hidden="true" />
           </span>
         </div>
         <h1 className="mb-0 mt-4 text-xl font-semibold">{space.name}</h1>
-        <p className="mb-0 mt-2 text-sm leading-6 text-muted-foreground">
+        <p className="mb-0 mt-2 text-sm leading-6 text-cream-muted">
           {invitation.inviter_name || "A Space owner"} invited you to this Space. Its conversations,
           plans, Journal, and Library stay private until you accept.
         </p>
         {error ? (
-          <p className="mb-0 mt-3 text-sm text-destructive" role="alert">
+          <p className="mb-0 mt-3 text-sm text-cream-bright" role="alert">
             {error}
           </p>
         ) : null}

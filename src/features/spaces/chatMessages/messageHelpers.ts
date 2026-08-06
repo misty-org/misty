@@ -27,6 +27,17 @@ export function canPublish(message: SpaceMessage, currentUserId?: string) {
   );
 }
 
+/**
+ * Run states where the Agent is simply working and nothing is being asked of
+ * the reader. These are shown as a typing bubble at the end of the thread; the
+ * inline run card is reserved for states that need a decision.
+ */
+const inFlightRunStates = new Set(["queued", "working", "retrying"]);
+
+export function isInFlightRun(run: { state: string }) {
+  return inFlightRunStates.has(run.state);
+}
+
 export function hasAnyAttachment(message: SpaceMessage | undefined) {
   return Boolean(
     message &&

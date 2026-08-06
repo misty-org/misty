@@ -2,7 +2,6 @@ export type { ChatComposerSuggestion } from "@/models/types/features/spaces/Spac
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Lightbulb, LightbulbOff, MessagesSquare, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/ui";
 
 import { useAuth } from "@/features/auth/AuthContext";
@@ -27,16 +26,18 @@ import { useSpaceChatDraft } from "./spaceChat/useSpaceChatDraft";
 import { useSpaceChatMessageActions } from "./spaceChat/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./spaceChat/useSpaceChatPermissions";
 import { useSpaceChatScope, useSpaceChatStore } from "./spaceChat/useSpaceChatData";
+import { usePendingAgentRuns } from "./spaceChat/usePendingAgentRuns";
 import { useSpaceActionSuggestions } from "./spaceChat/useSpaceActionSuggestions";
+import { useChatScrollRestoration } from "./spaceChat/useChatScrollRestoration";
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user: authUser } = useAuth();
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
   const conversationId = searchParams.get("conversation") ?? "";
   const endRef = useRef<HTMLDivElement | null>(null);
+  const lastReadReceiptRef = useRef("");
 
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
   const store = useSpaceChatStore();
@@ -54,8 +55,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     store,
   });
   const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
-  const actionSuggestions = useSpaceActionSuggestions(spaceId, conversationId);
+  const actionSuggestions = useSpaceActionSuggestions(
+    spaceId,
+    conversationId,
+    !scope.activeConversation?.direct_agent_id,
+  );
 
+  const agentTurns = usePendingAgentRuns(spaceId, conversationId);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   const suggestions = useChatSuggestions({
@@ -127,11 +133,23 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     storeUpdateMessage: store.updateMessage,
     storeDeleteMessage: store.deleteMessage,
     storeToggleReaction: store.toggleMessageReaction,
+    onAgentRunsQueued: agentTurns.track,
   });
 
   const [messagesLoading] = useMinimumSpin(
     conversationId ? conversationChat.loading : store.loading && scope.defaultMessages.length === 0,
   );
+  const chatScroll = useChatScrollRestoration({
+    viewerId: user?.id,
+    spaceId,
+    conversationId,
+    ready:
+      !messagesLoading &&
+      (!conversationId || conversationChat.loadedConversationId === conversationId),
+    messages: scope.messages,
+    pendingRunCount: agentTurns.pending.length,
+    targetMessageId: searchParams.get("message") ?? undefined,
+  });
 
   // Switching Space (or identity) abandons anything staged in the composer.
   useEffect(() => {
@@ -144,38 +162,30 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   }, [spaceId, user?.id]);
 
   useEffect(() => {
-    const messageId = searchParams.get("message");
-    const target = messageId ? document.getElementById(`message-${messageId}`) : endRef.current;
-    target?.scrollIntoView({ block: messageId ? "center" : "end" });
     const last = scope.messages[scope.messages.length - 1];
-    if (last && !conversationId && !store.referenceOnly) void store.markRead(spaceId, last.seq);
-    if (last && conversationId && !store.referenceOnly) {
-      void spacesApi.markConversationRead(spaceId, conversationId, last.seq);
-    }
-  }, [conversationId, scope.messages, searchParams, spaceId]);
+    if (!last || store.referenceOnly) return;
+    const receiptKey = `${spaceId}:${conversationId || "everyone"}:${last.seq}`;
+    if (lastReadReceiptRef.current === receiptKey) return;
+    lastReadReceiptRef.current = receiptKey;
+    const request = conversationId
+      ? spacesApi.markConversationRead(spaceId, conversationId, last.seq)
+      : store.markRead(spaceId, last.seq);
+    void request.catch(() => {
+      if (lastReadReceiptRef.current === receiptKey) lastReadReceiptRef.current = "";
+    });
+  }, [conversationId, scope.messages, spaceId, store.referenceOnly]);
 
-  const canClearConversation = Boolean(
-    conversationId && (scope.activeConversation?.created_by_user_id === user?.id || access.isOwner),
-  );
   const canClearEveryone = !conversationId && access.isOwner;
   const clearChat = async () => {
-    const description = conversationId
-      ? "Permanently delete this conversation and all of its messages?"
-      : "Permanently delete every message in Everyone?";
-    if (!window.confirm(description)) return;
-    if (conversationId) {
-      await spacesApi.deleteOrClearConversation(spaceId, conversationId);
-      navigate(`/spaces/${encodeURIComponent(spaceId)}/chat`, { replace: true });
-    } else {
-      await spacesApi.clearEveryoneConversation(spaceId);
-      await store.loadMessages(spaceId);
-    }
+    if (!window.confirm("Permanently delete every message in Everyone?")) return;
+    await spacesApi.clearEveryoneConversation(spaceId);
+    await store.loadMessages(spaceId);
   };
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground">
-      <header className="misty-spaces-toolbar flex h-11 shrink-0 items-center gap-2.5 px-3">
-        <span className="grid size-7 shrink-0 place-items-center text-muted-foreground">
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">
+      <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-charcoal-border bg-charcoal-bg px-3">
+        <span className="grid size-7 shrink-0 place-items-center text-cream-muted">
           <MessagesSquare size={16} strokeWidth={1.75} />
         </span>
         <span className="min-w-0 flex-1">
@@ -183,13 +193,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             {conversationId ? scope.activeConversation?.title || "Conversation" : "Everyone"}
           </h1>
         </span>
-        {canClearConversation || canClearEveryone ? (
+        {canClearEveryone ? (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8 text-muted-foreground"
-            aria-label={conversationId ? "Delete or clear conversation" : "Clear Everyone history"}
+            className="size-8 text-cream-muted"
+            aria-label="Clear Everyone history"
             onClick={() => void clearChat()}
           >
             <Trash2 size={15} />
@@ -200,7 +210,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8 text-muted-foreground"
+            className="size-8 text-cream-muted"
             aria-label={
               suggestionVeto
                 ? "Resume action suggestions"
@@ -237,10 +247,13 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         setError={conversationChat.setError}
         loading={messagesLoading}
         endRef={endRef}
+        scrollRef={chatScroll.scrollRef}
+        onScroll={chatScroll.onScroll}
         onOpenPicker={openPicker}
         onBeginMention={input.beginMention}
         onReply={draft.setReplyToMessageId}
         onDelete={setMessageToDelete}
+        pendingAgentRuns={agentTurns.pending}
         actionSuggestions={actionSuggestions.items}
         onActionSuggestionsChanged={() => void actionSuggestions.refresh()}
       />

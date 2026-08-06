@@ -61,7 +61,7 @@ export const WorkStatusPopup = memo(function WorkStatusPopup() {
         <strong className="block truncate text-[13px] font-semibold leading-tight">
           {visibleSummary.title}
         </strong>
-        <span className="block truncate text-xs leading-tight text-[var(--misty-text-muted)]">
+        <span className="block truncate text-xs leading-tight text-cream-muted">
           {visibleSummary.detail}
         </span>
       </span>

@@ -11,9 +11,9 @@ import { PluginPrimaryAction, type PluginActionHandlers } from "./PluginPrimaryA
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card className="gap-2 rounded-lg" size="sm">
-      <div className="px-(--card-spacing)">
-        <p className="text-xs font-medium text-foreground">{title}</p>
-        <div className="mt-2 text-xs text-muted-foreground">{children}</div>
+      <div className="px-6">
+        <p className="text-xs font-medium text-cream">{title}</p>
+        <div className="mt-2 text-xs text-cream-muted">{children}</div>
       </div>
     </Card>
   );
@@ -45,7 +45,7 @@ export function PluginDetailDialog({
                   pluginId={plugin.id}
                   pluginName={plugin.name}
                   roundedClassName="rounded-lg"
-                  textClassName="text-xs font-semibold text-white"
+                  textClassName="text-xs font-semibold text-cream-bright"
                 />
                 <div className="min-w-0">
                   <DialogTitle className="flex min-w-0 items-center gap-2">
@@ -72,10 +72,7 @@ export function PluginDetailDialog({
                   <ul className="grid gap-1.5">
                     {plugin.capabilities.map((item) => (
                       <li className="flex gap-1.5" key={item}>
-                        <CheckCircle2
-                          className="mt-0.5 shrink-0 text-[var(--misty-success)]"
-                          size={13}
-                        />
+                        <CheckCircle2 className="mt-0.5 shrink-0 text-sage-fg" size={13} />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -93,13 +90,13 @@ export function PluginDetailDialog({
                 <DetailSection title="Placement">
                   <dl className="grid grid-cols-[88px_1fr] gap-x-2 gap-y-1.5">
                     <dt>Appears in</dt>
-                    <dd className="text-foreground">
+                    <dd className="text-cream">
                       {plugin.whereItAppears.join(", ") || plugin.placement.views.join(", ")}
                     </dd>
                     <dt>Opens as</dt>
-                    <dd className="capitalize text-foreground">{plugin.placement.openMode}</dd>
+                    <dd className="capitalize text-cream">{plugin.placement.openMode}</dd>
                     <dt>Selection</dt>
-                    <dd className="text-foreground">
+                    <dd className="text-cream">
                       {plugin.placement.requiresSelection ? "Required" : "Not required"}
                     </dd>
                   </dl>

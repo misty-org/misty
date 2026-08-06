@@ -105,7 +105,7 @@ export function LibraryMemoryPlayback({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex h-[calc(100dvh-var(--misty-window-titlebar-inset))] max-h-[calc(100dvh-var(--misty-window-titlebar-inset))] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-black p-0 text-white sm:max-w-none [&>button]:right-5 [&>button]:top-5 [&>button]:text-white"
+        className="flex h-[calc(100dvh-28px)] max-h-[calc(100dvh-28px)] w-screen max-w-none flex-col gap-0 rounded-none border-0 bg-charcoal-workspace p-0 text-cream-bright sm:max-w-none [&>button]:right-5 [&>button]:top-5 [&>button]:text-cream-bright"
         onKeyDown={(event) => {
           if (
             (event.target as HTMLElement).matches(
@@ -124,25 +124,25 @@ export function LibraryMemoryPlayback({
         <div className="flex items-center gap-1 px-5 pt-4">
           {items.map((candidate, candidateIndex) => (
             <Button
-              className="h-1 flex-1 overflow-hidden rounded-full border-0 bg-white/20 p-0"
+              className="h-1 flex-1 overflow-hidden rounded-full border-0 bg-charcoal-active p-0"
               type="button"
               key={candidate.id}
               onClick={() => setIndex(candidateIndex)}
               aria-label={`Show item ${candidateIndex + 1}`}
             >
               <span
-                className={`block h-full bg-white transition-[width] duration-300 ${candidateIndex < index ? "w-full" : candidateIndex === index ? "w-1/2" : "w-0"}`}
+                className={`block h-full bg-charcoal-active transition-[width] duration-300 ${candidateIndex < index ? "w-full" : candidateIndex === index ? "w-1/2" : "w-0"}`}
               />
             </Button>
           ))}
         </div>
         <header className="px-5 py-4 pr-16">
-          <DialogTitle className="truncate text-base text-white">{group.title}</DialogTitle>
-          <DialogDescription className="mt-1 truncate text-xs text-white/55">
+          <DialogTitle className="truncate text-base text-cream-bright">{group.title}</DialogTitle>
+          <DialogDescription className="mt-1 truncate text-xs text-cream-bright/55">
             {group.subtitle}
           </DialogDescription>
         </header>
-        <main className="relative grid min-h-0 flex-1 place-items-center overflow-hidden bg-[radial-gradient(circle_at_center,#252525,#050505_72%)]">
+        <main className="relative grid min-h-0 flex-1 place-items-center overflow-hidden bg-charcoal-workspace">
           {musicUrl ? (
             <audio ref={musicRef} className="hidden" src={musicUrl} autoPlay={playing} loop />
           ) : null}
@@ -165,18 +165,18 @@ export function LibraryMemoryPlayback({
                 alt={item.display_name}
               />
             ) : (
-              <div className="grid place-items-center gap-3 text-white/60">
+              <div className="grid place-items-center gap-3 text-cream-bright/60">
                 <File size={48} />
                 <span className="text-sm">{item.display_name}</span>
               </div>
             )
           ) : (
-            <div className="text-sm text-white/50">{contentError || "Loading…"}</div>
+            <div className="text-sm text-cream-bright/50">{contentError || "Loading…"}</div>
           )}
           {items.length > 1 ? (
             <>
               <Button
-                className="absolute left-5 grid size-10 place-items-center rounded-full border-0 bg-black/35 text-white opacity-70 backdrop-blur hover:opacity-100"
+                className="absolute left-5 grid size-10 place-items-center rounded-full border-0 bg-charcoal-workspace text-cream-bright opacity-70 hover:opacity-100"
                 type="button"
                 onClick={previous}
                 aria-label="Previous"
@@ -184,7 +184,7 @@ export function LibraryMemoryPlayback({
                 <ChevronLeft size={22} />
               </Button>
               <Button
-                className="absolute right-5 grid size-10 place-items-center rounded-full border-0 bg-black/35 text-white opacity-70 backdrop-blur hover:opacity-100"
+                className="absolute right-5 grid size-10 place-items-center rounded-full border-0 bg-charcoal-workspace text-cream-bright opacity-70 hover:opacity-100"
                 type="button"
                 onClick={next}
                 aria-label="Next"
@@ -193,9 +193,9 @@ export function LibraryMemoryPlayback({
               </Button>
             </>
           ) : null}
-          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/45 px-4 py-2 backdrop-blur">
+          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-charcoal-workspace px-4 py-2 ">
             <Button
-              className="grid size-8 place-items-center border-0 bg-transparent text-white/75 hover:text-white"
+              className="grid size-8 place-items-center border-0 bg-transparent text-cream-bright/75 hover:text-cream-bright"
               type="button"
               onClick={previous}
               aria-label="Previous"
@@ -203,7 +203,7 @@ export function LibraryMemoryPlayback({
               <SkipBack size={17} />
             </Button>
             <Button
-              className="grid size-10 place-items-center rounded-full border-0 bg-white text-black"
+              className="grid size-10 place-items-center rounded-full border-0 bg-charcoal-active text-charcoal-bg"
               type="button"
               onClick={() => setPlaying((current) => !current)}
               aria-label={playing ? "Pause" : "Play"}
@@ -211,7 +211,7 @@ export function LibraryMemoryPlayback({
               {playing ? <Pause size={18} /> : <Play size={18} />}
             </Button>
             <Button
-              className="grid size-8 place-items-center border-0 bg-transparent text-white/75 hover:text-white"
+              className="grid size-8 place-items-center border-0 bg-transparent text-cream-bright/75 hover:text-cream-bright"
               type="button"
               onClick={next}
               aria-label="Next"
@@ -221,7 +221,7 @@ export function LibraryMemoryPlayback({
           </div>
         </main>
         <footer className="px-5 py-3 text-center">
-          <p className="m-0 truncate text-xs text-white/70">
+          <p className="m-0 truncate text-xs text-cream-bright/70">
             {item.display_name} · {index + 1} of {items.length}
           </p>
         </footer>

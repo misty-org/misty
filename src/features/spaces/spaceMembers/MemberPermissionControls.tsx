@@ -117,7 +117,7 @@ export function MemberPermissionControls({
       </Button>
 
       <DialogContent className="flex max-h-[min(820px,calc(100vh-32px))] max-w-xl flex-col overflow-hidden p-0">
-        <DialogHeader className="border-b border-border/60 px-5 py-4 text-left sm:px-6 sm:py-5">
+        <DialogHeader className="border-b border-charcoal-border/60 px-5 py-4 text-left sm:px-6 sm:py-5">
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>Permissions for {memberName}</DialogTitle>
             {loaded ? <Badge variant="outline">{enabledCount} enabled</Badge> : null}
@@ -130,7 +130,7 @@ export function MemberPermissionControls({
         <div className="min-h-0 overflow-auto p-4 sm:p-5">
           {error ? (
             <p
-              className="mb-4 mt-0 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              className="mb-4 mt-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
               role="alert"
             >
               {error}
@@ -138,7 +138,7 @@ export function MemberPermissionControls({
           ) : null}
 
           {!loaded ? (
-            <Card className="grid min-h-56 place-items-center bg-muted/30 shadow-none ring-0">
+            <Card className="grid min-h-56 place-items-center bg-charcoal-card shadow-none ring-0">
               <Button
                 variant="outline"
                 type="button"
@@ -163,7 +163,7 @@ export function MemberPermissionControls({
           )}
         </div>
 
-        <DialogFooter className="mt-0 flex-row justify-between gap-3 border-t border-border/60 px-4 py-3 sm:px-5">
+        <DialogFooter className="mt-0 flex-row justify-between gap-3 border-t border-charcoal-border/60 px-4 py-3 sm:px-5">
           <Button
             variant="outline"
             type="button"
@@ -197,7 +197,7 @@ function PermissionGroup({
 
   return (
     <Card className="overflow-hidden">
-      <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border/60 px-3.5">
+      <header className="flex min-h-11 items-center justify-between gap-3 border-b border-charcoal-border/60 px-3.5">
         <h3 className="m-0 text-xs font-semibold">{group.title}</h3>
         <Badge variant="secondary">
           {enabledCount}/{group.items.length}
@@ -208,24 +208,24 @@ function PermissionGroup({
           const blocked = permissionBlockedByParent(permissions, item.id);
           return (
             <label
-              className={`flex min-h-[58px] items-center gap-3 border-b border-border/60 px-3.5 py-2.5 last:border-0 ${
-                blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-muted/70"
+              className={`flex min-h-[58px] items-center gap-3 border-b border-charcoal-border/60 px-3.5 py-2.5 last:border-0 ${
+                blocked ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-charcoal-card"
               }`}
               key={item.id}
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-xs font-medium">{item.label}</span>
-                <span className="mt-0.5 block text-[10px] leading-relaxed text-muted-foreground">
+                <span className="mt-0.5 block text-[10px] leading-relaxed text-cream-muted">
                   {item.description}
                 </span>
                 {blocked ? (
-                  <span className="mt-1 block text-[9px] text-amber-500">
+                  <span className="mt-1 block text-[9px] text-sage-fg">
                     Requires the related parent permission.
                   </span>
                 ) : null}
               </span>
               {savingPermission === item.id ? (
-                <span className="text-[9px] text-muted-foreground">Saving…</span>
+                <span className="text-[9px] text-cream-muted">Saving…</span>
               ) : (
                 <Checkbox
                   checked={Boolean(permissions[item.id])}

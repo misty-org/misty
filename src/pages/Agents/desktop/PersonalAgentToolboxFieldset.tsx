@@ -16,20 +16,20 @@ export function PersonalAgentToolboxFieldset({
   onActionsChange: (actions: AgentToolboxAction[]) => void;
 }) {
   return (
-    <fieldset className="grid gap-3 rounded-lg border border-border p-3">
+    <fieldset className="grid gap-3 rounded-lg border border-charcoal-border p-3">
       <legend className="px-1 text-sm font-medium">Agent Toolbox</legend>
-      <p className="m-0 text-xs text-muted-foreground">
+      <p className="m-0 text-xs text-cream-muted">
         Choose exact actions. Space permissions, connections, and approvals are checked again
         whenever the Agent acts.
       </p>
       {!loaded ? (
-        <p className="m-0 text-xs text-muted-foreground">Loading available actions…</p>
+        <p className="m-0 text-xs text-cream-muted">Loading available actions…</p>
       ) : (
         <div className="grid gap-2">
           {actions.map((action) => (
             <Label
               key={action.name}
-              className="flex items-start gap-2 rounded-md border border-border/70 p-2.5 font-normal"
+              className="flex items-start gap-2 rounded-md border border-charcoal-border/70 p-2.5 font-normal"
             >
               <Checkbox
                 className="mt-0.5"
@@ -47,11 +47,11 @@ export function PersonalAgentToolboxFieldset({
               <span className="min-w-0">
                 <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                   {toolboxActionLabel(action.name)}
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <span className="rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-cream-muted">
                     {action.risk}
                   </span>
                 </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
+                <span className="mt-0.5 block text-xs text-cream-muted">
                   {action.description}
                   {action.approval !== "none"
                     ? ` Approval: ${action.approval === "interactive" ? "always ask" : "explicit request"}.`
@@ -63,15 +63,15 @@ export function PersonalAgentToolboxFieldset({
         </div>
       )}
       {activity.length > 0 ? (
-        <div className="grid gap-1 border-t border-border pt-2">
+        <div className="grid gap-1 border-t border-charcoal-border pt-2">
           <p className="m-0 text-xs font-medium">Recent action activity</p>
           {activity.slice(0, 5).map((item, index) => (
             <p
-              className="m-0 flex items-center justify-between gap-2 text-xs text-muted-foreground"
+              className="m-0 flex items-center justify-between gap-2 text-xs text-cream-muted"
               key={`${item.tool_name}-${item.created_at}-${index}`}
             >
               <span className="truncate">{toolboxActionLabel(item.tool_name)}</span>
-              <span className={item.state === "failed" ? "text-destructive" : ""}>
+              <span className={item.state === "failed" ? "text-cream-bright" : ""}>
                 {item.state}
               </span>
             </p>

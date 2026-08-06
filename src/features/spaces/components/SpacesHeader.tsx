@@ -21,10 +21,15 @@ export function SpacesHeader(props: {
   onCloseTab: (tabId: string) => void;
   onReorderTab: (tabId: string, fromIndex: number, toIndex: number) => void;
   onSelectTab: (tabId: string) => void;
+  onRenameTab: (tabId: string, title: string) => void;
 }) {
   const tabs = props.session?.tabs ?? [];
+  // Only File Manager tabs own their title; a Space tab's comes from its route.
+  const renameableTabIds = new Set(
+    tabs.filter((tab) => tab.kind === "file-manager").map((tab) => tab.id),
+  );
   return (
-    <header className="h-[46px] min-w-0 border-b border-border/45 bg-background">
+    <header className="h-[46px] min-w-0 border-b border-charcoal-border/45 bg-charcoal-bg">
       <ChromeTabStrip
         tabs={tabs.map(tabDescriptor)}
         activeTabId={props.session?.activeTabId ?? ""}
@@ -32,8 +37,10 @@ export function SpacesHeader(props: {
         addTabControl={<NewWorkspaceTabMenu onOpenTool={props.onOpenTool} />}
         actions={<SpacesUtilityTray onOpenTool={props.onOpenTool} />}
         canCloseTab={() => true}
+        canRenameTab={(tab) => renameableTabIds.has(tab.id)}
         onAddTab={() => undefined}
         onCloseTab={(tab) => props.onCloseTab(tab.id)}
+        onRenameTab={props.onRenameTab}
         onReorderTab={props.onReorderTab}
         onSelectTab={props.onSelectTab}
       />
@@ -65,7 +72,7 @@ function NewWorkspaceTabMenu(props: { onOpenTool: (kind: WorkspaceTabKind) => vo
             <Icon className="mt-0.5 size-4" strokeWidth={1.8} />
             <span className="min-w-0">
               <span className="block text-sm font-medium">{label}</span>
-              <span className="block text-xs text-muted-foreground">{description}</span>
+              <span className="block text-xs text-cream-muted">{description}</span>
             </span>
           </DropdownMenuItem>
         ))}

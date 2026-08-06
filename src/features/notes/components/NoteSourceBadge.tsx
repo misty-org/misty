@@ -1,15 +1,8 @@
 import type {
-  NoteSourceBadgeProps,
-  NoteSourceIconProps,
-  NoteSyncIndicatorProps,
-  ProviderGlyphProps,
-} from "@/models/interfaces/features/notes/components/NoteSourceBadge";
-export type {
-  NoteSourceBadgeProps,
-  NoteSourceIconProps,
-  NoteSyncIndicatorProps,
-  ProviderGlyphProps,
-} from "@/models/interfaces/features/notes/components/NoteSourceBadge";
+  NoteSource,
+  NoteProviderStatus,
+  NoteSyncStatus,
+} from "@/models/types/features/notes/types";
 import { SiDropbox, SiGoogledrive, SiNotion, SiObsidian } from "react-icons/si";
 import {
   AlertTriangle,
@@ -19,7 +12,6 @@ import {
   PenLine,
   RefreshCw,
 } from "lucide-react";
-import type { NoteProviderStatus, NoteSyncStatus } from "@/models/types/features/notes/types";
 import type { StatusTone } from "@/models/types/ui/status-badge";
 import { StatusBadge, cn } from "@/ui";
 
@@ -42,7 +34,7 @@ export function NoteSourceIcon(props: NoteSourceIconProps) {
     <PenLine
       size={size}
       strokeWidth={1.9}
-      className={cn("text-primary", props.className)}
+      className={cn("text-cream-bright", props.className)}
       aria-label={props.title}
       aria-hidden={props.title ? undefined : true}
     />
@@ -53,8 +45,8 @@ export function NoteSourceBadge(props: NoteSourceBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded border border-border/70 bg-muted/50",
-        "px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+        "inline-flex shrink-0 items-center gap-1 rounded border border-charcoal-border/70 bg-charcoal-card",
+        "px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-cream-muted",
         props.className,
       )}
     >
@@ -87,9 +79,9 @@ export function NoteSyncIndicator(props: NoteSyncIndicatorProps) {
           size={12}
           strokeWidth={2}
           className={cn(
-            tone === "warning" && "text-amber-500",
-            tone === "info" && "text-primary",
-            tone === "neutral" && "text-muted-foreground",
+            tone === "warning" && "text-sage-fg",
+            tone === "info" && "text-cream-bright",
+            tone === "neutral" && "text-cream-muted",
             props.status === "syncing" && "animate-spin",
           )}
         />
@@ -134,9 +126,34 @@ export function ProviderGlyph(props: ProviderGlyphProps) {
   const glyph = providerGlyphs[props.providerId];
   if (!glyph) {
     return (
-      <PenLine size={size} strokeWidth={1.9} className={cn("text-primary", props.className)} />
+      <PenLine size={size} strokeWidth={1.9} className={cn("text-cream-bright", props.className)} />
     );
   }
   const Icon = glyph.icon;
   return <Icon size={size} color={glyph.color} className={props.className} aria-hidden="true" />;
+}
+
+export interface NoteSourceIconProps {
+  source: NoteSource;
+  size?: number;
+  className?: string;
+  title?: string;
+}
+
+export interface NoteSourceBadgeProps {
+  source: NoteSource;
+  className?: string;
+}
+
+export interface NoteSyncIndicatorProps {
+  status: NoteSyncStatus;
+  /** Compact renders a dot-only chip for dense list rows. */
+  compact?: boolean;
+  className?: string;
+}
+
+export interface ProviderGlyphProps {
+  providerId: string;
+  size?: number;
+  className?: string;
 }

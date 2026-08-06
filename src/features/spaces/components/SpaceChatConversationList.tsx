@@ -1,8 +1,15 @@
-import { MessagesSquare, Pencil, Plus, Users } from "lucide-react";
+import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { Link } from "react-router-dom";
-import { Button } from "@/ui";
-import { cn } from "@/ui";
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  cn,
+} from "@/ui";
 import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
 
@@ -13,6 +20,8 @@ export function SpaceChatConversationList({
   currentUserId,
   onCreateConversation,
   onEditConversation,
+  onDeleteConversation,
+  isSpaceOwner = false,
 }: {
   activeSpaceId: string;
   conversations: SpaceConversation[];
@@ -20,6 +29,8 @@ export function SpaceChatConversationList({
   currentUserId?: string;
   onCreateConversation?: () => void;
   onEditConversation?: (conversation: SpaceConversation) => void;
+  onDeleteConversation?: (conversation: SpaceConversation) => void;
+  isSpaceOwner?: boolean;
 }) {
   const mistyConversations = conversations.filter(
     (conversation) => conversation.origin !== "discord",
@@ -33,7 +44,7 @@ export function SpaceChatConversationList({
           className={conversationLinkClass(!activeConversationId)}
           to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat`}
         >
-          <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground ring-1 ring-sidebar-border/50">
+          <span className="grid size-7 place-items-center rounded-md bg-charcoal-active text-cream-muted ring-1 ring-charcoal-border/50">
             <Users size={15} strokeWidth={1.75} />
           </span>
           <span className="min-w-0 truncate font-medium">Everyone</span>
@@ -47,6 +58,8 @@ export function SpaceChatConversationList({
         currentUserId={currentUserId}
         onCreate={onCreateConversation}
         onEdit={onEditConversation}
+        onDelete={onDeleteConversation}
+        isSpaceOwner={isSpaceOwner}
       />
       {discord.length ? (
         <DiscordConversationGroup
@@ -81,7 +94,7 @@ function DiscordConversationGroup({
             className={conversationLinkClass(activeConversationId === conversation.id)}
             to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
           >
-            <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-[#5865F2]">
+            <span className="grid size-7 place-items-center rounded-md bg-sage-bg text-sage-fg">
               <SiDiscord className="size-3.5" aria-hidden />
             </span>
             <span className="min-w-0">
@@ -89,9 +102,7 @@ function DiscordConversationGroup({
                 {conversation.external_display_name || conversation.title}
               </span>
               {conversation.integration_status === "disconnected" ? (
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  Disconnected
-                </span>
+                <span className="block truncate text-[11px] text-cream-muted">Disconnected</span>
               ) : null}
             </span>
           </Link>
@@ -109,6 +120,8 @@ function ConversationGroup({
   currentUserId,
   onCreate,
   onEdit,
+  onDelete,
+  isSpaceOwner,
 }: {
   title: string;
   activeSpaceId: string;
@@ -117,6 +130,8 @@ function ConversationGroup({
   currentUserId?: string;
   onCreate?: () => void;
   onEdit?: (conversation: SpaceConversation) => void;
+  onDelete?: (conversation: SpaceConversation) => void;
+  isSpaceOwner: boolean;
 }) {
   return (
     <SpaceSidebarSection
@@ -138,18 +153,26 @@ function ConversationGroup({
       }
     >
       <nav className="grid gap-1" aria-label={`${title} conversations`}>
-        {conversations.map((conversation) => (
-          <div className="group/row relative" key={conversation.id}>
+        {conversations.map((conversation) => {
+          const canRename = Boolean(
+            onEdit &&
+            conversation.kind !== "direct" &&
+            conversation.created_by_user_id === currentUserId,
+          );
+          const canDelete = Boolean(
+            onDelete && (isSpaceOwner || conversation.created_by_user_id === currentUserId),
+          );
+          const link = (
             <Link
               className={conversationLinkClass(activeConversationId === conversation.id)}
               to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
             >
-              <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
+              <span className="grid size-7 place-items-center rounded-md bg-charcoal-active text-cream-muted">
                 <MessagesSquare size={15} strokeWidth={1.75} />
               </span>
-              <span className="min-w-0 pr-6">
+              <span className="min-w-0">
                 <span className="block truncate font-medium">{conversation.title}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">
+                <span className="block truncate text-[11px] text-cream-muted">
                   {conversation.participants
                     .map((participant) =>
                       participant.user_id === currentUserId ? "You" : participant.name,
@@ -158,25 +181,34 @@ function ConversationGroup({
                 </span>
               </span>
             </Link>
-            {onEdit && conversation.created_by_user_id === currentUserId ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1.5 top-1/2 size-6 -translate-y-1/2 opacity-0 shadow-none group-hover/row:opacity-100 focus-visible:opacity-100"
-                type="button"
-                aria-label={`Edit ${conversation.title}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onEdit(conversation);
-                }}
-              >
-                <Pencil size={12} />
-              </Button>
-            ) : null}
-          </div>
-        ))}
+          );
+          if (!canRename && !canDelete) return <div key={conversation.id}>{link}</div>;
+          return (
+            <ContextMenu key={conversation.id}>
+              <ContextMenuTrigger asChild>{link}</ContextMenuTrigger>
+              <ContextMenuContent className="w-44">
+                {canRename ? (
+                  <ContextMenuItem onSelect={() => onEdit?.(conversation)}>
+                    <Pencil />
+                    Edit conversation
+                  </ContextMenuItem>
+                ) : null}
+                {canRename && canDelete ? <ContextMenuSeparator /> : null}
+                {canDelete ? (
+                  <ContextMenuItem
+                    className="text-cream-bright focus:bg-charcoal-active focus:text-cream-bright"
+                    onSelect={() => onDelete?.(conversation)}
+                  >
+                    <Trash2 />
+                    Delete conversation
+                  </ContextMenuItem>
+                ) : null}
+              </ContextMenuContent>
+            </ContextMenu>
+          );
+        })}
         {conversations.length === 0 ? (
-          <p className="px-2 py-1 text-[11px] text-muted-foreground">None yet</p>
+          <p className="px-2 py-1 text-[11px] text-cream-muted">None yet</p>
         ) : null}
       </nav>
     </SpaceSidebarSection>
@@ -186,12 +218,12 @@ function ConversationGroup({
 function conversationLinkClass(isActive: boolean) {
   return cn(
     [
-      "misty-hover-marker-side misty-spaces-interactive relative grid min-h-9 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md",
-      "bg-none px-2.5 text-[13px] no-underline outline-none hover:bg-none",
-      "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+      "relative grid min-h-9 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md",
+      "px-2.5 text-[13px] no-underline outline-none transition-colors",
+      "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     ].join(" "),
     isActive
-      ? "misty-active-marker-side text-sidebar-accent-foreground"
-      : "text-sidebar-foreground hover:text-sidebar-accent-foreground",
+      ? "bg-charcoal-active text-cream-bright font-medium"
+      : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
   );
 }

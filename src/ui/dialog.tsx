@@ -20,7 +20,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 z-[var(--misty-layer-overlay)] bg-black/55 backdrop-blur-[1px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[2147483000] bg-charcoal-workspace data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -38,10 +38,10 @@ const DialogContent = React.forwardRef<
       ref={ref}
       data-slot="dialog-content"
       className={cn(
-        "fixed left-1/2 top-1/2 z-[var(--misty-layer-dialog)] grid",
-        "max-h-[calc(100dvh-var(--misty-window-titlebar-inset)-2rem)] w-[calc(100%-2rem)] max-w-lg",
-        "-translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-6",
-        "text-popover-foreground shadow-xl ring-1 ring-foreground/10 duration-200",
+        "fixed left-1/2 top-1/2 z-[2147483100] grid",
+        "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
+        "-translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
+        "text-cream shadow-xl ring-1 ring-cream/10 duration-200",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -52,7 +52,7 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         data-slot="dialog-close"
-        className="absolute right-4 top-4 grid size-8 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none"
+        className="absolute right-4 top-4 grid size-8 place-items-center rounded-md text-cream-muted outline-none transition-colors hover:bg-charcoal-card hover:text-cream focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40 disabled:pointer-events-none"
       >
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
@@ -100,7 +100,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     data-slot="dialog-description"
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm text-cream-muted", className)}
     {...props}
   />
 ));

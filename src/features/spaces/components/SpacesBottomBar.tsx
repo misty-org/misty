@@ -22,7 +22,7 @@ export function SpacesBottomBarToggle({
     <Button
       className={cn(
         "size-7 rounded-md !bg-transparent p-0 hover:!bg-transparent active:!bg-transparent aria-pressed:!bg-transparent",
-        pressed ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+        pressed ? "text-cream" : "text-cream-muted hover:text-cream",
       )}
       size="icon"
       variant="ghost"

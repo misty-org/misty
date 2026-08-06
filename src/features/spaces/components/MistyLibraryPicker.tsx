@@ -1,25 +1,28 @@
-import type { LibraryMediaFilter } from "@/models/types/features/spaces/components/MistyLibraryPicker";
-export type { LibraryMediaFilter } from "@/models/types/features/spaces/components/MistyLibraryPicker";
-import type { MistyLibraryPickerProps } from "@/models/interfaces/features/spaces/components/MistyLibraryPicker";
-export type { MistyLibraryPickerProps } from "@/models/interfaces/features/spaces/components/MistyLibraryPicker";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, File, Image, Music2, Search, Video, X } from "lucide-react";
-
-import { Button } from "@/ui";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpenText, Check, File, Image, Music2, Search, Video, X } from "lucide-react";
 import {
+  Badge,
+  ToggleGroup,
+  ToggleGroupItem,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
+  ErrorState,
+  Input,
+  ScrollArea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  cn,
 } from "@/ui";
-import { EmptyState, ErrorState } from "@/ui";
-import { Input } from "@/ui";
-import { ScrollArea } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { Skeleton } from "@/ui";
-import { cn } from "@/ui";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 
@@ -27,11 +30,11 @@ const pickerStyles = {
   dialog: [
     "grid h-[min(640px,calc(100vh-64px))] w-[min(720px,calc(100vw-32px))] max-w-none",
     "grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
-    "max-sm:h-[calc(100vh-var(--misty-window-titlebar-inset))] max-sm:w-screen max-sm:rounded-none",
+    "max-sm:h-screen max-sm:w-screen max-sm:rounded-none",
   ].join(" "),
   searchField: [
-    "flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border/80 bg-background",
-    "px-3 text-muted-foreground shadow-xs transition-colors",
+    "flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-charcoal-border/80 bg-charcoal-bg",
+    "px-3 text-cream-muted shadow-xs transition-colors",
   ].join(" "),
   searchInput: [
     "!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0",
@@ -120,7 +123,7 @@ export function MistyLibraryPicker({
 
   const panel = (
     <>
-      <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+      <div className="flex items-center gap-2 border-b border-charcoal-border px-5 py-3">
         <div className={pickerStyles.searchField} role="search">
           <Search size={15} aria-hidden="true" />
           <Input
@@ -163,7 +166,7 @@ export function MistyLibraryPicker({
         </Select>
       </div>
 
-      <ScrollArea className="min-h-0 bg-background">
+      <ScrollArea className="min-h-0 bg-charcoal-bg">
         <div className="p-4">
           {loading ? (
             <div
@@ -209,8 +212,8 @@ export function MistyLibraryPicker({
                     className={cn(
                       "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
                       selected
-                        ? "ring-2 ring-primary"
-                        : "bg-card inset-ring-1 inset-ring-foreground/10 hover:bg-accent",
+                        ? "ring-2 ring-charcoal-active"
+                        : "bg-charcoal-card inset-ring-1 inset-ring-cream/10 hover:bg-charcoal-hover",
                     )}
                     variant="ghost"
                     type="button"
@@ -219,19 +222,19 @@ export function MistyLibraryPicker({
                     aria-pressed={selected}
                     onClick={() => toggleItem(item.id)}
                   >
-                    <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-muted">
+                    <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-charcoal-card">
                       <MistyLibraryPickerThumbnail spaceId={spaceId} item={item} />
                     </span>
                     <span className="block min-w-0 px-2.5 py-2">
                       <span className="block truncate text-xs font-medium">
                         {item.display_name}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
+                      <span className="mt-0.5 block truncate text-[11px] font-normal text-cream-muted">
                         {item.file.original_filename}
                       </span>
                     </span>
                     {selected ? (
-                      <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-md bg-primary text-primary-foreground shadow-xs">
+                      <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-md bg-charcoal-active text-cream-bright shadow-xs">
                         <Check className="size-3" />
                       </span>
                     ) : null}
@@ -243,8 +246,8 @@ export function MistyLibraryPicker({
         </div>
       </ScrollArea>
 
-      <DialogFooter className="flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
-        <p className="text-xs text-muted-foreground">
+      <DialogFooter className="flex-row items-center justify-between gap-4 border-t border-charcoal-border px-5 py-3 sm:justify-between">
+        <p className="text-xs text-cream-muted">
           {selection.length} of {maximumSelected} selected
         </p>
         <div className="flex gap-2">
@@ -273,7 +276,7 @@ export function MistyLibraryPicker({
       }}
     >
       <DialogContent className={pickerStyles.dialog}>
-        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border px-5 py-3 pr-14 text-left">
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-14 text-left">
           <div className="min-w-0">
             <DialogTitle className="text-base">Choose from Library</DialogTitle>
             <DialogDescription>
@@ -341,7 +344,7 @@ function MistyLibraryPickerThumbnail({
         ? Music2
         : File;
   return (
-    <span ref={rootRef} className="grid size-full place-items-center text-muted-foreground">
+    <span ref={rootRef} className="grid size-full place-items-center text-cream-muted">
       {url ? (
         <img className="size-full object-cover" src={url} alt="" />
       ) : (
@@ -360,4 +363,20 @@ function libraryPickerItemMIME(item: SpaceLibraryItem): string {
   )
     .split(";")[0]
     .toLocaleLowerCase();
+}
+
+export type LibraryMediaFilter = "all" | "image" | "video" | "audio" | "document";
+
+export interface MistyLibraryPickerProps {
+  spaceId: string;
+  /** Render only the picker panel when a parent owns the shared dialog shell. */
+  embedded?: boolean;
+  /** Whether this embedded panel is currently visible. */
+  active?: boolean;
+  /** Source switcher rendered in the header when this picker is hosted by MistyPicker. */
+  sourceToggle?: ReactNode;
+  selectedIds: string[];
+  maximumSelected?: number;
+  onCancel: () => void;
+  onChoose: (itemIds: string[]) => void;
 }

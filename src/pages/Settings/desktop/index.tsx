@@ -1,24 +1,6 @@
-import type { SettingsSection, SettingValue } from "@/models/types/pages/Settings/desktop/index";
-export type { SettingsSection, SettingValue } from "@/models/types/pages/Settings/desktop/index";
-import type {
-  NavItem,
-  SettingsContentProps,
-} from "@/models/interfaces/pages/Settings/desktop/index";
-export type {
-  NavItem,
-  SettingsContentProps,
-} from "@/models/interfaces/pages/Settings/desktop/index";
-import { memo, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
-import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/ui";
-import { Badge } from "@/ui";
-import { Input } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { Switch } from "@/ui";
-import { Slider } from "@/ui";
-import { Spinner } from "@/ui";
 import {
+  RefreshCcw,
+  Image,
   AppWindow,
   ArrowLeftRight,
   Bell,
@@ -28,7 +10,6 @@ import {
   Eye,
   FolderOpen,
   HardDrive,
-  Image,
   Keyboard,
   Lock,
   Rows3,
@@ -37,30 +18,52 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { InstallerCard } from "../../../features/installer/InstallerCard";
+import {
+  Slider,
+  Button,
+  Badge,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Switch,
+  Spinner,
+} from "@/ui";
+import { InstallerCard } from "@/features/installer/InstallerCard";
+import { isAndroidBuild } from "@/platform/buildTarget";
+import {
+  defaultTransferProfileId,
+  transferProfileRecords,
+} from "@/pages/Settings/transferProfiles";
+import {
+  DesktopSettingsFrame,
+  DesktopSettingsRow as SettingsRow,
+  DesktopSettingsSection as SettingsSectionBlock,
+} from "@/pages/Settings/DesktopSettingsUI";
+import { memo, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useShallow } from "zustand/react/shallow";
 import { DesktopUpdaterSettings } from "@/features/updater/DesktopUpdaterSettings";
-import { useAppStore } from "@/stores/app";
+import {
+  useAppStore,
+  notificationsDeviceKey,
+  selectAgentPreferences,
+  useSettingsStore,
+} from "@/stores/app";
 import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { defaultAgentModelId, selectedAgentModelName } from "@/features/agents/modelSelection";
-import { settingsIndexToThemeMode, themeModeToSettingsIndex, useAppThemeStore } from "@/stores/app";
 import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
   SearchStatus,
   ShortcutBinding,
 } from "@/models/interfaces/services/misty-api";
-import { notificationsDeviceKey, selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import { useOperationQueueStore, useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
 import { userFacingErrorText } from "@/lib/format";
 import { hasTauriInternals } from "@/platform/tauri";
-import { isAndroidBuild } from "@/platform/buildTarget";
-import { defaultTransferProfileId, transferProfileRecords } from "../transferProfiles";
-import {
-  DesktopSettingsFrame,
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
-} from "../DesktopSettingsUI";
 
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
@@ -81,7 +84,7 @@ const sectionDescriptions: Record<SettingsSection, string> = {
   general: "Files startup, default actions, and browsing behavior.",
   app: "Updates, version details, and local support information.",
   agent: "Control Agents and the actions they can perform.",
-  appearance: "Theme, density, wallpaper, text size, and motion.",
+  appearance: "Density, text size, previews, and motion.",
   privacy: "Choose what diagnostic data Misty may share.",
   transfers: "Defaults for copies, downloads, and destinations.",
   search: "Keep filenames and connected libraries searchable.",
@@ -92,7 +95,6 @@ const sectionDescriptions: Record<SettingsSection, string> = {
 
 const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
-const themeOptions = ["System", "Dark", "Light"];
 const scaleOptions = ["Small", "Default", "Large"];
 const keymapOptions = ["System", "VS Code", "Finder"];
 const terminalOptions = ["System Default", "Terminal", "iTerm", "Warp", "Ghostty", "Alacritty"];
@@ -110,22 +112,22 @@ const settingsPrimaryButtonClass = "min-w-32";
 const settingsReferenceListClass = "grid min-w-0";
 
 const settingsReferenceRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-border/60 px-5 py-2 text-sm text-foreground";
+  "grid min-h-[54px] grid-cols-[minmax(0,0.52fr)_minmax(220px,0.48fr)] items-center gap-[18px] border-b border-charcoal-border/60 px-5 py-2 text-sm text-cream";
 
 const settingsReferenceHeaderClass =
-  "min-h-10 bg-muted/40 text-xs font-medium text-muted-foreground";
+  "min-h-10 bg-charcoal-card text-xs font-medium text-cream-muted";
 
 const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
 
 const settingsIconDangerClass =
-  "size-[30px] border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive";
+  "size-[30px] border-charcoal-active/25 text-cream-bright hover:bg-charcoal-active hover:text-cream-bright";
 
 const settingsInlineActionsClass = "flex items-center gap-3 px-5 py-4";
 
-const settingsEmptyClass = "px-5 py-4 text-sm text-muted-foreground";
+const settingsEmptyClass = "px-5 py-4 text-sm text-cream-muted";
 
 const settingsAssociationRowClass =
-  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-border/60 px-5 py-2 text-sm text-foreground";
+  "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center gap-[18px] border-b border-charcoal-border/60 px-5 py-2 text-sm text-cream";
 
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -350,7 +352,7 @@ function AppSettings(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Runtime">
-        <div className="bg-muted/30 p-4">
+        <div className="bg-charcoal-card p-4">
           <InstallerCard embedded variant="compact" />
         </div>
       </SettingsSectionBlock>
@@ -511,26 +513,14 @@ function agentScopesPayload(
 }
 
 function AppearanceSettings(props: SettingsContentProps) {
-  const themeMode = useAppThemeStore((state) => state.themeMode);
-  const setThemeMode = useAppThemeStore((state) => state.setThemeMode);
-  const themeIndex = themeModeToSettingsIndex(themeMode);
-
   return (
     <>
       <SettingsSectionBlock title="Theme">
         <SettingsRow
-          label="Theme mode"
-          description="Choose whether Misty follows the system appearance or uses a fixed theme."
+          label="Visual style"
+          description="Misty uses one high-contrast warm charcoal theme across every workspace."
         >
-          <SelectControl
-            value={themeIndex}
-            options={themeOptions}
-            disabled={props.working}
-            onChange={(value) => {
-              setThemeMode(settingsIndexToThemeMode(value));
-              props.onSettingChange("appearance", "theme_index", value);
-            }}
-          />
+          <Badge variant="secondary">Warm charcoal</Badge>
         </SettingsRow>
         <SettingsRow
           label="UI scale"
@@ -550,6 +540,7 @@ function AppearanceSettings(props: SettingsContentProps) {
         <SettingsRow
           label="Compact mode"
           description="Reduce padding and spacing in file-heavy views."
+          last
         >
           <SwitchControl
             checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
@@ -557,31 +548,6 @@ function AppearanceSettings(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
           />
         </SettingsRow>
-        {!isAndroidBuild ? (
-          <>
-            <SettingsRow
-              label="App wallpaper"
-              description="Choose an image, GIF, or video to show behind Misty pages."
-            >
-              <WallpaperControl
-                value={stringSetting(props.document, "appearance", "wallpaper_path", "")}
-                disabled={props.working}
-                onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
-              />
-            </SettingsRow>
-            <SettingsRow
-              label="Panel opacity"
-              description="Lower values make app surfaces more transparent, revealing more wallpaper."
-              last
-            >
-              <OpacityControl
-                value={numberSetting(props.document, "appearance", "panel_opacity", 0.82)}
-                disabled={props.working}
-                onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
-              />
-            </SettingsRow>
-          </>
-        ) : null}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Typography">
@@ -839,7 +805,7 @@ function SearchSettings(props: SettingsContentProps) {
         <div className="grid gap-4 px-5 py-5">
           <div className="flex items-start justify-between gap-5">
             <div className="flex min-w-0 gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
                 {scanActive ? (
                   <Spinner label="Checking files" size="lg" />
                 ) : (
@@ -847,14 +813,14 @@ function SearchSettings(props: SettingsContentProps) {
                 )}
               </div>
               <div className="grid min-w-0 gap-1">
-                <strong className="text-sm font-medium text-foreground">
+                <strong className="text-sm font-medium text-cream">
                   {scanActive
                     ? "Checking for file changes"
                     : indexedItems
                       ? "Search is kept up to date"
                       : "Ready for the first check"}
                 </strong>
-                <span className="text-sm leading-relaxed text-muted-foreground">
+                <span className="text-sm leading-relaxed text-cream-muted">
                   {scanActive
                     ? `${scanProgress.toLocaleString()} items checked${status?.currentPath ? ` · ${shortPath(status.currentPath)}` : ""}`
                     : status?.lastScanTimeMs
@@ -862,7 +828,7 @@ function SearchSettings(props: SettingsContentProps) {
                       : "Run the first check to make filenames and folders available from Spotlight."}
                 </span>
                 {error || status?.lastScanError ? (
-                  <span className="text-sm text-destructive">
+                  <span className="text-sm text-cream-bright">
                     {userFacingErrorText(error || status?.lastScanError)}
                   </span>
                 ) : null}
@@ -889,7 +855,7 @@ function SearchSettings(props: SettingsContentProps) {
               </Button>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-4 max-[720px]:grid-cols-1">
+          <div className="grid grid-cols-3 gap-2 border-t border-charcoal-border/60 pt-4 max-[720px]:grid-cols-1">
             <SearchStatCard label="Searchable" value={indexedItems.toLocaleString()} compact />
             <SearchStatCard
               label="On this device"
@@ -902,7 +868,7 @@ function SearchSettings(props: SettingsContentProps) {
               compact
             />
           </div>
-          <p className="m-0 text-xs leading-relaxed text-muted-foreground">
+          <p className="m-0 text-xs leading-relaxed text-cream-muted">
             Covered: {friendlyCoverage(indexedLocalRoots, indexedRemoteNames)}. Common build and
             cache folders are skipped automatically.
           </p>
@@ -936,7 +902,7 @@ function SearchSettings(props: SettingsContentProps) {
                 key={`${scanError.source}:${scanError.message}`}
               >
                 <span className={settingsReferenceSpanClass}>{scanError.source}</span>
-                <span className="min-w-0 [overflow-wrap:anywhere] text-destructive">
+                <span className="min-w-0 [overflow-wrap:anywhere] text-cream-bright">
                   {userFacingErrorText(scanError.message)}
                 </span>
               </div>
@@ -957,16 +923,16 @@ function SearchHealthCard(props: {
   attention?: boolean;
 }) {
   return (
-    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10">
+    <div className="grid min-h-28 grid-cols-[40px_minmax(0,1fr)] gap-3 rounded-xl bg-charcoal-card p-4 shadow-xs inset-ring-1 inset-ring-cream/10">
       <div
-        className={`grid size-10 place-items-center rounded-lg ${props.attention ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}
+        className={`grid size-10 place-items-center rounded-lg ${props.attention ? "bg-charcoal-active text-cream-bright" : "bg-charcoal-card text-cream-muted"}`}
       >
         {props.active ? <Spinner label="Updating file search" size="lg" /> : props.icon}
       </div>
       <div className="grid content-center gap-1">
-        <span className="text-xs text-muted-foreground">{props.title}</span>
-        <strong className="text-lg font-semibold text-foreground">{props.value}</strong>
-        <span className="text-xs leading-relaxed text-muted-foreground">{props.detail}</span>
+        <span className="text-xs text-cream-muted">{props.title}</span>
+        <strong className="text-lg font-semibold text-cream">{props.value}</strong>
+        <span className="text-xs leading-relaxed text-cream-muted">{props.detail}</span>
       </div>
     </div>
   );
@@ -975,14 +941,14 @@ function SearchHealthCard(props: {
 function SearchStatCard(props: { label: string; value: string; compact?: boolean }) {
   return (
     <div
-      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md bg-muted/45 px-3`}
+      className={`${props.compact ? "min-h-[54px]" : "min-h-[76px]"} grid content-center gap-1 rounded-md bg-charcoal-card px-3`}
     >
       <strong
-        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-base" : "text-xl"} font-semibold tabular-nums text-foreground`}
+        className={`min-w-0 overflow-hidden text-ellipsis whitespace-nowrap ${props.compact ? "text-base" : "text-xl"} font-semibold tabular-nums text-cream`}
       >
         {props.value}
       </strong>
-      <span className="text-xs text-muted-foreground">{props.label}</span>
+      <span className="text-xs text-cream-muted">{props.label}</span>
     </div>
   );
 }
@@ -1312,9 +1278,7 @@ function AdvancedSettings(props: SettingsContentProps) {
 
 function SettingsNote(props: { children: ReactNode }) {
   return (
-    <p className="m-0 max-w-2xl px-5 py-4 text-sm leading-5 text-muted-foreground">
-      {props.children}
-    </p>
+    <p className="m-0 max-w-2xl px-5 py-4 text-sm leading-5 text-cream-muted">{props.children}</p>
   );
 }
 
@@ -1338,7 +1302,7 @@ function WorkspaceRootControl(props: {
   return (
     <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
       <span
-        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-foreground" : "text-muted-foreground"}`}
+        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-cream" : "text-cream-muted"}`}
         title={props.value || "Default"}
       >
         {props.value || "Default"}
@@ -1368,119 +1332,6 @@ function WorkspaceRootControl(props: {
           Reset
         </Button>
       </div>
-    </div>
-  );
-}
-
-function WallpaperControl(props: {
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  const pickerAvailable = hasTauriInternals();
-  const chooseWallpaper = async () => {
-    if (!pickerAvailable) return;
-    const selection = await open({
-      title: "Choose App Wallpaper",
-      multiple: false,
-      directory: false,
-      filters: [
-        {
-          name: "Images and videos",
-          extensions: [
-            "apng",
-            "avif",
-            "bmp",
-            "gif",
-            "jpg",
-            "jpeg",
-            "png",
-            "svg",
-            "webp",
-            "m4v",
-            "mov",
-            "mp4",
-            "ogv",
-            "webm",
-          ],
-        },
-      ],
-    });
-    const path = Array.isArray(selection) ? selection[0] : selection;
-    if (path) props.onChange(path);
-  };
-
-  return (
-    <div className="grid w-full min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
-      <span
-        className={`block w-full min-w-0 max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-foreground" : "text-muted-foreground"}`}
-        title={props.value || "None"}
-      >
-        {props.value || "None"}
-      </span>
-      <div className="grid w-full max-w-[360px] grid-cols-2 gap-2">
-        <Button
-          variant="outline"
-          type="button"
-          className={`${settingsControlButtonClass} w-full`}
-          disabled={props.disabled || !pickerAvailable}
-          title={
-            pickerAvailable ? "Choose app wallpaper" : "File picker unavailable on this platform"
-          }
-          onClick={() => void chooseWallpaper()}
-        >
-          <Image size={15} />
-          Choose
-        </Button>
-        <Button
-          variant="outline"
-          type="button"
-          className={`${settingsControlButtonClass} w-full`}
-          disabled={props.disabled || !props.value}
-          onClick={() => props.onChange("")}
-        >
-          Reset
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function OpacityControl(props: {
-  value: number;
-  disabled: boolean;
-  onCommit: (value: number) => void;
-}) {
-  const normalizedValue = clampOpacity(props.value);
-  const [draftPercent, setDraftPercent] = useState(Math.round(normalizedValue * 100));
-
-  useEffect(() => {
-    setDraftPercent(Math.round(normalizedValue * 100));
-  }, [normalizedValue]);
-
-  const commitDraft = (percent = draftPercent) => {
-    const nextValue = clampOpacity(percent / 100);
-    if (nextValue !== normalizedValue) props.onCommit(nextValue);
-  };
-
-  return (
-    <div className="grid w-full min-w-0 max-w-[360px] justify-items-end gap-2 max-[760px]:justify-items-start">
-      <span className="text-sm font-medium tabular-nums text-foreground">{draftPercent}%</span>
-      <Slider
-        aria-label="Panel opacity"
-        className="h-8 w-[220px] max-w-full"
-        disabled={props.disabled}
-        min={0}
-        max={100}
-        step={1}
-        value={[draftPercent]}
-        onValueChange={(values) => {
-          setDraftPercent(values[0] ?? draftPercent);
-        }}
-        onValueCommit={(values) => {
-          commitDraft(values[0] ?? draftPercent);
-        }}
-      />
     </div>
   );
 }
@@ -1562,7 +1413,7 @@ function ProfileNumberInput(props: {
     if (next !== props.value) props.onCommit(next);
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-muted-foreground">
+    <label className="grid gap-1 text-left text-[11px] text-cream-muted">
       {props.label}
       <Input
         key={props.value}
@@ -1591,7 +1442,7 @@ function ProfileTextInput(props: {
     if (event.currentTarget.value !== props.value) props.onCommit(event.currentTarget.value.trim());
   };
   return (
-    <label className="grid gap-1 text-left text-[11px] text-muted-foreground">
+    <label className="grid gap-1 text-left text-[11px] text-cream-muted">
       {props.label}
       <Input
         key={props.value}
@@ -1611,7 +1462,7 @@ function ProfileTextInput(props: {
 function ValueText(props: { value: string; muted?: boolean }) {
   return (
     <span
-      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.muted ? "text-muted-foreground" : "text-foreground"}`}
+      className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.muted ? "text-cream-muted" : "text-cream"}`}
     >
       {props.value}
     </span>
@@ -1627,7 +1478,7 @@ function CopyableValueText(props: { value: string; disabled?: boolean }) {
   return (
     <span className="flex min-w-0 max-w-[420px] items-center justify-end gap-2 max-[760px]:justify-start">
       <span
-        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.disabled ? "text-muted-foreground" : "text-foreground"}`}
+        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.disabled ? "text-cream-muted" : "text-cream"}`}
         title={props.value}
       >
         {props.value}
@@ -1667,10 +1518,6 @@ function numberSetting(
   return typeof value === "number" ? value : fallback;
 }
 
-function clampOpacity(value: number): number {
-  return Math.min(1, Math.max(0, Math.round(value * 100) / 100));
-}
-
 function booleanSetting(
   document: Record<string, unknown>,
   section: string,
@@ -1692,3 +1539,38 @@ function stringSetting(
 }
 
 export default SettingsWorkspace;
+
+export type SettingsSection =
+  | "general"
+  | "app"
+  | "agent"
+  | "appearance"
+  | "privacy"
+  | "transfers"
+  | "search"
+  | "notifications"
+  | "shortcuts"
+  | "advanced";
+
+export type SettingValue =
+  string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;
+
+export interface NavItem {
+  id: SettingsSection;
+  label: string;
+  icon: LucideIcon;
+}
+
+export interface SettingsContentProps {
+  document: Record<string, unknown>;
+  launchOnLogin: LaunchOnLoginSnapshot | null;
+  working: boolean;
+  onSettingChange: (section: string, key: string, value: SettingValue) => void;
+  onLoad: () => Promise<void>;
+  onShortcutChange: (commandId: string, shortcut: string) => void;
+  onSaveShortcuts: () => Promise<void>;
+  onRemoveOpenWithAssociation: (key: string) => Promise<void>;
+  shortcuts: ShortcutBinding[];
+  openWithAssociations: OpenWithAssociation[];
+  app: ReturnType<typeof useAppStore.getState>["app"];
+}

@@ -64,7 +64,7 @@ export function LibraryItemThumbnail({
   if (preview?.kind === "pdf")
     return (
       <object
-        className="pointer-events-none size-full bg-white"
+        className="pointer-events-none size-full bg-charcoal-active"
         data={preview.url}
         type="application/pdf"
         aria-label={`PDF thumbnail for ${item.display_name}`}

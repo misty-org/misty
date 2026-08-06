@@ -1,13 +1,14 @@
-import type { TransfersMultiPanelSnapshot } from "@/models/interfaces/pages/Transfers/desktop/transferPersistence";
-export type { TransfersMultiPanelSnapshot } from "@/models/interfaces/pages/Transfers/desktop/transferPersistence";
-import type { MultiPanelClosedPane, MultiPanelTab } from "@/models/interfaces/workspace";
-import type { MultiPanelStore } from "@/models/interfaces/workspace";
 import {
   isTransferTableColumn,
   transferDefaultColumnWidths,
   transferMinimumColumnWidths,
   transferTableColumns,
-} from "./transferModel";
+} from "@/pages/Transfers/desktop/transferModel";
+import type {
+  MultiPanelClosedPane,
+  MultiPanelTab,
+  MultiPanelStore,
+} from "@/models/interfaces/workspace";
 import type {
   TransferColumnWidths,
   TransferTableColumn,
@@ -134,4 +135,13 @@ export function saveTransferPanelVisibility(visibility: {
   } catch {
     // Panel toggles remain available for the current session.
   }
+}
+
+export interface TransfersMultiPanelSnapshot {
+  tabs: MultiPanelTab[];
+  activeTabId: string;
+  activePaneId: string;
+  closedPanes: MultiPanelClosedPane[];
+  nextPaneIndex: number;
+  nextTabIndex: number;
 }

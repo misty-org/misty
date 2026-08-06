@@ -42,10 +42,10 @@ export function DrawingPanelSidebar(props: {
                 type="button"
                 variant="ghost"
                 className={cn(
-                  "misty-hover-marker-side relative h-9 min-w-0 justify-start gap-2 rounded-md px-3 text-left text-xs font-normal",
+                  "relative h-9 min-w-0 justify-start gap-2 rounded-md px-3 text-left text-xs font-normal",
                   props.activeDrawingId === drawing.id
-                    ? "misty-active-marker-side text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:text-sidebar-accent-foreground",
+                    ? "bg-charcoal-active text-cream-bright font-medium"
+                    : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
                 )}
                 onClick={() =>
                   navigate(
@@ -60,7 +60,7 @@ export function DrawingPanelSidebar(props: {
       </nav>
 
       {!drawings.loading && drawings.drawings.length === 0 ? (
-        <p className="px-2 py-1 text-[11px] text-muted-foreground">None yet</p>
+        <p className="px-2 py-1 text-[11px] text-cream-muted">None yet</p>
       ) : null}
     </>
   );

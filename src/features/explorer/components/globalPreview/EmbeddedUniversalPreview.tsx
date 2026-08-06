@@ -88,21 +88,21 @@ export function EmbeddedUniversalPreview(props: {
     );
   if (isAudio && props.url)
     return (
-      <div className="grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl bg-card p-8 text-center shadow-xs inset-ring-1 inset-ring-foreground/10">
-        <span className="text-5xl text-muted-foreground">♫</span>
+      <div className="grid w-[min(520px,90%)] justify-items-center gap-5 rounded-xl bg-charcoal-card p-8 text-center shadow-xs inset-ring-1 inset-ring-cream/10">
+        <span className="text-5xl text-cream-muted">♫</span>
         <strong>{props.name}</strong>
         <audio className="w-full" src={props.url} controls />
       </div>
     );
   if (isPdf && props.url)
     return (
-      <Suspense fallback={<div className="h-full min-h-[520px] w-full bg-neutral-800" />}>
+      <Suspense fallback={<div className="h-full min-h-[520px] w-full bg-charcoal-card" />}>
         <PdfViewer url={props.url} name={props.name} />
       </Suspense>
     );
   if (resource?.kind === "markdown")
     return (
-      <article className="prose dark:prose-invert mx-auto h-full w-full max-w-4xl overflow-auto px-8 py-10">
+      <article className="prose prose-invert mx-auto h-full w-full max-w-4xl overflow-auto px-8 py-10">
         <Suspense fallback={<span>Rendering Markdown…</span>}>
           <ReactMarkdown>{resource.text ?? ""}</ReactMarkdown>
         </Suspense>
@@ -110,13 +110,13 @@ export function EmbeddedUniversalPreview(props: {
     );
   if (resource?.kind === "text")
     return (
-      <pre className="m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-7 text-left font-mono text-[13px] leading-6 text-foreground/80">
+      <pre className="m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-7 text-left font-mono text-[13px] leading-6 text-cream/80">
         {resource.text}
       </pre>
     );
   if (resource?.kind === "document")
     return (
-      <article className="mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10 py-12 text-left font-serif text-[16px] leading-8 text-foreground/80">
+      <article className="mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10 py-12 text-left font-serif text-[16px] leading-8 text-cream/80">
         {resource.text || "This document contains no readable text."}
       </article>
     );

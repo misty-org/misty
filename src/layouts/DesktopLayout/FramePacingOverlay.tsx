@@ -78,13 +78,13 @@ export function FramePacingOverlay(props: { enabled: boolean }) {
       aria-label="Frame pacing overlay"
     >
       <strong className="col-span-full text-xs font-extrabold">{label}</strong>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+      <span className="whitespace-nowrap text-cream-muted tabular-nums">
         {state.fps > 0 ? state.fps : "--"} FPS
       </span>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+      <span className="whitespace-nowrap text-cream-muted tabular-nums">
         {state.frameMs > 0 ? state.frameMs.toFixed(1) : "--"} ms
       </span>
-      <span className="whitespace-nowrap text-[var(--misty-text-muted)] tabular-nums">
+      <span className="whitespace-nowrap text-cream-muted tabular-nums">
         {state.slowFramePercent}% slow
       </span>
     </aside>

@@ -1,10 +1,6 @@
-import type { IconButtonProps } from "@/models/types/ui/icon-button";
-export type { IconButtonProps } from "@/models/types/ui/icon-button";
 import * as React from "react";
-import { Button } from "@/ui";
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/ui";
 import type { ButtonProps } from "@/models/interfaces/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui";
-import { cn } from "@/ui";
 
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
   (
@@ -56,3 +52,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
 );
 IconButton.displayName = "IconButton";
 export { IconButton };
+
+export type IconButtonProps = Omit<ButtonProps, "asChild" | "size"> & {
+  children: React.ReactNode;
+  label: string;
+  tooltip?: string | false;
+  size?: "sm" | "default" | "lg";
+};

@@ -1,5 +1,3 @@
-import type { SearchStore } from "@/models/interfaces/stores/explorer/useSearchStore";
-export type { SearchStore } from "@/models/interfaces/stores/explorer/useSearchStore";
 import { create } from "zustand";
 import { searchCancelScan, searchGetStatus, searchInit, searchStartScan } from "@/stores/backend";
 import type { SearchQueryScope } from "@/models/types/services/misty-api";
@@ -276,4 +274,25 @@ export function resetSearchAccountState(): void {
     error: null,
     initialized: false,
   });
+}
+
+export interface SearchStore {
+  open: boolean;
+  query: string;
+  scope: SearchQueryScope;
+  currentPath: string;
+  results: SearchResult[];
+  searching: boolean;
+  status: SearchStatus | null;
+  error: string | null;
+  initialized: boolean;
+  initialize: () => Promise<void>;
+  openSearch: (currentPath: string) => Promise<void>;
+  closeSearch: () => void;
+  setQuery: (query: string) => void;
+  setScope: (scope: SearchQueryScope) => void;
+  refreshStatus: () => Promise<void>;
+  startScan: (currentPath: string) => Promise<void>;
+  cancelScan: () => Promise<void>;
+  executeSearch: () => Promise<void>;
 }

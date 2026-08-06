@@ -1,7 +1,4 @@
-import type { AuthFieldProps } from "@/models/interfaces/features/auth/components/AuthField";
-export type { AuthFieldProps } from "@/models/interfaces/features/auth/components/AuthField";
-import { Input } from "@/ui";
-import { Label } from "@/ui";
+import { Input, Label } from "@/ui";
 
 export default function AuthField({
   id,
@@ -38,4 +35,19 @@ export default function AuthField({
       />
     </div>
   );
+}
+
+export interface AuthFieldProps {
+  id: string;
+  label: string;
+  type?: string;
+  value: string;
+  placeholder?: string;
+  autoComplete?: string;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  required?: boolean;
+  disabled?: boolean;
+  onChange: (value: string) => void;
 }

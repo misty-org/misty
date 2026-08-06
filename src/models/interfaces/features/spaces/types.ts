@@ -202,7 +202,7 @@ export interface SpaceMessage {
   sender_avatar_version?: number;
   sender_kind: "person" | "agent" | "system";
   sender_agent_id?: string;
-  sender?: import("./conversationTypes").SpaceMessageSender;
+  sender?: import("@/features/spaces/connections/useDiscordLink").SpaceMessageSender;
   content: MessageSpan[];
   file_node_ids: string[];
   library_item_ids?: string[];
@@ -215,7 +215,7 @@ export interface SpaceMessage {
    * existing caller stays valid and the UI can treat "no origin" as "ours".
    */
   origin?: MessageOrigin;
-  triggered_runs?: import("./conversationTypes").SpaceMessageAgentRun[];
+  triggered_runs?: import("@/features/spaces/connections/useDiscordLink").SpaceMessageAgentRun[];
   created_at: string;
 }
 export interface SpaceMessageReaction {
@@ -648,4 +648,4 @@ export interface LibraryEditResult {
 }
 export type * from "@/models/interfaces/features/spaces/agentArchitectureTypes";
 export type * from "@/models/interfaces/features/spaces/actionSuggestionTypes";
-export type * from "@/models/interfaces/features/spaces/conversationTypes";
+export type * from "@/features/spaces/connections/useDiscordLink";

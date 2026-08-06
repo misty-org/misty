@@ -1,18 +1,25 @@
-import type { MistyFilePickerMode } from "@/models/types/features/picker/FilePicker";
-export type { MistyFilePickerMode } from "@/models/types/features/picker/FilePicker";
-import type { MistyFilePickerProps } from "@/models/interfaces/features/picker/FilePicker";
-export type { MistyFilePickerProps } from "@/models/interfaces/features/picker/FilePicker";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
-import { CloudDownload } from "lucide-react";
-import { Button } from "@/ui";
 import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import { FolderOpen, CloudDownload } from "lucide-react";
+import { FileBrowser } from "@/features/explorer/components/FileBrowser";
+import { ExplorerPickerToolbar } from "@/features/explorer/components/ExplorerPickerToolbar";
+import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Alert,
+  AlertDescription,
 } from "@/ui";
 import { devicesSnapshot, explorerListDirectory } from "@/stores/backend";
 import type {
@@ -21,21 +28,22 @@ import type {
   MountedDevice,
   ProviderRemote,
 } from "@/models/interfaces/services/misty-api";
-import { Alert, AlertDescription } from "@/ui";
-import { FileBrowser } from "../explorer/components/FileBrowser";
 import { PickerPlaces } from "./PickerPlaces";
-import { ExplorerPickerToolbar } from "../explorer/components/ExplorerPickerToolbar";
 import { errorText } from "@/lib/format";
 import { useMultiPanelStore } from "@/features/workspace";
-import { useAppStore } from "@/stores/app";
-import { sortListing, useExplorerStore } from "@/stores/explorer";
-import type { ExplorerSortColumn, ExplorerSortState } from "@/stores/explorer";
-import { useProvidersStore } from "@/stores/providers";
 import {
+  useAppStore,
   selectAdvancedPreferences,
   selectGeneralPreferences,
   useSettingsStore,
 } from "@/stores/app";
+import {
+  sortListing,
+  useExplorerStore,
+  type ExplorerSortColumn,
+  type ExplorerSortState,
+} from "@/stores/explorer";
+import { useProvidersStore } from "@/stores/providers";
 
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
@@ -276,7 +284,7 @@ export function MistyFilePicker({
 
   const panel = (
     <>
-      <div className="border-b border-border">
+      <div className="border-b border-charcoal-border">
         <ExplorerPickerToolbar
           path={listing?.path || initialPath || homeDir}
           query={searchQuery}
@@ -293,7 +301,7 @@ export function MistyFilePicker({
       </div>
 
       <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] max-[860px]:grid-cols-[minmax(0,1fr)]">
-        <div className="min-h-0 overflow-hidden border-r border-border max-[860px]:hidden">
+        <div className="min-h-0 overflow-hidden border-r border-charcoal-border max-[860px]:hidden">
           <PickerPlaces
             homePath={homeDir}
             activePath={listing?.path || explorerPath || homeDir}
@@ -307,10 +315,10 @@ export function MistyFilePicker({
           />
         </div>
 
-        <main className="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+        <main className="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg">
           {showCloudNotice ? (
-            <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-muted/40 px-4 py-2.5">
-              <CloudDownload className="text-muted-foreground" />
+            <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-charcoal-card px-4 py-2.5">
+              <CloudDownload className="text-cream-muted" />
               <AlertDescription className="text-xs">
                 Cloud items must be downloaded to a local folder before you can choose them.
               </AlertDescription>
@@ -348,14 +356,14 @@ export function MistyFilePicker({
             onInlineEditCancel={() => undefined}
           />
           {loading && listing ? (
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-charcoal-active" />
           ) : null}
         </main>
       </div>
 
-      <DialogFooter className="mt-0 flex flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
+      <DialogFooter className="mt-0 flex flex-row items-center justify-between gap-4 border-t border-charcoal-border px-5 py-3 sm:justify-between">
         <p
-          className="m-0 min-w-0 truncate text-xs text-muted-foreground max-[800px]:hidden"
+          className="m-0 min-w-0 truncate text-xs text-cream-muted max-[800px]:hidden"
           title={
             multiple && selectedPaths.length > 0
               ? selectedPaths.join("\n")
@@ -398,7 +406,7 @@ export function MistyFilePicker({
       }}
     >
       <DialogContent className={pickerDialogClassName}>
-        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border px-5 py-3 pr-14 text-left">
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-14 text-left">
           <div className="min-w-0">
             <DialogTitle className="text-base">
               {title || (mode === "folder" ? "Choose a folder" : "Choose a file")}
@@ -436,4 +444,23 @@ function resolvePreferredRoot(configuredPath: string, homePath: string): string 
     return joinPath(homePath, trimmed.slice(2));
   if (/^(?:\/|[A-Za-z]:[\\/])/.test(trimmed)) return trimmed;
   return joinPath(homePath, trimmed);
+}
+
+export type MistyFilePickerMode = "file" | "folder";
+
+export interface MistyFilePickerProps {
+  mode: MistyFilePickerMode;
+  /** Render only the picker panel when a parent owns the shared dialog shell. */
+  embedded?: boolean;
+  /** Whether this embedded panel is currently visible. */
+  active?: boolean;
+  multiple?: boolean;
+  title?: string;
+  initialPath?: string | null;
+  allowedExtensions?: string[];
+  /** Source switcher rendered in the header when this picker is hosted by MistyPicker. */
+  sourceToggle?: ReactNode;
+  onCancel: () => void;
+  onSelect: (path: string) => void;
+  onSelectMany?: (paths: string[]) => void;
 }

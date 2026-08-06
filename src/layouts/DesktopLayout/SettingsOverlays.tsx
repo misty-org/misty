@@ -1,10 +1,9 @@
-import type { CSSProperties } from "react";
 import SettingsWorkspace from "@/pages/Settings/desktop";
 import { ProvidersWorkspace } from "@/pages/Providers/desktop";
 import { ActivityFeed } from "./ActivityFeed";
 import { WorkspaceOverlay } from "./WorkspaceOverlay";
 
-type OverlayProps = { open: boolean; style: CSSProperties; onClose: () => void };
+type OverlayProps = { open: boolean; onClose: () => void };
 
 export function ActivityOverlay(props: OverlayProps) {
   return (

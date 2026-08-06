@@ -1,15 +1,11 @@
-import type { StateViewProps, StateTone, LoadingStateProps } from "@/models/types/ui/state-view";
-export type { StateViewProps, StateTone, LoadingStateProps } from "@/models/types/ui/state-view";
 import * as React from "react";
-
-import { Spinner } from "@/ui";
-import { cn } from "@/ui";
+import { Spinner, cn } from "@/ui";
 
 const toneClasses: Record<StateTone, string> = {
-  empty: "text-foreground",
-  error: "text-destructive",
-  permission: "text-amber-500",
-  loading: "text-foreground",
+  empty: "text-cream",
+  error: "text-cream-bright",
+  permission: "text-sage-fg",
+  loading: "text-cream",
 };
 
 /**
@@ -39,7 +35,7 @@ function StateView({
     >
       <h2 className={cn("text-sm font-semibold", toneClasses[tone])}>{title}</h2>
       {description ? (
-        <p className="mt-1.5 max-w-sm text-sm leading-5 text-muted-foreground">{description}</p>
+        <p className="mt-1.5 max-w-sm text-sm leading-5 text-cream-muted">{description}</p>
       ) : null}
       {action ? <div className="mt-5 flex items-center gap-2">{action}</div> : null}
     </div>
@@ -81,3 +77,17 @@ function LoadingState({ label = "Loading", title = "Loading", ...props }: Loadin
   );
 }
 export { EmptyState, ErrorState, LoadingState, PermissionState };
+
+export type StateViewProps = Omit<React.HTMLAttributes<HTMLDivElement>, "title"> & {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  compact?: boolean;
+};
+
+export type StateTone = "empty" | "error" | "permission" | "loading";
+
+export type LoadingStateProps = Omit<StateViewProps, "title"> & {
+  title?: React.ReactNode;
+  label?: string;
+};

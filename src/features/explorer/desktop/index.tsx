@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CSSProperties, PointerEvent, ReactNode } from "react";
+import type { PointerEvent, ReactNode } from "react";
 import { readText, writeHtml, writeImage, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/routing/paths";
@@ -377,14 +377,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       ),
     [homePath, library, mountRoot, pinnedPaths, sidebarRemotes, workspacePaths],
   );
-  const workspaceStyle = useMemo(
-    () =>
-      ({
-        "--explorer-sidebar-width": `${sidebarWidth}px`,
-        "--preview-width": `${previewWidth}px`,
-      }) as CSSProperties,
-    [previewWidth, sidebarWidth],
-  );
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
@@ -717,7 +709,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           explorerShellStyles.workspaceBase,
           !sidebarVisible && explorerShellStyles.workspaceCollapsed,
         )}
-        style={workspaceStyle}
       >
         <main ref={mainRef} className={explorerShellStyles.main}>
           <MultiPanelWorkspace
@@ -729,9 +720,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             showTabStrip={!props.embedded}
             showDefaultPaneControls={false}
             renderNavigationAside={explorerSidebar}
+            navigationAsideWidth={sidebarWidth}
             onNavigationAsideResizeStart={startSidebarResize}
             navigationAsideResizing={resizeTarget === "sidebar"}
             renderAside={inspector}
+            asideWidth={previewWidth}
             onAsideResizeStart={startPreviewResize}
             asideResizing={resizeTarget === "preview"}
             renderPane={renderPane}

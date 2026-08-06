@@ -120,10 +120,7 @@ export function ExplorerPluginTabMenu(props: {
           align="end"
           sideOffset={7}
           collisionPadding={12}
-          className={cx(
-            pluginTabMenuStyles.menu,
-            "max-h-[var(--radix-popover-content-available-height)]",
-          )}
+          className={cx(pluginTabMenuStyles.menu, "max-h-[min(24rem,calc(100dvh-2rem))]")}
           style={{
             width: `min(${selectedPluginId ? 600 : 360}px, calc(100vw - 24px))`,
             display: open ? undefined : "none",

@@ -28,7 +28,7 @@ export function ExtensionCatalogIcon({
   pluginName,
   logoSrc,
   className = "",
-  textClassName = "text-xs font-semibold text-white",
+  textClassName = "text-xs font-semibold text-cream-bright",
   roundedClassName = "rounded-xl",
   imageClassName = "h-[72%] w-[72%] object-contain",
   size,
@@ -48,7 +48,7 @@ export function ExtensionCatalogIcon({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center border border-white/8 bg-[#121416] ${roundedClassName} ${textClassName} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center border border-charcoal-border bg-charcoal-card ${roundedClassName} ${textClassName} ${className}`}
       data-plugin-icon={normalizedExtensionCatalogIconId(pluginId)}
       style={sizedStyle}
     >

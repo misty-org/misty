@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { settingsOverlayLayerClass, settingsOverlayPanelClass } from "./styles";
 
@@ -10,7 +10,6 @@ import { settingsOverlayLayerClass, settingsOverlayPanelClass } from "./styles";
  */
 export function WorkspaceOverlay(props: {
   open: boolean;
-  style: CSSProperties;
   ariaLabel: string;
   onClose: () => void;
   children: ReactNode;
@@ -32,7 +31,6 @@ export function WorkspaceOverlay(props: {
     <div
       data-slot="workspace-overlay"
       className={`app-pages-root ${settingsOverlayLayerClass}`}
-      style={props.style}
       role="presentation"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();

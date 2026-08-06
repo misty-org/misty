@@ -39,6 +39,8 @@ export interface SpaceChatMessageActionsOptions {
     fileNodeIds: string[],
   ) => Promise<unknown>;
   storeDeleteMessage: (spaceId: string, messageId: string) => Promise<unknown>;
+  /** Starts the typing indicator without waiting for the queued run event. */
+  onAgentRunsQueued: (runs: SpaceMessage["triggered_runs"]) => void;
   storeToggleReaction: (
     spaceId: string,
     messageId: string,
@@ -83,6 +85,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           state: run.state as NonNullable<SpaceMessage["triggered_runs"]>[number]["state"],
         }));
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
+        options.onAgentRunsQueued(response.message.triggered_runs);
         if (
           options.activeConversation?.origin === "discord" &&
           options.canPublishToDiscord(response.message)

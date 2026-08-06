@@ -69,9 +69,9 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
   };
 
   return (
-    <div className="shrink-0 bg-background px-[clamp(18px,4vw,56px)] pb-5 pt-2">
+    <div className="shrink-0 bg-charcoal-bg px-[clamp(18px,4vw,56px)] pb-5 pt-2">
       <form className="mx-auto max-w-4xl" onSubmit={props.onSubmit}>
-        <InputGroup className="misty-spaces-floating rounded-2xl border-border/65 bg-card/90 focus-within:-translate-y-px">
+        <InputGroup className="rounded-xl border border-charcoal-border bg-charcoal-card shadow-none">
           {draft.replyToMessageId ? (
             <ChatReplyBanner
               senderName={props.replyToSenderName}
@@ -135,7 +135,10 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
             }
           />
 
-          <InputGroupAddon align="block-end" className="min-h-11 border-t border-border/60 px-3">
+          <InputGroupAddon
+            align="block-end"
+            className="min-h-11 border-t border-charcoal-border/60 px-3"
+          >
             {props.canUploadAttachments || props.canBrowseLibrary ? (
               <InputGroupButton
                 variant="ghost"
@@ -161,7 +164,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               {draft.text.length}/{MAX_MESSAGE_LENGTH}
             </InputGroupText>
             <InputGroupButton
-              className="ml-2 rounded-lg"
+              className="ml-2 rounded-full bg-charcoal-active p-2 text-cream-bright transition-colors hover:bg-[#504942]"
               size="icon-sm"
               disabled={props.sending || draft.isEmpty}
               type="submit"

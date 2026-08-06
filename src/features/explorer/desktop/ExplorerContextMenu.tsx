@@ -393,7 +393,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
       title={item.disabled ? item.disabledReason : undefined}
       onSelect={() => item.onRun()}
     >
-      <span className="inline-flex w-[19px] items-center justify-center text-muted-foreground">
+      <span className="inline-flex w-[19px] items-center justify-center text-cream-muted">
         {item.icon}
       </span>
       <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -420,7 +420,7 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
             side="bottom"
             sideOffset={0}
             collisionPadding={8}
-            className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[250px] overflow-y-auto"
+            className="max-h-[min(560px,calc(100dvh-2rem))] w-[250px] overflow-y-auto"
             onPointerDown={(event) => event.stopPropagation()}
           >
             {menuEntries.map((item) =>
@@ -430,14 +430,14 @@ export const ExplorerContextMenu = memo(function ExplorerContextMenu() {
                     disabled={item.disabled}
                     title={item.disabled ? item.disabledReason : undefined}
                   >
-                    <span className="inline-flex w-[19px] items-center justify-center text-muted-foreground">
+                    <span className="inline-flex w-[19px] items-center justify-center text-cream-muted">
                       {item.icon}
                     </span>
                     <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                       {item.label}
                     </span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))] w-[246px] overflow-y-auto">
+                  <DropdownMenuSubContent className="max-h-[min(560px,calc(100dvh-2rem))] w-[246px] overflow-y-auto">
                     {item.items.map(renderLeaf)}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>

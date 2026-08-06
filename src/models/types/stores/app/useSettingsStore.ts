@@ -17,7 +17,6 @@ import type {
 } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
-import { settingsIndexToThemeMode, useAppThemeStore } from "@/stores/app";
 import { telemetryPreferencesChanged } from "@/analytics/lifecycle";
 
 import type {
@@ -29,7 +28,7 @@ import type {
   AdvancedPreferences,
   SearchMaintenancePreferences,
   SettingsStore,
-} from "@/models/interfaces/stores/app/useSettingsStore";
+} from "@/stores/app/useSettingsStore";
 
 export type SettingsSection =
   | "general"

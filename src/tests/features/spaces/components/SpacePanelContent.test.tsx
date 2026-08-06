@@ -48,7 +48,7 @@ describe("SpacePanelContent", () => {
     ).toBeNull();
     expect(container.querySelector("header")?.textContent).toBe("Design team");
     expect(container.querySelector('[aria-label^="Space menu"]')).toBeNull();
-    expect(container.querySelector("header > div")?.className).not.toContain("bg-sidebar-accent");
+    expect(container.querySelector("header > div")?.className).not.toContain("bg-charcoal-active");
     expect(container.querySelector("nav[aria-label='Space sections']")).not.toBeNull();
     expect(container.querySelector("nav[aria-label='Space management']")).not.toBeNull();
   });

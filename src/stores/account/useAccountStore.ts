@@ -321,7 +321,7 @@ function payloadDetail(payload: unknown): string {
   }
 }
 
-async function resolveAccountApiBase(): Promise<string> {
+export async function resolveAccountApiBase(): Promise<string> {
   const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
   const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
   const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);

@@ -66,7 +66,7 @@ export function PluginIcon(props: {
 }) {
   return (
     <span
-      className="grid shrink-0 place-items-center rounded-md bg-[var(--misty-surface-2)] text-[8px] font-bold text-white"
+      className="grid shrink-0 place-items-center rounded-md bg-charcoal-card text-[8px] font-bold text-cream-bright"
       style={{ width: Math.max(props.size + 4, 20), height: Math.max(props.size + 4, 20) }}
       aria-hidden="true"
     >

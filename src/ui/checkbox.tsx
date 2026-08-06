@@ -12,7 +12,7 @@ const Checkbox = React.forwardRef<
     ref={ref}
     data-slot="checkbox"
     className={cn(
-      "peer grid size-4 shrink-0 place-content-center rounded-[4px] border border-input bg-transparent shadow-xs outline-none transition-shadow focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+      "peer grid size-4 shrink-0 place-content-center rounded-[4px] border border-charcoal-border bg-transparent shadow-xs outline-none transition-shadow focus-visible:border-charcoal-active focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-charcoal-active data-[state=checked]:bg-charcoal-active data-[state=checked]:text-cream-bright",
       className,
     )}
     {...props}

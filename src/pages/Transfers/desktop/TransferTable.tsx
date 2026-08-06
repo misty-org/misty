@@ -1,33 +1,9 @@
-import type { TransferTableActions } from "@/models/types/pages/Transfers/desktop/TransferTable";
-export type { TransferTableActions } from "@/models/types/pages/Transfers/desktop/TransferTable";
-import { memo, useState } from "react";
-import type {
-  MouseEvent as ReactMouseEvent,
-  PointerEvent as ReactPointerEvent,
-  ReactNode,
-} from "react";
+import { EmptyState, StatusBadge, Button } from "@/ui";
+import { relativeTime, remoteSummary } from "@/pages/Transfers/transferUtils";
 import {
-  ChevronDown,
-  ChevronRight,
-  Pause,
-  Play,
-  RefreshCcw,
-  RotateCcw,
-  XCircle,
-} from "lucide-react";
-import type { TransferRecord } from "@/models/interfaces/services/misty-api";
-import { EmptyState } from "@/ui";
-import { IconButton } from "@/ui/icon-button";
-import { StatusBadge } from "@/ui";
-import { Button } from "@/ui";
-import { prettyLabel } from "@/lib/format";
-import type {
-  TransferSortDirection,
-  TransferSortKey,
-} from "@/models/types/stores/transfers/useTransfersStore";
-import { relativeTime, remoteSummary } from "../transferUtils";
-import { TransferRowActionsMenu, TransferRowContextMenu } from "./TransferMenus";
-import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
+  TransferRowActionsMenu,
+  TransferRowContextMenu,
+} from "@/pages/Transfers/desktop/TransferMenus";
 import {
   canPauseResumeTransfer,
   isTransferTableColumn,
@@ -39,14 +15,38 @@ import {
   transferStatusLabel,
   transferStatusTone,
   transferTime,
-} from "./transferModel";
+} from "@/pages/Transfers/desktop/transferModel";
+import { transferStyles } from "@/pages/Transfers/desktop/transferStyles";
+import {
+  memo,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Pause,
+  Play,
+  RefreshCcw,
+  RotateCcw,
+  XCircle,
+} from "lucide-react";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import { IconButton } from "@/ui/icon-button";
+import { prettyLabel } from "@/lib/format";
+import type {
+  TransferSortDirection,
+  TransferSortKey,
+} from "@/models/types/stores/transfers/useTransfersStore";
+import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
 import type {
   TransferColumnWidths,
   TransferSortableKey,
   TransferTableColumn,
   TransferTreeRow,
 } from "@/models/types/pages/Transfers/desktop/transferModel";
-import { transferStyles } from "./transferStyles";
 
 export function TransferHistoryTable(
   props: TransferTableActions & {
@@ -431,3 +431,12 @@ function SpacerRow(props: { height: number; colSpan: number }) {
     </tr>
   );
 }
+
+export type TransferTableActions = TransferActionHandlers & {
+  selectedCount: number;
+  hasTransfers: boolean;
+  historyWorking: boolean;
+  queueWorking: boolean;
+  isBatchPaused: (row: TransferRecord) => boolean;
+  isTransferPaused: (row: TransferRecord) => boolean;
+};

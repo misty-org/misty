@@ -78,7 +78,7 @@ export function NotionSourcesDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[560px] gap-0 p-0">
-        <DialogHeader className="border-b border-border px-5 py-4">
+        <DialogHeader className="border-b border-charcoal-border px-5 py-4">
           <DialogTitle className="text-[14px]">Notion sources</DialogTitle>
           <DialogDescription className="text-[12px]">
             Pick the pages and databases this Space reads as notes.
@@ -88,23 +88,23 @@ export function NotionSourcesDialog({
         <ScrollArea className="max-h-[50vh]">
           <div className="space-y-1 px-5 py-4">
             {loading ? (
-              <p className="m-0 flex items-center gap-2 text-sm text-muted-foreground">
+              <p className="m-0 flex items-center gap-2 text-sm text-cream-muted">
                 <LoaderCircle className="size-4 animate-spin" aria-hidden />
                 Loading your Notion workspace…
               </p>
             ) : error ? (
-              <p className="m-0 text-sm text-destructive" role="alert">
+              <p className="m-0 text-sm text-cream-bright" role="alert">
                 {error}
               </p>
             ) : !sources.length ? (
-              <p className="m-0 text-sm text-muted-foreground">
+              <p className="m-0 text-sm text-cream-muted">
                 Misty cannot see any Notion pages yet. Share a page or database with the Misty
                 integration in Notion, then reopen this dialog.
               </p>
             ) : (
               sources.map((source) => (
                 <label
-                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-muted/50"
+                  className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm hover:bg-charcoal-card"
                   key={source.id}
                 >
                   <Checkbox
@@ -113,15 +113,13 @@ export function NotionSourcesDialog({
                     aria-label={source.title}
                   />
                   {source.kind === "database" ? (
-                    <Database className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <Database className="size-4 shrink-0 text-cream-muted" aria-hidden />
                   ) : (
-                    <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <FileText className="size-4 shrink-0 text-cream-muted" aria-hidden />
                   )}
                   <span className="min-w-0 flex-1 truncate">{source.title}</span>
                   {source.parentTitle ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {source.parentTitle}
-                    </span>
+                    <span className="shrink-0 text-xs text-cream-muted">{source.parentTitle}</span>
                   ) : null}
                 </label>
               ))
@@ -129,7 +127,7 @@ export function NotionSourcesDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="border-t border-border px-5 py-3">
+        <DialogFooter className="border-t border-charcoal-border px-5 py-3">
           <Button variant="ghost" type="button" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

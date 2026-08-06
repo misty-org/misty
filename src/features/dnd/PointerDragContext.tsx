@@ -9,18 +9,6 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-
-import type {
-  PointerDragContextValue,
-  PointerDragPayload,
-  PointerDragState,
-  PointerDropZoneSpec,
-} from "@/models/interfaces/features/dnd/PointerDragContext";
-export type {
-  PointerDragPayload,
-  PointerDropZoneSpec,
-} from "@/models/interfaces/features/dnd/PointerDragContext";
-
 /**
  * Pointer-driven drag and drop for in-app payloads.
  *
@@ -205,4 +193,35 @@ function PointerDragPreview({ state }: { state: PointerDragState }) {
       {state.preview}
     </div>
   );
+}
+
+export interface PointerDragPayload {
+  kind: string;
+  id: string;
+  data?: unknown;
+}
+
+export interface PointerDropZoneSpec {
+  id: string;
+  accepts: (payload: PointerDragPayload) => boolean;
+  onDrop: (payload: PointerDragPayload, pointer: { x: number; y: number }) => void;
+}
+
+export interface PointerDragState {
+  payload: PointerDragPayload | null;
+  pointer: { x: number; y: number } | null;
+  activeZoneId: string;
+  preview: ReactNode;
+}
+
+export interface PointerDragContextValue {
+  state: PointerDragState;
+  /** Call from onPointerDown on the drag source. The drag arms and begins past a small threshold. */
+  startDrag: (
+    event: { clientX: number; clientY: number; button: number; isPrimary: boolean },
+    payload: PointerDragPayload,
+    preview?: ReactNode,
+  ) => void;
+  registerZone: (element: HTMLElement, spec: RefObject<PointerDropZoneSpec>) => () => void;
+  cancel: () => void;
 }

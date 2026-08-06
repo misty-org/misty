@@ -51,7 +51,7 @@ export function MistyPicker({
 
   const sourceToggle = libraryAvailable ? (
     <ToggleGroup
-      className="shrink-0 rounded-md bg-muted/60 p-0.5"
+      className="shrink-0 rounded-md bg-charcoal-card p-0.5"
       type="single"
       value={source}
       onValueChange={(value) => {
@@ -78,7 +78,7 @@ export function MistyPicker({
       }}
     >
       <DialogContent className={sharedPickerDialogClassName}>
-        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border px-5 py-3 pr-14 text-left">
+        <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-14 text-left">
           <div className="min-w-0">
             <DialogTitle className="text-base">
               {source === "library"

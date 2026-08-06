@@ -1,7 +1,3 @@
-import type { ClientDebugLevel } from "@/models/types/platform/clientDebug";
-export type { ClientDebugLevel } from "@/models/types/platform/clientDebug";
-import type { ClientDebugEvent } from "@/models/interfaces/platform/clientDebug";
-export type { ClientDebugEvent } from "@/models/interfaces/platform/clientDebug";
 const debugStorageKey = "misty.clientDebug.events.v1";
 const maxDebugEvents = 40;
 let installed = false;
@@ -98,4 +94,15 @@ function formatErrorDetail(error: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+export type ClientDebugLevel = "info" | "warn" | "error";
+
+export interface ClientDebugEvent {
+  id: string;
+  createdAt: string;
+  level: ClientDebugLevel;
+  scope: string;
+  message: string;
+  detail?: string;
 }

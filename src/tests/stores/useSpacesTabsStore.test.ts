@@ -67,6 +67,30 @@ describe("per-Space workspace tabs", () => {
     expect(store.addTab("account-1", "space-a", "extensions")).toBeNull();
   });
 
+  it("renames a File Manager tab and reports the stored title", () => {
+    const store = useSpacesTabsStore.getState();
+    store.ensureSession("account-1", "space-a");
+    const tabId = store.addTab("account-1", "space-a", "file-manager");
+
+    expect(store.renameTab("account-1", "space-a", tabId!, "  Photos  ")).toBe("Photos");
+    const session =
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
+    expect(session?.tabs.find((tab) => tab.id === tabId)?.title).toBe("Photos");
+  });
+
+  it("refuses renames that would be overwritten or are empty", () => {
+    const store = useSpacesTabsStore.getState();
+    store.ensureSession("account-1", "space-a");
+    const spaceTab =
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")]?.tabs[0];
+    const fileTab = store.addTab("account-1", "space-a", "file-manager");
+
+    // A Space tab's title comes from its route, so a rename could not survive.
+    expect(store.renameTab("account-1", "space-a", spaceTab!.id, "Anything")).toBe("");
+    expect(store.renameTab("account-1", "space-a", fileTab!, "   ")).toBe("");
+    expect(store.renameTab("account-1", "space-a", "missing-tab", "Photos")).toBe("");
+  });
+
   it("prunes inaccessible Spaces without touching another account", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");

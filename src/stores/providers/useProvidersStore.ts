@@ -1,20 +1,5 @@
-import type { ProvidersSet } from "@/models/types/stores/providers/useProvidersStore";
-export type { ProvidersSet } from "@/models/types/stores/providers/useProvidersStore";
-import type {
-  ProviderConnectionSession,
-  ProvidersWorkspaceState,
-  CachedRemoteDraft,
-  ProvidersStore,
-} from "@/models/interfaces/stores/providers/useProvidersStore";
-export type {
-  ProviderConnectionSession,
-  ProvidersWorkspaceState,
-  CachedRemoteDraft,
-  ProvidersStore,
-} from "@/models/interfaces/stores/providers/useProvidersStore";
-import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
 import {
+  providersConfigureRemote,
   providersConfigPaths,
   providersDisconnectRemote,
   providersRefresh,
@@ -24,6 +9,14 @@ import {
   providersSnapshot,
   providersTestRemote,
 } from "@/stores/backend";
+import type {
+  ProviderConnectionSession,
+  ProvidersWorkspaceState,
+  CachedRemoteDraft,
+  ProvidersStore,
+} from "@/models/interfaces/stores/providers/useProvidersStore";
+import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
 import { accountFetchMe } from "@/stores/account/useAccountStore";
 import type { AccountMeResponse } from "@/models/interfaces/stores/account/useAccountStore";
 import type { ProviderConfigMode } from "@/models/types/services/misty-api";
@@ -1171,3 +1164,7 @@ function validateConnectionSession(
   );
   return missing ? `${missing.label || missing.name} is required.` : null;
 }
+
+export type ProvidersSet = (
+  partial: Partial<ProvidersStore> | ((state: ProvidersStore) => Partial<ProvidersStore>),
+) => void;

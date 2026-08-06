@@ -1,5 +1,3 @@
-import type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
-export type { TransferProfileRecord } from "@/models/interfaces/pages/Settings/transferProfiles";
 import type { TransferProfileOptions } from "@/models/interfaces/services/misty-api";
 
 export const BUILT_IN_TRANSFER_PROFILE_IDS = new Set([
@@ -85,4 +83,16 @@ function fallbackTransferProfile(): TransferProfileRecord {
     checksum: false,
     builtIn: true,
   };
+}
+
+export interface TransferProfileRecord {
+  id: string;
+  name: string;
+  transfers: number;
+  checkers: number;
+  bandwidthLimit: string;
+  retries: number;
+  lowLevelRetries: number;
+  checksum: boolean;
+  builtIn: boolean;
 }

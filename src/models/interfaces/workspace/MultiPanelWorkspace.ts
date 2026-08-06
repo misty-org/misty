@@ -18,9 +18,11 @@ export interface MultiPanelWorkspaceProps {
   showDefaultPaneControls?: boolean;
   renderContextHeader?: (tab: MultiPanelTab) => ReactNode;
   renderNavigationAside?: ReactNode;
+  navigationAsideWidth?: number;
   onNavigationAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
   navigationAsideResizing?: boolean;
   renderAside?: ReactNode;
+  asideWidth?: number;
   onAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
   asideResizing?: boolean;
   canCloseTab?: (tab: MultiPanelTab) => boolean;

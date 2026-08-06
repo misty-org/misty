@@ -29,7 +29,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     data-inset={inset}
     data-variant={variant}
     className={cn(
-      "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-8 data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream not-data-[variant=destructive]:focus:**:text-cream data-inset:pl-8 data-open:bg-charcoal-hover data-open:text-cream [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}
@@ -48,7 +48,7 @@ const DropdownMenuSubContent = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-sub-content"
     className={cn(
-      "relative z-[var(--misty-layer-menu)] min-w-[96px] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-hidden rounded-md bg-popover/70 p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 animate-none! **:data-[slot$=-item]:focus:bg-foreground/10 **:data-[slot$=-item]:data-highlighted:bg-foreground/10 **:data-[slot$=-separator]:bg-foreground/5 **:data-[slot$=-trigger]:focus:bg-foreground/10 **:data-[slot$=-trigger]:aria-expanded:bg-foreground/10! **:data-[variant=destructive]:focus:bg-foreground/10! **:data-[variant=destructive]:text-accent-foreground! **:data-[variant=destructive]:**:text-accent-foreground!",
+      "relative z-[2147483400] min-w-[96px] origin-center overflow-hidden rounded-md bg-charcoal-card p-1 text-cream shadow-lg ring-1 ring-cream/10 duration-100 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 animate-none! **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
       className,
     )}
     {...props}
@@ -67,7 +67,7 @@ const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       align={align}
       className={cn(
-        "relative z-[var(--misty-layer-menu)] max-h-[var(--radix-dropdown-menu-content-available-height)] w-[var(--radix-dropdown-menu-trigger-width)] min-w-32 origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-md bg-popover/70 p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] before:backdrop-blur-2xl before:backdrop-saturate-150 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 animate-none! **:data-[slot$=-item]:focus:bg-foreground/10 **:data-[slot$=-item]:data-highlighted:bg-foreground/10 **:data-[slot$=-separator]:bg-foreground/5 **:data-[slot$=-trigger]:focus:bg-foreground/10 **:data-[slot$=-trigger]:aria-expanded:bg-foreground/10! **:data-[variant=destructive]:focus:bg-foreground/10! **:data-[variant=destructive]:text-accent-foreground! **:data-[variant=destructive]:**:text-accent-foreground!",
+        "relative z-[2147483400] max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32 origin-center overflow-x-hidden overflow-y-auto rounded-md bg-charcoal-card p-1 text-cream shadow-md ring-1 ring-cream/10 duration-100 before:pointer-events-none before:absolute before:inset-0 before:-z-1 before:rounded-[inherit] data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 animate-none! **:data-[slot$=-item]:focus:bg-charcoal-hover **:data-[slot$=-item]:data-highlighted:bg-charcoal-hover **:data-[slot$=-separator]:bg-charcoal-hover **:data-[slot$=-trigger]:focus:bg-charcoal-hover **:data-[slot$=-trigger]:aria-expanded:bg-charcoal-hover! **:data-[variant=destructive]:focus:bg-charcoal-hover! **:data-[variant=destructive]:text-cream! **:data-[variant=destructive]:**:text-cream!",
         className,
       )}
       {...props}
@@ -89,7 +89,7 @@ const DropdownMenuItem = React.forwardRef<
     data-inset={inset}
     data-variant={variant}
     className={cn(
-      "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+      "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream not-data-[variant=destructive]:focus:**:text-cream data-inset:pl-8 data-[variant=destructive]:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-[variant=destructive]:focus:text-cream-bright data-[variant=destructive]:focus:bg-charcoal-active data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-cream-bright",
       className,
     )}
     {...props}
@@ -108,7 +108,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     data-slot="dropdown-menu-checkbox-item"
     data-inset={inset}
     className={cn(
-      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream focus:**:text-cream data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     checked={checked}
@@ -138,7 +138,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     data-slot="dropdown-menu-radio-item"
     data-inset={inset}
     className={cn(
-      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-hidden select-none focus:bg-charcoal-hover focus:text-cream focus:**:text-cream data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
     {...props}
@@ -166,10 +166,7 @@ const DropdownMenuLabel = React.forwardRef<
     ref={ref}
     data-slot="dropdown-menu-label"
     data-inset={inset}
-    className={cn(
-      "px-2 py-1.5 text-xs font-medium text-muted-foreground data-inset:pl-8",
-      className,
-    )}
+    className={cn("px-2 py-1.5 text-xs font-medium text-cream-muted data-inset:pl-8", className)}
     {...props}
   />
 ));
@@ -182,7 +179,7 @@ const DropdownMenuSeparator = React.forwardRef<
   <DropdownMenuPrimitive.Separator
     ref={ref}
     data-slot="dropdown-menu-separator"
-    className={cn("-mx-1 my-1 h-px bg-border", className)}
+    className={cn("-mx-1 my-1 h-px bg-charcoal-border", className)}
     {...props}
   />
 ));
@@ -193,7 +190,7 @@ const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTML
     <span
       data-slot="dropdown-menu-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground",
+        "ml-auto text-xs tracking-widest text-cream-muted group-focus/dropdown-menu-item:text-cream",
         className,
       )}
       {...props}

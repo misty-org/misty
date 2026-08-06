@@ -1,5 +1,3 @@
-import type { PhotoEditorProps } from "@/models/interfaces/features/editor/PhotoEditor";
-export type { PhotoEditorProps } from "@/models/interfaces/features/editor/PhotoEditor";
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
 import type { FilerobotImageEditorConfig } from "react-filerobot-image-editor";
@@ -40,55 +38,55 @@ const CopyIcon: FunctionComponent = () => <Copy size={16} />;
 // @scaleflex/ui's ThemeOverride uses a fixed key set we only partly fill.
 const filerobotTheme = {
   palette: {
-    "bg-grey": "#1a1c22",
-    "bg-stateless": "#111216",
-    "bg-active": "#20232a",
-    "bg-base-light": "#20232a",
-    "bg-base-medium": "#2a2d34",
-    "bg-primary": "#0b0c0f",
-    "bg-primary-light": "#111216",
-    "bg-primary-hover": "#15171c",
-    "bg-primary-active": "#1a1c22",
-    "bg-primary-0-5-opacity": "rgba(11, 12, 15, 0.5)",
-    "bg-primary-stateless": "#2a2d34",
-    "bg-secondary": "#111216",
-    "bg-hover": "#1a1c22",
-    "txt-primary": "#f3f5f7",
-    "txt-secondary": "#c7cdd3",
-    "txt-secondary-invert": "#0b0c0f",
-    "txt-placeholder": "#7d848d",
-    "accent-primary": "#e7edf3",
-    "accent-primary-hover": "#ffffff",
-    "accent-primary-active": "#ffffff",
-    "accent-primary-disabled": "#2a2d34",
-    "accent-secondary-disabled": "#15171c",
-    "accent-stateless": "#e7edf3",
-    "accent-stateless_0_4_opacity": "rgba(231, 237, 243, 0.4)",
-    accent_0_5_opacity: "rgba(231, 237, 243, 0.05)",
-    accent_1_2_opacity: "rgba(231, 237, 243, 0.12)",
-    "icons-primary": "#f3f5f7",
-    "icons-secondary": "#c7cdd3",
-    "icons-placeholder": "#7d848d",
-    "icons-invert": "#0b0c0f",
-    "icons-muted": "#7d848d",
-    "icons-primary-hover": "#ffffff",
-    "icons-secondary-hover": "#f3f5f7",
-    "borders-primary": "#2a2d34",
-    "borders-primary-hover": "#3a3d44",
-    "borders-secondary": "#20232a",
-    "borders-strong": "#3a3d44",
-    "borders-disabled": "#2a2d34",
-    "borders-button": "#3a3d44",
-    "borders-item": "#20232a",
-    "btn-primary-text": "#17191c",
-    "btn-disabled-text": "#7d848d",
-    "btn-secondary-text": "#f3f5f7",
-    "link-primary": "#c7cdd3",
-    "link-stateless": "#c7cdd3",
-    "link-hover": "#ffffff",
-    "link-active": "#ffffff",
-    "link-pressed": "#ffffff",
-    "link-muted": "#7d848d",
+    "bg-grey": "#1A1918",
+    "bg-stateless": "#141312",
+    "bg-active": "#443E38",
+    "bg-base-light": "#1A1918",
+    "bg-base-medium": "#2E2B29",
+    "bg-primary": "#100F0E",
+    "bg-primary-light": "#171615",
+    "bg-primary-hover": "#2E2B29",
+    "bg-primary-active": "#443E38",
+    "bg-primary-0-5-opacity": "#100F0E",
+    "bg-primary-stateless": "#1A1918",
+    "bg-secondary": "#171615",
+    "bg-hover": "#2E2B29",
+    "txt-primary": "#E6E1DA",
+    "txt-secondary": "#948D84",
+    "txt-secondary-invert": "#141312",
+    "txt-placeholder": "#948D84",
+    "accent-primary": "#A3BFAB",
+    "accent-primary-hover": "#E6E1DA",
+    "accent-primary-active": "#F5F2ED",
+    "accent-primary-disabled": "#443E38",
+    "accent-secondary-disabled": "#2E2B29",
+    "accent-stateless": "#A3BFAB",
+    "accent-stateless_0_4_opacity": "#52825A",
+    accent_0_5_opacity: "#28312B",
+    accent_1_2_opacity: "#28312B",
+    "icons-primary": "#E6E1DA",
+    "icons-secondary": "#948D84",
+    "icons-placeholder": "#948D84",
+    "icons-invert": "#141312",
+    "icons-muted": "#948D84",
+    "icons-primary-hover": "#F5F2ED",
+    "icons-secondary-hover": "#E6E1DA",
+    "borders-primary": "#292624",
+    "borders-primary-hover": "#443E38",
+    "borders-secondary": "#292624",
+    "borders-strong": "#443E38",
+    "borders-disabled": "#292624",
+    "borders-button": "#443E38",
+    "borders-item": "#292624",
+    "btn-primary-text": "#141312",
+    "btn-disabled-text": "#948D84",
+    "btn-secondary-text": "#E6E1DA",
+    "link-primary": "#A3BFAB",
+    "link-stateless": "#A3BFAB",
+    "link-hover": "#E6E1DA",
+    "link-active": "#F5F2ED",
+    "link-pressed": "#F5F2ED",
+    "link-muted": "#948D84",
   },
   typography: { fontFamily: "inherit" },
 } as FilerobotImageEditorConfig["theme"];
@@ -128,7 +126,7 @@ async function renderedToBlob(image: RenderedImage, mimeType: string): Promise<B
 function EditorShell(props: { name: string; children: ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-[2147483300] bg-[#0b0c0f]"
+      className="fixed inset-0 z-[2147483300] bg-charcoal-workspace"
       role="dialog"
       aria-modal="true"
       aria-label={`Edit ${props.name}`}
@@ -141,10 +139,10 @@ function EditorShell(props: { name: string; children: ReactNode }) {
 function EditorStatus(props: { name: string; error?: string; onClose: () => void }) {
   return (
     <EditorShell name={props.name}>
-      <div className="grid h-full place-items-center text-sm text-white/60">
+      <div className="grid h-full place-items-center text-sm text-cream-bright/60">
         <div className="grid justify-items-center gap-3">
           {props.error ? (
-            <p className="max-w-sm text-center text-red-200">{props.error}</p>
+            <p className="max-w-sm text-center text-cream-bright">{props.error}</p>
           ) : (
             <>
               <Loader2 className="animate-spin" size={28} />
@@ -155,7 +153,7 @@ function EditorStatus(props: { name: string; error?: string; onClose: () => void
             type="button"
             variant="ghost"
             size="icon"
-            className="mt-2 size-10 rounded-xl bg-white/[0.08] text-white/60 hover:bg-white/15 hover:text-white"
+            className="mt-2 size-10 rounded-xl bg-charcoal-active text-cream-bright/60 hover:bg-charcoal-active hover:text-cream-bright"
             aria-label="Close editor"
             onClick={props.onClose}
           >
@@ -198,7 +196,7 @@ export function PhotoEditor(props: PhotoEditorProps) {
     <EditorShell name={props.name}>
       <Suspense
         fallback={
-          <div className="grid h-full place-items-center text-white/60">
+          <div className="grid h-full place-items-center text-cream-bright/60">
             <Loader2 className="animate-spin" size={28} />
           </div>
         }
@@ -206,7 +204,7 @@ export function PhotoEditor(props: PhotoEditorProps) {
         <FilerobotImageEditor
           key={props.sourceKey}
           source={props.url}
-          backgroundColor="#0b0c0f"
+          backgroundColor="#100F0E"
           theme={filerobotTheme}
           tabsIds={filerobotTabs}
           defaultTabId={TAB.ADJUST}
@@ -239,7 +237,7 @@ export function PhotoEditor(props: PhotoEditorProps) {
       </Suspense>
       {saveError ? (
         <p
-          className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-red-500/15 px-3 py-2 text-xs text-red-200"
+          className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
           role="status"
         >
           {saveError}
@@ -247,4 +245,27 @@ export function PhotoEditor(props: PhotoEditorProps) {
       ) : null}
     </EditorShell>
   );
+}
+
+export interface PhotoEditorProps {
+  /** Remounts the editor when the underlying image changes. */
+  sourceKey: string;
+  /** File/display name, used for the default saved-image name. */
+  name: string;
+  /** Object URL (blob:/asset:) for the image to edit. */
+  url: string;
+  indexLabel?: string;
+  tags?: string[];
+  /** Preferred output MIME type; defaults to image/png. */
+  outputMimeType?: string;
+  loading?: boolean;
+  error?: string;
+  /** When true, the editor is view-only and both save actions are hidden. */
+  readonly?: boolean;
+  onClose: () => void;
+  onCancel?: () => void;
+  /** Save over the original. Receives the client-rendered image. */
+  onSave: (rendered: Blob) => void | Promise<void>;
+  /** Save the client-rendered image as a new copy. */
+  onSaveAsCopy: (rendered: Blob) => void | Promise<void>;
 }
