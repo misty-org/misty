@@ -38,6 +38,7 @@ export function RoadmapInspector(props: {
   onDirty: () => void;
   onUpdateRoadmap: (value: SpaceRoadmapSnapshot["roadmap"]) => void;
   onArchiveRoadmap: () => void;
+  compact?: boolean;
 }) {
   const selectedRoadmap =
     props.selectedId === props.snapshot.roadmap.id ? props.snapshot.roadmap : undefined;
@@ -46,13 +47,19 @@ export function RoadmapInspector(props: {
   const selectedNode = props.snapshot.nodes.find((item) => item.id === props.selectedId);
   const selectedEdge = props.snapshot.edges.find((item) => item.id === props.selectedId);
   if (!selectedRoadmap && !selectedGoal && !selectedMilestone && !selectedNode && !selectedEdge)
-    return (
+    return props.compact ? null : (
       <aside className="grid h-full place-items-center border-t border-border/70 p-5 text-center text-xs text-muted-foreground xl:border-l xl:border-t-0">
         <span>Select a milestone, goal, planning node, or connection to inspect it.</span>
       </aside>
     );
   return (
-    <aside className="min-h-0 overflow-auto border-t border-border/70 bg-background p-4 xl:border-l xl:border-t-0">
+    <aside
+      className={
+        props.compact
+          ? "min-h-0 overflow-auto bg-popover p-4 text-popover-foreground"
+          : "min-h-0 overflow-auto border-t border-border/70 bg-background p-4 xl:border-l xl:border-t-0"
+      }
+    >
       {selectedRoadmap ? (
         <RoadmapForm
           roadmap={selectedRoadmap}
@@ -218,7 +225,7 @@ function EdgeForm({
   );
 }
 
-function MilestoneForm({
+export function MilestoneForm({
   milestone,
   canManage,
   onSave,
@@ -284,7 +291,7 @@ function MilestoneForm({
   );
 }
 
-function GoalForm({
+export function GoalForm({
   goal,
   tasks,
   canManage,
@@ -302,6 +309,7 @@ function GoalForm({
   onDirty: () => void;
 }) {
   const [draft, setDraft] = useState(goal);
+  useEffect(() => setDraft(goal), [goal]);
   const autosave = useRoadmapAutosave(draft, (value) => onSave(value), onDirty);
   const linked = new Set(goal.tasks.map((task) => task.id));
   return (

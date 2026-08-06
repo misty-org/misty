@@ -15,7 +15,6 @@ import { SpaceLibrary } from "./SpaceLibrary";
 import { SpacePlanner } from "./SpacePlanner";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
-import { isMistySpace } from "./mistySpace";
 
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
@@ -118,7 +117,7 @@ export function SpaceDetail() {
         />
       );
     }
-    if (plannerPart === "agenda" && !["month", "week", "list"].includes(routeParts[4] ?? "")) {
+    if (plannerPart === "agenda" && !["month", "week", "day"].includes(routeParts[4] ?? "")) {
       return (
         <Navigate
           to={`/spaces/${encodeURIComponent(spaceId)}/planner/agenda/month${location.search}${location.hash}`}
@@ -126,7 +125,7 @@ export function SpaceDetail() {
         />
       );
     }
-    if (!["tasks", "agenda", "roadmaps"].includes(plannerPart)) {
+    if (!["tasks", "agenda", "goals", "milestones", "roadmaps"].includes(plannerPart)) {
       return (
         <Navigate
           to={`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board${location.search}${location.hash}`}
@@ -195,7 +194,7 @@ export function SpaceDetail() {
   }
 
   if (!space && spaces.length > 0) {
-    const fallback = spaces.find(isMistySpace) ?? spaces[0];
+    const fallback = spaces[0];
     return <Navigate to={defaultJournalPath(fallback.id)} replace />;
   }
 
@@ -207,13 +206,6 @@ export function SpaceDetail() {
         description="This Space may have been removed, or you may no longer have access."
       />
     );
-  }
-
-  if (isMistySpace(space) && section !== "chat") {
-    const conversation = space.support_conversation_id
-      ? `?conversation=${encodeURIComponent(space.support_conversation_id)}`
-      : "";
-    return <Navigate to={`/spaces/${encodeURIComponent(space.id)}/chat${conversation}`} replace />;
   }
 
   return (

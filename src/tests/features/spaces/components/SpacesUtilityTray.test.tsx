@@ -39,6 +39,20 @@ describe("SpacesUtilityTray", () => {
     expect(
       container.querySelector('[aria-label="Open File Manager"] .lucide-folder-open'),
     ).not.toBeNull();
+    expect(container.querySelector('[aria-label="Open Extensions"] .lucide-blocks')).not.toBeNull();
     expect(container.querySelector('[aria-label*="terminal" i]')).toBeNull();
+  });
+
+  it("opens Agents from the utility tray", async () => {
+    const onOpenTool = vi.fn();
+    await act(async () => root.render(<SpacesUtilityTray onOpenTool={onOpenTool} />));
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Open Agents"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onOpenTool).toHaveBeenCalledWith("agents");
   });
 });

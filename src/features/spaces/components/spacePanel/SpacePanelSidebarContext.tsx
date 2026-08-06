@@ -11,7 +11,7 @@ import { SpaceSidebarLink } from "./SpaceSidebarLink";
 
 export interface SpacePanelSidebarContextProps {
   section: string;
-  plannerSection: "tasks" | "agenda" | "roadmaps";
+  plannerSection: "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
   roadmapId: string;
   activeSpaceId: string;
   activeSpaceName: string;
@@ -21,7 +21,6 @@ export interface SpacePanelSidebarContextProps {
   activeConversationId: string | null;
   currentUserId: string | undefined;
   activeDrawingId: string;
-  supportOnly?: boolean;
   onCreateConversation?: () => void;
   onEditConversation?: (conversation: SpaceConversation) => void;
 }
@@ -42,7 +41,6 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           conversations={props.conversations}
           activeConversationId={props.activeConversationId}
           currentUserId={props.currentUserId}
-          supportOnly={props.supportOnly}
           onCreateConversation={props.onCreateConversation}
           onEditConversation={props.onEditConversation}
         />

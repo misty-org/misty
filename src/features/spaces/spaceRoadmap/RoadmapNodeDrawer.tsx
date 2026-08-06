@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { GripVertical, PanelLeftClose, Pin, Search, Settings2, X } from "lucide-react";
+import { GripVertical, Search, Settings2, X } from "lucide-react";
 import type { SpaceRoadmapNodeDefinition } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
 import { Button, Input, cn } from "@/ui";
 import { RoadmapNodeDefinitionManager } from "./RoadmapNodeDefinitionManager";
@@ -8,11 +8,9 @@ import { roadmapNodeColors, roadmapPalette, type RoadmapPaletteItem } from "./ro
 const categories: RoadmapPaletteItem["category"][] = ["Structure", "Planning", "Context", "Custom"];
 export function RoadmapNodeDrawer(props: {
   open: boolean;
-  pinned: boolean;
   canManage: boolean;
   definitions: SpaceRoadmapNodeDefinition[];
   onClose: () => void;
-  onPinnedChange: (value: boolean) => void;
   onAdd: (item: RoadmapPaletteItem) => void;
   onCreateDefinition: (value: Partial<SpaceRoadmapNodeDefinition>) => Promise<void>;
   onUpdateDefinition: (value: SpaceRoadmapNodeDefinition) => Promise<void>;
@@ -31,34 +29,19 @@ export function RoadmapNodeDrawer(props: {
   return (
     <aside
       className={cn(
-        "absolute bottom-3 left-3 top-3 z-20 flex w-64 flex-col overflow-hidden rounded-xl",
-        "border border-border/70 bg-background/95 shadow-xl backdrop-blur",
-        props.pinned &&
-          cn(
-            "xl:relative xl:bottom-auto xl:left-auto xl:top-auto xl:z-auto xl:h-full xl:w-64",
-            "xl:shrink-0 xl:rounded-none xl:border-y-0 xl:border-l-0 xl:shadow-none",
-          ),
+        "relative z-auto flex h-full w-64 shrink-0 flex-col overflow-hidden",
+        "border-r border-border/70 bg-background/95 backdrop-blur",
       )}
       aria-label="Roadmap node library"
     >
       <header className="flex h-11 items-center gap-2 border-b border-border/60 px-3">
-        <strong className="text-xs">Add node</strong>
+        <strong className="text-xs">Node tools</strong>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="ml-auto size-7 hidden xl:grid"
-          aria-label={props.pinned ? "Unpin node library" : "Pin node library"}
-          onClick={() => props.onPinnedChange(!props.pinned)}
-        >
-          {props.pinned ? <PanelLeftClose className="size-3.5" /> : <Pin className="size-3.5" />}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          aria-label="Close node library"
+          className="ml-auto size-7"
+          aria-label="Hide node tools"
           onClick={props.onClose}
         >
           <X className="size-3.5" />

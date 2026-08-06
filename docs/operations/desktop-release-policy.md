@@ -51,5 +51,18 @@ unredacted incident details.
    forward-fix version; direct reinstall of a previous signed version is an
    owner-assisted recovery path and must preserve user data.
 
+Agent membership releases are coordinated minimum-version releases. Back up
+PostgreSQL and complete a migration dry run first; do not enable the new client
+until every Space and device capability contract passes against the target
+server. The removed private-session histories are intentionally not restored
+by a client rollback.
+
+Action suggestions ship after that foundation in a second guarded release.
+Deploy the database and server support dark, then the minimum-version desktop,
+then expose the owner opt-in. Existing Spaces remain off. Operators must retain
+a server kill switch and verify the synthetic precision/privacy corpus before
+enabling detection; disabling it must stop new jobs without affecting ordinary
+Conversations or already-created resources.
+
 Windows Authenticode signing is deferred for the early beta. Until it is added,
 users may see a Microsoft Defender SmartScreen warning when installing Misty.

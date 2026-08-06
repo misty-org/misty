@@ -2,19 +2,17 @@ import { useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
-import { isMistySpace } from "../mistySpace";
-import { useAppRouteMemoryStore } from "@/stores/app/useAppRouteMemoryStore";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { defaultSpaceRoute } from "@/stores/spaces/useSpacesTabsStore";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpacePageLoadingPlaceholder } from "../components/SpacesLoadingPlaceholder";
 import type { SpacesShellOutletContext } from "./outletContext";
+import { preferredMistySpace } from "../mistySpace";
 
 /** Redirects /spaces into remembered work, preferring Misty when no route is remembered. */
 export function SpacesIndexRedirect() {
   const navigate = useNavigate();
   const { openCreateSpaceDialog } = useOutletContext<SpacesShellOutletContext>();
-  const lastSpacesRoute = useAppRouteMemoryStore((state) => state.lastSpacesRoute);
   const { spaces, loading, error, snapshotReady, load } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
@@ -24,7 +22,7 @@ export function SpacesIndexRedirect() {
       load: state.load,
     })),
   );
-  const destination = resolveSpacesLandingRoute(spaces, lastSpacesRoute);
+  const destination = resolveSpacesLandingRoute(spaces);
 
   useEffect(() => {
     if (!destination) return;
@@ -61,26 +59,7 @@ export function SpacesIndexRedirect() {
   );
 }
 
-export function resolveSpacesLandingRoute(spaces: Space[], lastSpacesRoute: string): string | null {
-  const rememberedSpaceId = spaceIdFromRoute(lastSpacesRoute);
-  const rememberedSpace = spaces.find((space) => space.id === rememberedSpaceId);
-  if (
-    rememberedSpace &&
-    lastSpacesRoute.startsWith(`/spaces/${encodeURIComponent(rememberedSpace.id)}/`)
-  ) {
-    return lastSpacesRoute;
-  }
-
-  const fallback = spaces.find(isMistySpace) ?? spaces[0];
+export function resolveSpacesLandingRoute(spaces: Space[]): string | null {
+  const fallback = preferredMistySpace(spaces);
   return fallback ? defaultSpaceRoute(fallback.id) : null;
-}
-
-function spaceIdFromRoute(route: string): string {
-  try {
-    const parsed = new URL(route, "https://misty.local");
-    const parts = parsed.pathname.split("/").filter(Boolean);
-    return parts[0] === "spaces" && parts[1] ? decodeURIComponent(parts[1]) : "";
-  } catch {
-    return "";
-  }
 }

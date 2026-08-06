@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChromeTabStrip } from "@/features/workspace/ChromeTabStrip";
+import { ChromeTabStrip, workspaceTabDropIndex } from "@/features/workspace/ChromeTabStrip";
 
 describe("ChromeTabStrip", () => {
   let container: HTMLDivElement;
@@ -74,5 +74,31 @@ describe("ChromeTabStrip", () => {
       expect.objectContaining({ id: "tab-1", path: "/Users/Misty" }),
     );
     expect(onSelectTab).not.toHaveBeenCalled();
+  });
+
+  it("marks tabs as Tauri-safe drag sources when reordering is enabled", () => {
+    act(() => {
+      root.render(
+        <ChromeTabStrip
+          tabs={[{ id: "tab-1", title: "Home", path: "/", paneId: "pane-1" }]}
+          activeTabId="tab-1"
+          onAddTab={vi.fn()}
+          onCloseTab={vi.fn()}
+          onReorderTab={vi.fn()}
+          onSelectTab={vi.fn()}
+        />,
+      );
+    });
+
+    const tab = container.querySelector<HTMLElement>('.chrome-tab[data-tab-id="tab-1"]');
+    expect(tab?.getAttribute("draggable")).toBe("true");
+    expect(tab?.dataset.reorderDragSource).toBe("true");
+    expect(tab?.dataset.mistyWindowDragBlock).toBe("true");
+  });
+
+  it("calculates final insertion indexes before and after a hovered tab", () => {
+    expect(workspaceTabDropIndex(["a", "b", "c"], "a", "c", false)).toBe(1);
+    expect(workspaceTabDropIndex(["a", "b", "c"], "a", "c", true)).toBe(2);
+    expect(workspaceTabDropIndex(["a", "b", "c"], "c", "a", false)).toBe(0);
   });
 });

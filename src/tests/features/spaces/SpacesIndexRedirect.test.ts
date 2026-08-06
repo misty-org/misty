@@ -4,31 +4,39 @@ import type { Space } from "@/models/interfaces/features/spaces/types";
 import { defaultSpaceRoute } from "@/stores/spaces/useSpacesTabsStore";
 
 describe("Spaces landing route", () => {
-  it("keeps a remembered Space route when the Misty guide Space is unavailable", () => {
-    const space = spaceFixture({ id: "team-space" });
+  it("opens Misty instead of a previously remembered Space", () => {
+    const teamSpace = spaceFixture({ id: "team-space", name: "Family" });
+    const mistySpace = spaceFixture({ id: "misty-space", name: "Misty" });
 
-    expect(resolveSpacesLandingRoute([space], "/spaces/team-space/planner/tasks/board")).toBe(
-      "/spaces/team-space/planner/tasks/board",
+    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(
+      defaultSpaceRoute("misty-space"),
     );
   });
 
   it("opens the first available Space while Misty provisioning catches up", () => {
     const space = spaceFixture({ id: "team-space" });
 
-    expect(resolveSpacesLandingRoute([space], "/spaces/missing/chat")).toBe(
-      defaultSpaceRoute("team-space"),
+    expect(resolveSpacesLandingRoute([space])).toBe(defaultSpaceRoute("team-space"));
+  });
+
+  it("uses Misty when there is no active or remembered Space", () => {
+    const teamSpace = spaceFixture({ id: "team-space" });
+    const mistySpace = spaceFixture({ id: "misty", kind: "standard" });
+
+    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(defaultSpaceRoute("misty"));
+  });
+
+  it("recognizes the Misty home Space even when its id is server-generated", () => {
+    const teamSpace = spaceFixture({ id: "team-space", name: "Family" });
+    const mistySpace = spaceFixture({ id: "space-home", name: "Misty" });
+
+    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(
+      defaultSpaceRoute("space-home"),
     );
   });
 
-  it("prefers the permanent Misty guide Space when there is no usable memory", () => {
-    const teamSpace = spaceFixture({ id: "team-space" });
-    const mistySpace = spaceFixture({ id: "misty", kind: "misty" });
-
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace], "")).toBe(defaultSpaceRoute("misty"));
-  });
-
   it("leaves an empty account on the first-Space screen", () => {
-    expect(resolveSpacesLandingRoute([], "")).toBeNull();
+    expect(resolveSpacesLandingRoute([])).toBeNull();
   });
 });
 

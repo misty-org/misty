@@ -1,6 +1,6 @@
 import type { SpaceAgendaEntry } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
 
-export type AgendaView = "month" | "week" | "list";
+export type AgendaView = "month" | "week" | "day";
 
 export function agendaRange(anchor: Date, view: AgendaView) {
   if (view === "month") {
@@ -12,22 +12,27 @@ export function agendaRange(anchor: Date, view: AgendaView) {
   }
   const from = view === "week" ? startOfWeek(anchor) : startOfDay(anchor);
   const to = new Date(from);
-  to.setDate(to.getDate() + (view === "week" ? 7 : 90));
+  to.setDate(to.getDate() + (view === "week" ? 7 : 1));
   return { from, to };
 }
 
 export function moveAnchor(anchor: Date, view: AgendaView, direction: number) {
   const next = new Date(anchor);
   if (view === "month") next.setMonth(next.getMonth() + direction);
-  else next.setDate(next.getDate() + direction * (view === "week" ? 7 : 30));
+  else next.setDate(next.getDate() + direction * (view === "week" ? 7 : 1));
   return next;
 }
 
 export function agendaTitle(anchor: Date, view: AgendaView) {
   if (view === "month")
     return anchor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  if (view === "list")
-    return `From ${anchor.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  if (view === "day")
+    return anchor.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   const from = startOfWeek(anchor);
   const to = new Date(from);
   to.setDate(to.getDate() + 6);
@@ -35,11 +40,14 @@ export function agendaTitle(anchor: Date, view: AgendaView) {
     month: "short",
     day: "numeric",
   });
-  const toLabel = to.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const toLabel =
+    from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear()
+      ? `${to.getDate()}, ${to.getFullYear()}`
+      : to.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
   return `${fromLabel} – ${toLabel}`;
 }
 

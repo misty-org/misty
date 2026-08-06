@@ -13,13 +13,8 @@ import { assertUploadLimit } from "@/features/library/uploadLimits";
 import { readDownloadBlob } from "@/features/library/signedDownload";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { addRequestCorrelation } from "@/platform/requestCorrelation";
+import type { SpaceRun, SpaceTaskActivity } from "@/models/interfaces/features/spaces/types";
 import type {
-  SpaceConversation,
-  SpaceRun,
-  SpaceTaskActivity,
-} from "@/models/interfaces/features/spaces/types";
-import type {
-  AgentMentionFailure,
   MessageSpan,
   BulkLibraryItemAction,
   LibraryEditDefinition,
@@ -47,6 +42,7 @@ import type {
   LibraryImportHistoryItem,
   LibraryAssetStack,
   Space,
+  SpaceAgentMembership,
   SpaceEvent,
   SpaceInboxItem,
   SpaceMessage,
@@ -73,10 +69,11 @@ import type {
   SpaceTemplate,
 } from "@/models/interfaces/features/spaces/types";
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
-import type { TaskSchedule } from "@/models/interfaces/features/spaces/connections/calendarTasks";
 import type { ConflictResolution } from "@/models/types/features/spaces/connections/calendarTasks";
 import { createSpaceMembersApi } from "./spaceMembersApi";
 import { createSpaceAgentMembershipsApi } from "./spaceAgentMembershipsApi";
+import { createSpaceConversationsApi } from "./spaceConversationsApi";
+import { createSpaceActionSuggestionsApi } from "./spaceActionSuggestionsApi";
 import { createSpacePlannerExpansionApi } from "./spacePlannerExpansionApi";
 import {
   isSpaceReferenceOnly,
@@ -121,7 +118,7 @@ export async function spaceRequest<T = void>(path: string, init?: SpaceRequestIn
     !init?.allowWhileReferenceOnly
   ) {
     throw new SpaceRequestError(
-      "This is a saved copy. Reconnect to Misty before making changes.",
+      "Spaces are unavailable while Misty reconnects.",
       503,
       "offline_reference_only",
     );
@@ -204,7 +201,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     library_reauthentication_required: "Unlock this protected Library collection again.",
-    offline_reference_only: "Reconnect to Misty before making changes.",
+    offline_reference_only: "Spaces are unavailable while Misty reconnects.",
     integration_required:
       "Connect the workflow’s required provider in this Space before running it.",
     agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
@@ -264,10 +261,8 @@ export const spacesApi = {
     spaceRequest<{ messages: SpaceMessage[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,
     ),
-  conversations: (spaceId: string) =>
-    spaceRequest<{ conversations: SpaceConversation[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations`,
-    ),
+  ...createSpaceConversationsApi(spaceRequest),
+  ...createSpaceActionSuggestionsApi(spaceRequest),
   integrations: (spaceId: string) =>
     spaceRequest<{
       integrations: SpaceIntegration[];
@@ -295,96 +290,29 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
       { method: "PUT", body: JSON.stringify({ resources }) },
     ),
-  createConversation: (spaceId: string, title: string, memberIds: string[]) =>
-    spaceRequest<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
-      method: "POST",
-      body: JSON.stringify({ title, member_ids: memberIds }),
-    }),
-  updateConversation: (
-    spaceId: string,
-    conversationId: string,
-    title: string,
-    memberIds: string[],
-  ) =>
-    spaceRequest<SpaceConversation>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
-      { method: "PATCH", body: JSON.stringify({ title, member_ids: memberIds }) },
-    ),
-  deleteDisconnectedConversation: (spaceId: string, conversationId: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
-      { method: "DELETE" },
-    ),
-  conversationMessages: (spaceId: string, conversationId: string, before = 0) =>
-    spaceRequest<{ messages: SpaceMessage[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages?before=${before}&limit=50`,
-    ),
-  sendConversationMessage: (
-    spaceId: string,
-    conversationId: string,
-    content: MessageSpan[],
-    fileNodeIds: string[] = [],
-    attachmentIds: string[] = [],
-    libraryItemIds: string[] = [],
-    replyToMessageId = "",
-  ) =>
-    spaceRequest<{
-      message: SpaceMessage;
-      agent_replies: SpaceMessage[];
-      agent_failures?: AgentMentionFailure[];
-    }>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          content,
-          file_node_ids: fileNodeIds,
-          attachment_ids: attachmentIds,
-          library_item_ids: libraryItemIds,
-          reply_to_message_id: replyToMessageId,
-        }),
-      },
-    ),
-  updateConversationMessage: (
-    spaceId: string,
-    conversationId: string,
-    messageId: string,
-    content: MessageSpan[],
-    fileNodeIds: string[] = [],
-  ) =>
-    spaceRequest<SpaceMessage>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
-      { method: "PUT", body: JSON.stringify({ content, file_node_ids: fileNodeIds }) },
-    ),
-  deleteConversationMessage: (spaceId: string, conversationId: string, messageId: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}`,
-      { method: "DELETE" },
-    ),
-  addConversationMessageReaction: (
-    spaceId: string,
-    conversationId: string,
-    messageId: string,
-    emoji: string,
-  ) =>
-    spaceRequest<SpaceMessage>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
-      { method: "PUT" },
-    ),
-  removeConversationMessageReaction: (
-    spaceId: string,
-    conversationId: string,
-    messageId: string,
-    emoji: string,
-  ) =>
-    spaceRequest<SpaceMessage>(
-      `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/reactions/${encodeURIComponent(emoji)}`,
-      { method: "DELETE" },
-    ),
   chatAgents: (spaceId: string) =>
-    spaceRequest<{ agents: SpaceStudioResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/chat/agents`,
-    ),
+    spaceRequest<{ agents: SpaceAgentMembership[] }>(
+      `/spaces/${encodeURIComponent(spaceId)}/agents`,
+    ).then(({ agents }) => ({
+      agents: agents
+        .filter((agent) => agent.enabled)
+        .map((agent) => ({
+          id: agent.agent_id,
+          space_id: agent.space_id,
+          creator_user_id: agent.owner_user_id,
+          kind: "agent" as const,
+          name: agent.name,
+          description: agent.description,
+          icon: agent.icon,
+          model_id: agent.model_id,
+          enabled: agent.enabled,
+          status: agent.work_state,
+          version: agent.approved_version,
+          schedules_enabled: false,
+          created_at: agent.created_at,
+          updated_at: agent.updated_at,
+        })),
+    })),
   tasks: (
     spaceId: string,
     filters: {
@@ -469,29 +397,6 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}?version=${task.version}`,
       { method: "DELETE" },
     ),
-  /**
-   * Creates a task bound to a Google calendar. `publish: false` keeps it a local
-   * draft; `true` creates the Google event immediately. Either way the write is
-   * something the user asked for, never an implicit consequence of typing.
-   */
-  createCalendarTask: (
-    spaceId: string,
-    input: {
-      title: string;
-      notes: string;
-      status: SpaceTaskStatus;
-      priority: SpaceTaskPriority;
-      calendar_source_id: string;
-      schedule: TaskSchedule;
-      publish: boolean;
-      assignee_user_id?: string;
-    },
-  ) =>
-    spaceRequest<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks/calendar`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
   /** Pushes a task's local schedule edits to Google. */
   publishTaskToCalendar: (spaceId: string, task: SpaceTask) =>
     spaceRequest<SpaceTask>(
@@ -522,6 +427,27 @@ export const spacesApi = {
   calendarEvents: (spaceId: string, from: string, to: string) =>
     spaceRequest<{ events: SpaceCalendarEvent[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    ),
+  createCalendarEvent: (
+    spaceId: string,
+    input: Pick<
+      SpaceCalendarEvent,
+      "title" | "description" | "location" | "starts_at" | "ends_at" | "all_day" | "timezone"
+    >,
+  ) =>
+    spaceRequest<SpaceCalendarEvent>(`/spaces/${encodeURIComponent(spaceId)}/calendar/events`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateCalendarEvent: (spaceId: string, event: SpaceCalendarEvent) =>
+    spaceRequest<SpaceCalendarEvent>(
+      `/spaces/${encodeURIComponent(spaceId)}/calendar/events/${encodeURIComponent(event.id)}`,
+      { method: "PATCH", body: JSON.stringify(event) },
+    ),
+  deleteCalendarEvent: (spaceId: string, event: SpaceCalendarEvent) =>
+    spaceRequest(
+      `/spaces/${encodeURIComponent(spaceId)}/calendar/events/${encodeURIComponent(event.id)}?version=${event.version ?? 1}`,
+      { method: "DELETE" },
     ),
   calendarSources: (spaceId: string) =>
     spaceRequest<{ sources: SpaceCalendarSource[] }>(
@@ -556,8 +482,18 @@ export const spacesApi = {
   ) =>
     spaceRequest<{
       message: SpaceMessage;
-      agent_replies: SpaceMessage[];
-      agent_failures?: AgentMentionFailure[];
+      triggered_runs: Array<{
+        id: string;
+        agent_id: string;
+        state:
+          | "queued"
+          | "working"
+          | "awaiting_approval"
+          | "completed"
+          | "failed"
+          | "canceled"
+          | "retrying";
+      }>;
     }>(`/spaces/${encodeURIComponent(spaceId)}/messages`, {
       method: "POST",
       body: JSON.stringify({
@@ -568,6 +504,19 @@ export const spacesApi = {
         reply_to_message_id: replyToMessageId,
       }),
     }),
+  runDetail: (runId: string) =>
+    spaceRequest<import("@/models/interfaces/features/spaces/types").SpaceRunDetail>(
+      `/runs/${encodeURIComponent(runId)}`,
+    ),
+  decideRun: (runId: string, approved: boolean) =>
+    spaceRequest<SpaceRun>(`/runs/${encodeURIComponent(runId)}/approval`, {
+      method: "POST",
+      body: JSON.stringify({ approved }),
+    }),
+  cancelRun: (runId: string) =>
+    spaceRequest<SpaceRun>(`/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
+  retryRun: (runId: string) =>
+    spaceRequest<SpaceRun>(`/runs/${encodeURIComponent(runId)}/retry`, { method: "POST" }),
   updateMessage: (
     spaceId: string,
     messageId: string,
@@ -1281,6 +1230,7 @@ async function uploadLibraryFile(
       byte_size: file.size,
       sha256,
       purpose,
+      ...(options?.conversationId ? { conversation_id: options.conversationId } : {}),
       // In-place replace: the server should reuse `replace_item_id` instead of
       // minting a new item. Older servers ignore these and mint a new id, which
       // replaceLibraryItemContent() detects and cleans up.

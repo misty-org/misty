@@ -35,6 +35,10 @@ import type { MistyFilePickerMode } from "@/models/types/features/picker/FilePic
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
+  /** Render only the picker panel when a parent owns the shared dialog shell. */
+  embedded?: boolean;
+  /** Whether this embedded panel is currently visible. */
+  active?: boolean;
   multiple?: boolean;
   title?: string;
   initialPath?: string | null;

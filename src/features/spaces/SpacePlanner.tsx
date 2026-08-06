@@ -9,6 +9,7 @@ import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 import { CalendarSourceDrawer, SpaceTaskDrawer } from "./SpacePlannerViews";
 import { SpaceAgenda } from "./SpaceAgenda";
 import { SpaceRoadmapWorkspace } from "./SpaceRoadmapWorkspace";
+import { SpaceRoadmapItemsWorkspace } from "./SpaceRoadmapItemsWorkspace";
 import { SpacePlannerBody } from "./spaceTasks/SpacePlannerBody";
 import { TaskFilters } from "./spaceTasks/TaskFilters";
 import { normalizeView } from "./spaceTasks/taskFiltering";
@@ -44,6 +45,15 @@ export function SpacePlanner({
   if (route.plannerSection === "roadmaps") {
     return (
       <SpaceRoadmapWorkspace spaceId={spaceId} roadmapId={route.roadmapId} canManage={canManage} />
+    );
+  }
+  if (route.plannerSection === "goals" || route.plannerSection === "milestones") {
+    return (
+      <SpaceRoadmapItemsWorkspace
+        spaceId={spaceId}
+        kind={route.plannerSection === "goals" ? "goal" : "milestone"}
+        canManage={canManage}
+      />
     );
   }
   return (
@@ -114,7 +124,6 @@ function SpaceTasksPlanner({
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
       <SpacePlannerHeader
-        view={view}
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}
         sources={data.sources}
@@ -124,12 +133,6 @@ function SpaceTasksPlanner({
         calendarImportAvailable={
           data.sources.length > 0 ||
           data.integrations.some((integration) => integration.status === "active")
-        }
-        onViewChange={(next) =>
-          navigate({
-            pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${next}`,
-            search: location.search,
-          })
         }
         onQuery={(value: string) => filters.updateParam("q", value)}
         onSync={() => void data.load(false)}

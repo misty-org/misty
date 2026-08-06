@@ -3,7 +3,15 @@ export type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces
 import { Button } from "@/ui";
 import { Plus, X } from "lucide-react";
 import "./chromeTabs.css";
-import { memo, useCallback, useEffect, useRef, type DragEvent, type WheelEvent } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type WheelEvent,
+} from "react";
 import { useExplorerDropRegistry } from "@/features/explorer/drag/ExplorerDragContext";
 import { createExplorerDropTargetSpec } from "@/features/explorer/drag/ExplorerDropTarget";
 
@@ -22,6 +30,12 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
   const shellRef = useRef<HTMLDivElement | null>(null);
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const draggedTabIdRef = useRef<string | null>(null);
+  const suppressSelectionRef = useRef(false);
+  const [draggedTabId, setDraggedTabId] = useState("");
+  const [dropIndicator, setDropIndicator] = useState<{
+    tabId: string;
+    position: "before" | "after";
+  }>();
   const registerDropZone = useExplorerDropRegistry();
 
   useEffect(() => {
@@ -61,23 +75,59 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
 
   const handleDragStart = useCallback((event: DragEvent<HTMLDivElement>, tabId: string) => {
     draggedTabIdRef.current = tabId;
+    suppressSelectionRef.current = true;
+    setDraggedTabId(tabId);
     event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-misty-workspace-tab", tabId);
     event.dataTransfer.setData("text/plain", tabId);
   }, []);
 
+  const finishTabDrag = useCallback(() => {
+    draggedTabIdRef.current = null;
+    setDraggedTabId("");
+    setDropIndicator(undefined);
+    window.setTimeout(() => {
+      suppressSelectionRef.current = false;
+    }, 0);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>, destinationTabId: string) => {
+      const sourceTabId = draggedTabIdRef.current;
+      if (!props.onReorderTab || !sourceTabId || sourceTabId === destinationTabId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      const bounds = event.currentTarget.getBoundingClientRect();
+      setDropIndicator({
+        tabId: destinationTabId,
+        position: event.clientX >= bounds.left + bounds.width / 2 ? "after" : "before",
+      });
+    },
+    [props.onReorderTab],
+  );
+
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, destinationTabId: string) => {
-      event.preventDefault();
       const sourceTabId =
-        draggedTabIdRef.current || event.dataTransfer.getData("text/plain").trim();
-      draggedTabIdRef.current = null;
-      if (!sourceTabId || sourceTabId === destinationTabId || !props.onReorderTab) return;
+        draggedTabIdRef.current ||
+        event.dataTransfer.getData("application/x-misty-workspace-tab").trim();
+      if (!sourceTabId || sourceTabId === destinationTabId || !props.onReorderTab)
+        return void finishTabDrag();
+      event.preventDefault();
+      event.stopPropagation();
       const fromIndex = props.tabs.findIndex((tab) => tab.id === sourceTabId);
-      const toIndex = props.tabs.findIndex((tab) => tab.id === destinationTabId);
-      if (fromIndex < 0 || toIndex < 0) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const toIndex = workspaceTabDropIndex(
+        props.tabs.map((tab) => tab.id),
+        sourceTabId,
+        destinationTabId,
+        event.clientX >= bounds.left + bounds.width / 2,
+      );
+      if (fromIndex < 0 || toIndex < 0) return void finishTabDrag();
       props.onReorderTab(sourceTabId, fromIndex, toIndex);
+      finishTabDrag();
     },
-    [props.onReorderTab, props.tabs],
+    [finishTabDrag, props.onReorderTab, props.tabs],
   );
 
   return (
@@ -98,16 +148,18 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               className="chrome-tab"
               data-tab-id={tab.id}
               data-active={active ? "true" : "false"}
+              data-dragging={draggedTabId === tab.id ? "true" : undefined}
+              data-drop-position={
+                dropIndicator?.tabId === tab.id ? dropIndicator.position : undefined
+              }
               data-misty-window-drag-block={props.onReorderTab ? "true" : undefined}
               data-reorder-drag-source={props.onReorderTab ? "true" : undefined}
               draggable={Boolean(props.onReorderTab)}
-              onDragEnd={() => {
-                draggedTabIdRef.current = null;
-              }}
-              onDragOver={(event) => {
-                if (!props.onReorderTab) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
+              onDragEnd={finishTabDrag}
+              onDragOver={(event) => handleDragOver(event, tab.id)}
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                if (dropIndicator?.tabId === tab.id) setDropIndicator(undefined);
               }}
               onDragStart={(event) => handleDragStart(event, tab.id)}
               onDrop={(event) => handleDrop(event, tab.id)}
@@ -118,7 +170,9 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                 role="tab"
                 aria-selected={active}
                 title={tab.path}
-                onClick={() => props.onSelectTab(tab.id)}
+                onClick={() => {
+                  if (!suppressSelectionRef.current) props.onSelectTab(tab.id);
+                }}
               >
                 <span className="chrome-tab-title">{tab.title}</span>
               </button>
@@ -156,3 +210,15 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     </div>
   );
 });
+
+export function workspaceTabDropIndex(
+  order: string[],
+  sourceId: string,
+  targetId: string,
+  insertAfter: boolean,
+): number {
+  if (sourceId === targetId || !order.includes(sourceId) || !order.includes(targetId)) return -1;
+  const remaining = order.filter((id) => id !== sourceId);
+  const targetIndex = remaining.indexOf(targetId);
+  return targetIndex + (insertAfter ? 1 : 0);
+}

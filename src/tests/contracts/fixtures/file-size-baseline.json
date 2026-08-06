@@ -33,7 +33,6 @@
   "src/models/interfaces/services/misty-api/types.ts": 1388,
   "src/pages/Settings/desktop/index.tsx": 1694,
   "src/pages/Transfers/desktop/index.tsx": 550,
-  "src/stores/agent/useAgentSessionStore.ts": 1798,
   "src/stores/backend/useMistyBackendStore.ts": 852,
   "src/stores/media/useSmartLibraryStore.ts": 538,
   "src/stores/providers/useProvidersStore.ts": 1176,

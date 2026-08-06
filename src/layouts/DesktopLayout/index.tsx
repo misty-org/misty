@@ -286,7 +286,7 @@ export function DesktopLayout(props: {
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
-        <div className="mb-3 grid h-[50px] w-[54px] place-items-center">
+        <div className="flex h-[46px] w-[54px] shrink-0 items-start justify-center pt-3">
           {mistyLogoSource ? (
             <img
               className="h-[34px] w-[34px] object-contain"

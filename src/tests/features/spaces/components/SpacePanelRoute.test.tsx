@@ -63,6 +63,9 @@ describe("Space routing", () => {
   it.each([
     ["/spaces/space-1/planner/tasks/list", "tasks", "list", "month", ""],
     ["/spaces/space-1/planner/agenda/week", "agenda", "board", "week", ""],
+    ["/spaces/space-1/planner/agenda/day", "agenda", "board", "day", ""],
+    ["/spaces/space-1/planner/goals", "goals", "board", "month", ""],
+    ["/spaces/space-1/planner/milestones", "milestones", "board", "month", ""],
     ["/spaces/space-1/planner/roadmaps/map-1", "roadmaps", "board", "month", "map-1"],
     ["/spaces/space-1/planner/calendar", "agenda", "board", "month", ""],
   ])("parses Planner route %s", async (entry, plannerSection, taskView, agendaView, roadmapId) => {

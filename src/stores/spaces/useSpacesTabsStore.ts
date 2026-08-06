@@ -5,7 +5,7 @@ import { spaceNotesEnabled } from "@/features/notes/availability";
 const maximumOpenTabs = 16;
 const pendingSpaceId = "__pending__";
 
-export type WorkspaceTabKind = "space" | "file-manager" | "extensions" | "transfers";
+export type WorkspaceTabKind = "space" | "file-manager" | "agents" | "extensions" | "transfers";
 
 interface WorkspaceTabBase {
   id: string;
@@ -27,12 +27,20 @@ export interface ExtensionsWorkspaceTab extends WorkspaceTabBase {
   kind: "extensions";
 }
 
+export interface AgentsWorkspaceTab extends WorkspaceTabBase {
+  kind: "agents";
+}
+
 export interface TransfersWorkspaceTab extends WorkspaceTabBase {
   kind: "transfers";
 }
 
 export type SpacesTab =
-  SpaceWorkspaceTab | FileManagerWorkspaceTab | ExtensionsWorkspaceTab | TransfersWorkspaceTab;
+  | SpaceWorkspaceTab
+  | FileManagerWorkspaceTab
+  | AgentsWorkspaceTab
+  | ExtensionsWorkspaceTab
+  | TransfersWorkspaceTab;
 
 export interface SpacesTabsSession {
   tabs: SpacesTab[];
@@ -304,7 +312,7 @@ function createTab(
       workspaceId: `space-files-${encodeURIComponent(spaceId)}-${index}`,
     };
   }
-  return { id, kind, title: kind === "extensions" ? "Extensions" : "Transfers" };
+  return { id, kind, title: workspaceToolTitle(kind) };
 }
 
 function normalizeSession(session: SpacesTabsSession, spaceId: string): SpacesTabsSession {
@@ -350,9 +358,13 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
     typeof candidate.id === "string" && candidate.id
       ? candidate.id
       : `space-workspace-tab-${index}`;
-  const kind: WorkspaceTabKind = ["space", "file-manager", "extensions", "transfers"].includes(
-    String(candidate.kind),
-  )
+  const kind: WorkspaceTabKind = [
+    "space",
+    "file-manager",
+    "agents",
+    "extensions",
+    "transfers",
+  ].includes(String(candidate.kind))
     ? (candidate.kind as WorkspaceTabKind)
     : "space";
   if (kind === "space")
@@ -372,7 +384,12 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
           ? candidate.workspaceId
           : `space-files-${encodeURIComponent(spaceId)}-${index}`,
     };
-  return { id, kind, title: kind === "extensions" ? "Extensions" : "Transfers" };
+  return { id, kind, title: workspaceToolTitle(kind) };
+}
+
+function workspaceToolTitle(kind: Exclude<WorkspaceTabKind, "space" | "file-manager">): string {
+  if (kind === "agents") return "Agents";
+  return kind === "extensions" ? "Extensions" : "Transfers";
 }
 
 function migratePersistedTabs(

@@ -11,7 +11,6 @@ export function SpaceChatConversationList({
   conversations,
   activeConversationId,
   currentUserId,
-  supportOnly,
   onCreateConversation,
   onEditConversation,
 }: {
@@ -19,7 +18,6 @@ export function SpaceChatConversationList({
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId?: string;
-  supportOnly?: boolean;
   onCreateConversation?: () => void;
   onEditConversation?: (conversation: SpaceConversation) => void;
 }) {
@@ -27,25 +25,6 @@ export function SpaceChatConversationList({
     (conversation) => conversation.origin !== "discord",
   );
   const discord = conversations.filter((conversation) => conversation.origin === "discord");
-
-  if (supportOnly) {
-    return (
-      <nav className="grid gap-1" aria-label="Misty support conversation">
-        {mistyConversations.map((conversation) => (
-          <Link
-            key={conversation.id}
-            className={conversationLinkClass(activeConversationId === conversation.id)}
-            to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
-          >
-            <span className="grid size-7 place-items-center rounded-md bg-sidebar-accent text-muted-foreground">
-              <MessagesSquare size={15} strokeWidth={1.75} />
-            </span>
-            <span className="min-w-0 truncate font-medium">Ask Misty</span>
-          </Link>
-        ))}
-      </nav>
-    );
-  }
 
   return (
     <div className="grid gap-3">
@@ -66,8 +45,8 @@ export function SpaceChatConversationList({
         conversations={mistyConversations}
         activeConversationId={activeConversationId}
         currentUserId={currentUserId}
-        onCreate={onCreateConversation ?? (() => undefined)}
-        onEdit={onEditConversation ?? (() => undefined)}
+        onCreate={onCreateConversation}
+        onEdit={onEditConversation}
       />
       {discord.length ? (
         <DiscordConversationGroup
@@ -136,24 +115,26 @@ function ConversationGroup({
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId?: string;
-  onCreate: () => void;
-  onEdit: (conversation: SpaceConversation) => void;
+  onCreate?: () => void;
+  onEdit?: (conversation: SpaceConversation) => void;
 }) {
   return (
     <SpaceSidebarSection
       title={title}
       count={conversations.length}
       action={
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
-          type="button"
-          aria-label={`Create a new ${title.toLowerCase()} conversation`}
-          onClick={onCreate}
-        >
-          <Plus size={13} />
-        </Button>
+        onCreate ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
+            type="button"
+            aria-label={`Create a new ${title.toLowerCase()} conversation`}
+            onClick={onCreate}
+          >
+            <Plus size={13} />
+          </Button>
+        ) : undefined
       }
     >
       <nav className="grid gap-1" aria-label={`${title} conversations`}>
@@ -169,13 +150,15 @@ function ConversationGroup({
               <span className="min-w-0 pr-6">
                 <span className="block truncate font-medium">{conversation.title}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {conversation.members
-                    .map((member) => (member.user_id === currentUserId ? "You" : member.name))
+                  {conversation.participants
+                    .map((participant) =>
+                      participant.user_id === currentUserId ? "You" : participant.name,
+                    )
                     .join(", ")}
                 </span>
               </span>
             </Link>
-            {conversation.created_by_user_id === currentUserId ? (
+            {onEdit && conversation.created_by_user_id === currentUserId ? (
               <Button
                 variant="ghost"
                 size="icon"

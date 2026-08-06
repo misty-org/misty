@@ -16,9 +16,9 @@ const validSettingsSections = new Set(["general", "members", "connections"]);
 export interface SpacePanelRoute {
   activeSpaceId: string;
   section: string;
-  plannerSection: "tasks" | "agenda" | "roadmaps";
+  plannerSection: "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
   taskView: string;
-  agendaView: "month" | "week" | "list";
+  agendaView: "month" | "week" | "day";
   roadmapId: string;
   settingsSection: string;
   libraryCollection: string;
@@ -51,8 +51,8 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const plannerSection =
     plannerPart === "agenda" || plannerPart === "calendar"
       ? "agenda"
-      : plannerPart === "roadmaps"
-        ? "roadmaps"
+      : plannerPart === "goals" || plannerPart === "milestones" || plannerPart === "roadmaps"
+        ? plannerPart
         : "tasks";
   const legacyTaskView = plannerPart === "board" || plannerPart === "list" ? plannerPart : "";
   const canonicalTaskView = plannerPart === "tasks" ? (routeParts[4] ?? "") : "";
@@ -66,8 +66,8 @@ export function useSpacePanelRoute(): SpacePanelRoute {
       routeSection === "planner" && ["board", "list"].includes(canonicalTaskView || legacyTaskView)
         ? canonicalTaskView || legacyTaskView
         : "board",
-    agendaView: ["month", "week", "list"].includes(agendaCandidate)
-      ? (agendaCandidate as "month" | "week" | "list")
+    agendaView: ["month", "week", "day"].includes(agendaCandidate)
+      ? (agendaCandidate as "month" | "week" | "day")
       : "month",
     roadmapId:
       routeSection === "planner" && plannerPart === "roadmaps"

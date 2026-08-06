@@ -10,7 +10,12 @@ import {
 import { Checkbox } from "@/ui";
 import { Input } from "@/ui";
 import { Button } from "@/ui";
-import type { SpaceConversation, SpaceMember } from "@/models/interfaces/features/spaces/types";
+import type {
+  SpaceActorRef,
+  SpaceAgentMembership,
+  SpaceConversation,
+  SpaceMember,
+} from "@/models/interfaces/features/spaces/types";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
 export function CreateEditConversationDialog({
@@ -18,6 +23,7 @@ export function CreateEditConversationDialog({
   open,
   onOpenChange,
   members,
+  agents,
   currentUserId,
   conversation,
   onSaved,
@@ -26,13 +32,14 @@ export function CreateEditConversationDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   members: SpaceMember[];
+  agents: SpaceAgentMembership[];
   currentUserId?: string;
   /** Present when editing an existing conversation; absent when creating one. */
   conversation?: SpaceConversation | null;
   onSaved: (conversation: SpaceConversation) => void;
 }) {
   const [title, setTitle] = useState("");
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [selectedActors, setSelectedActors] = useState<SpaceActorRef[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,24 +47,33 @@ export function CreateEditConversationDialog({
     if (!open) return;
     setError("");
     setTitle(conversation?.title ?? "");
-    setSelectedMemberIds(
-      conversation?.members
-        .filter((member) => member.user_id !== currentUserId)
-        .map((member) => member.user_id) ?? [],
+    setSelectedActors(
+      conversation?.participants
+        .filter((participant) => participant.user_id !== currentUserId)
+        .flatMap((participant): SpaceActorRef[] =>
+          participant.kind === "agent" && participant.agent_id
+            ? [{ kind: "agent", agent_id: participant.agent_id }]
+            : participant.user_id
+              ? [{ kind: "person", user_id: participant.user_id }]
+              : [],
+        ) ?? [],
     );
   }, [open, conversation, currentUserId]);
 
   const otherMembers = members.filter((member) => member.user_id !== currentUserId);
-  const canSave = selectedMemberIds.length > 0 && !saving;
+  const canSave = selectedActors.length > 0 && !saving;
 
   const close = () => {
     if (saving) return;
     onOpenChange(false);
   };
 
-  const toggleMember = (memberId: string, checked: boolean) => {
-    setSelectedMemberIds((current) =>
-      checked ? [...current, memberId] : current.filter((id) => id !== memberId),
+  const actorKey = (actor: SpaceActorRef) =>
+    actor.kind === "agent" ? `agent:${actor.agent_id}` : `person:${actor.user_id}`;
+  const toggleActor = (actor: SpaceActorRef, checked: boolean) => {
+    const key = actorKey(actor);
+    setSelectedActors((current) =>
+      checked ? [...current, actor] : current.filter((item) => actorKey(item) !== key),
     );
   };
 
@@ -67,8 +83,12 @@ export function CreateEditConversationDialog({
     setSaving(true);
     setError("");
     try {
-      const selectedNames = selectedMemberIds
-        .map((memberId) => otherMembers.find((member) => member.user_id === memberId)?.name)
+      const selectedNames = selectedActors
+        .map((actor) =>
+          actor.kind === "agent"
+            ? agents.find((agent) => agent.agent_id === actor.agent_id)?.name
+            : otherMembers.find((member) => member.user_id === actor.user_id)?.name,
+        )
         .filter((name): name is string => Boolean(name));
       const resolvedTitle = (title.trim() || selectedNames.join(", ") || "Conversation").slice(
         0,
@@ -79,9 +99,9 @@ export function CreateEditConversationDialog({
             spaceId,
             conversation.id,
             resolvedTitle,
-            selectedMemberIds,
+            selectedActors,
           )
-        : await spacesApi.createConversation(spaceId, resolvedTitle, selectedMemberIds);
+        : await spacesApi.createConversation(spaceId, resolvedTitle, selectedActors);
       onSaved(saved);
       onOpenChange(false);
     } catch (reason) {
@@ -98,7 +118,7 @@ export function CreateEditConversationDialog({
           <DialogHeader>
             <DialogTitle>{conversation ? "Edit conversation" : "New conversation"}</DialogTitle>
             <DialogDescription>
-              Choose one or more members. You can change the people in this conversation later.
+              Choose people and Agents. You can change participants later.
             </DialogDescription>
           </DialogHeader>
           <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
@@ -111,15 +131,19 @@ export function CreateEditConversationDialog({
             />
           </label>
           <fieldset className="misty-transient-scrollbar mt-4 grid max-h-56 gap-1 overflow-y-auto border-0 p-0">
-            <legend className="mb-2 text-xs font-medium text-muted-foreground">Members</legend>
+            <legend className="mb-2 text-xs font-medium text-muted-foreground">Participants</legend>
             {otherMembers.map((member) => (
               <label
                 className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-accent"
                 key={member.user_id}
               >
                 <Checkbox
-                  checked={selectedMemberIds.includes(member.user_id)}
-                  onCheckedChange={(checked) => toggleMember(member.user_id, Boolean(checked))}
+                  checked={selectedActors.some(
+                    (actor) => actor.kind === "person" && actor.user_id === member.user_id,
+                  )}
+                  onCheckedChange={(checked) =>
+                    toggleActor({ kind: "person", user_id: member.user_id }, Boolean(checked))
+                  }
                 />
                 <span className="min-w-0">
                   <span className="block truncate text-foreground">{member.name}</span>
@@ -129,6 +153,29 @@ export function CreateEditConversationDialog({
                 </span>
               </label>
             ))}
+            {agents
+              .filter((agent) => agent.enabled)
+              .map((agent) => (
+                <label
+                  className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-accent"
+                  key={`agent:${agent.agent_id}`}
+                >
+                  <Checkbox
+                    checked={selectedActors.some(
+                      (actor) => actor.kind === "agent" && actor.agent_id === agent.agent_id,
+                    )}
+                    onCheckedChange={(checked) =>
+                      toggleActor({ kind: "agent", agent_id: agent.agent_id }, Boolean(checked))
+                    }
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-foreground">{agent.name}</span>
+                    <span className="block truncate text-[9px] text-muted-foreground">
+                      Agent · {agent.space_role || agent.role || "Teammate"}
+                    </span>
+                  </span>
+                </label>
+              ))}
           </fieldset>
           {error ? (
             <p

@@ -1,6 +1,22 @@
+import { useEffect, useRef } from "react";
+import { CalendarDays, CheckSquare2, GitFork } from "lucide-react";
 import type { SpaceAgendaEntry } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
 import { Button, cn } from "@/ui";
-import { dayKey, groupAgendaEntries, startOfWeek } from "./agendaDates";
+import { dayKey, groupAgendaEntries, startOfDay, startOfWeek } from "./agendaDates";
+
+export type AgendaZoomMinutes = 60 | 30 | 15;
+
+interface AgendaViewProps {
+  anchor: Date;
+  entries: SpaceAgendaEntry[];
+  onOpen: (entry: SpaceAgendaEntry) => void;
+}
+
+interface AgendaTimelineViewProps extends AgendaViewProps {
+  view: "week" | "day";
+  zoomMinutes: AgendaZoomMinutes;
+  onZoom: (direction: "in" | "out") => void;
+}
 
 export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -11,112 +27,254 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
     day.setDate(day.getDate() + index);
     return day;
   });
+
   return (
-    <div className="min-w-[720px] overflow-hidden rounded-lg border border-border/70">
-      <div className="grid grid-cols-7 border-b border-border/70 bg-muted/20">
-        {days.slice(0, 7).map((day) => (
-          <div
-            className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground"
-            key={day.toISOString()}
-          >
-            {day.toLocaleDateString(undefined, { weekday: "short" })}
+    <div className="misty-transient-scrollbar h-full min-h-0 overflow-auto">
+      <div className="grid min-h-full min-w-[760px] grid-rows-[auto_repeat(6,minmax(112px,1fr))] border-l border-t border-border/60">
+        <div className="grid grid-cols-7 border-b border-border/60 bg-background">
+          {days.slice(0, 7).map((day) => (
+            <div
+              className="border-r border-border/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+              key={day.toISOString()}
+            >
+              {day.toLocaleDateString(undefined, { weekday: "short" })}
+            </div>
+          ))}
+        </div>
+        {Array.from({ length: 6 }, (_, weekIndex) => (
+          <div className="grid min-h-0 grid-cols-7" key={weekIndex}>
+            {days.slice(weekIndex * 7, weekIndex * 7 + 7).map((day) => {
+              const items = grouped[dayKey(day)] ?? [];
+              const muted = day.getMonth() !== anchor.getMonth();
+              const today = isSameDay(day, new Date());
+              return (
+                <section
+                  className={cn(
+                    "min-h-0 border-b border-r border-border/60 px-1.5 py-1.5",
+                    muted && "bg-muted/10 text-muted-foreground",
+                  )}
+                  key={day.toISOString()}
+                  aria-label={day.toDateString()}
+                >
+                  <div className="mb-1 flex h-6 items-center justify-center">
+                    <span
+                      className={cn(
+                        "grid size-6 place-items-center rounded-full text-xs",
+                        today && "bg-foreground font-semibold text-zinc-950",
+                      )}
+                    >
+                      {day.getDate()}
+                    </span>
+                  </div>
+                  <div className="grid gap-0.5">
+                    {items.slice(0, 4).map((entry) => (
+                      <AgendaMonthChip entry={entry} key={entry.id} onOpen={onOpen} />
+                    ))}
+                    {items.length > 4 ? (
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        +{items.length - 4} more
+                      </span>
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         ))}
-      </div>
-      <div className="grid grid-cols-7">
-        {days.map((day) => {
-          const items = grouped[dayKey(day)] ?? [];
-          return (
-            <section
-              className={cn(
-                "min-h-28 border-b border-r border-border/50 p-1.5",
-                day.getMonth() !== anchor.getMonth() && "bg-muted/10 text-muted-foreground",
-              )}
-              key={day.toISOString()}
-              aria-label={day.toDateString()}
-            >
-              <div className="mb-1 text-right text-[11px]">{day.getDate()}</div>
-              <div className="grid gap-1">
-                {items.slice(0, 4).map((entry) => (
-                  <AgendaChip entry={entry} key={entry.id} onOpen={onOpen} />
-                ))}
-                {items.length > 4 ? (
-                  <span className="px-1 text-[10px] text-muted-foreground">
-                    +{items.length - 4} more
-                  </span>
-                ) : null}
-              </div>
-            </section>
-          );
-        })}
       </div>
     </div>
   );
 }
 
-export function AgendaWeekView({ anchor, entries, onOpen }: AgendaViewProps) {
-  const start = startOfWeek(anchor);
-  const grouped = groupAgendaEntries(entries);
-  const days = Array.from({ length: 7 }, (_, index) => {
+export function AgendaTimelineView({
+  anchor,
+  entries,
+  onOpen,
+  view,
+  zoomMinutes,
+  onZoom,
+}: AgendaTimelineViewProps) {
+  const start = view === "week" ? startOfWeek(anchor) : startOfDay(anchor);
+  const dayCount = view === "week" ? 7 : 1;
+  const days = Array.from({ length: dayCount }, (_, index) => {
     const day = new Date(start);
     day.setDate(day.getDate() + index);
     return day;
   });
-  return (
-    <div className="grid min-w-[720px] grid-cols-7 overflow-hidden rounded-lg border border-border/70">
-      {days.map((day) => (
-        <section
-          className="min-h-[520px] border-r border-border/60 last:border-r-0"
-          key={day.toISOString()}
-        >
-          <header className="sticky top-0 z-10 border-b border-border/60 bg-background/95 p-2 text-center">
-            <div className="text-[10px] uppercase text-muted-foreground">
-              {day.toLocaleDateString(undefined, { weekday: "short" })}
-            </div>
-            <div className="text-sm font-semibold">{day.getDate()}</div>
-          </header>
-          <div className="grid gap-1 p-1.5">
-            {(grouped[dayKey(day)] ?? []).map((entry) => (
-              <AgendaCard entry={entry} key={entry.id} onOpen={onOpen} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-export function AgendaListView({ entries, onOpen }: Omit<AgendaViewProps, "anchor">) {
   const grouped = groupAgendaEntries(entries);
+  const slotHeight = zoomMinutes === 60 ? 36 : zoomMinutes === 30 ? 22 : 18;
+  const hourHeight = slotHeight * (60 / zoomMinutes);
+  const timelineHeight = hourHeight * 24;
+  const slots = Array.from({ length: (24 * 60) / zoomMinutes + 1 }, (_, index) => index);
+  const hours = Array.from({ length: 24 }, (_, index) => index);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const previousScaleRef = useRef(hourHeight);
+  const previousRangeRef = useRef(`${view}:${dayKey(start)}`);
+  const initialScrollHour = days.some((day) => isSameDay(day, new Date()))
+    ? Math.max(0, new Date().getHours() - 1)
+    : 7;
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const rangeKey = `${view}:${dayKey(start)}`;
+    if (previousRangeRef.current !== rangeKey) {
+      element.scrollTop = hourHeight * initialScrollHour;
+      previousRangeRef.current = rangeKey;
+    } else if (previousScaleRef.current !== hourHeight) {
+      element.scrollTop = element.scrollTop * (hourHeight / previousScaleRef.current);
+    } else if (element.scrollTop === 0) {
+      element.scrollTop = hourHeight * initialScrollHour;
+    }
+    previousScaleRef.current = hourHeight;
+  }, [hourHeight, initialScrollHour, start.getTime(), view]);
+
+  const now = new Date();
+  const showNow = days.some((day) => isSameDay(day, now));
+  const nowTop = ((now.getHours() * 60 + now.getMinutes()) / 60) * hourHeight;
+  const currentTimeLabel = formatTime(now.toISOString());
+  const currentTimeMatchesHour = now.getMinutes() === 0;
+
   return (
-    <div className="mx-auto grid w-full max-w-4xl gap-5">
-      {Object.entries(grouped).map(([date, items]) => (
-        <section key={date}>
-          <h2 className="sticky top-0 z-10 m-0 border-b border-border/60 bg-background/95 px-1 py-2 text-sm font-semibold">
-            {new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-          </h2>
-          <div className="divide-y divide-border/50">
-            {items.map((entry) => (
-              <AgendaCard entry={entry} key={entry.id} onOpen={onOpen} />
+    <div
+      ref={scrollRef}
+      className="misty-transient-scrollbar h-full min-h-0 overflow-auto [overscroll-behavior:contain]"
+      aria-label={`${view} calendar timeline`}
+      onWheel={(event) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        onZoom(event.deltaY < 0 ? "in" : "out");
+      }}
+    >
+      <div
+        className="relative min-h-full border-l border-t border-border/60"
+        style={{ minWidth: view === "week" ? 920 : 640 }}
+      >
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md">
+          <div
+            className="grid min-h-14 border-b border-border/60"
+            style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
+          >
+            <div className="border-r border-border/60" />
+            {days.map((day) => (
+              <div
+                className="flex items-center justify-center gap-2 border-r border-border/60 px-2 text-center"
+                key={day.toISOString()}
+              >
+                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {day.toLocaleDateString(undefined, { weekday: "short" })}
+                </span>
+                <span
+                  className={cn(
+                    "grid size-7 place-items-center rounded-full text-sm font-semibold",
+                    isSameDay(day, now) && "bg-foreground text-zinc-950",
+                  )}
+                >
+                  {day.getDate()}
+                </span>
+              </div>
             ))}
           </div>
-        </section>
-      ))}
+          <div
+            className="grid min-h-[54px] border-b border-border/60"
+            style={{ gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))` }}
+          >
+            <div className="flex items-center justify-center border-r border-border/60 text-xs text-muted-foreground">
+              All day
+            </div>
+            {days.map((day) => (
+              <div
+                className="flex min-w-0 flex-col justify-center gap-1 border-r border-border/60 px-1.5 py-1"
+                key={day.toISOString()}
+              >
+                {(grouped[dayKey(day)] ?? [])
+                  .filter((entry) => entry.all_day)
+                  .slice(0, 2)
+                  .map((entry) => (
+                    <AgendaAllDayChip entry={entry} key={entry.id} onOpen={onOpen} />
+                  ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div
+          className="relative grid"
+          style={{
+            height: timelineHeight,
+            gridTemplateColumns: `72px repeat(${dayCount}, minmax(0, 1fr))`,
+          }}
+        >
+          <div className="relative border-r border-border/60" aria-hidden="true">
+            {hours.map((hour) => {
+              const labelTop = hour === 0 ? 8 : hour * hourHeight;
+              if (showNow && currentTimeMatchesHour && hour === now.getHours()) return null;
+              return (
+                <span
+                  className={cn(
+                    "absolute right-3 text-[11px] text-muted-foreground",
+                    hour === 0 ? "top-2" : "-translate-y-1/2",
+                  )}
+                  key={hour}
+                  style={hour === 0 ? undefined : { top: labelTop }}
+                >
+                  {formatHour(hour)}
+                </span>
+              );
+            })}
+          </div>
+          {days.map((day) => {
+            const timedEntries = (grouped[dayKey(day)] ?? []).filter((entry) => !entry.all_day);
+            return (
+              <div className="relative border-r border-border/60" key={day.toISOString()}>
+                {slots.map((slot) => {
+                  const major = (slot * zoomMinutes) % 60 === 0;
+                  return (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute inset-x-0 border-t",
+                        major ? "border-border/60" : "border-border/30",
+                      )}
+                      key={slot}
+                      style={{ top: slot * slotHeight }}
+                    />
+                  );
+                })}
+                {timedEntries.map((entry) => (
+                  <AgendaTimedEvent
+                    entry={entry}
+                    hourHeight={hourHeight}
+                    key={entry.id}
+                    minimumMinutes={zoomMinutes}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </div>
+            );
+          })}
+          {showNow ? (
+            <div
+              className="pointer-events-none absolute inset-x-0 z-20"
+              style={{ top: nowTop }}
+              aria-label={`Current time ${currentTimeLabel}`}
+            >
+              <span className="absolute left-[72px] right-0 flex -translate-y-1/2 items-center">
+                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-red-500" />
+                <span className="-ml-1.5 h-px w-2 shrink-0 bg-red-500" />
+                <span className="shrink-0 whitespace-nowrap rounded bg-background px-1.5 py-0.5 text-[10px] font-semibold text-red-500">
+                  {currentTimeLabel}
+                </span>
+                <span className="h-px min-w-0 flex-1 bg-red-500" />
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
 
-interface AgendaViewProps {
-  anchor: Date;
-  entries: SpaceAgendaEntry[];
-  onOpen: (entry: SpaceAgendaEntry) => void;
-}
-
-function AgendaChip({
+function AgendaMonthChip({
   entry,
   onOpen,
 }: {
@@ -128,21 +286,22 @@ function AgendaChip({
       type="button"
       variant="ghost"
       className={cn(
-        "h-auto w-full justify-start truncate rounded px-1.5 py-1 text-left text-[10px] font-medium",
-        kindClass(entry.kind),
+        "h-6 w-full justify-start gap-1 truncate rounded px-1.5 text-left text-[10px] font-medium",
+        kindSurface(entry.kind),
       )}
       title={entry.title}
       onClick={() => onOpen(entry)}
     >
-      {entry.all_day
-        ? ""
-        : `${new Date(entry.starts_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} `}
-      {entry.title}
+      <EntryIcon entry={entry} className="size-3 shrink-0" />
+      <span className="truncate">
+        {entry.all_day ? "" : `${formatTime(entry.starts_at)} `}
+        {entry.title}
+      </span>
     </Button>
   );
 }
 
-function AgendaCard({
+function AgendaAllDayChip({
   entry,
   onOpen,
 }: {
@@ -153,51 +312,93 @@ function AgendaCard({
     <Button
       type="button"
       variant="ghost"
-      className="h-auto w-full items-start justify-start gap-3 rounded-md px-2 py-2.5 text-left font-normal hover:bg-muted/40"
+      className={cn(
+        "h-7 w-full justify-start gap-1.5 truncate rounded-md border px-2 text-left text-[11px] font-medium",
+        kindSurface(entry.kind),
+      )}
       onClick={() => onOpen(entry)}
     >
-      <span className={cn("mt-1 size-2.5 shrink-0 rounded-full", kindDot(entry.kind))} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{entry.title}</span>
-        <span className="block text-xs text-muted-foreground">
-          {entry.all_day
-            ? "All day"
-            : new Date(entry.starts_at).toLocaleTimeString([], {
-                hour: "numeric",
-                minute: "2-digit",
-              })}{" "}
-          ·{" "}
-          {entry.kind === "event"
-            ? "Calendar"
-            : entry.kind === "roadmap_node"
-              ? roadmapNodeLabel(entry.roadmap_node_kind)
-              : entry.kind[0].toUpperCase() + entry.kind.slice(1)}
-        </span>
+      <EntryIcon entry={entry} className="size-3.5 shrink-0" />
+      <span className="truncate">{entry.title}</span>
+    </Button>
+  );
+}
+
+function AgendaTimedEvent({
+  entry,
+  hourHeight,
+  minimumMinutes,
+  onOpen,
+}: {
+  entry: SpaceAgendaEntry;
+  hourHeight: number;
+  minimumMinutes: AgendaZoomMinutes;
+  onOpen: (entry: SpaceAgendaEntry) => void;
+}) {
+  const startsAt = new Date(entry.starts_at);
+  const endsAt = new Date(entry.ends_at);
+  const startMinutes = startsAt.getHours() * 60 + startsAt.getMinutes();
+  const durationMinutes = Math.max(
+    minimumMinutes / 2,
+    (endsAt.getTime() - startsAt.getTime()) / 60_000,
+  );
+  const top = (startMinutes / 60) * hourHeight;
+  const height = Math.max(40, (durationMinutes / 60) * hourHeight);
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className={cn(
+        "absolute inset-x-1 z-10 h-auto min-h-7 items-start justify-start gap-1.5",
+        "overflow-hidden rounded-md border px-2 py-1.5 text-left font-normal shadow-sm",
+        kindSurface(entry.kind),
+      )}
+      style={{ top, height }}
+      title={`${entry.title}, ${formatTimeRange(entry)}`}
+      onClick={() => onOpen(entry)}
+    >
+      <EntryIcon entry={entry} className="mt-0.5 size-3.5 shrink-0" />
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-semibold leading-4">{entry.title}</span>
+        {height >= 38 ? (
+          <span className="block truncate text-[9px] leading-3.5 opacity-75">
+            {formatTimeRange(entry)}
+          </span>
+        ) : null}
       </span>
     </Button>
   );
 }
 
-function kindClass(kind: SpaceAgendaEntry["kind"]) {
-  return kind === "task"
-    ? "bg-blue-500/15 text-blue-300"
-    : kind === "event"
-      ? "bg-violet-500/15 text-violet-300"
-      : kind === "roadmap_node"
-        ? "bg-amber-500/15 text-amber-300"
-        : "bg-emerald-500/15 text-emerald-300";
-}
-function kindDot(kind: SpaceAgendaEntry["kind"]) {
-  return kind === "task"
-    ? "bg-blue-500"
-    : kind === "event"
-      ? "bg-violet-500"
-      : kind === "roadmap_node"
-        ? "bg-amber-500"
-        : "bg-emerald-500";
+function EntryIcon({ entry, className }: { entry: SpaceAgendaEntry; className?: string }) {
+  if (entry.kind === "task") return <CheckSquare2 className={className} />;
+  if (entry.kind === "event") return <CalendarDays className={className} />;
+  return <GitFork className={className} />;
 }
 
-function roadmapNodeLabel(kind: SpaceAgendaEntry["roadmap_node_kind"]) {
-  if (!kind) return "Roadmap";
-  return kind[0].toUpperCase() + kind.slice(1);
+function kindSurface(kind: SpaceAgendaEntry["kind"]) {
+  return kind === "task"
+    ? "border-blue-400/30 bg-blue-500/20 text-blue-100 hover:bg-blue-500/25"
+    : kind === "event"
+      ? "border-violet-400/30 bg-violet-500/20 text-violet-100 hover:bg-violet-500/25"
+      : kind === "roadmap_node"
+        ? "border-amber-400/30 bg-amber-500/20 text-amber-100 hover:bg-amber-500/25"
+        : "border-emerald-400/30 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/25";
+}
+
+function isSameDay(left: Date, right: Date) {
+  return dayKey(left) === dayKey(right);
+}
+
+function formatHour(hour: number) {
+  return new Date(2026, 0, 1, hour).toLocaleTimeString([], { hour: "numeric" });
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatTimeRange(entry: SpaceAgendaEntry) {
+  return `${formatTime(entry.starts_at)} – ${formatTime(entry.ends_at)}`;
 }

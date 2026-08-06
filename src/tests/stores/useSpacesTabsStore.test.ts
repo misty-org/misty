@@ -36,6 +36,17 @@ describe("per-Space workspace tabs", () => {
     );
   });
 
+  it("creates Agents as a normal top-level workspace tab", () => {
+    const store = useSpacesTabsStore.getState();
+    store.ensureSession("account-1", "space-a");
+    store.addTab("account-1", "space-a", "agents");
+
+    const session =
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
+    expect(session.tabs.map((tab) => tab.kind)).toEqual(["space", "agents"]);
+    expect(activeSpacesTab(session)).toMatchObject({ kind: "agents", title: "Agents" });
+  });
+
   it("replaces the final closed tab with a fresh Space tab", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");

@@ -1,17 +1,44 @@
-export interface SpaceConversationMember {
-  user_id: string;
+export type SpaceActorRef =
+  | { kind: "person"; user_id: string; agent_id?: never }
+  | { kind: "agent"; agent_id: string; user_id?: never };
+
+export interface SpaceParticipant {
+  kind: "person" | "agent";
+  user_id?: string;
+  agent_id?: string;
   name: string;
-  email: string;
+  email?: string;
+  avatar?: import("@/models/interfaces/features/agents/personal").AgentAvatar;
   joined_at: string;
+}
+
+export interface SpaceMessageSender {
+  kind: "person" | "agent" | "system";
+  user_id?: string;
+  agent_id?: string;
+  display_name: string;
+  avatar_version?: number;
+}
+
+export interface SpaceMessageAgentRun {
+  id: string;
+  agent_id: string;
+  state:
+    "queued" | "working" | "awaiting_approval" | "completed" | "failed" | "canceled" | "retrying";
+  run_id?: string;
+  error_code?: string;
+  error_message?: string;
 }
 
 export interface SpaceConversation {
   id: string;
-  kind?: "standard" | "misty_support";
+  kind?: "standard" | "direct";
   space_id: string;
   title: string;
   created_by_user_id: string;
-  members: SpaceConversationMember[];
+  direct_user_id?: string;
+  direct_agent_id?: string;
+  participants: SpaceParticipant[];
   origin: "misty" | "discord";
   integration_id?: string;
   external_resource_id?: string;

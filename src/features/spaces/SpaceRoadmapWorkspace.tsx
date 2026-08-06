@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GitFork, LoaderCircle, Plus } from "lucide-react";
+import { GitFork, LoaderCircle, Plus, SquarePen } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import { errorText } from "@/lib/format";
@@ -18,7 +18,6 @@ import {
   applyRoadmapLayout,
   milestoneAt,
   normalizeRoadmapSnapshot,
-  readBoolean,
   readExpandedGoals,
 } from "./spaceRoadmap/RoadmapWorkspaceHelpers";
 import { roadmapPalette, type RoadmapPaletteItem } from "./spaceRoadmap/roadmapNodeCatalog";
@@ -35,15 +34,13 @@ export function SpaceRoadmapWorkspace({
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const drawerPinKey = `misty:roadmap-node-drawer-pinned:${user?.id ?? "anonymous"}:${spaceId}`;
   const [roadmaps, setRoadmaps] = useState<SpaceRoadmap[]>([]);
   const [snapshot, setSnapshot] = useState<SpaceRoadmapSnapshot>();
   const [tasks, setTasks] = useState<SpaceTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saveState, setSaveState] = useState<SpaceRoadmapSaveState>("saved");
-  const [nodeDrawerOpen, setNodeDrawerOpen] = useState(false);
-  const [nodeDrawerPinned, setNodeDrawerPinned] = useState(() => readBoolean(drawerPinKey));
+  const [nodeDrawerOpen, setNodeDrawerOpen] = useState(true);
   const [placementRequest, setPlacementRequest] = useState<{
     paletteId: string;
     token: string;
@@ -88,16 +85,6 @@ export function SpaceRoadmapWorkspace({
   useEffect(() => {
     setExpandedGoalIds(readExpandedGoals(expansionKey));
   }, [expansionKey]);
-  useEffect(() => {
-    setNodeDrawerPinned(readBoolean(drawerPinKey));
-  }, [drawerPinKey]);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(drawerPinKey, JSON.stringify(nodeDrawerPinned));
-    } catch {
-      // Personal drawer layout is optional.
-    }
-  }, [drawerPinKey, nodeDrawerPinned]);
   useEffect(() => {
     try {
       window.localStorage.setItem(expansionKey, JSON.stringify([...expandedGoalIds]));
@@ -219,9 +206,9 @@ export function SpaceRoadmapWorkspace({
       <main className="h-full overflow-auto p-6">
         <div className="mx-auto max-w-4xl">
           <header className="mb-6">
-            <h1 className="m-0 text-xl font-semibold">Roadmaps</h1>
+            <h1 className="m-0 text-xl font-semibold">Views</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Group milestones, goals, and the tasks that move them forward.
+              Choose a roadmap canvas, then open it when you are ready to edit.
             </p>
           </header>
           {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
@@ -252,30 +239,38 @@ export function SpaceRoadmapWorkspace({
               New roadmap
             </Button>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
             {roadmaps.map((roadmap) => (
-              <Button
-                type="button"
-                variant="ghost"
-                className={[
-                  "h-auto min-h-32 flex-col items-start justify-start rounded-xl border",
-                  "border-border/70 bg-card p-4 text-left font-normal transition-colors",
-                  "hover:border-primary/40 hover:bg-muted/20",
-                ].join(" ")}
+              <article
+                className="flex min-h-20 items-center gap-3 border-t border-border/60 px-4 py-3 first:border-t-0"
                 key={roadmap.id}
-                onClick={() =>
-                  navigate(
-                    `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps/${encodeURIComponent(roadmap.id)}`,
-                  )
-                }
               >
-                <GitFork className="mb-5 size-5 text-muted-foreground" />
-                <strong className="block text-sm">{roadmap.name}</strong>
-                <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
-                  {roadmap.description || "No description yet"}
-                </span>
-              </Button>
+                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                  <GitFork className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-sm font-medium">{roadmap.name}</strong>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {roadmap.description || "No description yet"}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    navigate(
+                      `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps/${encodeURIComponent(roadmap.id)}`,
+                    )
+                  }
+                >
+                  <SquarePen className="size-4" />
+                  Open editor
+                </Button>
+              </article>
             ))}
+            {!roadmaps.length && !loading ? (
+              <div className="p-10 text-center text-sm text-muted-foreground">No roadmaps yet.</div>
+            ) : null}
           </div>
         </div>
       </main>
@@ -419,7 +414,6 @@ export function SpaceRoadmapWorkspace({
       selectedId={selectedId}
       expandedGoalIds={expandedGoalIds}
       nodeDrawerOpen={nodeDrawerOpen}
-      nodeDrawerPinned={nodeDrawerPinned}
       placementRequest={placementRequest}
       palette={palette}
       navigate={navigate}
@@ -433,7 +427,6 @@ export function SpaceRoadmapWorkspace({
       setSelectedId={setSelectedId}
       setExpandedGoalIds={setExpandedGoalIds}
       setNodeDrawerOpen={setNodeDrawerOpen}
-      setNodeDrawerPinned={setNodeDrawerPinned}
       setPlacementRequest={setPlacementRequest}
     />
   );

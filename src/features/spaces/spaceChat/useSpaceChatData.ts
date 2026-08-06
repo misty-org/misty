@@ -59,15 +59,23 @@ export function useSpaceChatScope(options: {
     (conversation) => conversation.id === conversationId,
   );
   const allowedMemberIds = useMemo(
-    () => new Set(activeConversation?.members.map((member) => member.user_id) ?? []),
+    () =>
+      new Set(
+        activeConversation?.participants
+          .filter((participant) => participant.kind === "person")
+          .flatMap((participant) => (participant.user_id ? [participant.user_id] : [])) ?? [],
+      ),
     [activeConversation],
   );
   const directRecipient = useMemo(() => {
-    if (!activeConversation || activeConversation.members.length > 2) return undefined;
-    const other =
-      activeConversation.members.find((member) => member.user_id !== currentUserId) ??
-      activeConversation.members[0];
-    return other ? { userId: other.user_id, name: other.name } : undefined;
+    if (!activeConversation || activeConversation.participants.length > 2) return undefined;
+    const other = activeConversation.participants.find(
+      (participant) =>
+        participant.kind === "person" &&
+        Boolean(participant.user_id) &&
+        participant.user_id !== currentUserId,
+    );
+    return other?.user_id ? { userId: other.user_id, name: other.name } : undefined;
   }, [activeConversation, currentUserId]);
   const nodes = useMemo(
     () => (store.nodesBySpace[spaceId] ?? emptyNodes).filter((node) => node.kind === "link"),
@@ -80,7 +88,14 @@ export function useSpaceChatScope(options: {
     activeConversation,
     directRecipient,
     nodes,
-    agents: store.agentsBySpace[spaceId] ?? emptyAgents,
+    agents: conversationId
+      ? (store.agentsBySpace[spaceId] ?? emptyAgents).filter((agent) =>
+          activeConversation?.participants.some(
+            (participant) =>
+              participant.kind === "agent" && participant.agent_id === agent.id,
+          ),
+        )
+      : store.agentsBySpace[spaceId] ?? emptyAgents,
     members: conversationId
       ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
       : allMembers,

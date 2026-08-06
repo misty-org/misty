@@ -1,22 +1,9 @@
-import { Bot } from "lucide-react";
 import type { DesktopNavItem } from "@/models/types/layouts";
 import type { AppTab } from "@/models/types/routing/types";
 import { routes } from "./paths";
 import { agentTeammatesV1Enabled } from "@/features/agents/flags";
 
-export const desktopNavItems = [
-  ...(agentTeammatesV1Enabled()
-    ? []
-    : [
-        {
-          id: "agents" as const,
-          label: "Agents",
-          path: routes.agents,
-          icon: Bot,
-          active: (pathname: string) => pathname.startsWith(routes.agents),
-        },
-      ]),
-] satisfies DesktopNavItem[];
+export const desktopNavItems: DesktopNavItem[] = [];
 
 const deepLinkPrefixes = [
   routes.invite,

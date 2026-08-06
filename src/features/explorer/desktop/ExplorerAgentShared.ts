@@ -1,15 +1,4 @@
 import { selectedPathsForPane, useExplorerStore } from "@/stores/explorer";
-import type { AiStatus } from "@/models/interfaces/stores/agent/useAgentSessionStore";
-
-export function agentStatusText(status: AiStatus | null): string {
-  if (!status) return "Checking Agents...";
-  if (status.configured) return `Ready (${status.modelName})`;
-  return "Backend unavailable";
-}
-
-export function agentPlaceholder(configured: boolean, fallback: string): string {
-  return configured ? fallback : "Configure hosted Agents to continue";
-}
 
 export function selectedPathsAcrossPanes(
   panes: ReturnType<typeof useExplorerStore.getState>["panes"],

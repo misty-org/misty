@@ -8,14 +8,10 @@ import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { routes } from "./paths";
-import { LegacyAgentRedirect } from "./LegacyAgentRedirect";
 import { LegacyWorkspaceToolRedirect } from "./LegacyWorkspaceToolRedirect";
 import { SpaceInvitationRedemption } from "../features/spaces/components/SpaceInvitationRedemption";
 import { spaceNotesEnabled } from "../features/notes/availability";
 import AgentsPage from "../pages/Agents";
-import { agentTeammatesV1Enabled } from "../features/agents/flags";
-
-const legacyAgentElement = agentTeammatesV1Enabled() ? <LegacyAgentRedirect /> : <AgentsPage />;
 
 export const router = createBrowserRouter([
   {
@@ -38,9 +34,9 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "agents", element: legacyAgentElement },
+              { path: "agents", element: <AgentsPage /> },
               { path: "automations", element: <Navigate to={routes.spaces} replace /> },
-              { path: "assistant", element: legacyAgentElement },
+              { path: "assistant", element: <Navigate to={routes.agents} replace /> },
               {
                 path: "spaces",
                 element: <SpacesShell />,
@@ -58,7 +54,7 @@ export const router = createBrowserRouter([
                 ],
               },
               { path: "studio", element: <Navigate to={routes.spaces} replace /> },
-              { path: "studio/agents", element: legacyAgentElement },
+              { path: "studio/agents", element: <Navigate to={routes.agents} replace /> },
               { path: "studio/workflows", element: <Navigate to={routes.spaces} replace /> },
               { path: "extensions", element: <LegacyWorkspaceToolRedirect kind="extensions" /> },
               { path: "changelog", element: <Navigate to={routes.spaces} replace /> },

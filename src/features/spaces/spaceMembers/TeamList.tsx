@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Avatar,
   AvatarFallback,
@@ -71,7 +71,7 @@ export function TeamList({
   onReload: () => Promise<void>;
   onError: (message: string) => void;
 }) {
-  const [, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const personalAgents = usePersonalAgentsStore((state) => state.agents);
   const loadPersonalAgents = usePersonalAgentsStore((state) => state.load);
   const [selectedAgentId, setSelectedAgentId] = useState("");
@@ -106,12 +106,11 @@ export function TeamList({
     }
   };
   const openAgent = (agentId: string) => {
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set("agentDock", "1");
-      next.set("agent", agentId);
-      return next;
-    });
+    void spacesApi.directAgentConversation(spaceId, agentId).then((conversation) =>
+      navigate(
+        `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
+      ),
+    );
   };
 
   return (
@@ -239,33 +238,6 @@ export function TeamList({
               </div>
             ))
           : null}
-
-        {!loading ? (
-          <div className={`${rowClass} border-t border-border/60 bg-violet-500/[0.03]`}>
-            <AgentAvatar
-              name="Misty"
-              avatar={{ kind: "preset", preset_id: "sparkles", accent: "violet" }}
-              className="size-10"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto min-w-0 truncate p-0 text-left text-sm font-medium"
-                  onClick={() => openAgent("misty")}
-                >
-                  Misty
-                </Button>
-                <Badge variant="secondary">Agent</Badge>
-              </div>
-              <p className="mb-0 mt-0.5 truncate text-xs text-muted-foreground">
-                Team coordinator · managed by Misty
-              </p>
-            </div>
-            <WorkStateBadge state="ready" />
-          </div>
-        ) : null}
 
         {!loading
           ? agents.map((agent) => (
@@ -412,9 +384,14 @@ export function TeamList({
 function WorkStateBadge({ state }: { state: NonNullable<SpaceAgentMembership["work_state"]> }) {
   const labels = {
     ready: "Ready",
+    queued: "Queued",
     working: "Working",
+    awaiting_approval: "Awaiting approval",
     needs_approval: "Needs approval",
+    retrying: "Retrying",
+    completed: "Ready",
     failed: "Failed",
+    canceled: "Canceled",
     disabled: "Disabled",
     update_available: "Update available",
   } as const;

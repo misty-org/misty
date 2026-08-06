@@ -26,8 +26,7 @@ export type * from "./agentTaskTypes";
 
 export interface Space {
   id: string;
-  kind?: "standard" | "misty";
-  support_conversation_id?: string;
+  kind?: "standard";
   security_domain_id?: string;
   owner_user_id: string;
   name: string;
@@ -145,7 +144,7 @@ export interface SpaceCalendarSource {
   space_id: string;
   integration_id: string;
   connected_by_user_id: string;
-  provider: "google";
+  provider: "google" | "misty";
   external_calendar_id: string;
   display_name: string;
   timezone: string;
@@ -162,7 +161,7 @@ export interface SpaceCalendarEvent {
   id: string;
   space_id: string;
   source_id: string;
-  provider: "google";
+  provider: "google" | "misty";
   external_event_id: string;
   fingerprint: string;
   title: string;
@@ -180,6 +179,9 @@ export interface SpaceCalendarEvent {
   removed_at?: string;
   created_at: string;
   updated_at: string;
+  version?: number;
+  audience_kind?: "space" | "conversation";
+  audience_conversation_id?: string;
 }
 
 export interface GoogleCalendarChoice {
@@ -200,6 +202,7 @@ export interface SpaceMessage {
   sender_avatar_version?: number;
   sender_kind: "person" | "agent" | "system";
   sender_agent_id?: string;
+  sender?: import("./conversationTypes").SpaceMessageSender;
   content: MessageSpan[];
   file_node_ids: string[];
   library_item_ids?: string[];
@@ -212,9 +215,9 @@ export interface SpaceMessage {
    * existing caller stays valid and the UI can treat "no origin" as "ours".
    */
   origin?: MessageOrigin;
+  triggered_runs?: import("./conversationTypes").SpaceMessageAgentRun[];
   created_at: string;
 }
-
 export interface SpaceMessageReaction {
   emoji: string;
   count: number;
@@ -644,4 +647,5 @@ export interface LibraryEditResult {
   edit?: LibraryEditVersion;
 }
 export type * from "@/models/interfaces/features/spaces/agentArchitectureTypes";
+export type * from "@/models/interfaces/features/spaces/actionSuggestionTypes";
 export type * from "@/models/interfaces/features/spaces/conversationTypes";

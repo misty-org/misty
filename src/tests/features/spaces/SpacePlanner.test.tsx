@@ -69,7 +69,7 @@ describe("SpacePlanner", () => {
     });
 
     expect(container.textContent).toContain("Tasks");
-    expect(container.textContent).toContain("board view");
+    expect(container.textContent).not.toContain("board view");
     expect(container.textContent).not.toContain("Calendar");
     expect(container.querySelector('button[aria-label="Sync planner"]')).not.toBeNull();
     expect(container.textContent).toContain("To do");
@@ -90,6 +90,41 @@ describe("SpacePlanner", () => {
 
     expect(document.body.textContent).toContain("New task");
     expect(document.querySelector("#space-task-title")).not.toBeNull();
+    expect(document.querySelector('[data-slot="sheet-content"]')?.className).toContain(
+      "bg-[var(--misty-app-modal-bg,var(--popover))]",
+    );
+  });
+
+  it("shows task notes without an unassigned placeholder avatar", async () => {
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-detailed",
+          task_key: "MST-4",
+          title: "Finish taking screenshots for website",
+          notes: "Capture the final light and dark production states.",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Capture the final light and dark production states.");
+    expect(container.querySelector('[title="Unassigned"]')).toBeNull();
   });
 
   it("keeps core tasks available when optional calendar endpoints fail", async () => {

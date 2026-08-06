@@ -3,7 +3,6 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
-import { isMistySpace } from "../mistySpace";
 
 // Work surfaces only. Management controls live at the opposite end of the top bar.
 const sections = [
@@ -17,9 +16,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
   const { user } = useAuth();
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const permissions = space?.permissions;
-  const visibleSections = (
-    isMistySpace(space) ? sections.filter(({ id }) => id === "chat") : sections
-  )
+  const visibleSections = sections
     .filter(({ id }) => id !== "chat" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);

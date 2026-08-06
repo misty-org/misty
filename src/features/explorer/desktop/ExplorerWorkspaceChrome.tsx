@@ -3,6 +3,10 @@ import { useMultiPanelStore } from "@/features/workspace";
 import { isChromeTabPath } from "./explorerPlugins/tabPaths";
 import { ExplorerBottomBar } from "./ExplorerWorkspaceUtils";
 
+export function resolveExplorerBottomBarRenderer(embedded?: boolean) {
+  return embedded ? undefined : renderExplorerBottomBar;
+}
+
 export function renderExplorerBottomBar(tab: MultiPanelTab) {
   if (isChromeTabPath(tab.path)) return null;
   return (

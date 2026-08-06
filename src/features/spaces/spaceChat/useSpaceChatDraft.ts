@@ -10,7 +10,7 @@ export const MAX_CHAT_ATTACHMENTS = 5;
  * Attachments and Library picks share one budget, so `attachmentSlotsLeft` is
  * the single number every add path checks before offering more.
  */
-export function useSpaceChatDraft(spaceId: string) {
+export function useSpaceChatDraft(spaceId: string, conversationId = "") {
   const [text, setText] = useState("");
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
@@ -41,7 +41,9 @@ export function useSpaceChatDraft(spaceId: string) {
     try {
       const uploaded: MessageAttachment[] = [];
       for (const path of paths.slice(0, attachmentSlotsLeft)) {
-        const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment");
+        const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment", {
+          conversationId: conversationId || undefined,
+        });
         if (result.attachment) uploaded.push(result.attachment);
       }
       setPendingAttachments((current) => [...current, ...uploaded]);

@@ -1,6 +1,6 @@
 import { spaceNotesEnabled } from "@/features/notes/availability";
 
-type PlannerSubpage = "tasks" | "agenda" | "roadmaps";
+type PlannerSubpage = "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";
 
 interface SpaceSubpageMemory {
@@ -64,6 +64,8 @@ export function rememberedJournalRoute(
 function defaultPlannerRoute(spaceId: string, subpage: PlannerSubpage) {
   const base = `/spaces/${encodeURIComponent(spaceId)}/planner`;
   if (subpage === "agenda") return `${base}/agenda/month`;
+  if (subpage === "goals") return `${base}/goals`;
+  if (subpage === "milestones") return `${base}/milestones`;
   if (subpage === "roadmaps") return `${base}/roadmaps`;
   return `${base}/tasks/board`;
 }
@@ -81,7 +83,13 @@ function parseSpaceRoute(
     if (parts[0] !== "spaces" || decodeURIComponent(parts[1] ?? "") !== spaceId) return undefined;
     if (parts[2] === "planner") {
       const subpage = parts[3];
-      if (subpage === "tasks" || subpage === "agenda" || subpage === "roadmaps") {
+      if (
+        subpage === "tasks" ||
+        subpage === "agenda" ||
+        subpage === "goals" ||
+        subpage === "milestones" ||
+        subpage === "roadmaps"
+      ) {
         return { section: "planner" as const, subpage };
       }
     }

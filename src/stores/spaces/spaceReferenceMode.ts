@@ -1,21 +1,25 @@
 import type { SpacesStore } from "@/models/interfaces/stores/spaces/useSpacesStore";
 import type { SpacesSnapshot } from "@/models/interfaces/features/spaces/types";
 import { SpaceRequestError } from "./useSpacesBackendStore";
-import {
-  cacheSpaceSnapshot,
-  readSpaceReferenceCache,
-  setSpaceReferenceAccount,
-} from "./spaceReferenceCache";
+import { removeSpaceReferenceCache, setSpaceReferenceAccount } from "./spaceReferenceCache";
 import { setSpaceReferenceOnly, subscribeSpaceReferenceOnly } from "./spaceConnectivity";
 
+let clearedReferenceCacheAccount = "";
+
 export function setSpaceReferenceModeAccount(accountId: string): void {
-  setSpaceReferenceAccount(accountId);
+  const normalizedAccountId = accountId.trim();
+  setSpaceReferenceAccount(normalizedAccountId);
+  // Saved-copy mode has been retired. Remove any encrypted reference cache
+  // left by an earlier build so it cannot become a fallback again.
+  if (normalizedAccountId && normalizedAccountId !== clearedReferenceCacheAccount) {
+    clearedReferenceCacheAccount = normalizedAccountId;
+    void removeSpaceReferenceCache(normalizedAccountId);
+  }
 }
 
 export function liveSpaceSnapshotState(snapshot: SpacesSnapshot): Partial<SpacesStore> {
   const lastSyncedAt = new Date().toISOString();
   setSpaceReferenceOnly(false);
-  cacheSpaceSnapshot(snapshot);
   return {
     spaces: snapshot.spaces,
     invitations: snapshot.invitations,
@@ -30,23 +34,24 @@ export function liveSpaceSnapshotState(snapshot: SpacesSnapshot): Partial<Spaces
 
 export async function referenceSpaceSnapshotState(
   error: unknown,
-  current: SpacesStore,
+  _current: SpacesStore,
 ): Promise<Partial<SpacesStore> | null> {
   if (!canUseSpaceReferenceFallback(error)) return null;
-  const cached = await readSpaceReferenceCache();
-  if (!cached && current.spaces.length === 0) return null;
   setSpaceReferenceOnly(true);
   return {
-    spaces: cached?.snapshot.spaces ?? current.spaces,
+    spaces: [],
     invitations: [],
-    limits: cached?.snapshot.entitlements ?? current.limits,
-    ownerStorage: cached?.snapshot.owner_storage ?? current.ownerStorage,
-    membersBySpace: cached?.membersBySpace ?? current.membersBySpace,
-    messagesBySpace: cached?.messagesBySpace ?? current.messagesBySpace,
-    nodesBySpace: cached?.nodesBySpace ?? current.nodesBySpace,
-    snapshotReady: true,
+    limits: null,
+    ownerStorage: null,
+    membersBySpace: {},
+    agentMembershipsBySpace: {},
+    messagesBySpace: {},
+    nodesBySpace: {},
+    agentsBySpace: {},
+    workflowsBySpace: {},
+    snapshotReady: false,
     referenceOnly: true,
-    lastSyncedAt: cached?.savedAt ?? current.lastSyncedAt,
+    lastSyncedAt: null,
     loading: false,
     error: null,
   };
@@ -60,6 +65,7 @@ export function canUseSpaceReferenceFallback(error: unknown): boolean {
 export function resetSpaceReferenceMode(): void {
   setSpaceReferenceOnly(false);
   setSpaceReferenceAccount("");
+  clearedReferenceCacheAccount = "";
 }
 
 export function bindSpaceReferenceMode(

@@ -19,6 +19,8 @@ describe("Space subpage route memory", () => {
       "space-1",
       "/spaces/space-1/planner/agenda/week?date=2026-08-17",
     );
+    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/planner/goals");
+    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/planner/milestones");
     rememberSpaceSubpageRoute(
       "account-1",
       "space-1",
@@ -30,6 +32,12 @@ describe("Space subpage route memory", () => {
     );
     expect(rememberedPlannerRoute("account-1", "space-1", "agenda")).toBe(
       "/spaces/space-1/planner/agenda/week?date=2026-08-17",
+    );
+    expect(rememberedPlannerRoute("account-1", "space-1", "goals")).toBe(
+      "/spaces/space-1/planner/goals",
+    );
+    expect(rememberedPlannerRoute("account-1", "space-1", "milestones")).toBe(
+      "/spaces/space-1/planner/milestones",
     );
     expect(rememberedPlannerRoute("account-1", "space-1", "roadmaps")).toBe(
       "/spaces/space-1/planner/roadmaps/map-1?node=risk-2",

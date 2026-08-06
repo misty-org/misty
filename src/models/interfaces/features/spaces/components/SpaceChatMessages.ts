@@ -34,6 +34,7 @@ import { copyLibraryItemsToClipboard } from "@/features/spaces/libraryClipboard"
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type { MessageSpan } from "@/models/types/features/spaces/types";
 import type {
+  SpaceActionSuggestionBatch,
   SpaceLibraryItem,
   SpaceMessage,
   SpaceNode,
@@ -44,6 +45,8 @@ export interface SpaceChatMessagesProps {
   error: string;
   loading: boolean;
   messages: SpaceMessage[];
+  actionSuggestions?: SpaceActionSuggestionBatch[];
+  onActionSuggestionsChanged?: () => void;
   currentUserId?: string;
   isOwner: boolean;
   canWrite: boolean;

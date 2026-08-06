@@ -49,6 +49,8 @@ const mediaOptions: Array<{ value: LibraryMediaFilter; label: string }> = [
 
 export function MistyLibraryPicker({
   spaceId,
+  embedded = false,
+  active = true,
   selectedIds,
   maximumSelected = 5,
   sourceToggle,
@@ -116,6 +118,153 @@ export function MistyLibraryPicker({
 
   const searching = Boolean(query.trim()) || mediaFilter !== "all";
 
+  const panel = (
+    <>
+      <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+        <div className={pickerStyles.searchField} role="search">
+          <Search size={15} aria-hidden="true" />
+          <Input
+            className={pickerStyles.searchInput}
+            aria-label="Search Library"
+            autoComplete="off"
+            autoFocus={active}
+            spellCheck={false}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search names, filenames, and tags"
+          />
+          {query ? (
+            <Button
+              className="size-6 shrink-0"
+              size="icon"
+              variant="ghost"
+              type="button"
+              aria-label="Clear Library search"
+              onClick={() => setQuery("")}
+            >
+              <X size={13} />
+            </Button>
+          ) : null}
+        </div>
+        <Select
+          value={mediaFilter}
+          onValueChange={(value) => setMediaFilter(value as LibraryMediaFilter)}
+        >
+          <SelectTrigger className="w-[142px] shrink-0" aria-label="Filter by media type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {mediaOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <ScrollArea className="min-h-0 bg-background">
+        <div className="p-4">
+          {loading ? (
+            <div
+              className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3"
+              aria-label="Loading Library"
+            >
+              {Array.from({ length: 12 }, (_, index) => (
+                <Skeleton className="aspect-[4/3] rounded-lg" key={index} />
+              ))}
+            </div>
+          ) : error ? (
+            <ErrorState title="Library could not be loaded" description={error} />
+          ) : filteredItems.length === 0 ? (
+            <EmptyState
+              title={searching ? "No matching items" : "This Library is empty"}
+              description={
+                searching
+                  ? "Try another search or media type."
+                  : "Items added to this Space will appear here."
+              }
+              action={
+                searching ? (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setMediaFilter("all");
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : null
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+              {filteredItems.map((item) => {
+                const selected = selection.includes(item.id);
+                const unavailable = !selected && selection.length >= maximumSelected;
+                return (
+                  <Button
+                    className={cn(
+                      "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
+                      selected
+                        ? "ring-2 ring-primary"
+                        : "bg-card inset-ring-1 inset-ring-foreground/10 hover:bg-accent",
+                    )}
+                    variant="ghost"
+                    type="button"
+                    key={item.id}
+                    disabled={unavailable}
+                    aria-pressed={selected}
+                    onClick={() => toggleItem(item.id)}
+                  >
+                    <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-muted">
+                      <MistyLibraryPickerThumbnail spaceId={spaceId} item={item} />
+                    </span>
+                    <span className="block min-w-0 px-2.5 py-2">
+                      <span className="block truncate text-xs font-medium">
+                        {item.display_name}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
+                        {item.file.original_filename}
+                      </span>
+                    </span>
+                    {selected ? (
+                      <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-md bg-primary text-primary-foreground shadow-xs">
+                        <Check className="size-3" />
+                      </span>
+                    ) : null}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      <DialogFooter className="flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
+        <p className="text-xs text-muted-foreground">
+          {selection.length} of {maximumSelected} selected
+        </p>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={loading || selection.length === 0}
+            onClick={() => onChoose(selection)}
+          >
+            Add {selection.length || ""} item{selection.length === 1 ? "" : "s"}
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  );
+
+  if (embedded) return panel;
+
   return (
     <Dialog
       open
@@ -133,147 +282,7 @@ export function MistyLibraryPicker({
           </div>
           {sourceToggle}
         </DialogHeader>
-
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <div className={pickerStyles.searchField} role="search">
-            <Search size={15} aria-hidden="true" />
-            <Input
-              className={pickerStyles.searchInput}
-              aria-label="Search Library"
-              autoComplete="off"
-              autoFocus
-              spellCheck={false}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search names, filenames, and tags"
-            />
-            {query ? (
-              <Button
-                className="size-6 shrink-0"
-                size="icon"
-                variant="ghost"
-                type="button"
-                aria-label="Clear Library search"
-                onClick={() => setQuery("")}
-              >
-                <X size={13} />
-              </Button>
-            ) : null}
-          </div>
-          <Select
-            value={mediaFilter}
-            onValueChange={(value) => setMediaFilter(value as LibraryMediaFilter)}
-          >
-            <SelectTrigger className="w-[142px] shrink-0" aria-label="Filter by media type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {mediaOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <ScrollArea className="min-h-0 bg-background">
-          <div className="p-4">
-            {loading ? (
-              <div
-                className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3"
-                aria-label="Loading Library"
-              >
-                {Array.from({ length: 12 }, (_, index) => (
-                  <Skeleton className="aspect-[4/3] rounded-lg" key={index} />
-                ))}
-              </div>
-            ) : error ? (
-              <ErrorState title="Library could not be loaded" description={error} />
-            ) : filteredItems.length === 0 ? (
-              <EmptyState
-                title={searching ? "No matching items" : "This Library is empty"}
-                description={
-                  searching
-                    ? "Try another search or media type."
-                    : "Items added to this Space will appear here."
-                }
-                action={
-                  searching ? (
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() => {
-                        setQuery("");
-                        setMediaFilter("all");
-                      }}
-                    >
-                      Clear filters
-                    </Button>
-                  ) : null
-                }
-              />
-            ) : (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-                {filteredItems.map((item) => {
-                  const selected = selection.includes(item.id);
-                  const unavailable = !selected && selection.length >= maximumSelected;
-                  return (
-                    <Button
-                      className={cn(
-                        "group relative h-auto flex-col items-stretch justify-start gap-0 overflow-hidden whitespace-normal rounded-lg p-0 text-left shadow-xs",
-                        selected
-                          ? "ring-2 ring-primary"
-                          : "bg-card inset-ring-1 inset-ring-foreground/10 hover:bg-accent",
-                      )}
-                      variant="ghost"
-                      type="button"
-                      key={item.id}
-                      disabled={unavailable}
-                      aria-pressed={selected}
-                      onClick={() => toggleItem(item.id)}
-                    >
-                      <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-muted">
-                        <MistyLibraryPickerThumbnail spaceId={spaceId} item={item} />
-                      </span>
-                      <span className="block min-w-0 px-2.5 py-2">
-                        <span className="block truncate text-xs font-medium">
-                          {item.display_name}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
-                          {item.file.original_filename}
-                        </span>
-                      </span>
-                      {selected ? (
-                        <span className="absolute right-2 top-2 grid size-5 place-items-center rounded-md bg-primary text-primary-foreground shadow-xs">
-                          <Check className="size-3" />
-                        </span>
-                      ) : null}
-                    </Button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
-          <p className="text-xs text-muted-foreground">
-            {selection.length} of {maximumSelected} selected
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={loading || selection.length === 0}
-              onClick={() => onChoose(selection)}
-            >
-              Add {selection.length || ""} item{selection.length === 1 ? "" : "s"}
-            </Button>
-          </div>
-        </DialogFooter>
+        {panel}
       </DialogContent>
     </Dialog>
   );

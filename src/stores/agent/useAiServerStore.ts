@@ -1,33 +1,3 @@
-import type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiServerStore";
-export type { AiMode, FileOperation } from "@/models/types/stores/agent/useAiServerStore";
-import type {
-  ToolDefinition,
-  ToolManifest,
-  AgentMessageRequest,
-  ToolRequest,
-  ToolResult,
-  FileOperationPlan,
-  AgentEvent,
-  AgentEventsResponse,
-  AgentSessionsResponse,
-  AgentTranscriptResponse,
-  CreateSessionResponse,
-  AgentStatusResponse,
-  ManagedAiErrorPayload,
-} from "@/models/interfaces/stores/agent/useAiServerStore";
-export type {
-  ToolDefinition,
-  ToolManifest,
-  AgentMessageRequest,
-  ToolRequest,
-  ToolResult,
-  FileOperationPlan,
-  AgentEvent,
-  AgentEventsResponse,
-  CreateSessionResponse,
-  AgentStatusResponse,
-  ManagedAiErrorPayload,
-} from "@/models/interfaces/stores/agent/useAiServerStore";
 import { appSnapshot } from "@/stores/backend";
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
 import { addRequestCorrelation } from "@/platform/requestCorrelation";
@@ -36,7 +6,13 @@ import {
   readAccountSessionGeneration,
   readAccountAuthToken,
 } from "@/stores/account/useAuthTokenStore";
-import type { AgentCitation } from "@/models/interfaces/features/agents/types";
+
+interface ManagedAiErrorPayload {
+  code?: string;
+  message?: string;
+  reset_at?: string;
+  retry_after_seconds?: number;
+}
 
 export class ManagedAiRequestError extends Error {
   constructor(
@@ -48,100 +24,6 @@ export class ManagedAiRequestError extends Error {
     super(message);
     this.name = "ManagedAiRequestError";
   }
-}
-
-export async function fetchAgentStatus(): Promise<AgentStatusResponse> {
-  return managedAiRequest<AgentStatusResponse>("/ai/status");
-}
-
-export async function createAgentSession(
-  optionsOrJob:
-    | { agentId?: string; spaceId?: string; modelId?: string; reasoningEffort?: string }
-    | string
-    | undefined = {},
-  legacySpaceId?: string,
-): Promise<CreateSessionResponse> {
-  const options: {
-    agentId?: string;
-    agentJobId?: string;
-    spaceId?: string;
-    modelId?: string;
-    reasoningEffort?: string;
-  } =
-    legacySpaceId !== undefined
-      ? {
-          agentJobId: typeof optionsOrJob === "string" ? optionsOrJob : undefined,
-          spaceId: legacySpaceId,
-        }
-      : typeof optionsOrJob === "object"
-        ? optionsOrJob
-        : { agentJobId: optionsOrJob, spaceId: legacySpaceId };
-  return managedAiRequest<CreateSessionResponse>("/ai/sessions", {
-    method: "POST",
-    body:
-      options.agentId || options.spaceId || options.modelId || options.reasoningEffort
-        ? JSON.stringify({
-            agent_id: options.agentId || undefined,
-            agent_job_id: options.agentJobId || undefined,
-            space_id: options.spaceId || undefined,
-            model_id: options.modelId || undefined,
-            reasoning_effort: options.reasoningEffort || undefined,
-          })
-        : undefined,
-  });
-}
-
-export async function sendAgentMessage(
-  sessionId: string,
-  body: AgentMessageRequest,
-): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-export async function fetchAgentEvents(
-  sessionId: string,
-  after: number,
-): Promise<AgentEventsResponse> {
-  return managedAiRequest<AgentEventsResponse>(
-    `/ai/sessions/${encodeURIComponent(sessionId)}/events?after=${after}`,
-  );
-}
-
-export async function submitToolResults(sessionId: string, results: ToolResult[]): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/tool-results`, {
-    method: "POST",
-    body: JSON.stringify({ results }),
-  });
-}
-
-export async function cancelAgentSession(sessionId: string): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}/cancel`, {
-    method: "POST",
-  });
-}
-
-export async function listAgentSessions(): Promise<AgentSessionsResponse> {
-  return managedAiRequest<AgentSessionsResponse>("/ai/sessions");
-}
-
-export async function fetchAgentTranscript(sessionId: string): Promise<AgentTranscriptResponse> {
-  return managedAiRequest<AgentTranscriptResponse>(
-    `/ai/sessions/${encodeURIComponent(sessionId)}/transcript`,
-  );
-}
-
-export async function renameAgentSession(sessionId: string, title: string): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, {
-    method: "PATCH",
-    body: JSON.stringify({ title }),
-  });
-}
-
-export async function deleteAgentSession(sessionId: string): Promise<void> {
-  await managedAiRequest(`/ai/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
 export async function managedAiRequest<T = unknown>(path: string, init?: RequestInit): Promise<T> {

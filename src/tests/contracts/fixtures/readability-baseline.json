@@ -73,10 +73,6 @@
       "hash": "043207ffb7a51556"
     },
     {
-      "length": 244,
-      "hash": "24da16f79e42100c"
-    },
-    {
       "length": 216,
       "hash": "453cd590309473a5"
     },
@@ -177,12 +173,6 @@
       "hash": "8ff40d995b9c5ebb"
     }
   ],
-  "src/features/explorer/desktop/ExplorerAgentMessage.tsx": [
-    {
-      "length": 187,
-      "hash": "c555cfc68acf4988"
-    }
-  ],
   "src/features/explorer/desktop/ExplorerBatchRenameDialog.tsx": [
     {
       "length": 187,
@@ -227,16 +217,8 @@
       "hash": "3b9840c7074912a4"
     },
     {
-      "length": 162,
-      "hash": "490486c9a0360c2b"
-    },
-    {
       "length": 193,
       "hash": "61adc7ee1a85432e"
-    },
-    {
-      "length": 161,
-      "hash": "726e17bc18b3d06c"
     },
     {
       "length": 259,
@@ -437,30 +419,10 @@
       "hash": "96c232ebbc2f4ecb"
     }
   ],
-  "src/layouts/DesktopLayout/styles.ts": [
-    {
-      "length": 170,
-      "hash": "0a7c3e354af1facb"
-    }
-  ],
   "src/layouts/RootLayout.tsx": [
     {
       "length": 351,
       "hash": "4d314090e61c352d"
-    }
-  ],
-  "src/pages/Agents/desktop/AgentChatList.tsx": [
-    {
-      "length": 196,
-      "hash": "568f8fe2092850e4"
-    },
-    {
-      "length": 244,
-      "hash": "acf80abf4682c040"
-    },
-    {
-      "length": 166,
-      "hash": "e789f791dcf7de35"
     }
   ],
   "src/pages/Providers/components/RemoteListPanel.tsx": [
@@ -521,40 +483,12 @@
       "hash": "3d80b8d56d7cabb9"
     },
     {
-      "length": 406,
-      "hash": "46821eaddddbb52a"
-    },
-    {
       "length": 167,
       "hash": "4bb6b31c0c4f439b"
     },
     {
       "length": 181,
       "hash": "db2b67857c4c58ff"
-    }
-  ],
-  "src/stores/agent/useAgentSessionStore.ts": [
-    {
-      "length": 176,
-      "hash": "2738ef9f3e9cef70"
-    },
-    {
-      "length": 185,
-      "hash": "7f8ead6ee6c72fd3"
-    },
-    {
-      "length": 162,
-      "hash": "d9032def2895053a"
-    }
-  ],
-  "src/stores/spaces/useSpacesBackendStore.ts": [
-    {
-      "length": 180,
-      "hash": "dcbb3efd46a04810"
-    },
-    {
-      "length": 180,
-      "hash": "dcbb3efd46a04810"
     }
   ],
   "src/ui/alert-dialog.tsx": [
@@ -721,22 +655,6 @@
       "hash": "9d312c6437d8f453"
     }
   ],
-  "src/ui/input-group.tsx": [
-    {
-      "length": 238,
-      "hash": "aa7e44bc38f2dd86"
-    },
-    {
-      "length": 221,
-      "hash": "aaf05704a47ee7d1"
-    }
-  ],
-  "src/ui/input.tsx": [
-    {
-      "length": 639,
-      "hash": "0d1a0fc640539430"
-    }
-  ],
   "src/ui/popover.tsx": [
     {
       "length": 557,
@@ -763,10 +681,6 @@
     {
       "length": 643,
       "hash": "361c299a550b7a0f"
-    },
-    {
-      "length": 643,
-      "hash": "d85ec3c48ec28bcd"
     }
   ],
   "src/ui/sheet.tsx": [
@@ -783,22 +697,6 @@
       "hash": "ab28a86731425b15"
     }
   ],
-  "src/ui/slider.tsx": [
-    {
-      "length": 224,
-      "hash": "d288075abc8f0123"
-    }
-  ],
-  "src/ui/switch.tsx": [
-    {
-      "length": 340,
-      "hash": "075f8e1c0ecf5043"
-    },
-    {
-      "length": 180,
-      "hash": "bce13ac375ce3c67"
-    }
-  ],
   "src/ui/tabs.tsx": [
     {
       "length": 808,
@@ -813,32 +711,10 @@
       "hash": "f1149f08f3167fdd"
     }
   ],
-  "src/ui/textarea.tsx": [
-    {
-      "length": 522,
-      "hash": "a83b9b1f13a0a0cc"
-    }
-  ],
   "src/ui/toggle-group.tsx": [
     {
       "length": 202,
       "hash": "5a0a74f340ed01bb"
-    },
-    {
-      "length": 980,
-      "hash": "c7037cb5983fee89"
-    }
-  ],
-  "src/ui/toggle.tsx": [
-    {
-      "length": 458,
-      "hash": "37b351ef988dbc53"
-    }
-  ],
-  "src/ui/tooltip.tsx": [
-    {
-      "length": 468,
-      "hash": "0c2a1656d9cd8b5c"
     }
   ]
 }

@@ -78,9 +78,11 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           draft.selectedLibraryIds,
           draft.replyToMessageId,
         );
-        setGroupMessages((current) =>
-          mergeSpaceMessages(current, [response.message, ...response.agent_replies]),
-        );
+        response.message.triggered_runs = (response.triggered_runs ?? []).map((run) => ({
+          ...run,
+          state: run.state as NonNullable<SpaceMessage["triggered_runs"]>[number]["state"],
+        }));
+        setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
         if (
           options.activeConversation?.origin === "discord" &&
           options.canPublishToDiscord(response.message)

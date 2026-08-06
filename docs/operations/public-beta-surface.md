@@ -5,13 +5,19 @@ Chat, Journal notes/drawings, direct R2-backed Journal/Library assets, Agents,
 the three user-controlled cloud connections, billing/entitlements when live
 mode is configured, updates, diagnostics, data export, and account deletion.
 
-Agents in beta are contextual teammates in Files and Spaces. The
-`agent_teammates_v1` client rollout is controlled by
-`VITE_AGENT_TEAMMATES_V1=true`; production must deploy the backward-compatible
-server migration before enabling the client flag. Legacy `/agents` and
-`/assistant` links remain compatible and open the contextual Agent dock.
-Device job execution, folder agents, and document intelligence remain separate
-`VITE_MISTY_*` capabilities in `src/features/agents/flags.ts`.
+Agents are reusable definitions and first-class, permissioned Space members.
+The Agents destination is management-only; all interaction happens through
+normal Space Conversations, assignments, mentions, or enabled automations.
+Files and Transfers additionally require an expiring per-user, per-device
+grant. The first-class model ships only with the coordinated minimum desktop,
+server, and database version; no Agent Dock or private-session fallback exists.
+
+Action suggestions are an owner-enabled, participant-vetoable enhancement to
+human conversations. Misty performs neutral detection but is never an Agent
+identity. A suggestion is shared conversation UI, not a message, and cannot
+execute until a member reviews every selected action, chooses an eligible
+participating Agent, and accepts the exact payload. Private conversations may
+create only conversation-scoped resources and native Misty calendar events.
 
 The API is the feature boundary:
 
