@@ -117,7 +117,8 @@ export function AgentMembershipList({
                 {agent.update_available ? <Badge variant="outline">Update available</Badge> : null}
               </div>
               <p className="mb-0 mt-0.5 truncate text-xs text-muted-foreground">
-                Tasks and chat · attached files only · approved v{agent.approved_version}
+                {agent.capability_grants?.length ?? 0} approved capabilities · approved v
+                {agent.approved_version}
               </p>
             </div>
             {canManage ? (
@@ -144,9 +145,11 @@ export function AgentMembershipList({
                     void run(`toggle:${agent.agent_id}`, () =>
                       spacesApi.updateSpaceAgent(spaceId, agent, {
                         enabled: !agent.enabled,
+                        role_id: agent.role_id,
                         space_role: agent.space_role ?? "",
                         space_instructions: agent.space_instructions ?? "",
                         permissions: agent.permissions,
+                        capability_grants: agent.capability_grants,
                       }),
                     )
                   }

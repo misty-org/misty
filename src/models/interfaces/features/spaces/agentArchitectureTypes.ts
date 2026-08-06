@@ -161,10 +161,6 @@ export interface SpaceRun {
   requesting_member_id: string;
   source_conversation_id?: string;
   source_task_id?: string;
-  // "mika" is the pre-rename value, still present on rows created before
-  // 20260916000000_rename_agent_run_source_type.sql and accepted by that
-  // migration's CHECK during the transition. "connector" and "task" were always
-  // valid server-side but were missing from this union.
   source_type:
     | "direct"
     | "group_mention"
@@ -172,8 +168,7 @@ export interface SpaceRun {
     | "studio_test"
     | "schedule"
     | "connector"
-    | "task"
-    | "mika";
+    | "task";
   agent_id?: string;
   workflow_identifier?: string;
   workflow_version_id?: string;
@@ -235,63 +230,6 @@ export interface WorkflowRunStep {
   StartedAt?: string;
   CompletedAt?: string;
   UpdatedAt: string;
-}
-
-export interface AgentCatalogEntry {
-  agent_id: string;
-  agent_name: string;
-  description: string;
-  icon: string;
-  status: string;
-  runtime_kind: string;
-  space_id: string;
-  space_name: string;
-  workflow: WorkflowVersion;
-  capabilities: WorkflowCapability[];
-}
-
-export interface RoutingOption {
-  space_id: string;
-  space_name: string;
-  agent_id: string;
-  agent_name: string;
-  capability_id: string;
-  capability_name: string;
-}
-
-export interface RoutingDecision {
-  needs_clarification: boolean;
-  question?: string;
-  options?: RoutingOption[];
-  selected?: RoutingOption;
-  reason?: string;
-}
-
-export interface AgentDelegationResult {
-  status: string;
-  trace?: string;
-  routing: RoutingDecision;
-  run?: SpaceRun;
-}
-
-export interface AgentConversation {
-  id: string;
-  space_id: string;
-  owner_user_id: string;
-  agent_id: string;
-  agent_name: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AgentConversationEvent {
-  id: number;
-  conversation_id: string;
-  user_id: string;
-  event_type: "user_message" | "agent_message" | "run" | "error";
-  data: Record<string, unknown>;
-  created_at: string;
 }
 
 export interface SpaceIntegration {

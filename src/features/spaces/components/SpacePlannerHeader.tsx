@@ -14,15 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui";
 import type { SpaceCalendarSource } from "@/models/interfaces/features/spaces/types";
-import type { TaskViewMode } from "@/models/types/features/spaces/SpacePlanner";
-import { SpaceViewModeToggle } from "./SpaceViewModeToggle";
 
-/**
- * Compact task controls. Board/List are local presentation modes, so they stay
- * in this toolbar rather than competing with Planner pages in the Space rail.
- */
+/** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
-  view,
   query,
   activeFilterCount,
   sources,
@@ -31,13 +25,11 @@ export function SpacePlannerHeader({
   canManageIntegrations,
   calendarImportAvailable,
   filters,
-  onViewChange,
   onQuery,
   onSync,
   onImport,
   onCreate,
 }: {
-  view: TaskViewMode;
   query: string;
   activeFilterCount: number;
   sources: SpaceCalendarSource[];
@@ -47,7 +39,6 @@ export function SpacePlannerHeader({
   calendarImportAvailable: boolean;
   /** Filter controls, shown only when the user opens the popover. */
   filters: ReactNode;
-  onViewChange: (view: TaskViewMode) => void;
   onQuery: (value: string) => void;
   onSync: () => void;
   onImport: () => void;
@@ -61,19 +52,7 @@ export function SpacePlannerHeader({
 
   return (
     <header className="misty-spaces-toolbar flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5">
-      <div>
-        <h1 className="m-0 text-sm font-semibold">Tasks</h1>
-        <p className="m-0 text-[11px] capitalize text-muted-foreground">{view} view</p>
-      </div>
-      <SpaceViewModeToggle
-        label="Task view"
-        value={view}
-        options={[
-          { value: "board", label: "Board" },
-          { value: "list", label: "List" },
-        ]}
-        onChange={onViewChange}
-      />
+      <h1 className="m-0 text-sm font-semibold">Tasks</h1>
 
       <div className="ml-auto flex items-center gap-2">
         {showSearch ? (

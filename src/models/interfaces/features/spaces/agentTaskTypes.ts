@@ -1,5 +1,6 @@
 import type { SpaceRole } from "@/models/types/features/spaces/types";
 import type { AgentAvatar } from "@/models/interfaces/features/agents/personal";
+import type { AgentCapabilityGrant } from "@/models/interfaces/features/spaces/agentArchitectureTypes";
 
 export interface SpaceMember {
   space_id: string;
@@ -25,6 +26,8 @@ export interface SpaceAgentMembership {
   model_id?: string;
   reasoning_effort?: "" | "low" | "medium" | "high";
   enabled: boolean;
+  role_id?: string;
+  capability_grants?: AgentCapabilityGrant[];
   approved_version_id: string;
   approved_version: number;
   latest_version_id: string;
@@ -36,7 +39,18 @@ export interface SpaceAgentMembership {
   membership_version: number;
   created_at: string;
   updated_at: string;
-  work_state?: "ready" | "working" | "needs_approval" | "failed" | "disabled" | "update_available";
+  work_state?:
+    | "ready"
+    | "queued"
+    | "working"
+    | "awaiting_approval"
+    | "needs_approval"
+    | "retrying"
+    | "completed"
+    | "failed"
+    | "canceled"
+    | "disabled"
+    | "update_available";
   attention_count?: number;
   last_activity_at?: string;
   current_task_id?: string;

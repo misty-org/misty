@@ -12,33 +12,30 @@ export const tabletFrameClass = [
 ].join(" ");
 
 export const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden py-2";
+  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden pb-2 pt-0";
 export const tabletNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden py-2";
+  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden pb-2 pt-0";
 
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 export const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-[var(--misty-app-route-bg,var(--misty-bg))]";
 
-export const navbarGroupClass =
-  "flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto overscroll-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+export const navbarGroupClass = [
+  "flex min-h-0 w-full flex-1 flex-col items-center gap-3 overflow-x-hidden overflow-y-auto",
+  "overscroll-contain pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+].join(" ");
 
 export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-4";
 
-export const navLinkBaseClass = [
-  "relative grid h-[70px] w-full shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
+export const navItemBaseClass = [
+  "grid h-[70px] w-full shrink-0 grid-rows-[50px_18px] place-items-center border-0 !bg-transparent p-0",
   "text-[var(--misty-text-muted)] no-underline shadow-none transition-colors hover:!bg-transparent",
   "hover:text-[var(--misty-text)] active:translate-y-0 aria-expanded:!bg-transparent",
-  "before:pointer-events-none before:absolute before:left-0 before:top-[5px] before:z-[1] before:block before:h-10 before:w-1",
-  "before:origin-center before:scale-y-0 before:rounded-r-full before:bg-[var(--misty-divider-active,var(--primary))] before:opacity-0 before:content-['']",
-  "before:will-change-[scale] before:transition-[scale,opacity] before:duration-200",
-  "before:ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:before:transition-none",
-  "hover:before:scale-y-50 hover:before:opacity-80 focus-visible:before:scale-y-50",
-  "focus-visible:before:opacity-80 focus-within:before:scale-y-50 focus-within:before:opacity-80",
 ].join(" ");
-export const navLinkActiveClass =
-  "text-[var(--misty-text)] before:!scale-y-100 before:!opacity-100 before:!duration-300 before:!ease-[cubic-bezier(0.4,0,0.2,1)]";
+export const navLinkBaseClass = `misty-hover-marker-side misty-navbar-marker-side ${navItemBaseClass}`;
+export const navLinkActiveClass = "misty-active-marker-side text-[var(--misty-text)]";
+export const navButtonActiveClass = "text-[var(--misty-text)]";
 
 export const navIconTileBaseClass = [
   "relative grid h-[50px] w-[54px] place-items-center rounded-[13px] text-[var(--misty-text)] transition-colors",

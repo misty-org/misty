@@ -36,7 +36,12 @@ describe("Space subpage navigation", () => {
     });
 
     const links = [...container.querySelectorAll("a")];
-    expect(links.map((link) => link.textContent?.trim())).toEqual(["Tasks", "Agenda", "Roadmap"]);
+    expect(links.map((link) => link.textContent?.trim())).toEqual([
+      "Tasks",
+      "Agenda",
+      "Calendar",
+      "Roadmap",
+    ]);
     expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Agenda");
     expect(container.querySelector('[aria-label="Expand Tasks"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Collapse Agenda"]')).not.toBeNull();
@@ -44,11 +49,11 @@ describe("Space subpage navigation", () => {
 
     const expandTasks = container.querySelector<HTMLButtonElement>('[aria-label="Expand Tasks"]');
     await act(async () => expandTasks?.click());
-    expect(container.querySelector('nav[aria-label="Task shortcuts"]')).not.toBeNull();
+    expect(container.querySelector('nav[aria-label="Task views"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Collapse Tasks"]')).not.toBeNull();
   });
 
-  it("keeps task shortcuts in the sidebar but moves Board and List into the toolbar", async () => {
+  it("keeps only Board and List in the Tasks dropdown", async () => {
     mockPlannerLists();
     await act(async () => {
       root.render(
@@ -58,16 +63,22 @@ describe("Space subpage navigation", () => {
       );
     });
 
-    expect(link("Board")).toBeUndefined();
-    expect(link("List")).toBeUndefined();
-    expect(link("Assigned to me")?.getAttribute("href")).toBe(
-      "/spaces/space-1/planner/tasks/list?mine=1",
+    expect(link("Board")?.getAttribute("href")).toBe(
+      "/spaces/space-1/planner/tasks/board?mine=1&due=week",
     );
+    expect(link("List")?.getAttribute("href")).toBe(
+      "/spaces/space-1/planner/tasks/list?mine=1&due=week",
+    );
+    expect(link("List")?.getAttribute("aria-current")).toBe("page");
+    expect(link("All tasks")).toBeUndefined();
+    expect(link("Assigned to me")).toBeUndefined();
+    expect(link("Unassigned")).toBeUndefined();
+    expect(link("Due this week")).toBeUndefined();
     expect(link("Agenda")).toBeDefined();
     expect(link("Roadmap")).toBeDefined();
   });
 
-  it("keeps calendar visibility in the sidebar without Agenda view modes", async () => {
+  it("keeps Calendar as the Agenda dropdown destination", async () => {
     mockPlannerLists();
     await act(async () => {
       root.render(
@@ -77,19 +88,57 @@ describe("Space subpage navigation", () => {
       );
     });
 
-    expect(container.textContent).toContain("Visible calendars");
+    expect(container.querySelector('[aria-label="Agenda destinations"]')).not.toBeNull();
+    expect(link("Calendar")?.getAttribute("href")).toBe(
+      "/spaces/space-1/planner/agenda/week?date=2026-08-17",
+    );
+    expect(link("Calendar")?.getAttribute("aria-current")).toBe("page");
     expect(link("Month")).toBeUndefined();
     expect(link("Week")).toBeUndefined();
-    expect(link("List")).toBeUndefined();
+    expect(link("Day")).toBeUndefined();
+    expect(container.querySelector('[role="checkbox"]')).toBeNull();
   });
 
-  it("switches task presentation from the page toolbar", async () => {
-    const onViewChange = vi.fn();
+  it("keeps the Roadmap dropdown flat and labels the collective destination Views", async () => {
+    mockPlannerLists();
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/goals"]}>
+          <PlannerPanelSidebar spaceId="space-1" section="goals" roadmapId="" />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(link("Goals")?.getAttribute("aria-current")).toBe("page");
+    expect(link("Milestones")).toBeDefined();
+    expect(link("Views")?.getAttribute("href")).toBe("/spaces/space-1/planner/roadmaps");
+    expect(container.textContent).not.toContain("Configure");
+    expect(container.textContent).not.toContain("Collective");
+  });
+
+  it("does not mark Calendar active when its inactive dropdown is expanded", async () => {
+    mockPlannerLists();
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/tasks/list"]}>
+          <PlannerPanelSidebar spaceId="space-1" section="tasks" roadmapId="" />
+        </MemoryRouter>,
+      );
+    });
+
+    const expandAgenda = container.querySelector<HTMLButtonElement>('[aria-label="Expand Agenda"]');
+    await act(async () => expandAgenda?.click());
+
+    expect(link("Calendar")).toBeDefined();
+    expect(link("Calendar")?.getAttribute("aria-current")).toBeNull();
+    expect(link("Calendar")?.classList).not.toContain("misty-active-marker-side");
+  });
+
+  it("does not repeat Board and List in the page toolbar", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
           <SpacePlannerHeader
-            view="board"
             query=""
             activeFilterCount={0}
             sources={[]}
@@ -98,7 +147,6 @@ describe("Space subpage navigation", () => {
             canManageIntegrations={false}
             calendarImportAvailable={false}
             filters={null}
-            onViewChange={onViewChange}
             onQuery={() => {}}
             onSync={() => {}}
             onImport={() => {}}
@@ -108,9 +156,10 @@ describe("Space subpage navigation", () => {
       );
     });
 
-    const listView = container.querySelector<HTMLButtonElement>('[aria-label="List view"]');
-    await act(async () => listView?.click());
-    expect(onViewChange).toHaveBeenCalledWith("list");
+    expect(container.querySelector('[aria-label="Board view"]')).toBeNull();
+    expect(container.querySelector('[aria-label="List view"]')).toBeNull();
+    expect(container.textContent).not.toContain("Board view");
+    expect(container.textContent).not.toContain("List view");
   });
 
   function link(label: string) {
@@ -120,7 +169,6 @@ describe("Space subpage navigation", () => {
   }
 
   function mockPlannerLists() {
-    vi.spyOn(spacesApi, "calendarSources").mockResolvedValue({ sources: [] });
     vi.spyOn(spacesApi, "roadmaps").mockResolvedValue({ roadmaps: [] });
   }
 });

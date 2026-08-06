@@ -58,7 +58,7 @@ describe("spaceErrorMessage", () => {
 });
 
 describe("spaceRequest account isolation", () => {
-  it("blocks writes without touching the network while a saved copy is open", async () => {
+  it("blocks writes without touching the network while Spaces are unavailable", async () => {
     setSpaceReferenceOnly(true);
     const fetchMock = vi.spyOn(globalThis, "fetch");
 
@@ -71,7 +71,7 @@ describe("spaceRequest account isolation", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("enters saved-copy mode after a network failure", async () => {
+  it("locks Spaces after a network failure", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
     await expect(spaceRequest("/spaces")).rejects.toThrow("Failed to fetch");

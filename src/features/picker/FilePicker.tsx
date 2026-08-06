@@ -48,6 +48,7 @@ const pickerDialogClassName = [
 
 export function MistyFilePicker({
   mode,
+  embedded = false,
   multiple = false,
   title,
   initialPath,
@@ -273,6 +274,122 @@ export function MistyFilePicker({
     );
   };
 
+  const panel = (
+    <>
+      <div className="border-b border-border">
+        <ExplorerPickerToolbar
+          path={listing?.path || initialPath || homeDir}
+          query={searchQuery}
+          canGoBack={historyIndex > 0}
+          canGoForward={historyIndex >= 0 && historyIndex < history.length - 1}
+          canGoParent={Boolean(listing?.parentPath)}
+          onBack={() => navigateHistory(historyIndex - 1)}
+          onForward={() => navigateHistory(historyIndex + 1)}
+          onParent={() => listing?.parentPath && void loadPath(listing.parentPath)}
+          onNavigate={(path) => void loadPath(path)}
+          onRefresh={() => listing && void loadPath(listing.path, "none")}
+          onQueryChange={setSearchQuery}
+        />
+      </div>
+
+      <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] max-[860px]:grid-cols-[minmax(0,1fr)]">
+        <div className="min-h-0 overflow-hidden border-r border-border max-[860px]:hidden">
+          <PickerPlaces
+            homePath={homeDir}
+            activePath={listing?.path || explorerPath || homeDir}
+            mountRoot={mountRoot}
+            remotes={remotes}
+            remoteLoading={providersLoading}
+            devices={devices}
+            devicesLoading={devicesLoading}
+            pinnedPaths={pinnedPaths}
+            onNavigate={(path) => void loadPath(path)}
+          />
+        </div>
+
+        <main className="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+          {showCloudNotice ? (
+            <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-muted/40 px-4 py-2.5">
+              <CloudDownload className="text-muted-foreground" />
+              <AlertDescription className="text-xs">
+                Cloud items must be downloaded to a local folder before you can choose them.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <FileBrowser
+            paneId="misty-file-picker"
+            selectionOnly
+            listing={browserListing}
+            selectedIds={selectedIds}
+            loading={loading && !listing}
+            error={error}
+            viewMode={explorerViewMode}
+            sort={sort}
+            showHidden={showHidden}
+            commandQuery={searchQuery}
+            commandQueryMode="filter"
+            directorySizes={directorySizes}
+            cutPaths={emptyCutPaths}
+            inlineEdit={null}
+            onSort={updateSort}
+            onToggleHidden={() => {
+              const next = !showHidden;
+              setShowHidden(next);
+              if (listing) void loadPath(listing.path, "none", next);
+            }}
+            onSelect={selectBrowserEntry}
+            onClearSelection={() => setSelectedIds([])}
+            onOpen={openEntry}
+            onContextMenu={(event) => event.preventDefault()}
+            onBackgroundContextMenu={(event) => event.preventDefault()}
+            onDropItems={() => undefined}
+            onInlineEditChange={() => undefined}
+            onInlineEditCommit={() => undefined}
+            onInlineEditCancel={() => undefined}
+          />
+          {loading && listing ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" />
+          ) : null}
+        </main>
+      </div>
+
+      <DialogFooter className="mt-0 flex flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
+        <p
+          className="m-0 min-w-0 truncate text-xs text-muted-foreground max-[800px]:hidden"
+          title={
+            multiple && selectedPaths.length > 0
+              ? selectedPaths.join("\n")
+              : selected?.path || listing?.path
+          }
+        >
+          {selectionIsCloud
+            ? "Download this item locally before choosing it"
+            : multiple && selectedPaths.length > 0
+              ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected`
+              : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
+        </p>
+        <div className="ml-auto flex shrink-0 gap-2">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={loading || !canChoose} onClick={choose}>
+            {mode === "folder"
+              ? selected
+                ? "Choose folder"
+                : "Choose this folder"
+              : multiple
+                ? selectedPaths.length > 0
+                  ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
+                  : "Choose files"
+                : "Choose file"}
+          </Button>
+        </div>
+      </DialogFooter>
+    </>
+  );
+
+  if (embedded) return panel;
+
   return (
     <Dialog
       open
@@ -296,116 +413,7 @@ export function MistyFilePicker({
           </div>
           {sourceToggle}
         </DialogHeader>
-
-        <div className="border-b border-border">
-          <ExplorerPickerToolbar
-            path={listing?.path || initialPath || homeDir}
-            query={searchQuery}
-            canGoBack={historyIndex > 0}
-            canGoForward={historyIndex >= 0 && historyIndex < history.length - 1}
-            canGoParent={Boolean(listing?.parentPath)}
-            onBack={() => navigateHistory(historyIndex - 1)}
-            onForward={() => navigateHistory(historyIndex + 1)}
-            onParent={() => listing?.parentPath && void loadPath(listing.parentPath)}
-            onNavigate={(path) => void loadPath(path)}
-            onRefresh={() => listing && void loadPath(listing.path, "none")}
-            onQueryChange={setSearchQuery}
-          />
-        </div>
-
-        <div className="grid min-h-0 grid-cols-[220px_minmax(0,1fr)] max-[860px]:grid-cols-[minmax(0,1fr)]">
-          <div className="min-h-0 overflow-hidden border-r border-border max-[860px]:hidden">
-            <PickerPlaces
-              homePath={homeDir}
-              activePath={listing?.path || explorerPath || homeDir}
-              mountRoot={mountRoot}
-              remotes={remotes}
-              remoteLoading={providersLoading}
-              devices={devices}
-              devicesLoading={devicesLoading}
-              pinnedPaths={pinnedPaths}
-              onNavigate={(path) => void loadPath(path)}
-            />
-          </div>
-
-          <main className="relative grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
-            {showCloudNotice ? (
-              <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-muted/40 px-4 py-2.5">
-                <CloudDownload className="text-muted-foreground" />
-                <AlertDescription className="text-xs">
-                  Cloud items must be downloaded to a local folder before you can choose them.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <FileBrowser
-              paneId="misty-file-picker"
-              selectionOnly
-              listing={browserListing}
-              selectedIds={selectedIds}
-              loading={loading && !listing}
-              error={error}
-              viewMode={explorerViewMode}
-              sort={sort}
-              showHidden={showHidden}
-              commandQuery={searchQuery}
-              commandQueryMode="filter"
-              directorySizes={directorySizes}
-              cutPaths={emptyCutPaths}
-              inlineEdit={null}
-              onSort={updateSort}
-              onToggleHidden={() => {
-                const next = !showHidden;
-                setShowHidden(next);
-                if (listing) void loadPath(listing.path, "none", next);
-              }}
-              onSelect={selectBrowserEntry}
-              onClearSelection={() => setSelectedIds([])}
-              onOpen={openEntry}
-              onContextMenu={(event) => event.preventDefault()}
-              onBackgroundContextMenu={(event) => event.preventDefault()}
-              onDropItems={() => undefined}
-              onInlineEditChange={() => undefined}
-              onInlineEditCommit={() => undefined}
-              onInlineEditCancel={() => undefined}
-            />
-            {loading && listing ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-primary/60" />
-            ) : null}
-          </main>
-        </div>
-
-        <DialogFooter className="mt-0 flex flex-row items-center justify-between gap-4 border-t border-border px-5 py-3 sm:justify-between">
-          <p
-            className="m-0 min-w-0 truncate text-xs text-muted-foreground max-[800px]:hidden"
-            title={
-              multiple && selectedPaths.length > 0
-                ? selectedPaths.join("\n")
-                : selected?.path || listing?.path
-            }
-          >
-            {selectionIsCloud
-              ? "Download this item locally before choosing it"
-              : multiple && selectedPaths.length > 0
-                ? `${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"} selected`
-                : selected?.path || (mode === "folder" ? listing?.path : "Select a file")}
-          </p>
-          <div className="ml-auto flex shrink-0 gap-2">
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={loading || !canChoose} onClick={choose}>
-              {mode === "folder"
-                ? selected
-                  ? "Choose folder"
-                  : "Choose this folder"
-                : multiple
-                  ? selectedPaths.length > 0
-                    ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
-                    : "Choose files"
-                  : "Choose file"}
-            </Button>
-          </div>
-        </DialogFooter>
+        {panel}
       </DialogContent>
     </Dialog>
   );

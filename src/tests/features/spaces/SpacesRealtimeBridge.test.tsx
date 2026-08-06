@@ -78,20 +78,15 @@ describe("SpacesRealtimeBridge", () => {
     expect(mocks.spaces.loadInbox).not.toHaveBeenCalled();
   });
 
-  it("records a settled load failure in Activity without surfacing it immediately", async () => {
+  it("keeps reconnect failures out of Activity", async () => {
     mocks.spaces.error = "Load failed";
 
     await act(async () => {
       root.render(<SpacesRealtimeBridge />);
     });
-    await act(async () => vi.advanceTimersByTime(1_199));
+    expect(mocks.spaces.clearError).toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTime(2_000));
     expect(mocks.explorer.recordActivity).not.toHaveBeenCalled();
-
-    await act(async () => vi.advanceTimersByTime(1));
-    expect(mocks.explorer.recordActivity).toHaveBeenCalledWith(
-      "Spaces couldn’t refresh. Check your connection and try again.",
-      "error",
-    );
   });
 
   it("silently clears account-switch handoff errors", async () => {

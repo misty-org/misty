@@ -28,7 +28,13 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         "max-[680px]:grid-cols-[156px_1px_minmax(0,1fr)]",
       )}
     >
-      <aside className="min-h-0 overflow-y-auto bg-sidebar p-4 text-sidebar-foreground max-[680px]:px-2.5">
+      <aside
+        className={cn(
+          "min-h-0 overflow-y-auto bg-sidebar p-4 text-sidebar-foreground",
+          "[--misty-active-bar-left:-1rem] max-[680px]:px-2.5",
+          "max-[680px]:[--misty-active-bar-left:-0.625rem]",
+        )}
+      >
         <nav className="flex min-h-0 flex-col gap-4" aria-label={props.navigationLabel}>
           <div className="grid gap-1">
             <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
@@ -44,9 +50,10 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                   variant="ghost"
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
-                    active &&
-                      "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+                    "misty-hover-marker-side h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
+                    active
+                      ? "misty-active-marker-side text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                   onClick={() => props.onSelect(item.id)}
                 >

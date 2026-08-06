@@ -43,6 +43,8 @@ describe("SpaceChatConversationList", () => {
     });
 
     expect(container.textContent).toContain("Conversations - 2");
+    expect(container.textContent).toContain("Everyone");
+    expect(container.querySelector('a[href="/spaces/space-1/chat"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Direct");
     expect(container.textContent).not.toContain("Group");
     expect(container.textContent).toContain("Discord - 2");
@@ -68,7 +70,8 @@ function conversation(
     origin,
     integration_status: "active",
     external_display_name: origin === "discord" ? title : undefined,
-    members: memberIds.map((userId) => ({
+    participants: memberIds.map((userId) => ({
+      kind: "person" as const,
       user_id: userId,
       name: userId,
       email: `${userId}@example.com`,

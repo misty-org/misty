@@ -90,7 +90,7 @@ describe("SpaceAgenda", () => {
     container.remove();
   });
 
-  it.each(["month", "week", "list"] as const)("renders the %s presentation", async (view) => {
+  it.each(["month", "week", "day"] as const)("renders the %s presentation", async (view) => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[`/spaces/space-1/planner/agenda/${view}?date=2026-08-04`]}>
@@ -102,12 +102,10 @@ describe("SpaceAgenda", () => {
     });
     expect(container.textContent).toContain("Ship beta");
     expect(container.textContent).toContain("Launch goal");
-    expect(container.textContent).toContain("Launch dependency risk");
+    if (view === "day") expect(container.textContent).not.toContain("Launch dependency risk");
+    else expect(container.textContent).toContain("Launch dependency risk");
     expect(container.querySelector(`main[aria-label="${view} agenda"]`)).not.toBeNull();
-    const activeView = `${view[0].toUpperCase()}${view.slice(1)} view`;
-    expect(
-      container.querySelector(`[aria-label="${activeView}"]`)?.getAttribute("data-state"),
-    ).toBe("on");
+    expect(container.querySelector('[aria-label="Agenda view"]')).toBeNull();
   });
 
   it("applies account-and-Space visibility preferences", async () => {
@@ -117,8 +115,8 @@ describe("SpaceAgenda", () => {
     );
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/list?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="list" canManage canManageIntegrations />
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/week?date=2026-08-04"]}>
+          <SpaceAgenda spaceId="space-1" view="week" canManage canManageIntegrations />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -127,5 +125,91 @@ describe("SpaceAgenda", () => {
     expect(container.textContent).not.toContain("Ship beta");
     expect(container.textContent).toContain("Launch goal");
     expect(container.textContent).toContain("Launch dependency risk");
+  });
+
+  it("keeps the month calendar visible when there are no entries", async () => {
+    agenda.mockResolvedValue({ entries: [] });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
+          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).not.toContain("Your agenda is clear");
+    expect(container.querySelectorAll('main[aria-label="month agenda"] section')).toHaveLength(42);
+  });
+
+  it("moves calendar visibility controls into the Calendars drawer", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
+          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("Calendars"))
+        ?.click();
+    });
+
+    expect(document.body.textContent).toContain("Visible calendars");
+    expect(document.querySelector('[aria-label="Misty"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Google Calendar"]')).not.toBeNull();
+  });
+
+  it("uses an event-first toolbar and zooms the timeline precision", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/week?date=2026-08-04"]}>
+          <SpaceAgenda spaceId="space-1" view="week" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector("h1")).toBeNull();
+    expect(container.querySelector('[aria-label="Go to today"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Calendar view"]')?.textContent).toContain("Week");
+    expect(container.querySelector('[aria-label="Calendar time interval"]')?.textContent).toContain(
+      "30 min",
+    );
+    expect(
+      [...container.querySelectorAll("button")].some((button) =>
+        button.textContent?.includes("New event"),
+      ),
+    ).toBe(true);
+    expect(container.textContent).not.toContain("New task");
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Zoom in calendar"]')?.click();
+    });
+    expect(container.querySelector('[aria-label="Calendar time interval"]')?.textContent).toContain(
+      "15 min",
+    );
+  });
+
+  it("keeps time zoom out of Month view", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
+          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[aria-label="Calendar time interval"]')).toBeNull();
+    expect(container.querySelector('[aria-label="month agenda"]')).not.toBeNull();
   });
 });

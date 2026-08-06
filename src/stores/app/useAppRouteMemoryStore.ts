@@ -121,13 +121,9 @@ function safeSpaceQuery(path: string, section: string): string {
   const params = new URLSearchParams(
     path.slice(queryIndex + 1, hashIndex >= 0 ? hashIndex : path.length),
   );
-  // "mika" is the pre-rename name for the agent panel query parameter. It stays
-  // allowed so a route persisted before the rename still round-trips instead of
-  // being silently stripped; "agent" is what is written now.
-  const agentPanelParams = ["agent", "agentDock", "mika"];
   const allowed =
     section === "chat"
-      ? new Set(["conversation", "message", ...agentPanelParams])
+      ? new Set(["conversation", "message"])
       : section === "planner"
         ? new Set([
             "q",
@@ -137,13 +133,12 @@ function safeSpaceQuery(path: string, section: string): string {
             "due",
             "mine",
             "sort",
-            ...agentPanelParams,
           ])
         : section === "library"
-          ? new Set(["collection", ...agentPanelParams])
+          ? new Set(["collection"])
           : section === "notes"
             ? new Set(["group"])
-            : new Set(agentPanelParams);
+            : new Set<string>();
   for (const key of [...params.keys()]) {
     if (!allowed.has(key)) params.delete(key);
   }

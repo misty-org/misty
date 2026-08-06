@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Settings2, UserPlus, UsersRound } from "lucide-react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
   Avatar,
@@ -22,6 +22,7 @@ import type {
 import type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
 import { personInitials } from "../personInitials";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyViewers: SpacePresenceViewer[] = [];
@@ -33,7 +34,7 @@ type PresentMember = SpaceMember & { presenceStatus: PresenceStatus };
 export function SpaceMembersPopover({ space }: { space: Space }) {
   const { user } = useAuth();
   const location = useLocation();
-  const [, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { members, agents, viewers, loadMembers } = useSpacesStore(
@@ -110,7 +111,7 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
             <p className="mb-0 mt-0.5 text-[11px] text-muted-foreground">
-              {(members.length || space.member_count) + agents.length + 1} teammates in {space.name}
+              {(members.length || space.member_count) + agents.length} teammates in {space.name}
             </p>
           </div>
           {onlineCount > 0 ? (
@@ -126,13 +127,12 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
               members={orderedMembers}
               agents={agents}
               onOpenAgent={(agentId) => {
-                setSearchParams((current) => {
-                  const next = new URLSearchParams(current);
-                  next.set("agentDock", "1");
-                  next.set("agent", agentId);
-                  return next;
-                });
                 setOpen(false);
+                void spacesApi.directAgentConversation(space.id, agentId).then((conversation) =>
+                  navigate(
+                    `/spaces/${encodeURIComponent(space.id)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
+                  ),
+                );
               }}
             />
           )}
@@ -199,21 +199,6 @@ function TeamRows({
           </span>
         </div>
       ))}
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto min-h-10 justify-start gap-2.5 rounded-md px-2 py-1.5 text-left"
-        onClick={() => onOpenAgent("misty")}
-      >
-        <AgentAvatar
-          name="Misty"
-          avatar={{ kind: "preset", preset_id: "sparkles", accent: "violet" }}
-          className="size-7"
-          iconClassName="size-3.5"
-        />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium">Misty</span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">Agent · Ready</span>
-      </Button>
       {agents.map((agent) => (
         <Button
           type="button"
@@ -244,12 +229,17 @@ function agentWorkStateLabel(agent: SpaceAgentMembership): string {
   const state = agent.work_state || (agent.enabled ? "ready" : "disabled");
   return {
     ready: "Ready",
+    queued: "Queued",
     working: "Working",
+    awaiting_approval: "Awaiting approval",
     needs_approval: "Needs approval",
+    retrying: "Retrying",
+    completed: "Ready",
     failed: "Failed",
+    canceled: "Canceled",
     disabled: "Disabled",
     update_available: "Update available",
-  }[state];
+  }[state] ?? "Ready";
 }
 
 function PresenceDot({ status }: { status: PresenceStatus }) {

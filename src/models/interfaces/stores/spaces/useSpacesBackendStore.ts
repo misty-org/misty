@@ -53,6 +53,7 @@ import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBac
 
 export interface LibraryUploadOptions {
   signal?: AbortSignal;
+  conversationId?: string;
   onProgress?: (progress: number) => void;
   onStage?: (stage: "reading" | "hashing" | "uploading" | "finalizing") => void;
 }

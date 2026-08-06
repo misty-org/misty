@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { desktopNavItems, desktopRouteIdFromPath } from "@/routing/navigation";
 
 describe("first-class Agent navigation", () => {
-  it("moves workspace modes and Agents out of the primary rail", () => {
+  it("keeps workspace modes and Agents out of the primary rail", () => {
     expect(desktopNavItems.map((item) => item.id)).not.toContain("spaces");
     expect(desktopNavItems.map((item) => item.id)).not.toContain("files");
     expect(desktopNavItems.map((item) => item.id)).not.toContain("extensions");

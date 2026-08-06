@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
@@ -10,6 +10,7 @@ import { useAppStore } from "@/stores/app";
 import { useExplorerStore } from "@/stores/explorer";
 import {
   activeSpacesTab,
+  defaultSpaceRoute,
   normalizeSpacesTabRoute,
   spacesTabsSessionKey,
   useSpacesTabsStore,
@@ -20,25 +21,17 @@ import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomB
 import { SpacesHeader } from "./SpacesHeader";
 import { SpacesWorkspaceSurface } from "./SpacesWorkspaceSurface";
 import { SpacePageFrame } from "./SpacePageLayout";
-import { SpaceReferenceStatus } from "./SpaceReferenceStatus";
+import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
 import { CreateSpaceDialog } from "../spacesShell/CreateSpaceDialog";
-import { SpaceInvitationsNotice } from "../spacesShell/SpaceInvitationsNotice";
+import { SpaceInvitationSidebar, SpaceInvitationView } from "../spacesShell/SpaceInvitationView";
 import { useCreateSpaceDialog } from "../spacesShell/useCreateSpaceDialog";
 import { useCreateSpaceRouteRequest } from "../spacesShell/useCreateSpaceRouteRequest";
 import { readPanelVisible, writePanelVisible } from "../spacesShell/spacesShellStorage";
 import { rememberSpaceSubpageRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import type { SpacesShellOutletContext } from "../spacesShell/outletContext";
-import { AgentDock } from "@/features/agents/AgentDock";
-import { agentTeammatesV1Enabled } from "@/features/agents/flags";
-import {
-  agentDockMaxWidth,
-  agentDockMinWidth,
-  agentDockWidthStorageKey,
-  clampAgentDockWidth,
-  isCompactAgentDock,
-} from "@/features/agents/agentDockState";
+import { preferredMistySpace } from "../mistySpace";
 
 export { SpacesIndexRedirect } from "../spacesShell/SpacesIndexRedirect";
 
@@ -49,20 +42,14 @@ export default function SpacesShell() {
   const accountId = user?.id ?? "";
   const currentSpacesRoute = `${location.pathname}${location.search}${location.hash}`;
   const pendingTabRouteRef = useRef<string | null>(null);
-  const agentDockOpen =
-    agentTeammatesV1Enabled() && new URLSearchParams(location.search).get("agentDock") === "1";
+  const handledLocationKeyRef = useRef<string | null>(null);
   const [panelVisible, setPanelVisible] = useState(readPanelVisible);
-  const [agentDockWidth, setAgentDockWidth] = useState(420);
-  const [compactAgentDock, setCompactAgentDock] = useState(() =>
-    isCompactAgentDock(window.innerWidth),
-  );
   const {
     spaces,
     invitations,
     loading,
     snapshotReady,
     referenceOnly,
-    lastSyncedAt,
     error,
     load,
     createSpace,
@@ -76,7 +63,6 @@ export default function SpacesShell() {
       loading: state.loading,
       snapshotReady: state.snapshotReady,
       referenceOnly: state.referenceOnly,
-      lastSyncedAt: state.lastSyncedAt,
       error: state.error,
       load: state.load,
       createSpace: state.createSpace,
@@ -89,6 +75,9 @@ export default function SpacesShell() {
   useCreateSpaceRouteRequest(dialog.start);
   const panelRoute = useSpacePanelRoute();
   const activeSpace = spaces.find((space) => space.id === panelRoute.activeSpaceId);
+  const activeInvitation = invitations.find(
+    (invitation) => invitation.space_id === panelRoute.activeSpaceId,
+  );
   const sessionKey = spacesTabsSessionKey(accountId, panelRoute.activeSpaceId);
   const tabSession = useSpacesTabsStore((state) => state.sessions[sessionKey]);
   const activeTab = activeSpacesTab(tabSession);
@@ -114,54 +103,17 @@ export default function SpacesShell() {
 
   const routeParts = location.pathname.split("/").filter(Boolean);
   const detailRouteActive = routeParts[0] === "spaces" && routeParts.length >= 3;
-  const reconnect = () => void load({ force: true, accountId });
+  const spaceSurfaceActive = Boolean(activeInvitation || activeTab?.kind === "space");
+  const reconnect = useCallback(() => void load({ force: true, accountId }), [accountId, load]);
 
-  const closeAgentDock = () => {
-    const params = new URLSearchParams(location.search);
-    params.delete("agentDock");
-    navigate(`${location.pathname}${params.size ? `?${params.toString()}` : ""}${location.hash}`, {
+  const respondToActiveInvitation = async (accept: boolean) => {
+    if (!activeInvitation) return;
+    clearError();
+    await respondInvite(activeInvitation.id, accept);
+    navigate(accept ? defaultSpaceRoute(activeInvitation.space_id) : "/spaces", {
       replace: true,
+      state: { mistySpaceSwitch: true },
     });
-    window.requestAnimationFrame(() =>
-      document.querySelector<HTMLElement>('[aria-label="Space team"]')?.focus(),
-    );
-  };
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 1099px)");
-    const update = () => setCompactAgentDock(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  useEffect(() => {
-    if (!accountId || !activeSpace?.id) return;
-    const key = agentDockWidthStorageKey(accountId, activeSpace.id);
-    const saved = Number(window.localStorage.getItem(key));
-    if (Number.isFinite(saved) && saved >= agentDockMinWidth && saved <= agentDockMaxWidth) {
-      setAgentDockWidth(saved);
-    }
-  }, [accountId, activeSpace?.id]);
-  useEffect(() => {
-    if (!accountId || !activeSpace?.id) return;
-    window.localStorage.setItem(
-      agentDockWidthStorageKey(accountId, activeSpace.id),
-      String(agentDockWidth),
-    );
-  }, [accountId, activeSpace?.id, agentDockWidth]);
-  const beginAgentDockResize = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = agentDockWidth;
-    const onMove = (moveEvent: PointerEvent) => {
-      setAgentDockWidth(clampAgentDockWidth(startWidth + startX - moveEvent.clientX));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
   };
 
   useEffect(() => {
@@ -180,6 +132,23 @@ export default function SpacesShell() {
   useEffect(() => {
     if (!user) clearError();
   }, [clearError, user]);
+  useEffect(() => {
+    if (!snapshotReady || loading || !panelRoute.activeSpaceId || activeSpace || activeInvitation)
+      return;
+    const fallback = preferredMistySpace(spaces);
+    navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
+      replace: true,
+      state: { mistySpaceSwitch: true },
+    });
+  }, [
+    activeInvitation,
+    activeSpace,
+    loading,
+    navigate,
+    panelRoute.activeSpaceId,
+    snapshotReady,
+    spaces,
+  ]);
   useEffect(() => {
     if (!user?.id || !activeSpace?.id) {
       setViewingSpace("");
@@ -214,6 +183,12 @@ export default function SpacesShell() {
       if (normalizedRoute !== pendingRoute) return;
       pendingTabRouteRef.current = null;
     }
+    // Tab selection does not navigate, so an active tool tab can legitimately
+    // sit over the current Space URL. Only reconcile the URL when React Router
+    // reports a new navigation; otherwise opening File Manager (or another
+    // tool) would immediately create and activate a duplicate Space tab.
+    if (handledLocationKeyRef.current === location.key) return;
+    handledLocationKeyRef.current = location.key;
     if (activeTab?.kind === "space") {
       updateActiveSpaceRoute(accountId, activeSpace.id, normalizedRoute);
       return;
@@ -228,6 +203,7 @@ export default function SpacesShell() {
     activeTab?.kind,
     addWorkspaceTab,
     currentSpacesRoute,
+    location.key,
     location.state,
     selectWorkspaceTab,
     tabSession,
@@ -315,6 +291,10 @@ export default function SpacesShell() {
       />
     );
 
+  if (referenceOnly) {
+    return <SpacesReconnectScreen onReconnect={reconnect} />;
+  }
+
   const outletContext = {
     openCreateSpaceDialog: dialog.start,
   } satisfies SpacesShellOutletContext;
@@ -329,9 +309,9 @@ export default function SpacesShell() {
         ].join(" ")}
         style={{
           gridTemplateColumns:
-            panelVisible && activeTab?.kind === "space"
-              ? `var(--misty-spaces-rail-width) minmax(0, 1fr) ${agentDockOpen && activeSpace && !compactAgentDock ? `${agentDockWidth}px` : "0px"}`
-              : `0px minmax(0, 1fr) ${agentDockOpen && activeSpace && !compactAgentDock ? `${agentDockWidth}px` : "0px"}`,
+            panelVisible && spaceSurfaceActive
+              ? "var(--misty-spaces-rail-width) minmax(0, 1fr)"
+              : "0px minmax(0, 1fr)",
         }}
       >
         <div className="col-span-full row-start-1 min-w-0">
@@ -348,7 +328,7 @@ export default function SpacesShell() {
         </div>
 
         <AnimatePresence initial={false}>
-          {panelVisible && activeTab?.kind === "space" ? (
+          {panelVisible && spaceSurfaceActive ? (
             <motion.aside
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -359,26 +339,26 @@ export default function SpacesShell() {
                 "border-r border-sidebar-border/60 px-3 pb-2 pt-3 text-sm text-sidebar-foreground",
               ].join(" ")}
             >
-              <SpacePanelContent
-                key={activeSpace?.id}
-                spaces={spaces}
-                loading={loading}
-                notices={
-                  <SpaceInvitationsNotice
-                    invitations={invitations}
-                    onRespond={(id, accept) => void respondInvite(id, accept)}
-                  />
-                }
-              />
+              {activeInvitation ? (
+                <SpaceInvitationSidebar invitation={activeInvitation} />
+              ) : (
+                <SpacePanelContent key={activeSpace?.id} spaces={spaces} loading={loading} />
+              )}
             </motion.aside>
           ) : null}
         </AnimatePresence>
 
         <main
-          key={activeTab?.id}
+          key={activeInvitation?.id ?? activeTab?.id}
           className="misty-spaces-canvas relative col-start-2 row-start-2 min-h-0 min-w-0 overflow-hidden"
         >
-          {activeTab?.kind === "space" ? (
+          {activeInvitation ? (
+            <SpaceInvitationView
+              invitation={activeInvitation}
+              error={error ?? ""}
+              onRespond={respondToActiveInvitation}
+            />
+          ) : activeTab?.kind === "space" ? (
             detailRouteActive ? (
               <SpacePageFrame>
                 <Outlet context={outletContext} />
@@ -388,60 +368,10 @@ export default function SpacesShell() {
             )
           ) : activeTab ? (
             <SpacesWorkspaceSurface tab={activeTab} />
-          ) : null}
+          ) : (
+            <Outlet context={outletContext} />
+          )}
         </main>
-
-        <AnimatePresence initial={false}>
-          {agentDockOpen && activeSpace && activeTab?.kind === "space" && !referenceOnly ? (
-            <motion.aside
-              initial={{ opacity: 0, x: 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 16 }}
-              className={[
-                compactAgentDock
-                  ? "fixed bottom-8 right-0 top-[46px] z-40 max-w-[calc(100vw-32px)]"
-                  : "relative col-start-3 row-start-2 min-h-0 min-w-0",
-                "overflow-hidden",
-                "border-l border-border/60 bg-background",
-                "shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.45)]",
-              ].join(" ")}
-              style={compactAgentDock ? { width: agentDockWidth } : undefined}
-            >
-              <div
-                className="absolute inset-y-0 left-0 z-20 w-1 cursor-col-resize touch-none hover:bg-primary/20"
-                role="separator"
-                aria-label="Resize Agent panel"
-                aria-orientation="vertical"
-                tabIndex={0}
-                onPointerDown={beginAgentDockResize}
-                onKeyDown={(event) => {
-                  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-                  event.preventDefault();
-                  setAgentDockWidth((width) =>
-                    clampAgentDockWidth(width + (event.key === "ArrowLeft" ? 20 : -20)),
-                  );
-                }}
-              />
-              <AgentDock
-                context={{
-                  surface: "space",
-                  label: [
-                    activeSpace.name,
-                    spaceContextLabel(panelRoute),
-                    new URLSearchParams(location.search).get("task") ? "Task open" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · "),
-                  spaceId: activeSpace.id,
-                  spaceName: activeSpace.name,
-                  section: panelRoute.section,
-                  taskId: new URLSearchParams(location.search).get("task") ?? undefined,
-                }}
-                onClose={closeAgentDock}
-              />
-            </motion.aside>
-          ) : null}
-        </AnimatePresence>
 
         <footer className="col-span-full row-start-3 flex min-h-8 items-center border-t border-border/45 bg-background/70 px-2">
           <SpacesBottomBarToggle
@@ -451,9 +381,6 @@ export default function SpacesShell() {
           >
             {panelVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
           </SpacesBottomBarToggle>
-          {referenceOnly ? (
-            <SpaceReferenceStatus {...{ lastSyncedAt, loading }} onReconnect={reconnect} />
-          ) : null}
           <div
             id={spacesBottomBarActionsId}
             className="ml-auto flex min-w-0 items-center justify-end gap-1"
@@ -464,14 +391,4 @@ export default function SpacesShell() {
       </div>
     </MotionConfig>
   );
-}
-
-function spaceContextLabel(route: ReturnType<typeof useSpacePanelRoute>): string {
-  if (route.section === "planner") {
-    if (route.plannerSection === "agenda") return "Agenda";
-    if (route.plannerSection === "roadmaps") return "Roadmap";
-    return "Planner";
-  }
-  if (route.section === "notes" || route.section === "drawings") return "Journal";
-  return route.section.charAt(0).toUpperCase() + route.section.slice(1);
 }

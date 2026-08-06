@@ -207,7 +207,7 @@ import { usePanelResize } from "./explorerWorkspace/usePanelResize";
 import { usePluginRegistry } from "./explorerWorkspace/usePluginRegistry";
 import { useTransferRefreshPolling } from "./explorerWorkspace/useTransferRefreshPolling";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
-import { renderExplorerBottomBar } from "./ExplorerWorkspaceChrome";
+import { resolveExplorerBottomBarRenderer } from "./ExplorerWorkspaceChrome";
 import {
   scopedWorkspaceEntries,
   useScopedExplorerWorkspace,
@@ -723,7 +723,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           <MultiPanelWorkspace
             className="explorer-multipanel"
             canCloseTab={(tab) => canCloseExplorerTab(tab, useMultiPanelStore.getState().tabs)}
-            renderBottomBar={renderExplorerBottomBar}
+            renderBottomBar={resolveExplorerBottomBarRenderer(props.embedded)}
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}
             showTabStrip={!props.embedded}

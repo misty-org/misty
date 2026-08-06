@@ -10,11 +10,6 @@ import {
   libraryItemRequest,
 } from "./libraryItemRequest";
 import type { SensitiveScope } from "./useLibrarySensitiveAccess";
-import { isSpaceReferenceOnly } from "@/stores/spaces/spaceConnectivity";
-import {
-  cacheSpaceLibraryQuery,
-  readSpaceReferenceCache,
-} from "@/stores/spaces/spaceReferenceCache";
 
 export interface UseLibraryItemsOptions {
   spaceId: string;
@@ -77,14 +72,6 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
     setLoading(true);
     setLocalError("");
     const curated = isCurated(collection, selectedCollectionId);
-    const referenceQueryKey = JSON.stringify([
-      collection,
-      selectedCollectionId,
-      searchQuery,
-      mediaType,
-      sort,
-      direction,
-    ]);
     void libraryItemRequest({
       spaceId,
       collection,
@@ -97,7 +84,6 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
     })
       .then((library) => {
         if (!current) return;
-        if (!sensitiveCollectionScope) cacheSpaceLibraryQuery(spaceId, referenceQueryKey, library);
         const nextItems = curated
           ? filterCuratedItems(library.items, { searchQuery, mediaType, sort, direction })
           : library.items;
@@ -105,7 +91,7 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
         setVisibleItems(nextItems);
         setNextAfter(curated ? "" : (library.next_after ?? ""));
       })
-      .catch(async (error: unknown) => {
+      .catch((error: unknown) => {
         if (!current) return;
         if (
           error instanceof SpaceRequestError &&
@@ -113,22 +99,6 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
           sensitiveCollectionScope
         ) {
           options.onSensitiveGrantRejected(sensitiveCollectionScope);
-          return;
-        }
-        const cached =
-          !sensitiveCollectionScope && isSpaceReferenceOnly()
-            ? (await readSpaceReferenceCache())?.libraryQueriesBySpace?.[spaceId]?.[
-                referenceQueryKey
-              ]
-            : undefined;
-        if (!current) return;
-        if (cached) {
-          const nextItems = curated
-            ? filterCuratedItems(cached.items, { searchQuery, mediaType, sort, direction })
-            : cached.items;
-          setItems(nextItems);
-          setVisibleItems(nextItems);
-          setNextAfter("");
           return;
         }
         setLocalError(error instanceof Error ? error.message : "Library could not be loaded.");

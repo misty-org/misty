@@ -42,6 +42,7 @@ describe("SpacesHeader", () => {
     expect(container.querySelector('[role="tablist"]')).not.toBeNull();
     expect(container.querySelector('[title="New tab"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Open File Manager"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Open Agents"]')).not.toBeNull();
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>('[aria-label="Open Transfers"]')

@@ -6,6 +6,7 @@ import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import type {
   Space,
+  SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
 } from "@/models/interfaces/features/spaces/types";
@@ -23,9 +24,10 @@ import {
   spaceSectionPath,
   useSpacePanelRoute,
 } from "./spacePanel/spacePanelRoute";
-import { isMistySpace } from "../mistySpace";
+import { preferredMistySpace } from "../mistySpace";
 
 const emptyMembers: SpaceMember[] = [];
+const emptyAgents: SpaceAgentMembership[] = [];
 
 export function SpacePanelContent(props: {
   spaces: Space[];
@@ -41,9 +43,10 @@ export function SpacePanelContent(props: {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
 
-  const { members, snapshotReady, loadMembers } = useSpacesStore(
+  const { members, agents, snapshotReady, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[activeSpaceId] ?? emptyMembers,
+      agents: state.agentMembershipsBySpace[activeSpaceId] ?? emptyAgents,
       snapshotReady: state.snapshotReady,
       loadMembers: state.loadMembers,
     })),
@@ -55,38 +58,22 @@ export function SpacePanelContent(props: {
     enabled: Boolean(user),
   });
   const libraryUsage = useSpaceLibraryUsage({ activeSpaceId, activeSpace, section, snapshotReady });
-  const mistySpace = isMistySpace(activeSpace);
-  const supportConversation = conversations.find(
-    (conversation) =>
-      conversation.kind === "misty_support" ||
-      conversation.id === activeSpace?.support_conversation_id,
-  );
 
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
     if (!activeSpaceId || props.loading || activeSpace || props.spaces.length === 0) return;
-    navigate(spaceSectionPath(props.spaces[0].id, section, settingsSection), { replace: true });
+    const fallback = preferredMistySpace(props.spaces);
+    if (fallback)
+      navigate(spaceSectionPath(fallback.id, section, settingsSection), { replace: true });
   }, [activeSpace, activeSpaceId, navigate, props.loading, props.spaces, section, settingsSection]);
 
   useEffect(() => {
-    if (!user || !snapshotReady || !activeSpaceId || !activeSpace || mistySpace) return;
-    void loadMembers(activeSpaceId);
-  }, [activeSpace, activeSpaceId, loadMembers, mistySpace, snapshotReady, user]);
-
-  useEffect(() => {
-    if (!mistySpace) return;
-    if (section !== "chat") {
-      navigate(
-        supportConversation
-          ? spaceConversationPath(activeSpaceId, supportConversation.id)
-          : `/spaces/${encodeURIComponent(activeSpaceId)}/chat`,
-        { replace: true },
-      );
-      return;
-    }
-    if (!supportConversation || route.conversationId === supportConversation.id) return;
-    navigate(spaceConversationPath(activeSpaceId, supportConversation.id), { replace: true });
-  }, [activeSpaceId, mistySpace, navigate, route.conversationId, section, supportConversation]);
+    if (!user || !snapshotReady || !activeSpaceId || !activeSpace) return;
+    // Stale routes can lose access between the snapshot and this request. The
+    // store repairs those with a fresh snapshot; other request failures should
+    // not become unhandled promise rejections in the desktop webview.
+    void loadMembers(activeSpaceId).catch(() => undefined);
+  }, [activeSpace, activeSpaceId, loadMembers, snapshotReady, user]);
 
   const handleConversationSaved = (saved: SpaceConversation) => {
     upsertConversation(saved);
@@ -102,29 +89,18 @@ export function SpacePanelContent(props: {
       activeSpaceName={activeSpace?.name ?? "Journal"}
       settingsSection={settingsSection}
       libraryCollection={route.libraryCollection}
-      conversations={
-        mistySpace ? (supportConversation ? [supportConversation] : []) : conversations
-      }
+      conversations={conversations}
       activeConversationId={route.conversationId}
       currentUserId={user?.id}
       activeDrawingId={route.drawingId}
-      supportOnly={mistySpace}
-      onCreateConversation={
-        mistySpace
-          ? undefined
-          : () => {
-              setEditingConversation(null);
-              setDialogOpen(true);
-            }
-      }
-      onEditConversation={
-        mistySpace
-          ? undefined
-          : (conversation) => {
-              setEditingConversation(conversation);
-              setDialogOpen(true);
-            }
-      }
+      onCreateConversation={() => {
+        setEditingConversation(null);
+        setDialogOpen(true);
+      }}
+      onEditConversation={(conversation) => {
+        setEditingConversation(conversation);
+        setDialogOpen(true);
+      }}
     />
   ) : null;
 
@@ -155,26 +131,23 @@ export function SpacePanelContent(props: {
               </div>
             ) : null}
           </div>
-          {!mistySpace ? (
-            <SpaceStorageFooter
-              usage={libraryUsage}
-              showsOwnerStorage={activeSpace?.owner_user_id === user?.id}
-            />
-          ) : null}
+          <SpaceStorageFooter
+            usage={libraryUsage}
+            showsOwnerStorage={activeSpace?.owner_user_id === user?.id}
+          />
         </>
       ) : null}
 
-      {!mistySpace ? (
-        <CreateEditConversationDialog
-          spaceId={activeSpaceId}
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          members={members}
-          currentUserId={user?.id}
-          conversation={editingConversation}
-          onSaved={handleConversationSaved}
-        />
-      ) : null}
+      <CreateEditConversationDialog
+        spaceId={activeSpaceId}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        members={members}
+        agents={agents}
+        currentUserId={user?.id}
+        conversation={editingConversation}
+        onSaved={handleConversationSaved}
+      />
     </div>
   );
 }

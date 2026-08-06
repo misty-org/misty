@@ -24,7 +24,10 @@ const InputGroupTextarea = React.forwardRef<HTMLTextAreaElement, React.Component
       ref={ref}
       data-slot="input-group-textarea"
       className={cn(
-        "field-sizing-content max-h-40 min-h-20 min-w-0 max-w-full w-full resize-none overflow-x-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-3 py-3 text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-transparent",
+        "field-sizing-content max-h-40 min-h-20 min-w-0 max-w-full w-full resize-none",
+        "overflow-x-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-3 py-3",
+        "text-base outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed",
+        "disabled:opacity-50 md:text-sm dark:bg-transparent",
         className,
       )}
       {...props}

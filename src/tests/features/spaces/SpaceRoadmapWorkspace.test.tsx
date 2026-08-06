@@ -66,7 +66,7 @@ describe("SpaceRoadmapWorkspace", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(container.textContent).toContain("Roadmaps");
+    expect(container.textContent).toContain("Views");
     expect(container.textContent).toContain("Launch plan");
     expect(container.textContent).toContain("New roadmap");
   });

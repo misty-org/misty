@@ -6,6 +6,8 @@ import {
   desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
+  navButtonActiveClass,
+  navItemBaseClass,
   navLinkActiveClass,
   navLinkBaseClass,
 } from "@/layouts/DesktopLayout/styles";
@@ -44,21 +46,19 @@ describe("desktop surface colors", () => {
     expect(navbarGroupClass).toContain("overflow-y-auto");
     expect(navbarGroupClass).toContain("[scrollbar-width:none]");
     expect(navbarGroupClass).toContain("[&::-webkit-scrollbar]:hidden");
+    expect(navbarGroupClass).not.toContain("py-1");
     expect(navbarBottomClass).toContain("shrink-0");
   });
 
   it("anchors the navigation state marker to the left edge of the rail", () => {
     expect(navLinkBaseClass).toContain("w-full");
-    expect(navLinkBaseClass).toContain("before:left-0");
-    expect(navLinkBaseClass).toContain("before:h-10");
-    expect(navLinkBaseClass).toContain("before:w-1");
-    expect(navLinkBaseClass).toContain("hover:before:scale-y-50");
-    expect(navLinkBaseClass).toContain("before:transition-[scale,opacity]");
-    expect(navLinkBaseClass).toContain("before:duration-200");
-    expect(navLinkBaseClass).toContain("before:ease-[cubic-bezier(0.4,0,0.2,1)]");
-    expect(navLinkBaseClass).toContain("motion-reduce:before:transition-none");
-    expect(navLinkActiveClass).toContain("before:!scale-y-100");
-    expect(navLinkActiveClass).toContain("before:!opacity-100");
-    expect(navLinkActiveClass).toContain("before:!duration-300");
+    expect(navLinkBaseClass).toContain("misty-hover-marker-side");
+    expect(navLinkBaseClass).toContain("misty-navbar-marker-side");
+    expect(navLinkActiveClass).toContain("misty-active-marker-side");
+  });
+
+  it("keeps action buttons in the navbar free of navigation markers", () => {
+    expect(navItemBaseClass).not.toContain("misty-hover-marker-side");
+    expect(navButtonActiveClass).not.toContain("misty-active-marker-side");
   });
 });

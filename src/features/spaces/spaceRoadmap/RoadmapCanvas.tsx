@@ -48,7 +48,7 @@ export function RoadmapCanvas(props: {
   onPlacementHandled: () => void;
   onToggleGoal: (goalId: string) => void;
   onOpenTask: (taskId: string) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, anchor?: { x: number; y: number }) => void;
   onLayout: (nodes: RoadmapNode[]) => void;
   onConnect: (connection: Connection, edgeType: SpaceRoadmapEdgeType) => void;
   onDuplicate: (id: string) => void;
@@ -269,11 +269,16 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
         onNodesChange={handleNodeChanges}
         onEdgesChange={onEdgesChange}
         onConnect={requestConnection}
-        onNodeClick={(_, node) =>
-          node.data.taskId ? props.onOpenTask(node.data.taskId) : props.onSelect(node.id)
+        onNodeClick={(event, node) =>
+          node.data.taskId
+            ? props.onOpenTask(node.data.taskId)
+            : props.onSelect(node.id, { x: event.clientX, y: event.clientY })
         }
         onPaneClick={() => props.onSelect("")}
-        onEdgeClick={(_, edge) => !edge.id.startsWith("task-edge:") && props.onSelect(edge.id)}
+        onEdgeClick={(event, edge) =>
+          !edge.id.startsWith("task-edge:") &&
+          props.onSelect(edge.id, { x: event.clientX, y: event.clientY })
+        }
         onNodeDragStart={(_, node) =>
           node.data.canvasKind !== "task" && history.capture(nodesRef.current)
         }

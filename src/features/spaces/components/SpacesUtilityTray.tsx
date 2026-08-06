@@ -1,4 +1,11 @@
-import { ArrowRightLeft, FolderOpen, PanelsTopLeft, Puzzle, type LucideIcon } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Blocks,
+  Bot,
+  FolderOpen,
+  PanelsTopLeft,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/ui";
 import type { WorkspaceTabKind } from "@/stores/spaces/useSpacesTabsStore";
 
@@ -27,10 +34,16 @@ export const workspaceToolDefinitions: ReadonlyArray<{
     icon: FolderOpen,
   },
   {
+    kind: "agents",
+    label: "Agents",
+    description: "Work with Misty and your Agent teammates",
+    icon: Bot,
+  },
+  {
     kind: "extensions",
     label: "Extensions",
     description: "Browse and manage Misty extensions",
-    icon: Puzzle,
+    icon: Blocks,
   },
   {
     kind: "transfers",
@@ -43,11 +56,8 @@ export const workspaceToolDefinitions: ReadonlyArray<{
 export function SpacesUtilityTray(props: { onOpenTool: (kind: WorkspaceTabKind) => void }) {
   return (
     <nav className="flex items-center gap-0.5" aria-label="Workspace tools">
-      {workspaceToolDefinitions.map(({ kind, label, icon }, index) => (
+      {workspaceToolDefinitions.map(({ kind, label, icon }) => (
         <span className="contents" key={kind}>
-          {index === 2 ? (
-            <span className="mx-0.5 h-4 w-px bg-border/70" aria-hidden="true" />
-          ) : null}
           <UtilityButton
             icon={icon}
             label={`Open ${label}`}
@@ -76,7 +86,7 @@ function UtilityButton({
       aria-label={label}
       onClick={onClick}
     >
-      <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+      <Icon className="size-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
     </Button>
   );
 }

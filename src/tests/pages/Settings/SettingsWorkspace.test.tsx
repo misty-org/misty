@@ -136,4 +136,19 @@ describe("SettingsWorkspace", () => {
     const heading = container.querySelector("h1");
     expect(heading?.textContent).toBe("Appearance");
   });
+
+  it("uses the shared active bar for the selected settings section", async () => {
+    await renderWorkspace("general");
+
+    const nav = container.querySelector('nav[aria-label="Settings sections"]');
+    const sidebar = nav?.closest("aside");
+    const activeItem = nav?.querySelector('button[aria-current="page"]');
+    const inactiveItem = nav?.querySelector('button:not([aria-current="page"])');
+
+    expect(sidebar?.className).toContain("[--misty-active-bar-left:-1rem]");
+    expect(activeItem?.classList).toContain("misty-hover-marker-side");
+    expect(activeItem?.classList).toContain("misty-active-marker-side");
+    expect(inactiveItem?.classList).toContain("misty-hover-marker-side");
+    expect(inactiveItem?.classList).not.toContain("misty-active-marker-side");
+  });
 });

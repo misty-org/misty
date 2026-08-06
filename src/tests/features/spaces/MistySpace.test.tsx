@@ -1,12 +1,12 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { canManageSpaceLifecycle, isMistySpace } from "@/features/spaces/mistySpace";
+import { canManageSpaceLifecycle } from "@/features/spaces/mistySpace";
 import { useSpaceChatPermissions } from "@/features/spaces/spaceChat/useSpaceChatPermissions";
 import type { Space } from "@/models/interfaces/features/spaces/types";
 import { resetSpacesAccountState, useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
-describe("permanent Misty Space", () => {
+describe("default Misty Space", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -27,35 +27,30 @@ describe("permanent Misty Space", () => {
     container.remove();
   });
 
-  it("is system-managed and cannot expose lifecycle actions", () => {
+  it("allows ordinary management but respects operator-only deletion", () => {
     const space = mistySpace();
-    expect(isMistySpace(space)).toBe(true);
-    expect(canManageSpaceLifecycle(space, "rename")).toBe(false);
-    expect(canManageSpaceLifecycle(space, "invite")).toBe(false);
-    expect(canManageSpaceLifecycle(space, "leave")).toBe(false);
+    expect(canManageSpaceLifecycle(space, "rename")).toBe(true);
+    expect(canManageSpaceLifecycle(space, "invite")).toBe(true);
     expect(canManageSpaceLifecycle(space, "delete")).toBe(false);
   });
 
-  it("allows text only in the user's support conversation while connected", async () => {
-    await renderProbe("support-1", "misty_support");
+  it("uses normal Space permissions in every conversation", async () => {
+    await renderProbe("conversation-1", "standard");
     expect(readProbe()).toMatchObject({
       canWriteMessages: true,
-      canUploadAttachments: false,
-      canBrowseLibrary: false,
+      canUploadAttachments: true,
+      canBrowseLibrary: true,
     });
 
     await renderProbe("", undefined);
-    expect(readProbe().canWriteMessages).toBe(false);
+    expect(readProbe().canWriteMessages).toBe(true);
 
     useSpacesStore.setState({ referenceOnly: true });
-    await renderProbe("support-1", "misty_support");
+    await renderProbe("conversation-1", "standard");
     expect(readProbe().canWriteMessages).toBe(false);
   });
 
-  async function renderProbe(
-    conversationId: string,
-    conversationKind: "misty_support" | undefined,
-  ) {
+  async function renderProbe(conversationId: string, conversationKind: "standard" | undefined) {
     await act(async () => {
       root.render(
         <PermissionProbe conversationId={conversationId} conversationKind={conversationKind} />,
@@ -70,7 +65,7 @@ describe("permanent Misty Space", () => {
 
 function PermissionProbe(props: {
   conversationId: string;
-  conversationKind: "misty_support" | undefined;
+  conversationKind: "standard" | undefined;
 }) {
   const permissions = useSpaceChatPermissions(
     "misty",
@@ -83,20 +78,19 @@ function PermissionProbe(props: {
 function mistySpace(): Space {
   return {
     id: "misty",
-    kind: "misty",
-    support_conversation_id: "support-1",
-    owner_user_id: "misty-publisher",
+    kind: "standard",
+    owner_user_id: "owner",
     name: "Misty",
-    role: "member",
+    role: "owner",
     member_count: 0,
     pending_count: 0,
-    is_shared: true,
+    is_shared: false,
     permissions: {
       "messages.read": true,
-      "messages.write": false,
-      "misty.support.write": true,
-      "attachments.upload": false,
-      "library.view": false,
+      "messages.write": true,
+      "attachments.upload": true,
+      "library.view": true,
+      "space.delete": false,
     },
     created_at: "2026-08-03T00:00:00Z",
     updated_at: "2026-08-03T00:00:00Z",

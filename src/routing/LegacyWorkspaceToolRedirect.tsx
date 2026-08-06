@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { isMistySpace } from "@/features/spaces/mistySpace";
 import { useAppRouteMemoryStore } from "@/stores/app/useAppRouteMemoryStore";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import {
@@ -28,7 +27,7 @@ export function LegacyWorkspaceToolRedirect(props: { kind: Exclude<WorkspaceTabK
     started.current = true;
     const rememberedRoute = useAppRouteMemoryStore.getState().lastSpacesRoute;
     const rememberedId = spaceIdFromRoute(rememberedRoute);
-    const target = spaces.find((space) => space.id === rememberedId) ?? spaces.find(isMistySpace);
+    const target = spaces.find((space) => space.id === rememberedId) ?? spaces[0];
     if (!target) {
       navigate("/spaces", { replace: true });
       return;

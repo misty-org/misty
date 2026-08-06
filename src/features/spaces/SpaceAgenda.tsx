@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  CalendarDays,
+  CalendarCheck2,
   CalendarPlus,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
+  Minus,
   Plus,
   RefreshCcw,
 } from "lucide-react";
@@ -19,11 +23,33 @@ import type {
 import type { SpaceAgendaEntry } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { useSpaceAgendaPreferences } from "@/stores/spaces/useSpaceAgendaPreferences";
-import { Button } from "@/ui";
-import { SpaceViewModeToggle } from "./components/SpaceViewModeToggle";
+import {
+  Button,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/ui";
 import { CalendarSourceDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
-import { AgendaListView, AgendaMonthView, AgendaWeekView } from "./spaceAgenda/AgendaViews";
-import { agendaRange, agendaTitle, moveAnchor, type AgendaView } from "./spaceAgenda/agendaDates";
+import {
+  AgendaMonthView,
+  AgendaTimelineView,
+  type AgendaZoomMinutes,
+} from "./spaceAgenda/AgendaViews";
+import {
+  agendaRange,
+  agendaTitle,
+  dayKey,
+  moveAnchor,
+  type AgendaView,
+} from "./spaceAgenda/agendaDates";
+import { NewCalendarEventDialog } from "./spaceAgenda/NewCalendarEventDialog";
 
 export function SpaceAgenda({
   spaceId,
@@ -53,7 +79,9 @@ export function SpaceAgenda({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [eventOpen, setEventOpen] = useState<SpaceCalendarEvent>();
-  const { visibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [zoomMinutes, setZoomMinutes] = useState<AgendaZoomMinutes>(30);
+  const { visibility, setVisibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
   const range = useMemo(() => agendaRange(anchor, view), [anchor, view]);
 
   const load = useCallback(async () => {
@@ -102,8 +130,22 @@ export function SpaceAgenda({
   const updateAnchor = (next: Date) => {
     setAnchor(next);
     const params = new URLSearchParams(location.search);
-    params.set("date", next.toISOString().slice(0, 10));
+    params.set("date", dayKey(next));
     navigate({ pathname: location.pathname, search: `?${params}` }, { replace: true });
+  };
+  const updateView = (next: AgendaView) => {
+    navigate({
+      pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/${next}`,
+      search: location.search,
+    });
+  };
+  const updateZoom = (direction: "in" | "out") => {
+    const steps: AgendaZoomMinutes[] = [60, 30, 15];
+    setZoomMinutes((current) => {
+      const index = steps.indexOf(current);
+      const next = Math.min(steps.length - 1, Math.max(0, index + (direction === "in" ? 1 : -1)));
+      return steps[next];
+    });
   };
   const openEntry = (entry: SpaceAgendaEntry) => {
     if (entry.task_id)
@@ -115,7 +157,7 @@ export function SpaceAgenda({
         id: entry.id.replace(/^event:/, ""),
         space_id: spaceId,
         source_id: entry.source_id ?? "",
-        provider: "google",
+        provider: entry.source_id === "misty" ? "misty" : "google",
         external_event_id: entry.external_event_id ?? "",
         fingerprint: "",
         title: entry.title,
@@ -160,106 +202,186 @@ export function SpaceAgenda({
   };
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
-      <header className="misty-spaces-toolbar flex min-h-12 flex-wrap items-center gap-2 px-4 py-2">
-        <div>
-          <h1 className="m-0 text-sm font-semibold">Agenda</h1>
-          <p className="m-0 text-xs text-muted-foreground">{agendaTitle(anchor, view)}</p>
-        </div>
-        <SpaceViewModeToggle
-          label="Agenda view"
-          value={view}
-          options={[
-            { value: "month", label: "Month" },
-            { value: "week", label: "Week" },
-            { value: "list", label: "List" },
-          ]}
-          onChange={(next) =>
-            navigate({
-              pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/${next}`,
-              search: location.search,
-            })
-          }
-        />
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Previous range"
-            onClick={() => updateAnchor(moveAnchor(anchor, view, -1))}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => updateAnchor(new Date())}>
-            Today
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Next range"
-            onClick={() => updateAnchor(moveAnchor(anchor, view, 1))}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Refresh agenda"
-            onClick={() =>
-              void run("sync", async () => {
-                await spacesApi.syncCalendarTasks(spaceId);
-                await load();
-              })
-            }
-          >
-            {loading ? (
-              <LoaderCircle className="size-4 animate-spin" />
-            ) : (
-              <RefreshCcw className="size-4" />
-            )}
-          </Button>
-          {canManageIntegrations ? (
-            <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
+      <header className="misty-spaces-toolbar misty-transient-scrollbar min-h-[60px] overflow-x-auto border-b border-border/60 px-3 py-2">
+        <div className="flex min-w-max items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9"
+              aria-label="Previous range"
+              onClick={() => updateAnchor(moveAnchor(anchor, view, -1))}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-9 min-w-40 justify-between gap-3 px-3 font-medium"
+                  aria-label="Choose calendar date"
+                >
+                  {agendaTitle(anchor, view)}
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-3">
+                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                  Go to date
+                  <Input
+                    type="date"
+                    className="h-9 bg-background text-sm text-foreground"
+                    value={dayKey(anchor)}
+                    onChange={(event) => {
+                      if (event.target.value)
+                        updateAnchor(new Date(`${event.target.value}T12:00:00`));
+                    }}
+                  />
+                </label>
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9"
+              aria-label="Next range"
+              onClick={() => updateAnchor(moveAnchor(anchor, view, 1))}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-9"
+              aria-label="Go to today"
+              title="Today"
+              onClick={() => updateAnchor(new Date())}
+            >
+              <CalendarCheck2 className="size-4" />
+            </Button>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1.5 pl-6">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-9 min-w-28 justify-between gap-2 px-3 font-medium"
+                  aria-label="Calendar view"
+                >
+                  <CalendarDays className="size-4" />
+                  {view[0].toUpperCase() + view.slice(1)}
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuRadioGroup
+                  value={view}
+                  onValueChange={(next) => updateView(next as AgendaView)}
+                >
+                  <DropdownMenuRadioItem value="month">Month</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="week">Week</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="day">Day</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button
+              variant="outline"
+              className="h-9 gap-2 px-3 font-medium"
+              onClick={() => setDrawerOpen(true)}
+            >
               <CalendarPlus className="size-4" />
               Calendars
             </Button>
-          ) : null}
-          {canManage ? (
+
+            {view !== "month" ? (
+              <div
+                className="flex h-9 items-center overflow-hidden rounded-md border border-border/80"
+                aria-label="Calendar time interval"
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 rounded-none border-r border-border/60"
+                  aria-label="Zoom out calendar"
+                  disabled={zoomMinutes === 60}
+                  onClick={() => updateZoom("out")}
+                >
+                  <Minus className="size-4" />
+                </Button>
+                <span className="min-w-16 px-2 text-center text-xs font-medium">
+                  {zoomMinutes} min
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 rounded-none border-l border-border/60"
+                  aria-label="Zoom in calendar"
+                  disabled={zoomMinutes === 15}
+                  onClick={() => updateZoom("in")}
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </div>
+            ) : null}
+
             <Button
-              size="sm"
+              variant="outline"
+              size="icon"
+              className="size-9"
+              aria-label="Refresh calendar"
               onClick={() =>
-                navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?create=task`)
+                void run("sync", async () => {
+                  await spacesApi.syncCalendarTasks(spaceId);
+                  await load();
+                })
               }
             >
-              <Plus className="size-4" />
-              Task
+              {loading ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <RefreshCcw className="size-4" />
+              )}
             </Button>
-          ) : null}
+            {canManage ? (
+              <Button
+                className="h-9 gap-2 px-4 font-semibold"
+                onClick={() => setCreateEventOpen(true)}
+              >
+                <Plus className="size-4" />
+                New event
+              </Button>
+            ) : null}
+          </div>
         </div>
       </header>
-      <main className="min-h-0 overflow-auto p-4" aria-label={`${view} agenda`}>
+      <main className="relative min-h-0 overflow-hidden" aria-label={`${view} agenda`}>
         {error ? (
-          <div className="mb-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <div
+            className={cn(
+              "absolute inset-x-3 top-3 z-40 flex items-center justify-between rounded-md",
+              "border border-destructive/30 bg-background/95 px-3 py-2 text-sm text-destructive",
+              "shadow-md backdrop-blur",
+            )}
+          >
             <span>{error}</span>
             <Button size="sm" variant="outline" onClick={() => void load()}>
               Retry
             </Button>
           </div>
         ) : null}
-        {!loading && !visible.length ? (
-          <div className="grid min-h-72 place-items-center text-center">
-            <div>
-              <h2 className="m-0 text-base font-semibold">Your agenda is clear</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Deadlines, roadmap dates, and connected calendars will appear here.
-              </p>
-            </div>
-          </div>
-        ) : view === "month" ? (
+        {view === "month" ? (
           <AgendaMonthView anchor={anchor} entries={visible} onOpen={openEntry} />
-        ) : view === "week" ? (
-          <AgendaWeekView anchor={anchor} entries={visible} onOpen={openEntry} />
         ) : (
-          <AgendaListView entries={visible} onOpen={openEntry} />
+          <AgendaTimelineView
+            anchor={anchor}
+            entries={visible}
+            view={view}
+            zoomMinutes={zoomMinutes}
+            onOpen={openEntry}
+            onZoom={updateZoom}
+          />
         )}
       </main>
       {drawerOpen ? (
@@ -268,6 +390,9 @@ export function SpaceAgenda({
           selectedIntegration={selectedIntegration}
           choices={choices}
           sources={sources}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+          canManage={canManageIntegrations}
           connectionsUnavailable={false}
           busy={busy}
           onSelect={(id) => {
@@ -300,6 +425,19 @@ export function SpaceAgenda({
           onClose={() => setEventOpen(undefined)}
         />
       ) : null}
+      <NewCalendarEventDialog
+        open={createEventOpen}
+        anchor={anchor}
+        busy={busy === "create-event"}
+        onOpenChange={setCreateEventOpen}
+        onCreate={(input) =>
+          void run("create-event", async () => {
+            await spacesApi.createCalendarEvent(spaceId, input);
+            setCreateEventOpen(false);
+            await load();
+          })
+        }
+      />
     </div>
   );
 }

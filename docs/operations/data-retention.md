@@ -11,8 +11,11 @@ Published legal wording must match it before public beta.
 | Journal/Library binary object | While any active database reference exists | Reference-aware cleanup removes the R2 object only after its last reference and safety window; legal holds prevent deletion |
 | Abandoned upload | Until reservation expiry plus reconciliation safety window | Reservation is released and an old unreferenced object is deleted without opening its body |
 | Shared Space messages/files | While the Space retains them | Leaving or deleting an account removes access but does not silently erase data other members rely on; authored content is anonymized where the schema permits |
-| Personal Agents, private Agent memory, and conversations | Agent definitions and approved versions remain while the owner account is active; private conversations expire after 30 days | A deletion request immediately disables owned Agents, Space memberships, and active runs. At purge, private conversations and member-scoped memory are deleted, behavioral instructions and versions are redacted, and shared Task/audit records retain only historical attribution |
-| Agent Task runs and durable jobs | Retained with their Space Task and audit history | Reassignment, Agent removal, or account deletion cancels active work. Private run input/output belonging to a deleted requester is redacted at account purge |
+| Personal Agent definitions and Space placements | Definitions and approved versions remain while the owner account is active; Agent messages follow their Space conversation's retention | A deletion request immediately disables owned Agents, placements, device grants, and active runs. Shared messages, Tasks, runs, and audit records retain neutral historical attribution; obsolete private-session memory is not retained or exported |
+| Agent runs and durable device jobs | Retained with the triggering Space conversation, Task, and audit history | Reassignment, placement removal, device-grant revocation, or account deletion cancels active work. Requester-owned sensitive run input/output is redacted at account purge |
+| Conversation-scoped resources | Retained with the source conversation unless their human creator explicitly shares them with the Space | Conversation deletion archives and purges private Tasks, native events, Journal items, roadmaps, Library items, suggestion bundles, and follow-ups through their normal retention path; Space-shared resources survive |
+| Action suggestion bundle | Seven days if untouched; accepted results follow the created resource/run retention | Personal dismissal removes only that viewer's card. Evidence stores message identifiers and hashes, never detector reasoning or conversation text |
+| Scheduled Agent follow-up | Until delivered, canceled, or terminally failed; delivery records follow the source conversation/run audit history | The authorizer may cancel the whole reminder and recipients may opt out. Revoked authorizers/Agents cancel delivery; removed recipients are skipped |
 | Collaboration ticket/JTI | Ticket lifetime plus five minutes | Durable Object replay marker is opportunistically swept |
 | Support bundle | Local only | Created only on user action; never uploaded automatically |
 
@@ -23,6 +26,10 @@ Production operators must separately set and document:
 - R2 version/deletion-protection retention
 - telemetry retention in the selected region/project
 - legal-hold and litigation-preservation overrides
+
+Suggestion telemetry is metadata-only: detector latency, status, action kind,
+allowance consumption, and failure codes. Conversation text and proposed field
+values must never be emitted to product analytics or operational metrics.
 
 Backups expire on their configured schedule; an account cannot be selectively
 removed from an immutable backup. Restored systems must reapply completed

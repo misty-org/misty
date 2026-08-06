@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import { SpaceChatMessages } from "../components/SpaceChatMessages";
 import type { MistyPickerSource } from "@/models/interfaces/features/picker/MistyPicker";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
+import type { SpaceActionSuggestionBatch } from "@/models/interfaces/features/spaces/types";
 import type { SpaceChatPermissions } from "./useSpaceChatPermissions";
 import type { MessageEditingState } from "./useMessageEditing";
 import type { ChatSuggestionsState } from "./useChatSuggestions";
@@ -26,6 +27,8 @@ export interface SpaceChatThreadProps {
   onBeginMention: () => void;
   onReply: (messageId: string) => void;
   onDelete: (message: SpaceMessage) => void;
+  actionSuggestions: SpaceActionSuggestionBatch[];
+  onActionSuggestionsChanged: () => void;
 }
 
 /** The scrolling message list, wired to the Space's data and message actions. */
@@ -37,6 +40,8 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       error={props.error}
       loading={props.loading}
       messages={scope.messages}
+      actionSuggestions={props.actionSuggestions}
+      onActionSuggestionsChanged={props.onActionSuggestionsChanged}
       currentUserId={props.currentUserId}
       isOwner={access.isOwner}
       canWrite={access.canWriteMessages}

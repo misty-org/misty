@@ -17,7 +17,12 @@ export function createSpaceAgentMembershipsApi(request: SpaceRequest) {
       membership: SpaceAgentMembership,
       patch: Pick<
         SpaceAgentMembership,
-        "enabled" | "space_role" | "space_instructions" | "permissions"
+        | "enabled"
+        | "role_id"
+        | "space_role"
+        | "space_instructions"
+        | "permissions"
+        | "capability_grants"
       >,
     ) =>
       request<SpaceAgentMembership>(

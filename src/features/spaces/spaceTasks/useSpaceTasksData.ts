@@ -9,8 +9,6 @@ import type {
 } from "@/models/interfaces/features/spaces/types";
 import { mergeTasks } from "./taskOrdering";
 import type { TaskFilterParams } from "./useTaskFilterParams";
-import { isSpaceReferenceOnly } from "@/stores/spaces/spaceConnectivity";
-import { cacheSpaceTasks, readSpaceReferenceCache } from "@/stores/spaces/spaceReferenceCache";
 
 const TASK_PAGE_SIZE = 200;
 
@@ -76,7 +74,6 @@ export function useSpaceTasksData(options: {
         setTasks((current) => (append ? mergeTasks(current, taskResult.tasks) : taskResult.tasks));
         setNextCursor(taskResult.next_cursor ?? "");
         setStatusTotals(taskResult.status_totals ?? {});
-        cacheSpaceTasks(spaceId, taskResult);
         setError("");
         setLoading(false);
 
@@ -100,22 +97,7 @@ export function useSpaceTasksData(options: {
         );
       } catch (reason) {
         if (generation !== loadGenerationRef.current) return;
-        const cached = isSpaceReferenceOnly()
-          ? (await readSpaceReferenceCache())?.tasksBySpace?.[spaceId]
-          : undefined;
-        if (generation !== loadGenerationRef.current) return;
-        if (cached) {
-          setTasks(filterCachedTasks(cached.tasks, filters));
-          setStatusTotals(cached.status_totals ?? {});
-          setNextCursor("");
-          setSources([]);
-          setIntegrations([]);
-          setConnectionsUnavailable(true);
-          setCalendarNotice("Saved task data is available. Reconnect to refresh calendar details.");
-          setError("");
-        } else {
-          setError(errorText(reason));
-        }
+        setError(errorText(reason));
       } finally {
         if (generation === loadGenerationRef.current) setLoading(false);
       }
@@ -161,33 +143,6 @@ export function useSpaceTasksData(options: {
     connectionsUnavailable,
     load,
   };
-}
-
-function filterCachedTasks(tasks: SpaceTask[], filters: TaskFilterParams): SpaceTask[] {
-  const query = filters.query.trim().toLowerCase();
-  return tasks
-    .filter((task) => filters.status === "all" || task.status === filters.status)
-    .filter((task) => filters.priority === "all" || task.priority === filters.priority)
-    .filter((task) => !query || `${task.title} ${task.notes}`.toLowerCase().includes(query))
-    .filter((task) => {
-      if (filters.assignee === "unassigned")
-        return !task.assignee_user_id && !task.assignee_agent_id;
-      if (!filters.effectiveAssignee) return true;
-      if (filters.effectiveAssignee.startsWith("person:"))
-        return task.assignee_user_id === filters.effectiveAssignee.slice(7);
-      if (filters.effectiveAssignee.startsWith("agent:"))
-        return task.assignee_agent_id === filters.effectiveAssignee.slice(6);
-      return true;
-    })
-    .filter((task) => {
-      if (filters.due === "no_due") return !task.due_at;
-      if (!filters.dueRange) return true;
-      if (!task.due_at) return false;
-      const due = new Date(task.due_at).getTime();
-      const from = filters.dueRange.from ? new Date(filters.dueRange.from).getTime() : -Infinity;
-      const to = filters.dueRange.to ? new Date(filters.dueRange.to).getTime() : Infinity;
-      return due >= from && due <= to;
-    });
 }
 
 export type SpaceTasksData = ReturnType<typeof useSpaceTasksData>;

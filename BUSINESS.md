@@ -59,21 +59,21 @@ Copy, upload, and reference semantics must always be explicit. Provenance, contr
 
 ### Agents
 
-Agents are a first-class part of the product with their own destination, and they are Space-aware: an agent knows which Space and which surface the member is working in, and what that member is allowed to do there.
+Agents are reusable identities managed from their own destination and first-class members of every Space where they are placed.
 
-- In Files, an agent works from the user's private file context.
-- In a Space, an agent uses only the current member's authorized context for that Space.
-- Space agent conversations are private to the current account and Space.
+- Files and Transfers require an expiring per-user, per-device grant for the requesting member's online device.
+- In a Space, an agent uses the intersection of the member's permissions, its Space role, its approved version, and its granted capabilities.
+- Agent direct messages are normal Space conversations, isolated to one member, Agent, and Space.
 - An agent should know what a Space is and what its surfaces do, so it can answer questions about the work as well as about the content.
 - Important answers should link to the Space items that supported them.
 
-Space context and histories must be enforced by the server. A client-only filter is not a security boundary. If the connected server cannot create permission-checked Space sessions, the application must show an unavailable state instead of sending Space context through an account-wide session.
+Space context and histories must be enforced by the server. A client-only filter is not a security boundary. There is no account-wide or fallback Agent chat.
 
 Context must be rebuilt as the work changes rather than captured once when a conversation starts, so an agent does not answer from a stale view of the Space.
 
-Agents may read Space content and perform a limited set of writes. Reads are permission-checked at data access. Writes are explicit, described in plain language before they happen, and confirmed by the member; an agent never mutates shared, multi-member state silently.
+Agents may read granted Space content and perform granted writes. Explicit reversible writes proceed; destructive, external, and sensitive actions require an inline approval attached to the run and triggering conversation or Task.
 
-`@agent` mentions in Chat are a shared Space behavior and run server-side. They are distinct from the private agent conversation, which belongs to one member.
+Direct Agent messages run automatically. Everyone and group conversations run Agents only through explicit `@mentions`.
 
 ### Integrations
 
@@ -94,7 +94,7 @@ The beta succeeds when two people can complete this loop reliably:
 7. Create and use shared Tasks.
 8. Create and use durable shared Notes.
 9. Understand and manage access.
-10. Open a private agent conversation from any Space section.
+10. Open an Agent's canonical direct conversation from Space Members.
 11. Receive an answer grounded only in authorized Space context.
 12. Switch accounts or Spaces without carrying history or context across the boundary.
 
@@ -105,7 +105,7 @@ Studio, Workflows, Automations, an integration marketplace, and enterprise knowl
 ## Trust principles
 
 - Permission checks happen at data access, not only in the interface.
-- Private agent sessions are isolated by account and Space on the server.
+- Agent direct and group conversations use normal Space retention and participant isolation.
 - Membership is rechecked when context or history is read.
 - Local originals remain intact when content is shared.
 - Uploads show destination, progress, cancellation, and failures.

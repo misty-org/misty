@@ -111,6 +111,34 @@ describe("SpaceSectionNavigation", () => {
     expect(labels).not.toContain("Library");
   });
 
+  it("applies normal permissions to the default Misty Space", async () => {
+    useSpacesStore.setState({
+      spaces: [
+        spaceFixture({
+          id: "misty",
+          kind: "standard",
+          permissions: {
+            "messages.read": false,
+            "tasks.view": false,
+            "library.view": false,
+          },
+        }),
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/misty/notes"]}>
+          <SpaceSectionNavigation spaceId="misty" section="notes" />
+        </MemoryRouter>,
+      );
+    });
+
+    expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
+      "Journal",
+    ]);
+  });
+
   it("treats Notes and Drawings as Journal destinations", async () => {
     useSpacesStore.setState({ spaces: [spaceFixture()] });
 

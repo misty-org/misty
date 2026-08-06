@@ -24,7 +24,7 @@ import {
   usePointerDrag,
   type PointerDragPayload,
 } from "@/features/dnd/PointerDragContext";
-import { agentTaskDisplayState } from "@/features/agents/agentDockState";
+import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
 
 const boardStatuses: Array<{ id: SpaceTaskStatus; label: string }> = [
   { id: "todo", label: "To do" },
@@ -268,6 +268,7 @@ function TaskCard({
 }) {
   const assignee = members.find((member) => member.user_id === task.assignee_user_id);
   const agent = agents.find((item) => item.agent_id === task.assignee_agent_id);
+  const notes = task.notes.trim();
   const { startDrag, state } = usePointerDrag();
   const dragging = state.payload?.kind === TASK_DRAG_KIND && state.payload.id === task.id;
   const draggedRef = useRef(false);
@@ -309,7 +310,10 @@ function TaskCard({
     >
       <CardHeader className="p-3 pb-2">
         <div
-          className="flex w-full items-start gap-1.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className={[
+            "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md",
+            "text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+          ].join(" ")}
           role="button"
           tabIndex={0}
           onClick={openTask}
@@ -320,7 +324,14 @@ function TaskCard({
           }}
         >
           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          <CardTitle className="line-clamp-3 flex-1 text-sm leading-5">{task.title}</CardTitle>
+          <div className="min-w-0">
+            <CardTitle className="line-clamp-3 text-sm leading-5">{task.title}</CardTitle>
+            {notes ? (
+              <p className="mb-0 mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                {notes}
+              </p>
+            ) : null}
+          </div>
           {busy ? <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" /> : null}
         </div>
       </CardHeader>
@@ -335,9 +346,11 @@ function TaskCard({
             </span>
           ) : null}
           {agent ? <AgentTaskState taskId={task.id} agent={agent} /> : null}
-          <span className="ml-auto">
-            <TaskMemberAvatar member={assignee} agent={agent} />
-          </span>
+          {assignee || agent ? (
+            <span className="ml-auto">
+              <TaskMemberAvatar member={assignee} agent={agent} />
+            </span>
+          ) : null}
         </div>
         {canManage ? (
           <TaskInlineSelect
@@ -358,8 +371,11 @@ function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMe
   const state = agentTaskDisplayState(taskId, agent);
   const labels = {
     ready: "Ready",
+    queued: "Queued",
     working: "Working",
+    awaiting_approval: "Awaiting approval",
     needs_approval: "Needs approval",
+    retrying: "Retrying",
     failed: "Failed",
     disabled: "Disabled",
     update_available: "Update available",

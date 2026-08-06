@@ -36,6 +36,8 @@ export interface SpaceRoadmap {
   description: string;
   graph_version: number;
   created_by_user_id: string;
+  audience_kind: "space" | "conversation";
+  audience_conversation_id?: string;
   archived_at?: string;
   created_at: string;
   updated_at: string;
