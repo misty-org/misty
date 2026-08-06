@@ -1,6 +1,5 @@
 import type { SheetContentProps } from "@/models/interfaces/ui/sheet";
 export type { SheetContentProps } from "@/models/interfaces/ui/sheet";
-("use client");
 
 import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";

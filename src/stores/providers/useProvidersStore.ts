@@ -328,10 +328,7 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
     const generation = connectionGeneration;
     set({ working: true, error: null, message: null });
     if (!get().providers) {
-      try {
-        await get().load();
-      } finally {
-      }
+      await get().load();
       if (generation !== connectionGeneration || !get().providers) {
         if (generation === connectionGeneration) set({ working: false });
         return;
