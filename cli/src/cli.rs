@@ -208,6 +208,9 @@ enum ServerCommand {
         /// Stream underlying build output.
         #[arg(long)]
         verbose: bool,
+        /// Also open the local operator console in your browser.
+        #[arg(long)]
+        gui: bool,
     },
     /// Show service health and any unfinished or failed setup jobs.
     Status,
@@ -450,11 +453,23 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 detach: _,
                 no_build,
                 verbose,
-            } => server::up(&settings.workspace, true, !no_build, verbose),
+                gui,
+            } => {
+                server::up(&settings.workspace, true, !no_build, verbose)?;
+                if gui {
+                    crate::console::open(&settings.workspace)
+                } else {
+                    println!("Console: misty server up --gui");
+                    Ok(())
+                }
+            }
             ServerCommand::Status => server::status(&settings.workspace),
             ServerCommand::Deploy => server::deploy_development(&settings.workspace),
             ServerCommand::Url => server::url(&settings.workspace),
-            ServerCommand::Down { volumes } => server::down(&settings.workspace, volumes),
+            ServerCommand::Down { volumes } => {
+                crate::console::stop(&settings.workspace)?;
+                server::down(&settings.workspace, volumes)
+            }
             ServerCommand::Logs {
                 service,
                 follow,

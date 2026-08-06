@@ -3,6 +3,7 @@ mod checks;
 mod cli;
 mod cloudflare;
 mod config;
+mod console;
 mod desktop;
 mod development;
 mod diagnostics;
