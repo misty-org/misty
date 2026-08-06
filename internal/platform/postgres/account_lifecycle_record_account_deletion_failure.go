@@ -41,26 +41,6 @@ func (db *Database) ScheduleAccountDeletion(
 		).Scan(&userID); err != nil {
 			return err
 		}
-		var supportConversationID sql.NullString
-		if err := tx.QueryRowContext(ctx, `SELECT id FROM space_conversations WHERE kind='misty_support' AND support_user_id=$1 FOR UPDATE`, userID).Scan(&supportConversationID); err != nil && err != sql.ErrNoRows {
-			return err
-		}
-		if supportConversationID.Valid {
-			var supportSpaceID string
-			if err := tx.QueryRowContext(ctx, `SELECT space_id FROM space_conversations WHERE id=$1`, supportConversationID.String).Scan(&supportSpaceID); err != nil {
-				return err
-			}
-			messageIDs, err := messageIDsForConversationTx(ctx, tx, supportSpaceID, supportConversationID.String)
-			if err != nil {
-				return err
-			}
-			if err := cleanupSpaceMessagesTx(ctx, tx, supportSpaceID, messageIDs); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversations WHERE id=$1`, supportConversationID.String); err != nil {
-				return err
-			}
-		}
 		rows, err := tx.QueryContext(ctx, `
 			SELECT space_id FROM space_members
 			WHERE user_id=$1 AND role='member'`, userID)

@@ -76,6 +76,8 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 			args = append(args, value)
 			return fmt.Sprintf("$%d", len(args))
 		}
+		viewerPlaceholder := addArgument(userID)
+		conditions = append(conditions, "(i.audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members audience_member WHERE audience_member.conversation_id=i.audience_conversation_id AND audience_member.actor_kind='person' AND audience_member.user_id="+viewerPlaceholder+"))")
 		switch query.Visibility {
 		case "visible":
 			conditions = append(conditions, "i.hidden=FALSE")
@@ -112,10 +114,10 @@ func (db *Database) LibraryItems(ctx context.Context, userID, spaceID string, qu
 		switch query.Utility {
 		case "":
 		case "recently-viewed":
-			viewerPlaceholder := addArgument(userID)
-			conditions = append(conditions, "EXISTS(SELECT 1 FROM space_library_item_views item_view WHERE item_view.space_id=i.space_id AND item_view.space_library_item_id=i.id AND item_view.user_id="+viewerPlaceholder+")")
-			sortExpression = "(SELECT item_view.last_viewed_at FROM space_library_item_views item_view WHERE item_view.space_id=i.space_id AND item_view.space_library_item_id=i.id AND item_view.user_id=" + viewerPlaceholder + ")"
-			subquerySortExpression = "(SELECT item_view.last_viewed_at FROM space_library_item_views item_view WHERE item_view.space_id=cursor_item.space_id AND item_view.space_library_item_id=cursor_item.id AND item_view.user_id=" + viewerPlaceholder + ")"
+			recentViewerPlaceholder := addArgument(userID)
+			conditions = append(conditions, "EXISTS(SELECT 1 FROM space_library_item_views item_view WHERE item_view.space_id=i.space_id AND item_view.space_library_item_id=i.id AND item_view.user_id="+recentViewerPlaceholder+")")
+			sortExpression = "(SELECT item_view.last_viewed_at FROM space_library_item_views item_view WHERE item_view.space_id=i.space_id AND item_view.space_library_item_id=i.id AND item_view.user_id=" + recentViewerPlaceholder + ")"
+			subquerySortExpression = "(SELECT item_view.last_viewed_at FROM space_library_item_views item_view WHERE item_view.space_id=cursor_item.space_id AND item_view.space_library_item_id=cursor_item.id AND item_view.user_id=" + recentViewerPlaceholder + ")"
 		case "recently-edited":
 			conditions = append(conditions, "i.current_edit_version_id IS NOT NULL")
 			sortExpression, subquerySortExpression = "i.updated_at", "cursor_item.updated_at"

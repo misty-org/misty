@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
@@ -18,7 +17,6 @@ const (
 	toolboxTasksQuery     = "tasks.query"
 	toolboxTasksCreate    = "tasks.create"
 	toolboxTasksUpdate    = "tasks.update"
-	toolboxSpacesRename   = "spaces.rename"
 	toolboxAgentsDelegate = "agents.delegate"
 )
 
@@ -43,31 +41,10 @@ func spaceAgentToolbox(database *db.Database, delegationHandlers ...agenttools.H
 		agenttools.Registration{Descriptor: withToolTriggers(messagesSendToolDescriptor(), messageTriggers), Handler: legacyHandler},
 		agenttools.Registration{Descriptor: withToolTriggers(librarySearchToolDescriptor(), messageTriggers), Handler: legacyHandler},
 		agenttools.Registration{Descriptor: withToolTriggers(tasksQueryToolDescriptor(), messageTriggers), Handler: legacyHandler},
+		agenttools.Registration{Descriptor: withToolTriggers(calendarQueryToolDescriptor(), messageTriggers), Handler: legacyHandler},
 		agenttools.Registration{Descriptor: withToolTriggers(tasksCreateToolDescriptor(), messageTriggers), Handler: legacyHandler},
 		agenttools.Registration{Descriptor: withToolTriggers(tasksUpdateToolDescriptor(), messageTriggers), Handler: legacyHandler},
 		agenttools.Registration{Descriptor: agentDelegationToolDescriptor(), Handler: delegationHandler},
-		agenttools.Registration{Descriptor: agenttools.Descriptor{
-			Name: toolboxSpacesRename, Version: 1, Description: "Rename the current Space when its owner explicitly provides the new name.",
-			Risk: serveragent.RiskWrite, InputSchema: spaceRenameAgentToolSchema(), OutputSchema: agentToolObjectOutputSchema(), OwnerOnly: true, AllowCustomAgent: false,
-			Approval: agenttools.ApprovalExplicitIntent, Locality: agenttools.LocalityServer, Idempotent: true, AuditEvent: "space.updated",
-			Sources: []string{"space_conversation"}, Triggers: messageTriggers,
-		}, Handler: func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
-			var input struct {
-				Name string `json:"name"`
-			}
-			if json.Unmarshal(request.Arguments, &input) != nil {
-				return nil, db.ErrSpaceInvalid
-			}
-			input.Name = strings.TrimSpace(input.Name)
-			if input.Name == "" || !spaceRenameIsGrounded(invocation.OriginalInput, input.Name) {
-				return nil, workflowv2.ErrCapabilityDenied
-			}
-			space, err := database.RenameSpace(ctx, invocation.UserID, invocation.SpaceID, input.Name)
-			if err != nil {
-				return nil, err
-			}
-			return TestingMustAPIRawJSON(space), nil
-		}},
 	)
 }
 
@@ -85,7 +62,7 @@ func agentDelegationToolDescriptor() agenttools.Descriptor {
 			},
 		}),
 		OutputSchema: agentToolObjectOutputSchema(), RequiredPermission: db.PermissionAgentsRun,
-		AllowCustomAgent: false, Approval: agenttools.ApprovalExplicitIntent,
+		AgentPermission: db.PermissionAgentsRun, AllowCustomAgent: true, Approval: agenttools.ApprovalExplicitIntent,
 		Locality: agenttools.LocalityServer, Idempotent: false, AuditEvent: "agent.run.started",
 		Sources: []string{"space_conversation"}, Triggers: []string{"message"},
 	}
@@ -97,7 +74,7 @@ func withToolTriggers(descriptor agenttools.Descriptor, triggers []string) agent
 }
 
 func resolveSpaceAgentToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, includeMessages, includeLibrary bool, delegationHandlers ...agenttools.Handler) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	requested := TestingCompileAgentIntent(prompt)
+	requested := append([]string{"calendar.query"}, TestingCompileAgentIntent(prompt)...)
 	if includeMessages {
 		requested = append([]string{toolboxMessagesSearch}, requested...)
 	}
@@ -115,6 +92,7 @@ func resolveSpaceAgentToolbox(ctx context.Context, database *db.Database, actor 
 	invocation := agenttools.Invocation{
 		UserID: actor.userID, SpaceID: actor.spaceID, AgentID: actor.agentID, RunID: actor.runID,
 		SessionID: actor.sessionID, Source: "space_conversation", Trigger: "message", OriginalInput: prompt, ExplicitTools: explicit,
+		ConversationScopeKind: map[bool]string{true: db.ConversationScopePrivate, false: db.ConversationScopeEveryone}[actor.conversationID != ""], ConversationID: actor.conversationID,
 	}
 	manifest, err := toolbox.Resolve(ctx, invocation, requested, authorizeSpaceAgentTool(database))
 	return toolbox, invocation, manifest, err
@@ -142,6 +120,9 @@ func readOnlyToolRequests(toolbox *agenttools.Registry, requested []string) []st
 
 func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
+		if invocation.ConversationScopeKind == db.ConversationScopePrivate && descriptor.Locality == agenttools.LocalityProvider && descriptor.Risk != serveragent.RiskRead {
+			return false, nil
+		}
 		if invocation.AgentID != "" && !descriptor.AllowCustomAgent {
 			return false, nil
 		}
@@ -180,35 +161,6 @@ func executeSpaceAgentToolbox(ctx context.Context, toolbox *agenttools.Registry,
 		return nil, workflowv2.ErrCapabilityDenied
 	}
 	return result, err
-}
-
-func spaceRenameAgentToolSchema() json.RawMessage {
-	return TestingMustAPIRawJSON(map[string]any{
-		"type": "object", "required": []string{"name"},
-		"properties": map[string]any{"name": map[string]any{"type": "string", "minLength": 1, "maxLength": 80}},
-	})
-}
-
-func spaceRenameIsGrounded(prompt, name string) bool {
-	requested := strings.ToLower(requestedSpaceRenameName(prompt))
-	name = strings.ToLower(strings.Trim(strings.TrimSpace(name), "\"'` .?!"))
-	return requested != "" && requested == name
-}
-
-func requestedSpaceRenameName(prompt string) string {
-	lower := strings.ToLower(prompt)
-	for _, marker := range []string{" space name to ", " space called ", " space named ", " space to ", " space as "} {
-		index := strings.Index(lower, marker)
-		if index < 0 {
-			continue
-		}
-		value := strings.TrimSpace(prompt[index+len(marker):])
-		if lineEnd := strings.IndexAny(value, "\r\n"); lineEnd >= 0 {
-			value = value[:lineEnd]
-		}
-		return strings.Trim(strings.TrimSpace(value), "\"'` .?!")
-	}
-	return ""
 }
 
 func manifestToolNames(manifest serveragent.ToolManifest) []string {

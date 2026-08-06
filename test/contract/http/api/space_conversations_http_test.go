@@ -108,7 +108,7 @@ func TestConversationHTTPAccessControl(t *testing.T) {
 		}
 	}
 
-	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []string{member.ID})
+	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []db.SpaceActorRef{{Kind: "person", UserID: member.ID}})
 	if err != nil {
 		t.Fatalf("CreateSpaceConversation() error = %v", err)
 	}
@@ -174,7 +174,10 @@ func TestConversationHTTPAccessControl(t *testing.T) {
 	// Editing is restricted to the conversation's creator: neither the
 	// non-member Space mate nor an actual conversation member (who didn't
 	// create it) may rename it or change its membership.
-	editBody := map[string]any{"title": "Hijacked", "member_ids": []string{owner.ID, member.ID}}
+	editBody := map[string]any{"title": "Hijacked", "participants": []db.SpaceActorRef{
+		{Kind: "person", UserID: owner.ID},
+		{Kind: "person", UserID: member.ID},
+	}}
 	rec = performConversationRequest(t, router, http.MethodPatch, conversationPath, spacemateToken, editBody)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("PATCH conversation (spacemate) status = %d, body = %s, want 403", rec.Code, rec.Body)
@@ -186,7 +189,10 @@ func TestConversationHTTPAccessControl(t *testing.T) {
 
 	// The creator can rename the conversation and add the space mate; only
 	// then does the space mate gain visibility into it.
-	growBody := map[string]any{"title": "Launch crew v2", "member_ids": []string{member.ID, spacemate.ID}}
+	growBody := map[string]any{"title": "Launch crew v2", "participants": []db.SpaceActorRef{
+		{Kind: "person", UserID: member.ID},
+		{Kind: "person", UserID: spacemate.ID},
+	}}
 	rec = performConversationRequest(t, router, http.MethodPatch, conversationPath, ownerToken, growBody)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PATCH conversation (owner) status = %d, body = %s", rec.Code, rec.Body)

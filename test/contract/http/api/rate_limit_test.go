@@ -61,8 +61,6 @@ func TestNormalizeRateLimitPath(t *testing.T) {
 		"/api":                   "/",
 		"":                       "/",
 		"   /api/auth/forgot   ": "/auth/forgot",
-		"/api/ai/sessions/secret-session/messages": "/ai/sessions/{sessionID}/messages",
-		"/ai/sessions/another-secret/tool-results": "/ai/sessions/{sessionID}/tool-results",
 	}
 
 	for input, want := range tests {
@@ -123,27 +121,6 @@ func TestAPIRateLimiterMiddleware(t *testing.T) {
 	}
 	if secondRecorder.Header().Get("Retry-After") == "" {
 		t.Fatal("Retry-After header should be set on rate-limited responses")
-	}
-}
-
-func TestAPIRateLimiterSharesBudgetAcrossDynamicAISessionIDs(t *testing.T) {
-	limiter := NewAPIRateLimiter()
-	limiter.TestingNow = func() time.Time { return time.Unix(0, 0) }
-	limiter.TestingRoutePolicies["POST /ai/sessions/{sessionID}/messages"] = RateLimitPolicy{Limit: 1, Window: time.Minute}
-	handler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
-
-	for index, sessionID := range []string{"first", "second"} {
-		req := httptest.NewRequest(http.MethodPost, "/api/ai/sessions/"+sessionID+"/messages", nil)
-		req.RemoteAddr = "203.0.113.9:1234"
-		recorder := httptest.NewRecorder()
-		handler.ServeHTTP(recorder, req)
-		want := http.StatusOK
-		if index == 1 {
-			want = http.StatusTooManyRequests
-		}
-		if recorder.Code != want {
-			t.Fatalf("request %d status=%d, want %d", index, recorder.Code, want)
-		}
 	}
 }
 

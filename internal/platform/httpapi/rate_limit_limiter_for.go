@@ -34,13 +34,9 @@ const overflowRouteKey = "{overflow}"
 // path the limiter already computes.
 var costBearingRoutes = map[string]bool{
 	"/ai/complete":                                              true,
-	"/ai/sessions":                                              true,
-	"/ai/sessions/{sessionID}/messages":                         true,
-	"/ai/sessions/{sessionID}/tool-results":                     true,
 	"/ai/media-search/chunks":                                   true,
 	"/ai/media-search/search":                                   true,
 	"/spaces/{spaceID}/calendar/sync":                           true,
-	"/spaces/{spaceID}/tasks/calendar":                          true,
 	"/spaces/{spaceID}/integrations/discord/link":               true,
 	"/spaces/{spaceID}/integrations/discord/link/{id}/sync":     true,
 	"/spaces/{spaceID}/integrations/discord/link/{id}/publish":  true,
@@ -76,12 +72,6 @@ func TestingNormalizeRateLimitPath(path string) string {
 	parts := strings.Split(strings.Trim(trimmed, "/"), "/")
 	if len(parts) == 4 && parts[0] == "spaces" && parts[2] == "library" && parts[3] == "reauthenticate" {
 		return "/spaces/{spaceID}/library/reauthenticate"
-	}
-	if len(parts) == 4 && parts[0] == "ai" && parts[1] == "sessions" {
-		switch parts[3] {
-		case "messages", "events", "tool-results", "cancel":
-			return "/ai/sessions/{sessionID}/" + parts[3]
-		}
 	}
 	// Space-scoped routes carry ids in the path. Collapsing them keeps one
 	// budget per route shape instead of handing out a fresh budget per Space —

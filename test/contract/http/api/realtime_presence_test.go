@@ -4,15 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
-
-	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
+
+	"github.com/kannachi323/misty/server/test/testkit"
 )
 
 // testDatabaseLockID matches the advisory lock ID used by the db and
@@ -24,27 +23,7 @@ const testDatabaseLockID int64 = 621042
 func openPresenceTestDatabase(t *testing.T) *db.Database {
 	t.Helper()
 
-	host := firstNonEmpty(envconfig.Getenv("TEST_DB_HOST"), envconfig.Getenv("DB_HOST"))
-	port := firstNonEmpty(envconfig.Getenv("TEST_DB_PORT"), envconfig.Getenv("DB_PORT"))
-	user := firstNonEmpty(envconfig.Getenv("TEST_DB_USER"), envconfig.Getenv("DB_USER"))
-	password := firstNonEmpty(envconfig.Getenv("TEST_DB_PASSWORD"), envconfig.Getenv("DB_PASSWORD"))
-	name := firstNonEmpty(envconfig.Getenv("TEST_DB_NAME"), envconfig.Getenv("DB_NAME"))
-	sslmode := firstNonEmpty(envconfig.Getenv("TEST_DB_SSLMODE"), envconfig.Getenv("DB_SSLMODE"))
-	if host == "" || user == "" || password == "" || name == "" {
-		t.Skip("missing TEST_DB_*/DB_* environment; skipping realtime presence test")
-	}
-	if !strings.Contains(strings.ToLower(name), "test") {
-		t.Fatalf("refusing to run against non-test database %q", name)
-	}
-
-	t.Setenv("DB_HOST", host)
-	t.Setenv("DB_PORT", port)
-	t.Setenv("DB_USER", user)
-	t.Setenv("DB_PASSWORD", password)
-	t.Setenv("DB_NAME", name)
-	if sslmode != "" {
-		t.Setenv("DB_SSLMODE", sslmode)
-	}
+	testkit.ApplyDatabaseEnvironment(t)
 
 	database := &db.Database{}
 	if err := database.Start(); err != nil {
@@ -66,15 +45,6 @@ func openPresenceTestDatabase(t *testing.T) *db.Database {
 // truncate tables between runs the way db/integration's helpers do).
 func uniqueTestEmail(label string) string {
 	return fmt.Sprintf("presence-%s-%d@example.com", label, time.Now().UnixNano())
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func newTestRealtimeClient(userID string) *TestingRealtimeClient {

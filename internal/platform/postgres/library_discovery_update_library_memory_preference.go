@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -130,6 +131,8 @@ func (db *Database) LibraryDiscoveryItems(ctx context.Context, userID, spaceID, 
 				ORDER BY COALESCE(i.date_override,f.intrinsic_capture_at,f.original_uploaded_at) DESC,i.id`
 			args = append(args, coordinates[0], coordinates[1])
 		}
+		args = append(args, userID)
+		statement = strings.Replace(statement, " ORDER BY", " AND "+resourceAudienceSQL("i", fmt.Sprintf("$%d", len(args)))+" ORDER BY", 1)
 		rows, err := tx.QueryContext(ctx, statement, args...)
 		if err != nil {
 			return err
@@ -173,6 +176,11 @@ func (db *Database) MergeLibraryDuplicates(ctx context.Context, userID, spaceID 
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
+		}
+		for _, id := range ids {
+			if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, id); err != nil {
+				return err
+			}
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,i.version,i.lifecycle_state,f.blob_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.space_id=$1 AND i.id=ANY($2) FOR UPDATE OF i`, spaceID, pq.Array(ids))
 		if err != nil {

@@ -62,8 +62,11 @@ func (db *Database) CreateLibraryGrant(ctx context.Context, userID, sourceSpaceI
 		if _, err := requireSpaceMemberTx(ctx, tx, destinationSpaceID, userID); err != nil {
 			return ErrLibraryForbidden
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, sourceSpaceID, sourceItemID); err != nil {
+			return err
+		}
 		var exists bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items WHERE id=$1 AND space_id=$2 AND lifecycle_state='ready')`, sourceItemID, sourceSpaceID).Scan(&exists); err != nil || !exists {
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM space_library_items WHERE id=$1 AND space_id=$2 AND lifecycle_state='ready' AND audience_kind='space')`, sourceItemID, sourceSpaceID).Scan(&exists); err != nil || !exists {
 			return ErrLibraryNotFound
 		}
 		if err := tx.QueryRowContext(ctx, `SELECT g.id,r.id FROM space_library_grants g JOIN space_library_direct_references r ON r.grant_id=g.id WHERE g.source_space_id=$1 AND g.source_item_id=$2 AND g.destination_space_id=$3 AND g.state='active' LIMIT 1`, sourceSpaceID, sourceItemID, destinationSpaceID).Scan(&grantID, &referenceID); err != nil && !errors.Is(err, sql.ErrNoRows) {

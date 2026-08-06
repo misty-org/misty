@@ -220,7 +220,32 @@ func (s *SpacesService) RunRetry() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		run, err := s.database.RetrySpaceRun(r.Context(), userID, chi.URLParam(r, "runID"))
+		previous, previousErr := s.database.SpaceRun(r.Context(), userID, chi.URLParam(r, "runID"))
+		if previousErr != nil {
+			writeSpaceError(w, previousErr)
+			return
+		}
+		if previous.SourceType == "suggestion" {
+			batch, item, err := s.database.SpaceActionSuggestionForRun(r.Context(), userID, previous.ID)
+			if err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			if err := s.database.AuthorizeSuggestionAction(r.Context(), userID, batch.SpaceID, item.SelectedAgentID, item.RequiredCapability, batch.Scope); err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			run, followUp, err := s.executeReviewedSuggestion(r.Context(), userID, batch, *item)
+			if err != nil {
+				_ = s.database.CompleteSpaceActionSuggestionItem(r.Context(), userID, batch.SpaceID, item.ID, "failed", runID(run), "")
+				writeSpaceError(w, err)
+				return
+			}
+			_ = s.database.CompleteSpaceActionSuggestionItem(r.Context(), userID, batch.SpaceID, item.ID, "completed", runID(run), followUpID(followUp))
+			writeJSON(w, http.StatusOK, run)
+			return
+		}
+		run, err := s.database.RetrySpaceRun(r.Context(), userID, previous.ID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return

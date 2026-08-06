@@ -162,18 +162,73 @@ func (s *SpacesService) SpaceCalendar() http.HandlerFunc {
 		if !ok {
 			return
 		}
-		from, fromErr := time.Parse(time.RFC3339, r.URL.Query().Get("from"))
-		to, toErr := time.Parse(time.RFC3339, r.URL.Query().Get("to"))
-		if fromErr != nil || toErr != nil || !to.After(from) || to.Sub(from) > 370*24*time.Hour {
-			writeSpaceError(w, db.ErrSpaceInvalid)
+		spaceID := chi.URLParam(r, "spaceID")
+		switch r.Method {
+		case http.MethodGet:
+			from, fromErr := time.Parse(time.RFC3339, r.URL.Query().Get("from"))
+			to, toErr := time.Parse(time.RFC3339, r.URL.Query().Get("to"))
+			if fromErr != nil || toErr != nil || !to.After(from) || to.Sub(from) > 370*24*time.Hour {
+				writeSpaceError(w, db.ErrSpaceInvalid)
+				return
+			}
+			items, err := s.database.SpaceCalendarEvents(r.Context(), userID, spaceID, from, to)
+			if err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"events": items})
+		case http.MethodPost:
+			var body db.SpaceCalendarEvent
+			if decodeJSON(w, r, &body) != nil {
+				return
+			}
+			body.SpaceID = spaceID
+			item, err := s.database.CreateNativeCalendarEvent(r.Context(), userID, body)
+			if err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusCreated, item)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}
+}
+
+func (s *SpacesService) SpaceNativeCalendarEvent() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
 			return
 		}
-		items, err := s.database.SpaceCalendarEvents(r.Context(), userID, chi.URLParam(r, "spaceID"), from, to)
-		if err != nil {
-			writeSpaceError(w, err)
-			return
+		spaceID, eventID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "eventID")
+		switch r.Method {
+		case http.MethodPatch:
+			var body db.SpaceCalendarEvent
+			if decodeJSON(w, r, &body) != nil {
+				return
+			}
+			body.ID, body.SpaceID = eventID, spaceID
+			item, err := s.database.UpdateNativeCalendarEvent(r.Context(), userID, body)
+			if err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, item)
+		case http.MethodDelete:
+			version, err := strconv.ParseInt(r.URL.Query().Get("version"), 10, 64)
+			if err != nil {
+				writeSpaceError(w, db.ErrSpaceInvalid)
+				return
+			}
+			if err := s.database.ArchiveNativeCalendarEvent(r.Context(), userID, spaceID, eventID, version); err != nil {
+				writeSpaceError(w, err)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"events": items})
 	}
 }
 

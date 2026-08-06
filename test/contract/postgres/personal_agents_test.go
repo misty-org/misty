@@ -10,7 +10,7 @@ import (
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
+func TestPersonalAgentOwnershipSpaceMembershipAndConversationIsolation(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Agent Owner", "personal-agent-owner@example.com", "password123")
@@ -43,7 +43,7 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 	if _, err := database.RespondToSpaceInvite(ctx, privateMember.ID, privateInvite.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	privateConversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Private group", []string{privateMember.ID})
+	privateConversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Private group", []SpaceActorRef{{Kind: "person", UserID: privateMember.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 	grants, err := database.ReplacePersonalAgentGrants(ctx, owner.ID, created.ID, []PersonalAgentGrantInput{{
 		SpaceID: space.ID, MemberUserIDs: []string{member.ID},
 	}})
-	if err != nil || len(grants) != 1 || len(grants[0].MemberUserIDs) != 1 {
+	if err != nil || len(grants) != 1 || !grants[0].AllMembers || len(grants[0].MemberUserIDs) != 0 {
 		t.Fatalf("grants = %#v, %v", grants, err)
 	}
 	memberAgents, err := database.AccessiblePersonalAgents(ctx, member.ID, space.ID)
@@ -85,6 +85,10 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 	}
 	if memberAgents[0].Instructions != "" || len(memberAgents[0].ContextPermissions) != 0 || len(memberAgents[0].ToolPermissions) != 0 {
 		t.Fatalf("shared Agent exposed private configuration: %#v", memberAgents[0])
+	}
+	privateMemberAgents, err := database.AccessiblePersonalAgents(ctx, privateMember.ID, space.ID)
+	if err != nil || len(privateMemberAgents) != 1 {
+		t.Fatalf("Space member could not see first-class Agent membership: %#v, %v", privateMemberAgents, err)
 	}
 	effectiveContext, err := database.EffectivePersonalAgentContextPermissions(ctx, member.ID, space.ID, created.ID)
 	if err != nil {
@@ -114,21 +118,6 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 		t.Fatalf("Agent membership did not remove Task context: %s, %v", effectiveContext, err)
 	}
 
-	if err := database.AppendPersonalAgentMemory(ctx, member.ID, space.ID, created.ID, "member question", "member answer"); err != nil {
-		t.Fatal(err)
-	}
-	if err := database.AppendPersonalAgentMemory(ctx, owner.ID, space.ID, created.ID, "owner question", "owner answer"); err != nil {
-		t.Fatal(err)
-	}
-	memberMemory, err := database.PersonalAgentMemoryContext(ctx, member.ID, space.ID, created.ID)
-	if err != nil || !strings.Contains(memberMemory, "member question") || strings.Contains(memberMemory, "owner question") {
-		t.Fatalf("member memory = %q, %v", memberMemory, err)
-	}
-	ownerMemory, err := database.PersonalAgentMemoryContext(ctx, owner.ID, space.ID, created.ID)
-	if err != nil || !strings.Contains(ownerMemory, "owner question") || strings.Contains(ownerMemory, "member question") {
-		t.Fatalf("owner memory = %q, %v", ownerMemory, err)
-	}
-
 	updated := *created
 	updated.Name = "Research Guide"
 	updatedAgent, err := database.UpdatePersonalAgent(ctx, owner.ID, updated)
@@ -142,8 +131,8 @@ func TestPersonalAgentOwnershipSharingAndMemoryIsolation(t *testing.T) {
 	if _, err := database.ReplacePersonalAgentGrants(ctx, owner.ID, created.ID, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.PersonalAgentMemoryContext(ctx, member.ID, space.ID, created.ID); !errors.Is(err, ErrPersonalAgentNotFound) {
-		t.Fatalf("revoked member memory read = %v, want ErrPersonalAgentNotFound", err)
+	if agents, err := database.AccessiblePersonalAgents(ctx, member.ID, space.ID); err != nil || len(agents) != 0 {
+		t.Fatalf("removed Space Agent membership remained visible: %#v, %v", agents, err)
 	}
 	if err := database.DeletePersonalAgent(ctx, owner.ID, created.ID); err != nil {
 		t.Fatal(err)

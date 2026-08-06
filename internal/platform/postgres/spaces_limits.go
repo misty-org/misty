@@ -31,20 +31,18 @@ var (
 )
 
 type Space struct {
-	ID                    string          `json:"id"`
-	SecurityDomainID      string          `json:"security_domain_id"`
-	OwnerUserID           string          `json:"owner_user_id"`
-	Name                  string          `json:"name"`
-	Kind                  string          `json:"kind"`
-	MistyRole             string          `json:"misty_role,omitempty"`
-	SupportConversationID string          `json:"support_conversation_id,omitempty"`
-	Role                  string          `json:"role"`
-	MemberCount           int             `json:"member_count"`
-	PendingCount          int             `json:"pending_count"`
-	IsShared              bool            `json:"is_shared"`
-	Permissions           map[string]bool `json:"permissions"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
+	ID               string          `json:"id"`
+	SecurityDomainID string          `json:"security_domain_id"`
+	OwnerUserID      string          `json:"owner_user_id"`
+	Name             string          `json:"name"`
+	Kind             string          `json:"kind"`
+	Role             string          `json:"role"`
+	MemberCount      int             `json:"member_count"`
+	PendingCount     int             `json:"pending_count"`
+	IsShared         bool            `json:"is_shared"`
+	Permissions      map[string]bool `json:"permissions"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type SpaceMember struct {
@@ -84,6 +82,7 @@ type MessageSpan struct {
 	UserID  string `json:"user_id,omitempty"`
 	AgentID string `json:"agent_id,omitempty"`
 	Label   string `json:"label,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
 
 type SpaceMessage struct {
@@ -96,6 +95,7 @@ type SpaceMessage struct {
 	SenderAvatarVersion int64                  `json:"sender_avatar_version,omitempty"`
 	SenderKind          string                 `json:"sender_kind"`
 	SenderAgentID       string                 `json:"sender_agent_id,omitempty"`
+	Sender              SpaceMessageSender     `json:"sender"`
 	Content             []MessageSpan          `json:"content"`
 	FileNodeIDs         []string               `json:"file_node_ids"`
 	LibraryItemIDs      []string               `json:"library_item_ids"`
@@ -107,6 +107,14 @@ type SpaceMessage struct {
 	// every existing client stays valid and "no origin" reads as "ours".
 	Origin    json.RawMessage `json:"origin,omitempty"`
 	CreatedAt time.Time       `json:"created_at"`
+}
+
+type SpaceMessageSender struct {
+	Kind          string `json:"kind"`
+	UserID        string `json:"user_id,omitempty"`
+	AgentID       string `json:"agent_id,omitempty"`
+	DisplayName   string `json:"display_name"`
+	AvatarVersion int64  `json:"avatar_version,omitempty"`
 }
 
 type SpaceMessageReaction struct {
@@ -181,40 +189,43 @@ type SpaceStudioResource struct {
 }
 
 type SpaceRun struct {
-	ID                   string          `json:"id"`
-	SpaceID              string          `json:"space_id"`
-	ResourceKind         string          `json:"resource_kind"`
-	ResourceID           string          `json:"resource_id"`
-	InitiatedByUserID    string          `json:"initiated_by_user_id"`
-	BillingUserID        string          `json:"billing_user_id"`
-	TriggerKind          string          `json:"trigger_kind"`
-	State                string          `json:"state"`
-	Input                json.RawMessage `json:"input"`
-	Result               json.RawMessage `json:"result"`
-	ErrorCode            string          `json:"error_code,omitempty"`
-	CreatedAt            time.Time       `json:"created_at"`
-	CompletedAt          *time.Time      `json:"completed_at,omitempty"`
-	RequestingMemberID   string          `json:"requesting_member_id"`
-	SourceConversationID string          `json:"source_conversation_id,omitempty"`
-	SourceType           string          `json:"source_type"`
-	AgentID              string          `json:"agent_id,omitempty"`
-	WorkflowIdentifier   string          `json:"workflow_identifier,omitempty"`
-	WorkflowVersionID    string          `json:"workflow_version_id,omitempty"`
-	WorkflowVersion      string          `json:"workflow_version,omitempty"`
-	CapabilityID         string          `json:"capability_id,omitempty"`
-	Progress             int             `json:"progress"`
-	Outputs              json.RawMessage `json:"outputs"`
-	Artifacts            json.RawMessage `json:"artifacts"`
-	ErrorMessage         string          `json:"error_message,omitempty"`
-	RetryOfRunID         string          `json:"retry_of_run_id,omitempty"`
-	CanceledAt           *time.Time      `json:"canceled_at,omitempty"`
-	UpdatedAt            time.Time       `json:"updated_at"`
-	AgentInstanceID      string          `json:"agent_instance_id,omitempty"`
-	AgentVersionID       string          `json:"agent_version_id,omitempty"`
-	Attempt              int             `json:"attempt"`
-	NextRetryAt          *time.Time      `json:"next_retry_at,omitempty"`
-	SourceTaskID         string          `json:"source_task_id,omitempty"`
-	ActionEnvelope       json.RawMessage `json:"action_envelope,omitempty"`
+	ID                    string          `json:"id"`
+	SpaceID               string          `json:"space_id"`
+	ResourceKind          string          `json:"resource_kind"`
+	ResourceID            string          `json:"resource_id"`
+	InitiatedByUserID     string          `json:"initiated_by_user_id"`
+	BillingUserID         string          `json:"billing_user_id"`
+	TriggerKind           string          `json:"trigger_kind"`
+	State                 string          `json:"state"`
+	Input                 json.RawMessage `json:"input"`
+	Result                json.RawMessage `json:"result"`
+	ErrorCode             string          `json:"error_code,omitempty"`
+	CreatedAt             time.Time       `json:"created_at"`
+	CompletedAt           *time.Time      `json:"completed_at,omitempty"`
+	RequestingMemberID    string          `json:"requesting_member_id"`
+	SourceConversationID  string          `json:"source_conversation_id,omitempty"`
+	ConversationScopeKind string          `json:"conversation_scope_kind"`
+	ScopeConversationID   string          `json:"scope_conversation_id,omitempty"`
+	SourceMessageID       string          `json:"source_message_id,omitempty"`
+	SourceType            string          `json:"source_type"`
+	AgentID               string          `json:"agent_id,omitempty"`
+	WorkflowIdentifier    string          `json:"workflow_identifier,omitempty"`
+	WorkflowVersionID     string          `json:"workflow_version_id,omitempty"`
+	WorkflowVersion       string          `json:"workflow_version,omitempty"`
+	CapabilityID          string          `json:"capability_id,omitempty"`
+	Progress              int             `json:"progress"`
+	Outputs               json.RawMessage `json:"outputs"`
+	Artifacts             json.RawMessage `json:"artifacts"`
+	ErrorMessage          string          `json:"error_message,omitempty"`
+	RetryOfRunID          string          `json:"retry_of_run_id,omitempty"`
+	CanceledAt            *time.Time      `json:"canceled_at,omitempty"`
+	UpdatedAt             time.Time       `json:"updated_at"`
+	AgentInstanceID       string          `json:"agent_instance_id,omitempty"`
+	AgentVersionID        string          `json:"agent_version_id,omitempty"`
+	Attempt               int             `json:"attempt"`
+	NextRetryAt           *time.Time      `json:"next_retry_at,omitempty"`
+	SourceTaskID          string          `json:"source_task_id,omitempty"`
+	ActionEnvelope        json.RawMessage `json:"action_envelope,omitempty"`
 }
 
 func (db *Database) TestingSpaceTx(ctx context.Context, fn func(*sql.Tx) error) error {

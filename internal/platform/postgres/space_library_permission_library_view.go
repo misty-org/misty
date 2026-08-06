@@ -12,7 +12,6 @@ const (
 	PermissionLibraryView        = "library.view"
 	PermissionMessagesRead       = "messages.read"
 	PermissionMessagesWrite      = "messages.write"
-	PermissionMistySupportWrite  = "misty.support.write"
 	PermissionLibraryUpload      = "library.upload"
 	PermissionAttachmentUpload   = "attachments.upload"
 	PermissionLibraryAdd         = "library.add"
@@ -29,6 +28,7 @@ const (
 	PermissionTasksView          = "tasks.view"
 	PermissionTasksManage        = "tasks.manage"
 	PermissionIntegrationsManage = "integrations.manage"
+	PermissionSpaceDelete        = "space.delete"
 	LibraryRecoveryWindow        = 30 * 24 * time.Hour
 )
 

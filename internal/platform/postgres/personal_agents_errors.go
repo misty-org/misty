@@ -103,9 +103,9 @@ func personalAgentVersionID(agentID string, version int64) string {
 
 func insertPersonalAgentVersionTx(ctx context.Context, tx *sql.Tx, agent PersonalAgent, userID string) (string, error) {
 	id := personalAgentVersionID(agent.ID, agent.Version)
-	checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s", agent.ID, agent.Version, agent.Name, agent.Role, agent.Description, agent.Instructions, agent.ModelID, agent.ReasoningEffort, agent.Icon, string(agent.Avatar)))))
-	_, err := tx.ExecContext(ctx, `INSERT INTO personal_agent_versions(id,agent_id,version,name,role,description,icon,avatar,instructions,model_mode,model_id,reasoning_effort,checksum_sha256,created_by_user_id)
-		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(agent_id,version) DO NOTHING`, id, agent.ID, agent.Version, agent.Name, agent.Role, agent.Description, agent.Icon, agent.Avatar, agent.Instructions, agent.ModelMode, agent.ModelID, agent.ReasoningEffort, checksum, userID)
+	checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s\x00%s", agent.ID, agent.Version, agent.Name, agent.Role, agent.Description, agent.Instructions, agent.ModelID, agent.ReasoningEffort, agent.Icon, string(agent.Avatar), string(agent.ContextPermissions), string(agent.ToolPermissions)))))
+	_, err := tx.ExecContext(ctx, `INSERT INTO personal_agent_versions(id,agent_id,version,name,role,description,icon,avatar,instructions,model_mode,model_id,reasoning_effort,context_permissions,tool_permissions,checksum_sha256,created_by_user_id)
+		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) ON CONFLICT(agent_id,version) DO NOTHING`, id, agent.ID, agent.Version, agent.Name, agent.Role, agent.Description, agent.Icon, agent.Avatar, agent.Instructions, agent.ModelMode, agent.ModelID, agent.ReasoningEffort, agent.ContextPermissions, agent.ToolPermissions, checksum, userID)
 	return id, err
 }
 

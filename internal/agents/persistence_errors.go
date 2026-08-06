@@ -31,21 +31,16 @@ type SessionPersistence interface {
 }
 
 type persistedSessionState struct {
-	ID              string    `json:"id"`
-	UserID          string    `json:"userId"`
-	BillingUserID   string    `json:"billingUserId"`
-	BillingScope    string    `json:"billingScope"`
-	ModelID         string    `json:"modelId,omitempty"`
-	ReasoningEffort string    `json:"reasoningEffort,omitempty"`
-	SystemPrompt    string    `json:"systemPrompt,omitempty"`
-	AllowTools      *bool     `json:"allowTools,omitempty"`
-	AllowWriteTools *bool     `json:"allowWriteTools,omitempty"`
-	AgentTier       AgentTier `json:"agentTier"`
-	// LegacyAgentTier reads the pre-rename key so a conversation persisted by an
-	// older binary keeps its tier. Migration and rollout are not atomic, so this
-	// must outlive 20260915000000_rename_agent_session_tier.sql by one release.
-	// Only AgentTier is ever written.
-	LegacyAgentTier       AgentTier         `json:"mikaTier,omitempty"`
+	ID                    string            `json:"id"`
+	UserID                string            `json:"userId"`
+	BillingUserID         string            `json:"billingUserId"`
+	BillingScope          string            `json:"billingScope"`
+	ModelID               string            `json:"modelId,omitempty"`
+	ReasoningEffort       string            `json:"reasoningEffort,omitempty"`
+	SystemPrompt          string            `json:"systemPrompt,omitempty"`
+	AllowTools            *bool             `json:"allowTools,omitempty"`
+	AllowWriteTools       *bool             `json:"allowWriteTools,omitempty"`
+	AgentTier             AgentTier         `json:"agentTier"`
 	Mode                  string            `json:"mode"`
 	Capabilities          ToolManifest      `json:"capabilities"`
 	Messages              []Message         `json:"messages"`
@@ -114,11 +109,6 @@ func TestingUnmarshalPersistentSession(raw json.RawMessage, expectedID, expected
 	if state.Mode == "" {
 		state.Mode = ModeAsk
 	}
-	if state.AgentTier == "" {
-		state.AgentTier = state.LegacyAgentTier
-	}
-	// NormalizeAgentTier also maps legacy "mika-*" values, so an un-migrated row
-	// resolves to its real tier rather than defaulting to TierLow.
 	state.AgentTier = NormalizeAgentTier(state.AgentTier)
 	if state.BillingUserID == "" {
 		state.BillingUserID = state.UserID

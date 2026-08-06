@@ -203,7 +203,7 @@ func agentMembershipHasPermission(membership *SpaceAgentMembership, permission s
 	return json.Unmarshal(membership.Permissions, &permissions) == nil && permissions[permission]
 }
 
-func TestGlobalPersonalAgentSpaceDiscoveryAndMessageSendRecheckMembership(t *testing.T) {
+func TestSpaceAgentMessageSendRechecksMembership(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Global Agent Owner", "global-agent-owner@example.com", "password123")
@@ -212,9 +212,6 @@ func TestGlobalPersonalAgentSpaceDiscoveryAndMessageSendRecheckMembership(t *tes
 	}
 	visible, err := database.CreateSpace(ctx, owner.ID, "Visible Space")
 	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Unlinked Space"); err != nil {
 		t.Fatal(err)
 	}
 	agent, err := database.CreatePersonalAgent(ctx, owner.ID, PersonalAgent{
@@ -233,10 +230,6 @@ func TestGlobalPersonalAgentSpaceDiscoveryAndMessageSendRecheckMembership(t *tes
 	if _, err := database.UpdatePersonalAgent(ctx, owner.ID, renamed); err != nil {
 		t.Fatal(err)
 	}
-	spaces, err := database.AccessiblePersonalAgentSpaces(ctx, owner.ID, agent.ID)
-	if err != nil || len(spaces) != 1 || spaces[0].ID != visible.ID || !spaces[0].CanSend {
-		t.Fatalf("accessible Spaces = %#v, %v", spaces, err)
-	}
 	message, err := database.CreatePersonalAgentSpaceMessage(ctx, owner.ID, visible.ID, agent.ID, "Launch is today")
 	if err != nil || message.SenderKind != "agent" || message.SenderAgentID != agent.ID || message.SenderUserID != owner.ID || message.SenderName != "Messenger" {
 		t.Fatalf("Agent message = %#v, %v", message, err)
@@ -252,16 +245,12 @@ func TestGlobalPersonalAgentSpaceDiscoveryAndMessageSendRecheckMembership(t *tes
 	}); err != nil {
 		t.Fatal(err)
 	}
-	spaces, err = database.AccessiblePersonalAgentSpaces(ctx, owner.ID, agent.ID)
-	if err != nil || len(spaces) != 0 {
-		t.Fatalf("disabled membership remained discoverable: %#v, %v", spaces, err)
-	}
 	if _, err := database.CreatePersonalAgentSpaceMessage(ctx, owner.ID, visible.ID, agent.ID, "Must not send"); !errors.Is(err, ErrPersonalAgentNotFound) {
 		t.Fatalf("send after membership disable = %v, want not found", err)
 	}
 }
 
-func TestMistyDelegationTargetsOnlyEnabledGrantedSpaceAgents(t *testing.T) {
+func TestSpaceAgentDelegationTargetsOnlyEnabledSpaceMembers(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
 	owner, err := database.CreateUser("Misty Routing Owner", "misty-routing-owner@example.com", "password123")
@@ -295,12 +284,13 @@ func TestMistyDelegationTargetsOnlyEnabledGrantedSpaceAgents(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resolved, _, err := api.TestingResolveMistyDelegationTarget(ctx, database, owner.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist")
+	resolved, _, err := api.TestingResolveSpaceDelegationTarget(ctx, database, owner.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist")
 	if err != nil || resolved == nil || resolved.AgentID != agent.ID {
 		t.Fatalf("owner delegation target = %#v, %v", resolved, err)
 	}
-	if _, _, err := api.TestingResolveMistyDelegationTarget(ctx, database, member.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist"); !errors.Is(err, workflowv2.ErrCapabilityDenied) {
-		t.Fatalf("ungranted member delegation error = %v, want capability denied", err)
+	memberResolved, _, err := api.TestingResolveSpaceDelegationTarget(ctx, database, member.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist")
+	if err != nil || memberResolved == nil || memberResolved.AgentID != agent.ID {
+		t.Fatalf("Space member delegation target = %#v, %v", memberResolved, err)
 	}
 
 	membership, err := database.SpaceAgentMembership(ctx, owner.ID, space.ID, agent.ID)
@@ -314,7 +304,7 @@ func TestMistyDelegationTargetsOnlyEnabledGrantedSpaceAgents(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := api.TestingResolveMistyDelegationTarget(ctx, database, owner.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist"); !errors.Is(err, workflowv2.ErrCapabilityDenied) {
+	if _, _, err := api.TestingResolveSpaceDelegationTarget(ctx, database, owner.ID, space.ID, agent.ID, "", "Delegate this to Routing Specialist"); !errors.Is(err, workflowv2.ErrCapabilityDenied) {
 		t.Fatalf("disabled Agent delegation error = %v, want capability denied", err)
 	}
 }

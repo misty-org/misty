@@ -13,12 +13,9 @@ func TestAccountsStartWithMistyAndStandardSpacesBecomeSharedOnlyByInvite(t *test
 	database := openTestDatabase(t)
 	ctx := context.Background()
 
-	owner, err := database.CreateUserWithUsername("Owner", MistyOperatorUsername, "space-owner@example.com", "password123")
+	owner, err := database.CreateUser("Owner", "space-owner@example.com", "password123")
 	if err != nil {
 		t.Fatalf("CreateUser(owner) error = %v", err)
-	}
-	if err := database.BootstrapMistySpace(ctx, owner.ID); err != nil {
-		t.Fatalf("BootstrapMistySpace() error = %v", err)
 	}
 	member, err := database.CreateUser("Member", "space-member@example.com", "password123")
 	if err != nil {
@@ -29,8 +26,8 @@ func TestAccountsStartWithMistyAndStandardSpacesBecomeSharedOnlyByInvite(t *test
 	if err != nil {
 		t.Fatalf("ListSpaces(owner) error = %v", err)
 	}
-	if len(ownerSpaces) != 1 || ownerSpaces[0].Kind != "misty" {
-		t.Fatalf("initial owner Spaces = %#v, want permanent Misty Space", ownerSpaces)
+	if len(ownerSpaces) != 1 || ownerSpaces[0].Kind != "standard" || ownerSpaces[0].Name != "Misty" {
+		t.Fatalf("initial owner Spaces = %#v, want ordinary default Misty Space", ownerSpaces)
 	}
 	project, err := database.CreateSpace(ctx, owner.ID, "Project")
 	if err != nil {
@@ -44,8 +41,8 @@ func TestAccountsStartWithMistyAndStandardSpacesBecomeSharedOnlyByInvite(t *test
 	if err != nil {
 		t.Fatalf("CreateSpace(second additional) = %#v, %v, want success", secondAdditional, err)
 	}
-	if _, err := database.CreateSpace(ctx, owner.ID, "Third total"); err != nil {
-		t.Fatalf("CreateSpace(third total) error = %v, want Basic limit to allow three", err)
+	if _, err := database.CreateSpace(ctx, owner.ID, "Fourth total"); !errors.Is(err, ErrSpaceLimit) {
+		t.Fatalf("CreateSpace(fourth total) error = %v, want ErrSpaceLimit because the default Misty Space counts toward the Basic limit", err)
 	}
 	if err := database.DeleteSpace(ctx, owner.ID, secondAdditional.ID, secondAdditional.Name); err != nil {
 		t.Fatalf("DeleteSpace(second additional) error = %v", err)
@@ -55,8 +52,8 @@ func TestAccountsStartWithMistyAndStandardSpacesBecomeSharedOnlyByInvite(t *test
 	}
 
 	memberSpaces, err := database.ListSpaces(ctx, member.ID)
-	if err != nil || len(memberSpaces) != 1 || memberSpaces[0].Kind != "misty" {
-		t.Fatalf("ListSpaces(member) = %#v, %v, want permanent Misty Space", memberSpaces, err)
+	if err != nil || len(memberSpaces) != 1 || memberSpaces[0].Kind != "standard" || memberSpaces[0].Name != "Misty" {
+		t.Fatalf("ListSpaces(member) = %#v, %v, want ordinary default Misty Space", memberSpaces, err)
 	}
 
 	invite, err := database.InviteToSpace(ctx, owner.ID, project.ID, member.Email)

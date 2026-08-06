@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 func TestSpaceRoadmapProgressDerivation(t *testing.T) {
@@ -51,13 +53,13 @@ func TestRoadmapDependencyCycleDetection(t *testing.T) {
 		{SourceGoalID: "b", TargetGoalID: "c", EdgeType: "dependency"},
 		{SourceGoalID: "c", TargetGoalID: "a", EdgeType: "related"},
 	}
-	if TestingRoadmapDependencyWouldCycle(edges, "c", "a") != true {
+	if !TestingRoadmapDependencyWouldCycle(edges, "c", "a") {
 		t.Fatal("expected c -> a dependency to close the dependency cycle")
 	}
 	if TestingRoadmapDependencyWouldCycle(edges, "c", "d") {
 		t.Fatal("unconnected dependency must not be rejected")
 	}
-	if TestingRoadmapDependencyWouldCycle(edges, "a", "a") != true {
+	if !TestingRoadmapDependencyWouldCycle(edges, "a", "a") {
 		t.Fatal("self dependency must be rejected")
 	}
 }
@@ -81,29 +83,29 @@ func TestRoadmapCustomFieldSchemaValidation(t *testing.T) {
 		{"id":"confidence","label":"Confidence","type":"select","options":["Low","High"]},
 		{"id":"approved","label":"Approved","type":"checkbox"}
 	]`)
-	fields, ok := decodeRoadmapFieldSchema(valid)
+	fields, ok := TestingDecodeRoadmapFieldSchema(valid)
 	if !ok || len(fields) != 3 {
 		t.Fatalf("valid schema rejected: %#v", fields)
 	}
-	if !validateRoadmapFieldValues(json.RawMessage(`{"owner_note":"Misty","confidence":"High","approved":true}`), fields) {
+	if !TestingValidateRoadmapFieldValues(json.RawMessage(`{"owner_note":"Misty","confidence":"High","approved":true}`), fields) {
 		t.Fatal("valid typed values rejected")
 	}
-	if validateRoadmapFieldValues(json.RawMessage(`{"confidence":"Unknown"}`), fields) {
+	if TestingValidateRoadmapFieldValues(json.RawMessage(`{"confidence":"Unknown"}`), fields) {
 		t.Fatal("unknown select option accepted")
 	}
-	if validateRoadmapFieldValues(json.RawMessage(`{"approved":"yes"}`), fields) {
+	if TestingValidateRoadmapFieldValues(json.RawMessage(`{"approved":"yes"}`), fields) {
 		t.Fatal("invalid checkbox value accepted")
 	}
-	if _, ok := decodeRoadmapFieldSchema(json.RawMessage(`[{"id":"same","label":"One","type":"date"},{"id":"same","label":"Two","type":"date"}]`)); ok {
+	if _, ok := TestingDecodeRoadmapFieldSchema(json.RawMessage(`[{"id":"same","label":"One","type":"date"},{"id":"same","label":"Two","type":"date"}]`)); ok {
 		t.Fatal("duplicate field ids accepted")
 	}
-	if validRoadmapDefinitionUpdate(
+	if TestingValidRoadmapDefinitionUpdate(
 		[]SpaceRoadmapFieldDefinition{{ID: "score", Label: "Score", Type: "number"}},
 		[]SpaceRoadmapFieldDefinition{{ID: "score", Label: "Score", Type: "short_text"}},
 	) {
 		t.Fatal("field type mutation accepted")
 	}
-	if validRoadmapDefinitionUpdate(
+	if TestingValidRoadmapDefinitionUpdate(
 		[]SpaceRoadmapFieldDefinition{{ID: "score", Label: "Score", Type: "number"}},
 		[]SpaceRoadmapFieldDefinition{},
 	) {

@@ -13,26 +13,29 @@ import (
 )
 
 type SpaceTask struct {
-	ID               string          `json:"id"`
-	SpaceID          string          `json:"space_id"`
-	TaskNumber       int64           `json:"task_number"`
-	TaskKey          string          `json:"task_key"`
-	Title            string          `json:"title"`
-	Notes            string          `json:"notes"`
-	Status           string          `json:"status"`
-	Priority         string          `json:"priority"`
-	Rank             int64           `json:"rank"`
-	AssigneeUserID   string          `json:"assignee_user_id,omitempty"`
-	AssigneeAgentID  string          `json:"assignee_agent_id,omitempty"`
-	DueAt            *time.Time      `json:"due_at,omitempty"`
-	DueTimezone      string          `json:"due_timezone"`
-	SourceRefs       json.RawMessage `json:"source_refs"`
-	CreatedByUserID  string          `json:"created_by_user_id,omitempty"`
-	CreatedByAgentID string          `json:"created_by_agent_id,omitempty"`
-	SourceRunID      string          `json:"source_run_id,omitempty"`
-	Version          int64           `json:"version"`
-	CompletedAt      *time.Time      `json:"completed_at,omitempty"`
-	ArchivedAt       *time.Time      `json:"archived_at,omitempty"`
+	ID                     string          `json:"id"`
+	SpaceID                string          `json:"space_id"`
+	TaskNumber             int64           `json:"task_number"`
+	TaskKey                string          `json:"task_key"`
+	Title                  string          `json:"title"`
+	Notes                  string          `json:"notes"`
+	Status                 string          `json:"status"`
+	Priority               string          `json:"priority"`
+	Rank                   int64           `json:"rank"`
+	AssigneeUserID         string          `json:"assignee_user_id,omitempty"`
+	AssigneeAgentID        string          `json:"assignee_agent_id,omitempty"`
+	DueAt                  *time.Time      `json:"due_at,omitempty"`
+	DueTimezone            string          `json:"due_timezone"`
+	SourceRefs             json.RawMessage `json:"source_refs"`
+	CreatedByUserID        string          `json:"created_by_user_id,omitempty"`
+	CreatedByAgentID       string          `json:"created_by_agent_id,omitempty"`
+	SourceRunID            string          `json:"source_run_id,omitempty"`
+	AudienceKind           string          `json:"audience_kind"`
+	AudienceConversationID string          `json:"audience_conversation_id,omitempty"`
+	AudienceCreatorUserID  string          `json:"audience_creator_user_id,omitempty"`
+	Version                int64           `json:"version"`
+	CompletedAt            *time.Time      `json:"completed_at,omitempty"`
+	ArchivedAt             *time.Time      `json:"archived_at,omitempty"`
 	// Google Calendar state. All three stay empty for Misty-only tasks.
 	Schedule         json.RawMessage `json:"schedule,omitempty"`
 	Calendar         json.RawMessage `json:"calendar,omitempty"`
@@ -144,35 +147,42 @@ type SpaceCalendarSource struct {
 }
 
 type SpaceCalendarEvent struct {
-	ID                string          `json:"id"`
-	SpaceID           string          `json:"space_id"`
-	SourceID          string          `json:"source_id"`
-	Provider          string          `json:"provider"`
-	ExternalEventID   string          `json:"external_event_id"`
-	Fingerprint       string          `json:"fingerprint"`
-	Title             string          `json:"title"`
-	Description       string          `json:"description"`
-	Location          string          `json:"location"`
-	MeetingURL        string          `json:"meeting_url"`
-	Organizer         json.RawMessage `json:"organizer"`
-	StartsAt          time.Time       `json:"starts_at"`
-	EndsAt            time.Time       `json:"ends_at"`
-	AllDay            bool            `json:"all_day"`
-	Timezone          string          `json:"timezone"`
-	Status            string          `json:"status"`
-	ProviderCreatedAt *time.Time      `json:"provider_created_at,omitempty"`
-	ProviderUpdatedAt *time.Time      `json:"provider_updated_at,omitempty"`
-	RemovedAt         *time.Time      `json:"removed_at,omitempty"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	ID                     string          `json:"id"`
+	SpaceID                string          `json:"space_id"`
+	SourceID               string          `json:"source_id"`
+	Provider               string          `json:"provider"`
+	ExternalEventID        string          `json:"external_event_id"`
+	Fingerprint            string          `json:"fingerprint"`
+	Title                  string          `json:"title"`
+	Description            string          `json:"description"`
+	Location               string          `json:"location"`
+	MeetingURL             string          `json:"meeting_url"`
+	Organizer              json.RawMessage `json:"organizer"`
+	StartsAt               time.Time       `json:"starts_at"`
+	EndsAt                 time.Time       `json:"ends_at"`
+	AllDay                 bool            `json:"all_day"`
+	Timezone               string          `json:"timezone"`
+	Status                 string          `json:"status"`
+	ProviderCreatedAt      *time.Time      `json:"provider_created_at,omitempty"`
+	ProviderUpdatedAt      *time.Time      `json:"provider_updated_at,omitempty"`
+	RemovedAt              *time.Time      `json:"removed_at,omitempty"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
+	Origin                 string          `json:"origin,omitempty"`
+	Version                int64           `json:"version,omitempty"`
+	AudienceKind           string          `json:"audience_kind,omitempty"`
+	AudienceConversationID string          `json:"audience_conversation_id,omitempty"`
+	CreatedByUserID        string          `json:"created_by_user_id,omitempty"`
+	CreatedByAgentID       string          `json:"created_by_agent_id,omitempty"`
+	SourceRunID            string          `json:"source_run_id,omitempty"`
 }
 
-const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),COALESCE(assignee_agent_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),version,completed_at,archived_at,created_at,updated_at,schedule,calendar,conflicted_fields`
+const spaceTaskColumns = `id,space_id,task_number,task_key,title,notes,status,priority,rank,COALESCE(assignee_user_id,''),COALESCE(assignee_agent_id,''),due_at,due_timezone,source_refs,COALESCE(created_by_user_id,''),COALESCE(created_by_agent_id,''),COALESCE(source_run_id,''),audience_kind,COALESCE(audience_conversation_id,''),COALESCE(audience_creator_user_id,''),version,completed_at,archived_at,created_at,updated_at,schedule,calendar,conflicted_fields`
 
 func scanSpaceTask(row interface{ Scan(...any) error }, out *SpaceTask) error {
 	var schedule, calendar []byte
 	var conflicts pq.StringArray
-	if err := row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.AssigneeAgentID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
+	if err := row.Scan(&out.ID, &out.SpaceID, &out.TaskNumber, &out.TaskKey, &out.Title, &out.Notes, &out.Status, &out.Priority, &out.Rank, &out.AssigneeUserID, &out.AssigneeAgentID, &out.DueAt, &out.DueTimezone, &out.SourceRefs, &out.CreatedByUserID, &out.CreatedByAgentID, &out.SourceRunID, &out.AudienceKind, &out.AudienceConversationID, &out.AudienceCreatorUserID, &out.Version, &out.CompletedAt, &out.ArchivedAt, &out.CreatedAt, &out.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
 		return err
 	}
 	if len(schedule) > 0 {
@@ -250,7 +260,7 @@ func (db *Database) SpaceTaskForMember(ctx context.Context, userID, spaceID, tas
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		return scanSpaceTask(tx.QueryRowContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE id=$1 AND space_id=$2 AND archived_at IS NULL`, taskID, spaceID), out)
+		return scanSpaceTask(tx.QueryRowContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE id=$1 AND space_id=$2 AND archived_at IS NULL AND (audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$3))`, taskID, spaceID, userID), out)
 	})
 	if err == sql.ErrNoRows {
 		return nil, ErrSpaceNotFound
@@ -285,8 +295,8 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		filters := `space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4='' OR assignee_agent_id=$4) AND ($5='' OR priority=$5) AND ($6='' OR title ILIKE '%'||$6||'%' OR notes ILIKE '%'||$6||'%' OR task_key ILIKE '%'||$6||'%') AND ($7::timestamptz IS NULL OR due_at >= $7) AND ($8::timestamptz IS NULL OR due_at < $8) AND ($9 OR archived_at IS NULL)`
-		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE `+filters+` ORDER BY `+order+` LIMIT $10 OFFSET $11`, spaceID, query.Status, query.AssigneeUserID, query.AssigneeAgentID, query.Priority, query.Search, query.DueFrom, query.DueTo, query.IncludeArchived, query.Limit+1, offset)
+		filters := `space_id=$1 AND ($2='' OR status=$2) AND ($3='' OR assignee_user_id=$3) AND ($4='' OR assignee_agent_id=$4) AND ($5='' OR priority=$5) AND ($6='' OR title ILIKE '%'||$6||'%' OR notes ILIKE '%'||$6||'%' OR task_key ILIKE '%'||$6||'%') AND ($7::timestamptz IS NULL OR due_at >= $7) AND ($8::timestamptz IS NULL OR due_at < $8) AND ($9 OR archived_at IS NULL) AND (audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$12))`
+		rows, err := tx.QueryContext(ctx, `SELECT `+spaceTaskColumns+` FROM space_tasks WHERE `+filters+` ORDER BY `+order+` LIMIT $10 OFFSET $11`, spaceID, query.Status, query.AssigneeUserID, query.AssigneeAgentID, query.Priority, query.Search, query.DueFrom, query.DueTo, query.IncludeArchived, query.Limit+1, offset, userID)
 		if err != nil {
 			return err
 		}
@@ -305,7 +315,7 @@ func (db *Database) SpaceTaskPage(ctx context.Context, userID, spaceID string, q
 			out.Tasks = out.Tasks[:query.Limit]
 			out.NextCursor = TestingEncodeTaskCursor(offset + query.Limit)
 		}
-		countRows, err := tx.QueryContext(ctx, `SELECT status,COUNT(*) FROM space_tasks WHERE space_id=$1 AND archived_at IS NULL GROUP BY status`, spaceID)
+		countRows, err := tx.QueryContext(ctx, `SELECT status,COUNT(*) FROM space_tasks WHERE space_id=$1 AND archived_at IS NULL AND (audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$2)) GROUP BY status`, spaceID, userID)
 		if err != nil {
 			return err
 		}

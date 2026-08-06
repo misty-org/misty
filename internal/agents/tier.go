@@ -13,21 +13,11 @@ const (
 	TierHigh AgentTier = "tier-high"
 )
 
-// Legacy tier values persisted before the agent rename. NormalizeAgentTier still
-// accepts them so a conversation written by an older binary keeps its tier
-// instead of silently falling back to TierLow. Remove once
-// 20260915000000_rename_agent_session_tier.sql has run everywhere.
-const (
-	legacyTierLow  AgentTier = "mika-low"
-	legacyTierMed  AgentTier = "mika-med"
-	legacyTierHigh AgentTier = "mika-high"
-)
-
 func NormalizeAgentTier(value AgentTier) AgentTier {
 	switch AgentTier(strings.ToLower(strings.TrimSpace(string(value)))) {
-	case TierMed, legacyTierMed:
+	case TierMed:
 		return TierMed
-	case TierHigh, legacyTierHigh:
+	case TierHigh:
 		return TierHigh
 	default:
 		return TierLow

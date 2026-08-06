@@ -59,6 +59,11 @@ func (db *Database) LibraryTransferItems(ctx context.Context, userID, spaceID st
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryDownload); err != nil {
 			return err
 		}
+		for _, itemID := range itemIDs {
+			if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+				return err
+			}
+		}
 		rows, err := tx.QueryContext(ctx, `SELECT i.id,f.security_domain_id,COALESCE(rb.r2_object_key,b.r2_object_key),i.display_name,COALESCE(rb.server_detected_mime_type,b.server_detected_mime_type),COALESCE(rb.byte_size,b.byte_size),COALESCE(rb.sha256,b.sha256),f.intrinsic_metadata,(rb.id IS NOT NULL),COALESCE(v.edit_definition,'{}'::jsonb)
 			FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id
 			LEFT JOIN library_item_versions v ON v.id=i.current_edit_version_id AND v.lifecycle_state='ready' AND v.rendition_state='ready'
@@ -99,8 +104,11 @@ func (db *Database) RecordLibraryImport(ctx context.Context, userID, sourceSpace
 		if err := requireSpacePermissionTx(ctx, tx, userID, destinationSpaceID, PermissionLibraryImport); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, sourceSpaceID, sourceItemID); err != nil {
+			return err
+		}
 		var sourceDomainID, destinationDomainID string
-		if err := tx.QueryRowContext(ctx, `SELECT f.security_domain_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready'`, sourceItemID, sourceSpaceID).Scan(&sourceDomainID); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT f.security_domain_id FROM space_library_items i JOIN library_files f ON f.id=i.file_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' AND i.audience_kind='space'`, sourceItemID, sourceSpaceID).Scan(&sourceDomainID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrLibraryNotFound
 			}

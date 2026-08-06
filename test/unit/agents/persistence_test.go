@@ -59,18 +59,13 @@ func (p *memorySessionPersistence) SaveAgentSession(_ context.Context, id, userI
 	return nil
 }
 
-// A session persisted before the agent rename stores its tier under "mikaTier"
-// with a "mika-*" value. Both must still resolve, or every resumed conversation
-// silently drops to TierLow.
-func TestUnmarshalPersistentSessionReadsLegacyTierKey(t *testing.T) {
+func TestUnmarshalPersistentSessionReadsCurrentTier(t *testing.T) {
 	for _, testCase := range []struct {
 		name  string
 		state string
 		want  AgentTier
 	}{
-		{"legacy key and value", `{"id":"s1","userId":"u1","mikaTier":"mika-high"}`, TierHigh},
-		{"legacy key med", `{"id":"s1","userId":"u1","mikaTier":"mika-med"}`, TierMed},
-		{"current key wins", `{"id":"s1","userId":"u1","agentTier":"tier-high","mikaTier":"mika-low"}`, TierHigh},
+		{"high", `{"id":"s1","userId":"u1","agentTier":"tier-high"}`, TierHigh},
 		{"current key only", `{"id":"s1","userId":"u1","agentTier":"tier-med"}`, TierMed},
 		{"absent defaults low", `{"id":"s1","userId":"u1"}`, TierLow},
 	} {

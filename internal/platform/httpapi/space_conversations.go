@@ -25,13 +25,13 @@ func (s *SpacesService) Conversations() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Title     string   `json:"title"`
-			MemberIDs []string `json:"member_ids"`
+			Title        string             `json:"title"`
+			Participants []db.SpaceActorRef `json:"participants"`
 		}
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		item, err := s.database.CreateSpaceConversation(r.Context(), userID, spaceID, body.Title, body.MemberIDs)
+		item, err := s.database.CreateSpaceConversation(r.Context(), userID, spaceID, body.Title, body.Participants)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -63,13 +63,34 @@ func (s *SpacesService) Conversation() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			Title     string   `json:"title"`
-			MemberIDs []string `json:"member_ids"`
+			Title        string             `json:"title"`
+			Participants []db.SpaceActorRef `json:"participants"`
 		}
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		item, err := s.database.UpdateSpaceConversation(r.Context(), userID, spaceID, conversationID, body.Title, body.MemberIDs)
+		item, err := s.database.UpdateSpaceConversation(r.Context(), userID, spaceID, conversationID, body.Title, body.Participants)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	}
+}
+
+func (s *SpacesService) DirectAgentConversation() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		var body struct {
+			AgentID string `json:"agent_id"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		item, err := s.database.DirectAgentConversation(r.Context(), userID, chi.URLParam(r, "spaceID"), body.AgentID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -107,22 +128,41 @@ func (s *SpacesService) ConversationMessages() http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
+		directAgentID, err := s.database.DirectConversationAgentID(r.Context(), userID, spaceID, conversationID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		if directAgentID != "" {
+			allowed, permissionErr := s.database.EffectiveAgentSpacePermission(r.Context(), userID, spaceID, directAgentID, db.PermissionMessagesWrite)
+			if permissionErr != nil {
+				writeSpaceError(w, permissionErr)
+				return
+			}
+			if !allowed {
+				writeSpaceError(w, db.ErrSpaceForbidden)
+				return
+			}
+		}
 		message, agentIDs, err := s.database.CreateSpaceConversationMessageWithReferences(r.Context(), userID, spaceID, conversationID, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs, body.ReplyToMessageID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
 		}
-		agentReplies := make([]*db.SpaceMessage, 0, len(agentIDs))
-		agentFailures := make([]agentMentionFailure, 0)
-		for _, agentID := range uniqueStrings(agentIDs) {
-			reply, runErr := s.runMentionedAgent(r.Context(), userID, spaceID, conversationID, agentID, message.ID, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs)
-			if runErr != nil {
-				agentFailures = append(agentFailures, TestingAgentMentionFailureFromError(agentID, runErr))
-			} else if reply != nil {
-				agentReplies = append(agentReplies, reply)
-			}
+		triggerKind := "mention"
+		if directAgentID != "" {
+			agentIDs = []string{directAgentID}
+			triggerKind = "direct"
 		}
-		writeJSON(w, http.StatusCreated, map[string]any{"message": message, "agent_replies": agentReplies, "agent_failures": agentFailures})
+		triggers, err := s.enqueueSpaceAgentMessageTriggers(r.Context(), userID, spaceID, conversationID, message.ID, triggerKind, agentIDs, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		if directAgentID == "" && len(agentIDs) == 0 {
+			_ = s.database.QueueSpaceActionSuggestionAnalysis(r.Context(), userID, spaceID, conversationID, message.ID)
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{"message": message, "triggered_runs": triggers})
 	}
 }
 
@@ -140,6 +180,7 @@ func (s *SpacesService) ConversationMessage() http.HandlerFunc {
 				writeSpaceError(w, err)
 				return
 			}
+			_ = s.database.InvalidateSpaceActionSuggestionsForMessage(r.Context(), spaceID, conversationID, messageID)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -155,6 +196,7 @@ func (s *SpacesService) ConversationMessage() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
+		_ = s.database.InvalidateSpaceActionSuggestionsForMessage(r.Context(), spaceID, conversationID, messageID)
 		writeJSON(w, http.StatusOK, message)
 	}
 }

@@ -53,8 +53,8 @@ func (db *Database) LibraryGroupItems(ctx context.Context, userID, spaceID, grou
 		if json.Unmarshal(raw, &rules) != nil || validateLibraryGroupRules(rules) != nil {
 			return ErrLibraryInvalid
 		}
-		conditions := []string{"i.space_id=$1", "i.lifecycle_state='ready'", "i.hidden=FALSE"}
-		args := []any{spaceID}
+		conditions := []string{"i.space_id=$1", "i.lifecycle_state='ready'", "i.hidden=FALSE", resourceAudienceSQL("i", "$2")}
+		args := []any{spaceID, userID}
 		for _, rule := range rules.All {
 			args = append(args, rule.Value)
 			placeholder := fmt.Sprintf("$%d", len(args))

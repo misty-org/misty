@@ -12,15 +12,7 @@ import (
 
 func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, conversationID, messageID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		mistySupport, err := isMistySupportConversationTx(ctx, tx, spaceID, conversationID)
-		if err != nil {
-			return err
-		}
-		if mistySupport {
-			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMistySupportWrite); err != nil {
-				return err
-			}
-		} else if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
+		if err := requireSpaceMessageWriteTx(ctx, tx, userID, spaceID); err != nil {
 			return err
 		}
 		if conversationID != "" {
@@ -46,15 +38,23 @@ func (db *Database) deleteSpaceMessage(ctx context.Context, userID, spaceID, con
 }
 
 func (db *Database) CreateSpaceAgentMessage(ctx context.Context, billingUserID, spaceID, agentID, text string) (*SpaceMessage, error) {
-	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, "", agentID, text, false)
+	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, "", agentID, []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}, false)
 }
 
 func (db *Database) CreateSpaceConversationAgentMessage(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string) (*SpaceMessage, error) {
-	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, conversationID, agentID, text, false)
+	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, conversationID, agentID, []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}, false)
 }
 
-func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text string, enforceMembership bool) (*SpaceMessage, error) {
-	content := []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}}
+func (db *Database) CreateSpaceConversationAgentMessageWithSourceLink(ctx context.Context, billingUserID, spaceID, conversationID, agentID, text, sourceConversationID string) (*SpaceMessage, error) {
+	url := "/spaces/" + spaceID + "/chat"
+	if sourceConversationID != "" {
+		url += "?conversation=" + sourceConversationID
+	}
+	content := []MessageSpan{{Type: "text", Text: strings.TrimSpace(text)}, {Type: "text", Text: "\n\n"}, {Type: "link", Label: "Open source conversation", URL: url}}
+	return db.createSpaceAgentMessageWithMembership(ctx, billingUserID, spaceID, conversationID, agentID, content, false)
+}
+
+func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, billingUserID, spaceID, conversationID, agentID string, content []MessageSpan, enforceMembership bool) (*SpaceMessage, error) {
 	if err := TestingValidateMessage(content, nil); err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, b
 			if err != nil {
 				return err
 			}
-			if !agentMembershipPermission(membership.Permissions, PermissionMessagesRead) || !agentMembershipPermission(membership.Permissions, PermissionMessagesWrite) {
+			if !agentRolePermission(membership, PermissionMessagesRead) || !agentRolePermission(membership, PermissionMessagesWrite) {
 				return ErrSpaceForbidden
 			}
 		}
@@ -82,11 +82,10 @@ func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, b
 			VALUES($1,$2,NULLIF($3,''),$4,'agent',$5,$6) RETURNING seq,created_at`, out.ID, spaceID, conversationID, billingUserID, agentID, raw).Scan(&out.Seq, &out.CreatedAt); err != nil {
 			return err
 		}
-		if err := tx.QueryRowContext(ctx, `SELECT v.name FROM personal_agent_space_grants g JOIN personal_agent_versions v ON v.id=g.approved_version_id WHERE g.agent_id=$1 AND g.space_id=$2
-			UNION ALL SELECT name FROM space_agents WHERE id=$1 AND space_id=$2
-			UNION ALL SELECT 'Misty' WHERE $1='misty' LIMIT 1`, agentID, spaceID).Scan(&out.SenderName); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COALESCE((SELECT v.name FROM personal_agent_space_grants g JOIN personal_agent_versions v ON v.id=g.approved_version_id WHERE g.agent_id=$1 AND g.space_id=$2 LIMIT 1),'Former agent')`, agentID, spaceID).Scan(&out.SenderName); err != nil {
 			return err
 		}
+		out.Sender = SpaceMessageSender{Kind: "agent", AgentID: agentID, DisplayName: out.SenderName}
 		eventID, err := recordSpaceEventTx(ctx, tx, spaceID, billingUserID, "message.created", out.ID, out)
 		if err != nil {
 			return err

@@ -22,8 +22,7 @@ func UpdateProfile(database *db.Database) http.HandlerFunc {
 		var body struct {
 			Name string `json:"name"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 		body.Name = strings.TrimSpace(body.Name)
@@ -56,8 +55,7 @@ func UpdateDevice(database *db.Database) http.HandlerFunc {
 		var body struct {
 			Device string `json:"device"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 
@@ -117,8 +115,7 @@ func UpdateSettings(database *db.Database) http.HandlerFunc {
 			AnalyticsEnabled      bool `json:"analytics_enabled"`
 			ErrorReportingEnabled bool `json:"error_reporting_enabled"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 
@@ -148,8 +145,7 @@ func UpdateTelemetryPreferences(database *db.Database) http.HandlerFunc {
 			AnalyticsEnabled      bool `json:"analytics_enabled"`
 			ErrorReportingEnabled bool `json:"error_reporting_enabled"`
 		}
-		if err := decodeJSON(w, r, &body); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if decodeJSON(w, r, &body) != nil {
 			return
 		}
 		if err := database.UpdateTelemetryPreferences(userID, body.AnalyticsEnabled, body.ErrorReportingEnabled); err != nil {

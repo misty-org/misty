@@ -14,16 +14,18 @@ import (
 var ErrWorkflowIntegrationRequired = errors.New("workflow integration required")
 
 type AgentRunRequest struct {
-	RequestingMemberID   string          `json:"requesting_member_id"`
-	SpaceID              string          `json:"space_id"`
-	AgentID              string          `json:"agent_id"`
-	SourceConversationID string          `json:"source_conversation_id,omitempty"`
-	SourceType           string          `json:"source_type"`
-	CapabilityID         string          `json:"capability_id,omitempty"`
-	Input                json.RawMessage `json:"input"`
-	TriggerKind          string          `json:"trigger_kind"`
-	SourceTaskID         string          `json:"source_task_id,omitempty"`
-	ActionEnvelope       json.RawMessage `json:"action_envelope,omitempty"`
+	RequestingMemberID   string                    `json:"requesting_member_id"`
+	SpaceID              string                    `json:"space_id"`
+	AgentID              string                    `json:"agent_id"`
+	SourceConversationID string                    `json:"source_conversation_id,omitempty"`
+	ConversationScope    SpaceConversationScopeRef `json:"conversation_scope"`
+	SourceMessageID      string                    `json:"source_message_id,omitempty"`
+	SourceType           string                    `json:"source_type"`
+	CapabilityID         string                    `json:"capability_id,omitempty"`
+	Input                json.RawMessage           `json:"input"`
+	TriggerKind          string                    `json:"trigger_kind"`
+	SourceTaskID         string                    `json:"source_task_id,omitempty"`
+	ActionEnvelope       json.RawMessage           `json:"action_envelope,omitempty"`
 }
 
 type RunAction struct {
@@ -71,7 +73,7 @@ type AgentConversationEvent struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
-const spaceRunColumns = `id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,result,COALESCE(error_code,''),created_at,completed_at,requesting_member_id,COALESCE(source_conversation_id,''),source_type,COALESCE(agent_id,''),COALESCE(workflow_identifier,''),COALESCE(workflow_version_id,''),COALESCE(workflow_version,''),COALESCE(capability_id,''),progress,outputs,artifacts,COALESCE(error_message,''),COALESCE(retry_of_run_id,''),canceled_at,updated_at,COALESCE(agent_instance_id,''),COALESCE(agent_version_id,''),attempt,next_retry_at,COALESCE(source_task_id,''),action_envelope`
+const spaceRunColumns = `id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,result,COALESCE(error_code,''),created_at,completed_at,requesting_member_id,COALESCE(source_conversation_id,''),source_type,COALESCE(agent_id,''),COALESCE(workflow_identifier,''),COALESCE(workflow_version_id,''),COALESCE(workflow_version,''),COALESCE(capability_id,''),progress,outputs,artifacts,COALESCE(error_message,''),COALESCE(retry_of_run_id,''),canceled_at,updated_at,COALESCE(agent_instance_id,''),COALESCE(agent_version_id,''),attempt,next_retry_at,COALESCE(source_task_id,''),action_envelope,conversation_scope_kind,COALESCE(scope_conversation_id,''),COALESCE(source_message_id,'')`
 
 func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest) (*SpaceRun, error) {
 	if !validRunSource(request.SourceType) || strings.TrimSpace(request.RequestingMemberID) == "" || strings.TrimSpace(request.AgentID) == "" {
@@ -105,6 +107,16 @@ func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest)
 		if !enabled {
 			return ErrSpaceInvalid
 		}
+		scope := request.ConversationScope
+		if scope.Kind == "" {
+			scope = NormalizeConversationScope(request.SourceConversationID)
+		}
+		if scope.Kind == ConversationScopePrivate {
+			if err := validateResourceAudienceTx(ctx, tx, request.RequestingMemberID, request.SpaceID, SpaceResourceAudience{Kind: SpaceAudienceConversation, ConversationID: scope.ConversationID}); err != nil {
+				return err
+			}
+		}
+		out.ConversationScopeKind, out.ScopeConversationID, out.SourceMessageID = scope.Kind, scope.ConversationID, request.SourceMessageID
 		out.State = "running"
 		out.CapabilityID = strings.TrimSpace(request.CapabilityID)
 		var workflow *WorkflowVersion
@@ -137,9 +149,9 @@ func (db *Database) CreateAgentRun(ctx context.Context, request AgentRunRequest)
 				out.State = "awaiting_approval"
 			}
 		}
-		if err := tx.QueryRowContext(ctx, `INSERT INTO space_runs(id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,requesting_member_id,source_conversation_id,source_type,agent_id,workflow_identifier,workflow_version_id,workflow_version,capability_id,outputs,artifacts,agent_instance_id,agent_version_id,attempt)
-			VALUES($1,$2,'agent',$3,$4,$4,$5,$6,$7,$4,NULLIF($8,''),$9,$3,NULLIF($10,''),NULLIF($11,''),NULLIF($12,''),$13,'{}'::jsonb,'[]'::jsonb,$14,$15,1) RETURNING created_at,updated_at`,
-			out.ID, request.SpaceID, request.AgentID, request.RequestingMemberID, request.TriggerKind, out.State, request.Input, request.SourceConversationID, request.SourceType, out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID, instance.ID, instance.AgentVersionID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO space_runs(id,space_id,resource_kind,resource_id,initiated_by_user_id,billing_user_id,trigger_kind,state,input,requesting_member_id,source_conversation_id,source_type,agent_id,workflow_identifier,workflow_version_id,workflow_version,capability_id,outputs,artifacts,agent_instance_id,agent_version_id,attempt,conversation_scope_kind,scope_conversation_id,source_message_id)
+			VALUES($1,$2,'agent',$3,$4,$4,$5,$6,$7,$4,NULLIF($8,''),$9,$3,NULLIF($10,''),NULLIF($11,''),NULLIF($12,''),$13,'{}'::jsonb,'[]'::jsonb,$14,$15,1,$16,NULLIF($17,''),NULLIF($18,'')) RETURNING created_at,updated_at`,
+			out.ID, request.SpaceID, request.AgentID, request.RequestingMemberID, request.TriggerKind, out.State, request.Input, request.SourceConversationID, request.SourceType, out.WorkflowIdentifier, out.WorkflowVersionID, out.WorkflowVersion, out.CapabilityID, instance.ID, instance.AgentVersionID, scope.Kind, scope.ConversationID, request.SourceMessageID).Scan(&out.CreatedAt, &out.UpdatedAt); err != nil {
 			return err
 		}
 		if out.State == "awaiting_approval" {

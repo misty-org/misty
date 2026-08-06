@@ -86,8 +86,8 @@ func TestFixedMemberCollaborationPermissionsAreEnforced(t *testing.T) {
 		space.ID,
 		[]MessageSpan{{Type: "text", Text: "Not a member"}},
 		nil,
-	); !errors.Is(err, ErrLibraryForbidden) {
-		t.Fatalf("CreateSpaceMessage(outsider) error = %v, want ErrLibraryForbidden", err)
+	); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("CreateSpaceMessage(outsider) error = %v, want ErrSpaceForbidden", err)
 	}
 	if _, err := database.InviteToSpace(ctx, member.ID, space.ID, outsider.Email); !errors.Is(err, ErrSpaceForbidden) {
 		t.Fatalf("InviteToSpace(member) error = %v, want ErrSpaceForbidden", err)
@@ -148,12 +148,12 @@ func TestSpaceGroupConversationsStayScopedToSelectedMembers(t *testing.T) {
 		}
 	}
 
-	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []string{member.ID})
+	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []SpaceActorRef{{Kind: "person", UserID: member.ID}})
 	if err != nil {
 		t.Fatalf("CreateSpaceConversation() error = %v", err)
 	}
-	if len(conversation.Members) != 2 {
-		t.Fatalf("conversation members = %#v, want creator and selected member", conversation.Members)
+	if len(conversation.Participants) != 2 {
+		t.Fatalf("conversation participants = %#v, want creator and selected member", conversation.Participants)
 	}
 	memberConversations, err := database.SpaceConversations(ctx, member.ID, space.ID)
 	if err != nil || len(memberConversations) != 1 || memberConversations[0].ID != conversation.ID {

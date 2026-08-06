@@ -155,9 +155,6 @@ func (db *Database) CompleteLibraryUpload(ctx context.Context, userID, spaceID, 
 		if _, err := tx.ExecContext(ctx, `UPDATE space_storage_usage SET reserved_bytes=GREATEST(0,reserved_bytes-$1),used_bytes=used_bytes+$2,version=version+1,updated_at=NOW() WHERE space_id=$3`, upload.RequestedByteSize, verifiedSize, spaceID); err != nil {
 			return err
 		}
-		if err := adjustMistySupportStorageTx(ctx, tx, spaceID, verifiedSize, -upload.RequestedByteSize); err != nil {
-			return err
-		}
 		if err := tx.QueryRowContext(ctx, `UPDATE space_library_uploads SET verified_byte_size=$1,verified_sha256=$2,detected_mime_type=$3,state='ready',file_id=$4,finalized_at=NOW(),version=version+1,updated_at=NOW() WHERE id=$5 RETURNING version,updated_at`, verifiedSize, verifiedSHA, detectedMIME, file.ID, upload.ID).Scan(&upload.Version, &upload.UpdatedAt); err != nil {
 			return err
 		}

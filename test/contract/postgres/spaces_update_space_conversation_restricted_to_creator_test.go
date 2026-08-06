@@ -34,28 +34,28 @@ func TestUpdateSpaceConversationRestrictedToCreator(t *testing.T) {
 		}
 	}
 
-	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []string{member.ID})
+	conversation, err := database.CreateSpaceConversation(ctx, owner.ID, space.ID, "Launch crew", []SpaceActorRef{{Kind: "person", UserID: member.ID}})
 	if err != nil {
 		t.Fatalf("CreateSpaceConversation() error = %v", err)
 	}
 
 	// A non-creator member can read and write messages, but cannot rename the
 	// conversation or change who's in it.
-	if _, err := database.UpdateSpaceConversation(ctx, member.ID, space.ID, conversation.ID, "Hijacked name", []string{owner.ID, member.ID}); !errors.Is(err, ErrSpaceForbidden) {
+	if _, err := database.UpdateSpaceConversation(ctx, member.ID, space.ID, conversation.ID, "Hijacked name", []SpaceActorRef{{Kind: "person", UserID: owner.ID}, {Kind: "person", UserID: member.ID}}); !errors.Is(err, ErrSpaceForbidden) {
 		t.Fatalf("UpdateSpaceConversation(non-creator member) error = %v, want ErrSpaceForbidden", err)
 	}
 
 	// An outsider who isn't even in the conversation is rejected too.
-	if _, err := database.UpdateSpaceConversation(ctx, outsider.ID, space.ID, conversation.ID, "Hijacked name", []string{owner.ID, outsider.ID}); !errors.Is(err, ErrSpaceForbidden) {
+	if _, err := database.UpdateSpaceConversation(ctx, outsider.ID, space.ID, conversation.ID, "Hijacked name", []SpaceActorRef{{Kind: "person", UserID: owner.ID}, {Kind: "person", UserID: outsider.ID}}); !errors.Is(err, ErrSpaceForbidden) {
 		t.Fatalf("UpdateSpaceConversation(outsider not in conversation) error = %v, want ErrSpaceForbidden", err)
 	}
 
 	// The creator can rename the conversation and add a new member.
-	updated, err := database.UpdateSpaceConversation(ctx, owner.ID, space.ID, conversation.ID, "Renamed crew", []string{member.ID, outsider.ID})
+	updated, err := database.UpdateSpaceConversation(ctx, owner.ID, space.ID, conversation.ID, "Renamed crew", []SpaceActorRef{{Kind: "person", UserID: member.ID}, {Kind: "person", UserID: outsider.ID}})
 	if err != nil {
 		t.Fatalf("UpdateSpaceConversation(creator, add member) error = %v", err)
 	}
-	if updated.Title != "Renamed crew" || len(updated.Members) != 3 {
+	if updated.Title != "Renamed crew" || len(updated.Participants) != 3 {
 		t.Fatalf("updated conversation = %#v, want renamed with 3 members", updated)
 	}
 	outsiderConversations, err := database.SpaceConversations(ctx, outsider.ID, space.ID)
@@ -65,7 +65,7 @@ func TestUpdateSpaceConversationRestrictedToCreator(t *testing.T) {
 
 	// The creator can also remove a member; that member immediately loses
 	// access to the conversation and its messages.
-	if _, err := database.UpdateSpaceConversation(ctx, owner.ID, space.ID, conversation.ID, "Renamed crew", []string{outsider.ID}); err != nil {
+	if _, err := database.UpdateSpaceConversation(ctx, owner.ID, space.ID, conversation.ID, "Renamed crew", []SpaceActorRef{{Kind: "person", UserID: outsider.ID}}); err != nil {
 		t.Fatalf("UpdateSpaceConversation(creator, remove member) error = %v", err)
 	}
 	memberConversationsAfterRemoval, err := database.SpaceConversations(ctx, member.ID, space.ID)

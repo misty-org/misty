@@ -14,15 +14,17 @@ import (
 )
 
 type SpaceRoadmap struct {
-	ID              string     `json:"id"`
-	SpaceID         string     `json:"space_id"`
-	Name            string     `json:"name"`
-	Description     string     `json:"description"`
-	GraphVersion    int64      `json:"graph_version"`
-	CreatedByUserID string     `json:"created_by_user_id"`
-	ArchivedAt      *time.Time `json:"archived_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID                     string     `json:"id"`
+	SpaceID                string     `json:"space_id"`
+	Name                   string     `json:"name"`
+	Description            string     `json:"description"`
+	GraphVersion           int64      `json:"graph_version"`
+	CreatedByUserID        string     `json:"created_by_user_id"`
+	AudienceKind           string     `json:"audience_kind"`
+	AudienceConversationID string     `json:"audience_conversation_id,omitempty"`
+	ArchivedAt             *time.Time `json:"archived_at,omitempty"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type SpaceRoadmapMilestone struct {
@@ -147,7 +149,7 @@ type SpaceRoadmapLayout struct {
 	Nodes      []SpaceRoadmapNode      `json:"nodes"`
 }
 
-const roadmapColumns = `id,space_id,name,description,graph_version,created_by_user_id,archived_at,created_at,updated_at`
+const roadmapColumns = `id,space_id,name,description,graph_version,created_by_user_id,audience_kind,COALESCE(audience_conversation_id,''),archived_at,created_at,updated_at`
 const roadmapMilestoneColumns = `id,space_id,roadmap_id,title,description,target_date,rank,position_x,position_y,width,height,version,created_at,updated_at`
 const roadmapGoalColumns = `id,space_id,roadmap_id,milestone_id,title,description,target_date,rank,position_x,position_y,manual_completed_at,COALESCE(manual_completed_by_user_id,''),version,created_at,updated_at`
 const roadmapEdgeColumns = `id,space_id,roadmap_id,source_kind,source_id,target_kind,target_id,COALESCE(source_goal_id,''),COALESCE(target_goal_id,''),edge_type,label,version,created_at,updated_at`
@@ -155,7 +157,7 @@ const roadmapNodeDefinitionColumns = `id,space_id,name,description,icon,color,ag
 const roadmapNodeColumns = `id,space_id,roadmap_id,COALESCE(milestone_id,''),COALESCE(definition_id,''),node_kind,title,description,target_date,position_x,position_y,field_values,version,archived_at,created_at,updated_at`
 
 func scanSpaceRoadmap(scanner interface{ Scan(...any) error }, item *SpaceRoadmap) error {
-	return scanner.Scan(&item.ID, &item.SpaceID, &item.Name, &item.Description, &item.GraphVersion, &item.CreatedByUserID, &item.ArchivedAt, &item.CreatedAt, &item.UpdatedAt)
+	return scanner.Scan(&item.ID, &item.SpaceID, &item.Name, &item.Description, &item.GraphVersion, &item.CreatedByUserID, &item.AudienceKind, &item.AudienceConversationID, &item.ArchivedAt, &item.CreatedAt, &item.UpdatedAt)
 }
 
 func scanSpaceRoadmapMilestone(scanner interface{ Scan(...any) error }, item *SpaceRoadmapMilestone) error {
@@ -184,7 +186,7 @@ func (db *Database) SpaceRoadmaps(ctx context.Context, userID, spaceID string) (
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT `+roadmapColumns+` FROM space_roadmaps WHERE space_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC,id`, spaceID)
+		rows, err := tx.QueryContext(ctx, `SELECT `+roadmapColumns+` FROM space_roadmaps WHERE space_id=$1 AND archived_at IS NULL AND (audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$2)) ORDER BY updated_at DESC,id`, spaceID, userID)
 		if err != nil {
 			return err
 		}
@@ -202,6 +204,10 @@ func (db *Database) SpaceRoadmaps(ctx context.Context, userID, spaceID string) (
 }
 
 func (db *Database) CreateSpaceRoadmap(ctx context.Context, userID, spaceID, name, description string) (*SpaceRoadmapSnapshot, error) {
+	return db.CreateSpaceRoadmapWithAudience(ctx, userID, spaceID, name, description, SpaceResourceAudience{Kind: SpaceAudienceSpace})
+}
+
+func (db *Database) CreateSpaceRoadmapWithAudience(ctx context.Context, userID, spaceID, name, description string, audience SpaceResourceAudience) (*SpaceRoadmapSnapshot, error) {
 	name, description = strings.TrimSpace(name), strings.TrimSpace(description)
 	if name == "" || len([]rune(name)) > 160 || len([]rune(description)) > 5000 {
 		return nil, ErrSpaceInvalid
@@ -212,13 +218,20 @@ func (db *Database) CreateSpaceRoadmap(ctx context.Context, userID, spaceID, nam
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksManage); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roadmaps(id,space_id,name,description,created_by_user_id) VALUES($1,$2,$3,$4,$5)`, roadmapID, spaceID, name, description, userID); err != nil {
+		normalized, err := NormalizeResourceAudience(audience.Kind, audience.ConversationID)
+		if err != nil {
+			return err
+		}
+		if err := validateResourceAudienceTx(ctx, tx, userID, spaceID, normalized); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roadmaps(id,space_id,name,description,created_by_user_id,audience_kind,audience_conversation_id) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''))`, roadmapID, spaceID, name, description, userID, normalized.Kind, normalized.ConversationID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO space_roadmap_milestones(id,space_id,roadmap_id,title,rank,position_x,position_y) VALUES($1,$2,$3,'First milestone',1024,80,80)`, milestoneID, spaceID, roadmapID); err != nil {
 			return err
 		}
-		_, err := recordSpaceEventTx(ctx, tx, spaceID, userID, "roadmap.created", roadmapID, map[string]any{"roadmap_id": roadmapID})
+		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "roadmap.created", roadmapID, map[string]any{"roadmap_id": roadmapID})
 		return err
 	})
 	if err != nil {
@@ -233,7 +246,7 @@ func (db *Database) SpaceRoadmap(ctx context.Context, userID, spaceID, roadmapID
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionTasksView); err != nil {
 			return err
 		}
-		if err := loadSpaceRoadmapTx(ctx, tx, spaceID, roadmapID, out); errors.Is(err, sql.ErrNoRows) {
+		if err := loadSpaceRoadmapTx(ctx, tx, userID, spaceID, roadmapID, out); errors.Is(err, sql.ErrNoRows) {
 			return ErrSpaceNotFound
 		} else {
 			return err
@@ -242,8 +255,8 @@ func (db *Database) SpaceRoadmap(ctx context.Context, userID, spaceID, roadmapID
 	return out, err
 }
 
-func loadSpaceRoadmapTx(ctx context.Context, tx *sql.Tx, spaceID, roadmapID string, out *SpaceRoadmapSnapshot) error {
-	if err := scanSpaceRoadmap(tx.QueryRowContext(ctx, `SELECT `+roadmapColumns+` FROM space_roadmaps WHERE id=$1 AND space_id=$2 AND archived_at IS NULL`, roadmapID, spaceID), &out.Roadmap); err != nil {
+func loadSpaceRoadmapTx(ctx context.Context, tx *sql.Tx, userID, spaceID, roadmapID string, out *SpaceRoadmapSnapshot) error {
+	if err := scanSpaceRoadmap(tx.QueryRowContext(ctx, `SELECT `+roadmapColumns+` FROM space_roadmaps WHERE id=$1 AND space_id=$2 AND archived_at IS NULL AND (audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members cm WHERE cm.conversation_id=audience_conversation_id AND cm.actor_kind='person' AND cm.user_id=$3))`, roadmapID, spaceID, userID), &out.Roadmap); err != nil {
 		return err
 	}
 	milestoneRows, err := tx.QueryContext(ctx, `SELECT `+roadmapMilestoneColumns+` FROM space_roadmap_milestones WHERE roadmap_id=$1 AND space_id=$2 AND archived_at IS NULL ORDER BY rank,id`, roadmapID, spaceID)

@@ -104,7 +104,7 @@ func TestSpaceAgentWorkflowPinningRoutingConcurrencyPrivacyAndApproval(t *testin
 	if err != nil || firstRun.WorkflowVersionID != versions[0].ID || firstRun.State != "running" {
 		t.Fatalf("first run = %#v, %v", firstRun, err)
 	}
-	group, err := database.CreateSpaceConversation(ctx, member.ID, space.ID, "Operations leads", []string{owner.ID})
+	group, err := database.CreateSpaceConversation(ctx, member.ID, space.ID, "Operations leads", []SpaceActorRef{{Kind: "person", UserID: owner.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}

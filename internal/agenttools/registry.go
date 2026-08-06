@@ -59,17 +59,19 @@ type Descriptor struct {
 }
 
 type Invocation struct {
-	UserID          string
-	SpaceID         string
-	AgentID         string
-	AgentInstanceID string
-	RunID           string
-	SessionID       string
-	Source          string
-	Trigger         string
-	OriginalInput   string
-	ExplicitTools   map[string]bool
-	ApprovedTools   map[string]bool
+	UserID                string
+	SpaceID               string
+	AgentID               string
+	AgentInstanceID       string
+	RunID                 string
+	SessionID             string
+	Source                string
+	Trigger               string
+	OriginalInput         string
+	ExplicitTools         map[string]bool
+	ApprovedTools         map[string]bool
+	ConversationScopeKind string
+	ConversationID        string
 	// DelegatedApproval is used by runtimes that persist and resume approval
 	// inside the tool handler. The descriptor still advertises the real policy;
 	// the handler remains responsible for enforcing it before any external write.

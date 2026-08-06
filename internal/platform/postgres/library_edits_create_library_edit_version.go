@@ -19,6 +19,9 @@ func (db *Database) CreateLibraryEditVersion(ctx context.Context, userID, spaceI
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		var currentID, mimeType string
 		var actualVersion int64
 		if err := tx.QueryRowContext(ctx, `SELECT COALESCE(i.current_edit_version_id,''),i.version,b.server_detected_mime_type FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id WHERE i.id=$1 AND i.space_id=$2 AND i.lifecycle_state='ready' FOR UPDATE OF i`, itemID, spaceID).Scan(&currentID, &actualVersion, &mimeType); errors.Is(err, sql.ErrNoRows) {
@@ -78,6 +81,9 @@ func (db *Database) SelectLibraryEditVersion(ctx context.Context, userID, spaceI
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
 			return err
 		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
+			return err
+		}
 		if editID != "" {
 			var valid bool
 			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM library_item_versions WHERE id=$1 AND space_library_item_id=$2 AND lifecycle_state='ready')`, editID, itemID).Scan(&valid); err != nil || !valid {
@@ -110,6 +116,9 @@ func (db *Database) SelectLibraryEditVersion(ctx context.Context, userID, spaceI
 func (db *Database) DeleteLibraryEditVersion(ctx context.Context, userID, spaceID, itemID, editID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionLibraryEdit); err != nil {
+			return err
+		}
+		if err := requireLibraryItemAudienceTx(ctx, tx, userID, spaceID, itemID); err != nil {
 			return err
 		}
 		var currentID, renditionState, domainID string
