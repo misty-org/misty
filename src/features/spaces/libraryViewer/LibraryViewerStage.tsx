@@ -6,7 +6,7 @@ import type { LibraryAssetStack } from "@/models/interfaces/features/spaces/type
 import { LibraryStackChips, LibraryStackEffectChips } from "./LibraryStackChips";
 
 const arrowClass =
-  "absolute top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-black/45 text-white disabled:opacity-20";
+  "absolute top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-charcoal-border/10 bg-charcoal-workspace text-cream-bright disabled:opacity-20";
 
 export interface LibraryViewerStageProps {
   displayName: string;
@@ -38,7 +38,7 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
   const { assetStack, index, itemCount } = props;
 
   return (
-    <div className="relative isolate min-h-0 min-w-0 overflow-hidden bg-black/35">
+    <div className="relative isolate min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace">
       <div className="absolute inset-6 flex min-h-0 min-w-0 items-center justify-center overflow-hidden">
         <EmbeddedUniversalPreview
           name={props.displayName}

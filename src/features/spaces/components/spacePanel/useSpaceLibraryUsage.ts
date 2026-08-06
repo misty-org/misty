@@ -6,21 +6,24 @@ import type { Space, SpaceStorageUsage } from "@/models/interfaces/features/spac
 /**
  * Storage quota for the active Space, refreshed whenever the Library changes.
  *
- * Loaded while a Space is active to populate the SpaceStorageFooter across all Space sections.
+ * `enabled` exists because the quota now lives behind the header's usage
+ * popover: there is no reason to poll a number nobody is looking at, so the
+ * fetch waits until something actually displays it.
  */
 export function useSpaceLibraryUsage(options: {
   activeSpaceId: string;
   activeSpace: Space | undefined;
-  section?: string;
   snapshotReady: boolean;
+  enabled?: boolean;
 }): SpaceStorageUsage | null {
   const { activeSpaceId, activeSpace, snapshotReady } = options;
+  const enabled = options.enabled ?? true;
   const ownerStorage = useSpacesStore((state) => state.ownerStorage);
   const [usage, setUsage] = useState<SpaceStorageUsage | null>(null);
 
   useEffect(() => {
     setUsage(null);
-    if (!snapshotReady || !activeSpaceId || !activeSpace) {
+    if (!enabled || !snapshotReady || !activeSpaceId || !activeSpace) {
       return;
     }
     let active = true;
@@ -44,7 +47,7 @@ export function useSpaceLibraryUsage(options: {
       active = false;
       window.removeEventListener("misty:space-library-event", reloadOnLibraryEvent);
     };
-  }, [activeSpace, activeSpaceId, snapshotReady]);
+  }, [activeSpace, activeSpaceId, enabled, snapshotReady]);
 
   return useMemo(() => {
     if (!activeSpaceId || !activeSpace) return null;

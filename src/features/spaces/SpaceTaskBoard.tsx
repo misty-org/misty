@@ -153,18 +153,14 @@ function BoardColumn({
   return (
     <section
       ref={dropZone.ref}
-      className={`flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col border-r border-border/55 px-3 py-2 transition-colors last:border-r-0 ${
-        dropZone.active
-          ? "bg-accent/45 shadow-[inset_0_2px_0_color-mix(in_srgb,var(--primary)_45%,transparent)]"
-          : "bg-transparent"
+      className={`flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0 ${
+        dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent"
       }`}
     >
       <header className="flex min-h-11 items-center gap-2 px-2">
         <span className={`size-2 rounded-full ${statusDot(column.id)}`} />
-        <h2 className="m-0 text-xs font-semibold text-foreground">{column.label}</h2>
-        <span className="text-[11px] tabular-nums text-muted-foreground">
-          {total ?? tasks.length}
-        </span>
+        <h2 className="m-0 text-xs font-semibold text-cream">{column.label}</h2>
+        <span className="text-[11px] tabular-nums text-cream-muted">{total ?? tasks.length}</span>
         {canManage ? (
           <Button
             className="ml-auto size-7"
@@ -195,7 +191,7 @@ function BoardColumn({
         ))}
 
         {creating ? (
-          <Card className="gap-0 py-0 shadow-none ring-foreground/8">
+          <Card className="gap-0 py-0 shadow-none ring-cream/8">
             <form onSubmit={onSubmitCreate}>
               <CardContent className="p-3">
                 <Input
@@ -228,15 +224,15 @@ function BoardColumn({
         {!tasks.length && !creating ? (
           <Button
             className={[
-              "misty-spaces-interactive min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent",
-              "text-xs text-muted-foreground shadow-none hover:bg-muted/35",
+              "min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent",
+              "text-xs text-cream-muted shadow-none hover:bg-charcoal-card",
             ].join(" ")}
             variant="ghost"
             type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
-            <span className="grid size-7 place-items-center text-muted-foreground">
+            <span className="grid size-7 place-items-center text-cream-muted">
               <Plus className="size-3.5" />
             </span>
             Drop or create
@@ -303,16 +299,16 @@ function TaskCard({
       ref={dropZone.ref}
       data-misty-window-drag-block={canManage ? "true" : undefined}
       data-pointer-drag-source={canManage ? "true" : undefined}
-      className={`misty-spaces-interactive group gap-0 py-0 shadow-sm ring-foreground/8 hover:shadow-md ${
+      className={`group gap-0 py-0 shadow-sm ring-cream/8 hover:shadow-md ${
         canManage ? "cursor-grab" : "cursor-default"
-      } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-primary" : ""}`}
+      } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-charcoal-active" : ""}`}
       onPointerDown={beginDrag}
     >
       <CardHeader className="p-3 pb-2">
         <div
           className={[
             "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md",
-            "text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+            "text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-active",
           ].join(" ")}
           role="button"
           tabIndex={0}
@@ -323,21 +319,19 @@ function TaskCard({
             onOpen(task);
           }}
         >
-          <GripVertical className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          <GripVertical className="mt-0.5 size-3.5 shrink-0 text-cream-muted opacity-0 transition-opacity group-hover:opacity-100" />
           <div className="min-w-0">
             <CardTitle className="line-clamp-3 text-sm leading-5">{task.title}</CardTitle>
             {notes ? (
-              <p className="mb-0 mt-1 line-clamp-2 text-xs leading-4 text-muted-foreground">
-                {notes}
-              </p>
+              <p className="mb-0 mt-1 line-clamp-2 text-xs leading-4 text-cream-muted">{notes}</p>
             ) : null}
           </div>
-          {busy ? <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" /> : null}
+          {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
         </div>
       </CardHeader>
       <CardContent className="p-3 pt-0">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-medium text-muted-foreground">{task.task_key}</span>
+          <span className="text-[10px] font-medium text-cream-muted">{task.task_key}</span>
           <TaskPriorityBadge priority={task.priority} />
           <TaskSyncBadge task={task} />
           {task.due_at ? (
@@ -386,10 +380,10 @@ function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMe
     <span
       className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
         attention
-          ? "bg-destructive/12 text-destructive"
+          ? "bg-charcoal-active text-cream-bright"
           : state === "working"
-            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300"
-            : "bg-muted text-muted-foreground"
+            ? "bg-status-green text-sage-fg"
+            : "bg-charcoal-card text-cream-muted"
       }`}
       title={`${agent.name}: ${labels[state]}`}
     >
@@ -400,9 +394,9 @@ function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMe
 
 function TaskDragPreview({ task }: { task: SpaceTask }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-3 py-2 shadow-lg">
-      <p className="m-0 line-clamp-2 text-sm font-medium text-foreground">{task.title}</p>
-      <span className="text-[10px] font-medium text-muted-foreground">{task.task_key}</span>
+    <div className="rounded-xl border border-charcoal-border bg-charcoal-card px-3 py-2 shadow-lg">
+      <p className="m-0 line-clamp-2 text-sm font-medium text-cream">{task.title}</p>
+      <span className="text-[10px] font-medium text-cream-muted">{task.task_key}</span>
     </div>
   );
 }

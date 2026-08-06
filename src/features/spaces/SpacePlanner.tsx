@@ -122,7 +122,7 @@ function SpaceTasksPlanner({
   }, [actions.openEdit, data.loading, data.tasks, location.pathname, location.search, navigate]);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       <SpacePlannerHeader
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}

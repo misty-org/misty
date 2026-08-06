@@ -126,15 +126,15 @@ export function GlobalPreviewDialog(props: {
     >
       <DialogContent
         aria-describedby={undefined}
-        className="left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0 rounded-none bg-background p-0 text-foreground shadow-none ring-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 [&>[data-slot=dialog-close]]:hidden"
+        className="left-0 top-0 block h-full w-full max-w-none translate-x-0 translate-y-0 rounded-none bg-charcoal-bg p-0 text-cream shadow-none ring-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100 [&>[data-slot=dialog-close]]:hidden"
       >
         <section className="grid h-full min-h-0 grid-rows-[58px_minmax(0,1fr)]">
-          <header className="grid min-w-0 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-3 border-b border-border px-4">
+          <header className="grid min-w-0 grid-cols-[minmax(180px,1fr)_auto_minmax(180px,1fr)] items-center gap-3 border-b border-charcoal-border px-4">
             <div className="min-w-0">
               <DialogTitle className="m-0 truncate text-sm font-semibold">
                 {props.source.name}
               </DialogTitle>
-              <span className="block truncate text-[11px] text-muted-foreground">
+              <span className="block truncate text-[11px] text-cream-muted">
                 {friendlyType(extension, props.source.mimeType)}
               </span>
             </div>
@@ -177,9 +177,9 @@ export function GlobalPreviewDialog(props: {
             </div>
           </header>
           <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_300px] max-[820px]:grid-cols-1">
-            <main className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background">
+            <main className="relative grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg">
               {canEditText ? (
-                <div className="flex min-h-12 items-center justify-center border-b border-border bg-muted/30 px-3">
+                <div className="flex min-h-12 items-center justify-center border-b border-charcoal-border bg-charcoal-card px-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -232,10 +232,10 @@ export function GlobalPreviewDialog(props: {
                 ) : null}
               </div>
             </main>
-            <aside className="min-h-0 overflow-y-auto border-l border-border bg-card p-5 max-[820px]:hidden">
+            <aside className="min-h-0 overflow-y-auto border-l border-charcoal-border bg-charcoal-card p-5 max-[820px]:hidden">
               <div className="grid gap-5">
                 <div>
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
                     Inspector
                   </span>
                   <h2 className="m-0 mt-2 break-words text-lg font-semibold">
@@ -261,24 +261,24 @@ export function GlobalPreviewDialog(props: {
                 </dl>
                 {props.source.description ? (
                   <div>
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
                       Description
                     </span>
-                    <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">
+                    <p className="m-0 mt-2 text-sm leading-6 text-cream-muted">
                       {props.source.description}
                     </p>
                   </div>
                 ) : null}
                 {saveStatus || saveError ? (
                   <p
-                    className={`m-0 rounded-lg px-3 py-2 text-xs ${saveError ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}
+                    className={`m-0 rounded-lg px-3 py-2 text-xs ${saveError ? "bg-charcoal-active text-cream-bright" : "bg-sage-bg text-sage-fg"}`}
                     role="status"
                   >
                     {saveError ?? saveStatus}
                   </p>
                 ) : null}
                 {props.source.remote ? (
-                  <p className="m-0 rounded-lg bg-warning/10 px-3 py-2 text-xs leading-5 text-warning">
+                  <p className="m-0 rounded-lg bg-sage-bg px-3 py-2 text-xs leading-5 text-sage-fg">
                     Remote previews are read-only. Download the file to edit it.
                   </p>
                 ) : null}

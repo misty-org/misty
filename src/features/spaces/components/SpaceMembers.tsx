@@ -31,18 +31,18 @@ export function SpaceMembers({
   return (
     <div
       className={
-        embedded ? "min-w-0" : "h-full min-h-0 overflow-auto bg-background px-5 py-5 sm:px-6"
+        embedded ? "min-w-0" : "h-full min-h-0 overflow-auto bg-charcoal-bg px-5 py-5 sm:px-6"
       }
     >
       <div className={embedded ? "w-full" : "mx-auto w-full max-w-5xl"}>
         <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3">
           <div>
             {!embedded ? (
-              <h2 className="m-0 text-sm font-semibold text-foreground">
+              <h2 className="m-0 text-sm font-semibold text-cream">
                 {teammatesEnabled ? "Team" : "Members"}
               </h2>
             ) : null}
-            <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-muted-foreground`}>
+            <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-cream-muted`}>
               {teammatesEnabled
                 ? `${members.length + agents.length + 1} teammates`
                 : `${members.length} active member${members.length === 1 ? "" : "s"}`}
@@ -58,7 +58,7 @@ export function SpaceMembers({
 
         {bannerError ? (
           <Button
-            className="mb-3 h-auto w-full justify-start whitespace-normal rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-left text-xs text-destructive hover:bg-destructive/15 hover:text-destructive"
+            className="mb-3 h-auto w-full justify-start whitespace-normal rounded-lg border border-charcoal-active/30 bg-charcoal-active px-3 py-2 text-left text-xs text-cream-bright hover:bg-charcoal-active hover:text-cream-bright"
             variant="ghost"
             type="button"
             onClick={clearError}

@@ -1,18 +1,29 @@
-import type {
-  SpaceLibraryHeaderProps,
-  SpaceLibraryEmptyStateProps,
-} from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
-export type {
-  SpaceLibraryHeaderProps,
-  SpaceLibraryEmptyStateProps,
-} from "@/models/interfaces/features/spaces/components/SpaceLibraryChrome";
-import { Grid2X2, Image as List, Minus, Plus, Search, Upload, X } from "lucide-react";
-import { EmptyState } from "@/ui";
-import { Toolbar, ToolbarGroup } from "@/ui";
-import { Button } from "@/ui";
-import { Input } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { cn } from "@/ui";
+import {
+  Image as ImageIcon,
+  Grid2X2,
+  Image as List,
+  Minus,
+  Plus,
+  Search,
+  Upload,
+  X,
+} from "lucide-react";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+  EmptyState,
+  Toolbar,
+  ToolbarGroup,
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  cn,
+} from "@/ui";
+import type { LibraryUploadJob } from "@/models/types/features/spaces/useSpaceLibraryData";
 import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 import type { LibraryItemQuery } from "@/models/interfaces/features/spaces/types";
 import {
@@ -23,9 +34,9 @@ import {
 
 const toolbarControlStyles = {
   group:
-    "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-border/80 bg-background px-1 shadow-xs",
-  button: "size-7 rounded-sm text-muted-foreground shadow-none",
-  buttonActive: "bg-accent text-accent-foreground",
+    "flex h-9 shrink-0 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1 shadow-xs",
+  button: "size-7 rounded-sm text-cream-muted shadow-none",
+  buttonActive: "bg-charcoal-hover text-cream",
 } as const;
 
 const mediaTypeOptions = [
@@ -63,11 +74,11 @@ export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
 
   return (
     <div className="shrink-0">
-      <Toolbar label="Library tools" wrap className="misty-spaces-toolbar min-h-11 px-3 py-1.5">
+      <Toolbar label="Library tools" wrap className="min-h-11 px-3 py-1.5">
         <label
           className={cn(
             "!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md",
-            "border border-border/70 bg-muted/30 px-2.5 text-muted-foreground shadow-none",
+            "border border-charcoal-border/70 bg-charcoal-card px-2.5 text-cream-muted shadow-none",
             "transition-colors",
           )}
         >
@@ -294,4 +305,42 @@ function collectionLabel(collection: string): string {
       } as Record<string, string>
     )[collection] ?? "this collection"
   );
+}
+
+export interface SpaceLibraryHeaderProps {
+  uploadAvailable: boolean;
+  uploading: boolean;
+  uploadDisabled: boolean;
+  onUpload: () => void;
+  searchInput: string;
+  onSearchInput: (value: string) => void;
+  onSearchFocus: () => void;
+  onSearchBlur: () => void;
+  mediaType: string;
+  onMediaType: (value: string) => void;
+  sort: NonNullable<LibraryItemQuery["sort"]>;
+  direction: NonNullable<LibraryItemQuery["direction"]>;
+  onSort: (
+    sort: NonNullable<LibraryItemQuery["sort"]>,
+    direction: NonNullable<LibraryItemQuery["direction"]>,
+  ) => void;
+  albumOrderAvailable: boolean;
+  viewMode: "grid" | "list";
+  onViewMode: (mode: "grid" | "list") => void;
+  itemScale: number;
+  onItemScale: (scale: number) => void;
+  visibleItemCount: number;
+  // Upload progress lives in the toolbar so it never displaces Library content.
+  uploadJobs: LibraryUploadJob[];
+  onClearUploads: () => void;
+}
+
+export interface SpaceLibraryEmptyStateProps {
+  collection: string;
+  searching?: boolean;
+  uploadAvailable: boolean;
+  uploading: boolean;
+  uploadDisabled: boolean;
+  onUpload: () => void;
+  onClearSearch?: () => void;
 }

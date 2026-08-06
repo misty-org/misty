@@ -235,7 +235,7 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
   return (
     <div
       ref={canvasRef}
-      className="relative h-full min-h-[420px] w-full overflow-hidden bg-muted/10"
+      className="relative h-full min-h-[420px] w-full overflow-hidden bg-charcoal-card"
       onDragOver={(event) => {
         if (!props.canManage) return;
         event.preventDefault();
@@ -298,12 +298,12 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls
           showInteractive={false}
-          className="!overflow-hidden !rounded-lg !border !border-border/70 !bg-background/90 !shadow-sm"
+          className="!overflow-hidden !rounded-lg !border !border-charcoal-border/70 !bg-charcoal-bg !shadow-sm"
         />
         <MiniMap
           pannable
           zoomable
-          className="!rounded-lg !border !border-border/70 !bg-background/90 !shadow-sm"
+          className="!rounded-lg !border !border-charcoal-border/70 !bg-charcoal-bg !shadow-sm"
           nodeColor={(node) =>
             roadmapNodeColors[(node.data as RoadmapNodeData).color ?? "slate"].hex
           }
@@ -311,16 +311,16 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
       </ReactFlow>
       {pendingConnection ? (
         <div
-          className="absolute inset-0 z-20 grid place-items-center bg-background/25 backdrop-blur-[1px]"
+          className="absolute inset-0 z-20 grid place-items-center bg-charcoal-bg "
           onMouseDown={() => cancelPending(setEdges, setPendingConnection)}
         >
           <div
-            className="w-64 rounded-xl border border-border bg-card p-2 shadow-xl"
+            className="w-64 rounded-xl border border-charcoal-border bg-charcoal-card p-2 shadow-xl"
             role="dialog"
             aria-label="Choose connection type"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
               Connection type
             </p>
             {pendingConnection.types.map((type) => (

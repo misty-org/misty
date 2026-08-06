@@ -36,7 +36,7 @@ export function SpaceSidebarSection({
               variant="ghost"
               className={[
                 "h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left text-xs shadow-none",
-                "font-semibold text-muted-foreground hover:bg-transparent hover:text-sidebar-accent-foreground",
+                "font-semibold text-cream-muted hover:bg-transparent hover:text-cream-bright",
               ].join(" ")}
               aria-controls={contentId}
               aria-expanded={expanded}
@@ -46,7 +46,7 @@ export function SpaceSidebarSection({
               <span className="min-w-0 flex-1 truncate">
                 {title}
                 {typeof count === "number" && count > 0 ? (
-                  <span className="text-muted-foreground/80"> - {count}</span>
+                  <span className="text-cream-muted/80"> - {count}</span>
                 ) : null}
               </span>
               <ChevronRight
@@ -55,7 +55,7 @@ export function SpaceSidebarSection({
               />
             </Button>
           ) : title ? (
-            <h2 className="m-0 min-w-0 flex-1 truncate text-xs font-semibold text-muted-foreground">
+            <h2 className="m-0 min-w-0 flex-1 truncate text-xs font-semibold text-cream-muted">
               {title}
             </h2>
           ) : (

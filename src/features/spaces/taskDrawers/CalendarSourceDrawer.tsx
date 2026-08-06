@@ -52,8 +52,8 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
 
   return (
     <Sheet open onOpenChange={(open) => !open && props.onClose()}>
-      <SheetContent className="w-[min(480px,96vw)] bg-background p-0 sm:max-w-[480px]">
-        <SheetHeader className="border-b border-border/60 px-5 py-4 pr-14 text-left">
+      <SheetContent className="w-[min(480px,96vw)] bg-charcoal-bg p-0 sm:max-w-[480px]">
+        <SheetHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
           <SheetTitle>Calendars</SheetTitle>
           <SheetDescription>
             Choose which calendars are visible to members of this Space.
@@ -129,16 +129,16 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
                   description="This Space does not currently have a working Google Calendar connection."
                 />
               ) : busy === "calendars" ? (
-                <div className="grid min-h-40 place-items-center text-muted-foreground">
+                <div className="grid min-h-40 place-items-center text-cream-muted">
                   <LoaderCircle className="size-5 animate-spin" aria-label="Loading calendars" />
                 </div>
               ) : selectedIntegration ? (
-                <div className="mt-4 divide-y divide-border/60 overflow-hidden rounded-lg bg-muted/30">
+                <div className="mt-4 divide-y divide-charcoal-border/60 overflow-hidden rounded-lg bg-charcoal-card">
                   {choices.map((choice) => {
                     const active = published.has(`${selectedIntegration}:${choice.id}`);
                     return (
                       <div className="flex items-center gap-3 p-3" key={choice.id}>
-                        <SiGooglecalendar className="size-4 shrink-0 text-muted-foreground" />
+                        <SiGooglecalendar className="size-4 shrink-0 text-cream-muted" />
                         <span className="min-w-0 flex-1 truncate text-sm">{choice.summary}</span>
                         <Button
                           size="sm"
@@ -153,7 +153,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
                     );
                   })}
                   {!choices.length ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-cream-muted">
                       No calendars are available for this account.
                     </p>
                   ) : null}
@@ -165,13 +165,13 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
               <div className="grid gap-1">
                 {sources.map((source) => (
                   <div
-                    className="flex min-h-11 items-center gap-2 rounded-md px-2 hover:bg-muted"
+                    className="flex min-h-11 items-center gap-2 rounded-md px-2 hover:bg-charcoal-card"
                     key={source.id}
                   >
                     {source.status === "active" ? (
-                      <Check className="size-4 text-emerald-500" />
+                      <Check className="size-4 text-sage-fg" />
                     ) : (
-                      <CircleAlert className="size-4 text-amber-500" />
+                      <CircleAlert className="size-4 text-sage-fg" />
                     )}
                     <span className="min-w-0 flex-1 truncate text-sm">{source.display_name}</span>
                     {source.status !== "disabled" ? (
@@ -190,7 +190,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
                   </div>
                 ))}
                 {!sources.length ? (
-                  <p className="text-xs text-muted-foreground">No calendars published yet.</p>
+                  <p className="text-xs text-cream-muted">No calendars published yet.</p>
                 ) : null}
               </div>
             </>
@@ -207,7 +207,7 @@ function CalendarVisibilityToggle(props: {
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted">
+    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-charcoal-card">
       <Checkbox
         checked={props.checked}
         aria-label={props.label}

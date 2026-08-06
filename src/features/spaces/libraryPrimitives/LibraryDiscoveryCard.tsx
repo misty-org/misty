@@ -24,7 +24,7 @@ export function LibraryDiscoveryCard({
   const canEdit = useContext(LibraryCanEditContext);
 
   return (
-    <article className="group relative overflow-hidden rounded-xl bg-card shadow-xs inset-ring-1 inset-ring-foreground/10">
+    <article className="group relative overflow-hidden rounded-xl bg-charcoal-card shadow-xs inset-ring-1 inset-ring-cream/10">
       <Button
         className="block w-full border-0 bg-transparent p-0 text-left"
         type="button"
@@ -32,20 +32,18 @@ export function LibraryDiscoveryCard({
       >
         <span className="relative block">
           <AlbumCover spaceId={spaceId} itemId={group.cover_item_id} />
-          <span className="absolute left-3 top-3 grid size-8 place-items-center rounded-lg bg-black/55 text-white backdrop-blur">
+          <span className="absolute left-3 top-3 grid size-8 place-items-center rounded-lg bg-charcoal-workspace text-cream-bright ">
             <Icon size={16} />
           </span>
         </span>
         <span className="block p-3">
           <span className="block truncate text-xs font-medium">{group.title}</span>
-          <span className="mt-1 block truncate text-[10px] text-muted-foreground">
-            {group.subtitle}
-          </span>
+          <span className="mt-1 block truncate text-[10px] text-cream-muted">{group.subtitle}</span>
         </span>
       </Button>
       {canEdit && onTogglePin ? (
         <Button
-          className={`absolute right-3 top-3 grid size-8 place-items-center rounded-lg border-0 backdrop-blur ${pinned ? "bg-white text-black" : "bg-black/55 text-white opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
+          className={`absolute right-3 top-3 grid size-8 place-items-center rounded-lg border-0 ${pinned ? "bg-charcoal-active text-charcoal-bg" : "bg-charcoal-workspace text-cream-bright opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
           type="button"
           onClick={onTogglePin}
           title={pinned ? "Unpin" : "Pin collection"}

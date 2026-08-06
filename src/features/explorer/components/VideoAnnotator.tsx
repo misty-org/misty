@@ -165,9 +165,12 @@ export default function VideoAnnotator({
   }, []);
 
   return (
-    <div className="flex h-full w-full flex-col bg-black">
-      <div className="flex h-11 flex-none items-center gap-3 border-b border-white/10 bg-[#111216] px-3 text-white">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/90" title={name}>
+    <div className="flex h-full w-full flex-col bg-charcoal-workspace">
+      <div className="flex h-11 flex-none items-center gap-3 border-b border-charcoal-border bg-charcoal-card px-3 text-cream-bright">
+        <span
+          className="min-w-0 flex-1 truncate text-sm font-medium text-cream-bright/90"
+          title={name}
+        >
           {name}
         </span>
         <div className="flex flex-none items-center gap-2">
@@ -175,7 +178,9 @@ export default function VideoAnnotator({
             type="button"
             variant={drawing ? "default" : "ghost"}
             size="sm"
-            className={drawing ? "" : "text-white/70 hover:bg-white/10 hover:text-white"}
+            className={
+              drawing ? "" : "text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
+            }
             aria-pressed={drawing}
             onClick={toggleDraw}
           >
@@ -193,7 +198,9 @@ export default function VideoAnnotator({
                     size="icon"
                     aria-label={`Pen color ${swatch}`}
                     className={`size-5 rounded-full border p-0 transition ${
-                      color === swatch ? "border-white ring-2 ring-white/40" : "border-white/20"
+                      color === swatch
+                        ? "border-charcoal-border ring-2 ring-charcoal-border/40"
+                        : "border-charcoal-border/20"
                     }`}
                     style={{ backgroundColor: swatch }}
                     onClick={() => setColor(swatch)}
@@ -214,7 +221,7 @@ export default function VideoAnnotator({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-white/70 hover:bg-white/10 hover:text-white"
+                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
                 aria-label="Undo"
                 disabled={strokes.length === 0}
                 onClick={undo}
@@ -225,7 +232,7 @@ export default function VideoAnnotator({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-white/70 hover:bg-white/10 hover:text-white"
+                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
                 aria-label="Redo"
                 disabled={redo.length === 0}
                 onClick={redoStroke}
@@ -236,7 +243,7 @@ export default function VideoAnnotator({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="size-8 text-white/70 hover:bg-white/10 hover:text-white"
+                className="size-8 text-cream-bright/70 hover:bg-charcoal-active hover:text-cream-bright"
                 aria-label="Clear drawing"
                 disabled={strokes.length === 0}
                 onClick={clear}

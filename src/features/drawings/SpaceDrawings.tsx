@@ -105,7 +105,7 @@ function DrawingWorkspace(props: {
 }) {
   const room = useDrawingRoom(props.drawing.space_id, props.drawing.id, props.user);
   return (
-    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
+    <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       <DrawingHeader
         drawing={props.drawing}
         connection={room.connection}
@@ -117,7 +117,7 @@ function DrawingWorkspace(props: {
           <div
             className={[
               "absolute left-1/2 top-3 z-30 max-w-xl -translate-x-1/2 rounded-md border",
-              "border-amber-500/30 bg-background/95 px-3 py-2 text-sm shadow-md",
+              "border-sage-fg/30 bg-charcoal-bg px-3 py-2 text-sm shadow-md",
             ].join(" ")}
           >
             {room.notice}
@@ -140,7 +140,7 @@ function DrawingWorkspace(props: {
       <JournalAttribution
         technology="Excalidraw"
         href="https://excalidraw.com/"
-        className="absolute bottom-3 right-3 z-20 shadow-sm backdrop-blur-sm"
+        className="absolute bottom-3 right-3 z-20 shadow-sm "
       />
     </div>
   );
@@ -148,8 +148,8 @@ function DrawingWorkspace(props: {
 
 function DrawingLoading({ label }: { label: string }) {
   return (
-    <div className="grid h-full place-items-center bg-background">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="grid h-full place-items-center bg-charcoal-bg">
+      <div className="flex items-center gap-2 text-sm text-cream-muted">
         <Spinner className="size-4" />
         {label}…
       </div>

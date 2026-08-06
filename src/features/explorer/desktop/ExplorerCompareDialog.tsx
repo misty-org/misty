@@ -191,7 +191,7 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
           if (!open) props.onClose();
         }}
       >
-        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground">
+        <DialogContent className="flex max-h-[min(760px,calc(100vh-48px))] w-[min(780px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream">
           <form
             className="contents"
             onSubmit={(event) => {
@@ -199,7 +199,7 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
               void runCompare();
             }}
           >
-            <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
+            <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-charcoal-border px-5 py-4 text-left">
               <div>
                 <DialogTitle>Compare With</DialogTitle>
                 <DialogDescription>
@@ -228,11 +228,11 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
                 </Button>
               </div>
               <div className={compareStyles.fields}>
-                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                   <span>Left</span>
                   <Input value={leftPath} onChange={(event) => setLeftPath(event.target.value)} />
                 </label>
-                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                   <span>Right</span>
                   <Input
                     autoFocus
@@ -417,7 +417,7 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
                 </>
               ) : null}
             </div>
-            <DialogFooter className="mt-0 border-t border-border px-5 py-4">
+            <DialogFooter className="mt-0 border-t border-charcoal-border px-5 py-4">
               <Button variant="outline" type="button" onClick={props.onClose}>
                 Close
               </Button>
@@ -439,7 +439,7 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
             <AlertDialogTitle>Replace file text?</AlertDialogTitle>
             <AlertDialogDescription>
               Replace{" "}
-              <strong className="break-all font-medium text-foreground">
+              <strong className="break-all font-medium text-cream">
                 {mergeTarget === "left" ? leftPath.trim() : rightPath.trim()}
               </strong>{" "}
               with the {mergeTarget === "left" ? "right" : "left"} file’s text. This overwrites the

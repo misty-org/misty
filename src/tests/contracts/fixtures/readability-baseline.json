@@ -1,22 +1,28 @@
 {
-  "src/features/explorer/components/DeepSearchOverlay.tsx": [
+  "src/features/agents/AgentSources.tsx": [
     {
-      "length": 169,
-      "hash": "c2bd46a6ff86e678"
-    },
-    {
-      "length": 317,
-      "hash": "f57a217ac4f24983"
-    },
-    {
-      "length": 180,
-      "hash": "fc5e12670ee1c98f"
+      "length": 287,
+      "hash": "0444dc36ca36ba69"
     }
   ],
-  "src/features/explorer/components/ExplorerLoadingShell.tsx": [
+  "src/features/drawings/components/DrawingHeader.tsx": [
     {
-      "length": 195,
-      "hash": "a48155938d7e0939"
+      "length": 163,
+      "hash": "8c5a66ebdefd411f"
+    }
+  ],
+  "src/features/explorer/components/DeepSearchOverlay.tsx": [
+    {
+      "length": 319,
+      "hash": "043bcc5b43e4abfb"
+    },
+    {
+      "length": 170,
+      "hash": "5742f1a0b6c9ca78"
+    },
+    {
+      "length": 164,
+      "hash": "e36571c94fea60c0"
     }
   ],
   "src/features/explorer/components/ExplorerSidebar.tsx": [
@@ -27,62 +33,90 @@
   ],
   "src/features/explorer/components/ExplorerSidebarSupport.tsx": [
     {
-      "length": 196,
-      "hash": "010b88dfceb5ff64"
+      "length": 189,
+      "hash": "5d2346243a5b423a"
     },
     {
-      "length": 275,
-      "hash": "474d90bcbf3536ba"
-    },
-    {
-      "length": 221,
-      "hash": "4bef9133dc61e751"
-    },
-    {
-      "length": 272,
-      "hash": "4c76d9c52745e774"
-    },
-    {
-      "length": 211,
-      "hash": "78923b82157b28e6"
+      "length": 291,
+      "hash": "e1a0e21ad2575b67"
     },
     {
       "length": 214,
       "hash": "84385ddf284e7db2"
     },
     {
-      "length": 278,
-      "hash": "b2108dac53ecfc77"
+      "length": 196,
+      "hash": "010b88dfceb5ff64"
     },
     {
-      "length": 350,
-      "hash": "b8d26342cd30b1a6"
-    },
-    {
-      "length": 311,
-      "hash": "c0465f51e753a2bf"
+      "length": 209,
+      "hash": "1dc414f69ca412b9"
     }
   ],
   "src/features/explorer/components/ExplorerToolbarSupport.tsx": [
     {
-      "length": 188,
-      "hash": "01ebdf6f3d909fbf"
-    },
-    {
-      "length": 193,
-      "hash": "043207ffb7a51556"
-    },
-    {
-      "length": 216,
-      "hash": "453cd590309473a5"
-    },
-    {
-      "length": 225,
-      "hash": "a8390f5c5cf92847"
+      "length": 189,
+      "hash": "15d6f32e30f68564"
     },
     {
       "length": 166,
       "hash": "f081774bbecf3e86"
+    },
+    {
+      "length": 208,
+      "hash": "646c924a6c89075b"
+    },
+    {
+      "length": 206,
+      "hash": "9e132b34ed362752"
+    },
+    {
+      "length": 178,
+      "hash": "7e98b31fa6357fc1"
+    }
+  ],
+  "src/features/explorer/components/FileBrowserStyles.ts": [
+    {
+      "length": 293,
+      "hash": "bdd8303a6f9758ed"
+    },
+    {
+      "length": 226,
+      "hash": "53af1478daeb4792"
+    },
+    {
+      "length": 315,
+      "hash": "7b453a0d72fc990b"
+    },
+    {
+      "length": 224,
+      "hash": "4d9bba85432618e6"
+    },
+    {
+      "length": 286,
+      "hash": "e3bbbf97c2618a79"
+    },
+    {
+      "length": 295,
+      "hash": "6714114c1c6a1d92"
+    },
+    {
+      "length": 186,
+      "hash": "a7cb3377baed7ad2"
+    },
+    {
+      "length": 473,
+      "hash": "155776b3db8a16d0"
+    },
+    {
+      "length": 238,
+      "hash": "63094f68c2bd11c8"
+    }
+  ],
+  "src/features/explorer/components/MediaSearchViewer.tsx": [
+    {
+      "length": 168,
+      "hash": "346027b027925317"
     }
   ],
   "src/features/explorer/components/fileBrowser/FileGridItem.tsx": [
@@ -97,222 +131,168 @@
       "hash": "b4c2e7423e99897f"
     }
   ],
-  "src/features/explorer/components/FileBrowserStyles.ts": [
-    {
-      "length": 277,
-      "hash": "27bd2031fbe25353"
-    },
-    {
-      "length": 234,
-      "hash": "456dba2acb476f55"
-    },
-    {
-      "length": 224,
-      "hash": "5687f270b4ce63d1"
-    },
-    {
-      "length": 243,
-      "hash": "5799dc3a6e851956"
-    },
-    {
-      "length": 171,
-      "hash": "76faf81425df8f81"
-    },
-    {
-      "length": 315,
-      "hash": "7b453a0d72fc990b"
-    },
-    {
-      "length": 186,
-      "hash": "a7cb3377baed7ad2"
-    },
-    {
-      "length": 456,
-      "hash": "ad668d4aa609de06"
-    },
-    {
-      "length": 283,
-      "hash": "bd7bc1b90c6b7169"
-    },
-    {
-      "length": 293,
-      "hash": "bdd8303a6f9758ed"
-    },
-    {
-      "length": 179,
-      "hash": "ec9c15abda3e191f"
-    }
-  ],
   "src/features/explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
     {
-      "length": 167,
-      "hash": "2b7cae55690b56f2"
+      "length": 161,
+      "hash": "54f971eaa0cb4590"
+    },
+    {
+      "length": 162,
+      "hash": "ff8fd46c3a758db7"
     }
   ],
   "src/features/explorer/components/globalPreview/GlobalPreviewDialog.tsx": [
     {
-      "length": 256,
-      "hash": "f529a1dd4fde1f9a"
+      "length": 252,
+      "hash": "5c7e40e14f4fbc2c"
     }
   ],
   "src/features/explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
     {
-      "length": 313,
-      "hash": "785fe5bb4e668bfe"
+      "length": 312,
+      "hash": "d6fecc00bf4b053b"
     }
   ],
   "src/features/explorer/components/libraryWorkspace/LibraryGallery.tsx": [
     {
-      "length": 191,
-      "hash": "78cfebef265d0e19"
-    }
-  ],
-  "src/features/explorer/components/MediaSearchViewer.tsx": [
-    {
-      "length": 169,
-      "hash": "8ff40d995b9c5ebb"
+      "length": 195,
+      "hash": "b21f214321697811"
     }
   ],
   "src/features/explorer/desktop/ExplorerBatchRenameDialog.tsx": [
     {
-      "length": 187,
-      "hash": "10b171f476d0621e"
+      "length": 185,
+      "hash": "8eacfb597700938c"
     },
     {
-      "length": 181,
-      "hash": "4985f910d49ab71e"
+      "length": 178,
+      "hash": "cfa4e7ac0886c148"
     }
   ],
   "src/features/explorer/desktop/ExplorerCompareDialog.tsx": [
     {
-      "length": 183,
-      "hash": "ed5921fd8191ac6f"
+      "length": 176,
+      "hash": "7f7194965c3d66f6"
     }
   ],
   "src/features/explorer/desktop/ExplorerDesktopDialogStyles.ts": [
     {
-      "length": 167,
-      "hash": "ceffaf919118fdb0"
+      "length": 177,
+      "hash": "0c987fdfe42144b1"
     }
   ],
   "src/features/explorer/desktop/ExplorerDesktopPluginStyles.ts": [
     {
-      "length": 327,
-      "hash": "1835dbae28fce89d"
+      "length": 215,
+      "hash": "0d6076bdd5155271"
     },
     {
-      "length": 197,
-      "hash": "1a9860cbc5b06354"
+      "length": 313,
+      "hash": "9456c2b3e5ef24d2"
     },
     {
       "length": 322,
-      "hash": "21bc6c4773677b9c"
+      "hash": "dbfd1795f077325e"
     },
     {
-      "length": 225,
-      "hash": "27d9d2753b636f8a"
+      "length": 207,
+      "hash": "86d65be9ead7a342"
     },
     {
-      "length": 290,
-      "hash": "3b9840c7074912a4"
+      "length": 192,
+      "hash": "cda4c5d14206bc12"
     },
     {
-      "length": 193,
-      "hash": "61adc7ee1a85432e"
+      "length": 165,
+      "hash": "1977511f1629dfc7"
     },
     {
-      "length": 259,
-      "hash": "77b991331eea1df0"
+      "length": 249,
+      "hash": "b5d044864529f73a"
     },
     {
-      "length": 246,
-      "hash": "7d7313b566040549"
+      "length": 317,
+      "hash": "94dbbc66b9f00e80"
     },
     {
-      "length": 180,
-      "hash": "87f085754e8efe28"
+      "length": 285,
+      "hash": "c529b4ccb7e826b7"
     },
     {
-      "length": 318,
-      "hash": "9fd88133a3def68e"
+      "length": 187,
+      "hash": "2280bac6ece3dc9e"
     },
     {
-      "length": 365,
-      "hash": "bf3275eddd005a6c"
+      "length": 346,
+      "hash": "7339bb7b260d5539"
     },
     {
-      "length": 208,
-      "hash": "d46e23625954d705"
+      "length": 245,
+      "hash": "c8f24a824f3840f4"
     },
     {
-      "length": 233,
-      "hash": "d73055c276d1d242"
+      "length": 188,
+      "hash": "f92f6eb3932b07b9"
     },
     {
-      "length": 204,
-      "hash": "dcbe59e4e30ae7e8"
+      "length": 212,
+      "hash": "80ad36c2114b99c6"
+    },
+    {
+      "length": 245,
+      "hash": "e53f69af37473d31"
     }
   ],
   "src/features/explorer/desktop/ExplorerDesktopStatus.tsx": [
     {
-      "length": 285,
-      "hash": "8aa7509b5d1aa333"
+      "length": 254,
+      "hash": "8e82f1e129bb7caf"
     },
     {
-      "length": 218,
-      "hash": "94b02afcb462aac3"
+      "length": 187,
+      "hash": "57115d7e374e89ba"
     }
   ],
   "src/features/explorer/desktop/ExplorerDuplicateFinderDialog.tsx": [
     {
-      "length": 164,
-      "hash": "033b6028363d4d67"
-    },
-    {
-      "length": 171,
-      "hash": "b54d67d7c1ab43ea"
-    }
-  ],
-  "src/features/explorer/desktop/explorerPlugins/pluginPanelHosts.tsx": [
-    {
-      "length": 170,
-      "hash": "0691b8f81ecb7581"
+      "length": 173,
+      "hash": "be43f7e77e8aecdf"
     }
   ],
   "src/features/explorer/desktop/ExplorerShellStyles.ts": [
     {
-      "length": 222,
-      "hash": "50296bf8ff9b39f8"
+      "length": 161,
+      "hash": "64555a1d3f492d81"
     },
     {
-      "length": 190,
-      "hash": "ee238bb9eb374c87"
+      "length": 168,
+      "hash": "a01f57c9537dfb2c"
     }
   ],
   "src/features/explorer/desktop/ExplorerSmartLibraryDialog.tsx": [
     {
-      "length": 175,
-      "hash": "14edc727a51e276c"
+      "length": 196,
+      "hash": "218f209fa74ac0aa"
+    },
+    {
+      "length": 169,
+      "hash": "e14c04fbf402a87e"
     },
     {
       "length": 197,
       "hash": "2557855985f15a9f"
     },
     {
-      "length": 170,
-      "hash": "2937b47f5a08140c"
+      "length": 214,
+      "hash": "8188dee7f6fe2905"
+    },
+    {
+      "length": 175,
+      "hash": "14edc727a51e276c"
     },
     {
       "length": 344,
       "hash": "4eb6b129628c27e7"
-    },
-    {
-      "length": 203,
-      "hash": "69cccfeb7569bf6d"
-    },
-    {
-      "length": 214,
-      "hash": "8188dee7f6fe2905"
     }
   ],
   "src/features/explorer/desktop/ExplorerSmartLibraryViews.tsx": [
@@ -323,20 +303,64 @@
   ],
   "src/features/journal/components/JournalAttribution.tsx": [
     {
-      "length": 287,
-      "hash": "b0933552af08c522"
+      "length": 307,
+      "hash": "b696271c03ef9587"
+    }
+  ],
+  "src/features/spaces/SpaceLibraryPlayback.tsx": [
+    {
+      "length": 252,
+      "hash": "d2e929a3713d95d5"
+    },
+    {
+      "length": 175,
+      "hash": "6488f154a0db060e"
+    },
+    {
+      "length": 166,
+      "hash": "fb8cd6cd4b308a37"
+    },
+    {
+      "length": 167,
+      "hash": "42c12f99adc9e758"
+    }
+  ],
+  "src/features/spaces/SpaceLibraryViewer.tsx": [
+    {
+      "length": 291,
+      "hash": "03af4067d4776828"
+    }
+  ],
+  "src/features/spaces/SpaceLibraryViewerUtils.tsx": [
+    {
+      "length": 642,
+      "hash": "54a785654ae45689"
+    },
+    {
+      "length": 167,
+      "hash": "3ef5be5894d35e4f"
+    }
+  ],
+  "src/features/spaces/SpaceTaskCalendarGrid.tsx": [
+    {
+      "length": 172,
+      "hash": "47c6597f6ef6c873"
+    },
+    {
+      "length": 180,
+      "hash": "6112a241b5a46bac"
     }
   ],
   "src/features/spaces/chatMessages/MessageHoverActions.tsx": [
     {
-      "length": 262,
-      "hash": "99ca0873a82fcf98"
+      "length": 269,
+      "hash": "97552c91ea127eaf"
     }
   ],
   "src/features/spaces/chatMessages/MessageReplyPreview.tsx": [
     {
-      "length": 220,
-      "hash": "13b9ee0c55460599"
+      "length": 210,
+      "hash": "37ca8065247c9015"
     }
   ],
   "src/features/spaces/components/SpaceLibraryChrome.tsx": [
@@ -345,16 +369,22 @@
       "hash": "27b56d902eebe765"
     }
   ],
+  "src/features/spaces/components/SpaceManagementNavigation.tsx": [
+    {
+      "length": 165,
+      "hash": "c4977d3628e797c7"
+    }
+  ],
   "src/features/spaces/components/SpaceMembers.tsx": [
     {
-      "length": 224,
-      "hash": "be1d1f5ea7a589f6"
+      "length": 232,
+      "hash": "85f8fa0410b314ea"
     }
   ],
   "src/features/spaces/components/SpacesLoadingPlaceholder.tsx": [
     {
-      "length": 178,
-      "hash": "fd5009ea1f81de49"
+      "length": 167,
+      "hash": "bab522c30f72415c"
     }
   ],
   "src/features/spaces/libraryCollections/useLibraryMaintenance.ts": [
@@ -365,64 +395,64 @@
   ],
   "src/features/spaces/libraryPrimitives/LibraryCollectionCard.tsx": [
     {
-      "length": 230,
-      "hash": "0afc573e082ca355"
+      "length": 228,
+      "hash": "1b388d6418022c4a"
     }
   ],
   "src/features/spaces/libraryPrimitives/LibraryDiscoveryCard.tsx": [
     {
-      "length": 224,
-      "hash": "e35a5f2010d458a1"
+      "length": 243,
+      "hash": "9b9fef24deefcdec"
     }
   ],
-  "src/features/spaces/SpaceLibraryPlayback.tsx": [
+  "src/features/spaces/libraryViewer/LibraryViewerStage.tsx": [
     {
-      "length": 163,
-      "hash": "057ef96b93c86af5"
-    },
-    {
-      "length": 165,
-      "hash": "d90960f9ffebca87"
-    },
+      "length": 181,
+      "hash": "8979054a15fb7190"
+    }
+  ],
+  "src/features/spaces/spaceChat/ChatReplyBanner.tsx": [
     {
       "length": 164,
-      "hash": "e13858c4ea219d2c"
-    },
-    {
-      "length": 285,
-      "hash": "f30a25eeee3dae7c"
+      "hash": "07c67054587410af"
     }
   ],
-  "src/features/spaces/SpaceLibraryViewer.tsx": [
+  "src/features/spaces/taskDrawers/TaskDrawerProperties.tsx": [
     {
-      "length": 281,
-      "hash": "733931573f480082"
+      "length": 171,
+      "hash": "bd6f2b6a85059e8b"
     }
   ],
-  "src/features/spaces/SpaceLibraryViewerUtils.tsx": [
+  "src/features/workspace/ChromeTabStrip.tsx": [
     {
-      "length": 167,
-      "hash": "3ef5be5894d35e4f"
+      "length": 161,
+      "hash": "667b2934839f0389"
     },
     {
-      "length": 642,
-      "hash": "54a785654ae45689"
+      "length": 170,
+      "hash": "a1902bf61947a3b8"
     }
   ],
-  "src/features/spaces/SpaceTaskCalendarGrid.tsx": [
+  "src/layouts/DesktopLayout/ActivityFeed.tsx": [
     {
-      "length": 165,
-      "hash": "6ca98a1f5f80fe4e"
+      "length": 161,
+      "hash": "028ad2af95d36358"
+    }
+  ],
+  "src/layouts/DesktopLayout/styles.ts": [
+    {
+      "length": 161,
+      "hash": "b02e0bc0481ad599"
     },
     {
-      "length": 206,
-      "hash": "96c232ebbc2f4ecb"
+      "length": 169,
+      "hash": "33323ac7f5c59123"
     }
   ],
   "src/layouts/RootLayout.tsx": [
     {
-      "length": 351,
-      "hash": "4d314090e61c352d"
+      "length": 308,
+      "hash": "5aab0420a6de0452"
     }
   ],
   "src/pages/Providers/components/RemoteListPanel.tsx": [
@@ -433,288 +463,274 @@
   ],
   "src/pages/Providers/desktop/index.tsx": [
     {
-      "length": 180,
-      "hash": "20e80f8bb3b54372"
+      "length": 198,
+      "hash": "fd2ec3cf22d7eb39"
     }
   ],
   "src/pages/Settings/desktop/index.tsx": [
     {
-      "length": 163,
-      "hash": "39fa9ee7900f7677"
+      "length": 162,
+      "hash": "3d7dcf66ddbb7e89"
+    },
+    {
+      "length": 162,
+      "hash": "216a79dbb34e0bd0"
     },
     {
       "length": 198,
       "hash": "4cd5c39f34abc3e0"
     },
     {
-      "length": 183,
-      "hash": "7d6b81427cebef62"
+      "length": 175,
+      "hash": "e976147355e1cb29"
     },
     {
-      "length": 206,
-      "hash": "85b858ecdb1d81d0"
+      "length": 173,
+      "hash": "a31d88740c6ecdc9"
     },
     {
-      "length": 194,
-      "hash": "ce59e7aa7551d1ab"
-    },
-    {
-      "length": 185,
-      "hash": "e854c9161ac1776d"
+      "length": 184,
+      "hash": "de5f715a25619ef0"
     }
   ],
   "src/pages/SignIn/desktop/index.tsx": [
     {
-      "length": 176,
-      "hash": "3248baf642573f20"
+      "length": 185,
+      "hash": "29926a8b06e56b2e"
     },
     {
-      "length": 183,
-      "hash": "5b888b79edf14485"
+      "length": 195,
+      "hash": "2f0b6b91eb5e48b6"
     }
   ],
   "src/pages/Transfers/desktop/transferStyles.ts": [
     {
-      "length": 175,
-      "hash": "17a270e824fdf596"
+      "length": 172,
+      "hash": "4e25f08e16f5df05"
     },
     {
-      "length": 169,
-      "hash": "3d80b8d56d7cabb9"
-    },
-    {
-      "length": 167,
-      "hash": "4bb6b31c0c4f439b"
+      "length": 179,
+      "hash": "3e336e8feb21850b"
     },
     {
       "length": 181,
-      "hash": "db2b67857c4c58ff"
+      "hash": "6063a08e6b290a9b"
+    },
+    {
+      "length": 169,
+      "hash": "fa6dd583568aa7e4"
+    }
+  ],
+  "src/plugins/ExtensionCatalogIcon.tsx": [
+    {
+      "length": 165,
+      "hash": "f241d940f605b239"
     }
   ],
   "src/ui/alert-dialog.tsx": [
     {
-      "length": 211,
-      "hash": "fa8359c879e023b1"
+      "length": 179,
+      "hash": "57a90c121cb67190"
     }
   ],
   "src/ui/alert.tsx": [
     {
       "length": 318,
       "hash": "99a36f81b1dcd188"
-    },
-    {
-      "length": 165,
-      "hash": "a664cc2ae011421e"
     }
   ],
   "src/ui/avatar.tsx": [
     {
-      "length": 270,
-      "hash": "2f20904254665e6a"
+      "length": 202,
+      "hash": "ea35c9437cb52838"
     },
     {
-      "length": 179,
-      "hash": "cf61b2643d240d4c"
+      "length": 169,
+      "hash": "c9c35b78676c2f0a"
     },
     {
-      "length": 355,
-      "hash": "fa30b34687edc47f"
+      "length": 359,
+      "hash": "b5d6686e3c7cf320"
     }
   ],
   "src/ui/badge.tsx": [
     {
-      "length": 322,
-      "hash": "25c208a32bccccfc"
+      "length": 344,
+      "hash": "c55227b71cc33062"
     }
   ],
   "src/ui/button.tsx": [
     {
-      "length": 177,
-      "hash": "47f771c6714fcd43"
+      "length": 635,
+      "hash": "0c4d96199007caca"
     },
     {
-      "length": 198,
-      "hash": "bfe1086ce0af14c4"
+      "length": 170,
+      "hash": "46fc84894a33e9df"
     },
     {
-      "length": 607,
-      "hash": "d5cf1800e94bf850"
-    },
-    {
-      "length": 219,
-      "hash": "da7676fbe26c9cea"
-    },
-    {
-      "length": 232,
-      "hash": "dc8e7593fd7695af"
-    },
-    {
-      "length": 187,
-      "hash": "e2fe4c12e66712ad"
+      "length": 194,
+      "hash": "f9b1e240d32f08fd"
     }
   ],
   "src/ui/card.tsx": [
     {
-      "length": 257,
-      "hash": "2a97c70f08a14bd4"
+      "length": 285,
+      "hash": "6f80747f55e0d299"
     },
     {
-      "length": 356,
-      "hash": "bb7f0060cc6613ae"
+      "length": 301,
+      "hash": "0fd31895d3e806d9"
     }
   ],
   "src/ui/checkbox.tsx": [
     {
-      "length": 384,
-      "hash": "d4709db1c3685b98"
+      "length": 426,
+      "hash": "168a9cc7daf92dbf"
     }
   ],
   "src/ui/command.tsx": [
     {
-      "length": 223,
-      "hash": "16671e4543111c84"
+      "length": 388,
+      "hash": "df5bb95f1e54869e"
     },
     {
-      "length": 393,
-      "hash": "192909787ceae936"
+      "length": 213,
+      "hash": "1bebac7966783bf3"
     },
     {
-      "length": 320,
-      "hash": "796244045f5b5802"
-    },
-    {
-      "length": 161,
-      "hash": "86839f7907fdf10c"
+      "length": 316,
+      "hash": "101e6de7ba486f2f"
     }
   ],
   "src/ui/context-menu.tsx": [
     {
-      "length": 312,
-      "hash": "599e15f2c9b242a8"
+      "length": 291,
+      "hash": "88d485f81ca29eb3"
     },
     {
-      "length": 570,
-      "hash": "61a1c69509b1a338"
+      "length": 479,
+      "hash": "8b504becf9af070e"
     },
     {
-      "length": 310,
-      "hash": "665c360da06ac0c5"
+      "length": 536,
+      "hash": "3c46bfca85c8f2ad"
     },
     {
-      "length": 310,
-      "hash": "665c360da06ac0c5"
+      "length": 308,
+      "hash": "606852fa6da83289"
     },
     {
-      "length": 649,
-      "hash": "a61f2b3873d975ef"
+      "length": 306,
+      "hash": "dd1c5dc9e8552c35"
     },
     {
-      "length": 299,
-      "hash": "eb897849e77fee50"
+      "length": 306,
+      "hash": "dd1c5dc9e8552c35"
     }
   ],
   "src/ui/dialog.tsx": [
     {
-      "length": 205,
-      "hash": "ab28a86731425b15"
+      "length": 179,
+      "hash": "601db1ecebb28de6"
     },
     {
-      "length": 255,
-      "hash": "e56df5706fb2d7d6"
+      "length": 264,
+      "hash": "68a00f7845be8b17"
     }
   ],
   "src/ui/drag-layer.tsx": [
     {
-      "length": 190,
-      "hash": "7081d1e9cf5c6694"
+      "length": 162,
+      "hash": "1d858e9f0ea727ff"
     }
   ],
   "src/ui/dropdown-menu.tsx": [
     {
-      "length": 1103,
-      "hash": "0823c4aeed059041"
+      "length": 344,
+      "hash": "938ac8a13a38bba6"
     },
     {
-      "length": 353,
-      "hash": "4460484887ad0e44"
+      "length": 957,
+      "hash": "261fe29865ac1709"
     },
     {
-      "length": 353,
-      "hash": "4460484887ad0e44"
+      "length": 1053,
+      "hash": "3ac7e03a740acfeb"
     },
     {
-      "length": 1260,
-      "hash": "6311e164246b295e"
+      "length": 641,
+      "hash": "3a8334542fb1c90e"
     },
     {
-      "length": 364,
-      "hash": "79204e5de3f1d8ea"
+      "length": 337,
+      "hash": "7fa0b7e7ce65792b"
     },
     {
-      "length": 657,
-      "hash": "9d312c6437d8f453"
+      "length": 337,
+      "hash": "7fa0b7e7ce65792b"
     }
   ],
   "src/ui/popover.tsx": [
     {
-      "length": 557,
-      "hash": "81326dff5aa4bea2"
+      "length": 468,
+      "hash": "a9ab7707cefa0acc"
     }
   ],
   "src/ui/radio-group.tsx": [
     {
-      "length": 241,
-      "hash": "d7d1f183821a5848"
+      "length": 278,
+      "hash": "50ba02f7e7e3ffe3"
     }
   ],
   "src/ui/resizable.tsx": [
     {
-      "length": 656,
-      "hash": "11c3304a3f118b37"
+      "length": 676,
+      "hash": "68340d3a904d0f8a"
     }
   ],
   "src/ui/select.tsx": [
     {
-      "length": 271,
-      "hash": "05ab3d09474406e1"
+      "length": 539,
+      "hash": "ba3b6856afe22c60"
     },
     {
-      "length": 643,
-      "hash": "361c299a550b7a0f"
+      "length": 267,
+      "hash": "437ae662e3920950"
     }
   ],
   "src/ui/sheet.tsx": [
     {
-      "length": 257,
-      "hash": "352f7b16578d7766"
+      "length": 179,
+      "hash": "601db1ecebb28de6"
     },
     {
-      "length": 243,
-      "hash": "8d7b8e46c446ed2e"
+      "length": 221,
+      "hash": "6982afcd534a0947"
     },
     {
-      "length": 205,
-      "hash": "ab28a86731425b15"
+      "length": 266,
+      "hash": "8be6d06314d8c0df"
     }
   ],
   "src/ui/tabs.tsx": [
     {
-      "length": 808,
-      "hash": "2a36927a59bd4758"
+      "length": 231,
+      "hash": "b27539ee55cd7744"
     },
     {
-      "length": 236,
-      "hash": "37ee6dab3893b1bf"
+      "length": 811,
+      "hash": "6c785a2f63c803d2"
     },
     {
-      "length": 262,
-      "hash": "f1149f08f3167fdd"
+      "length": 252,
+      "hash": "2cd65f256ce42f1d"
     }
   ],
   "src/ui/toggle-group.tsx": [
     {
-      "length": 202,
-      "hash": "5a0a74f340ed01bb"
+      "length": 174,
+      "hash": "67c111461cb5f1b5"
     }
   ]
 }

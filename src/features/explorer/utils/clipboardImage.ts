@@ -1,5 +1,3 @@
-import type { ClipboardPngImage } from "@/models/interfaces/features/explorer/utils/clipboardImage";
-export type { ClipboardPngImage } from "@/models/interfaces/features/explorer/utils/clipboardImage";
 import { readImage } from "@tauri-apps/plugin-clipboard-manager";
 
 export async function clipboardImagePng(): Promise<ClipboardPngImage | null> {
@@ -20,4 +18,10 @@ export async function clipboardImagePng(): Promise<ClipboardPngImage | null> {
     width: size.width,
     height: size.height,
   };
+}
+
+export interface ClipboardPngImage {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
 }

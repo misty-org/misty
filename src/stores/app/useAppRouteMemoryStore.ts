@@ -1,5 +1,3 @@
-import type { AppRouteMemoryStore } from "@/models/interfaces/stores/app/useAppRouteMemoryStore";
-export type { AppRouteMemoryStore } from "@/models/interfaces/stores/app/useAppRouteMemoryStore";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -125,15 +123,7 @@ function safeSpaceQuery(path: string, section: string): string {
     section === "chat"
       ? new Set(["conversation", "message"])
       : section === "planner"
-        ? new Set([
-            "q",
-            "status",
-            "assignee",
-            "priority",
-            "due",
-            "mine",
-            "sort",
-          ])
+        ? new Set(["q", "status", "assignee", "priority", "due", "mine", "sort"])
         : section === "library"
           ? new Set(["collection"])
           : section === "notes"
@@ -151,4 +141,11 @@ function pathnameFromRoute(path: string): string {
   const end =
     [queryIndex, hashIndex].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? path.length;
   return path.slice(0, end);
+}
+
+export interface AppRouteMemoryStore {
+  lastAppRoute: string;
+  lastSpacesRoute: string;
+  rememberAppRoute: (path: string) => void;
+  resetAppRoute: () => void;
 }

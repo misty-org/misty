@@ -9,7 +9,7 @@ import {
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { BackToCollections } from "./LibraryNothingHere";
 
-const backLinkClass = "border-0 bg-transparent p-0 text-xs text-muted-foreground";
+const backLinkClass = "border-0 bg-transparent p-0 text-xs text-cream-muted";
 
 const dateGroupLabel = (collection: string) =>
   collection === "recent-days" ? "Recent Days" : collection === "months" ? "Months" : "Years";
@@ -36,7 +36,7 @@ export function LibraryCollectionHeader() {
           ← {dateGroupLabel(collection)}
         </Button>
         <h4 className="mb-0 mt-2 text-sm">{currentDateGroup.title}</h4>
-        <p className="mb-0 mt-1 text-xs text-muted-foreground">{currentDateGroup.subtitle}</p>
+        <p className="mb-0 mt-1 text-xs text-cream-muted">{currentDateGroup.subtitle}</p>
       </div>
     );
 
@@ -56,7 +56,7 @@ export function LibraryCollectionHeader() {
           </Button>
           <h4 className="mb-0 mt-2 text-sm">{currentAlbum.name}</h4>
           {currentAlbum.description ? (
-            <p className="mb-0 mt-1 text-xs text-muted-foreground">{currentAlbum.description}</p>
+            <p className="mb-0 mt-1 text-xs text-cream-muted">{currentAlbum.description}</p>
           ) : null}
         </div>
         {canEditLibrary ? (
@@ -72,7 +72,7 @@ export function LibraryCollectionHeader() {
                 Edit album
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-cream-bright focus:text-cream-bright"
                 onSelect={() => void collectionActions.deleteCurrentAlbum()}
               >
                 <Trash2 size={13} />
@@ -99,9 +99,7 @@ export function LibraryCollectionHeader() {
             ← {isDuplicate ? "Duplicates" : "Collections"}
           </Button>
           <h4 className="mb-0 mt-2 text-sm">{currentDiscoveryGroup.title}</h4>
-          <p className="mb-0 mt-1 text-xs text-muted-foreground">
-            {currentDiscoveryGroup.subtitle}
-          </p>
+          <p className="mb-0 mt-1 text-xs text-cream-muted">{currentDiscoveryGroup.subtitle}</p>
         </div>
         <div className="flex gap-2">
           {currentDiscoveryGroup.kind === "memory" && visibleItems.length > 0 ? (

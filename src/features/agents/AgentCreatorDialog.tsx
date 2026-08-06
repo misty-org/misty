@@ -231,12 +231,15 @@ export function AgentCreatorDialog({
             {steps.map((label, index) => (
               <li key={label} className="min-w-0">
                 <div
-                  className={cn("mb-1 h-1 rounded-full", index <= step ? "bg-primary" : "bg-muted")}
+                  className={cn(
+                    "mb-1 h-1 rounded-full",
+                    index <= step ? "bg-charcoal-active" : "bg-charcoal-card",
+                  )}
                 />
                 <span
                   className={cn(
                     "truncate text-xs",
-                    index === step ? "font-medium text-foreground" : "text-muted-foreground",
+                    index === step ? "font-medium text-cream" : "text-cream-muted",
                   )}
                 >
                   {index + 1}. {label}
@@ -304,7 +307,7 @@ export function AgentCreatorDialog({
                   {actions.map((action, index) => (
                     <Label
                       key={action.name}
-                      className="flex items-start gap-3 rounded-lg p-2 font-normal hover:bg-muted/50"
+                      className="flex items-start gap-3 rounded-lg p-2 font-normal hover:bg-charcoal-card"
                     >
                       <Checkbox
                         checked={action.granted}
@@ -325,7 +328,7 @@ export function AgentCreatorDialog({
                               : action.approval.replace("_", " ")}
                           </Badge>
                         </span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                        <span className="mt-0.5 block text-xs text-cream-muted">
                           {action.description}
                         </span>
                       </span>
@@ -337,7 +340,7 @@ export function AgentCreatorDialog({
 
             {step === 3 ? (
               <>
-                <div className="rounded-xl border bg-muted/25 p-4">
+                <div className="rounded-xl border bg-charcoal-card p-4">
                   <div className="flex items-center gap-3">
                     <AgentAvatar
                       name={name || "Agent"}
@@ -346,10 +349,10 @@ export function AgentCreatorDialog({
                     />
                     <div>
                       <p className="font-medium">{name || "Unnamed Agent"}</p>
-                      <p className="text-sm text-muted-foreground">{role || "No role yet"}</p>
+                      <p className="text-sm text-cream-muted">{role || "No role yet"}</p>
                     </div>
                   </div>
-                  <p className="mb-0 mt-3 text-sm text-muted-foreground">{purpose}</p>
+                  <p className="mb-0 mt-3 text-sm text-cream-muted">{purpose}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge variant="secondary" className="capitalize">
                       {personality}
@@ -370,7 +373,10 @@ export function AgentCreatorDialog({
                   {eligibleSpaces.map((space) => {
                     const selected = Object.prototype.hasOwnProperty.call(spaceRoles, space.id);
                     return (
-                      <div key={space.id} className="grid gap-2 rounded-lg p-2 hover:bg-muted/40">
+                      <div
+                        key={space.id}
+                        className="grid gap-2 rounded-lg p-2 hover:bg-charcoal-card"
+                      >
                         <Label className="flex items-center gap-2 font-normal">
                           <Checkbox
                             checked={selected}
@@ -408,7 +414,7 @@ export function AgentCreatorDialog({
                               }
                             />
                             <div className="ml-6 grid gap-1">
-                              <Label className="text-xs text-muted-foreground">
+                              <Label className="text-xs text-cream-muted">
                                 Who can work with this Agent?
                               </Label>
                               <Select
@@ -437,7 +443,7 @@ export function AgentCreatorDialog({
                     );
                   })}
                   {eligibleSpaces.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-cream-muted">
                       You can create this Agent privately now and add it to a Space later.
                     </p>
                   ) : null}
@@ -445,7 +451,7 @@ export function AgentCreatorDialog({
               </>
             ) : null}
             {error ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-cream-bright">
                 {error}
               </p>
             ) : null}

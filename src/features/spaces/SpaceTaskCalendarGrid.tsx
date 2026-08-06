@@ -33,7 +33,7 @@ export function SpaceTaskCalendar({
 
   return (
     <Card className="min-w-[720px] gap-0 overflow-hidden py-0">
-      <header className="flex min-h-12 items-center justify-between border-b border-border/60 px-3">
+      <header className="flex min-h-12 items-center justify-between border-b border-charcoal-border/60 px-3">
         <Button
           size="icon"
           variant="ghost"
@@ -44,7 +44,7 @@ export function SpaceTaskCalendar({
           <ChevronLeft className="size-4" />
         </Button>
         <div className="flex items-center gap-2">
-          <CalendarDays className="size-4 text-muted-foreground" />
+          <CalendarDays className="size-4 text-cream-muted" />
           <strong className="text-sm">
             {month.toLocaleDateString([], { month: "long", year: "numeric" })}
           </strong>
@@ -60,10 +60,10 @@ export function SpaceTaskCalendar({
         </Button>
       </header>
 
-      <div className="grid grid-cols-7 border-b border-border/60 bg-muted/40">
+      <div className="grid grid-cols-7 border-b border-charcoal-border/60 bg-charcoal-card">
         {weekDays.map((day) => (
           <span
-            className="p-2 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+            className="p-2 text-center text-[10px] font-medium uppercase tracking-wide text-cream-muted"
             key={day}
           >
             {day}
@@ -83,18 +83,18 @@ export function SpaceTaskCalendar({
 
           return (
             <div
-              className={`min-h-28 border-b border-r border-border/60 p-1.5 last:border-r-0 ${inMonth ? "bg-card" : "bg-muted/25 text-muted-foreground"}`}
+              className={`min-h-28 border-b border-r border-charcoal-border/60 p-1.5 last:border-r-0 ${inMonth ? "bg-charcoal-card" : "bg-charcoal-card text-cream-muted"}`}
               key={day.toISOString()}
             >
               <span
-                className={`grid size-6 place-items-center rounded-full text-[10px] ${today ? "bg-primary font-semibold text-primary-foreground" : ""}`}
+                className={`grid size-6 place-items-center rounded-full text-[10px] ${today ? "bg-charcoal-active font-semibold text-cream-bright" : ""}`}
               >
                 {day.getDate()}
               </span>
               <div className="mt-1 grid gap-1">
                 {dayEvents.slice(0, 3).map((event) => (
                   <Button
-                    className="h-6 justify-start truncate rounded-md bg-sky-500/10 px-1.5 text-[10px] font-normal text-sky-700 hover:bg-sky-500/20 dark:text-sky-300"
+                    className="h-6 justify-start truncate rounded-md bg-sage-bg px-1.5 text-[10px] font-normal text-sage-fg hover:bg-sage-bg text-sage-fg"
                     variant="ghost"
                     type="button"
                     key={event.id}
@@ -109,7 +109,7 @@ export function SpaceTaskCalendar({
                 ))}
                 {dayTasks.slice(0, 3).map((task) => (
                   <Button
-                    className="h-6 justify-start truncate rounded-md border-l-2 border-violet-500 bg-violet-500/10 px-1.5 text-[10px] font-normal text-violet-700 hover:bg-violet-500/20 dark:text-violet-300"
+                    className="h-6 justify-start truncate rounded-md border-l-2 border-sage-fg bg-sage-bg px-1.5 text-[10px] font-normal text-sage-fg hover:bg-sage-bg text-sage-fg"
                     variant="ghost"
                     title={`${task.task_key} · ${taskAssigneeName(members, agents, task)}`}
                     type="button"

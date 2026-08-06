@@ -1,4 +1,7 @@
-import type { SplitOrientation, MultiPanelPaneRestoreMode } from "@/models/types/workspace/types";
+import type {
+  SplitOrientation,
+  MultiPanelPaneRestoreMode,
+} from "@/features/workspace/useMultiPanelStore";
 
 export interface MultiPanelPane {
   id: string;

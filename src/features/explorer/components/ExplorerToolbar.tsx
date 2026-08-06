@@ -194,7 +194,7 @@ export const ExplorerToolbar = memo(function ExplorerToolbar(props: ExplorerTool
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" sideOffset={6} className="w-52">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
+              <DropdownMenuLabel className="text-xs text-cream-muted">
                 Create in this folder
               </DropdownMenuLabel>
               <DropdownMenuItem disabled={!props.canCreateFolder} onSelect={props.onCreateFolder}>

@@ -78,7 +78,7 @@ export function GoogleCalendarConnectionPanel({
         </div>
         {loading ? (
           <LoaderCircle
-            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            className="size-4 shrink-0 animate-spin text-cream-muted"
             aria-label="Checking Google Calendar"
           />
         ) : availability?.configured === false ? (
@@ -107,7 +107,7 @@ export function GoogleCalendarConnectionPanel({
       </CardHeader>
       {error ? (
         <CardContent>
-          <p className="m-0 text-xs text-destructive" role="alert">
+          <p className="m-0 text-xs text-cream-bright" role="alert">
             {error}
           </p>
         </CardContent>

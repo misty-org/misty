@@ -91,11 +91,10 @@ export function useSpaceChatScope(options: {
     agents: conversationId
       ? (store.agentsBySpace[spaceId] ?? emptyAgents).filter((agent) =>
           activeConversation?.participants.some(
-            (participant) =>
-              participant.kind === "agent" && participant.agent_id === agent.id,
+            (participant) => participant.kind === "agent" && participant.agent_id === agent.id,
           ),
         )
-      : store.agentsBySpace[spaceId] ?? emptyAgents,
+      : (store.agentsBySpace[spaceId] ?? emptyAgents),
     members: conversationId
       ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
       : allMembers,

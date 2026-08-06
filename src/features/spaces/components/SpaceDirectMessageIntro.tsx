@@ -30,13 +30,13 @@ export function SpaceDirectMessageIntro({
           {initials(recipient.name)}
         </AvatarFallback>
       </Avatar>
-      <h2 className="mt-4 text-[28px] font-bold leading-tight tracking-tight text-foreground">
+      <h2 className="mt-4 text-[28px] font-bold leading-tight tracking-tight text-cream">
         {recipient.name}
       </h2>
-      <p className="mt-0.5 text-lg font-semibold text-muted-foreground">{recipient.name}</p>
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className="mt-0.5 text-lg font-semibold text-cream-muted">{recipient.name}</p>
+      <p className="mt-3 text-sm text-cream-muted">
         This is the beginning of your direct message history with{" "}
-        <strong className="font-semibold text-foreground">{recipient.name}</strong>.
+        <strong className="font-semibold text-cream">{recipient.name}</strong>.
       </p>
     </div>
   );

@@ -1,5 +1,3 @@
-import type { DemoAccount } from "@/models/types/features/auth/demoSessionBootstrap";
-export type { DemoAccount } from "@/models/types/features/auth/demoSessionBootstrap";
 import { saveAccountAuthToken } from "@/stores/account/useAuthTokenStore";
 import type { SavedAccountSession } from "@/models/interfaces/stores/account/useAuthTokenStore";
 
@@ -51,3 +49,5 @@ export function parseDemoAccount(rawAccount: string): DemoAccount {
   }
   return account;
 }
+
+export type DemoAccount = Omit<SavedAccountSession, "lastUsedAt">;

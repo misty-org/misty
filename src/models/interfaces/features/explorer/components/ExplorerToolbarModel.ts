@@ -7,7 +7,7 @@ import type {
 } from "@/stores/explorer";
 import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
 
-import type { ExplorerCommandId } from "@/models/types/features/explorer/components/ExplorerToolbarModel";
+import type { ExplorerCommandId } from "@/features/explorer/components/ExplorerToolbarModel";
 
 export interface ExplorerLocationResult {
   id: string;

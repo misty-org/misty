@@ -19,7 +19,7 @@ export function MessageEditForm({
 }) {
   return (
     <form
-      className="mt-1 rounded-lg bg-muted/35 p-2"
+      className="mt-1 rounded-lg bg-charcoal-card p-2"
       onSubmit={(event) => onSubmit(event, message)}
     >
       <Textarea

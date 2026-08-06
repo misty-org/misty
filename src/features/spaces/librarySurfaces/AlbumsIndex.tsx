@@ -18,7 +18,7 @@ export function AlbumsIndex() {
         <div className="flex items-center gap-2">
           {currentAlbumFolder ? (
             <Button
-              className="border-0 bg-transparent p-0 text-xs text-muted-foreground"
+              className="border-0 bg-transparent p-0 text-xs text-cream-muted"
               type="button"
               onClick={() =>
                 data.setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")
@@ -85,7 +85,7 @@ export function AlbumsIndex() {
           >
             <Folder className="size-[26px]" />
             <span className="mt-5 block truncate text-xs font-medium">{folder.name}</span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
+            <span className="mt-1 block text-[10px] text-cream-muted">
               {folder.album_count + folder.folder_count} items
             </span>
           </Button>
@@ -100,7 +100,7 @@ export function AlbumsIndex() {
             <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
             <span className="block p-3">
               <span className="block truncate text-xs font-medium">{album.name}</span>
-              <span className="mt-1 block text-[10px] text-muted-foreground">
+              <span className="mt-1 block text-[10px] text-cream-muted">
                 {album.item_count} items
               </span>
             </span>

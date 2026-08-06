@@ -1,8 +1,4 @@
-import type {
-  NoteContentDraft,
-  NoteReadingPaneProps,
-} from "@/models/interfaces/features/notes/components/NoteReadingPane";
-export type { NoteReadingPaneProps } from "@/models/interfaces/features/notes/components/NoteReadingPane";
+import type { NoteBodyFormat, UnifiedNote } from "@/models/types/features/notes/types";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Check, PenLine, Star, Trash2, X } from "lucide-react";
 import {
@@ -25,9 +21,9 @@ import { NoteSyncIndicator } from "./NoteSourceBadge";
 
 const NoteBlockEditor = lazy(() => import("./NoteBlockEditor"));
 
-const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background";
+const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 
-const headerClass = "shrink-0 border-b border-border px-5 py-3.5";
+const headerClass = "shrink-0 border-b border-charcoal-border px-5 py-3.5";
 
 const noteBodyClass = "w-full px-[clamp(24px,4vw,56px)] py-6";
 
@@ -83,10 +79,10 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
       <header className={headerClass}>
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[17px] font-semibold leading-tight text-foreground">
+            <h1 className="truncate text-[17px] font-semibold leading-tight text-cream">
               {note.title}
             </h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-cream-muted">
               <span>{note.spaceName}</span>
               <span aria-hidden="true">·</span>
               <span>Updated {relativeTime(note.updatedAt)}</span>
@@ -104,7 +100,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                 className="size-8"
                 onClick={() => props.onToggleFavorite?.(note.id)}
               >
-                <Star size={14} className={cn(note.favorite && "fill-amber-500 text-amber-500")} />
+                <Star size={14} className={cn(note.favorite && "fill-sage-fg text-sage-fg")} />
               </Button>
             ) : null}
 
@@ -121,7 +117,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-8 text-muted-foreground hover:text-destructive"
+                    className="size-8 text-cream-muted hover:text-cream-bright"
                     title="Delete note"
                     aria-label="Delete note"
                   >
@@ -135,7 +131,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                       “{note.title}” and its collaborative history will be permanently removed.
                     </AlertDialogDescription>
                     {deleteError ? (
-                      <p className="m-0 text-sm text-destructive" role="alert">
+                      <p className="m-0 text-sm text-cream-bright" role="alert">
                         {deleteError}
                       </p>
                     ) : null}
@@ -143,7 +139,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                   <AlertDialogFooter>
                     <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                       disabled={deleting}
                       onClick={(event) => {
                         event.preventDefault();
@@ -298,4 +294,30 @@ function ReadingPaneSkeleton() {
       </div>
     </div>
   );
+}
+
+export interface NoteContentDraft {
+  body: string;
+  bodyFormat: NoteBodyFormat;
+  bodyMarkdown?: string;
+}
+
+export interface NoteReadingPaneProps {
+  note?: UnifiedNote;
+  hasNotes?: boolean;
+  accountId?: string;
+  loading: boolean;
+  editingNoteId?: string;
+  referenceOnly?: boolean;
+  onEditingNoteChange?: (noteId: string | undefined) => void;
+  /** Undefined for read-only sources; presence enables the Edit affordance. */
+  onSaveBody?: (noteId: string, body: string) => void;
+  onSaveContent?: (noteId: string, content: NoteContentDraft) => void;
+  onDelete?: (noteId: string) => Promise<void>;
+  onToggleFavorite?: (noteId: string) => void;
+  onNewNote: () => void;
+}
+
+export interface NoteConflictNoticeProps {
+  note: UnifiedNote;
 }

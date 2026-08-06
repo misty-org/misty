@@ -33,17 +33,17 @@ export function PendingInvitationsCard({
 
   return (
     <Card className="mt-4 overflow-hidden" aria-label="Pending invitations">
-      <div className="border-b border-border/60 px-4 py-3">
+      <div className="border-b border-charcoal-border/60 px-4 py-3">
         <h3 className="m-0 text-sm font-medium">Pending invitations</h3>
       </div>
       {invitations.map((invitation) => (
         <div
-          className="flex min-h-14 items-center gap-3 border-b border-border/60 px-4 py-3 last:border-0"
+          className="flex min-h-14 items-center gap-3 border-b border-charcoal-border/60 px-4 py-3 last:border-0"
           key={invitation.id}
         >
           <div className="min-w-0 flex-1">
             <p className="m-0 truncate text-sm">{invitation.invited_email}</p>
-            <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+            <p className="mb-0 mt-0.5 text-xs text-cream-muted">
               {deliveryLabel(invitation.delivery_status)}
             </p>
           </div>

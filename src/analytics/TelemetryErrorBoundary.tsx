@@ -16,7 +16,7 @@ export class TelemetryErrorBoundary extends Component<
     return this.state.failed ? (
       <main
         role="alert"
-        className="grid min-h-dvh place-items-center bg-background p-8 text-foreground"
+        className="grid min-h-dvh place-items-center bg-charcoal-bg p-8 text-cream"
       >
         Misty encountered an unexpected error. Please restart the app.
       </main>

@@ -1,13 +1,3 @@
-import type {
-  ServerTrustedDevice,
-  ServerDeviceList,
-  StoredDeviceIdentity,
-} from "@/models/interfaces/stores/agents/useAgentDeviceStore";
-export type {
-  ServerTrustedDevice,
-  ServerDeviceList,
-  StoredDeviceIdentity,
-} from "@/models/interfaces/stores/agents/useAgentDeviceStore";
 import { managedAiRequest, ManagedAiRequestError } from "@/stores/agent/useAiServerStore";
 import type { AgentDevice } from "@/models/interfaces/features/agents/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -227,4 +217,20 @@ function removeStorage(key: string): void {
   } catch {
     /* no-op */
   }
+}
+
+export interface ServerTrustedDevice {
+  id: string;
+  name: string;
+  publicKey?: string;
+  revokedAt?: string | null;
+}
+
+export interface ServerDeviceList {
+  devices: ServerTrustedDevice[];
+}
+
+export interface StoredDeviceIdentity {
+  publicKey: string;
+  privateKey: string;
 }

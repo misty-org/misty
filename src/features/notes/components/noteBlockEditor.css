@@ -1,27 +1,14 @@
 .misty-note-block-editor {
   position: relative;
   min-height: 0;
-  color: var(--foreground);
-  --bn-font-family: var(--misty-font-family);
-  --bn-border-radius: 8px;
-  --bn-colors-editor-text: var(--foreground);
-  --bn-colors-editor-background: transparent;
-  --bn-colors-menu-text: var(--popover-foreground);
-  --bn-colors-menu-background: var(--popover);
-  --bn-colors-tooltip-text: var(--popover-foreground);
-  --bn-colors-tooltip-background: var(--popover);
-  --bn-colors-hovered-text: var(--foreground);
-  --bn-colors-hovered-background: color-mix(in srgb, var(--muted) 82%, transparent);
-  --bn-colors-selected-text: var(--primary-foreground);
-  --bn-colors-selected-background: var(--primary);
-  --bn-colors-disabled-text: var(--muted-foreground);
-  --bn-colors-disabled-background: color-mix(in srgb, var(--muted) 48%, transparent);
-  --bn-colors-shadow: color-mix(in srgb, black 34%, transparent);
-  --bn-colors-border: var(--border);
-  --bn-colors-side-menu: var(--muted-foreground);
-  --bn-border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  --bn-shadow-medium: 0 14px 40px color-mix(in srgb, black 32%, transparent);
-  --bn-shadow-light: 0 8px 22px color-mix(in srgb, black 18%, transparent);
+  color: #e6e1da;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
 .misty-note-block-editor .misty-note-block-drop-gutter {
@@ -35,16 +22,16 @@
   -webkit-app-region: no-drag;
 }
 
-.misty-note-block-editor .bn-container {
+.misty-note-block-editor .bn-container,
+.misty-note-block-editor .bn-editor {
   margin: 0;
-  background: transparent;
+  background: transparent !important;
+  color: #e6e1da !important;
 }
 
 .misty-note-block-editor .bn-editor {
   min-height: 420px;
   padding: 0;
-  background: transparent;
-  color: var(--foreground);
   font-size: 14px;
   line-height: 1.65;
 }
@@ -54,10 +41,11 @@
 }
 
 .misty-note-block-editor .bn-side-menu {
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 2px;
-  z-index: 20;
+  color: #948d84;
 }
 
 .misty-note-block-editor
@@ -85,8 +73,7 @@
   left: 0;
   height: 3px;
   border-radius: 999px;
-  background: var(--info);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--info) 24%, transparent);
+  background: #a3bfab;
   content: "";
   pointer-events: none;
 }
@@ -100,17 +87,14 @@
 }
 
 .misty-note-block-editor .bn-block-outer.misty-note-block-is-dragging {
-  border-radius: var(--bn-border-radius, 4px);
-  background-color: color-mix(in srgb, var(--info) 18%, transparent) !important;
-  box-shadow:
-    -48px 0 0 color-mix(in srgb, var(--info) 18%, transparent),
-    inset 3px 0 0 var(--info),
-    0 0 0 2px color-mix(in srgb, var(--info) 58%, transparent) !important;
+  border-radius: 4px;
+  background-color: #28312b !important;
+  box-shadow: inset 3px 0 0 #a3bfab !important;
   opacity: 0.72;
 }
 
 .misty-note-block-editor .bn-block-content.misty-note-block-is-dragging {
-  border-radius: var(--bn-border-radius, 4px);
+  border-radius: 4px;
   background-color: transparent !important;
 }
 
@@ -131,8 +115,8 @@
 
 .misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre,
 .misty-note-block-editor .bn-editor code {
-  border-color: var(--misty-code-border);
-  background: var(--misty-code-bg);
+  border-color: #292624;
+  background: #100f0e;
 }
 
 .misty-note-block-editor .bn-editor [data-content-type="codeBlock"] pre {
@@ -148,7 +132,7 @@
 }
 
 .misty-note-block-editor .bn-editor a {
-  color: var(--primary);
+  color: #a3bfab;
   text-underline-offset: 2px;
 }
 
@@ -156,7 +140,10 @@
 .misty-note-block-editor .bn-formatting-toolbar,
 .misty-note-block-editor .bn-file-panel,
 .misty-note-block-editor .bn-link-toolbar {
-  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid #292624 !important;
+  background: #1a1918 !important;
+  color: #e6e1da !important;
+  box-shadow: none !important;
 }
 
 .misty-note-block-editor,

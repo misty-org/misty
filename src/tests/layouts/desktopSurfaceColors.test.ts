@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { sidebarStyles } from "@/features/explorer/components/ExplorerSidebarSupport";
-import { opacityAwareColor } from "@/layouts/DesktopLayout/useDesktopFrameStyle";
 import {
   desktopTitlebarClass,
   desktopWallpaperLayerClass,
@@ -12,32 +11,14 @@ import {
   navLinkBaseClass,
 } from "@/layouts/DesktopLayout/styles";
 
-describe("desktop surface colors", () => {
-  it("keeps theme tokens opaque when no wallpaper is active", () => {
-    expect(opacityAwareColor("var(--misty-surface)", 0.42, false)).toBe("var(--misty-surface)");
-  });
-
-  it("turns theme tokens into opacity-aware colors over a wallpaper", () => {
-    expect(opacityAwareColor("var(--misty-surface)", 0.82, true)).toBe(
-      "color-mix(in srgb, var(--misty-surface) 82%, transparent)",
-    );
-  });
-
-  it("clamps persisted opacity values to the valid CSS range", () => {
-    expect(opacityAwareColor("var(--misty-bg)", -1, true)).toContain(" 0%");
-    expect(opacityAwareColor("var(--misty-bg)", 2, true)).toContain(" 100%");
-  });
-
-  it("lets the custom titlebar reveal the app background", () => {
-    expect(desktopTitlebarClass).toContain("misty-app-titlebar-bg");
-    expect(desktopTitlebarClass).not.toContain("bg-transparent");
-    expect(desktopWallpaperLayerClass).toContain("absolute");
-    expect(desktopWallpaperLayerClass).toContain("row-span-full");
-  });
-
-  it("does not stack an opaque fallback beneath the Files sidebar", () => {
-    expect(sidebarStyles.root).toContain("misty-files-panel-bg,transparent");
-    expect(sidebarStyles.root).not.toContain("misty-files-panel-bg,var(--sidebar)");
+describe("desktop warm charcoal surfaces", () => {
+  it("uses opaque workspace and sidebar surfaces", () => {
+    expect(desktopTitlebarClass).toContain("bg-charcoal-workspace");
+    expect(desktopTitlebarClass).toContain("border-charcoal-border");
+    expect(desktopTitlebarClass).not.toContain("var(");
+    expect(desktopWallpaperLayerClass).toBe("hidden");
+    expect(sidebarStyles.root).toContain("bg-charcoal-sidebar");
+    expect(sidebarStyles.root).not.toContain("transparent");
   });
 
   it("scrolls overflowing primary navigation without moving its bottom controls", () => {
@@ -46,19 +27,18 @@ describe("desktop surface colors", () => {
     expect(navbarGroupClass).toContain("overflow-y-auto");
     expect(navbarGroupClass).toContain("[scrollbar-width:none]");
     expect(navbarGroupClass).toContain("[&::-webkit-scrollbar]:hidden");
-    expect(navbarGroupClass).not.toContain("py-1");
     expect(navbarBottomClass).toContain("shrink-0");
   });
 
-  it("anchors the navigation state marker to the left edge of the rail", () => {
-    expect(navLinkBaseClass).toContain("w-full");
-    expect(navLinkBaseClass).toContain("misty-hover-marker-side");
-    expect(navLinkBaseClass).toContain("misty-navbar-marker-side");
-    expect(navLinkActiveClass).toContain("misty-active-marker-side");
-  });
-
-  it("keeps action buttons in the navbar free of navigation markers", () => {
-    expect(navItemBaseClass).not.toContain("misty-hover-marker-side");
-    expect(navButtonActiveClass).not.toContain("misty-active-marker-side");
+  // Selection is an edge marker and hover only brightens: no interactive
+  // surface in the navbar grows a background of its own.
+  it("marks the active destination with an edge line rather than a filled tile", () => {
+    expect(navLinkBaseClass).toContain("rounded-lg");
+    expect(navLinkBaseClass).toContain("text-cream-muted");
+    expect(navLinkActiveClass).toContain("misty-navbar-marker-side");
+    expect(navLinkActiveClass).toContain("text-cream-bright");
+    expect(navButtonActiveClass).toContain("misty-navbar-marker-side");
+    expect(navLinkActiveClass).not.toContain("bg-charcoal-active");
+    expect(navItemBaseClass).not.toContain("hover:bg-");
   });
 });

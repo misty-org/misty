@@ -23,7 +23,7 @@ import type {
 } from "@/models/interfaces/features/spaces/types";
 import { buildMessageSpans, mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
 
-import type { ActivityTab } from "@/models/types/stores/spaces/useSpacesStore";
+import type { ActivityTab } from "@/stores/spaces/useSpacesStore";
 
 export interface SpacesStore {
   spaces: Space[];

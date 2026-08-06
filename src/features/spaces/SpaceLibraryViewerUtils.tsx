@@ -12,8 +12,8 @@ import { formatBytes } from "./libraryFormat";
 export function LibraryMetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[10px] capitalize text-muted-foreground">{label}</dt>
-      <dd className="m-0 mt-1 break-words text-muted-foreground">{value || "—"}</dd>
+      <dt className="text-[10px] capitalize text-cream-muted">{label}</dt>
+      <dd className="m-0 mt-1 break-words text-cream-muted">{value || "—"}</dd>
     </div>
   );
 }
@@ -33,7 +33,7 @@ export function LibraryEditRange({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="mt-4 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[10px] font-medium capitalize text-muted-foreground">
+    <label className="mt-4 grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[10px] font-medium capitalize text-cream-muted">
       <span>{label}</span>
       <span>{value.toFixed(2)}</span>
       <Slider
@@ -58,10 +58,10 @@ export function LibraryAdvancedAdjustments({
   const update = (key: keyof LibraryEditDefinition, value: number) =>
     onChange((current) => ({ ...current, [key]: value }));
   return (
-    <Collapsible className="mt-4 rounded-xl bg-muted/35 px-3 py-2">
+    <Collapsible className="mt-4 rounded-xl bg-charcoal-card px-3 py-2">
       <CollapsibleTrigger asChild>
         <Button
-          className="group h-7 w-full justify-between px-0 text-[10px] text-muted-foreground"
+          className="group h-7 w-full justify-between px-0 text-[10px] text-cream-muted"
           size="sm"
           variant="ghost"
         >

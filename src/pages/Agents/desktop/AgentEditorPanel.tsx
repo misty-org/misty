@@ -33,7 +33,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
 
   return (
     <section className="flex min-h-0 flex-col" aria-label="Agent preferences">
-      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
+      <header className="flex h-11 shrink-0 items-center gap-2 border-b border-charcoal-border px-4">
         <h1 className="m-0 min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight">
           {isNew ? "Create Agent" : editor.name || "Agent"}
         </h1>
@@ -42,7 +42,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
             type="button"
             size="icon"
             variant="ghost"
-            className="size-8 text-muted-foreground hover:text-destructive"
+            className="size-8 text-cream-muted hover:text-cream-bright"
             aria-label={`Delete ${editor.name || "Agent"}`}
             onClick={() => void editor.deleteAgent(editor.editingAgentId)}
           >
@@ -64,7 +64,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
 
       <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-2xl gap-4 px-6 py-5">
-          <p className="m-0 text-sm text-muted-foreground">
+          <p className="m-0 text-sm text-cream-muted">
             Configure the reusable identity and choose the Spaces where this Agent is a member.
           </p>
           <Field label="Name">
@@ -93,7 +93,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
               models={editor.models}
               value={editor.modelId}
               onValueChange={editor.setModelId}
-              className="w-full border border-input bg-background"
+              className="w-full border border-charcoal-border bg-charcoal-bg"
             />
           </Field>
           <Field label="Reasoning effort">
@@ -102,7 +102,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
               onValueChange={(value) => editor.setReasoningEffort(value as ReasoningEffort)}
               disabled={!editor.supportsReasoning}
             >
-              <SelectTrigger className="w-full border border-input bg-background">
+              <SelectTrigger className="w-full border border-charcoal-border bg-charcoal-bg">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -111,13 +111,13 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
                 <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-cream-muted">
               {editor.supportsReasoning
                 ? "Higher effort means deeper reasoning and slower, costlier replies."
                 : "This model doesn't support adjustable reasoning. Pick a reasoning model to enable it."}
             </span>
           </Field>
-          <fieldset className="grid gap-2 rounded-lg border border-border p-3">
+          <fieldset className="grid gap-2 rounded-lg border border-charcoal-border p-3">
             <legend className="px-1 text-sm font-medium">Readable Space context</legend>
             {Object.entries(CONTEXT_LABELS).map(([key, label]) => (
               <Label className="flex items-center gap-2 font-normal" key={key}>
@@ -140,7 +140,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
             loaded={editor.toolbox.loaded}
             onActionsChange={editor.toolbox.setActions}
           />
-          <fieldset className="grid gap-3 rounded-lg border border-border p-3">
+          <fieldset className="grid gap-3 rounded-lg border border-charcoal-border p-3">
             <legend className="px-1 text-sm font-medium">Share in Spaces</legend>
             {spaces.map((space) => {
               const grant = editor.grants[space.id] ?? {
@@ -163,7 +163,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
                     {space.name}
                   </Label>
                   {grant.enabled ? (
-                    <p className="mb-0 ml-6 mt-0 text-xs text-muted-foreground">
+                    <p className="mb-0 ml-6 mt-0 text-xs text-cream-muted">
                       Visible to everyone in this Space. Invocation is controlled by each
                       member&apos;s Agents permission.
                     </p>
@@ -172,7 +172,7 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
               );
             })}
           </fieldset>
-          {editor.error ? <p className="m-0 text-sm text-destructive">{editor.error}</p> : null}
+          {editor.error ? <p className="m-0 text-sm text-cream-bright">{editor.error}</p> : null}
         </div>
       </div>
     </section>

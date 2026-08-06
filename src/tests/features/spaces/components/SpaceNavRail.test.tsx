@@ -69,10 +69,10 @@ describe("SpaceNavRail", () => {
     expect(active?.dataset.reorderDragSource).toBe("true");
     expect(active?.dataset.mistyWindowDragBlock).toBe("true");
     expect(active?.className).toContain("rounded-full");
-    expect(active?.className).not.toContain("bg-sidebar-accent");
-    expect(active?.className).not.toContain("border-border/70");
+    expect(active?.className).not.toContain("bg-charcoal-active");
+    expect(active?.className).not.toContain("border-charcoal-border/70");
     expect(active?.querySelector('[data-slot="avatar"]')?.className).toContain(
-      "group-hover/space:ring-foreground/70",
+      "group-hover/space:ring-cream/70",
     );
     expect(active?.querySelector('[aria-label$="default profile picture"]')?.className).toContain(
       "rounded-full",

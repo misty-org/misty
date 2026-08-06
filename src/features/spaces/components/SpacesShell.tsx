@@ -87,6 +87,7 @@ export default function SpacesShell() {
     closeWorkspaceTab,
     reorderWorkspaceTabs,
     selectWorkspaceTab,
+    renameWorkspaceTab,
     updateActiveSpaceRoute,
     pruneTabSessions,
   } = useSpacesTabsStore(
@@ -96,6 +97,7 @@ export default function SpacesShell() {
       closeWorkspaceTab: state.closeTab,
       reorderWorkspaceTabs: state.reorderTabs,
       selectWorkspaceTab: state.selectTab,
+      renameWorkspaceTab: state.renameTab,
       updateActiveSpaceRoute: state.updateActiveSpaceRoute,
       pruneTabSessions: state.pruneSessions,
     })),
@@ -239,6 +241,20 @@ export default function SpacesShell() {
     }
   };
 
+  /**
+   * A File Manager tab owns one Explorer workspace, so its title is the
+   * workspace's name — renaming the tab renames the workspace behind it.
+   */
+  const renameTopLevelTab = (tabId: string, title: string) => {
+    if (!accountId || !activeSpace?.id) return;
+    const stored = renameWorkspaceTab(accountId, activeSpace.id, tabId, title);
+    if (!stored) return;
+    const renamed = tabSession?.tabs.find((tab) => tab.id === tabId);
+    if (renamed?.kind === "file-manager") {
+      void useExplorerStore.getState().renameWorkspace(renamed.workspaceId, stored);
+    }
+  };
+
   const selectTopLevelTab = (tabId: string) => {
     if (!accountId || !activeSpace?.id || tabId === activeTab?.id) return;
     const selected = tabSession?.tabs.find((tab) => tab.id === tabId);
@@ -303,14 +319,14 @@ export default function SpacesShell() {
     <MotionConfig reducedMotion="user" transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}>
       <div
         className={[
-          "misty-spaces-workbench grid h-full min-h-0",
+          "grid h-full min-h-0 bg-charcoal-bg",
           "grid-rows-[46px_minmax(0,1fr)_32px] overflow-hidden",
-          "transition-[grid-template-columns] duration-300 ease-[var(--misty-ease-out)]",
+          "transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         ].join(" ")}
         style={{
           gridTemplateColumns:
             panelVisible && spaceSurfaceActive
-              ? "var(--misty-spaces-rail-width) minmax(0, 1fr)"
+              ? "clamp(248px, 18vw, 268px) minmax(0, 1fr)"
               : "0px minmax(0, 1fr)",
         }}
       >
@@ -324,6 +340,7 @@ export default function SpacesShell() {
                 reorderWorkspaceTabs(accountId, activeSpace.id, tabId, fromIndex, toIndex);
             }}
             onSelectTab={selectTopLevelTab}
+            onRenameTab={renameTopLevelTab}
           />
         </div>
 
@@ -334,9 +351,9 @@ export default function SpacesShell() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -12 }}
               className={[
-                "misty-spaces-panel col-start-1 row-start-2 flex min-h-0",
-                "min-w-[var(--misty-spaces-rail-width)] flex-col overflow-hidden",
-                "border-r border-sidebar-border/60 px-3 pb-2 pt-3 text-sm text-sidebar-foreground",
+                "col-start-1 row-start-2 flex min-h-0",
+                "min-w-[248px] flex-col overflow-hidden",
+                "border-r border-charcoal-border bg-charcoal-sidebar px-3 pb-2 pt-3 text-sm text-cream-muted",
               ].join(" ")}
             >
               {activeInvitation ? (
@@ -350,7 +367,7 @@ export default function SpacesShell() {
 
         <main
           key={activeInvitation?.id ?? activeTab?.id}
-          className="misty-spaces-canvas relative col-start-2 row-start-2 min-h-0 min-w-0 overflow-hidden"
+          className="relative col-start-2 row-start-2 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
         >
           {activeInvitation ? (
             <SpaceInvitationView
@@ -373,7 +390,7 @@ export default function SpacesShell() {
           )}
         </main>
 
-        <footer className="col-span-full row-start-3 flex min-h-8 items-center border-t border-border/45 bg-background/70 px-2">
+        <footer className="col-span-full row-start-3 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
           <SpacesBottomBarToggle
             pressed={panelVisible}
             onClick={() => setPanelVisible((visible) => !visible)}

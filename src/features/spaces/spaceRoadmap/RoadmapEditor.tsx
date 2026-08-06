@@ -88,7 +88,7 @@ export function RoadmapEditor(props: {
   );
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-      <header className="misty-spaces-toolbar flex min-h-12 items-center gap-2 px-4">
+      <header className="flex min-h-12 items-center gap-2 px-4">
         <Button
           variant="ghost"
           className="h-auto min-w-0 justify-start px-1 py-0 text-left"
@@ -98,13 +98,13 @@ export function RoadmapEditor(props: {
         >
           <div className="min-w-0">
             <h1 className="m-0 truncate text-sm font-semibold">{snapshot.roadmap.name}</h1>
-            <p className="m-0 text-[11px] text-muted-foreground">
+            <p className="m-0 text-[11px] text-cream-muted">
               {snapshot.goal_done}/{snapshot.goal_total} goals · {snapshot.progress_percentage}%
             </p>
           </div>
         </Button>
         <span
-          className={`ml-auto text-[11px] ${saveState === "conflict" ? "text-destructive" : "text-muted-foreground"}`}
+          className={`ml-auto text-[11px] ${saveState === "conflict" ? "text-cream-bright" : "text-cream-muted"}`}
         >
           {saveState[0].toUpperCase() + saveState.slice(1)}
         </span>
@@ -152,7 +152,7 @@ export function RoadmapEditor(props: {
               type="button"
               size="icon"
               variant="outline"
-              className="absolute right-3 top-3 z-20 size-8 bg-background/90 shadow-sm backdrop-blur"
+              className="absolute right-3 top-3 z-20 size-8 bg-charcoal-bg shadow-sm "
               aria-label="Show node tools"
               onClick={() => setNodeDrawerOpen(true)}
             >
@@ -297,9 +297,9 @@ export function RoadmapEditor(props: {
         {selectedId ? (
           <div
             className={[
-              "fixed z-[var(--misty-layer-popover)] overflow-auto rounded-xl bg-popover",
+              "fixed z-50 overflow-auto rounded-xl bg-charcoal-card",
               "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))]",
-              "shadow-xl ring-1 ring-foreground/10",
+              "shadow-xl ring-1 ring-cream/10",
             ].join(" ")}
             style={{ left: inspectorLeft, top: inspectorTop }}
             role="dialog"
@@ -442,7 +442,7 @@ export function ErrorBanner({
   retryLabel?: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+    <div className="flex items-center justify-between border-b border-charcoal-active/30 bg-charcoal-active px-4 py-2 text-xs text-cream-bright">
       <span>{message}</span>
       <Button size="sm" variant="ghost" onClick={onRetry}>
         {retryLabel}

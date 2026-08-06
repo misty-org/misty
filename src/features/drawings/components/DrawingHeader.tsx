@@ -67,12 +67,12 @@ export function DrawingHeader(props: {
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border/60 bg-background px-3">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-charcoal-border/60 bg-charcoal-bg px-3">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Input
           value={title}
           aria-label="Drawing title"
-          className="h-8 max-w-md border-transparent bg-transparent px-2 font-medium shadow-none hover:border-input focus-visible:border-input"
+          className="h-8 max-w-md border-transparent bg-transparent px-2 font-medium shadow-none hover:border-charcoal-border focus-visible:border-charcoal-border"
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void saveTitle()}
           onKeyDown={(event) => {
@@ -87,13 +87,13 @@ export function DrawingHeader(props: {
           }}
         />
         {saving ? (
-          <span className="text-xs text-muted-foreground">Saving…</span>
+          <span className="text-xs text-cream-muted">Saving…</span>
         ) : error ? (
-          <span className="truncate text-xs text-destructive" role="alert">
+          <span className="truncate text-xs text-cream-bright" role="alert">
             {error}
           </span>
         ) : (
-          <Check size={14} className="text-muted-foreground" aria-label="Saved" />
+          <Check size={14} className="text-cream-muted" aria-label="Saved" />
         )}
       </div>
 
@@ -106,7 +106,7 @@ export function DrawingHeader(props: {
               type="button"
               size="icon"
               variant="ghost"
-              className="size-8 text-muted-foreground hover:text-destructive"
+              className="size-8 text-cream-muted hover:text-cream-bright"
               title="Delete drawing"
               aria-label="Delete drawing"
             >
@@ -120,7 +120,7 @@ export function DrawingHeader(props: {
                 “{props.drawing.title}” and its collaborative history will be permanently removed.
               </AlertDialogDescription>
               {error ? (
-                <p className="m-0 text-sm text-destructive" role="alert">
+                <p className="m-0 text-sm text-cream-bright" role="alert">
                   {error}
                 </p>
               ) : null}
@@ -128,7 +128,7 @@ export function DrawingHeader(props: {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 disabled={deleting}
                 onClick={(event) => {
                   event.preventDefault();
@@ -156,15 +156,15 @@ function ConnectionBadge({ state }: { state: DrawingConnectionState }) {
       variant="outline"
       className={cn(
         "gap-1.5 font-normal",
-        connected && "border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
-        state === "error" && "border-destructive/30 text-destructive",
+        connected && "border-status-green/30 text-sage-fg",
+        state === "error" && "border-charcoal-active/30 text-cream-bright",
       )}
     >
       <span
         className={cn(
-          "size-1.5 rounded-full bg-muted-foreground",
-          connected && "bg-emerald-500",
-          state === "error" && "bg-destructive",
+          "size-1.5 rounded-full bg-cream-muted",
+          connected && "bg-status-green",
+          state === "error" && "bg-charcoal-active",
         )}
       />
       {state === "connected"

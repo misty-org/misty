@@ -82,12 +82,16 @@ function messageIdentity(message: SpaceMessage): string {
   ].join(":");
 }
 
+/**
+ * `first:mt-0` because the leading divider sits directly under the header,
+ * where its own top margin only compounds the scroller's padding.
+ */
 export function ChatDateDivider({ label }: { label: string }) {
   return (
-    <div className="my-6 flex items-center gap-3" role="separator" aria-label={label}>
-      <span className="h-px flex-1 bg-border/70" />
-      <span className="text-[11px] font-semibold text-muted-foreground">{label}</span>
-      <span className="h-px flex-1 bg-border/70" />
+    <div className="my-6 flex items-center gap-3 first:mt-0" role="separator" aria-label={label}>
+      <span className="h-px flex-1 bg-charcoal-border" />
+      <span className="text-[11px] font-semibold text-cream-muted">{label}</span>
+      <span className="h-px flex-1 bg-charcoal-border" />
     </div>
   );
 }

@@ -82,7 +82,7 @@ export default function SignIn() {
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="group flex items-center gap-2 rounded-lg border border-border p-1 transition hover:border-text/30"
+                className="group flex items-center gap-2 rounded-lg border border-charcoal-border p-1 transition hover:border-charcoal-active"
               >
                 <button
                   type="button"
@@ -96,20 +96,20 @@ export default function SignIn() {
                     </AvatarFallback>
                   </Avatar>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-text">
+                    <span className="block truncate text-sm font-medium text-cream">
                       {account.name || account.email}
                     </span>
-                    <span className="block truncate text-xs text-text-muted">{account.email}</span>
+                    <span className="block truncate text-xs text-cream-muted">{account.email}</span>
                   </span>
                   {busyAccountId === account.id ? (
-                    <span className="shrink-0 pr-1 text-xs text-text-muted">Signing in…</span>
+                    <span className="shrink-0 pr-1 text-xs text-cream-muted">Signing in…</span>
                   ) : null}
                 </button>
                 <button
                   type="button"
                   aria-label={`Remove ${account.email}`}
                   title="Remove from this device"
-                  className="mr-1 shrink-0 rounded-md p-1.5 text-text-muted opacity-0 transition hover:text-text focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-60"
+                  className="mr-1 shrink-0 rounded-md p-1.5 text-cream-muted opacity-0 transition hover:text-cream focus-visible:opacity-100 group-hover:opacity-100 disabled:opacity-60"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId)}
                 >
@@ -120,7 +120,7 @@ export default function SignIn() {
             {error ? <AuthMessage tone="error" message={error} /> : null}
             <button
               type="button"
-              className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-text-muted transition hover:border-text/30 hover:text-text"
+              className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-charcoal-border p-3 text-sm text-cream-muted transition hover:border-charcoal-active hover:text-cream"
               onClick={() => {
                 setError("");
                 setEmail("");
@@ -160,11 +160,11 @@ export default function SignIn() {
     >
       <AuthCard
         footer={
-          <div className="text-center text-sm text-text-muted">
+          <div className="text-center text-sm text-cream-muted">
             <NavLink
               to="/register"
               state={{ from, addingAccount }}
-              className="transition hover:text-text"
+              className="transition hover:text-cream"
             >
               Don&apos;t have an account? Sign up
             </NavLink>

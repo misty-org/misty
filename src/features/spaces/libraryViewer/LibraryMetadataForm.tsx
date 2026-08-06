@@ -4,7 +4,7 @@ import type { LibraryItemMetadataPatch } from "@/models/interfaces/features/spac
 import type { SpaceLibraryItem } from "@/models/interfaces/features/spaces/types";
 import { LibraryMetadataRow } from "../SpaceLibraryViewerUtils";
 
-const labelClass = "grid gap-1.5 text-[10px] font-medium capitalize text-muted-foreground";
+const labelClass = "grid gap-1.5 text-[10px] font-medium capitalize text-cream-muted";
 
 /**
  * Editable name, caption and tags — or a read-only summary without permission.

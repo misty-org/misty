@@ -1,12 +1,9 @@
-import type { ExplorerPaneProps } from "@/models/interfaces/features/explorer/components/ExplorerPane";
-export type { ExplorerPaneProps } from "@/models/interfaces/features/explorer/components/ExplorerPane";
-import { memo, useCallback, useEffect, useMemo } from "react";
-import type { MouseEvent, ReactNode } from "react";
+import { FileBrowser } from "@/features/explorer/components/FileBrowser";
+import { groupItemsByOperation } from "@/features/explorer/drag/operations";
+import { memo, useCallback, useEffect, useMemo, type MouseEvent, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { FileBrowser } from "./FileBrowser";
 import { useExplorerStore } from "@/stores/explorer";
 import type { FileEntry } from "@/models/interfaces/services/misty-api";
-import { groupItemsByOperation } from "../drag/operations";
 import type {
   ExplorerDragModifiers,
   ExplorerDragPayload,
@@ -18,8 +15,8 @@ const paneStyles = {
   shellInactive: "opacity-65 transition-opacity hover:opacity-85",
   path: [
     "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden",
-    "border-b border-border/60 bg-[var(--misty-files-content-bg,var(--background))]",
-    "py-0 pl-3 pr-3 text-xs text-muted-foreground",
+    "border-b border-charcoal-border/60 bg-charcoal-bg",
+    "py-0 pl-3 pr-3 text-xs text-cream-muted",
     "max-[720px]:min-h-8 max-[720px]:pl-2.5 max-[720px]:pr-2.5 max-[720px]:text-[11px]",
   ].join(" "),
   pathText: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
@@ -191,4 +188,11 @@ function inlineEditForPane(
     return edit;
   }
   return null;
+}
+
+export interface ExplorerPaneProps {
+  paneId: string;
+  path: string;
+  isActive?: boolean;
+  paneActions?: ReactNode;
 }

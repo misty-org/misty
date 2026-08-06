@@ -1,5 +1,3 @@
-import type { AuthSubmitButtonProps } from "@/models/interfaces/features/auth/components/AuthSubmitButton";
-export type { AuthSubmitButtonProps } from "@/models/interfaces/features/auth/components/AuthSubmitButton";
 import { Button } from "@/ui";
 
 export default function AuthSubmitButton({
@@ -13,4 +11,11 @@ export default function AuthSubmitButton({
       {loading ? loadingLabel : idleLabel}
     </Button>
   );
+}
+
+export interface AuthSubmitButtonProps {
+  idleLabel: string;
+  loadingLabel: string;
+  loading: boolean;
+  disabled?: boolean;
 }

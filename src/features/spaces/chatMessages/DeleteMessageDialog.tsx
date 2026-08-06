@@ -30,7 +30,7 @@ export function DeleteMessageDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
             onClick={onConfirm}
           >
             Delete message

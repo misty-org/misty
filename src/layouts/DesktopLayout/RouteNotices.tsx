@@ -11,7 +11,7 @@ import { Banner } from "@/ui";
 import { globalNoticeLayerClass } from "./styles";
 
 const globalBannerClass =
-  "pointer-events-auto mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl shadow-[0_14px_36px_var(--misty-shadow)]";
+  "pointer-events-auto mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl shadow-xl";
 
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const appError = useAppStore((state) => state.error);

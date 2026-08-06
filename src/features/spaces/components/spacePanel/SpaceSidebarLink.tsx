@@ -17,7 +17,7 @@ export function SpaceSidebarLink({
     <Link className={sidebarLinkClass(active)} to={to} aria-current={active ? "page" : undefined}>
       <span
         className={`grid size-7 shrink-0 place-items-center transition-colors ${
-          active ? "text-foreground" : "text-muted-foreground"
+          active ? "text-cream" : "text-cream-muted"
         }`}
       >
         <Icon size={16} strokeWidth={1.75} />
@@ -30,12 +30,14 @@ export function SpaceSidebarLink({
 function sidebarLinkClass(isActive: boolean) {
   return cn(
     [
-      "misty-hover-marker-side misty-spaces-interactive relative flex h-9 min-w-0",
+      "relative flex h-9 min-w-0",
       "items-center gap-2 rounded-md px-2.5 text-sm no-underline outline-none",
-      "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+      "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     ].join(" "),
+    // Selection is an edge marker, not a filled panel, and hovering only
+    // brightens the label. See the marker rules in ui/styles/styles.css.
     isActive
-      ? "misty-active-marker-side text-sidebar-accent-foreground"
-      : "text-muted-foreground hover:text-foreground",
+      ? "misty-active-marker-side text-cream-bright font-medium"
+      : "text-cream-muted hover:text-cream",
   );
 }

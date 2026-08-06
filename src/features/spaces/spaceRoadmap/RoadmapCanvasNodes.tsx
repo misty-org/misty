@@ -61,22 +61,22 @@ function MilestoneNode({ data, selected }: NodeProps<RoadmapNode>) {
   return (
     <div
       className={cn(
-        "h-full w-full rounded-2xl border border-dashed border-border/80 bg-card/25 p-4",
-        selected && "ring-2 ring-primary/60",
+        "h-full w-full rounded-2xl border border-dashed border-charcoal-border/80 bg-charcoal-card p-4",
+        selected && "ring-2 ring-charcoal-active/60",
       )}
     >
       <NodeResizer minWidth={320} minHeight={240} isVisible={selected} />
       <NodeHandles color={data.color} />
       <div className="flex items-center gap-2 pr-2">
-        <Flag className="size-4 text-muted-foreground" />
+        <Flag className="size-4 text-cream-muted" />
         <strong className="truncate text-sm">{data.label}</strong>
-        <span className="ml-auto text-[10px] text-muted-foreground">{data.progress}%</span>
+        <span className="ml-auto text-[10px] text-cream-muted">{data.progress}%</span>
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded bg-muted">
-        <div className="h-full bg-primary" style={{ width: `${data.progress}%` }} />
+      <div className="mt-2 h-1 overflow-hidden rounded bg-charcoal-card">
+        <div className="h-full bg-charcoal-active" style={{ width: `${data.progress}%` }} />
       </div>
       {data.targetDate ? (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-cream-muted">
           <CalendarClock className="size-3" />
           {formatDate(data.targetDate)}
         </div>
@@ -89,27 +89,27 @@ function GoalNode({ data, selected }: NodeProps<RoadmapNode>) {
   return (
     <div
       className={cn(
-        "w-56 rounded-xl border border-border/80 border-l-[3px] border-l-blue-400 bg-card p-3 shadow-sm",
-        selected && "ring-2 ring-blue-400/50",
+        "w-56 rounded-xl border border-charcoal-border/80 border-l-[3px] border-l-sage-fg bg-charcoal-card p-3 shadow-sm",
+        selected && "ring-2 ring-sage-fg/50",
       )}
     >
       <NodeHandles color="blue" />
       <div className="flex items-start gap-2">
-        <Goal className="mt-0.5 size-4 shrink-0 text-blue-300" />
+        <Goal className="mt-0.5 size-4 shrink-0 text-sage-fg" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold">{data.label}</div>
-          <div className="mt-1 text-[9px] uppercase text-muted-foreground">
+          <div className="mt-1 text-[9px] uppercase text-cream-muted">
             Goal · {data.status.replace(/_/g, " ")}
           </div>
         </div>
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded bg-muted">
-        <div className="h-full bg-emerald-500" style={{ width: `${data.progress}%` }} />
+      <div className="mt-2 h-1 overflow-hidden rounded bg-charcoal-card">
+        <div className="h-full bg-status-green" style={{ width: `${data.progress}%` }} />
       </div>
       <Button
         type="button"
         variant="ghost"
-        className="nodrag mt-2 h-6 w-full justify-start gap-1 px-1 text-[10px] text-muted-foreground"
+        className="nodrag mt-2 h-6 w-full justify-start gap-1 px-1 text-[10px] text-cream-muted"
         onClick={(event) => {
           event.stopPropagation();
           data.onToggleGoal?.(data.endpoint?.id ?? "");
@@ -138,7 +138,7 @@ function SupportNode({ data, selected }: NodeProps<RoadmapNode>) {
   return (
     <div
       className={cn(
-        "w-52 rounded-xl border border-border/80 border-l-[3px] bg-card p-3 shadow-sm",
+        "w-52 rounded-xl border border-charcoal-border/80 border-l-[3px] bg-charcoal-card p-3 shadow-sm",
         colors.accent,
         selected && "ring-2 ring-current/40",
       )}
@@ -149,14 +149,12 @@ function SupportNode({ data, selected }: NodeProps<RoadmapNode>) {
           <Icon className="size-4" />
         </span>
         <div className="min-w-0">
-          <div className="truncate text-xs font-semibold text-foreground">{data.label}</div>
-          <div className="mt-1 truncate text-[9px] uppercase text-muted-foreground">
-            {data.subtitle}
-          </div>
+          <div className="truncate text-xs font-semibold text-cream">{data.label}</div>
+          <div className="mt-1 truncate text-[9px] uppercase text-cream-muted">{data.subtitle}</div>
         </div>
       </div>
       {data.targetDate ? (
-        <div className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="mt-2 flex items-center gap-1 text-[10px] text-cream-muted">
           <CalendarClock className="size-3" />
           {formatDate(data.targetDate)}
         </div>
@@ -167,15 +165,15 @@ function SupportNode({ data, selected }: NodeProps<RoadmapNode>) {
 
 function TaskNode({ data }: NodeProps<RoadmapNode>) {
   return (
-    <div className="w-48 rounded-lg border border-border/70 bg-background/95 p-2.5 shadow-sm">
-      <Handle type="source" position={Position.Left} className="!bg-muted-foreground" />
+    <div className="w-48 rounded-lg border border-charcoal-border/70 bg-charcoal-bg p-2.5 shadow-sm">
+      <Handle type="source" position={Position.Left} className="!bg-cream-muted" />
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 grid size-4 place-items-center rounded-full border border-border">
+        <span className="mt-0.5 grid size-4 place-items-center rounded-full border border-charcoal-border">
           <Circle className="size-2" />
         </span>
         <div className="min-w-0">
           <div className="truncate text-[11px] font-medium">{data.label}</div>
-          <div className="mt-1 text-[9px] uppercase text-muted-foreground">
+          <div className="mt-1 text-[9px] uppercase text-cream-muted">
             Task · {data.status.replace(/_/g, " ")}
           </div>
         </div>
@@ -331,9 +329,9 @@ function edgeView(
       type === "related" || type === "documents"
         ? { strokeDasharray: "5 4" }
         : type === "blocks"
-          ? { stroke: "#fb7185" }
+          ? { stroke: "#443E38" }
           : type === "measures"
-            ? { stroke: "#34d399" }
+            ? { stroke: "#52825A" }
             : undefined,
     data: { type },
   };

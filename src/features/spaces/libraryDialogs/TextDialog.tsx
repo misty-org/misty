@@ -56,7 +56,7 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
             ) : null}
             {model.error ? (
               <p
-                className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                className="rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-sm text-cream-bright"
                 role="alert"
               >
                 {model.error}

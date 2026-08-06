@@ -40,7 +40,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
       ) : null}
       {data.calendarNotice ? (
         <p
-          className="mx-0 mb-3 mt-0 rounded-md bg-muted/55 px-3 py-2 text-xs text-muted-foreground"
+          className="mx-0 mb-3 mt-0 rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted"
           role="status"
         >
           {data.calendarNotice}
@@ -48,7 +48,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
       ) : null}
 
       {isEmptyLoad ? (
-        <div className="grid h-full min-h-56 place-items-center text-muted-foreground">
+        <div className="grid h-full min-h-56 place-items-center text-cream-muted">
           <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />
         </div>
       ) : view === "board" ? (

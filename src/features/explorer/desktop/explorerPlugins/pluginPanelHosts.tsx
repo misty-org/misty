@@ -277,7 +277,7 @@ export function ExplorerWebPluginPanelHost(props: {
   return (
     <section className={`${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`}>
       {hostState !== "ready" ? (
-        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-[var(--misty-bg)] p-5 text-center text-sm text-[var(--misty-text-muted)]">
+        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-charcoal-bg p-5 text-center text-sm text-cream-muted">
           {hostState === "loading" ? (
             <>
               <RefreshCcw className="animate-spin" size={20} />
@@ -286,7 +286,7 @@ export function ExplorerWebPluginPanelHost(props: {
           ) : (
             <>
               <Puzzle size={24} />
-              <strong className="text-[var(--misty-text)]">Extension did not start</strong>
+              <strong className="text-cream">Extension did not start</strong>
               <span>
                 The panel bundle may be missing, outdated, or incompatible with this Misty version.
               </span>
@@ -300,7 +300,7 @@ export function ExplorerWebPluginPanelHost(props: {
                   Retry
                 </Button>
               </div>
-              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-[var(--misty-text-subtle)]">
+              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-cream-muted">
                 {props.panel.webEntry}
               </code>
             </>
@@ -310,7 +310,7 @@ export function ExplorerWebPluginPanelHost(props: {
       <iframe
         key={reloadKey}
         ref={iframeRef}
-        className="h-full min-h-[420px] w-full border-0 bg-[var(--misty-bg)]"
+        className="h-full min-h-[420px] w-full border-0 bg-charcoal-bg"
         src={source}
         title={`${props.panel.title} extension`}
         sandbox="allow-scripts allow-same-origin"

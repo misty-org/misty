@@ -64,7 +64,7 @@ export function NewDrawingDialog(props: {
             }}
           />
           {error ? (
-            <p className="m-0 text-xs text-destructive" role="alert">
+            <p className="m-0 text-xs text-cream-bright" role="alert">
               {error}
             </p>
           ) : null}

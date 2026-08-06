@@ -22,8 +22,8 @@ export function MessageReactions({
           size="sm"
           className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs transition-colors ${
             reaction.reacted_by_me
-              ? "border-primary/35 bg-primary/10 text-primary hover:bg-primary/15"
-              : "border-border/70 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+              ? "border-charcoal-active/35 bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
+              : "border-charcoal-border/70 bg-charcoal-card text-cream-muted hover:bg-charcoal-card hover:text-cream"
           } disabled:cursor-default disabled:opacity-80`}
           type="button"
           key={reaction.emoji}

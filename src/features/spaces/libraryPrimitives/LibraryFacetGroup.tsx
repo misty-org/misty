@@ -17,9 +17,7 @@ export function LibraryFacetGroup({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span className="mr-0.5 text-[10px] font-semibold capitalize text-muted-foreground">
-        {label}
-      </span>
+      <span className="mr-0.5 text-[10px] font-semibold capitalize text-cream-muted">{label}</span>
       {facets.slice(0, MAX_VISIBLE_FACETS).map((facet) => (
         <Button
           size="sm"
@@ -29,7 +27,7 @@ export function LibraryFacetGroup({
           onClick={() => onSelect(facet)}
         >
           {facet.label}
-          <span className="text-muted-foreground">{facet.count}</span>
+          <span className="text-cream-muted">{facet.count}</span>
         </Button>
       ))}
     </div>

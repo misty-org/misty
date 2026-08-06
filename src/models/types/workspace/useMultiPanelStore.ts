@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SplitOrientation } from "@/models/types/workspace/types";
+import type { SplitOrientation } from "@/features/workspace/useMultiPanelStore";
 import type {
   MultiPanelClosedPane,
   MultiPanelLayout,

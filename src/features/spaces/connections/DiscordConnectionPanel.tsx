@@ -51,7 +51,7 @@ export function DiscordConnectionPanel({
         </div>
         {discord.loading ? (
           <LoaderCircle
-            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            className="size-4 shrink-0 animate-spin text-cream-muted"
             aria-label="Checking Discord"
           />
         ) : discord.providerDiscoveryError ? (
@@ -95,14 +95,14 @@ export function DiscordConnectionPanel({
 
       {discord.error || discord.providerDiscoveryError ? (
         <CardContent>
-          <p className="m-0 text-xs text-destructive" role="alert">
+          <p className="m-0 text-xs text-cream-bright" role="alert">
             {discord.error || discord.providerDiscoveryError}
           </p>
         </CardContent>
       ) : null}
 
       {expanded && discord.integration ? (
-        <CardContent className="grid gap-4 border-t border-border/60 pt-4">
+        <CardContent className="grid gap-4 border-t border-charcoal-border/60 pt-4">
           {discord.links.map((link) => (
             <LinkedChannel
               key={link.id}
@@ -125,14 +125,14 @@ export function DiscordConnectionPanel({
             )
             .map((conversation) => (
               <div
-                className="flex items-center gap-3 rounded-lg border border-dashed border-border p-3"
+                className="flex items-center gap-3 rounded-lg border border-dashed border-charcoal-border p-3"
                 key={conversation.id}
               >
                 <div className="min-w-0 flex-1">
                   <p className="m-0 truncate text-sm font-medium">
                     #{conversation.external_display_name || conversation.title}
                   </p>
-                  <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+                  <p className="mb-0 mt-0.5 text-xs text-cream-muted">
                     Disconnected · Misty history preserved
                   </p>
                 </div>
@@ -201,7 +201,7 @@ function ChannelPicker({
   if (discoveryError)
     return (
       <div className="grid justify-items-start gap-3">
-        <p className="m-0 text-sm text-muted-foreground">
+        <p className="m-0 text-sm text-cream-muted">
           Misty could not check Discord channels. Reconnect Discord or try again.
         </p>
         <Button variant="outline" type="button" onClick={onRetry}>
@@ -212,7 +212,7 @@ function ChannelPicker({
     );
   if (!channels.length)
     return (
-      <p className="m-0 text-sm text-muted-foreground">
+      <p className="m-0 text-sm text-cream-muted">
         {hasLinks
           ? "Every available Discord channel is already linked."
           : "Misty cannot see any channels yet. Invite the Misty bot to a channel in Discord, then reopen this panel."}
@@ -264,15 +264,13 @@ function LinkedChannel({
   onUnlink: () => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-lg border border-border/70 p-3">
+    <div className="grid gap-3 rounded-lg border border-charcoal-border/70 p-3">
       <p className="m-0 text-sm">
         <strong>#{link.channel_name}</strong>
-        {link.guild_name ? (
-          <span className="text-muted-foreground"> in {link.guild_name}</span>
-        ) : null}
-        <span className="text-muted-foreground"> ↔ {conversationTitle ?? "this Space"}</span>
+        {link.guild_name ? <span className="text-cream-muted"> in {link.guild_name}</span> : null}
+        <span className="text-cream-muted"> ↔ {conversationTitle ?? "this Space"}</span>
       </p>
-      <p className="m-0 text-xs text-muted-foreground">
+      <p className="m-0 text-xs text-cream-muted">
         {link.last_synced_at ? `Last synced ${formatTime(link.last_synced_at)}` : "Not synced yet"}
         {link.last_error_code ? ` · ${linkErrorMessage(link.last_error_code)}` : ""}
       </p>
@@ -292,7 +290,7 @@ function LinkedChannel({
       <div className="flex flex-wrap gap-2">
         <Button
           aria-label={`Sync #${link.channel_name}`}
-          className="size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+          className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
           size="icon"
           title={`Sync #${link.channel_name}`}
           variant="ghost"
@@ -333,7 +331,7 @@ function PickerSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-1 text-xs text-muted-foreground">
+    <label className="grid gap-1 text-xs text-cream-muted">
       {label}
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="h-9 w-full text-xs" aria-label={label}>

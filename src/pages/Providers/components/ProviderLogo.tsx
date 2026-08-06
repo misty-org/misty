@@ -1,7 +1,3 @@
-import type { ProviderLogoSpec } from "@/models/types/pages/Providers/components/ProviderLogo";
-export type { ProviderLogoSpec } from "@/models/types/pages/Providers/components/ProviderLogo";
-import type { ProviderLogoProps } from "@/models/interfaces/pages/Providers/components/ProviderLogo";
-export type { ProviderLogoProps } from "@/models/interfaces/pages/Providers/components/ProviderLogo";
 import type { IconType } from "react-icons";
 import {
   SiApachehadoop,
@@ -161,4 +157,16 @@ export function ProviderLogo(props: ProviderLogoProps) {
 function providerLogoSpecForType(type: string): ProviderLogoSpec {
   const normalized = type.toLowerCase().replace(/[\s_-]+/g, "");
   return brandLogoMap[normalized] ?? backendLogoMap[normalized] ?? { kind: "lucide", icon: Cloud };
+}
+
+export type ProviderLogoSpec =
+  | { kind: "react"; icon: IconType; color?: string }
+  | { kind: "lucide"; icon: typeof Cloud; color?: string }
+  | { kind: "asset"; src: string };
+
+export interface ProviderLogoProps {
+  type: string;
+  size?: number;
+  className?: string;
+  title?: string;
 }

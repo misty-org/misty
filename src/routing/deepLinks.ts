@@ -1,5 +1,3 @@
-import type { AuthDeepLinkTarget } from "@/models/types/routing/deepLinks";
-export type { AuthDeepLinkTarget } from "@/models/types/routing/deepLinks";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { isNativeMobileBuild } from "@/platform/buildTarget";
@@ -118,3 +116,5 @@ function normalizeDeepLinkRoute(
   }
   return `${route}${search}`;
 }
+
+export type AuthDeepLinkTarget = "account" | "providers";

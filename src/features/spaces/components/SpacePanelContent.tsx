@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import type {
   Space,
   SpaceAgentMembership,
@@ -16,8 +17,6 @@ import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
 import { SpaceSidebarHeader } from "./spacePanel/SpaceSidebarHeader";
-import { SpaceStorageFooter } from "./spacePanel/SpaceStorageFooter";
-import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
 import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 import {
   spaceConversationPath,
@@ -51,13 +50,12 @@ export function SpacePanelContent(props: {
       loadMembers: state.loadMembers,
     })),
   );
-  const { conversations, upsertConversation } = useSpacePanelConversations({
+  const { conversations, upsertConversation, removeConversation } = useSpacePanelConversations({
     activeSpaceId,
     activeSpace,
     snapshotReady,
     enabled: Boolean(user),
   });
-  const libraryUsage = useSpaceLibraryUsage({ activeSpaceId, activeSpace, section, snapshotReady });
 
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
@@ -78,6 +76,21 @@ export function SpacePanelContent(props: {
   const handleConversationSaved = (saved: SpaceConversation) => {
     upsertConversation(saved);
     navigate(spaceConversationPath(activeSpaceId, saved.id));
+  };
+
+  const handleConversationDeleted = async (conversation: SpaceConversation) => {
+    if (!window.confirm(`Delete “${conversation.title}” and all of its messages?`)) return;
+    try {
+      await spacesApi.deleteOrClearConversation(activeSpaceId, conversation.id);
+      removeConversation(conversation.id);
+      if (route.conversationId === conversation.id) {
+        navigate(spaceSectionPath(activeSpaceId, "chat", settingsSection), { replace: true });
+      }
+    } catch (reason) {
+      window.alert(
+        reason instanceof Error ? reason.message : "The conversation could not be deleted.",
+      );
+    }
   };
 
   const activeSpaceNavigation = activeSpaceId ? (
@@ -101,6 +114,8 @@ export function SpacePanelContent(props: {
         setEditingConversation(conversation);
         setDialogOpen(true);
       }}
+      onDeleteConversation={(conversation) => void handleConversationDeleted(conversation)}
+      isSpaceOwner={activeSpace?.role === "owner"}
     />
   ) : null;
 
@@ -122,20 +137,14 @@ export function SpacePanelContent(props: {
       {spacesListSkeletonVisible ? (
         <SpacePanelSkeleton />
       ) : activeSpaceId ? (
-        <>
-          <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-2 [overscroll-behavior:contain]">
-            <SpaceSectionNavigation spaceId={activeSpaceId} section={section} />
-            {activeSpaceNavigation ? (
-              <div className="mt-3 border-t border-sidebar-border/45 pt-3">
-                {activeSpaceNavigation}
-              </div>
-            ) : null}
-          </div>
-          <SpaceStorageFooter
-            usage={libraryUsage}
-            showsOwnerStorage={activeSpace?.owner_user_id === user?.id}
-          />
-        </>
+        <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-2 [overscroll-behavior:contain]">
+          <SpaceSectionNavigation spaceId={activeSpaceId} section={section} />
+          {activeSpaceNavigation ? (
+            <div className="mt-3 border-t border-charcoal-border/45 pt-3">
+              {activeSpaceNavigation}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <CreateEditConversationDialog

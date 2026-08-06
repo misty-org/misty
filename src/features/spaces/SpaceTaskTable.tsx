@@ -1,23 +1,28 @@
-import type { TaskPatch } from "@/models/types/features/spaces/SpaceTaskTable";
-export type { TaskPatch } from "@/models/types/features/spaces/SpaceTaskTable";
-import { LoaderCircle } from "lucide-react";
-import { Button } from "@/ui";
-import { Card } from "@/ui";
-import { Input } from "@/ui";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
-import type {
-  SpaceAgentMembership,
-  SpaceMember,
-  SpaceTask,
-} from "@/models/interfaces/features/spaces/types";
 import {
   TaskEmptyState,
   TaskInlineSelect,
   taskPriorityOptions,
   taskStatusOptions,
   toLocalInput,
-} from "./SpaceTaskPrimitives";
+} from "@/features/spaces/SpaceTaskPrimitives";
+import { LoaderCircle } from "lucide-react";
+import {
+  Button,
+  Card,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/ui";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/models/types/features/spaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/models/interfaces/features/spaces/types";
 import { TaskSyncBadge } from "@/features/spaces/components/TaskSyncBadge";
 
 export function SpaceTaskList({
@@ -42,7 +47,7 @@ export function SpaceTaskList({
   return (
     <Card className="gap-0 overflow-hidden py-0">
       <Table className="min-w-[840px]" aria-label="Tasks">
-        <TableHeader className="bg-muted/50">
+        <TableHeader className="bg-charcoal-card">
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-24">Key</TableHead>
             <TableHead className="min-w-64">Task</TableHead>
@@ -134,7 +139,7 @@ export function SpaceTaskList({
                 <TableCell>
                   <Input
                     aria-label={`Due date for ${task.title}`}
-                    className="h-8 border-transparent bg-transparent px-2 text-xs shadow-none hover:bg-muted"
+                    className="h-8 border-transparent bg-transparent px-2 text-xs shadow-none hover:bg-charcoal-card"
                     disabled={!canManage || taskBusy}
                     type="datetime-local"
                     value={task.due_at ? toLocalInput(task.due_at) : ""}
@@ -155,3 +160,17 @@ export function SpaceTaskList({
     </Card>
   );
 }
+
+export type TaskPatch = Partial<
+  Pick<
+    SpaceTask,
+    | "title"
+    | "notes"
+    | "status"
+    | "priority"
+    | "assignee_user_id"
+    | "assignee_agent_id"
+    | "due_at"
+    | "due_timezone"
+  >
+>;

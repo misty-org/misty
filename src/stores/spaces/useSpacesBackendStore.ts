@@ -1,27 +1,8 @@
-import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
-export type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
-export type { SpacePresenceViewer } from "@/models/types/stores/spaces/useSpacesBackendStore";
-import type { LibraryUploadOptions } from "@/models/interfaces/stores/spaces/useSpacesBackendStore";
-export type { LibraryUploadOptions } from "@/models/interfaces/stores/spaces/useSpacesBackendStore";
-import {
-  isAccountSessionTransitioning,
-  readAccountSessionGeneration,
-  readAccountAuthToken,
-} from "@/stores/account/useAuthTokenStore";
-import { appSnapshot, normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
-import { assertUploadLimit } from "@/features/library/uploadLimits";
-import { readDownloadBlob } from "@/features/library/signedDownload";
-import { safeTauriAssetUrl } from "@/platform/tauri";
-import { addRequestCorrelation } from "@/platform/requestCorrelation";
-import type { SpaceRun, SpaceTaskActivity } from "@/models/interfaces/features/spaces/types";
 import type {
-  MessageSpan,
-  BulkLibraryItemAction,
-  LibraryEditDefinition,
-  SpaceTaskPriority,
-  SpaceTaskStatus,
-} from "@/models/types/features/spaces/types";
-import type {
+  SpaceConversation,
+  SpaceMember,
+  SpaceRun,
+  SpaceTaskActivity,
   BulkLibraryItemOptions,
   LibraryUploadResult,
   LibraryAlbum,
@@ -68,6 +49,26 @@ import type {
   SpaceSetup,
   SpaceTemplate,
 } from "@/models/interfaces/features/spaces/types";
+import type {
+  AgentMentionFailure,
+  MessageSpan,
+  BulkLibraryItemAction,
+  LibraryEditDefinition,
+  SpaceTaskPriority,
+  SpaceTaskStatus,
+} from "@/models/types/features/spaces/types";
+import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
+import {
+  isAccountSessionTransitioning,
+  readAccountSessionGeneration,
+  readAccountAuthToken,
+} from "@/stores/account/useAuthTokenStore";
+import { appSnapshot, normalizeApiBaseUrl, withDefaultApiPath } from "@/stores/backend";
+import { assertUploadLimit } from "@/features/library/uploadLimits";
+import { readDownloadBlob } from "@/features/library/signedDownload";
+import { safeTauriAssetUrl } from "@/platform/tauri";
+import { addRequestCorrelation } from "@/platform/requestCorrelation";
+import type { AgentUsage } from "@/models/interfaces/features/spaces/agentUsageTypes";
 import type { GlobalSpaceLibraryHit } from "@/models/interfaces/features/agents/personal";
 import type { ConflictResolution } from "@/models/types/features/spaces/connections/calendarTasks";
 import { createSpaceMembersApi } from "./spaceMembersApi";
@@ -715,6 +716,9 @@ export const spacesApi = {
     ),
   libraryUsage: (spaceId: string) =>
     spaceRequest<SpaceStorageUsage>(`/spaces/${encodeURIComponent(spaceId)}/library/usage`),
+  /** The signed-in account's weekly hosted-AI allowance, not a Space's. */
+  agentUsage: () =>
+    spaceRequest<{ agent_usage?: AgentUsage }>("/billing/usage", { cache: "no-store" }),
   libraryAssetStacks: (spaceId: string) =>
     spaceRequest<{ stacks: LibraryAssetStack[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/library/asset-stacks`,
@@ -1392,4 +1396,11 @@ function webviewUploadSizeError(): Error {
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+export interface LibraryUploadOptions {
+  signal?: AbortSignal;
+  conversationId?: string;
+  onProgress?: (progress: number) => void;
+  onStage?: (stage: "reading" | "hashing" | "uploading" | "finalizing") => void;
 }

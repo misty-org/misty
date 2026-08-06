@@ -13,7 +13,7 @@ import { JournalAttribution } from "@/features/journal/components/JournalAttribu
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 const shellClass =
-  "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground";
+  "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg text-cream";
 
 const bodyClass = "grid min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden";
 
@@ -159,7 +159,7 @@ export function SpaceNotes(props: SpaceNotesProps) {
       <JournalAttribution
         technology="BlockNote"
         href="https://www.blocknotejs.org/"
-        className="absolute bottom-3 right-3 z-20 shadow-sm backdrop-blur-sm"
+        className="absolute bottom-3 right-3 z-20 shadow-sm "
       />
     </div>
   );

@@ -34,6 +34,7 @@ describe("SpacesHeader", () => {
             onCloseTab={vi.fn()}
             onReorderTab={vi.fn()}
             onSelectTab={vi.fn()}
+            onRenameTab={vi.fn()}
           />
         </MemoryRouter>,
       );

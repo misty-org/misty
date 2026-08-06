@@ -201,8 +201,8 @@ export function SpaceAgenda({
     }
   };
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
-      <header className="misty-spaces-toolbar misty-transient-scrollbar min-h-[60px] overflow-x-auto border-b border-border/60 px-3 py-2">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
+      <header className="misty-transient-scrollbar min-h-[60px] overflow-x-auto border-b border-charcoal-border/60 px-3 py-2">
         <div className="flex min-w-max items-center gap-2">
           <div className="flex items-center gap-1.5">
             <Button
@@ -222,15 +222,15 @@ export function SpaceAgenda({
                   aria-label="Choose calendar date"
                 >
                   {agendaTitle(anchor, view)}
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                  <ChevronDown className="size-3.5 text-cream-muted" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-auto p-3">
-                <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">
+                <label className="grid gap-1.5 text-xs font-medium text-cream-muted">
                   Go to date
                   <Input
                     type="date"
-                    className="h-9 bg-background text-sm text-foreground"
+                    className="h-9 bg-charcoal-bg text-sm text-cream"
                     value={dayKey(anchor)}
                     onChange={(event) => {
                       if (event.target.value)
@@ -271,7 +271,7 @@ export function SpaceAgenda({
                 >
                   <CalendarDays className="size-4" />
                   {view[0].toUpperCase() + view.slice(1)}
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                  <ChevronDown className="size-3.5 text-cream-muted" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -297,13 +297,13 @@ export function SpaceAgenda({
 
             {view !== "month" ? (
               <div
-                className="flex h-9 items-center overflow-hidden rounded-md border border-border/80"
+                className="flex h-9 items-center overflow-hidden rounded-md border border-charcoal-border/80"
                 aria-label="Calendar time interval"
               >
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-none border-r border-border/60"
+                  className="size-9 rounded-none border-r border-charcoal-border/60"
                   aria-label="Zoom out calendar"
                   disabled={zoomMinutes === 60}
                   onClick={() => updateZoom("out")}
@@ -316,7 +316,7 @@ export function SpaceAgenda({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-9 rounded-none border-l border-border/60"
+                  className="size-9 rounded-none border-l border-charcoal-border/60"
                   aria-label="Zoom in calendar"
                   disabled={zoomMinutes === 15}
                   onClick={() => updateZoom("in")}
@@ -361,8 +361,8 @@ export function SpaceAgenda({
           <div
             className={cn(
               "absolute inset-x-3 top-3 z-40 flex items-center justify-between rounded-md",
-              "border border-destructive/30 bg-background/95 px-3 py-2 text-sm text-destructive",
-              "shadow-md backdrop-blur",
+              "border border-charcoal-active/30 bg-charcoal-bg px-3 py-2 text-sm text-cream-bright",
+              "shadow-md ",
             )}
           >
             <span>{error}</span>

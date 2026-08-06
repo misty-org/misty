@@ -115,10 +115,10 @@ export function DesktopUpdaterSettings() {
   return (
     <>
       <DesktopSettingsRow label="Version">
-        <span className="font-mono text-xs text-muted-foreground">v{version}-beta</span>
+        <span className="font-mono text-xs text-cream-muted">v{version}-beta</span>
       </DesktopSettingsRow>
       <DesktopSettingsRow label="Release channel">
-        <span className="text-sm text-foreground">Beta</span>
+        <span className="text-sm text-cream">Beta</span>
       </DesktopSettingsRow>
       <DesktopSettingsRow
         label="App updates"
@@ -128,7 +128,7 @@ export function DesktopUpdaterSettings() {
           <div className="flex flex-wrap items-center justify-end gap-2 max-[760px]:justify-start">
             <span
               className={
-                state === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
+                state === "error" ? "text-xs text-cream-bright" : "text-xs text-cream-muted"
               }
               role={state === "error" ? "alert" : "status"}
             >

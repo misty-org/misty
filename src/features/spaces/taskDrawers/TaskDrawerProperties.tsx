@@ -20,7 +20,7 @@ export function TaskDrawerProperties({
   canManage: boolean;
 }) {
   return (
-    <aside className="grid content-start gap-5 border-l border-border/60 bg-muted/30 p-5 max-sm:border-l-0 max-sm:border-t max-sm:border-border/60">
+    <aside className="grid content-start gap-5 border-l border-charcoal-border/60 bg-charcoal-card p-5 max-sm:border-l-0 max-sm:border-t max-sm:border-charcoal-border/60">
       <TaskProperty label="Status">
         <TaskInlineSelect
           label="Task status"
@@ -83,7 +83,7 @@ export function TaskDrawerProperties({
 function TaskProperty({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid gap-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-cream-muted">{label}</Label>
       {children}
     </div>
   );

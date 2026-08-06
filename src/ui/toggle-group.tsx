@@ -1,11 +1,7 @@
-import type { ToggleGroupProps } from "@/models/types/ui/toggle-group";
-export type { ToggleGroupProps } from "@/models/types/ui/toggle-group";
 import * as React from "react";
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group";
-import { type VariantProps } from "class-variance-authority";
-
-import { toggleVariants } from "@/ui";
-import { cn } from "@/ui";
+import type { VariantProps } from "class-variance-authority";
+import { toggleVariants, cn } from "@/ui";
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
@@ -44,9 +40,9 @@ const ToggleGroup = React.forwardRef<
       data-spacing={spacing}
       data-orientation={orientation}
       orientation={orientation}
-      style={{ "--gap": spacing, ...style } as React.CSSProperties}
+      style={{ gap: `${spacing * 0.25}rem`, ...style }}
       className={cn(
-        "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-md data-[spacing=0]:data-[variant=outline]:shadow-xs data-vertical:flex-col data-vertical:items-stretch",
+        "group/toggle-group flex w-fit flex-row items-center rounded-md data-[spacing=0]:data-[variant=outline]:shadow-xs data-vertical:flex-col data-vertical:items-stretch",
         className,
       )}
       {...props}
@@ -102,3 +98,9 @@ const ToggleGroupItem = React.forwardRef<
 ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName;
 
 export { ToggleGroup, ToggleGroupItem };
+
+export type ToggleGroupProps = React.ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root> &
+  VariantProps<typeof toggleVariants> & {
+    spacing?: number;
+    orientation?: "horizontal" | "vertical";
+  };

@@ -6,11 +6,11 @@ import type { BadgeProps } from "@/models/types/ui/badge";
 import { cn } from "@/ui";
 
 const statusClasses: Record<StatusTone, string> = {
-  neutral: "border-border bg-muted text-muted-foreground",
-  info: "border-primary/25 bg-primary/10 text-primary",
-  success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-500",
-  warning: "border-amber-500/25 bg-amber-500/10 text-amber-500",
-  danger: "border-destructive/25 bg-destructive/10 text-destructive",
+  neutral: "border-charcoal-border bg-charcoal-card text-cream-muted",
+  info: "border-charcoal-active/25 bg-charcoal-active text-cream-bright",
+  success: "border-status-green/25 bg-status-green text-sage-fg",
+  warning: "border-sage-fg/25 bg-sage-bg text-sage-fg",
+  danger: "border-charcoal-active/25 bg-charcoal-active text-cream-bright",
 };
 
 function StatusBadge({

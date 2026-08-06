@@ -1,5 +1,3 @@
-import type { SmartLibraryTokenEstimate } from "@/models/interfaces/features/spaces/smartLibrary";
-export type { SmartLibraryTokenEstimate } from "@/models/interfaces/features/spaces/smartLibrary";
 export const SMART_LIBRARY_PILOT = {
   sampleSize: 25,
   maximumSuccessfulImages: 500,
@@ -136,4 +134,15 @@ export const SMART_LIBRARY_ANALYSIS_SCHEMA = {
 
 function stringArraySchema(maxItems: number, maxLength = 64) {
   return { type: "array", maxItems, items: { type: "string", minLength: 1, maxLength } } as const;
+}
+
+export interface SmartLibraryTokenEstimate {
+  assetCount: number;
+  batchCount: number;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedEmbeddingTokens: number;
+  estimatedTotalTokens: number;
+  estimatedLowTokens: number;
+  estimatedHighTokens: number;
 }

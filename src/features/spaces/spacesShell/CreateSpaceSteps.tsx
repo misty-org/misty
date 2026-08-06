@@ -31,7 +31,9 @@ const integrationChoices: Array<{
 
 const cardClass = (selected: boolean) =>
   `h-auto justify-start whitespace-normal rounded-lg border p-3 text-left transition-colors ${
-    selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/55"
+    selected
+      ? "border-charcoal-active bg-charcoal-active"
+      : "border-charcoal-border hover:bg-charcoal-card"
   }`;
 
 export function CreateSpaceNameStep({
@@ -42,7 +44,7 @@ export function CreateSpaceNameStep({
   onName: (value: string) => void;
 }) {
   return (
-    <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
+    <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
       Space name
       <Input
         autoFocus
@@ -69,7 +71,7 @@ export function CreateSpaceTemplateStep({
   return (
     <section className="mt-5">
       <p className="m-0 text-sm font-medium">Choose a template</p>
-      <p className="mb-3 mt-1 text-xs text-muted-foreground">
+      <p className="mb-3 mt-1 text-xs text-cream-muted">
         Optional starter content—nothing is locked in.
       </p>
       <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1">
@@ -82,15 +84,13 @@ export function CreateSpaceTemplateStep({
             onClick={() => onTemplate(template.id)}
           >
             <span className="block text-sm font-medium">{template.name}</span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+            <span className="mt-1 block text-xs leading-relaxed text-cream-muted">
               {template.description}
             </span>
           </Button>
         ))}
       </div>
-      {templateError ? (
-        <p className="mb-0 mt-2 text-xs text-muted-foreground">{templateError}</p>
-      ) : null}
+      {templateError ? <p className="mb-0 mt-2 text-xs text-cream-muted">{templateError}</p> : null}
     </section>
   );
 }
@@ -107,7 +107,7 @@ export function CreateSpaceConnectionsStep({
   return (
     <section className="mt-5">
       <p className="m-0 text-sm font-medium">Connect tools your team already uses</p>
-      <p className="mb-3 mt-1 text-xs text-muted-foreground">
+      <p className="mb-3 mt-1 text-xs text-cream-muted">
         Optional. Setup can be closed and resumed at any time.
       </p>
       <div className="grid gap-2">
@@ -129,14 +129,12 @@ export function CreateSpaceConnectionsStep({
               <span className="flex-1 text-sm font-medium">
                 {name}
                 {unavailable ? (
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    Unavailable
-                  </span>
+                  <span className="ml-2 text-xs font-normal text-cream-muted">Unavailable</span>
                 ) : null}
               </span>
               <span
                 className={`grid size-5 place-items-center rounded-full border ${
-                  selected ? "border-primary bg-primary text-primary-foreground" : ""
+                  selected ? "border-charcoal-active bg-charcoal-active text-cream-bright" : ""
                 }`}
               >
                 {selected ? <Check size={12} /> : null}

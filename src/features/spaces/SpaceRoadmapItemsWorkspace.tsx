@@ -108,15 +108,15 @@ export function SpaceRoadmapItemsWorkspace({
   const Icon = kind === "goal" ? Target : Flag;
 
   return (
-    <main className="h-full overflow-auto bg-background p-6">
+    <main className="h-full overflow-auto bg-charcoal-bg p-6">
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
             <Icon className="size-4" />
           </div>
           <div>
             <h1 className="m-0 text-xl font-semibold">{title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-cream-muted">
               Configure {title.toLowerCase()} across every roadmap in this Space.
             </p>
           </div>
@@ -141,10 +141,10 @@ export function SpaceRoadmapItemsWorkspace({
         {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
         {loading && !snapshots.length ? (
           <div className="grid min-h-48 place-items-center">
-            <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+            <LoaderCircle className="size-5 animate-spin text-cream-muted" />
           </div>
         ) : rows.length ? (
-          <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+          <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
             {rows.map(({ item, snapshot, roadmap }, index) => {
               const goal = kind === "goal" ? (item as SpaceRoadmapGoal) : undefined;
               const milestone = kind === "milestone" ? (item as SpaceRoadmapMilestone) : undefined;
@@ -161,14 +161,14 @@ export function SpaceRoadmapItemsWorkspace({
                       variant="ghost"
                       className={[
                         "h-auto w-full justify-start gap-3 rounded-none px-4 py-3 text-left",
-                        "whitespace-normal transition-colors hover:bg-muted/35",
-                        index ? "border-t border-border/60" : "",
+                        "whitespace-normal transition-colors hover:bg-charcoal-card",
+                        index ? "border-t border-charcoal-border/60" : "",
                       ].join(" ")}
                     >
                       <StatusIcon status={status} />
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-sm font-medium">{item.title}</strong>
-                        <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="mt-0.5 flex items-center gap-2 text-xs text-cream-muted">
                           <span className="inline-flex items-center gap-1 truncate">
                             <GitFork className="size-3" />
                             {roadmap.name}
@@ -181,7 +181,7 @@ export function SpaceRoadmapItemsWorkspace({
                           ) : null}
                         </span>
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-cream-muted">
                         {goal
                           ? `${goal.progress_percentage}%`
                           : `${milestone?.goal_done ?? 0}/${milestone?.goal_total ?? 0} goals`}
@@ -241,10 +241,10 @@ export function SpaceRoadmapItemsWorkspace({
             })}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-border p-10 text-center">
-            <Icon className="mx-auto mb-3 size-5 text-muted-foreground" />
+          <div className="rounded-xl border border-dashed border-charcoal-border p-10 text-center">
+            <Icon className="mx-auto mb-3 size-5 text-cream-muted" />
             <p className="m-0 text-sm font-medium">No {title.toLowerCase()} yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-cream-muted">
               {roadmaps.length
                 ? `Create the first ${kind} from this list.`
                 : "Create a roadmap first, then add its planning structure here."}
@@ -299,7 +299,7 @@ function CreateRoadmapItem({
         <div className="grid gap-3">
           <div>
             <p className="m-0 text-sm font-semibold">New {kind}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Choose where it belongs.</p>
+            <p className="mt-1 text-xs text-cream-muted">Choose where it belongs.</p>
           </div>
           <Input
             autoFocus
@@ -334,7 +334,7 @@ function CreateRoadmapItem({
                 </SelectContent>
               </Select>
             ) : (
-              <p className="m-0 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <p className="m-0 rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream-muted">
                 Add a milestone to this roadmap before creating a goal.
               </p>
             )
@@ -380,11 +380,11 @@ function CreateRoadmapItem({
 
 function StatusIcon({ status }: { status: "not_started" | "in_progress" | "done" }) {
   return status === "done" ? (
-    <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
+    <CheckCircle2 className="size-4 shrink-0 text-sage-fg" />
   ) : status === "in_progress" ? (
-    <span className="size-4 shrink-0 rounded-full border-4 border-blue-500/70" />
+    <span className="size-4 shrink-0 rounded-full border-4 border-sage-fg/70" />
   ) : (
-    <span className="size-4 shrink-0 rounded-full border border-muted-foreground/50" />
+    <span className="size-4 shrink-0 rounded-full border border-cream-muted/50" />
   );
 }
 

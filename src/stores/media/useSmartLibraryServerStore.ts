@@ -1,5 +1,3 @@
-import type { SmartLibrarySearchHit } from "@/models/types/stores/media/useSmartLibraryServerStore";
-export type { SmartLibrarySearchHit } from "@/models/types/stores/media/useSmartLibraryServerStore";
 import type {
   RegisterSmartLibraryFolderRequest,
   RegisterSmartLibraryFolderResponse,
@@ -219,3 +217,5 @@ function validatePreviewBatch(previews: SmartLibraryPreviewInput[]): void {
     throw new Error("Library analysis batches must contain one to eight previews.");
   }
 }
+
+export type SmartLibrarySearchHit = SemanticSearchHit;

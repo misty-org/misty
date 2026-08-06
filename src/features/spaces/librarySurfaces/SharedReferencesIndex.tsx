@@ -5,7 +5,7 @@ import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { formatBytes } from "../libraryFormat";
 import { BackToCollections, LibraryNothingHere } from "./LibraryNothingHere";
 
-const cardClass = "rounded-xl bg-card p-4 shadow-xs inset-ring-1 inset-ring-foreground/10";
+const cardClass = "rounded-xl bg-charcoal-card p-4 shadow-xs inset-ring-1 inset-ring-cream/10";
 const gridClass = "grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3";
 
 /** Library items shared into this Space, and items this Space shares out. */
@@ -25,7 +25,7 @@ export function SharedReferencesIndex() {
             {sharedReferences.map((reference) => (
               <article className={cardClass} key={reference.id}>
                 <ReferenceHeading reference={reference} />
-                <p className="mb-3 mt-1 truncate text-[10px] text-muted-foreground">
+                <p className="mb-3 mt-1 truncate text-[10px] text-cream-muted">
                   From {reference.source_space_name} · {formatBytes(reference.byte_size)}
                 </p>
                 {data.canCopyLibrary ? (
@@ -53,7 +53,7 @@ export function SharedReferencesIndex() {
             {outgoingReferences.map((reference) => (
               <article className={cardClass} key={reference.id}>
                 <ReferenceHeading reference={reference} />
-                <p className="mb-3 mt-1 truncate text-[10px] text-muted-foreground">
+                <p className="mb-3 mt-1 truncate text-[10px] text-cream-muted">
                   To {reference.destination_space_name}
                 </p>
                 {data.canEditLibrary ? (

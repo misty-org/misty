@@ -1,28 +1,16 @@
-import type {
-  SmartLibrary,
-  SmartLibraryEstimate,
-  SmartLibraryProgress,
-} from "@/models/types/features/explorer/desktop/ExplorerSmartLibraryViews";
-export type {
-  SmartLibrary,
-  SmartLibraryEstimate,
-  SmartLibraryProgress,
-} from "@/models/types/features/explorer/desktop/ExplorerSmartLibraryViews";
 import { AlertCircle, Cloud, File, Images, RefreshCw, ShieldAlert, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SmartLibraryAsset } from "@/models/interfaces/services/misty-api";
-import { Badge } from "@/ui";
-import { Button } from "@/ui";
-import { Progress } from "@/ui";
+import { Badge, Button, Progress } from "@/ui";
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
 
 export function SmartLibraryFeature(props: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="grid gap-2 rounded-lg bg-muted/35 p-4">
-      <span className="text-primary">{props.icon}</span>
+    <div className="grid gap-2 rounded-lg bg-charcoal-card p-4">
+      <span className="text-cream-bright">{props.icon}</span>
       <strong className="text-sm font-medium">{props.title}</strong>
-      <span className="text-xs leading-relaxed text-muted-foreground">{props.text}</span>
+      <span className="text-xs leading-relaxed text-cream-muted">{props.text}</span>
     </div>
   );
 }
@@ -31,11 +19,11 @@ export function SmartLibraryBusy(props: { icon: ReactNode; title: string; text: 
   return (
     <div className="grid min-h-full place-items-center p-8">
       <div className="grid max-w-lg justify-items-center gap-4 text-center">
-        <span className="grid size-14 animate-pulse place-items-center rounded-xl bg-muted text-primary">
+        <span className="grid size-14 animate-pulse place-items-center rounded-xl bg-charcoal-card text-cream-bright">
           {props.icon}
         </span>
         <h3 className="m-0 text-xl font-semibold">{props.title}</h3>
-        <p className="m-0 text-sm leading-relaxed text-muted-foreground">{props.text}</p>
+        <p className="m-0 text-sm leading-relaxed text-cream-muted">{props.text}</p>
       </div>
     </div>
   );
@@ -44,7 +32,7 @@ export function SmartLibraryBusy(props: { icon: ReactNode; title: string; text: 
 export function SmartLibraryError(props: { text: string }) {
   return (
     <div
-      className="flex items-start gap-3 rounded-md bg-destructive/10 px-4 py-3 text-left text-sm text-destructive"
+      className="flex items-start gap-3 rounded-md bg-charcoal-active px-4 py-3 text-left text-sm text-cream-bright"
       role="alert"
     >
       <AlertCircle className="mt-0.5 shrink-0" size={17} />
@@ -63,12 +51,12 @@ export function SmartLibraryPreflightView(props: {
     <div className="grid gap-6">
       <div>
         <h3 className="m-0 text-xl font-semibold tracking-tight">Ready to try a sample</h3>
-        <p className="m-0 mt-2 text-sm text-muted-foreground">
+        <p className="m-0 mt-2 text-sm text-cream-muted">
           The scan was local and free. Smart Library will analyze a representative sample before
           asking to continue.
         </p>
       </div>
-      <div className="grid grid-cols-2 divide-x divide-border overflow-hidden rounded-lg bg-muted/35 lg:grid-cols-5 lg:divide-y-0">
+      <div className="grid grid-cols-2 divide-x divide-charcoal-border overflow-hidden rounded-lg bg-charcoal-card lg:grid-cols-5 lg:divide-y-0">
         <SmartLibraryMetric label="Discovered" value={preflight.totalImages} />
         <SmartLibraryMetric label="Supported" value={preflight.supportedImages} tone="good" />
         <SmartLibraryMetric
@@ -91,13 +79,13 @@ export function SmartLibraryPreflightView(props: {
           text={`${preflight.skippedFullOriginalImages} cloud files were skipped because their provider would require downloading the full original. This pilot uploads previews or extracted metadata only.`}
         />
       ) : null}
-      <div className="grid gap-4 rounded-lg bg-primary/10 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="grid gap-4 rounded-lg bg-charcoal-active p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <div className="grid gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-primary">
+          <span className="text-xs font-medium uppercase tracking-wide text-cream-bright">
             25-file trial allowance
           </span>
           <strong className="text-lg font-semibold">Try the sample before using hosted AI</strong>
-          <span className="text-sm leading-relaxed text-muted-foreground">
+          <span className="text-sm leading-relaxed text-cream-muted">
             {preflight.sampleAssetIds.length} files selected across subfolders, formats, and dates.{" "}
             {formatEstimate(props.estimate ?? preflight.estimate)}
           </span>
@@ -111,8 +99,8 @@ export function SmartLibraryPreflightView(props: {
           Try Sample
         </Button>
       </div>
-      <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-4 text-sm leading-relaxed text-muted-foreground">
-        <ShieldAlert className="mt-0.5 shrink-0 text-primary" size={18} />
+      <div className="flex items-start gap-3 rounded-lg bg-charcoal-card p-4 text-sm leading-relaxed text-cream-muted">
+        <ShieldAlert className="mt-0.5 shrink-0 text-cream-bright" size={18} />
         <span>
           Misty sends opaque asset IDs plus EXIF-stripped 384–512px previews for visual files, or
           bounded extracted text and metadata for other supported files. Paths and originals remain
@@ -134,18 +122,18 @@ export function SmartLibraryProgressView(props: {
   const percent = Math.round(((completed + failed) / total) * 100);
   return (
     <div className="grid min-h-[500px] place-items-center">
-      <div className="grid w-full max-w-2xl gap-5 rounded-lg bg-muted/30 p-6">
+      <div className="grid w-full max-w-2xl gap-5 rounded-lg bg-charcoal-card p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h3 className="m-0 text-xl font-semibold">Smart Library is understanding your files</h3>
-            <p className="m-0 mt-1 text-sm text-muted-foreground">
+            <p className="m-0 mt-1 text-sm text-cream-muted">
               Keep Misty open while hosted AI processes each bounded batch.
             </p>
           </div>
           <span className="text-2xl font-semibold">{percent}%</span>
         </div>
         <Progress value={percent} />
-        <div className="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-lg bg-background/60">
+        <div className="grid grid-cols-3 divide-x divide-charcoal-border overflow-hidden rounded-lg bg-charcoal-bg">
           <SmartLibraryMetric label="Completed" value={completed} tone="good" />
           <SmartLibraryMetric label="Remaining" value={queued} />
           <SmartLibraryMetric label="Failed" value={failed} tone={failed ? "warn" : undefined} />
@@ -170,7 +158,7 @@ export function SmartLibraryAssetGrid(props: {
 }) {
   if (props.assets.length === 0)
     return (
-      <div className="grid min-h-52 place-items-center rounded-lg bg-muted/30 text-sm text-muted-foreground">
+      <div className="grid min-h-52 place-items-center rounded-lg bg-charcoal-card text-sm text-cream-muted">
         No analyzed files are available for review.
       </div>
     );
@@ -190,18 +178,12 @@ function SmartLibraryMetric(props: {
   tone?: "good" | "warn";
 }) {
   const tone =
-    props.tone === "good"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : props.tone === "warn"
-        ? "text-amber-600 dark:text-amber-300"
-        : "text-foreground";
+    props.tone === "good" ? "text-sage-fg" : props.tone === "warn" ? "text-sage-fg" : "text-cream";
   return (
     <div className="grid gap-1 p-4">
-      <span className="text-xs font-medium text-muted-foreground">{props.label}</span>
+      <span className="text-xs font-medium text-cream-muted">{props.label}</span>
       <strong className={`text-xl font-semibold ${tone}`}>{props.value.toLocaleString()}</strong>
-      {props.suffix ? (
-        <span className="text-[11px] text-muted-foreground">{props.suffix}</span>
-      ) : null}
+      {props.suffix ? <span className="text-[11px] text-cream-muted">{props.suffix}</span> : null}
     </div>
   );
 }
@@ -215,12 +197,12 @@ function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: Smart
   const confidence =
     props.asset.confidence === null ? null : Math.round(props.asset.confidence * 100);
   return (
-    <article className="grid min-w-0 grid-rows-[180px_auto] overflow-hidden rounded-lg bg-muted/30">
-      <div className="relative overflow-hidden bg-muted">
+    <article className="grid min-w-0 grid-rows-[180px_auto] overflow-hidden rounded-lg bg-charcoal-card">
+      <div className="relative overflow-hidden bg-charcoal-card">
         {source ? (
           <img className="size-full object-cover" alt="" src={source} />
         ) : (
-          <span className="grid size-full place-items-center gap-2 text-muted-foreground">
+          <span className="grid size-full place-items-center gap-2 text-cream-muted">
             {visual && props.asset.sourceKind === "cloud" ? (
               <Cloud size={34} />
             ) : (
@@ -242,7 +224,7 @@ function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: Smart
           <strong className="block truncate text-sm font-medium" title={props.asset.relativePath}>
             {props.asset.name}
           </strong>
-          <span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+          <span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-cream-muted">
             {props.asset.description || "No description generated."}
           </span>
         </div>
@@ -256,7 +238,7 @@ function SmartLibraryAssetCard(props: { asset: SmartLibraryAsset; library: Smart
           </div>
         ) : null}
         {props.asset.collections.length > 0 ? (
-          <div className="flex items-center gap-2 text-[11px] font-medium text-primary">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-cream-bright">
             <Images size={13} />
             <span className="truncate">{props.asset.collections.join(" · ")}</span>
           </div>
@@ -275,3 +257,9 @@ function joinDevicePath(root: string, relative: string): string {
   const separator = root.includes("\\") && !root.includes("/") ? "\\" : "/";
   return `${root.replace(/[\\/]+$/, "")}${separator}${relative.replace(/^[\\/]+/, "")}`;
 }
+
+export type SmartLibrary = NonNullable<ReturnType<typeof useSmartLibraryStore.getState>["library"]>;
+
+export type SmartLibraryEstimate = ReturnType<typeof useSmartLibraryStore.getState>["estimate"];
+
+export type SmartLibraryProgress = ReturnType<typeof useSmartLibraryStore.getState>["progress"];

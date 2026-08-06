@@ -21,11 +21,11 @@ const SelectTrigger = React.forwardRef<
     data-slot="select-trigger"
     className={cn(
       "flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border",
-      "border-input bg-transparent px-2.5 py-2 text-sm shadow-xs transition-[color,box-shadow]",
-      "outline-none data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed",
-      "disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3",
-      "aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50",
-      "dark:aria-invalid:ring-destructive/40 [&>span]:line-clamp-1 [&_svg]:pointer-events-none",
+      "border-charcoal-border bg-transparent px-2.5 py-2 text-sm shadow-xs transition-[color,box-shadow]",
+      "outline-none data-[placeholder]:text-cream-muted disabled:cursor-not-allowed",
+      "disabled:opacity-50 aria-invalid:border-charcoal-active aria-invalid:ring-3",
+      "aria-invalid:ring-charcoal-active/20 bg-charcoal-card aria-invalid:border-charcoal-active/50",
+      "aria-invalid:ring-charcoal-active/40 [&>span]:line-clamp-1 [&_svg]:pointer-events-none",
       "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
       className,
     )}
@@ -76,7 +76,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       data-slot="select-content"
       className={cn(
-        "relative z-[var(--misty-layer-popover)] max-h-[var(--radix-select-content-available-height)] min-w-[8rem] origin-[var(--radix-select-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-md bg-popover/95 text-popover-foreground shadow-md ring-1 ring-foreground/10 backdrop-blur-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "relative z-[2147483420] max-h-[min(24rem,calc(100dvh-2rem))] min-w-[8rem] origin-center overflow-x-hidden overflow-y-auto rounded-md bg-charcoal-card text-cream shadow-md ring-1 ring-cream/10 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className,
@@ -85,13 +85,7 @@ const SelectContent = React.forwardRef<
       {...props}
     >
       <SelectScrollUpButton />
-      <SelectPrimitive.Viewport
-        className={cn(
-          "p-1",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
-        )}
-      >
+      <SelectPrimitive.Viewport className={cn("p-1", position === "popper" && "w-full min-w-32")}>
         {children}
       </SelectPrimitive.Viewport>
       <SelectScrollDownButton />
@@ -107,7 +101,7 @@ const SelectLabel = React.forwardRef<
   <SelectPrimitive.Label
     ref={ref}
     data-slot="select-label"
-    className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+    className={cn("px-2 py-1.5 text-xs font-medium text-cream-muted", className)}
     {...props}
   />
 ));
@@ -121,7 +115,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     data-slot="select-item"
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-foreground/10 focus:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-charcoal-hover focus:text-cream data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
       className,
     )}
     {...props}
@@ -143,7 +137,7 @@ const SelectSeparator = React.forwardRef<
   <SelectPrimitive.Separator
     ref={ref}
     data-slot="select-separator"
-    className={cn("-mx-1 my-1 h-px bg-foreground/5", className)}
+    className={cn("-mx-1 my-1 h-px bg-charcoal-hover", className)}
     {...props}
   />
 ));

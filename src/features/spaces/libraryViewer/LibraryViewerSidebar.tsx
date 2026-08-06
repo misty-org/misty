@@ -39,7 +39,7 @@ export interface LibraryViewerSidebarProps {
 /** The right-hand inspector: edit controls, metadata and version history. */
 export function LibraryViewerSidebar(props: LibraryViewerSidebarProps) {
   return (
-    <aside className="relative z-10 min-h-0 min-w-0 overflow-y-auto border-l border-border/60 bg-card p-5">
+    <aside className="relative z-10 min-h-0 min-w-0 overflow-y-auto border-l border-charcoal-border/60 bg-charcoal-card p-5">
       {props.editing ? (
         <LibraryEditPanel
           draft={props.editDraft}

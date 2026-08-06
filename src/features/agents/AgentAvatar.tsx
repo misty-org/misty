@@ -18,13 +18,13 @@ const presetIcons: Record<string, LucideIcon> = {
 };
 
 const accentClasses: Record<string, string> = {
-  indigo: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-300",
-  violet: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-  blue: "bg-blue-500/15 text-blue-600 dark:text-blue-300",
-  emerald: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
-  amber: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  rose: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-  neutral: "bg-muted text-muted-foreground",
+  indigo: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  violet: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  blue: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  emerald: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  amber: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  rose: "border border-charcoal-border bg-charcoal-card text-cream-bright",
+  neutral: "border border-charcoal-border bg-charcoal-card text-cream-bright",
 };
 
 export const agentAvatarPresets = [

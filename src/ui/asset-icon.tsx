@@ -1,7 +1,4 @@
-import type { AssetIconProps, MaskIconStyle } from "@/models/interfaces/ui/asset-icon";
-export type { AssetIconProps, MaskIconStyle } from "@/models/interfaces/ui/asset-icon";
-import { useEffect, useState } from "react";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   BadgeCheck,
   CheckCircle2,
@@ -114,4 +111,17 @@ function fallbackIcon(path: string | null): LucideIcon {
   if (/(^|\/)x(?:-|\.)/.test(value)) return X;
   if (value.includes("cloud") || value.includes("drive") || value.includes("dropbox")) return Cloud;
   return ImageOff;
+}
+
+export interface AssetIconProps {
+  src: string;
+  size?: number;
+  color?: boolean;
+  className?: string;
+  title?: string;
+}
+
+export interface MaskIconStyle extends CSSProperties {
+  WebkitMask: string;
+  mask: string;
 }

@@ -35,18 +35,18 @@ function PluginGridSkeleton() {
     <div aria-hidden="true" className={gridClass}>
       {[0, 1, 2, 3, 4, 5].map((index) => (
         <Card className="gap-3" key={index} size="sm">
-          <div className="flex items-center gap-3 px-(--card-spacing)">
+          <div className="flex items-center gap-3 px-6">
             <Skeleton className="size-10 shrink-0 rounded-lg" />
             <span className="grid min-w-0 flex-1 gap-1.5">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-3 w-20" />
             </span>
           </div>
-          <div className="grid gap-1.5 px-(--card-spacing)">
+          <div className="grid gap-1.5 px-6">
             <Skeleton className="h-3 w-full" />
             <Skeleton className="h-3 w-4/5" />
           </div>
-          <div className="flex justify-end px-(--card-spacing)">
+          <div className="flex justify-end px-6">
             <Skeleton className="h-8 w-20 rounded-lg" />
           </div>
         </Card>
@@ -110,14 +110,14 @@ export function PluginBrowser({
           </TabsList>
         </Tabs>
 
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-cream-muted">
           {showSkeleton ? "loading" : visiblePlugins.length}
         </span>
 
         {onRefresh ? (
           <Button
             aria-label="Reload extensions"
-            className="ml-auto size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+            className="ml-auto size-8 text-cream-muted/70 shadow-none hover:text-cream"
             disabled={loading}
             onClick={onRefresh}
             size="icon"
@@ -130,8 +130,8 @@ export function PluginBrowser({
         ) : null}
       </div>
 
-      {notice ? <p className="text-xs text-muted-foreground">{notice}</p> : null}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {notice ? <p className="text-xs text-cream-muted">{notice}</p> : null}
+      {error ? <p className="text-xs text-cream-bright">{error}</p> : null}
 
       <div className="misty-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {showSkeleton ? (
@@ -152,7 +152,7 @@ export function PluginBrowser({
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed px-5 py-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-xl border border-dashed px-5 py-10 text-center text-sm text-cream-muted">
             No extensions match the current filter.
           </div>
         )}

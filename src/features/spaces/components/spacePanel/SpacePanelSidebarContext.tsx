@@ -23,6 +23,8 @@ export interface SpacePanelSidebarContextProps {
   activeDrawingId: string;
   onCreateConversation?: () => void;
   onEditConversation?: (conversation: SpaceConversation) => void;
+  onDeleteConversation?: (conversation: SpaceConversation) => void;
+  isSpaceOwner?: boolean;
 }
 
 /**
@@ -43,6 +45,8 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
           currentUserId={props.currentUserId}
           onCreateConversation={props.onCreateConversation}
           onEditConversation={props.onEditConversation}
+          onDeleteConversation={props.onDeleteConversation}
+          isSpaceOwner={props.isSpaceOwner}
         />
       </div>
     );

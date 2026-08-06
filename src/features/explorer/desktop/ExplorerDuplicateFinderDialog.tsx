@@ -33,9 +33,9 @@ import { errorText } from "@/lib/format";
 import { formatBytes, formatDate } from "../utils/fileFormat";
 
 const dialogChromeClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(760px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";
 const bodyClass = "min-h-0 overflow-auto p-4";
-const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
+const fieldClass = "grid gap-1.5 text-xs font-medium text-cream-muted";
 const groupListClass = "mt-4 grid max-h-[360px] gap-3 overflow-auto pr-1";
 
 export function DuplicateFinderDialog(props: {
@@ -181,7 +181,7 @@ export function DuplicateFinderDialog(props: {
             void runScan();
           }}
         >
-          <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
+          <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-charcoal-border px-5 py-4 text-left">
             <div>
               <DialogTitle>Duplicate Finder</DialogTitle>
               <DialogDescription>
@@ -217,7 +217,7 @@ export function DuplicateFinderDialog(props: {
                 </Button>
               </div>
             </div>
-            <label className="mt-3 flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+            <label className="mt-3 flex items-center gap-2 rounded-md bg-charcoal-card px-3 py-2 text-xs text-cream">
               <Checkbox
                 checked={hashAll}
                 onCheckedChange={(checked) => setHashAll(Boolean(checked))}
@@ -225,7 +225,7 @@ export function DuplicateFinderDialog(props: {
               <span>Hash all duplicate-size candidates for exact matches</span>
             </label>
             {remoteApprovalPending ? (
-              <Card className="mt-3 flex flex-wrap items-center justify-between gap-3 border-0 bg-amber-500/10 p-3 text-sm text-amber-600 shadow-none dark:text-amber-300">
+              <Card className="mt-3 flex flex-wrap items-center justify-between gap-3 border-0 bg-sage-bg p-3 text-sm text-sage-fg shadow-none text-sage-fg">
                 {result?.remoteCandidateCount ?? 0} remote candidates need explicit download
                 approval before hashing.
                 <Button variant="outline" type="button" onClick={approveRemoteHash}>
@@ -234,12 +234,12 @@ export function DuplicateFinderDialog(props: {
               </Card>
             ) : null}
             {error ? (
-              <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-sm text-cream-bright">
                 {error}
               </div>
             ) : null}
             {result ? (
-              <Card className="mt-3 grid gap-1 border-0 bg-muted/40 p-3 text-sm text-muted-foreground shadow-none">
+              <Card className="mt-3 grid gap-1 border-0 bg-charcoal-card p-3 text-sm text-cream-muted shadow-none">
                 <span>{result.message}</span>
                 <span>
                   {result.scannedCount} scanned, {result.hashedCount} hashed, {cleanupCount}{" "}
@@ -248,7 +248,7 @@ export function DuplicateFinderDialog(props: {
               </Card>
             ) : null}
             {result && result.groups.length === 0 ? (
-              <Card className="mt-3 border-0 bg-muted/30 p-5 text-center text-sm text-muted-foreground shadow-none">
+              <Card className="mt-3 border-0 bg-charcoal-card p-5 text-center text-sm text-cream-muted shadow-none">
                 No duplicate candidates found for the current scan.
               </Card>
             ) : null}
@@ -256,20 +256,20 @@ export function DuplicateFinderDialog(props: {
               <div className={groupListClass}>
                 {result.groups.map((group) => (
                   <Card
-                    className="overflow-hidden border-0 bg-muted/30 shadow-none"
+                    className="overflow-hidden border-0 bg-charcoal-card shadow-none"
                     key={group.key}
                   >
-                    <header className="flex items-center justify-between gap-3 border-b border-border/70 px-3 py-2 text-xs">
+                    <header className="flex items-center justify-between gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs">
                       <strong>
                         {group.items.length} copies · {formatBytes(group.sizeBytes)}
                       </strong>
-                      <span className="truncate text-muted-foreground">{group.key}</span>
+                      <span className="truncate text-cream-muted">{group.key}</span>
                     </header>
                     {group.items.map((item) => {
                       const selected = selectedSet.has(item.path);
                       return (
                         <label
-                          className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/70 px-3 py-2 text-xs last:border-0"
+                          className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-charcoal-border/70 px-3 py-2 text-xs last:border-0"
                           key={item.path}
                         >
                           <Checkbox
@@ -277,10 +277,10 @@ export function DuplicateFinderDialog(props: {
                             onCheckedChange={() => toggleCleanupPath(group, item.path)}
                           />
                           <span className="grid min-w-0 gap-1">
-                            <span className="truncate text-foreground" title={item.path}>
+                            <span className="truncate text-cream" title={item.path}>
                               {item.path}
                             </span>
-                            <small className="text-muted-foreground">
+                            <small className="text-cream-muted">
                               {formatDate(item.modifiedMs)}
                               {item.sha256 ? ` · ${item.sha256.slice(0, 12)}` : ""}
                             </small>
@@ -296,7 +296,7 @@ export function DuplicateFinderDialog(props: {
               </div>
             ) : null}
           </div>
-          <DialogFooter className="mt-0 flex-row flex-wrap border-t border-border px-5 py-4">
+          <DialogFooter className="mt-0 flex-row flex-wrap border-t border-charcoal-border px-5 py-4">
             <Select
               value={cleanupMode}
               onValueChange={(value) => setCleanupMode(value === "move" ? "move" : "trash")}
