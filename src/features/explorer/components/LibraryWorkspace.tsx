@@ -1,10 +1,42 @@
-import type { LibraryTab } from "@/models/types/features/explorer/components/LibraryWorkspace";
-export type { LibraryTab } from "@/models/types/features/explorer/components/LibraryWorkspace";
-import { Input } from "@/ui";
-import { Button } from "@/ui";
-import { Badge } from "@/ui";
-import { Dialog, DialogContent, DialogTitle } from "@/ui";
-import { Progress } from "@/ui";
+import {
+  revealSearchResultInPane,
+  searchResultNavigationTarget,
+} from "@/features/explorer/utils/searchNavigation";
+import {
+  mergeHybridSearchResults,
+  queryIndexedExplorerSearch,
+  querySemanticExplorerSearch,
+} from "@/features/explorer/utils/globalSearch";
+import {
+  createSmartFolderDialogState,
+  smartFolderId,
+  smartFolderMatchMode,
+  smartFolderQueryFromRules,
+  smartFolderRulesWithMode,
+  sortSavedSearches,
+} from "@/features/explorer/components/ExplorerSidebarSupport";
+import { SmartFolderDialog } from "@/features/explorer/components/ExplorerSidebarDialogs";
+import { SearchResultThumbnail } from "@/features/explorer/components/SearchResultThumbnail";
+import {
+  searchResultContext,
+  searchResultSummary,
+} from "@/features/explorer/components/ExplorerToolbarSupport";
+import { formatBytes, formatDate } from "@/features/explorer/utils/fileFormat";
+import {
+  aggregateLibraryTags,
+  DEFAULT_ASSET_TAG_LIMIT,
+  DEFAULT_LIBRARY_TAG_LIMIT,
+  tagsWithout,
+  visibleAssetTags,
+  visibleLibraryTags,
+} from "@/features/explorer/utils/libraryTags";
+import { GlobalPreviewDialog } from "@/features/explorer/components/GlobalPreview";
+import { LibraryDropReviewDialog } from "@/features/explorer/components/LibraryDropReviewDialog";
+import {
+  MediaIndexApprovalDialog,
+  MediaIndexRemovalDialog,
+} from "@/features/explorer/components/MediaIndexDialogs";
+import { Input, Button, Badge, Dialog, DialogContent, DialogTitle, Progress } from "@/ui";
 import {
   File,
   Film,
@@ -34,44 +66,12 @@ import type {
 import { safeTauriAssetUrl } from "@/platform/tauri";
 import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
 import { useMediaSearchStore } from "@/stores/media/useMediaSearchStore";
-import { revealSearchResultInPane } from "../utils/searchNavigation";
-import {
-  mergeHybridSearchResults,
-  queryIndexedExplorerSearch,
-  querySemanticExplorerSearch,
-} from "../utils/globalSearch";
-import { searchResultNavigationTarget } from "../utils/searchNavigation";
-import {
-  createSmartFolderDialogState,
-  smartFolderId,
-  smartFolderMatchMode,
-  smartFolderQueryFromRules,
-  smartFolderRulesWithMode,
-  sortSavedSearches,
-} from "./ExplorerSidebarSupport";
 import type { SmartFolderDialogState } from "@/models/types/features/explorer/components/ExplorerSidebarSupport";
 import type { SmartFolderDraft } from "@/models/interfaces/features/explorer/components/ExplorerSidebarSupport";
-import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
-import { SearchResultThumbnail } from "./SearchResultThumbnail";
-import { searchResultContext, searchResultSummary } from "./ExplorerToolbarSupport";
 import { searchSemanticAssets } from "@/stores/media/useSmartLibraryServerStore";
-import { formatBytes, formatDate } from "../utils/fileFormat";
-import {
-  aggregateLibraryTags,
-  DEFAULT_ASSET_TAG_LIMIT,
-  DEFAULT_LIBRARY_TAG_LIMIT,
-  tagsWithout,
-  visibleAssetTags,
-  visibleLibraryTags,
-} from "../utils/libraryTags";
 import { useLibraryAssetFilter } from "./libraryWorkspace/useLibraryAssetFilter";
 import { useSemanticAssetSearch } from "./libraryWorkspace/useSemanticAssetSearch";
 import { useSmartFolders } from "./libraryWorkspace/useSmartFolders";
-import { GlobalPreviewDialog } from "./GlobalPreview";
-import { LibraryDropReviewDialog } from "./LibraryDropReviewDialog";
-import { MediaIndexApprovalDialog, MediaIndexRemovalDialog } from "./MediaIndexDialogs";
-
-export const libraryWorkspacePath = "misty://library";
 import { MediaLibraryPanel } from "./libraryWorkspace/MediaLibraryPanel";
 import { LibraryAssetViewer, LibraryGallery } from "./libraryWorkspace/LibraryGallery";
 import { LibraryEmpty } from "./libraryWorkspace/LibraryDetailPrimitives";
@@ -82,6 +82,8 @@ import {
   searchableRuleText,
   semanticRuleText,
 } from "./libraryWorkspace/savedSearchRules";
+
+export const libraryWorkspacePath = "misty://library";
 
 export function LibraryWorkspace(props: {
   paneId: string;
@@ -173,11 +175,11 @@ export function LibraryWorkspace(props: {
   };
 
   return (
-    <section className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-background text-foreground">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/60 px-6 py-5">
+    <section className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg text-cream">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-charcoal-border/60 px-6 py-5">
         <div>
           <h1 className="m-0 text-2xl font-bold tracking-[-0.03em]">Library</h1>
-          <p className="m-0 mt-1 text-sm text-muted-foreground">
+          <p className="m-0 mt-1 text-sm text-cream-muted">
             Private, on-device files organized with AI tags, collections, and search.
           </p>
         </div>
@@ -201,7 +203,7 @@ export function LibraryWorkspace(props: {
           </Button>
         </div>
       </header>
-      <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-6 py-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-charcoal-border/60 px-6 py-3">
         {(
           [
             ["library", Images, "Library"],
@@ -216,7 +218,7 @@ export function LibraryWorkspace(props: {
             variant={tab === value ? "secondary" : "ghost"}
             size="sm"
             aria-pressed={tab === value}
-            className={tab === value ? undefined : "text-muted-foreground"}
+            className={tab === value ? undefined : "text-cream-muted"}
             onClick={() => setTab(value)}
           >
             <Icon size={15} />
@@ -250,8 +252,8 @@ export function LibraryWorkspace(props: {
               <div>
                 <strong>{analyzed.length} analyzed files</strong>
               </div>
-              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-transparent px-3 sm:w-[360px]">
-                <Search className="shrink-0 text-muted-foreground" size={16} />
+              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-charcoal-border bg-transparent px-3 sm:w-[360px]">
+                <Search className="shrink-0 text-cream-muted" size={16} />
                 <Input
                   aria-label="Search Library"
                   className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm leading-none shadow-none focus-visible:ring-0"
@@ -260,16 +262,16 @@ export function LibraryWorkspace(props: {
                   onChange={(event) => setQuery(event.target.value)}
                 />
                 {semanticSearching ? (
-                  <Loader2 className="shrink-0 animate-spin text-muted-foreground" size={15} />
+                  <Loader2 className="shrink-0 animate-spin text-cream-muted" size={15} />
                 ) : null}
               </div>
             </div>
             {semanticError ? (
-              <p className="text-sm text-warning">
+              <p className="text-sm text-sage-fg">
                 Semantic search is unavailable; showing local metadata matches. {semanticError}
               </p>
             ) : null}
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <p className="text-sm text-cream-bright">{error}</p> : null}
             {query.trim() && !semanticSearching && visibleAssets.length === 0 ? (
               <LibraryEmpty
                 title="No matching files"
@@ -289,12 +291,12 @@ export function LibraryWorkspace(props: {
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h2 className="m-0 text-xl font-bold">Tags</h2>
-                <p className="m-0 mt-1 text-sm text-muted-foreground">
+                <p className="m-0 mt-1 text-sm text-cream-muted">
                   Agents add tags during analysis. Open a file to review, remove, or add one.
                 </p>
               </div>
-              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-input bg-transparent px-3 sm:w-[260px]">
-                <Search className="shrink-0 text-muted-foreground" size={15} />
+              <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-md border border-charcoal-border bg-transparent px-3 sm:w-[260px]">
+                <Search className="shrink-0 text-cream-muted" size={15} />
                 <Input
                   className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-sm leading-none shadow-none focus-visible:ring-0"
                   value={tagQuery}
@@ -345,7 +347,7 @@ export function LibraryWorkspace(props: {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-dashed text-muted-foreground"
+                  className="rounded-full border-dashed text-cream-muted"
                   aria-expanded={tagsExpanded}
                   onClick={() => setTagsExpanded((current) => !current)}
                 >
@@ -353,7 +355,7 @@ export function LibraryWorkspace(props: {
                 </Button>
               ) : null}
               {tagQuery && visibleTags.length === 0 ? (
-                <span className="text-sm text-muted-foreground">No matching tags</span>
+                <span className="text-sm text-cream-muted">No matching tags</span>
               ) : null}
             </div>
             <LibraryGallery
@@ -368,7 +370,7 @@ export function LibraryWorkspace(props: {
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="m-0 text-xl font-bold">Collections</h2>
-                <p className="m-0 mt-1 text-sm text-muted-foreground">
+                <p className="m-0 mt-1 text-sm text-cream-muted">
                   Saved, rule-based views evaluated against the actual file index and AI metadata.
                 </p>
               </div>
@@ -385,7 +387,7 @@ export function LibraryWorkspace(props: {
               {savedSearches.map((search) => (
                 <div
                   key={search.id}
-                  className="flex items-center gap-3 rounded-lg bg-card p-3 shadow-xs inset-ring-1 inset-ring-foreground/10"
+                  className="flex items-center gap-3 rounded-lg bg-charcoal-card p-3 shadow-xs inset-ring-1 inset-ring-cream/10"
                 >
                   <Button
                     variant="ghost"
@@ -394,7 +396,7 @@ export function LibraryWorkspace(props: {
                   >
                     <span className="min-w-0">
                       <strong className="block">{search.name}</strong>
-                      <small className="block truncate font-normal text-muted-foreground">
+                      <small className="block truncate font-normal text-cream-muted">
                         {search.query ||
                           smartFolderQueryFromRules(
                             search.rules,
@@ -413,10 +415,8 @@ export function LibraryWorkspace(props: {
                 </div>
               ))}
             </div>
-            {folderError ? <p className="text-sm text-destructive">{folderError}</p> : null}
-            {folderSearching ? (
-              <p className="text-sm text-muted-foreground">Evaluating rules…</p>
-            ) : null}
+            {folderError ? <p className="text-sm text-cream-bright">{folderError}</p> : null}
+            {folderSearching ? <p className="text-sm text-cream-muted">Evaluating rules…</p> : null}
             {folderResults.length > 0 ? (
               <div className="mt-6 grid gap-1">
                 <h3 className="mb-2">Results · {folderResults.length}</h3>
@@ -436,15 +436,15 @@ export function LibraryWorkspace(props: {
                   >
                     <SearchResultThumbnail
                       result={result}
-                      className="grid size-[52px] place-items-center overflow-hidden rounded-md bg-muted"
+                      className="grid size-[52px] place-items-center overflow-hidden rounded-md bg-charcoal-card"
                       imageClassName="size-full object-cover"
                     />
                     <span className="min-w-0">
                       <strong className="block truncate">{result.entry.name}</strong>
-                      <span className="block truncate text-sm text-muted-foreground">
+                      <span className="block truncate text-sm text-cream-muted">
                         {searchResultSummary(result)}
                       </span>
-                      <small className="block truncate text-muted-foreground/70">
+                      <small className="block truncate text-cream-muted/70">
                         {searchResultContext(result)}
                       </small>
                     </span>
@@ -483,3 +483,5 @@ export function LibraryWorkspace(props: {
     </section>
   );
 }
+
+export type LibraryTab = "library" | "collections" | "tags" | "media";

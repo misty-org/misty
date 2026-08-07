@@ -51,13 +51,13 @@ export function SpacePlannerHeader({
   const needsAttention = sources.some((source) => source.status !== "active");
 
   return (
-    <header className="misty-spaces-toolbar flex min-h-11 flex-wrap items-center gap-2 px-3 py-1.5">
+    <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
       <h1 className="m-0 text-sm font-semibold">Tasks</h1>
 
       <div className="ml-auto flex items-center gap-2">
         {showSearch ? (
           <div className="relative w-44">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
             <Input
               autoFocus
               className="h-8 pl-8 pr-8 text-xs"
@@ -122,7 +122,7 @@ export function SpacePlannerHeader({
           <DropdownMenuTrigger asChild>
             <Button
               aria-label="Sync planner"
-              className="relative size-8 text-muted-foreground/70 shadow-none hover:text-foreground"
+              className="relative size-8 text-cream-muted/70 shadow-none hover:text-cream"
               size="icon"
               title="Sync planner"
               variant="ghost"
@@ -135,7 +135,7 @@ export function SpacePlannerHeader({
               )}
               {needsAttention ? (
                 <span
-                  className="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500"
+                  className="absolute right-1 top-1 size-1.5 rounded-full bg-sage-bg"
                   aria-hidden
                 />
               ) : null}

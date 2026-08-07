@@ -23,7 +23,7 @@ import { relativeTime } from "@/features/notes/noteFilters";
 import { ProviderGlyph, providerStatusPresentation } from "./NoteSourceBadge";
 
 const sectionTitleClass =
-  "mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70";
+  "mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-cream-muted/70";
 
 export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
   const connected = props.adjacent.filter((entry) => entry.availability === "connected");
@@ -32,7 +32,7 @@ export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-[560px] gap-0 p-0">
-        <DialogHeader className="border-b border-border px-5 py-4">
+        <DialogHeader className="border-b border-charcoal-border px-5 py-4">
           <DialogTitle className="text-[14px]">Note sources</DialogTitle>
           <DialogDescription className="text-[12px]">
             Connectors that supply notes, plus integrations already connected elsewhere in Misty.
@@ -94,28 +94,28 @@ function ConnectorCard(props: ConnectorCardProps) {
   const native = connector.source === "misty";
 
   return (
-    <Card className="border-border bg-card p-3 shadow-sm">
+    <Card className="border-charcoal-border bg-charcoal-card p-3 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border bg-muted/40">
+        <span className="grid size-8 shrink-0 place-items-center rounded-md border border-charcoal-border bg-charcoal-card">
           <ProviderGlyph providerId={connector.providerId} size={15} />
         </span>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h4 className="truncate text-[13px] font-medium text-foreground">{connector.name}</h4>
+            <h4 className="truncate text-[13px] font-medium text-cream">{connector.name}</h4>
             <StatusBadge status={presentation.tone} dot>
               {presentation.label}
             </StatusBadge>
           </div>
-          <p className="mt-1 text-[11.5px] text-muted-foreground">
+          <p className="mt-1 text-[11.5px] text-cream-muted">
             {native
               ? "Built in. Notes you write are saved privately on this desktop."
               : "Misty reads selected pages and writes only when you explicitly publish."}
           </p>
           {props.error ? (
-            <p className="mt-1 text-[11px] text-amber-500">{props.error}</p>
+            <p className="mt-1 text-[11px] text-sage-fg">{props.error}</p>
           ) : lastSynced ? (
-            <p className="mt-1 text-[11px] text-muted-foreground/60">
+            <p className="mt-1 text-[11px] text-cream-muted/60">
               Last synced {relativeTime(lastSynced)}
             </p>
           ) : null}
@@ -162,9 +162,9 @@ function AdjacentCard(props: { entry: NotesIntegrationCard }) {
   const planned = entry.availability === "planned";
 
   return (
-    <Card className="border-border bg-card/60 p-3 shadow-none">
+    <Card className="border-charcoal-border bg-charcoal-card p-3 shadow-none">
       <div className="flex items-center gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-muted/30">
+        <span className="grid size-7 shrink-0 place-items-center rounded-md border border-charcoal-border bg-charcoal-card">
           <ProviderGlyph
             providerId={entry.providerId}
             size={13}
@@ -173,7 +173,7 @@ function AdjacentCard(props: { entry: NotesIntegrationCard }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h4 className="truncate text-[12.5px] font-medium text-foreground/90">{entry.name}</h4>
+            <h4 className="truncate text-[12.5px] font-medium text-cream/90">{entry.name}</h4>
             {planned ? (
               <StatusBadge status="neutral">Coming later</StatusBadge>
             ) : (
@@ -182,7 +182,7 @@ function AdjacentCard(props: { entry: NotesIntegrationCard }) {
               </StatusBadge>
             )}
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{entry.description}</p>
+          <p className="mt-0.5 truncate text-[11px] text-cream-muted">{entry.description}</p>
         </div>
       </div>
     </Card>

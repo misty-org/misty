@@ -1,4 +1,4 @@
-import type { FormEvent, RefObject } from "react";
+import type { FormEvent, RefObject, UIEventHandler } from "react";
 import {
   Ellipsis,
   LibraryBig,
@@ -45,6 +45,8 @@ export interface SpaceChatMessagesProps {
   error: string;
   loading: boolean;
   messages: SpaceMessage[];
+  /** Agent turns still in flight; drives the typing indicator. */
+  pendingAgentRuns?: { triggerId: string; runId: string; agentId: string }[];
   actionSuggestions?: SpaceActionSuggestionBatch[];
   onActionSuggestionsChanged?: () => void;
   currentUserId?: string;
@@ -59,6 +61,8 @@ export interface SpaceChatMessagesProps {
   canAddToLibrary: boolean;
   spaceId: string;
   endRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefObject<HTMLDivElement | null>;
+  onScroll: UIEventHandler<HTMLDivElement>;
   onEditingText: (value: string) => void;
   onCancelEditing: (messageId: string) => void;
   onSaveEdited: (event: FormEvent, message: SpaceMessage) => void;

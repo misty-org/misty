@@ -207,13 +207,13 @@ export function SpaceRoadmapWorkspace({
         <div className="mx-auto max-w-4xl">
           <header className="mb-6">
             <h1 className="m-0 text-xl font-semibold">Views</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-cream-muted">
               Choose a roadmap canvas, then open it when you are ready to edit.
             </p>
           </header>
           {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
           {canManage && (createRequested || !roadmaps.length) ? (
-            <div className="mb-6 flex max-w-lg gap-2 rounded-xl border border-border/70 bg-card p-4">
+            <div className="mb-6 flex max-w-lg gap-2 rounded-xl border border-charcoal-border/70 bg-charcoal-card p-4">
               <Input
                 autoFocus
                 placeholder="Roadmap name"
@@ -239,18 +239,18 @@ export function SpaceRoadmapWorkspace({
               New roadmap
             </Button>
           ) : null}
-          <div className="overflow-hidden rounded-xl border border-border/70 bg-card">
+          <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
             {roadmaps.map((roadmap) => (
               <article
-                className="flex min-h-20 items-center gap-3 border-t border-border/60 px-4 py-3 first:border-t-0"
+                className="flex min-h-20 items-center gap-3 border-t border-charcoal-border/60 px-4 py-3 first:border-t-0"
                 key={roadmap.id}
               >
-                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
                   <GitFork className="size-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <strong className="block truncate text-sm font-medium">{roadmap.name}</strong>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                  <span className="mt-0.5 block truncate text-xs text-cream-muted">
                     {roadmap.description || "No description yet"}
                   </span>
                 </div>
@@ -269,7 +269,7 @@ export function SpaceRoadmapWorkspace({
               </article>
             ))}
             {!roadmaps.length && !loading ? (
-              <div className="p-10 text-center text-sm text-muted-foreground">No roadmaps yet.</div>
+              <div className="p-10 text-center text-sm text-cream-muted">No roadmaps yet.</div>
             ) : null}
           </div>
         </div>
@@ -278,7 +278,7 @@ export function SpaceRoadmapWorkspace({
   if (loading && !snapshot)
     return (
       <div className="grid h-full place-items-center">
-        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+        <LoaderCircle className="size-5 animate-spin text-cream-muted" />
       </div>
     );
   if (!snapshot)

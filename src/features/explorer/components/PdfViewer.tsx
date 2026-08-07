@@ -83,14 +83,14 @@ export default function PdfViewer({
   const pageWidth = Math.round(baseWidth * zoom);
 
   return (
-    <div className="flex h-full w-full flex-col bg-muted">
+    <div className="flex h-full w-full flex-col bg-charcoal-card">
       {compact ? null : (
-        <div className="flex h-11 flex-none items-center justify-between gap-3 border-b border-border bg-background/95 px-3 text-foreground backdrop-blur">
+        <div className="flex h-11 flex-none items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-bg px-3 text-cream ">
           <span className="min-w-0 truncate text-sm font-medium" title={name}>
             {name}
           </span>
           <div className="flex flex-none items-center gap-3">
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="text-xs tabular-nums text-cream-muted">
               {numPages ? `Page ${currentPage} of ${numPages}` : "—"}
             </span>
             <div className="flex items-center gap-0.5">
@@ -105,7 +105,7 @@ export default function PdfViewer({
               >
                 <Minus size={16} />
               </Button>
-              <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
+              <span className="w-12 text-center text-xs tabular-nums text-cream-muted">
                 {Math.round(zoom * 100)}%
               </span>
               <Button
@@ -134,7 +134,7 @@ export default function PdfViewer({
         aria-label={`PDF reader for ${name}`}
       >
         {loadError ? (
-          <p className="mt-10 max-w-sm text-center text-sm text-destructive">{loadError}</p>
+          <p className="mt-10 max-w-sm text-center text-sm text-cream-bright">{loadError}</p>
         ) : (
           <Document
             file={url}
@@ -146,7 +146,7 @@ export default function PdfViewer({
               setLoadError(error instanceof Error ? error.message : "This PDF could not be opened.")
             }
             loading={
-              <div className="mt-10 grid justify-items-center gap-2 text-sm text-muted-foreground">
+              <div className="mt-10 grid justify-items-center gap-2 text-sm text-cream-muted">
                 <Loader2 className="animate-spin" size={26} />
                 Loading PDF…
               </div>

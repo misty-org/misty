@@ -15,13 +15,13 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
 
   return (
     <div
-      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg"
       aria-busy="true"
       role="status"
     >
       <span className="sr-only">{props.label ?? "Loading Space"}</span>
 
-      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border/60 px-3">
+      <header className="flex h-11 shrink-0 items-center justify-between border-b border-charcoal-border/60 px-3">
         <Skeleton className="h-8 min-w-44 max-w-xl flex-1 rounded-md" />
         <div className="flex items-center gap-2">
           <Skeleton className="size-8 rounded-md" />
@@ -52,7 +52,7 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border/50 px-[clamp(20px,5vw,72px)] py-4">
+      <div className="shrink-0 border-t border-charcoal-border/50 px-[clamp(20px,5vw,72px)] py-4">
         <div className="mx-auto max-w-5xl">
           <Skeleton className="h-12 w-full rounded-xl" />
         </div>
@@ -60,7 +60,7 @@ export function SpacePageLoadingPlaceholder(props: { label?: string; onRetry?: (
 
       {retryVisible && props.onRetry ? (
         <div className="absolute inset-x-0 top-20 z-10 flex justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full border border-border/70 bg-background/95 py-1.5 pl-4 pr-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <div className="flex items-center gap-3 rounded-full border border-charcoal-border/70 bg-charcoal-bg py-1.5 pl-4 pr-1.5 text-xs text-cream-muted shadow-sm ">
             <span>Still getting things ready</span>
             <Button size="sm" variant="ghost" type="button" onClick={props.onRetry}>
               Try again
@@ -76,12 +76,12 @@ export function SpacesAppLoadingPlaceholder() {
   return (
     <div
       className={[
-        "misty-spaces-workbench grid h-full min-h-0",
-        "grid-cols-[var(--misty-spaces-rail-width)_minmax(0,1fr)]",
-        "grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-background",
+        "grid h-full min-h-0",
+        "grid-cols-[clamp(248px,18vw,268px)_minmax(0,1fr)]",
+        "grid-rows-[minmax(0,1fr)_32px] overflow-hidden bg-charcoal-bg",
       ].join(" ")}
     >
-      <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-sidebar-border/60 bg-sidebar px-3 pb-2 pt-3">
+      <aside className="col-start-1 row-start-1 flex min-h-0 flex-col overflow-hidden border-r border-charcoal-border/60 bg-charcoal-sidebar px-3 pb-2 pt-3">
         <Skeleton className="h-10 rounded-md" />
         <div className="mt-5 grid gap-2">
           <Skeleton className="h-5 w-24 rounded-md" />
@@ -89,13 +89,13 @@ export function SpacesAppLoadingPlaceholder() {
           <Skeleton className="h-10 w-5/6 rounded-md" />
           <Skeleton className="h-10 w-4/5 rounded-md" />
         </div>
-        <div className="mt-auto border-t border-sidebar-border/55 pt-3">
+        <div className="mt-auto border-t border-charcoal-border/55 pt-3">
           <Skeleton className="h-9 rounded-md" />
         </div>
       </aside>
 
       <main className="col-start-2 row-start-1 grid min-h-0 min-w-0 grid-rows-[48px_minmax(0,1fr)] overflow-hidden">
-        <header className="flex items-center gap-1 border-b border-border/60 px-3">
+        <header className="flex items-center gap-1 border-b border-charcoal-border/60 px-3">
           {[72, 78, 88, 82].map((width) => (
             <Skeleton className="h-8 rounded-md" style={{ width }} key={width} />
           ))}
@@ -105,7 +105,7 @@ export function SpacesAppLoadingPlaceholder() {
         </div>
       </main>
 
-      <footer className="col-span-full row-start-2 flex items-center border-t border-border/60 px-2">
+      <footer className="col-span-full row-start-2 flex items-center border-t border-charcoal-border/60 px-2">
         <Skeleton className="size-6 rounded-md" />
       </footer>
     </div>

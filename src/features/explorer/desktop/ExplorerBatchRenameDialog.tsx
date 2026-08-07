@@ -1,10 +1,6 @@
-import type { BatchRenameCaseMode } from "@/models/types/features/explorer/desktop/ExplorerBatchRenameDialog";
-export type { BatchRenameCaseMode } from "@/models/types/features/explorer/desktop/ExplorerBatchRenameDialog";
-import type { BatchRenameOptions } from "@/models/interfaces/features/explorer/desktop/ExplorerBatchRenameDialog";
-export type { BatchRenameOptions } from "@/models/interfaces/features/explorer/desktop/ExplorerBatchRenameDialog";
 import { useCallback, useMemo, useState } from "react";
-import { Badge } from "@/ui";
 import {
+  Badge,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -13,33 +9,40 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/ui";
-import { Button } from "@/ui";
-import { Checkbox } from "@/ui";
-import {
+  Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/ui";
-import { Input } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { validateBatchRenameItems, useExplorerStore } from "@/stores/explorer";
-import type { ExplorerBatchRenameItem, ExplorerDialogState } from "@/stores/explorer";
+import {
+  validateBatchRenameItems,
+  useExplorerStore,
+  type ExplorerBatchRenameItem,
+  type ExplorerDialogState,
+} from "@/stores/explorer";
 
 const dialogChromeClass =
-  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-popover p-0 text-popover-foreground";
+  "flex max-h-[min(760px,calc(100vh-48px))] w-[min(720px,calc(100vw-48px))] max-w-none flex-col overflow-hidden bg-charcoal-card p-0 text-cream";
 const dialogWideClass = "w-[min(760px,calc(100vw-48px))]";
-const fieldClass = "grid gap-1.5 text-xs font-medium text-muted-foreground";
-const controlsClass = "grid grid-cols-4 gap-3 border-b border-border p-4 max-[820px]:grid-cols-2";
+const fieldClass = "grid gap-1.5 text-xs font-medium text-cream-muted";
+const controlsClass =
+  "grid grid-cols-4 gap-3 border-b border-charcoal-border p-4 max-[820px]:grid-cols-2";
 const toggleClass =
-  "flex min-h-9 items-center gap-2 rounded-md bg-muted/50 px-3 text-xs font-medium text-foreground";
+  "flex min-h-9 items-center gap-2 rounded-md bg-charcoal-card px-3 text-xs font-medium text-cream";
 const listClass = "min-h-0 overflow-auto px-4 py-3";
 const rowClass =
-  "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-border py-2.5 text-xs last:border-0";
-const rowInvalidClass = "rounded-md border border-destructive/25 bg-destructive/10 px-2";
+  "grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-charcoal-border py-2.5 text-xs last:border-0";
+const rowInvalidClass = "rounded-md border border-charcoal-active/25 bg-charcoal-active px-2";
 
 function batchRenameItemKey(item: ExplorerBatchRenameItem): string {
   return `${item.paneId}:${item.entryId}`;
@@ -164,7 +167,7 @@ function BatchRenameDialog(props: {
             applyPreview();
           }}
         >
-          <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-border px-5 py-4 text-left">
+          <DialogHeader className="grid grid-cols-[1fr_auto] items-start gap-4 border-b border-charcoal-border px-5 py-4 text-left">
             <div>
               <DialogTitle>Batch Rename</DialogTitle>
               <DialogDescription>
@@ -267,7 +270,7 @@ function BatchRenameDialog(props: {
             </label>
           </div>
           <div
-            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3 border-b border-charcoal-border px-4 py-2 text-[10px] font-semibold uppercase tracking-wide text-cream-muted"
             aria-hidden="true"
           >
             <span>Before</span>
@@ -279,7 +282,7 @@ function BatchRenameDialog(props: {
                 className={`${rowClass} ${item.error ? rowInvalidClass : ""}`}
                 key={batchRenameItemKey(item)}
               >
-                <span className="truncate text-muted-foreground" title={item.originalName}>
+                <span className="truncate text-cream-muted" title={item.originalName}>
                   {item.originalName}
                 </span>
                 <div>
@@ -298,12 +301,12 @@ function BatchRenameDialog(props: {
                     ) : null}
                   </div>
                   {item.error ? (
-                    <em className="mt-1 block text-[11px] not-italic text-destructive">
+                    <em className="mt-1 block text-[11px] not-italic text-cream-bright">
                       {item.error}
                     </em>
                   ) : (
                     <em
-                      className={`${`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "text-muted-foreground" : "text-emerald-500"} mt-1 block text-[11px] not-italic`}
+                      className={`${`${item.value.trim()}${item.lockedExtension}` === item.originalName ? "text-cream-muted" : "text-sage-fg"} mt-1 block text-[11px] not-italic`}
                     >
                       {`${item.value.trim()}${item.lockedExtension}` === item.originalName
                         ? "Unchanged"
@@ -314,7 +317,7 @@ function BatchRenameDialog(props: {
               </label>
             ))}
           </div>
-          <DialogFooter className="mt-0 border-t border-border px-5 py-4">
+          <DialogFooter className="mt-0 border-t border-charcoal-border px-5 py-4">
             <Button
               variant="outline"
               type="button"
@@ -354,14 +357,14 @@ export function ExplorerDialog() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Permanently</AlertDialogTitle>
           <AlertDialogDescription>
-            Delete <strong className="font-semibold text-foreground">{deleteLabel}</strong>? This
-            cannot be undone.
+            Delete <strong className="font-semibold text-cream">{deleteLabel}</strong>? This cannot
+            be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground"
+            className="bg-charcoal-active text-cream-bright"
             onClick={() => void useExplorerStore.getState().confirmDialog()}
           >
             Delete
@@ -370,4 +373,19 @@ export function ExplorerDialog() {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+export type BatchRenameCaseMode = "none" | "lower" | "upper" | "title";
+
+export interface BatchRenameOptions {
+  findText: string;
+  replaceText: string;
+  prefix: string;
+  suffix: string;
+  caseMode: BatchRenameCaseMode;
+  lockExtensions: boolean;
+  sequenceEnabled: boolean;
+  sequenceStart: number;
+  sequencePad: number;
+  manualValues: Record<string, string>;
 }

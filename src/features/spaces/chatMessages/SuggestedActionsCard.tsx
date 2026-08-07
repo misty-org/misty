@@ -48,22 +48,22 @@ export function SuggestedActionsCard({
   };
   return (
     <section
-      className="ml-[60px] my-3 rounded-xl border border-primary/20 bg-primary/[0.045] p-3"
+      className="ml-[60px] my-3 rounded-xl border border-charcoal-active/20 bg-charcoal-active p-3"
       aria-label="Suggested actions"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-charcoal-active text-cream-bright">
           <Lightbulb size={16} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-semibold">Suggested actions</p>
-          <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+          <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
             Misty noticed a concrete agreement. Nothing happens until someone reviews and accepts
             it.
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {batch.items.map((item) => (
-              <span key={item.id} className="rounded-md border bg-background/70 px-2 py-1 text-xs">
+              <span key={item.id} className="rounded-md border bg-charcoal-bg px-2 py-1 text-xs">
                 {item.title}
               </span>
             ))}
@@ -216,7 +216,7 @@ function SuggestionReviewDialog({
             perform each action.
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-lg border bg-muted/25 px-3 py-2 text-xs">
+        <div className="rounded-lg border bg-charcoal-card px-3 py-2 text-xs">
           <strong>Destination:</strong>{" "}
           {audience === "space" ? "Everyone in this Space" : "Only people in this conversation"}
         </div>
@@ -235,7 +235,7 @@ function SuggestionReviewDialog({
           ))}
         </div>
         {error ? (
-          <p className="m-0 text-sm text-destructive" role="alert">
+          <p className="m-0 text-sm text-cream-bright" role="alert">
             {error}
           </p>
         ) : null}
@@ -283,7 +283,9 @@ function ReviewItem({
     "conversation.follow_up.schedule": Timer,
   }[item.action_kind];
   return (
-    <article className={`rounded-xl border p-3 ${draft.selected ? "bg-card" : "opacity-60"}`}>
+    <article
+      className={`rounded-xl border p-3 ${draft.selected ? "bg-charcoal-card" : "opacity-60"}`}
+    >
       <div className="flex items-start gap-2">
         <Checkbox
           className="mt-1 size-4"
@@ -291,11 +293,11 @@ function ReviewItem({
           aria-label={`Select ${item.title}`}
           onCheckedChange={(checked) => onChange({ selected: checked === true })}
         />
-        <Icon className="mt-0.5 size-4 text-muted-foreground" />
+        <Icon className="mt-0.5 size-4 text-cream-muted" />
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-semibold">{item.title}</p>
           {item.summary ? (
-            <p className="mb-0 mt-0.5 text-xs text-muted-foreground">{item.summary}</p>
+            <p className="mb-0 mt-0.5 text-xs text-cream-muted">{item.summary}</p>
           ) : null}
         </div>
       </div>
@@ -332,7 +334,7 @@ function ReviewItem({
           {item.action_kind === "calendar.event.create" &&
           draft.input.calendar_source_id !== undefined &&
           draft.input.calendar_source_id !== "misty" ? (
-            <p className="m-0 rounded-md bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-300">
+            <p className="m-0 rounded-md bg-sage-bg px-2 py-1.5 text-xs text-sage-fg">
               Accepting approves this exact external calendar write.
             </p>
           ) : null}

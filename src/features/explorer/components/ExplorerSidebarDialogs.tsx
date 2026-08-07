@@ -54,7 +54,7 @@ const smartFolderOperators = [
 ] as const;
 
 const fieldClass = "grid gap-1.5";
-const fieldLabelClass = "text-xs font-medium text-muted-foreground";
+const fieldLabelClass = "text-xs font-medium text-cream-muted";
 
 export function WorkspaceDialog(props: {
   state: NonNullable<WorkspaceDialogState>;
@@ -75,14 +75,14 @@ export function WorkspaceDialog(props: {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete file layout</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete <strong className="font-medium text-foreground">{props.state.title}</strong>?
-              This removes the saved layout, not any files.
+              Delete <strong className="font-medium text-cream">{props.state.title}</strong>? This
+              removes the saved layout, not any files.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
+              className="bg-charcoal-active text-cream-bright"
               onClick={props.onConfirm}
             >
               Delete
@@ -245,16 +245,16 @@ export function SmartFolderDialog(props: {
             />
           </div>
 
-          <div className="grid gap-2 rounded-lg bg-muted/40 p-3">
+          <div className="grid gap-2 rounded-lg bg-charcoal-card p-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-medium text-muted-foreground">Rules</span>
+              <span className="text-xs font-medium text-cream-muted">Rules</span>
               <Button variant="ghost" size="sm" type="button" onClick={addRule}>
                 <Plus size={14} /> Add rule
               </Button>
             </div>
             {draft.rules.map((rule, index) => (
               <div
-                className="grid gap-2 border-t border-border/70 pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_32px]"
+                className="grid gap-2 border-t border-charcoal-border/70 pt-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.2fr)_32px]"
                 key={`rule:${index}`}
               >
                 <Select
@@ -307,7 +307,7 @@ export function SmartFolderDialog(props: {
           </div>
 
           {props.error ? (
-            <p className="m-0 text-sm text-destructive" role="alert">
+            <p className="m-0 text-sm text-cream-bright" role="alert">
               {props.error}
             </p>
           ) : null}

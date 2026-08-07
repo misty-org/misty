@@ -1,15 +1,23 @@
-import type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
-export type { RemoteEditPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteEditPanel";
-import { Alert, AlertDescription, AlertTitle } from "@/ui";
-import { Button } from "@/ui";
-import { Skeleton } from "@/ui";
+import type {
+  ProviderWorkflow,
+  CloudConfigPaths,
+  RemoteEditDraft,
+} from "@/models/interfaces/services/misty-api";
+import { RemoteConfigForm } from "@/pages/Providers/components/RemoteConfigForm";
+import { RemoteEditActions } from "@/pages/Providers/components/RemoteEditActions";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  Skeleton,
+  AssetIcon,
+  EmptyState,
+  ErrorState,
+  StatusBadge,
+} from "@/ui";
 import { iconAssets } from "@/assets/icons";
-import { AssetIcon } from "@/ui";
 import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
-import { RemoteConfigForm } from "./RemoteConfigForm";
-import { RemoteEditActions } from "./RemoteEditActions";
-import { EmptyState, ErrorState } from "@/ui";
-import { StatusBadge } from "@/ui";
 
 const remoteEditPanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
@@ -127,7 +135,7 @@ function RemoteEditSkeleton() {
       aria-busy="true"
       aria-label="Loading remote configuration"
     >
-      <div className="inline-flex items-center gap-2 text-[13px] text-muted-foreground">
+      <div className="inline-flex items-center gap-2 text-[13px] text-cream-muted">
         <AssetIcon className="animate-spin" src={iconAssets.sync16} size={17} />
         <span>Loading remote configuration</span>
       </div>
@@ -150,4 +158,28 @@ function RemoteEditSkeleton() {
       </div>
     </div>
   );
+}
+
+export interface RemoteEditPanelProps {
+  draft: RemoteEditDraft | null;
+  configPaths: CloudConfigPaths | null;
+  configKeys: string[];
+  workflow: ProviderWorkflow | null;
+  dirty: boolean;
+  loadingRemoteName: string | null;
+  working: boolean;
+  tokenVisible: boolean;
+  validRemoteName: boolean;
+  stale: boolean;
+  serviceError: string | null;
+  feedbackError: string | null;
+  feedbackMessage: string | null;
+  onDraftName: (name: string) => void;
+  onConfigField: (key: string, value: string) => void;
+  onTokenField: (key: string, value: string) => void;
+  onTokenVisible: (visible: boolean) => void;
+  onSave: () => void;
+  onDelete: (name: string) => void;
+  onReload: () => void;
+  onTest: () => void;
 }

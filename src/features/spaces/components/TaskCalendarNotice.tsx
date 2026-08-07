@@ -135,14 +135,14 @@ function Notice({
   children: ReactNode;
 }) {
   const toneClass =
-    tone === "warning" ? "border-amber-500/30 bg-amber-500/10" : "border-border bg-muted/40";
+    tone === "warning" ? "border-sage-fg/30 bg-sage-bg" : "border-charcoal-border bg-charcoal-card";
   return (
     <div className={`rounded-lg border px-3 py-2.5 text-xs ${toneClass}`} role="status">
       <p className="m-0 flex items-center gap-1.5 font-medium">
         <Icon className="size-3.5" aria-hidden />
         {title}
       </p>
-      <div className="mt-1 text-muted-foreground">{children}</div>
+      <div className="mt-1 text-cream-muted">{children}</div>
     </div>
   );
 }

@@ -59,17 +59,17 @@ export function SpaceInvitationRedemption() {
   };
 
   return (
-    <div className="grid h-full place-items-center bg-background p-6">
+    <div className="grid h-full place-items-center bg-charcoal-bg p-6">
       <Card className="w-full max-w-md p-6 text-center">
         {loading ? (
-          <LoaderCircle className="mx-auto size-6 animate-spin text-muted-foreground" />
+          <LoaderCircle className="mx-auto size-6 animate-spin text-cream-muted" />
         ) : preview ? (
           <>
-            <span className="mx-auto grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
+            <span className="mx-auto grid size-11 place-items-center rounded-xl bg-charcoal-active text-cream-bright">
               <Users size={20} />
             </span>
             <h1 className="mb-0 mt-4 text-xl font-semibold">Join {preview.space_name}</h1>
-            <p className="mb-0 mt-2 text-sm text-muted-foreground">
+            <p className="mb-0 mt-2 text-sm text-cream-muted">
               {preview.inviter_name} invited {preview.invited_email} to collaborate in this Space.
             </p>
             {user ? (
@@ -78,7 +78,7 @@ export function SpaceInvitationRedemption() {
                   {joining ? <LoaderCircle className="size-4 animate-spin" /> : null}
                   {joining ? "Joining…" : "Join Space"}
                 </Button>
-                <p className="m-0 text-xs text-muted-foreground">Signed in as {user.email}</p>
+                <p className="m-0 text-xs text-cream-muted">Signed in as {user.email}</p>
               </div>
             ) : (
               <div className="mt-5 grid grid-cols-2 gap-2">
@@ -97,7 +97,7 @@ export function SpaceInvitationRedemption() {
           </>
         ) : null}
         {error ? (
-          <p className="mb-0 mt-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <p className="mb-0 mt-4 rounded-lg bg-charcoal-active p-3 text-sm text-cream-bright">
             {error}
           </p>
         ) : null}

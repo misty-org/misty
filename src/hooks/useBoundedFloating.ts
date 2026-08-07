@@ -1,11 +1,3 @@
-import type {
-  UseBoundedFloatingOptions,
-  BoundedFloatingResult,
-} from "@/models/interfaces/hooks/useBoundedFloating";
-export type {
-  UseBoundedFloatingOptions,
-  BoundedFloatingResult,
-} from "@/models/interfaces/hooks/useBoundedFloating";
 import {
   useCallback,
   useEffect,
@@ -130,4 +122,21 @@ export function useBoundedFloating(options: UseBoundedFloatingOptions): BoundedF
   }, [options.anchorRef, options.open, updatePosition]);
 
   return { floatingRef, floatingStyle, opensAbove };
+}
+
+export interface UseBoundedFloatingOptions {
+  open: boolean;
+  anchorRef: RefObject<HTMLElement>;
+  align?: "start" | "end";
+  gap?: number;
+  viewportPadding?: number;
+  preferredMaxHeight?: number;
+  minimumUsefulHeight?: number;
+  matchAnchorWidth?: boolean;
+}
+
+export interface BoundedFloatingResult {
+  floatingRef: RefObject<HTMLDivElement | null>;
+  floatingStyle: CSSProperties;
+  opensAbove: boolean;
 }

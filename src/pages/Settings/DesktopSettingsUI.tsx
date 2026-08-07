@@ -1,17 +1,6 @@
-import type {
-  DesktopSettingsNavEntry,
-  DesktopSettingsFrameProps,
-} from "@/models/interfaces/pages/Settings/DesktopSettingsUI";
-export type {
-  DesktopSettingsNavEntry,
-  DesktopSettingsFrameProps,
-} from "@/models/interfaces/pages/Settings/DesktopSettingsUI";
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
-
-import { Button } from "@/ui";
-import { X } from "lucide-react";
-import { cn } from "@/ui";
+import { type LucideIcon, X } from "lucide-react";
+import { Button, cn } from "@/ui";
 
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
@@ -22,7 +11,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     <div
       aria-label={props.ariaLabel}
       className={cn(
-        "grid min-h-0 min-w-0 grid-cols-[216px_1px_minmax(0,1fr)] overflow-hidden bg-background",
+        "grid min-h-0 min-w-0 grid-cols-[216px_1px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg",
         overlay ? "h-full" : "h-screen",
         "max-[900px]:grid-cols-[184px_1px_minmax(0,1fr)]",
         "max-[680px]:grid-cols-[156px_1px_minmax(0,1fr)]",
@@ -30,14 +19,14 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     >
       <aside
         className={cn(
-          "min-h-0 overflow-y-auto bg-sidebar p-4 text-sidebar-foreground",
-          "[--misty-active-bar-left:-1rem] max-[680px]:px-2.5",
-          "max-[680px]:[--misty-active-bar-left:-0.625rem]",
+          "min-h-0 overflow-y-auto bg-charcoal-sidebar p-4 text-cream-muted",
+          "max-[680px]:px-2.5",
+          "",
         )}
       >
         <nav className="flex min-h-0 flex-col gap-4" aria-label={props.navigationLabel}>
           <div className="grid gap-1">
-            <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
+            <div className="px-2 pb-1 text-[11px] font-medium text-cream-muted">
               {overlay ? props.navigationLabel : props.navigationTitle}
             </div>
             {props.items.map((item) => {
@@ -50,10 +39,10 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                   variant="ghost"
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "misty-hover-marker-side h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
+                    "h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
                     active
-                      ? "misty-active-marker-side text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "bg-charcoal-active text-cream-bright"
+                      : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
                   )}
                   onClick={() => props.onSelect(item.id)}
                 >
@@ -68,23 +57,23 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         </nav>
       </aside>
 
-      <div aria-hidden="true" className="bg-border" />
+      <div aria-hidden="true" className="bg-charcoal-border" />
 
-      <main className="flex min-h-0 min-w-0 flex-col bg-background">
-        <header className="shrink-0 border-b border-border/60 bg-background">
+      <main className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
+        <header className="shrink-0 border-b border-charcoal-border/60 bg-charcoal-bg">
           <div className="flex min-h-14 min-w-0 items-center gap-3 px-6 py-2 max-[720px]:px-4">
             {ActiveIcon ? (
-              <div className="flex shrink-0 items-center text-muted-foreground">
+              <div className="flex shrink-0 items-center text-cream-muted">
                 <ActiveIcon className="size-4" strokeWidth={1.8} />
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-foreground">
+                <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
                   {props.title}
                 </h1>
                 {props.description ? (
-                  <p className="min-w-0 truncate text-xs text-muted-foreground max-[760px]:hidden">
+                  <p className="min-w-0 truncate text-xs text-cream-muted max-[760px]:hidden">
                     {props.description}
                   </p>
                 ) : null}
@@ -125,14 +114,12 @@ export function DesktopSettingsSection(props: {
   return (
     <section className="mb-7 min-w-0 last:mb-0">
       <div className="mb-4 min-w-0">
-        <h2 className="text-sm font-semibold leading-5 text-foreground">{props.title}</h2>
+        <h2 className="text-sm font-semibold leading-5 text-cream">{props.title}</h2>
         {props.description ? (
-          <p className="mt-1 max-w-2xl text-sm leading-5 text-muted-foreground">
-            {props.description}
-          </p>
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-cream-muted">{props.description}</p>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card">
         {props.children}
       </div>
     </section>
@@ -149,16 +136,16 @@ export function DesktopSettingsRow(props: {
   return (
     <div
       className={cn(
-        "grid min-h-16 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5 border-b border-border px-5 py-3.5 last:border-b-0",
+        "grid min-h-16 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5 border-b border-charcoal-border px-5 py-3.5 last:border-b-0",
         "max-[760px]:grid-cols-1 max-[760px]:items-start max-[760px]:gap-3",
         props.last && "border-b-0",
         props.muted && "opacity-50",
       )}
     >
       <div className="grid min-w-0 gap-1">
-        <strong className="text-sm font-medium leading-5 text-foreground">{props.label}</strong>
+        <strong className="text-sm font-medium leading-5 text-cream">{props.label}</strong>
         {props.description ? (
-          <span className="text-sm leading-5 text-muted-foreground">{props.description}</span>
+          <span className="text-sm leading-5 text-cream-muted">{props.description}</span>
         ) : null}
       </div>
       <div className="flex min-w-0 items-center justify-end max-[760px]:w-full max-[760px]:justify-start">
@@ -166,4 +153,24 @@ export function DesktopSettingsRow(props: {
       </div>
     </div>
   );
+}
+
+export interface DesktopSettingsNavEntry<Id extends string = string> {
+  id: Id;
+  label: string;
+  icon: LucideIcon;
+}
+
+export interface DesktopSettingsFrameProps<Id extends string> {
+  activeId: Id;
+  ariaLabel: string;
+  children: ReactNode;
+  description?: ReactNode;
+  items: readonly DesktopSettingsNavEntry<Id>[];
+  navigationLabel: string;
+  navigationTitle: string;
+  onClose?: () => void;
+  onSelect: (id: Id) => void;
+  presentation?: "page" | "overlay";
+  title: ReactNode;
 }

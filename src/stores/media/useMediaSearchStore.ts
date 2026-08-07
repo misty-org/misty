@@ -1,11 +1,4 @@
-import type {
-  MediaIndexEstimate,
-  MediaSearchState,
-} from "@/models/interfaces/stores/media/useMediaSearchStore";
-export type {
-  MediaIndexEstimate,
-  MediaSearchState,
-} from "@/models/interfaces/stores/media/useMediaSearchStore";
+import { ensureMediaSearchDeviceReady } from "@/stores/media/useMediaSearchMigrationStore";
 import { create } from "zustand";
 import {
   mediaSearchAcknowledgeRemovedAssets,
@@ -27,7 +20,6 @@ import {
 } from "@/stores/media/useMediaSearchServerStore";
 import { ManagedAiRequestError } from "@/stores/agent/useAiServerStore";
 import { useUserStore } from "@/stores/account/useUserStore";
-import { ensureMediaSearchDeviceReady } from "./useMediaSearchMigrationStore";
 
 export const useMediaSearchStore = create<MediaSearchState>((set, get) => {
   let worker: Promise<void> | null = null;
@@ -276,4 +268,31 @@ function isRetryableChunkError(reason: unknown): boolean {
     );
   }
   return reason instanceof TypeError;
+}
+
+export interface MediaIndexEstimate {
+  assetIds: string[];
+  fileNames: string[];
+  fileCount: number;
+  remainingDurationMs: number;
+  estimatedWeeklyPercent: number;
+}
+
+export interface MediaSearchState {
+  loaded: boolean;
+  loading: boolean;
+  indexingAssetId: string | null;
+  progress: number;
+  error: string | null;
+  snapshot: MediaSearchSnapshot | null;
+  pendingApproval: MediaIndexEstimate | null;
+  load: () => Promise<void>;
+  scan: () => Promise<void>;
+  requestIndex: (assetIds: string[]) => void;
+  confirmIndex: () => Promise<void>;
+  cancelIndexApproval: () => void;
+  pauseAsset: (assetId: string) => Promise<void>;
+  resumeAsset: (assetId: string) => Promise<void>;
+  removeAssetIndex: (assetId: string) => Promise<void>;
+  clearDeviceIndex: () => Promise<void>;
 }

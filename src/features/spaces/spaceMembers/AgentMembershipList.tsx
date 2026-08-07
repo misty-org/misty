@@ -60,7 +60,7 @@ export function AgentMembershipList({
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="m-0 text-sm font-semibold">Agents</h3>
-          <p className="mb-0 mt-1 text-xs text-muted-foreground">
+          <p className="mb-0 mt-1 text-xs text-cream-muted">
             {agents.length} non-human teammate{agents.length === 1 ? "" : "s"} · no human seats
           </p>
         </div>
@@ -103,9 +103,9 @@ export function AgentMembershipList({
         {agents.map((agent, index) => (
           <div
             key={agent.agent_id}
-            className={`flex min-h-[72px] items-center gap-3 px-4 py-3 ${index ? "border-t border-border/60" : ""}`}
+            className={`flex min-h-[72px] items-center gap-3 px-4 py-3 ${index ? "border-t border-charcoal-border/60" : ""}`}
           >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-charcoal-active text-cream-bright">
               <Bot className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
@@ -116,7 +116,7 @@ export function AgentMembershipList({
                 </Badge>
                 {agent.update_available ? <Badge variant="outline">Update available</Badge> : null}
               </div>
-              <p className="mb-0 mt-0.5 truncate text-xs text-muted-foreground">
+              <p className="mb-0 mt-0.5 truncate text-xs text-cream-muted">
                 {agent.capability_grants?.length ?? 0} approved capabilities · approved v
                 {agent.approved_version}
               </p>
@@ -159,7 +159,7 @@ export function AgentMembershipList({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="text-destructive hover:text-destructive"
+                  className="text-cream-bright hover:text-cream-bright"
                   disabled={Boolean(busy)}
                   aria-label={`Remove ${agent.name}`}
                   onClick={() =>
@@ -177,9 +177,9 @@ export function AgentMembershipList({
         {!agents.length ? (
           <div className="grid min-h-32 place-items-center p-6 text-center">
             <div>
-              <Bot className="mx-auto size-6 text-muted-foreground" />
+              <Bot className="mx-auto size-6 text-cream-muted" />
               <p className="mb-0 mt-2 text-sm font-medium">No Agents in this Space</p>
-              <p className="mb-0 mt-1 text-xs text-muted-foreground">
+              <p className="mb-0 mt-1 text-xs text-cream-muted">
                 Add one of your Agents as a teammate to assign tasks or mention it in chat.
               </p>
             </div>

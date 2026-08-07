@@ -1,5 +1,3 @@
-import type { LibraryTagCount } from "@/models/interfaces/features/explorer/utils/libraryTags";
-export type { LibraryTagCount } from "@/models/interfaces/features/explorer/utils/libraryTags";
 import type { SmartLibraryAsset } from "@/models/interfaces/services/misty-api";
 
 export const DEFAULT_LIBRARY_TAG_LIMIT = 12;
@@ -40,4 +38,9 @@ export function visibleAssetTags(tags: string[], expanded: boolean): string[] {
 export function tagsWithout(tags: string[], removedTag: string): string[] {
   const removed = removedTag.toLocaleLowerCase();
   return tags.filter((tag) => tag.toLocaleLowerCase() !== removed);
+}
+
+export interface LibraryTagCount {
+  name: string;
+  count: number;
 }

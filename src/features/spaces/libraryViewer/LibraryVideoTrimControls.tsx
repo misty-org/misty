@@ -3,7 +3,7 @@ import { Button, Input } from "@/ui";
 import type { LibraryEditDefinition } from "@/models/types/features/spaces/types";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";
 
-const labelClass = "grid gap-1 text-[10px] capitalize text-muted-foreground";
+const labelClass = "grid gap-1 text-[10px] capitalize text-cream-muted";
 const speedOptions: [string, string][] = [
   ["0.5", "0.5×"],
   ["1", "1×"],

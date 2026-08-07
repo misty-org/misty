@@ -42,50 +42,47 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-[var(--misty-files-panel-bg,transparent)] px-4 py-4 text-sidebar-foreground [overscroll-behavior:contain] max-[980px]:hidden",
+  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-4 py-4 text-cream-muted [overscroll-behavior:contain] max-[980px]:hidden",
   section: "[&+&]:mt-5",
   sectionTitle: "group/section-title mb-2 flex min-w-0 items-center gap-2",
   sectionToggle:
-    "min-w-0 justify-start gap-2 px-0 text-left text-muted-foreground shadow-none !bg-transparent hover:!bg-transparent hover:text-foreground focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-muted-foreground aria-expanded:hover:!bg-transparent aria-expanded:hover:text-foreground",
+    "min-w-0 justify-start gap-2 px-0 text-left text-cream-muted shadow-none !bg-transparent hover:!bg-transparent hover:text-cream focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-muted aria-expanded:hover:!bg-transparent aria-expanded:hover:text-cream",
   sectionToggleLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
-  sectionChevron: "flex-none text-muted-foreground",
+  sectionChevron: "flex-none text-cream-muted",
   sectionActions: "ml-auto flex flex-none items-center gap-0",
   sectionActionsReveal:
     "opacity-0 transition-opacity group-hover/section-title:opacity-100 group-focus-within/section-title:opacity-100",
-  sectionActionButton: "size-8 text-muted-foreground shadow-none",
+  sectionActionButton: "size-8 text-cream-muted shadow-none",
   spinning: "[&>svg]:animate-spin",
   itemIcon: "grid size-[34px] flex-none place-items-center [&_svg]:size-[31px]",
   itemButton:
-    "h-10 w-full justify-start gap-2 px-2 text-left text-sm font-medium text-muted-foreground shadow-none hover:!bg-[linear-gradient(90deg,color-mix(in_srgb,var(--sidebar-accent)_84%,transparent),color-mix(in_srgb,var(--sidebar-accent)_64%,transparent))] hover:text-foreground",
-  itemSelected:
-    "!bg-[linear-gradient(90deg,color-mix(in_srgb,var(--sidebar-accent)_96%,transparent),color-mix(in_srgb,var(--sidebar-accent)_72%,transparent))] text-accent-foreground hover:!bg-[linear-gradient(90deg,color-mix(in_srgb,var(--sidebar-accent)_96%,transparent),color-mix(in_srgb,var(--sidebar-accent)_72%,transparent))] hover:text-accent-foreground",
+    "h-10 w-full justify-start gap-2 px-2 text-left text-sm font-medium text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream",
+  itemSelected: "bg-charcoal-card text-cream hover:bg-charcoal-hover hover:text-cream",
   remoteIcon: "grid size-[34px] flex-none place-items-center",
   pinnedRow:
-    "group/pin flex min-h-10 min-w-0 items-center rounded-md text-muted-foreground transition-colors hover:bg-[linear-gradient(90deg,color-mix(in_srgb,var(--sidebar-accent)_84%,transparent),color-mix(in_srgb,var(--sidebar-accent)_64%,transparent))] hover:text-foreground",
+    "group/pin flex min-h-10 min-w-0 items-center rounded-md text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream",
   pinnedButton:
     "h-10 min-w-0 flex-1 justify-start gap-2 px-2 text-left text-sm font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-inherit active:translate-y-0 aria-expanded:!bg-transparent",
   pinnedUnpinButton:
     "mr-1 size-8 flex-none !bg-transparent text-inherit opacity-0 shadow-none hover:!bg-transparent hover:opacity-100 focus-visible:opacity-100 active:translate-y-0 aria-expanded:!bg-transparent",
   workspaceSelect:
-    "h-10 w-full justify-start gap-2 border border-sidebar-border/55 bg-sidebar-accent/20 px-2 text-left text-sm font-medium shadow-none hover:border-sidebar-border/80 hover:bg-sidebar-accent/28 [&_svg]:size-4",
+    "h-10 w-full justify-start gap-2 border border-charcoal-border/55 bg-charcoal-active px-2 text-left text-sm font-medium shadow-none hover:border-charcoal-border/80 hover:bg-charcoal-active [&_svg]:size-4",
   workspaceSelectLabel: "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
   list: "grid gap-1",
-  muted: "px-3 py-1 text-sm text-muted-foreground",
+  muted: "px-3 py-1 text-sm text-cream-muted",
   deviceButton:
-    "h-auto w-full items-start justify-start gap-2 px-2 py-2 text-left text-sm font-medium text-muted-foreground shadow-none hover:!bg-[linear-gradient(90deg,color-mix(in_srgb,var(--sidebar-accent)_84%,transparent),color-mix(in_srgb,var(--sidebar-accent)_64%,transparent))]",
+    "h-auto w-full items-start justify-start gap-2 px-2 py-2 text-left text-sm font-medium text-cream-muted shadow-none hover:bg-charcoal-hover",
   deviceIcon: "grid size-[34px] flex-none place-items-center pt-[1px] [&_svg]:size-[31px]",
   deviceRow: "grid min-w-0 grid-cols-[minmax(0,1fr)] items-stretch",
   deviceCopy: "grid min-w-0 flex-1 gap-[3px]",
   deviceName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-foreground",
-  deviceMeta:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground/70",
-  deviceMeter: "mt-0.5 h-1 overflow-hidden rounded-full bg-muted",
-  deviceMeterFill: "block h-full bg-muted-foreground",
-  errorText: "m-0 text-sm text-destructive",
-  smartMeta:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground/70",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-cream",
+  deviceMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
+  deviceMeter: "mt-0.5 h-1 overflow-hidden rounded-full bg-charcoal-card",
+  deviceMeterFill: "block h-full bg-cream-muted",
+  errorText: "m-0 text-sm text-cream-bright",
+  smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
 } as const;
 
 export { DeviceDialog, SmartFolderDialog, WorkspaceDialog } from "./ExplorerSidebarDialogs";

@@ -47,7 +47,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
     onChange((current) => ({ ...current, [key]: !current[key] }));
 
   return (
-    <section className="mb-6 border-b border-border/60 pb-5">
+    <section className="mb-6 border-b border-charcoal-border/60 pb-5">
       <div className="flex items-center justify-between">
         <h3 className="m-0 text-sm">Edit</h3>
         <Button
@@ -86,7 +86,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
         </Button>
       </div>
 
-      <label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-muted-foreground">
+      <label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-cream-muted">
         Filter
         <LibrarySelect
           value={draft.filter}
@@ -123,7 +123,9 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
         />
       ) : null}
 
-      {props.editError ? <p className="mb-0 mt-3 text-xs text-red-200">{props.editError}</p> : null}
+      {props.editError ? (
+        <p className="mb-0 mt-3 text-xs text-cream-bright">{props.editError}</p>
+      ) : null}
       <div className="mt-4 flex gap-2">
         <Button
           className="flex-1"

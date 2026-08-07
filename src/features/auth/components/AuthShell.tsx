@@ -1,5 +1,3 @@
-import type { AuthShellProps } from "@/models/interfaces/features/auth/components/AuthShell";
-export type { AuthShellProps } from "@/models/interfaces/features/auth/components/AuthShell";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/ui";
@@ -22,13 +20,9 @@ export default function AuthShell({ title, description, children, onBack }: Auth
       ) : null}
       <div className="relative mx-auto flex max-w-md flex-col items-center pt-6 sm:pt-10">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            {title}
-          </h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-cream sm:text-4xl">{title}</h1>
           {description ? (
-            <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-              {description}
-            </p>
+            <p className="mt-3 text-sm leading-6 text-cream-muted sm:text-base">{description}</p>
           ) : null}
         </div>
 
@@ -36,4 +30,11 @@ export default function AuthShell({ title, description, children, onBack }: Auth
       </div>
     </div>
   );
+}
+
+export interface AuthShellProps {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  onBack?: () => void;
 }

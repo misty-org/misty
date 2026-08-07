@@ -16,8 +16,8 @@ const collectionCardResetClassName = [
 
 export const collectionCardClassName = [
   collectionCardResetClassName,
-  "overflow-hidden rounded-xl border-0 bg-card p-0 text-left shadow-xs",
-  "inset-ring-1 inset-ring-foreground/10 transition-colors hover:bg-accent",
+  "overflow-hidden rounded-xl border-0 bg-charcoal-card p-0 text-left shadow-xs",
+  "inset-ring-1 inset-ring-cream/10 transition-colors hover:bg-charcoal-hover",
 ].join(" ");
 
 const collectionRailCardClassName = [collectionCardClassName, "w-[180px] shrink-0"].join(" ");
@@ -56,7 +56,7 @@ export function SpaceLibraryAlbumsOverview() {
         <div className="flex items-center gap-2">
           {currentAlbumFolder ? (
             <Button
-              className="border-0 bg-transparent p-0 text-xs text-muted-foreground"
+              className="border-0 bg-transparent p-0 text-xs text-cream-muted"
               type="button"
               onClick={() => setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")}
             >
@@ -116,7 +116,7 @@ export function SpaceLibraryAlbumsOverview() {
             {/* An explicit size class opts out of Button's [&_svg]:size-4 rule. */}
             <Folder className="size-[26px]" />
             <span className="mt-5 block truncate text-xs font-medium">{folder.name}</span>
-            <span className="mt-1 block text-[10px] text-muted-foreground">
+            <span className="mt-1 block text-[10px] text-cream-muted">
               {folder.album_count + folder.folder_count} items
             </span>
           </Button>
@@ -131,7 +131,7 @@ export function SpaceLibraryAlbumsOverview() {
             <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
             <span className="block p-3">
               <span className="block truncate text-xs font-medium">{album.name}</span>
-              <span className="mt-1 block text-[10px] text-muted-foreground">
+              <span className="mt-1 block text-[10px] text-cream-muted">
                 {album.item_count} items
               </span>
             </span>
@@ -139,7 +139,7 @@ export function SpaceLibraryAlbumsOverview() {
         ))}
       </div>
       {visibleAlbumFolders.length === 0 && visibleAlbumsForFolder.length === 0 ? (
-        <div className="grid min-h-48 place-items-center text-sm text-muted-foreground">
+        <div className="grid min-h-48 place-items-center text-sm text-cream-muted">
           Nothing to see here...
         </div>
       ) : null}
@@ -173,7 +173,7 @@ function RecentlyAddedRail() {
             }}
             aria-label={`Open ${item.display_name}`}
           >
-            <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-muted text-muted-foreground">
+            <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-charcoal-card text-cream-muted">
               <LibraryItemThumbnail
                 spaceId={spaceId}
                 item={item}
@@ -181,10 +181,10 @@ function RecentlyAddedRail() {
               />
             </span>
             <span className="block p-3">
-              <span className="block truncate text-xs font-medium text-foreground">
+              <span className="block truncate text-xs font-medium text-cream">
                 {item.display_name}
               </span>
-              <span className="mt-1 block truncate text-[10px] text-muted-foreground">
+              <span className="mt-1 block truncate text-[10px] text-cream-muted">
                 {formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0))} ·{" "}
                 {formatTime(item.added_at)}
               </span>
@@ -192,7 +192,7 @@ function RecentlyAddedRail() {
           </Button>
         ))}
         {displayItems.length === 0 ? (
-          <p className="m-0 py-4 text-xs text-muted-foreground">No recently added items.</p>
+          <p className="m-0 py-4 text-xs text-cream-muted">No recently added items.</p>
         ) : null}
       </div>
     </section>
@@ -227,14 +227,14 @@ function AlbumsRail() {
             <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
             <span className="block p-3">
               <span className="block truncate text-xs font-medium">{album.name}</span>
-              <span className="mt-1 block text-[10px] text-muted-foreground">
+              <span className="mt-1 block text-[10px] text-cream-muted">
                 {album.item_count} items
               </span>
             </span>
           </Button>
         ))}
         {albums.length === 0 ? (
-          <p className="m-0 py-4 text-xs text-muted-foreground">No albums yet.</p>
+          <p className="m-0 py-4 text-xs text-cream-muted">No albums yet.</p>
         ) : null}
       </div>
     </section>

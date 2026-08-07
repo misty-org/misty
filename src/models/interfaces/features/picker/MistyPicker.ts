@@ -1,4 +1,4 @@
-import type { MistyFilePickerMode } from "@/models/types/features/picker/FilePicker";
+import type { MistyFilePickerMode } from "@/features/picker/FilePicker";
 
 export type MistyPickerSource = "files" | "library";
 

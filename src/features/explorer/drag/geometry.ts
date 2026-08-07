@@ -1,5 +1,3 @@
-import type { PointLike } from "@/models/interfaces/features/explorer/drag/geometry";
-export type { PointLike } from "@/models/interfaces/features/explorer/drag/geometry";
 export function physicalToClientPoint(
   point: PointLike,
   scaleFactor: number,
@@ -55,4 +53,9 @@ export function pathContainsPath(parent: string, candidate: string): boolean {
     normalizedCandidate.startsWith(`${normalizedParent}/`) ||
     normalizedParent === "/"
   );
+}
+
+export interface PointLike {
+  x: number;
+  y: number;
 }

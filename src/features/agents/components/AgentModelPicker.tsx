@@ -59,9 +59,9 @@ export function AgentModelPicker({
           aria-label={`Model: ${label}`}
           aria-expanded={open}
         >
-          <Sparkles size={15} className="shrink-0 text-muted-foreground" />
+          <Sparkles size={15} className="shrink-0 text-cream-muted" />
           <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-          <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+          <ChevronDown size={14} className="shrink-0 text-cream-muted" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -81,12 +81,12 @@ export function AgentModelPicker({
                   value={`${model.name} ${model.id} ${model.capabilities.join(" ")}`}
                   onSelect={() => choose(model.id)}
                 >
-                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-muted">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-md bg-charcoal-card">
                     <ModelProviderLogo modelId={model.id} size={15} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{model.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{model.id}</span>
+                    <span className="block truncate text-xs text-cream-muted">{model.id}</span>
                   </span>
                   {value === model.id ? <Check size={14} /> : null}
                 </CommandItem>

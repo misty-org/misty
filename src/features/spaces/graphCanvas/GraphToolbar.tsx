@@ -39,7 +39,7 @@ export function GraphToolbar(props: {
   return (
     <TooltipProvider delayDuration={350}>
       <div
-        className="absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-lg border border-border/70 bg-background/90 p-1 shadow-sm backdrop-blur"
+        className="absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-lg border border-charcoal-border/70 bg-charcoal-bg p-1 shadow-sm "
         aria-label="Canvas editing tools"
       >
         {tools.map(({ label, icon: Icon, action, disabled }) => (

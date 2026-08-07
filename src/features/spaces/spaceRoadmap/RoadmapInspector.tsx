@@ -48,7 +48,7 @@ export function RoadmapInspector(props: {
   const selectedEdge = props.snapshot.edges.find((item) => item.id === props.selectedId);
   if (!selectedRoadmap && !selectedGoal && !selectedMilestone && !selectedNode && !selectedEdge)
     return props.compact ? null : (
-      <aside className="grid h-full place-items-center border-t border-border/70 p-5 text-center text-xs text-muted-foreground xl:border-l xl:border-t-0">
+      <aside className="grid h-full place-items-center border-t border-charcoal-border/70 p-5 text-center text-xs text-cream-muted xl:border-l xl:border-t-0">
         <span>Select a milestone, goal, planning node, or connection to inspect it.</span>
       </aside>
     );
@@ -56,8 +56,8 @@ export function RoadmapInspector(props: {
     <aside
       className={
         props.compact
-          ? "min-h-0 overflow-auto bg-popover p-4 text-popover-foreground"
-          : "min-h-0 overflow-auto border-t border-border/70 bg-background p-4 xl:border-l xl:border-t-0"
+          ? "min-h-0 overflow-auto bg-charcoal-card p-4 text-cream"
+          : "min-h-0 overflow-auto border-t border-charcoal-border/70 bg-charcoal-bg p-4 xl:border-l xl:border-t-0"
       }
     >
       {selectedRoadmap ? (
@@ -153,7 +153,7 @@ function RoadmapForm({
         />
       </Field>
       {canManage ? (
-        <Button variant="ghost" className="justify-start text-destructive" onClick={onArchive}>
+        <Button variant="ghost" className="justify-start text-cream-bright" onClick={onArchive}>
           <Archive className="size-4" />
           Archive roadmap
         </Button>
@@ -216,7 +216,7 @@ function EdgeForm({
         />
       </Field>
       {canManage ? (
-        <Button variant="ghost" className="justify-start text-destructive" onClick={onDelete}>
+        <Button variant="ghost" className="justify-start text-cream-bright" onClick={onDelete}>
           <Archive className="size-4" />
           Remove connection
         </Button>
@@ -282,7 +282,7 @@ export function MilestoneForm({
         />
       </Field>
       {canManage ? (
-        <Button variant="ghost" className="justify-start text-destructive" onClick={onArchive}>
+        <Button variant="ghost" className="justify-start text-cream-bright" onClick={onArchive}>
           <Archive className="size-4" />
           Archive milestone
         </Button>
@@ -359,10 +359,10 @@ export function GoalForm({
         </Button>
       ) : null}
       <Field label="Linked tasks">
-        <div className="max-h-48 overflow-auto rounded-md border border-border/70 p-1">
+        <div className="max-h-48 overflow-auto rounded-md border border-charcoal-border/70 p-1">
           {tasks.map((task) => (
             <label
-              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-muted/50"
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-charcoal-card"
               key={task.id}
             >
               <Checkbox
@@ -378,13 +378,11 @@ export function GoalForm({
               <span className="truncate">{task.title}</span>
             </label>
           ))}
-          {!tasks.length ? (
-            <p className="px-2 text-xs text-muted-foreground">No active tasks.</p>
-          ) : null}
+          {!tasks.length ? <p className="px-2 text-xs text-cream-muted">No active tasks.</p> : null}
         </div>
       </Field>
       {canManage ? (
-        <Button variant="ghost" className="justify-start text-destructive" onClick={onArchive}>
+        <Button variant="ghost" className="justify-start text-cream-bright" onClick={onArchive}>
           <Archive className="size-4" />
           Archive goal
         </Button>
@@ -396,10 +394,10 @@ export function GoalForm({
 function Header({ title, status }: { title: string; status: string }) {
   return (
     <div>
-      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
         {title}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">{status}</p>
+      <p className="mt-1 text-xs text-cream-muted">{status}</p>
     </div>
   );
 }

@@ -104,19 +104,17 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
   };
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-background text-foreground">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] bg-charcoal-bg text-cream">
+      <header className="flex items-center justify-between gap-4 border-b border-charcoal-border px-5 py-4">
         <div className="min-w-0">
           <h2 className="m-0 text-lg font-semibold leading-tight">Activity</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Track changes across Files and Spaces
-          </p>
+          <p className="mt-0.5 text-sm text-cream-muted">Track changes across Files and Spaces</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative hidden sm:block">
             <Search
               size={15}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
             />
             <Input
               value={search}
@@ -135,15 +133,15 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
                 <Filter size={15} />
                 Filter
                 {kindFilters.size > 0 ? (
-                  <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-foreground">
+                  <span className="ml-0.5 rounded-full bg-charcoal-active px-1.5 text-[10px] font-semibold text-cream">
                     {kindFilters.size}
                   </span>
                 ) : null}
-                <ChevronDown size={13} className="text-muted-foreground" />
+                <ChevronDown size={13} className="text-cream-muted" />
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-52 p-1.5">
-              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-cream-muted">
                 Type
               </p>
               {KIND_FILTERS.map((option) => {
@@ -155,7 +153,7 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
                     onClick={() => toggleKind(option.value)}
                     className={[
                       "flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5",
-                      "text-left text-sm text-foreground transition-colors hover:bg-accent",
+                      "text-left text-sm text-cream transition-colors hover:bg-charcoal-hover",
                     ].join(" ")}
                   >
                     {option.label}
@@ -163,8 +161,8 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
                       className={[
                         "grid size-4 place-items-center rounded-[4px] border",
                         active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border",
+                          ? "border-charcoal-active bg-charcoal-active text-cream-bright"
+                          : "border-charcoal-border",
                       ].join(" ")}
                     >
                       {active ? <CheckCheck size={11} strokeWidth={3} /> : null}
@@ -176,7 +174,7 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
                 <button
                   type="button"
                   onClick={() => setKindFilters(new Set())}
-                  className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-xs text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream"
                 >
                   Clear filters
                 </button>
@@ -211,7 +209,7 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
           {groups.length > 0 ? (
             groups.map((group) => (
               <section key={group.label} className="mb-2">
-                <h3 className="sticky top-0 z-10 -mx-5 bg-background/85 px-5 py-2 text-xs font-semibold text-muted-foreground backdrop-blur">
+                <h3 className="sticky top-0 z-10 -mx-5 bg-charcoal-bg px-5 py-2 text-xs font-semibold text-cream-muted ">
                   {group.label}
                 </h3>
                 <ol className="m-0 list-none p-0">
@@ -227,10 +225,10 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
             ))
           ) : (
             <div className="grid place-items-center gap-2 py-20 text-center">
-              <h3 className="m-0 text-base font-semibold text-foreground">
+              <h3 className="m-0 text-base font-semibold text-cream">
                 {hasEntries ? "No matching activity" : "You’re all caught up"}
               </h3>
-              <p className="m-0 max-w-xs text-sm text-muted-foreground">
+              <p className="m-0 max-w-xs text-sm text-cream-muted">
                 {hasEntries
                   ? "Try a different search or clear the filters."
                   : "Workspace changes and mentions will show up here as they happen."}
@@ -242,7 +240,7 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
               <Button
                 variant="ghost"
                 size="sm"
-                className="gap-1.5 text-muted-foreground"
+                className="gap-1.5 text-cream-muted"
                 onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
               >
                 <ChevronDown size={15} />
@@ -253,7 +251,7 @@ export const ActivityFeed = memo(function ActivityFeed(props: { onClose: () => v
         </div>
       </div>
 
-      <footer className="flex items-center gap-2 border-t border-border px-5 py-3 text-xs text-muted-foreground">
+      <footer className="flex items-center gap-2 border-t border-charcoal-border px-5 py-3 text-xs text-cream-muted">
         <Stat label="Today" value={stats.today} />
         <Dot />
         <Stat label="This week" value={stats.week} />
@@ -273,7 +271,7 @@ function FeedRow(props: { entry: FeedEntry; last: boolean }) {
       {!props.last ? (
         <span
           aria-hidden="true"
-          className="absolute left-5 top-11 -bottom-1 w-px -translate-x-1/2 bg-border"
+          className="absolute left-5 top-11 -bottom-1 w-px -translate-x-1/2 bg-charcoal-border"
         />
       ) : null}
       <Row
@@ -281,26 +279,24 @@ function FeedRow(props: { entry: FeedEntry; last: boolean }) {
         onClick={entry.onOpen}
         className={[
           "grid w-full grid-cols-[40px_minmax(0,1fr)] items-start gap-3 rounded-lg px-1 py-2.5 text-left",
-          interactive ? "transition-colors hover:bg-foreground/[0.04]" : "",
+          interactive ? "transition-colors hover:bg-charcoal-hover" : "",
         ].join(" ")}
       >
-        <span className="grid size-10 place-items-center rounded-full bg-secondary text-xs font-semibold text-foreground inset-ring-1 inset-ring-border">
+        <span className="grid size-10 place-items-center rounded-full bg-charcoal-card text-xs font-semibold text-cream inset-ring-1 inset-ring-charcoal-border">
           {initialsForProfile(entry.actor, "")}
         </span>
         <span className="min-w-0">
           <span className="block leading-snug [overflow-wrap:anywhere]">
-            <span className="font-semibold text-foreground">{entry.actor}</span>
-            {entry.verb ? <span className="text-muted-foreground"> {entry.verb} </span> : " "}
-            {entry.target ? (
-              <span className="font-semibold text-foreground">{entry.target}</span>
-            ) : null}
+            <span className="font-semibold text-cream">{entry.actor}</span>
+            {entry.verb ? <span className="text-cream-muted"> {entry.verb} </span> : " "}
+            {entry.target ? <span className="font-semibold text-cream">{entry.target}</span> : null}
           </span>
           {entry.detail ? (
-            <span className="mt-0.5 block text-sm text-muted-foreground [overflow-wrap:anywhere]">
+            <span className="mt-0.5 block text-sm text-cream-muted [overflow-wrap:anywhere]">
               {entry.detail}
             </span>
           ) : null}
-          <span className="mt-0.5 block text-xs text-muted-foreground">
+          <span className="mt-0.5 block text-xs text-cream-muted">
             {formatRelative(entry.timestampMs)}
           </span>
         </span>
@@ -312,13 +308,13 @@ function FeedRow(props: { entry: FeedEntry; last: boolean }) {
 function Stat(props: { label: string; value: number }) {
   return (
     <span>
-      {props.label} <span className="font-semibold text-foreground">{props.value}</span>
+      {props.label} <span className="font-semibold text-cream">{props.value}</span>
     </span>
   );
 }
 
 function Dot() {
-  return <span className="text-muted-foreground/50">•</span>;
+  return <span className="text-cream-muted/50">•</span>;
 }
 
 function buildFeedEntries(

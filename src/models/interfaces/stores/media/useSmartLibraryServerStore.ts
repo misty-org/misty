@@ -9,7 +9,7 @@ import type {
 import { managedAiRequest } from "@/stores/agent/useAiServerStore";
 import { SMART_LIBRARY_PILOT } from "@/features/spaces/smartLibrary";
 
-import type { SmartLibrarySearchHit } from "@/models/types/stores/media/useSmartLibraryServerStore";
+import type { SmartLibrarySearchHit } from "@/stores/media/useSmartLibraryServerStore";
 
 export interface RegisterSmartLibraryFolderRequest {
   clientLibraryId: string;

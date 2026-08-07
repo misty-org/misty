@@ -59,10 +59,8 @@ export function TransferSortMenu(props: {
           <ArrowUpDown />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 border-border/70 shadow-md">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Sort transfers
-        </DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-48 border-charcoal-border/70 shadow-md">
+        <DropdownMenuLabel className="text-xs text-cream-muted">Sort transfers</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {transferSortOptions.map((option) => {
           const active = props.sortKey === option.key;
@@ -95,10 +93,8 @@ export function TransferToolbarActions(props: TransferActionMenuProps) {
           <MoreHorizontal />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-border/70 shadow-md">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
-          History actions
-        </DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-56 border-charcoal-border/70 shadow-md">
+        <DropdownMenuLabel className="text-xs text-cream-muted">History actions</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownActionEntries entries={entries} />
       </DropdownMenuContent>
@@ -124,7 +120,7 @@ export function TransferRowActionsMenu(
           <MoreHorizontal />
         </IconButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-border/70 shadow-md">
+      <DropdownMenuContent align="end" className="w-56 border-charcoal-border/70 shadow-md">
         <DropdownActionEntries entries={entries} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -141,7 +137,7 @@ export function TransferRowContextMenu(
   return (
     <ContextMenu onOpenChange={props.onOpenChange}>
       <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56 border-border/70 shadow-md">
+      <ContextMenuContent className="w-56 border-charcoal-border/70 shadow-md">
         <ContextActionEntries entries={entries} />
       </ContextMenuContent>
     </ContextMenu>
@@ -156,7 +152,7 @@ function DropdownActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
       <DropdownMenuItem
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        className={entry.danger ? "text-destructive focus:text-destructive" : undefined}
+        className={entry.danger ? "text-cream-bright focus:text-cream-bright" : undefined}
         onSelect={entry.run}
       >
         {entry.icon}
@@ -174,7 +170,7 @@ function ContextActionEntries({ entries }: { entries: TransferMenuEntry[] }) {
       <ContextMenuItem
         key={`${entry.label}-${index}`}
         disabled={entry.disabled}
-        className={entry.danger ? "gap-2 text-destructive focus:text-destructive" : "gap-2"}
+        className={entry.danger ? "gap-2 text-cream-bright focus:text-cream-bright" : "gap-2"}
         onSelect={entry.run}
       >
         {entry.icon}

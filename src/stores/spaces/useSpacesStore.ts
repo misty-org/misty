@@ -1,7 +1,5 @@
-import type { ActivityTab } from "@/models/types/stores/spaces/useSpacesStore";
-export type { ActivityTab } from "@/models/types/stores/spaces/useSpacesStore";
+import { buildMessageSpans, mergeSpaceMessages } from "@/stores/spaces/useSpaceMessageSpansStore";
 import type { SpacesStore } from "@/models/interfaces/stores/spaces/useSpacesStore";
-export type { SpacesStore } from "@/models/interfaces/stores/spaces/useSpacesStore";
 import { create } from "zustand";
 import { openExternalLink } from "@/platform/openExternalLink";
 import { errorText } from "@/lib/format";
@@ -12,8 +10,8 @@ import {
   spacesApi,
 } from "@/stores/spaces/useSpacesBackendStore";
 import type { RealtimeEnvelope } from "@/models/types/stores/spaces/useSpacesBackendStore";
-import type { SpaceRun } from "@/models/interfaces/features/spaces/types";
 import type {
+  SpaceRun,
   Space,
   SpaceEvent,
   SpaceInboxItem,
@@ -24,7 +22,6 @@ import type {
   SpaceStudioResource,
   SpacesSnapshot,
 } from "@/models/interfaces/features/spaces/types";
-import { buildMessageSpans, mergeSpaceMessages } from "./useSpaceMessageSpansStore";
 import { readRealtimeCursor, writeRealtimeCursor } from "./spaceRealtimeCursor";
 import * as referenceMode from "./spaceReferenceMode";
 import * as accessErrors from "./spaceAccessErrors";
@@ -764,7 +761,9 @@ async function applyRealtimeEvent(
   } else if (event.type.startsWith("agent.run.")) {
     applyAgentRunEvent(event, set);
     window.dispatchEvent(new CustomEvent("misty:space-agent-run-event", { detail: event }));
-  } else if (event.type.startsWith("conversation."))
+  } else if (event.type.startsWith("action_suggestion."))
+    window.dispatchEvent(new CustomEvent("misty:space-action-suggestion-event", { detail: event }));
+  else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
     await get().loadNodes(event.space_id);
@@ -899,3 +898,5 @@ function clearRealtimeOpenTimer() {
   if (realtimeOpenTimer != null) window.clearTimeout(realtimeOpenTimer);
   realtimeOpenTimer = null;
 }
+
+export type ActivityTab = "unreads" | "mentions";

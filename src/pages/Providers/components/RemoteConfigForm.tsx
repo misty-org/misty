@@ -1,31 +1,37 @@
-import type { RemoteConfigFormProps } from "@/models/interfaces/pages/Providers/components/RemoteConfigForm";
-export type { RemoteConfigFormProps } from "@/models/interfaces/pages/Providers/components/RemoteConfigForm";
-import { Button } from "@/ui";
-import { Input } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
 import type {
+  CloudConfigPaths,
+  RemoteEditDraft,
   ProviderWorkflow,
   ProviderWorkflowOption,
 } from "@/models/interfaces/services/misty-api";
+import { isSecretKey, parseTokenFields } from "@/pages/Providers/providerUtils";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  AssetIcon,
+} from "@/ui";
 import { iconAssets } from "@/assets/icons";
-import { AssetIcon } from "@/ui";
 import { prettyLabel } from "@/lib/format";
-import { isSecretKey, parseTokenFields } from "../providerUtils";
 
 const remoteConfigFormClass = "min-h-0";
 
 const formGridClass =
   "grid max-w-[760px] grid-cols-2 gap-x-4 gap-y-3.5 p-[18px] max-[980px]:grid-cols-1";
 
-const labelClass = "grid gap-1.5 text-xs font-medium text-muted-foreground capitalize";
+const labelClass = "grid gap-1.5 text-xs font-medium text-cream-muted capitalize";
 
 const tokenFieldsClass =
   "col-span-full m-0 grid grid-cols-2 gap-x-4 gap-y-3.5 p-3.5 max-[980px]:grid-cols-1";
 
-const tokenLegendClass = "flex items-center gap-2.5 px-2 text-foreground";
+const tokenLegendClass = "flex items-center gap-2.5 px-2 text-cream";
 
 const pathsPanelClass =
-  "mx-[18px] mb-3.5 grid max-w-[760px] gap-1.5 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground [overflow-wrap:anywhere]";
+  "mx-[18px] mb-3.5 grid max-w-[760px] gap-1.5 rounded-md bg-charcoal-card p-3 text-xs text-cream-muted [overflow-wrap:anywhere]";
 
 const EMPTY_SELECT_VALUE = "__misty_empty__";
 
@@ -162,9 +168,7 @@ function ConfigField(props: {
         />
       )}
       {option?.help ? (
-        <small className="text-xs normal-case leading-[1.35] text-muted-foreground">
-          {option.help}
-        </small>
+        <small className="text-xs normal-case leading-[1.35] text-cream-muted">{option.help}</small>
       ) : null}
     </label>
   );
@@ -213,4 +217,16 @@ function workflowOptionForKey(
   key: string,
 ): ProviderWorkflowOption | null {
   return workflow?.options.find((option) => option.name === key) ?? null;
+}
+
+export interface RemoteConfigFormProps {
+  draft: RemoteEditDraft;
+  configKeys: string[];
+  workflow: ProviderWorkflow | null;
+  configPaths: CloudConfigPaths | null;
+  tokenVisible: boolean;
+  onDraftName: (name: string) => void;
+  onConfigField: (key: string, value: string) => void;
+  onTokenField: (key: string, value: string) => void;
+  onTokenVisible: (visible: boolean) => void;
 }

@@ -4,8 +4,8 @@
    here is scoped under .FIE_root, which only exists inside the editor. */
 
 .FIE_root {
-  background: #0b0c0f !important;
-  color: #f3f5f7 !important;
+  background: #100f0e !important;
+  color: #e6e1da !important;
   border: 0 !important;
 }
 
@@ -15,15 +15,15 @@
 .FIE_tabs-drawer,
 .FIE_tools-bar,
 .FIE_tools-bar-wrapper {
-  background-color: #111216 !important;
-  border-color: #20232a !important;
+  background-color: #171615 !important;
+  border-color: #292624 !important;
 }
 
 /* The editing canvas well (konva stage bg is set via the backgroundColor prop;
    this covers the surrounding container so no white seams show through). */
 .FIE_canvas-container,
 .FIE_canvas-node {
-  background-color: #0b0c0f !important;
+  background-color: #100f0e !important;
 }
 
 /* Zoom label + generic text/icons that inherit filerobot's light defaults. */
@@ -31,20 +31,20 @@
 .FIE_crop-tool-label,
 .FIE_filters-item-label,
 .FIE_annotations-options {
-  color: #f3f5f7 !important;
+  color: #e6e1da !important;
 }
 
 /* Primary "Save" button -> app accent (light pill on dark, like other primary
    buttons in the app) instead of filerobot's default lavender. */
 .FIE_topbar-save,
 .FIE_topbar-save-button {
-  background-color: #e7edf3 !important;
-  color: #17191c !important;
+  background-color: #443e38 !important;
+  color: #f5f2ed !important;
   border-color: transparent !important;
 }
 
 .FIE_topbar-save:hover,
 .FIE_topbar-save-button:hover {
-  background-color: #ffffff !important;
-  color: #17191c !important;
+  background-color: #504942 !important;
+  color: #f5f2ed !important;
 }

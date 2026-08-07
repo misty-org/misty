@@ -121,8 +121,8 @@ export function CreateEditConversationDialog({
               Choose people and Agents. You can change participants later.
             </DialogDescription>
           </DialogHeader>
-          <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
-            Name <span className="font-normal text-muted-foreground/75">(optional)</span>
+          <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
+            Name <span className="font-normal text-cream-muted/75">(optional)</span>
             <Input
               maxLength={80}
               placeholder="Uses member names when left blank"
@@ -131,10 +131,10 @@ export function CreateEditConversationDialog({
             />
           </label>
           <fieldset className="misty-transient-scrollbar mt-4 grid max-h-56 gap-1 overflow-y-auto border-0 p-0">
-            <legend className="mb-2 text-xs font-medium text-muted-foreground">Participants</legend>
+            <legend className="mb-2 text-xs font-medium text-cream-muted">Participants</legend>
             {otherMembers.map((member) => (
               <label
-                className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-accent"
+                className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-charcoal-hover"
                 key={member.user_id}
               >
                 <Checkbox
@@ -146,10 +146,8 @@ export function CreateEditConversationDialog({
                   }
                 />
                 <span className="min-w-0">
-                  <span className="block truncate text-foreground">{member.name}</span>
-                  <span className="block truncate text-[9px] text-muted-foreground">
-                    {member.email}
-                  </span>
+                  <span className="block truncate text-cream">{member.name}</span>
+                  <span className="block truncate text-[9px] text-cream-muted">{member.email}</span>
                 </span>
               </label>
             ))}
@@ -157,7 +155,7 @@ export function CreateEditConversationDialog({
               .filter((agent) => agent.enabled)
               .map((agent) => (
                 <label
-                  className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-accent"
+                  className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-charcoal-hover"
                   key={`agent:${agent.agent_id}`}
                 >
                   <Checkbox
@@ -169,8 +167,8 @@ export function CreateEditConversationDialog({
                     }
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-foreground">{agent.name}</span>
-                    <span className="block truncate text-[9px] text-muted-foreground">
+                    <span className="block truncate text-cream">{agent.name}</span>
+                    <span className="block truncate text-[9px] text-cream-muted">
                       Agent · {agent.space_role || agent.role || "Teammate"}
                     </span>
                   </span>
@@ -179,7 +177,7 @@ export function CreateEditConversationDialog({
           </fieldset>
           {error ? (
             <p
-              className="mb-0 mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
               role="alert"
             >
               {error}

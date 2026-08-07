@@ -39,7 +39,7 @@ export function UnlockDialog({ model }: { model: UnlockDialogModel }) {
             />
           </DialogField>
           {model.error ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-sm text-cream-bright" role="alert">
               {model.error}
             </p>
           ) : null}

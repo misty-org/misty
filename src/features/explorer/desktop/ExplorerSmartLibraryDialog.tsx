@@ -109,10 +109,10 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
           if (!open && !busy) props.onClose();
         }}
       >
-        <DialogContent className="flex h-[min(860px,calc(100vh-48px))] w-[min(860px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground [&>button]:hidden">
-          <DialogHeader className="flex-row items-center justify-between gap-5 border-b border-border px-6 py-4 text-left">
+        <DialogContent className="flex h-[min(860px,calc(100vh-48px))] w-[min(860px,calc(100vw-48px))] max-w-none flex-col gap-0 overflow-hidden bg-charcoal-card p-0 text-cream [&>button]:hidden">
+          <DialogHeader className="flex-row items-center justify-between gap-5 border-b border-charcoal-border px-6 py-4 text-left">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-charcoal-active text-cream-bright">
                 <Images size={20} />
               </span>
               <div className="min-w-0">
@@ -165,7 +165,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
               />
             ) : (
               <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)]">
-                <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-popover/95 px-6 py-3 backdrop-blur">
+                <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-charcoal-border bg-charcoal-card px-6 py-3 ">
                   <div className="flex min-w-0 items-center gap-2">
                     <Badge variant="secondary">
                       {library.sourceKind === "cloud" ? (
@@ -193,7 +193,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-8 text-muted-foreground hover:text-destructive"
+                      className="size-8 text-cream-muted hover:text-cream-bright"
                       type="button"
                       aria-label="Remove Library"
                       disabled={busy}
@@ -225,11 +225,11 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                     <SmartLibraryProgressView progress={progress} onRefresh={refreshProgress} />
                   ) : analyzedAssets.length > 0 ? (
                     <div className="grid gap-6">
-                      <section className="grid gap-4 rounded-lg bg-muted/30 p-5">
+                      <section className="grid gap-4 rounded-lg bg-charcoal-card p-5">
                         <div className="flex flex-wrap items-end justify-between gap-4">
                           <div>
                             <h3 className="m-0 text-xl font-semibold">Sample review</h3>
-                            <p className="m-0 mt-1 text-sm text-muted-foreground">
+                            <p className="m-0 mt-1 text-sm text-cream-muted">
                               Review descriptions, tags, confidence, and virtual collections before
                               analyzing more.
                             </p>
@@ -259,7 +259,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                             ) : null}
                           </div>
                         </div>
-                        <div className="flex items-start gap-3 rounded-md bg-primary/10 px-4 py-3 text-sm text-primary">
+                        <div className="flex items-start gap-3 rounded-md bg-charcoal-active px-4 py-3 text-sm text-cream-bright">
                           <Search className="mt-0.5 shrink-0" size={17} />
                           <span>
                             Metadata is ready. Search for these files from Explorer’s centered{" "}
@@ -269,7 +269,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                       </section>
                       <SmartLibraryAssetGrid assets={analyzedAssets} library={library} />
                       {failedAssets.length > 0 ? (
-                        <p className="m-0 text-sm text-destructive">
+                        <p className="m-0 text-sm text-cream-bright">
                           {failedAssets.length} file{failedAssets.length === 1 ? "" : "s"} failed.
                           Failed analysis and infrastructure retries do not use hosted AI.
                         </p>
@@ -328,14 +328,14 @@ function LibraryOnboarding(props: {
   return (
     <div className="grid min-h-full place-items-center p-8">
       <div className="grid w-full max-w-3xl justify-items-center gap-7 text-center">
-        <div className="grid size-20 place-items-center rounded-xl bg-primary/10 text-primary">
+        <div className="grid size-20 place-items-center rounded-xl bg-charcoal-active text-cream-bright">
           <Sparkles size={34} />
         </div>
         <div className="grid gap-3">
           <h3 className="m-0 text-2xl font-semibold tracking-tight">
             Understand your files, not just their folders.
           </h3>
-          <p className="m-0 mx-auto max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          <p className="m-0 mx-auto max-w-2xl text-sm leading-relaxed text-cream-muted">
             Smart Library first scans one folder locally, then analyzes a representative 25-file
             sample. Originals stay where they are; organization is virtual and reversible.
           </p>
@@ -373,7 +373,7 @@ function LibraryOnboarding(props: {
             Choose Local Folder
           </Button>
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-cream-muted">
           Connected-cloud folders can be selected by opening them in Files and choosing Use Current
           Folder.
         </span>

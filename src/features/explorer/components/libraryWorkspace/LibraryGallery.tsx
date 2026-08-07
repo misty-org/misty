@@ -35,12 +35,12 @@ function LibraryGalleryTile(props: {
     <Button
       type="button"
       variant="ghost"
-      className="group block h-auto min-w-0 overflow-hidden rounded-lg bg-card p-0 text-left shadow-xs inset-ring-1 inset-ring-foreground/10 transition hover:-translate-y-0.5 hover:shadow-md"
+      className="group block h-auto min-w-0 overflow-hidden rounded-lg bg-charcoal-card p-0 text-left shadow-xs inset-ring-1 inset-ring-cream/10 transition hover:-translate-y-0.5 hover:shadow-md"
       aria-label={`View ${props.asset.name}`}
       title={props.asset.name}
       onClick={props.onOpen}
     >
-      <span className="relative block aspect-square overflow-hidden bg-muted">
+      <span className="relative block aspect-square overflow-hidden bg-charcoal-card">
         {preview ? (
           <img
             className="size-full object-cover transition duration-200 group-hover:scale-[1.025]"
@@ -48,13 +48,13 @@ function LibraryGalleryTile(props: {
             alt=""
           />
         ) : (
-          <span className="grid size-full place-items-center bg-muted text-muted-foreground">
+          <span className="grid size-full place-items-center bg-charcoal-card text-cream-muted">
             <File size={34} strokeWidth={1.5} />
           </span>
         )}
-        <span className="absolute inset-x-0 bottom-0 block bg-black/75 px-3 py-2.5">
-          <strong className="block truncate text-sm text-white">{props.asset.name}</strong>
-          <span className="mt-0.5 block truncate text-[11px] text-white/65">
+        <span className="absolute inset-x-0 bottom-0 block bg-charcoal-workspace px-3 py-2.5">
+          <strong className="block truncate text-sm text-cream-bright">{props.asset.name}</strong>
+          <span className="mt-0.5 block truncate text-[11px] text-cream-bright/65">
             {props.asset.assetKind ||
               props.asset.extension.replace(/^\./, "").toUpperCase() ||
               "File"}

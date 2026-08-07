@@ -1,5 +1,3 @@
-import type { TelemetryIdentityUser } from "@/models/interfaces/analytics/identity";
-export type { TelemetryIdentityUser } from "@/models/interfaces/analytics/identity";
 import type { TelemetryClient } from "@/models/interfaces/analytics/types";
 
 export class TelemetryIdentityManager {
@@ -19,4 +17,10 @@ export class TelemetryIdentityManager {
     });
     this.currentUserId = user.id;
   }
+}
+
+export interface TelemetryIdentityUser {
+  id: string;
+  accountCreatedAt?: string;
+  currentPlan?: string;
 }

@@ -43,7 +43,6 @@ function UsageProbe({ spaceId, space }: { spaceId: string; space: Space }) {
   const usage = useSpaceLibraryUsage({
     activeSpaceId: spaceId,
     activeSpace: space,
-    section: "notes",
     snapshotReady: true,
   });
   return (

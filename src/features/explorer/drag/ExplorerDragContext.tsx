@@ -1,15 +1,14 @@
-import type {
-  RegisteredZone,
-  ArmedDrag,
-  PreparedEgress,
-  ExplorerDragContextValue,
-} from "@/models/interfaces/features/explorer/drag/ExplorerDragContext";
-export type {
-  RegisteredZone,
-  ArmedDrag,
-  PreparedEgress,
-  ExplorerDragContextValue,
-} from "@/models/interfaces/features/explorer/drag/ExplorerDragContext";
+import {
+  dragDistance,
+  edgeScrollDelta,
+  physicalToClientPoint,
+  selectDropCandidate,
+} from "@/features/explorer/drag/geometry";
+import {
+  dragAnnouncement,
+  ExplorerDragPreview,
+  setWebviewDragActive,
+} from "@/features/explorer/drag/ExplorerDragPreview";
 import {
   createContext,
   useCallback,
@@ -27,14 +26,7 @@ import { explorerCancelDragPreparation, explorerPrepareDragItems } from "@/store
 import { getAppliedAppZoom } from "@/hooks/useAppZoom";
 import { hasTauriInternals } from "@/platform/tauri";
 import { useExplorerStore } from "@/stores/explorer";
-import {
-  dragDistance,
-  edgeScrollDelta,
-  physicalToClientPoint,
-  selectDropCandidate,
-} from "./geometry";
 import { DragInteractionShield } from "@/ui";
-import { dragAnnouncement, ExplorerDragPreview, setWebviewDragActive } from "./ExplorerDragPreview";
 import type {
   ExplorerDragItem,
   ExplorerDragModifiers,
@@ -556,12 +548,12 @@ function dragPreviewDataUrl(items: ExplorerDragItem[]): string {
   canvas.height = 80;
   const context = canvas.getContext("2d");
   if (!context) return "data:image/png;base64,";
-  context.fillStyle = "rgba(20,22,26,.94)";
+  context.fillStyle = "#141312";
   context.roundRect(4, 4, 120, 72, 14);
   context.fill();
-  context.fillStyle = "#f5c451";
+  context.fillStyle = "#A3BFAB";
   context.fillRect(17, 22, 28, 24);
-  context.fillStyle = "#f4f4f5";
+  context.fillStyle = "#F5F2ED";
   context.font = "600 13px sans-serif";
   context.fillText(
     items.length > 1 ? `${items.length} items` : (items[0]?.name ?? "Item"),
@@ -575,4 +567,31 @@ function dragPreviewDataUrl(items: ExplorerDragItem[]): string {
 function refreshExplorerPanes(): void {
   const store = useExplorerStore.getState();
   Object.keys(store.panes).forEach((paneId) => void store.refreshPane(paneId));
+}
+
+export interface RegisteredZone {
+  element: HTMLElement;
+  spec: ExplorerDropZoneSpec;
+}
+
+export interface ArmedDrag {
+  pointerId: number;
+  source: HTMLElement;
+  start: { x: number; y: number };
+  items: ExplorerDragItem[];
+}
+
+export interface PreparedEgress {
+  sessionId: string;
+  promise: Promise<string[]>;
+  settled: boolean;
+  paths: string[] | null;
+  error: string | null;
+}
+
+export interface ExplorerDragContextValue {
+  state: ExplorerDragViewState;
+  armSource: (items: ExplorerDragItem[], event: ReactPointerEvent<HTMLElement>) => void;
+  registerZone: (element: HTMLElement, spec: ExplorerDropZoneSpec) => () => void;
+  cancel: (message?: string) => void;
 }

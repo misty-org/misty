@@ -29,7 +29,7 @@ export function AlbumCover({ spaceId, itemId }: { spaceId: string; itemId?: stri
   }, [itemId, spaceId]);
 
   return (
-    <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-muted text-muted-foreground">
+    <span className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-charcoal-card text-cream-muted">
       {url ? (
         <img className="size-full object-cover" src={url} alt="" />
       ) : (

@@ -69,11 +69,11 @@ export function SpaceSetupCards({
   };
 
   return (
-    <Card className="mx-4 mt-3 grid gap-3 border-primary/20 bg-primary/[0.035] p-3 shadow-none">
+    <Card className="mx-4 mt-3 grid gap-3 border-charcoal-active/20 bg-charcoal-active p-3 shadow-none">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">Your Space is ready</p>
-          <p className="mb-0 mt-1 text-xs text-muted-foreground">
+          <p className="mb-0 mt-1 text-xs text-cream-muted">
             Start chatting now. Invitations and connections can be finished whenever you want.
           </p>
         </div>
@@ -139,9 +139,9 @@ export function SpaceSetupCards({
           );
         })}
       </div>
-      {error ? <p className="m-0 text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="m-0 text-xs text-cream-bright">{error}</p> : null}
       {!isOwner && setup?.pending_providers.length ? (
-        <p className="m-0 text-xs text-muted-foreground">
+        <p className="m-0 text-xs text-cream-muted">
           The Space owner can finish these connections. They never limit your access.
         </p>
       ) : null}

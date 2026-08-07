@@ -1,12 +1,4 @@
 import type {
-  LibrarySearchOptions,
-  ParsedLibraryQuery,
-} from "@/models/interfaces/features/explorer/utils/librarySearch";
-export type {
-  LibrarySearchOptions,
-  ParsedLibraryQuery,
-} from "@/models/interfaces/features/explorer/utils/librarySearch";
-import type {
   FileKind,
   SearchQueryScope,
   SearchSourceKind,
@@ -173,4 +165,16 @@ function mergeStrings(left: string[], right: string[]): string[] {
 function normalizePath(path: string | null | undefined): string {
   const normalized = (path ?? "").replace(/\/+$/, "");
   return normalized || "/";
+}
+
+export interface LibrarySearchOptions {
+  currentPath?: string | null;
+  scope?: SearchQueryScope;
+  limit?: number | null;
+}
+
+export interface ParsedLibraryQuery {
+  terms: string[];
+  tags: string[];
+  comments: string[];
 }

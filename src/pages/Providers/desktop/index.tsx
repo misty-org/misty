@@ -21,17 +21,17 @@ const EMPTY_PROVIDER_REMOTES: ProviderRemote[] = [];
 const EMPTY_PROVIDER_WORKFLOWS: ProviderWorkflow[] = [];
 const EMPTY_PROVIDER_WORKSPACE = createProvidersWorkspaceState();
 
-const providersShellClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background";
+const providersShellClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 
-const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] bg-background";
+const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] bg-charcoal-bg";
 
 const providersOverlayHeaderClass =
-  "flex items-center justify-between gap-3 border-b border-border px-4 py-2.5";
+  "flex items-center justify-between gap-3 border-b border-charcoal-border px-4 py-2.5";
 
 const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-3";
 
 const providersPaneWorkspaceClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-border bg-card max-[860px]:grid-cols-[minmax(0,1fr)]";
+  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card max-[860px]:grid-cols-[minmax(0,1fr)]";
 
 export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -49,7 +49,7 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
     <div className={overlay ? providersShellClass : providersPageShellClass}>
       {overlay ? (
         <header className={providersOverlayHeaderClass}>
-          <h2 className="text-sm font-medium text-foreground">Remotes</h2>
+          <h2 className="text-sm font-medium text-cream">Remotes</h2>
           <Button variant="ghost" size="icon" aria-label="Close remotes" onClick={props.onClose}>
             <X size={16} />
           </Button>

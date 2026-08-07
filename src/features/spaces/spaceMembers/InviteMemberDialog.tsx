@@ -33,7 +33,7 @@ export function InviteMemberDialog({
               The invitation expires after seven days.
             </DialogDescription>
           </DialogHeader>
-          <label className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
+          <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
             Email address
             <Input
               autoFocus
@@ -46,7 +46,7 @@ export function InviteMemberDialog({
           </label>
           {error ? (
             <p
-              className="mb-0 mt-3 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
               role="alert"
             >
               {error}

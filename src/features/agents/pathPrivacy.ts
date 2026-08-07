@@ -1,5 +1,3 @@
-import type { AgentServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
-export type { AgentServerContext } from "@/models/interfaces/features/agents/pathPrivacy";
 /** Build the only path context that may cross the device/server boundary. */
 export function agentServerContext(
   localRoot: string | null,
@@ -47,4 +45,9 @@ function normalizeDevicePath(path: string): string {
 
 function isWindowsPath(path: string): boolean {
   return /^[a-zA-Z]:\//.test(path);
+}
+
+export interface AgentServerContext {
+  activeRoot?: string;
+  selectedPaths: string[];
 }

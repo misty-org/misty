@@ -14,15 +14,13 @@ export function SpaceInvitationsNotice({
 
   return (
     <section
-      className="grid gap-1.5 rounded-md bg-sidebar-accent/35 p-2"
+      className="grid gap-1.5 rounded-md bg-charcoal-active p-2"
       aria-label="Space invitations"
     >
-      <p className="m-0 px-1 text-xs font-semibold text-muted-foreground">Invitations</p>
+      <p className="m-0 px-1 text-xs font-semibold text-cream-muted">Invitations</p>
       {invitations.map((invite) => (
-        <article key={invite.id} className="rounded-md bg-sidebar-accent/60 p-2.5 text-sm">
-          <p className="m-0 truncate font-medium text-sidebar-accent-foreground">
-            {invite.space_name}
-          </p>
+        <article key={invite.id} className="rounded-md bg-charcoal-active p-2.5 text-sm">
+          <p className="m-0 truncate font-medium text-cream-bright">{invite.space_name}</p>
           <div className="mt-2 flex gap-1">
             <Button
               className="h-8 px-2 text-xs"

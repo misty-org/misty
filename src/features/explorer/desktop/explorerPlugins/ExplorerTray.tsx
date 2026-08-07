@@ -52,7 +52,7 @@ export function ExplorerTray(props: {
       >
         <PanelsTopLeft size={16} />
       </Button>
-      <span className="mx-0.5 h-4 w-px bg-border/70" aria-hidden="true" />
+      <span className="mx-0.5 h-4 w-px bg-charcoal-border" aria-hidden="true" />
       <ExplorerPluginTabMenu
         commands={props.commands}
         panels={props.panels}
