@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 type SpaceRoadmap struct {
@@ -366,35 +365,6 @@ func roadmapEndpointVisible(endpoint SpaceRoadmapEdgeEndpoint, snapshot *SpaceRo
 		}
 	}
 	return false
-}
-
-func loadSpaceRoadmapGoalTasksTx(ctx context.Context, tx *sql.Tx, roadmapID string, goals []SpaceRoadmapGoal) error {
-	if len(goals) == 0 {
-		return nil
-	}
-	goalIndex := map[string]int{}
-	for index := range goals {
-		goalIndex[goals[index].ID] = index
-	}
-	rows, err := tx.QueryContext(ctx, `SELECT gt.goal_id,`+spaceTaskColumns+` FROM space_roadmap_goal_tasks gt JOIN space_tasks ON space_tasks.id=gt.task_id WHERE gt.roadmap_id=$1 ORDER BY gt.added_at,gt.task_id`, roadmapID)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var goalID string
-		var task SpaceTask
-		var schedule, calendar []byte
-		var conflicts pq.StringArray
-		if err := rows.Scan(&goalID, &task.ID, &task.SpaceID, &task.TaskNumber, &task.TaskKey, &task.Title, &task.Notes, &task.Status, &task.Priority, &task.Rank, &task.AssigneeUserID, &task.AssigneeAgentID, &task.DueAt, &task.DueTimezone, &task.SourceRefs, &task.CreatedByUserID, &task.CreatedByAgentID, &task.SourceRunID, &task.Version, &task.CompletedAt, &task.ArchivedAt, &task.CreatedAt, &task.UpdatedAt, &schedule, &calendar, &conflicts); err != nil {
-			return err
-		}
-		task.Schedule, task.Calendar, task.ConflictedFields = schedule, calendar, conflicts
-		if index, ok := goalIndex[goalID]; ok {
-			goals[index].Tasks = append(goals[index].Tasks, task)
-		}
-	}
-	return rows.Err()
 }
 
 func calculateSpaceRoadmapProgress(out *SpaceRoadmapSnapshot) {

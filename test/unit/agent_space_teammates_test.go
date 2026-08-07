@@ -84,6 +84,26 @@ func TestCompileAgentIntentOnlyGrantsExplicitTaskWrites(t *testing.T) {
 	}
 }
 
+func TestCompileAgentIntentCarriesWritesThroughOneClarification(t *testing.T) {
+	got := api.TestingCompileAgentIntentWithContinuation(
+		"Wash the dishes, due at 9pm today",
+		"Can you create a task and assign it to Melissa Chen?",
+		"What should the task be called, and when is it due?",
+	)
+	if !slices.Contains(got, "tasks.create") || !slices.Contains(got, "tasks.update") {
+		t.Fatalf("continuation capabilities = %v, want task create and assignment", got)
+	}
+
+	canceled := api.TestingCompileAgentIntentWithContinuation(
+		"Never mind, cancel that",
+		"Can you create a task called Wash the dishes?",
+		"When should it be due?",
+	)
+	if slices.Contains(canceled, "tasks.create") {
+		t.Fatalf("canceled continuation capabilities = %v, must not include tasks.create", canceled)
+	}
+}
+
 func TestPrivateSpaceConversationReceivesServerOwnedTaskTools(t *testing.T) {
 	got := api.TestingSpaceConversationToolNames("Can you help me create tasks inside this Space?")
 	want := []string{"messages.search", "library.search", "tasks.query"}

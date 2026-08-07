@@ -73,8 +73,8 @@ func withToolTriggers(descriptor agenttools.Descriptor, triggers []string) agent
 	return descriptor
 }
 
-func resolveSpaceAgentToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, includeMessages, includeLibrary bool, delegationHandlers ...agenttools.Handler) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	requested := append([]string{"calendar.query"}, TestingCompileAgentIntent(prompt)...)
+func resolveSpaceAgentToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt, previousUserPrompt, previousAgentReply string, includeMessages, includeLibrary bool, delegationHandlers ...agenttools.Handler) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
+	requested := append([]string{"calendar.query"}, TestingCompileAgentIntentWithContinuation(prompt, previousUserPrompt, previousAgentReply)...)
 	if includeMessages {
 		requested = append([]string{toolboxMessagesSearch}, requested...)
 	}

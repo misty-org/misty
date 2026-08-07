@@ -94,7 +94,8 @@ func (db *Database) createSpaceAgentMessageWithMembership(ctx context.Context, b
 		recipientsQuery := `SELECT user_id FROM space_members WHERE space_id=$1`
 		recipientArgs := []any{spaceID}
 		if conversationID != "" {
-			recipientsQuery = `SELECT cm.user_id FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.conversation_id=$2`
+			// Agent members carry a NULL user_id, and only people have an inbox.
+			recipientsQuery = `SELECT cm.user_id FROM space_conversation_members cm JOIN space_conversations c ON c.id=cm.conversation_id WHERE c.space_id=$1 AND cm.conversation_id=$2 AND cm.actor_kind='person' AND cm.user_id IS NOT NULL`
 			recipientArgs = append(recipientArgs, conversationID)
 		}
 		rows, err := tx.QueryContext(ctx, recipientsQuery, recipientArgs...)

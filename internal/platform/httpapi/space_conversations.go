@@ -154,11 +154,7 @@ func (s *SpacesService) ConversationMessages() http.HandlerFunc {
 			agentIDs = []string{directAgentID}
 			triggerKind = "direct"
 		}
-		triggers, err := s.enqueueSpaceAgentMessageTriggers(r.Context(), userID, spaceID, conversationID, message.ID, triggerKind, agentIDs, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs)
-		if err != nil {
-			writeSpaceError(w, err)
-			return
-		}
+		triggers := s.enqueueSpaceAgentMessageTriggers(r.Context(), userID, spaceID, conversationID, message.ID, triggerKind, agentIDs, body.Content, body.FileNodeIDs, body.AttachmentIDs, body.LibraryItemIDs)
 		if directAgentID == "" && len(agentIDs) == 0 {
 			_ = s.database.QueueSpaceActionSuggestionAnalysis(r.Context(), userID, spaceID, conversationID, message.ID)
 		}

@@ -222,10 +222,14 @@ func TestProviderCallsAreCappedPerUserTurn(t *testing.T) {
 	}
 }
 
-type serverToolProvider struct{ calls int }
+type serverToolProvider struct {
+	calls         int
+	systemPrompts []string
+}
 
 func (provider *serverToolProvider) Next(request ModelRequest) (ModelResponse, error) {
 	provider.calls++
+	provider.systemPrompts = append(provider.systemPrompts, request.SystemPrompt)
 	if provider.calls == 1 {
 		return ModelResponse{ToolRequests: []ToolRequest{{ID: "read-1", Name: "workflow.read_content", Risk: RiskRead, Arguments: json.RawMessage(`{"resourceId":"doc-1"}`)}}}, nil
 	}
@@ -238,7 +242,7 @@ func (provider *serverToolProvider) Next(request ModelRequest) (ModelResponse, e
 func TestCompleteWithToolsUsesTheValidatedAgentToolLoop(t *testing.T) {
 	provider := &serverToolProvider{}
 	service := NewService(NewSessionStore(0), provider)
-	completion, err := service.CompleteWithToolsContext(context.Background(), "user", "user", "Read the document", TierLow, ToolManifest{Tools: []ToolDefinition{{Name: "workflow.read_content", Risk: RiskRead}}}, func(_ context.Context, request ToolRequest) (json.RawMessage, error) {
+	completion, err := service.CompleteWithToolsContext(context.Background(), "user", "user", "You are Buzz. Be terse.", "Read the document", TierLow, ToolManifest{Tools: []ToolDefinition{{Name: "workflow.read_content", Risk: RiskRead}}}, func(_ context.Context, request ToolRequest) (json.RawMessage, error) {
 		if request.Name != "workflow.read_content" {
 			t.Fatalf("tool = %#v", request)
 		}
@@ -246,5 +250,14 @@ func TestCompleteWithToolsUsesTheValidatedAgentToolLoop(t *testing.T) {
 	})
 	if err != nil || completion.Text != "Grounded answer" || completion.ToolCalls != 1 || provider.calls != 2 {
 		t.Fatalf("completion=%#v calls=%d err=%v", completion, provider.calls, err)
+	}
+	// The Agent identity has to reach the provider as the system prompt on every
+	// round: the prompt builder publishes it as agent_instructions_and_context,
+	// and an Agent whose instructions only appear in the user message is refused
+	// as personaless.
+	for round, systemPrompt := range provider.systemPrompts {
+		if systemPrompt != "You are Buzz. Be terse." {
+			t.Fatalf("system prompt on round %d = %q", round+1, systemPrompt)
+		}
 	}
 }

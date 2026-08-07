@@ -104,8 +104,38 @@ func messageIDsForConversationTx(ctx context.Context, tx *sql.Tx, spaceID, conve
 	return ids, rows.Err()
 }
 
-// DeleteOrClearSpaceConversation clears canonical direct-message history while
-// preserving its identity, and deletes ordinary named conversations.
+func humanMemberIDsForConversationTx(ctx context.Context, tx *sql.Tx, conversationID string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT user_id FROM space_conversation_members
+		WHERE conversation_id=$1 AND actor_kind='person' AND user_id IS NOT NULL`, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func cleanupSpaceConversationRunsTx(ctx context.Context, tx *sql.Tx, spaceID, conversationID string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM space_events e USING space_runs r
+		WHERE e.entity_id=r.id AND r.space_id=$1
+		AND (r.scope_conversation_id=$2 OR r.source_conversation_id=$2)`, spaceID, conversationID); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `DELETE FROM space_runs
+		WHERE space_id=$1 AND (scope_conversation_id=$2 OR source_conversation_id=$2)`, spaceID, conversationID)
+	return err
+}
+
+// DeleteOrClearSpaceConversation permanently closes a conversation and removes
+// its history. Direct Agent conversations are recreated on demand, so keeping
+// an empty canonical row here would make a deleted chat remain in the sidebar.
 func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, spaceID, conversationID string) error {
 	return db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if err := requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID); err != nil {
@@ -124,25 +154,18 @@ func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, 
 		if err != nil {
 			return err
 		}
-		if kind == "direct" {
-			ids, err := messageIDsForConversationTx(ctx, tx, spaceID, conversationID)
-			if err != nil {
-				return err
-			}
-			if err := cleanupSpaceMessagesTx(ctx, tx, spaceID, ids); err != nil {
-				return err
-			}
-			if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_reads WHERE conversation_id=$1`, conversationID); err != nil {
-				return err
-			}
-			_, err = tx.ExecContext(ctx, `UPDATE space_conversations SET updated_at=NOW() WHERE id=$1`, conversationID)
-			return err
-		}
-		if kind != "standard" || (creator != userID && role != "owner") {
+		if kind != "direct" && (kind != "standard" || (creator != userID && role != "owner")) {
 			return ErrSpaceForbidden
 		}
 		if origin == "discord" && integrationStatus != "disconnected" {
 			return ErrSpaceForbidden
+		}
+		participantUserIDs, err := humanMemberIDsForConversationTx(ctx, tx, conversationID)
+		if err != nil {
+			return err
+		}
+		if err := cleanupSpaceConversationRunsTx(ctx, tx, spaceID, conversationID); err != nil {
+			return err
 		}
 		ids, err := messageIDsForConversationTx(ctx, tx, spaceID, conversationID)
 		if err != nil {
@@ -158,7 +181,11 @@ func (db *Database) DeleteOrClearSpaceConversation(ctx context.Context, userID, 
 		if changed, _ := result.RowsAffected(); changed != 1 {
 			return ErrSpaceNotFound
 		}
-		return nil
+		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "conversation.deleted",
+			conversationID, map[string]any{
+				"conversation_id": conversationID, "participant_user_ids": participantUserIDs,
+			})
+		return err
 	})
 }
 

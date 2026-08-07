@@ -14,7 +14,8 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 	switch {
 	case strings.HasPrefix(event.EventType, "message."), strings.HasPrefix(event.EventType, "conversation."):
 		var payload struct {
-			ConversationID string `json:"conversation_id"`
+			ConversationID     string   `json:"conversation_id"`
+			ParticipantUserIDs []string `json:"participant_user_ids"`
 		}
 		if err := json.Unmarshal(event.Payload, &payload); err != nil {
 			return false, err
@@ -22,7 +23,18 @@ func spaceEventVisibleToUserTx(ctx context.Context, tx *sql.Tx, userID string, e
 		if payload.ConversationID == "" && strings.HasPrefix(event.EventType, "conversation.") {
 			payload.ConversationID = event.EntityID
 		}
-		if payload.ConversationID != "" {
+		if event.EventType == "conversation.deleted" {
+			visible := false
+			for _, participantUserID := range payload.ParticipantUserIDs {
+				if participantUserID == userID {
+					visible = true
+					break
+				}
+			}
+			if !visible {
+				return false, nil
+			}
+		} else if payload.ConversationID != "" {
 			var member bool
 			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
 				SELECT 1 FROM space_conversation_members cm

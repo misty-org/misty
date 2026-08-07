@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -225,6 +226,35 @@ func (s *SpacesService) RunRetry() http.HandlerFunc {
 			writeSpaceError(w, previousErr)
 			return
 		}
+		if payload, ok := personalAgentChatRetryPayload(previous); ok {
+			triggerID, _ := s.database.SpaceAgentMessageTriggerIDForRun(r.Context(), userID, previous.ID)
+			if triggerID != "" {
+				_ = s.database.UpdateSpaceAgentMessageTrigger(r.Context(), triggerID, "retrying", previous.ID, "", "")
+			}
+			_, retriedRunID, retryErr := s.runMentionedAgent(
+				r.Context(), userID, previous.SpaceID, payload.ConversationID, previous.AgentID,
+				previous.SourceMessageID, previous.TriggerKind, payload.Content, payload.FileNodeIDs,
+				payload.AttachmentIDs, payload.LibraryItemIDs,
+			)
+			if retryErr != nil {
+				code, message := spaceRunFailureFromError(retryErr)
+				if triggerID != "" {
+					_ = s.database.UpdateSpaceAgentMessageTrigger(context.WithoutCancel(r.Context()), triggerID, "failed", retriedRunID, code, message)
+				}
+				writeSpaceError(w, retryErr)
+				return
+			}
+			retried, retryErr := s.database.SpaceRun(r.Context(), userID, retriedRunID)
+			if retryErr != nil {
+				writeSpaceError(w, retryErr)
+				return
+			}
+			if triggerID != "" {
+				_ = s.database.UpdateSpaceAgentMessageTrigger(r.Context(), triggerID, "completed", retried.ID, "", "")
+			}
+			writeJSON(w, http.StatusOK, retried)
+			return
+		}
 		if previous.SourceType == "suggestion" {
 			batch, item, err := s.database.SpaceActionSuggestionForRun(r.Context(), userID, previous.ID)
 			if err != nil {
@@ -265,6 +295,38 @@ func (s *SpacesService) RunRetry() http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, finished)
 	}
+}
+
+type personalAgentChatRetry struct {
+	ConversationID string
+	Content        []db.MessageSpan
+	FileNodeIDs    []string
+	AttachmentIDs  []string
+	LibraryItemIDs []string
+}
+
+func personalAgentChatRetryPayload(run *db.SpaceRun) (personalAgentChatRetry, bool) {
+	if run == nil || run.AgentInstanceID != "" || run.AgentID == "" || run.ResourceKind != "agent" ||
+		run.SourceType != "direct" && run.SourceType != "group_mention" {
+		return personalAgentChatRetry{}, false
+	}
+	var input struct {
+		Content        []db.MessageSpan `json:"content"`
+		FileNodeIDs    []string         `json:"file_node_ids"`
+		AttachmentIDs  []string         `json:"attachment_ids"`
+		LibraryItemIDs []string         `json:"library_item_ids"`
+	}
+	if json.Unmarshal(run.Input, &input) != nil || len(input.Content) == 0 {
+		return personalAgentChatRetry{}, false
+	}
+	conversationID := run.ScopeConversationID
+	if conversationID == "" && run.ConversationScopeKind == db.ConversationScopePrivate {
+		conversationID = run.SourceConversationID
+	}
+	return personalAgentChatRetry{
+		ConversationID: conversationID, Content: input.Content, FileNodeIDs: input.FileNodeIDs,
+		AttachmentIDs: input.AttachmentIDs, LibraryItemIDs: input.LibraryItemIDs,
+	}, true
 }
 
 func (s *SpacesService) publishResumedRunResponse(r *http.Request, userID string, run *db.SpaceRun) error {
