@@ -17,7 +17,7 @@ import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { AgentRunInline } from "./AgentRunInline";
 import { SuggestedActionsCard } from "./SuggestedActionsCard";
-import { canPublish, initials } from "./messageHelpers";
+import { canPublish, initials, isInFlightRun } from "./messageHelpers";
 
 export interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -52,8 +52,10 @@ export function ChatMessageRow({
       <article
         className={[
           "group relative -mx-3 grid grid-cols-[44px_minmax(0,1fr)] gap-x-4 rounded-xl px-3 py-1",
-          "transition-colors duration-150 hover:bg-muted/25",
-          compact ? "" : "mt-4",
+          "transition-colors duration-150 hover:bg-charcoal-card",
+          // `first:` covers the message that opens a thread with no date
+          // divider above it, whose top margin would double the scroller's.
+          compact ? "" : "mt-4 first:mt-0",
         ].join(" ")}
         id={`message-${message.id}`}
       >
@@ -71,7 +73,7 @@ export function ChatMessageRow({
 
         <div className={`col-start-1 flex justify-end ${rowClass}`}>
           {compact ? (
-            <time className="pt-1 text-[10px] tabular-nums text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            <time className="pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
               {formatChatMessageTime(message.created_at)}
             </time>
           ) : (
@@ -97,12 +99,12 @@ export function ChatMessageRow({
               onSubmit={(event: FormEvent, target) => props.onSaveEdited(event, target)}
             />
           ) : (
-            <p className="whitespace-pre-wrap text-[15px] leading-6 text-foreground/90">
+            <p className="whitespace-pre-wrap text-[15px] leading-6 text-cream/90">
               {message.content.map((span, index) => (
                 <MessageContent key={index} span={span} />
               ))}
               {message.edited_at ? (
-                <span className="ml-1 text-[10px] text-muted-foreground">(edited)</span>
+                <span className="ml-1 text-[10px] text-cream-muted">(edited)</span>
               ) : null}
             </p>
           )}
@@ -119,9 +121,11 @@ export function ChatMessageRow({
             onLibraryItem={props.onLibraryItem}
             onReload={props.onReload}
           />
-          {message.triggered_runs?.map((run) => (
-            <AgentRunInline key={run.id} run={run} />
-          ))}
+          {message.triggered_runs
+            ?.filter((run) => !isInFlightRun(run))
+            .map((run) => (
+              <AgentRunInline key={run.id} run={run} />
+            ))}
           <MessageReactions
             message={message}
             canWrite={props.canWrite}
@@ -163,7 +167,7 @@ export function ChatMessageRow({
 function MessageHeader({ message }: { message: SpaceMessage }) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
-      <strong className="text-[15px] font-semibold text-foreground">{message.sender_name}</strong>
+      <strong className="text-[15px] font-semibold text-cream">{message.sender_name}</strong>
       {message.sender_kind === "agent" ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px] uppercase">
           <Sparkles />
@@ -171,7 +175,7 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
         </Badge>
       ) : null}
       <MessageOriginBadge origin={message.origin} />
-      <time className="text-[11px] tabular-nums text-muted-foreground">
+      <time className="text-[11px] tabular-nums text-cream-muted">
         {formatChatMessageTime(message.created_at)}
       </time>
     </div>
@@ -182,13 +186,13 @@ function MessageContent({ span }: { span: MessageSpan }) {
   if (span.type === "text") return <>{span.text}</>;
   if (span.type === "link") {
     return (
-      <Link className="font-medium text-primary underline underline-offset-2" to={span.url}>
+      <Link className="font-medium text-cream-bright underline underline-offset-2" to={span.url}>
         {span.label}
       </Link>
     );
   }
   return (
-    <span className="rounded bg-primary/10 px-1 py-0.5 font-medium text-primary">
+    <span className="inline-flex items-center rounded bg-sage-bg px-1.5 py-0.5 text-xs font-medium text-sage-fg">
       @{span.label}
     </span>
   );

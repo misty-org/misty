@@ -22,7 +22,7 @@ export function MessageOriginBadge({ origin }: { origin?: MessageOrigin }) {
         <SiDiscord aria-hidden />
         Discord
         {origin.author_handle ? (
-          <span className="text-muted-foreground">@{origin.author_handle}</span>
+          <span className="text-cream-muted">@{origin.author_handle}</span>
         ) : null}
       </Badge>
     );

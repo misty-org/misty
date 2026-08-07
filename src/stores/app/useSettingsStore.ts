@@ -8,26 +8,6 @@ export type {
   SettingValue,
   SettingsScaleToken,
 } from "@/models/types/stores/app/useSettingsStore";
-import type {
-  AppearancePreferences,
-  NotificationPreferences,
-  GeneralPreferences,
-  AgentPreferences,
-  ShortcutPreferences,
-  AdvancedPreferences,
-  SearchMaintenancePreferences,
-  SettingsStore,
-} from "@/models/interfaces/stores/app/useSettingsStore";
-export type {
-  AppearancePreferences,
-  NotificationPreferences,
-  GeneralPreferences,
-  AgentPreferences,
-  ShortcutPreferences,
-  AdvancedPreferences,
-  SearchMaintenancePreferences,
-  SettingsStore,
-} from "@/models/interfaces/stores/app/useSettingsStore";
 import { create } from "zustand";
 import {
   settingsOpenWithAssociations,
@@ -272,11 +252,6 @@ export function selectAppearancePreferences(
   return {
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
     fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
-    panelOpacity: clampSettingsNumber(
-      settingsNumber(source, "appearance", "panel_opacity", 0.82),
-      0,
-      1,
-    ),
     reducedMotionEnabled: settingsBoolean(source, "appearance", "reduced_motion_enabled", false),
     thumbnailPreviewsEnabled: settingsBoolean(
       source,
@@ -285,7 +260,6 @@ export function selectAppearancePreferences(
       true,
     ),
     uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
-    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
   };
 }
 
@@ -468,4 +442,76 @@ function settingsSectionRecord(
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+export interface AppearancePreferences {
+  compactModeEnabled: boolean;
+  fontSize: SettingsScaleToken;
+  reducedMotionEnabled: boolean;
+  thumbnailPreviewsEnabled: boolean;
+  uiScale: SettingsScaleToken;
+}
+
+export interface NotificationPreferences {
+  badgeCountEnabled: boolean;
+  desktopNotificationsEnabled: boolean;
+  digestNotificationsEnabled: boolean;
+  inAppNotificationsEnabled: boolean;
+  quietHoursEnabled: boolean;
+  soundNotificationsEnabled: boolean;
+}
+
+export interface GeneralPreferences {
+  confirmDestructiveActions: boolean;
+  defaultFileActionIndex: number;
+  defaultTransferBehaviorIndex: number;
+  openLinksExternally: boolean;
+  preferredWorkspaceRoot: string;
+}
+
+export interface AgentPreferences {
+  enabled: boolean;
+  scopes: {
+    filesAllowed: boolean;
+    cleanupAllowed: boolean;
+    searchAllowed: boolean;
+  };
+}
+
+export interface ShortcutPreferences {
+  customShortcutsEnabled: boolean;
+  keymapIndex: number;
+  shortcutHintsEnabled: boolean;
+}
+
+export interface AdvancedPreferences {
+  extensionToolsPath: string;
+  mountPath: string;
+  serverAddress: string;
+}
+
+export interface SearchMaintenancePreferences {
+  automaticFileDiscoveryEnabled: boolean;
+  discoveryIntervalMinutes: number;
+}
+
+export interface SettingsStore {
+  activeSection: SettingsSection;
+  settings: SettingsSnapshot | null;
+  settingsText: string;
+  launchOnLogin: LaunchOnLoginSnapshot | null;
+  openWithAssociations: OpenWithAssociation[];
+  shortcuts: ShortcutsSnapshot | null;
+  loaded: boolean;
+  working: boolean;
+  error: string | null;
+  message: string | null;
+  setActiveSection: (section: SettingsSection) => void;
+  load: () => Promise<void>;
+  setSettingsText: (value: string) => void;
+  updateSetting: (section: string, key: string, value: SettingValue) => void;
+  saveSettingsDocument: () => Promise<void>;
+  removeOpenWithAssociation: (key: string) => Promise<void>;
+  setShortcut: (commandId: string, shortcut: string) => void;
+  saveShortcuts: () => Promise<void>;
 }

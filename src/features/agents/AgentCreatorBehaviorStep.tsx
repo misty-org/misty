@@ -82,7 +82,7 @@ export function AgentCreatorBehaviorStep({
           models={models}
           value={modelId}
           onValueChange={onModelChange}
-          className="w-full border border-input bg-background"
+          className="w-full border border-charcoal-border bg-charcoal-bg"
         />
       </WizardField>
       <WizardField
@@ -125,7 +125,7 @@ function WizardField({
     <div className="grid gap-2">
       <div>
         <Label className="font-medium">{label}</Label>
-        {hint ? <p className="mb-0 mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+        {hint ? <p className="mb-0 mt-0.5 text-xs text-cream-muted">{hint}</p> : null}
       </div>
       {children}
     </div>

@@ -1,17 +1,22 @@
-import type { RemoteListPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteListPanel";
-export type { RemoteListPanelProps } from "@/models/interfaces/pages/Providers/components/RemoteListPanel";
-import { Button } from "@/ui";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui";
+import {
+  IconButton,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  AssetIcon,
+  PrimitiveIconButton,
+  EmptyState,
+  ErrorState,
+  StatusBadge,
+} from "@/ui";
+import { ProviderLogo } from "@/pages/Providers/components/ProviderLogo";
 import { remoteDisplayName } from "@/stores/backend";
 import type { ProviderRemote } from "@/models/interfaces/services/misty-api";
 import { iconAssets } from "@/assets/icons";
-import { AssetIcon } from "@/ui";
-import { PrimitiveIconButton } from "@/ui";
 import { Panel, PanelHeader } from "@/pages/Providers/components/ProviderPanel";
 import { useMinimumSpin } from "@/hooks/useMinimumSpin";
-import { ProviderLogo } from "./ProviderLogo";
-import { EmptyState, ErrorState } from "@/ui";
-import { StatusBadge } from "@/ui";
 
 const remotePanelClass =
   "grid min-h-0 grid-rows-[auto_minmax(0,1fr)] !rounded-none !border-0 !bg-transparent !shadow-none [border-radius:0]";
@@ -21,16 +26,16 @@ const remoteListActionsClass = "flex items-center gap-2";
 const remoteListClass = "min-h-0 overflow-auto p-2";
 
 const remoteRowClass =
-  "relative grid w-full grid-cols-[minmax(0,1fr)_30px] items-center border-b border-border bg-transparent text-foreground hover:bg-muted/70";
+  "relative grid w-full grid-cols-[minmax(0,1fr)_30px] items-center border-b border-charcoal-border bg-transparent text-cream hover:bg-charcoal-card";
 
-const remoteRowSelectedClass = "bg-muted shadow-[inset_3px_0_0_var(--primary)]";
+const remoteRowSelectedClass = "bg-charcoal-card border-l-2 border-charcoal-active";
 
 const remoteRowSelectClass =
   "grid h-auto min-w-0 grid-cols-[28px_minmax(120px,1fr)_82px_126px] items-center justify-start gap-2.5 rounded-none px-2 py-[11px] pl-2.5 text-left text-inherit hover:bg-transparent";
 
-const remoteProviderIconClass = "grid h-[26px] w-[26px] place-items-center text-primary";
+const remoteProviderIconClass = "grid h-[26px] w-[26px] place-items-center text-cream-bright";
 
-const remoteProviderIconWarningClass = "text-amber-500";
+const remoteProviderIconWarningClass = "text-sage-fg";
 
 export function RemoteListPanel(props: RemoteListPanelProps) {
   const [refreshSpinning, startRefreshSpin] = useMinimumSpin(props.loading);
@@ -42,7 +47,7 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
         actions={
           <div className={remoteListActionsClass}>
             <PrimitiveIconButton
-              className="text-muted-foreground/70 hover:text-foreground"
+              className="text-cream-muted/70 hover:text-cream"
               onClick={() => {
                 startRefreshSpin();
                 props.onRefresh();
@@ -128,7 +133,7 @@ function RemoteRow(props: {
         <span className="overflow-hidden text-ellipsis whitespace-nowrap font-[580]">
           {remoteDisplayName(remote)}
         </span>
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-muted-foreground">
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap text-cream-muted">
           {remote.type}
           {externalConfig ? " · user config" : ""}
         </span>
@@ -158,7 +163,7 @@ function RemoteRow(props: {
                 <AssetIcon src={iconAssets.plus16} size={15} /> Import
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-cream-bright focus:text-cream-bright"
                 onClick={props.onDisconnect}
               >
                 <AssetIcon src={iconAssets.trash24} size={15} /> Delete
@@ -170,7 +175,7 @@ function RemoteRow(props: {
                 <AssetIcon src={iconAssets.gear24} size={15} /> Configure
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
+                className="text-cream-bright focus:text-cream-bright"
                 onClick={props.onDisconnect}
               >
                 <AssetIcon src={iconAssets.trash24} size={15} /> Delete
@@ -181,4 +186,17 @@ function RemoteRow(props: {
       </DropdownMenu>
     </div>
   );
+}
+
+export interface RemoteListPanelProps {
+  remotes: ProviderRemote[];
+  selectedRemoteName: string | null;
+  loading: boolean;
+  serviceError: string | null;
+  working: boolean;
+  onRefresh: () => void;
+  onAdd: () => void;
+  onSelectRemote: (name: string) => void;
+  onRepair: (remote: ProviderRemote) => void;
+  onDisconnect: (name: string) => void;
 }

@@ -1,5 +1,3 @@
-import type { IconButtonProps } from "@/models/interfaces/ui/outlined-icon-button";
-export type { IconButtonProps } from "@/models/interfaces/ui/outlined-icon-button";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { IconButton as PrimitiveIconButton } from "./icon-button";
 
@@ -20,4 +18,8 @@ export function IconButton({
       {children}
     </PrimitiveIconButton>
   );
+}
+
+export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  children: ReactNode;
 }

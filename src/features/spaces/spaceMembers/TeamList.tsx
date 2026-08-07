@@ -106,21 +106,23 @@ export function TeamList({
     }
   };
   const openAgent = (agentId: string) => {
-    void spacesApi.directAgentConversation(spaceId, agentId).then((conversation) =>
-      navigate(
-        `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
-      ),
-    );
+    void spacesApi
+      .directAgentConversation(spaceId, agentId)
+      .then((conversation) =>
+        navigate(
+          `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
+        ),
+      );
   };
 
   return (
     <>
       <Card className="overflow-hidden" aria-label="Space team">
         {canManageAgents ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-charcoal-card px-4 py-3">
             <div>
               <p className="m-0 text-sm font-medium">Agent teammates</p>
-              <p className="mb-0 mt-0.5 text-xs text-muted-foreground">
+              <p className="mb-0 mt-0.5 text-xs text-cream-muted">
                 Hire an existing Agent or create a specialized coworker.
               </p>
             </div>
@@ -177,7 +179,7 @@ export function TeamList({
         {!loading
           ? members.map((member, index) => (
               <div
-                className={`group ${rowClass} transition-colors hover:bg-muted/50 ${index ? "border-t border-border/60" : ""}`}
+                className={`group ${rowClass} transition-colors hover:bg-charcoal-card ${index ? "border-t border-charcoal-border/60" : ""}`}
                 key={`person:${member.user_id}`}
               >
                 <Avatar className="size-10 shrink-0">
@@ -187,14 +189,12 @@ export function TeamList({
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
-                    <p className="m-0 truncate text-sm font-medium text-foreground">
-                      {member.name}
-                    </p>
+                    <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
                     {member.user_id === currentUserId ? (
                       <Badge variant="secondary">You</Badge>
                     ) : null}
                   </div>
-                  <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                  <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
                     <Mail className="size-3 shrink-0" /> {member.email}
                   </p>
                 </div>
@@ -226,7 +226,7 @@ export function TeamList({
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
+                          className="text-cream-bright focus:text-cream-bright"
                           onSelect={() => onMemberAction({ kind: "remove", member })}
                         >
                           <Trash2 className="mr-2 size-4" /> Remove member
@@ -243,7 +243,7 @@ export function TeamList({
           ? agents.map((agent) => (
               <div
                 key={`agent:${agent.agent_id}`}
-                className={`${rowClass} border-t border-border/60 transition-colors hover:bg-muted/50`}
+                className={`${rowClass} border-t border-charcoal-border/60 transition-colors hover:bg-charcoal-card`}
               >
                 <AgentAvatar
                   agentId={agent.agent_id}
@@ -267,7 +267,7 @@ export function TeamList({
                       <Badge variant="destructive">{agent.attention_count}</Badge>
                     ) : null}
                   </div>
-                  <p className="mb-0 mt-0.5 truncate text-xs text-muted-foreground">
+                  <p className="mb-0 mt-0.5 truncate text-xs text-cream-muted">
                     {agent.space_role || agent.role || "AI teammate"} · owner{" "}
                     {memberNames.get(agent.owner_user_id) || "external creator"}
                   </p>
@@ -319,7 +319,7 @@ export function TeamList({
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
+                        className="text-cream-bright focus:text-cream-bright"
                         onSelect={() =>
                           void run(`remove:${agent.agent_id}`, () =>
                             spacesApi.removeSpaceAgent(spaceId, agent.agent_id),

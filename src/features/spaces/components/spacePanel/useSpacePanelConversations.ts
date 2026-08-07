@@ -60,5 +60,11 @@ export function useSpacePanelConversations(options: {
     });
   };
 
-  return { conversations, upsertConversation };
+  const removeConversation = (conversationId: string) => {
+    setConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationId),
+    );
+  };
+
+  return { conversations, upsertConversation, removeConversation };
 }

@@ -50,7 +50,7 @@ export function TaskInlineSelect({
     >
       <SelectTrigger
         aria-label={label}
-        className={`h-8 min-w-0 border-transparent bg-transparent text-xs shadow-none hover:bg-muted ${className ?? ""}`}
+        className={`h-8 min-w-0 border-transparent bg-transparent text-xs shadow-none hover:bg-charcoal-card ${className ?? ""}`}
       >
         <SelectValue />
       </SelectTrigger>
@@ -122,7 +122,7 @@ export function TaskEmptyState({
 }) {
   return (
     <EmptyState
-      className="min-h-56 max-w-none rounded-lg bg-muted/30"
+      className="min-h-56 max-w-none rounded-lg bg-charcoal-card"
       compact
       title={title}
       description={description}
@@ -133,7 +133,7 @@ export function TaskEmptyState({
 export function TaskErrorState({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
     <ErrorState
-      className="mb-3 max-w-none rounded-lg border border-destructive/30 bg-destructive/10 py-4"
+      className="mb-3 max-w-none rounded-lg border border-charcoal-active/30 bg-charcoal-active py-4"
       compact
       title="Tasks could not be loaded"
       description={message}
@@ -148,8 +148,8 @@ export function TaskErrorState({ message, onDismiss }: { message: string; onDism
 
 export function dueTone(task: SpaceTask) {
   return task.due_at && new Date(task.due_at) < new Date() && task.status !== "done"
-    ? "text-destructive"
-    : "text-muted-foreground";
+    ? "text-cream-bright"
+    : "text-cream-muted";
 }
 
 export function shortDue(value: string) {
@@ -192,8 +192,8 @@ export function memberInitials(name: string) {
 }
 
 export function statusDot(status: SpaceTaskStatus) {
-  if (status === "done") return "bg-emerald-500";
-  if (status === "in_progress") return "bg-sky-500";
-  if (status === "canceled") return "bg-muted-foreground";
-  return "bg-amber-500";
+  if (status === "done") return "bg-status-green";
+  if (status === "in_progress") return "bg-sage-bg";
+  if (status === "canceled") return "bg-cream-muted";
+  return "bg-sage-bg";
 }

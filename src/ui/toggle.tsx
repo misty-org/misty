@@ -7,19 +7,19 @@ import { cn } from "@/ui";
 const toggleVariants = cva(
   [
     "group/toggle inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md",
-    "text-sm font-medium text-foreground outline-none",
-    "transition-[color,background-color,box-shadow] hover:bg-accent hover:text-accent-foreground",
-    "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40",
+    "text-sm font-medium text-cream outline-none",
+    "transition-[color,background-color,box-shadow] hover:bg-charcoal-hover hover:text-cream",
+    "focus-visible:border-charcoal-active focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40",
     "disabled:pointer-events-none disabled:opacity-50",
-    "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground",
-    "data-[state=on]:hover:bg-primary/90",
+    "data-[state=on]:bg-charcoal-active data-[state=on]:text-cream-bright",
+    "data-[state=on]:hover:bg-charcoal-active",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   ],
   {
     variants: {
       variant: {
         default: "bg-transparent",
-        outline: "border border-input bg-transparent shadow-xs hover:bg-muted",
+        outline: "border border-charcoal-border bg-transparent shadow-xs hover:bg-charcoal-card",
       },
       size: {
         default: "h-9 px-2 min-w-9",

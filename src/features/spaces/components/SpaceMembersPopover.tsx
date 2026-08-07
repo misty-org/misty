@@ -80,9 +80,9 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
       <PopoverTrigger asChild>
         <Button
           className={cn(
-            "relative grid size-8 place-items-center rounded-md p-0 text-muted-foreground shadow-none",
-            "hover:bg-accent/65 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
-            open && "bg-accent text-accent-foreground",
+            "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
+            "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
+            open && "text-cream-bright",
           )}
           variant="ghost"
           size="icon"
@@ -95,7 +95,7 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
           <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
           {onlineCount > 0 ? (
             <span
-              className="absolute bottom-1 right-1 size-1.5 rounded-full bg-emerald-500 ring-2 ring-background"
+              className="absolute bottom-1 right-1 size-2.5 rounded-full border-2 border-charcoal-sidebar bg-status-green"
               aria-hidden="true"
             />
           ) : null}
@@ -105,17 +105,17 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="w-72 overflow-hidden border-border/70 p-0"
+        className="w-72 overflow-hidden border-charcoal-border/70 p-0"
       >
-        <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
+        <div className="flex items-center justify-between border-b border-charcoal-border/60 px-3 py-2.5">
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
-            <p className="mb-0 mt-0.5 text-[11px] text-muted-foreground">
+            <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">
               {(members.length || space.member_count) + agents.length} teammates in {space.name}
             </p>
           </div>
           {onlineCount > 0 ? (
-            <span className="shrink-0 text-[11px] text-muted-foreground">{onlineCount} online</span>
+            <span className="shrink-0 text-[11px] text-cream-muted">{onlineCount} online</span>
           ) : null}
         </div>
 
@@ -128,18 +128,20 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
               agents={agents}
               onOpenAgent={(agentId) => {
                 setOpen(false);
-                void spacesApi.directAgentConversation(space.id, agentId).then((conversation) =>
-                  navigate(
-                    `/spaces/${encodeURIComponent(space.id)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
-                  ),
-                );
+                void spacesApi
+                  .directAgentConversation(space.id, agentId)
+                  .then((conversation) =>
+                    navigate(
+                      `/spaces/${encodeURIComponent(space.id)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
+                    ),
+                  );
               }}
             />
           )}
         </div>
 
         {space.role === "owner" || space.permissions?.["agents.manage"] === true ? (
-          <div className="grid grid-cols-2 gap-1 border-t border-border/60 p-1.5">
+          <div className="grid grid-cols-2 gap-1 border-t border-charcoal-border/60 p-1.5">
             <Button
               asChild
               className="h-8 justify-start gap-2 px-2 text-xs"
@@ -182,7 +184,7 @@ function TeamRows({
     <div className="grid gap-0.5">
       {members.map((member) => (
         <div
-          className="flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-accent/65"
+          className="flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-charcoal-hover"
           key={`person:${member.user_id}`}
         >
           <span className="relative inline-flex shrink-0">
@@ -194,9 +196,7 @@ function TeamRows({
             <PresenceDot status={member.presenceStatus} />
           </span>
           <span className="min-w-0 flex-1 truncate text-xs font-medium">{member.name}</span>
-          <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
-            {member.role}
-          </span>
+          <span className="shrink-0 text-[10px] capitalize text-cream-muted">{member.role}</span>
         </div>
       ))}
       {agents.map((agent) => (
@@ -216,7 +216,7 @@ function TeamRows({
             iconClassName="size-3.5"
           />
           <span className="min-w-0 flex-1 truncate text-xs font-medium">{agent.name}</span>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
+          <span className="shrink-0 text-[10px] text-cream-muted">
             Agent · {agentWorkStateLabel(agent)}
           </span>
         </Button>
@@ -227,29 +227,31 @@ function TeamRows({
 
 function agentWorkStateLabel(agent: SpaceAgentMembership): string {
   const state = agent.work_state || (agent.enabled ? "ready" : "disabled");
-  return {
-    ready: "Ready",
-    queued: "Queued",
-    working: "Working",
-    awaiting_approval: "Awaiting approval",
-    needs_approval: "Needs approval",
-    retrying: "Retrying",
-    completed: "Ready",
-    failed: "Failed",
-    canceled: "Canceled",
-    disabled: "Disabled",
-    update_available: "Update available",
-  }[state] ?? "Ready";
+  return (
+    {
+      ready: "Ready",
+      queued: "Queued",
+      working: "Working",
+      awaiting_approval: "Awaiting approval",
+      needs_approval: "Needs approval",
+      retrying: "Retrying",
+      completed: "Ready",
+      failed: "Failed",
+      canceled: "Canceled",
+      disabled: "Disabled",
+      update_available: "Update available",
+    }[state] ?? "Ready"
+  );
 }
 
 function PresenceDot({ status }: { status: PresenceStatus }) {
   return (
     <span
       className={cn(
-        "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-popover",
-        status === "online" && "bg-emerald-500",
-        status === "idle" && "bg-amber-400",
-        status === "offline" && "bg-muted-foreground/45",
+        "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-charcoal-border",
+        status === "online" && "bg-status-green",
+        status === "idle" && "bg-sage-bg",
+        status === "offline" && "bg-charcoal-hover",
       )}
       aria-hidden="true"
     />

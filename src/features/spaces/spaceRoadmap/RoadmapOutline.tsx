@@ -19,13 +19,13 @@ export function RoadmapOutline({
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="border-t border-border/70 bg-background/95"
+      className="border-t border-charcoal-border/70 bg-charcoal-bg"
     >
       <CollapsibleTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold uppercase tracking-wider text-cream-muted"
         >
           <ListTree className="size-3.5" />
           Accessible outline
@@ -40,8 +40,8 @@ export function RoadmapOutline({
             <div key={milestone.id}>
               <Button
                 className={cn(
-                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-muted",
-                  selectedId === milestone.id && "bg-muted",
+                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  selectedId === milestone.id && "bg-charcoal-card",
                 )}
                 type="button"
                 variant="ghost"
@@ -49,7 +49,7 @@ export function RoadmapOutline({
               >
                 <Flag className="size-3.5" />
                 <span className="truncate font-medium">{milestone.title}</span>
-                <span className="ml-auto text-[10px] text-muted-foreground">
+                <span className="ml-auto text-[10px] text-cream-muted">
                   {milestone.goal_done}/{milestone.goal_total}
                 </span>
               </Button>
@@ -61,7 +61,7 @@ export function RoadmapOutline({
                       className={cn(
                         outlineItemClass,
                         "pl-7 text-xs",
-                        selectedId === goal.id && "bg-muted text-foreground",
+                        selectedId === goal.id && "bg-charcoal-card text-cream",
                       )}
                       type="button"
                       variant="ghost"
@@ -92,7 +92,7 @@ export function RoadmapOutline({
                     className={cn(
                       outlineItemClass,
                       "pl-7 text-xs",
-                      selectedId === node.id && "bg-muted text-foreground",
+                      selectedId === node.id && "bg-charcoal-card text-cream",
                     )}
                     type="button"
                     variant="ghost"
@@ -110,8 +110,8 @@ export function RoadmapOutline({
             .map((node) => (
               <Button
                 className={cn(
-                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-muted",
-                  selectedId === node.id && "bg-muted",
+                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  selectedId === node.id && "bg-charcoal-card",
                 )}
                 type="button"
                 variant="ghost"
@@ -130,5 +130,5 @@ export function RoadmapOutline({
 
 const outlineItemClass = [
   "h-7 w-full justify-start gap-2 rounded pr-2 text-left font-normal",
-  "text-muted-foreground hover:bg-muted hover:text-foreground",
+  "text-cream-muted hover:bg-charcoal-card hover:text-cream",
 ].join(" ");

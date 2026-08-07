@@ -1,11 +1,3 @@
-import type {
-  StoredAgentUsage,
-  AgentUsageStore,
-} from "@/models/interfaces/stores/agent/useAgentUsageStore";
-export type {
-  StoredAgentUsage,
-  AgentUsageStore,
-} from "@/models/interfaces/stores/agent/useAgentUsageStore";
 import { create } from "zustand";
 
 export const agentDailyMessageLimit = 50;
@@ -70,4 +62,16 @@ function writeStoredUsage(usage: StoredAgentUsage): void {
   } catch {
     // Usage limits still work for this session when storage is unavailable.
   }
+}
+
+export interface StoredAgentUsage {
+  dateKey: string;
+  messagesUsed: number;
+}
+
+export interface AgentUsageStore {
+  dateKey: string;
+  messagesUsedToday: number;
+  syncForToday: () => void;
+  consumeMessage: () => boolean;
 }

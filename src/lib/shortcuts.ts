@@ -1,7 +1,5 @@
 import type { ShortcutMap } from "@/models/types/lib/shortcuts";
 export type { ShortcutMap } from "@/models/types/lib/shortcuts";
-import type { ParsedShortcut } from "@/models/interfaces/lib/shortcuts";
-export type { ParsedShortcut } from "@/models/interfaces/lib/shortcuts";
 import type { ShortcutBinding } from "@/models/interfaces/services/misty-api";
 
 export function shortcutMapFromBindings(
@@ -138,4 +136,12 @@ function normalizedEventKey(event: KeyboardEvent): string {
 
 function isMacLikePlatform(): boolean {
   return /mac|iphone|ipad|ipod/i.test(navigator.platform);
+}
+
+export interface ParsedShortcut {
+  alt: boolean;
+  ctrl: boolean;
+  key: string;
+  meta: boolean;
+  shift: boolean;
 }

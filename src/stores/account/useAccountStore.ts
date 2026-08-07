@@ -142,7 +142,7 @@ function textPreview(value: string): string {
 }
 
 function firstJsonValueText(value: string): string | null {
-  const start = value.search(/[\[{]/);
+  const start = value.search(/[[{]/);
   if (start < 0) return null;
   let depth = 0;
   let inString = false;
@@ -321,7 +321,7 @@ function payloadDetail(payload: unknown): string {
   }
 }
 
-async function resolveAccountApiBase(): Promise<string> {
+export async function resolveAccountApiBase(): Promise<string> {
   const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
   const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
   const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);

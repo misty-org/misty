@@ -1,5 +1,5 @@
-export const initialAgentModelId = "google/gemini-2.5-flash-lite";
-export const initialAgentModelName = "Gemini 2.5 Flash-Lite";
+export const initialAgentModelId = "poolside/laguna-s-2.1-free";
+export const initialAgentModelName = "Laguna S 2.1 Free";
 
 /**
  * The model a new chat starts on when neither the agent nor the chat overrides

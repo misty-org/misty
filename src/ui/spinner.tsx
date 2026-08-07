@@ -1,5 +1,3 @@
-import type { SpinnerProps } from "@/models/types/ui/spinner";
-export type { SpinnerProps } from "@/models/types/ui/spinner";
 import * as React from "react";
 import { LoaderCircle } from "lucide-react";
 
@@ -24,3 +22,8 @@ function Spinner({ className, label = "Loading", size = "default", ...props }: S
   );
 }
 export { Spinner };
+
+export type SpinnerProps = React.HTMLAttributes<HTMLSpanElement> & {
+  label?: string;
+  size?: "sm" | "default" | "lg";
+};

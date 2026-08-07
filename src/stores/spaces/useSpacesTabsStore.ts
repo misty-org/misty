@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { spaceNotesEnabled } from "@/features/notes/availability";
 
 const maximumOpenTabs = 16;
+const maximumTabTitleLength = 60;
 const pendingSpaceId = "__pending__";
 
 export type WorkspaceTabKind = "space" | "file-manager" | "agents" | "extensions" | "transfers";
@@ -66,6 +67,8 @@ interface SpacesTabsStore {
     toIndex: number,
   ) => void;
   selectTab: (accountId: string, spaceId: string, tabId: string) => void;
+  /** Returns the stored title, or "" when the rename was rejected. */
+  renameTab: (accountId: string, spaceId: string, tabId: string, title: string) => string;
   updateActiveSpaceRoute: (accountId: string, spaceId: string, route: string) => void;
   removeSession: (accountId: string, spaceId: string) => SpacesTab[];
   pruneSessions: (accountId: string, validSpaceIds: string[]) => SpacesTab[];
@@ -197,6 +200,29 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
         set((state) => ({
           sessions: { ...state.sessions, [key]: { ...current, tabs } },
         }));
+      },
+
+      renameTab: (accountId, spaceId, tabId, title) => {
+        const trimmed = title.trim().slice(0, maximumTabTitleLength);
+        if (!trimmed) return "";
+        const key = spacesTabsSessionKey(accountId, spaceId);
+        const current = get().sessions[key];
+        const target = current?.tabs.find((tab) => tab.id === tabId);
+        // Space tabs read their title from the route, so renaming one would be
+        // overwritten by the next navigation.
+        if (!current || !target || target.kind === "space" || target.title === trimmed) return "";
+        set((state) => ({
+          sessions: {
+            ...state.sessions,
+            [key]: {
+              ...current,
+              tabs: current.tabs.map((tab) =>
+                tab.id === tabId ? { ...tab, title: trimmed } : tab,
+              ),
+            },
+          },
+        }));
+        return trimmed;
       },
 
       removeSession: (accountId, spaceId) => {

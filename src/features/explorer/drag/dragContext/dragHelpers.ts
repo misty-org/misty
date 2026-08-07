@@ -48,12 +48,12 @@ export function dragPreviewDataUrl(items: ExplorerDragItem[]): string {
   canvas.height = 80;
   const context = canvas.getContext("2d");
   if (!context) return "data:image/png;base64,";
-  context.fillStyle = "rgba(20,22,26,.94)";
+  context.fillStyle = "#141312";
   context.roundRect(4, 4, 120, 72, 14);
   context.fill();
-  context.fillStyle = "#f5c451";
+  context.fillStyle = "#A3BFAB";
   context.fillRect(17, 22, 28, 24);
-  context.fillStyle = "#f4f4f5";
+  context.fillStyle = "#F5F2ED";
   context.font = "600 13px sans-serif";
   context.fillText(
     items.length > 1 ? `${items.length} items` : (items[0]?.name ?? "Item"),

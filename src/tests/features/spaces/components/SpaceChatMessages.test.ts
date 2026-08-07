@@ -5,6 +5,7 @@ import {
   formatChatMessageTime,
 } from "@/features/spaces/components/SpaceChatDisplay";
 import { messageReplyPreviewText } from "@/features/spaces/components/SpaceChatMessages";
+import { isInFlightRun } from "@/features/spaces/chatMessages/messageHelpers";
 import type { SpaceMessage } from "@/models/interfaces/features/spaces/types";
 
 function message(id: string, sender: string, createdAt: string): SpaceMessage {
@@ -67,5 +68,16 @@ describe("Space chat display rows", () => {
     ];
 
     expect(messageReplyPreviewText(repliedTo)).toBe("I think it tried @Sam to fix itself");
+  });
+});
+
+describe("Agent run states", () => {
+  it("treats only the working states as in flight", () => {
+    expect(["queued", "working", "retrying"].every((state) => isInFlightRun({ state }))).toBe(true);
+    expect(
+      ["completed", "failed", "canceled", "awaiting_approval"].some((state) =>
+        isInFlightRun({ state }),
+      ),
+    ).toBe(false);
   });
 });

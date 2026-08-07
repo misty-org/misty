@@ -1,5 +1,6 @@
-import type { TargetKind } from "@/models/types/features/explorer/drag/ExplorerDropTarget";
-export type { TargetKind } from "@/models/types/features/explorer/drag/ExplorerDropTarget";
+import { transferDropAcceptance } from "@/features/explorer/components/FileBrowserDrag";
+import { Droppable } from "@/features/explorer/drag/ExplorerDragContext";
+import { groupItemsByOperation, storageIdForPath } from "@/features/explorer/drag/operations";
 import { useMemo, type ReactNode } from "react";
 import {
   explorerPathIsDirectory,
@@ -9,9 +10,6 @@ import {
 import { useMultiPanelStore } from "@/features/workspace";
 import { useExplorerStore } from "@/stores/explorer";
 import { useSmartLibraryStore } from "@/stores/media/useSmartLibraryStore";
-import { transferDropAcceptance } from "../components/FileBrowserDrag";
-import { Droppable } from "./ExplorerDragContext";
-import { groupItemsByOperation, storageIdForPath } from "./operations";
 import type {
   ExplorerDragModifiers,
   ExplorerDragPayload,
@@ -176,3 +174,5 @@ function refreshAllPanes() {
   const explorer = useExplorerStore.getState();
   Object.keys(explorer.panes).forEach((paneId) => void explorer.refreshPane(paneId));
 }
+
+export type TargetKind = "directory" | "trash" | "library" | "invalid";

@@ -39,7 +39,7 @@ export function MemberList({
       ) : (
         members.map((member, index) => (
           <div
-            className={`group ${rowClass} transition-colors hover:bg-muted/50 ${index ? "border-t border-border/60" : ""}`}
+            className={`group ${rowClass} transition-colors hover:bg-charcoal-card ${index ? "border-t border-charcoal-border/60" : ""}`}
             key={member.user_id}
           >
             <Avatar className="size-10 shrink-0">
@@ -49,10 +49,10 @@ export function MemberList({
             </Avatar>
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
-                <p className="m-0 truncate text-sm font-medium text-foreground">{member.name}</p>
+                <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
                 {member.user_id === currentUserId ? <Badge variant="secondary">You</Badge> : null}
               </div>
-              <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+              <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
                 <Mail className="size-3 shrink-0" /> {member.email}
               </p>
             </div>
@@ -97,7 +97,7 @@ function MemberActionsMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
+          className="text-cream-bright focus:text-cream-bright"
           onSelect={() => onAction({ kind: "remove", member })}
         >
           <Trash2 className="mr-2 size-4" /> Remove member
@@ -112,7 +112,10 @@ function MemberListSkeleton() {
     <div aria-busy="true" role="status">
       <span className="sr-only">Loading members</span>
       {[0, 1, 2, 3].map((index) => (
-        <div className={`${rowClass} ${index ? "border-t border-border/60" : ""}`} key={index}>
+        <div
+          className={`${rowClass} ${index ? "border-t border-charcoal-border/60" : ""}`}
+          key={index}
+        >
           <Skeleton className="size-10 shrink-0 rounded-full" />
           <div className="grid min-w-0 flex-1 gap-2">
             <Skeleton className="h-3.5 w-32 rounded" />
@@ -128,9 +131,9 @@ function MemberListEmpty() {
   return (
     <div className="grid min-h-56 place-items-center p-6 text-center">
       <div>
-        <Users className="mx-auto size-6 text-muted-foreground" />
+        <Users className="mx-auto size-6 text-cream-muted" />
         <p className="mb-0 mt-3 text-sm font-medium">No members loaded</p>
-        <p className="mb-0 mt-1 text-xs text-muted-foreground">
+        <p className="mb-0 mt-1 text-xs text-cream-muted">
           Members will appear when access data is available.
         </p>
       </div>

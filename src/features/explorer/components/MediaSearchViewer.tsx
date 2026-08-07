@@ -46,21 +46,21 @@ export function MediaSearchViewer() {
         if (!open) close();
       }}
     >
-      <DialogContent className="grid max-h-[90vh] w-[min(1050px,94vw)] max-w-none grid-rows-[minmax(0,1fr)_auto] gap-0 overflow-hidden bg-card p-0 text-card-foreground">
+      <DialogContent className="grid max-h-[90vh] w-[min(1050px,94vw)] max-w-none grid-rows-[minmax(0,1fr)_auto] gap-0 overflow-hidden bg-charcoal-card p-0 text-cream">
         <DialogHeader className="sr-only">
           <DialogTitle>{result.entry.name}</DialogTitle>
           <DialogDescription>
             Media search result at {formatTime(result.match.mediaStartMs ?? 0)}.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-[240px] place-items-center overflow-hidden bg-black">
+        <div className="grid min-h-[240px] place-items-center overflow-hidden bg-charcoal-workspace">
           {isVideo ? (
             <video {...common} className="max-h-[68vh] max-w-full" />
           ) : (
             <audio {...common} className="w-[min(720px,88vw)]" />
           )}
         </div>
-        <div className="grid gap-3 border-t border-border p-5">
+        <div className="grid gap-3 border-t border-charcoal-border p-5">
           <div className="flex items-start gap-3">
             <Button
               size="icon"
@@ -72,16 +72,14 @@ export function MediaSearchViewer() {
             </Button>
             <div className="min-w-0">
               <h2 className="m-0 truncate text-lg font-semibold">{result.entry.name}</h2>
-              <p className="m-0 mt-1 text-sm text-muted-foreground">
+              <p className="m-0 mt-1 text-sm text-cream-muted">
                 {formatTime(result.match.mediaStartMs ?? 0)} ·{" "}
                 {result.match.mediaMatchKind === "spoken" ? "Spoken audio" : "Visual scene"}
               </p>
             </div>
           </div>
           {result.match.description ? (
-            <p className="m-0 text-sm leading-6 text-muted-foreground">
-              {result.match.description}
-            </p>
+            <p className="m-0 text-sm leading-6 text-cream-muted">{result.match.description}</p>
           ) : null}
         </div>
       </DialogContent>

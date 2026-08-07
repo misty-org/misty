@@ -1,5 +1,3 @@
-import type { BlogPost } from "@/models/interfaces/features/installer/data/blog";
-export type { BlogPost } from "@/models/interfaces/features/installer/data/blog";
 export const posts: BlogPost[] = [
   {
     title: "Introducing Misty — One App for All Your Cloud Files",
@@ -11,6 +9,13 @@ export const posts: BlogPost[] = [
 ];
 
 export const tagColors: Record<string, string> = {
-  Announcement: "bg-primary/10 text-primary border-primary/20",
-  Engineering: "bg-success/10 text-success border-success/20",
+  Announcement: "bg-charcoal-active text-cream-bright border-charcoal-active/20",
+  Engineering: "bg-sage-bg text-sage-fg border-status-green/20",
 };
+
+export interface BlogPost {
+  title: string;
+  date: string;
+  summary: string;
+  tag: string;
+}

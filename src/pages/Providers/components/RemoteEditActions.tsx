@@ -1,8 +1,5 @@
-import type { RemoteEditActionsProps } from "@/models/interfaces/pages/Providers/components/RemoteEditActions";
-export type { RemoteEditActionsProps } from "@/models/interfaces/pages/Providers/components/RemoteEditActions";
-import { Button } from "@/ui";
+import { Button, AssetIcon } from "@/ui";
 import { iconAssets } from "@/assets/icons";
-import { AssetIcon } from "@/ui";
 
 const editActionsClass =
   "grid max-w-[760px] grid-cols-3 gap-2.5 px-[18px] pb-[18px] max-[980px]:grid-cols-1";
@@ -36,4 +33,14 @@ export function RemoteEditActions(props: RemoteEditActionsProps) {
       </Button>
     </footer>
   );
+}
+
+export interface RemoteEditActionsProps {
+  working: boolean;
+  dirty: boolean;
+  validRemoteName: boolean;
+  stale: boolean;
+  onSave: () => void;
+  onDelete: () => void;
+  onTest: () => void;
 }

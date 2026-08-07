@@ -80,11 +80,11 @@ export function LibraryItemContextMenu(props: {
         />
       </ContextMenuTrigger>
       <ContextMenuContent
-        className="z-[var(--misty-layer-menu)] w-56"
+        className="w-56"
         aria-label={`Actions for ${props.item.display_name}`}
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
-        <ContextMenuLabel className="truncate text-xs font-medium text-muted-foreground">
+        <ContextMenuLabel className="truncate text-xs font-medium text-cream-muted">
           {props.item.display_name}
         </ContextMenuLabel>
         <ContextMenuSeparator />
@@ -110,8 +110,8 @@ export function LibraryItemContextMenu(props: {
                     <ContextMenuSubTrigger className="gap-2 text-xs">
                       <FolderPlus className="size-4" /> Add to album
                     </ContextMenuSubTrigger>
-                    <ContextMenuSubContent className="z-[var(--misty-layer-menu)] w-52">
-                      <ContextMenuLabel className="text-xs text-muted-foreground">
+                    <ContextMenuSubContent className="w-52">
+                      <ContextMenuLabel className="text-xs text-cream-muted">
                         Choose an album
                       </ContextMenuLabel>
                       <ContextMenuSeparator />
@@ -157,7 +157,7 @@ function MenuItem({
 }) {
   return (
     <ContextMenuItem
-      className={`gap-2 text-xs ${danger ? "text-destructive focus:text-destructive" : ""}`}
+      className={`gap-2 text-xs ${danger ? "text-cream-bright focus:text-cream-bright" : ""}`}
       onSelect={onSelect}
     >
       <span className="[&_svg]:size-4">{icon}</span>

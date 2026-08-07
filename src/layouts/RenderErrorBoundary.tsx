@@ -1,11 +1,3 @@
-import type {
-  RenderErrorBoundaryProps,
-  RenderErrorBoundaryState,
-} from "@/models/interfaces/layouts/RenderErrorBoundary";
-export type {
-  RenderErrorBoundaryProps,
-  RenderErrorBoundaryState,
-} from "@/models/interfaces/layouts/RenderErrorBoundary";
 import { Button } from "@/ui";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
@@ -29,13 +21,13 @@ export class RenderErrorBoundary extends Component<
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-background p-8 text-center text-foreground">
+      <section className="grid h-full min-h-0 min-w-0 content-center justify-items-center gap-3 bg-charcoal-bg p-8 text-center text-cream">
         <h1 className="m-0 text-[22px] font-semibold">Workspace render failed</h1>
-        <p className="m-0 max-w-[680px] text-muted-foreground [overflow-wrap:anywhere]">
+        <p className="m-0 max-w-[680px] text-cream-muted [overflow-wrap:anywhere]">
           {this.state.error.message}
         </p>
         <Button
-          className="rounded-lg border border-border bg-secondary px-3 py-2 text-secondary-foreground"
+          className="rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-cream"
           type="button"
           onClick={() => {
             clearVolatileWorkspaceSnapshots();
@@ -101,4 +93,12 @@ function clearHookOrderRecoveryAttempt(): void {
   } catch {
     // Ignore storage failures; retry still reloads the app where possible.
   }
+}
+
+export interface RenderErrorBoundaryProps {
+  children: ReactNode;
+}
+
+export interface RenderErrorBoundaryState {
+  error: Error | null;
 }

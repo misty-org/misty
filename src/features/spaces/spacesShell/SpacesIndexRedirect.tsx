@@ -48,7 +48,7 @@ export function SpacesIndexRedirect() {
     <div className="grid h-full place-items-center px-6 py-10 text-center">
       <div className="max-w-md">
         <h1 className="m-0 text-xl font-semibold">Create your first Space</h1>
-        <p className="mb-0 mt-2 text-sm leading-6 text-muted-foreground">
+        <p className="mb-0 mt-2 text-sm leading-6 text-cream-muted">
           Bring conversations, plans, notes, and shared files together in one place.
         </p>
         <Button className="mt-5" type="button" onClick={openCreateSpaceDialog}>

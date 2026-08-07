@@ -4,12 +4,12 @@ import { Button, Input, Label, Textarea, cn } from "@/ui";
 import { AgentAvatar, agentAvatarAccents, agentAvatarPresets } from "./AgentAvatar";
 
 const accentSwatches: Record<string, string> = {
-  indigo: "bg-indigo-500",
-  violet: "bg-violet-500",
-  blue: "bg-blue-500",
-  emerald: "bg-emerald-500",
-  amber: "bg-amber-500",
-  rose: "bg-rose-500",
+  indigo: "bg-sage-bg",
+  violet: "bg-sage-bg",
+  blue: "bg-sage-bg",
+  emerald: "bg-status-green",
+  amber: "bg-sage-bg",
+  rose: "bg-sage-bg",
 };
 
 export function AgentCreatorIdentityStep(props: {
@@ -65,7 +65,9 @@ export function AgentCreatorIdentityStep(props: {
               variant="outline"
               className={cn(
                 "grid h-auto w-[92px] justify-items-center gap-2 p-3 text-xs",
-                !props.avatarFile && props.preset === item.id && "border-primary bg-primary/5",
+                !props.avatarFile &&
+                  props.preset === item.id &&
+                  "border-charcoal-active bg-charcoal-active",
               )}
               onClick={() => {
                 props.onPresetChange(item.id);
@@ -81,11 +83,11 @@ export function AgentCreatorIdentityStep(props: {
           ))}
           <Label
             className={cn(
-              "grid w-[92px] cursor-pointer justify-items-center gap-2 rounded-lg border p-3 text-xs hover:bg-muted/50",
-              props.avatarFile && "border-primary bg-primary/5",
+              "grid w-[92px] cursor-pointer justify-items-center gap-2 rounded-lg border p-3 text-xs hover:bg-charcoal-card",
+              props.avatarFile && "border-charcoal-active bg-charcoal-active",
             )}
           >
-            <span className="grid size-8 place-items-center rounded-full bg-muted">
+            <span className="grid size-8 place-items-center rounded-full bg-charcoal-card">
               <Upload size={15} />
             </span>
             Upload
@@ -115,7 +117,7 @@ export function AgentCreatorIdentityStep(props: {
               aria-label={`${value} accent`}
               className={cn(
                 "size-6 rounded-full border-2 p-0",
-                props.accent === value ? "border-foreground" : "border-transparent",
+                props.accent === value ? "border-cream" : "border-transparent",
                 accentSwatches[value],
               )}
               onClick={() => props.onAccentChange(value)}
@@ -140,7 +142,7 @@ function IdentityField({
     <div className="grid gap-2">
       <div>
         <Label className="font-medium">{label}</Label>
-        {hint ? <p className="mb-0 mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+        {hint ? <p className="mb-0 mt-0.5 text-xs text-cream-muted">{hint}</p> : null}
       </div>
       {children}
     </div>

@@ -9,19 +9,19 @@ import { ChromeTabStrip } from "./ChromeTabStrip";
 import type { MultiPanelTab } from "@/models/interfaces/workspace";
 import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./useMultiPanelStore";
 import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
+import { sidePanelGridStyle } from "./sidePanelGridStyle";
 
 // Shared pane edges are owned here so adjacent panels never draw duplicate borders.
 const paneResizeDividerClass = [
   "group/resize relative z-[5] min-h-0 min-w-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0",
   "before:left-1/2 before:w-[9px] before:-translate-x-1/2 before:content-[''] after:pointer-events-none after:absolute",
-  "after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-[var(--misty-divider-default)]",
-  "after:content-[''] hover:after:bg-[var(--misty-divider-hover)]",
+  "after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-charcoal-border",
+  "after:content-[''] hover:after:bg-charcoal-active",
 ].join(" ");
-const paneResizeDividerActiveClass = "after:!bg-[var(--misty-divider-active)] [&>div]:!opacity-100";
+const paneResizeDividerActiveClass = "after:!bg-charcoal-active [&>div]:!opacity-100";
 
 const multiPanelStyles = {
-  workspace:
-    "grid h-full min-h-0 w-full min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,transparent)]",
+  workspace: "grid h-full min-h-0 w-full min-w-0 overflow-hidden bg-charcoal-sidebar",
   workspaceRows: "grid-rows-[46px_minmax(0,1fr)] max-[720px]:grid-rows-[38px_minmax(0,1fr)]",
   workspaceRowsWithBottom:
     "grid-rows-[46px_minmax(0,1fr)_auto] max-[720px]:grid-rows-[38px_minmax(0,1fr)_auto]",
@@ -34,36 +34,28 @@ const multiPanelStyles = {
   workspaceWithToolbarWithoutTabs: "grid-rows-[auto_minmax(0,1fr)]",
   workspaceWithToolbarAndBottomWithoutTabs: "grid-rows-[auto_minmax(0,1fr)_auto]",
   tools:
-    "relative z-[2] grid min-h-[92px] min-w-0 border-b border-border/60 bg-[var(--misty-files-panel-bg,var(--background))]",
+    "relative z-[2] grid min-h-[92px] min-w-0 border-b border-charcoal-border/60 bg-charcoal-sidebar",
   body: "grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] overflow-hidden",
-  bodyWithNavigation:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_1px_minmax(0,1fr)] max-[980px]:grid-cols-[minmax(0,1fr)]",
-  bodyWithAside:
-    "grid-cols-[minmax(0,1fr)_1px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
-  bodyWithNavigationAndAside:
-    "grid-cols-[var(--explorer-sidebar-width,260px)_1px_minmax(0,1fr)_1px_var(--preview-width,280px)] max-[980px]:grid-cols-[minmax(0,1fr)]",
   panel: [
     "relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden",
-    "bg-[var(--misty-files-content-bg,var(--background))] [contain:layout_paint]",
+    "bg-charcoal-bg [contain:layout_paint]",
   ].join(" "),
   lane: "relative grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)] overflow-hidden",
   splitter:
-    "absolute z-[6] bg-transparent after:absolute after:bg-[var(--misty-divider-subtle)] after:content-[''] hover:after:bg-[var(--misty-divider-hover)]",
-  splitterActive: "after:!bg-[var(--misty-divider-active)]",
+    "absolute z-[6] bg-transparent after:absolute after:bg-charcoal-border after:content-[''] hover:after:bg-charcoal-active",
+  splitterActive: "after:!bg-charcoal-active",
   splitterVertical:
     "bottom-0 top-0 w-[11px] -translate-x-[5px] cursor-col-resize after:bottom-0 after:left-[5px] after:top-0 after:w-px",
   splitterHorizontal:
     "left-0 right-0 h-[11px] -translate-y-[5px] cursor-row-resize after:left-0 after:right-0 after:top-[5px] after:h-px",
-  aside:
-    "min-h-0 min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,var(--background))] max-[980px]:hidden",
+  aside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar max-[980px]:hidden",
   asideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
   asideResizerActive: paneResizeDividerActiveClass,
-  navigationAside:
-    "min-h-0 min-w-0 overflow-hidden bg-[var(--misty-files-panel-bg,transparent)] max-[980px]:hidden",
+  navigationAside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar max-[980px]:hidden",
   navigationAsideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
   asideResizerGrip: [
     "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2",
-    "place-items-center rounded-md bg-[var(--misty-app-page-bg,var(--misty-bg))] text-[var(--misty-text-muted)]",
+    "place-items-center rounded-md bg-charcoal-card text-cream-muted",
     "opacity-0 transition-opacity group-hover/resize:opacity-60",
   ].join(" "),
   asideResizerGripIcon: "pointer-events-none",
@@ -73,8 +65,8 @@ const multiPanelStyles = {
   paneActions:
     "flex flex-none items-center gap-1 overflow-hidden px-2 py-1 max-[720px]:gap-0.5 max-[720px]:px-1.5",
   paneActionButton: [
-    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-[var(--misty-text-muted)]",
-    "hover:bg-[var(--misty-neutral-hover-bg,var(--misty-surface-hover))] hover:text-[var(--misty-text)]",
+    "grid h-[26px] w-7 place-items-center rounded-md border-0 bg-transparent text-cream-muted",
+    "hover:bg-charcoal-hover hover:text-cream",
     "max-[720px]:h-7 max-[720px]:w-[30px]",
   ].join(" "),
 } as const;
@@ -93,9 +85,11 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     onDidClosePane,
     onDidCloseTab,
     renderAside,
+    asideWidth = 280,
     renderBottomBar,
     renderContextHeader,
     renderNavigationAside,
+    navigationAsideWidth = 260,
     renderPane,
     renderTabActions,
     renderToolbar,
@@ -135,6 +129,9 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [draggingSplitter, setDraggingSplitter] = useState<"grid" | "lane0" | "lane1" | null>(null);
+  const [compactSidePanels, setCompactSidePanels] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 980,
+  );
   const activeTab = activeMultiPanelTab({ tabs, activeTabId });
   const canSplit = Boolean(activeTab && activeTab.panes.length < maxMultiPanelPanes());
   const lanes = activeTab ? normalizedLanes(activeTab) : [];
@@ -148,6 +145,14 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     didCleanRestoredBrowsePanesRef.current = true;
     collapseDuplicateBrowsePanes();
   }, [collapseDuplicateBrowsePanes]);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 980px)");
+    const update = () => setCompactSidePanels(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const handleCloseTab = useCallback(
     (tab: MultiPanelTab) => {
       if (canCloseTab && !canCloseTab(tab)) return;
@@ -208,12 +213,14 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
   if (!activeTab) return null;
   const hasNavigationAside = Boolean(renderNavigationAside);
   const hasAside = Boolean(renderAside);
-  const bodyClassName = cx(
-    multiPanelStyles.body,
-    hasNavigationAside && hasAside && multiPanelStyles.bodyWithNavigationAndAside,
-    hasNavigationAside && !hasAside && multiPanelStyles.bodyWithNavigation,
-    !hasNavigationAside && hasAside && multiPanelStyles.bodyWithAside,
-  );
+  const bodyClassName = multiPanelStyles.body;
+  const bodyStyle = sidePanelGridStyle({
+    asideWidth,
+    compact: compactSidePanels,
+    hasAside,
+    hasNavigationAside,
+    navigationAsideWidth,
+  });
   const toolbarContent = renderToolbar
     ? renderToolbar(activeTab.activePaneId, activeTab.path)
     : null;
@@ -311,7 +318,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
         </div>
       ) : null}
 
-      <div className={bodyClassName}>
+      <div className={bodyClassName} style={bodyStyle}>
         {renderNavigationAside ? (
           <>
             <div className={multiPanelStyles.navigationAside}>{renderNavigationAside}</div>

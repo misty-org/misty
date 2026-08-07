@@ -1,4 +1,4 @@
-import { Fragment, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import { Check, EllipsisVertical, Star } from "lucide-react";
 
 import { Button } from "@/ui";
@@ -97,7 +97,7 @@ export function SpaceLibraryItems() {
         return (
           <Fragment key={item.id}>
             {dateGroup && dateGroup !== previousDateGroup ? (
-              <h4 className="col-span-full mb-0 mt-3 text-xs font-semibold text-muted-foreground first:mt-0">
+              <h4 className="col-span-full mb-0 mt-3 text-xs font-semibold text-cream-muted first:mt-0">
                 {dateGroup}
               </h4>
             ) : null}
@@ -176,28 +176,21 @@ function LibraryItemCard({
     },
   });
   const itemSelectionStyle = selected
-    ? "inset-ring-2 inset-ring-primary"
-    : "inset-ring-1 inset-ring-foreground/10";
+    ? "inset-ring-2 inset-ring-charcoal-active"
+    : "inset-ring-1 inset-ring-cream/10";
 
   return (
     <article
       data-misty-window-drag-block={reorderable ? "true" : undefined}
       data-pointer-drag-source={reorderable ? "true" : undefined}
       className={[
-        "group relative min-w-0 rounded-xl bg-card p-2 shadow-xs",
-        "transition-[background-color,box-shadow,opacity] hover:bg-accent",
+        "group relative min-w-0 rounded-xl bg-charcoal-card p-2 shadow-xs",
+        "transition-[background-color,box-shadow,opacity] hover:bg-charcoal-hover",
         listLayout ? "flex items-center gap-3" : "flex flex-col",
         reorderable ? "cursor-grab" : "",
         dragging ? "opacity-40" : "",
-        dropZone.active ? "ring-2 ring-primary" : itemSelectionStyle,
+        dropZone.active ? "ring-2 ring-charcoal-active" : itemSelectionStyle,
       ].join(" ")}
-      style={
-        listLayout
-          ? ({
-              "--library-thumb-width": `${LIST_THUMBNAIL_WIDTHS[itemScale]}px`,
-            } as CSSProperties)
-          : undefined
-      }
       ref={dropZone.ref}
       onContextMenu={(event) => onContextMenu(event, item.id)}
       onPointerDown={(event) => {
@@ -219,13 +212,10 @@ function LibraryItemCard({
       <div className={listLayout ? "min-w-0 flex-1 py-1 pr-1" : "min-w-0 px-1 pb-1 pt-2.5"}>
         <div className="flex min-w-0 items-start gap-2">
           <div className="min-w-0 flex-1">
-            <p
-              className="m-0 truncate text-xs font-semibold text-foreground"
-              title={item.display_name}
-            >
+            <p className="m-0 truncate text-xs font-semibold text-cream" title={item.display_name}>
               {item.display_name}
             </p>
-            <p className="m-0 mt-1 truncate text-[11px] leading-4 text-muted-foreground">
+            <p className="m-0 mt-1 truncate text-[11px] leading-4 text-cream-muted">
               {[
                 formatBytes(Number(item.file.intrinsic_metadata.byte_size ?? 0)),
                 libraryFileTypeLabel(item),
@@ -259,16 +249,13 @@ function LibraryItemCard({
   }) {
     return (
       <div
-        className={
-          listLayout
-            ? "relative w-[var(--library-thumb-width)] shrink-0"
-            : "relative w-full min-w-0"
-        }
+        className={listLayout ? "relative shrink-0" : "relative w-full min-w-0"}
+        style={listLayout ? { width: `${LIST_THUMBNAIL_WIDTHS[itemScale]}px` } : undefined}
       >
         <Button
           className={[
             "relative grid aspect-[4/3] h-auto w-full place-items-center overflow-hidden",
-            "rounded-lg border-0 bg-muted p-0 text-muted-foreground hover:bg-muted",
+            "rounded-lg border-0 bg-charcoal-card p-0 text-cream-muted hover:bg-charcoal-card",
           ].join(" ")}
           variant="ghost"
           type="button"
@@ -284,7 +271,7 @@ function LibraryItemCard({
             reauthenticationToken={sensitiveCollectionToken}
           />
           {assetStack ? (
-            <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-1 text-[9px] font-semibold capitalize text-white">
+            <span className="absolute bottom-2 left-2 rounded-md bg-charcoal-workspace px-1.5 py-1 text-[9px] font-semibold capitalize text-cream-bright">
               {assetStackLabel(assetStack)}
             </span>
           ) : null}
@@ -336,7 +323,7 @@ function LibraryItemActions({
       aria-label={`Actions for ${item.display_name}`}
     >
       <Button
-        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
         type="button"
         onClick={() => void updateItem(item, { favorite: !item.favorite })}
         title={item.favorite ? "Remove favorite" : "Favorite"}
@@ -345,7 +332,7 @@ function LibraryItemActions({
         <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
       </Button>
       <Button
-        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
         type="button"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
@@ -362,16 +349,16 @@ function LibraryItemActions({
 
 function LibraryItemDragPreview({ name }: { name: string }) {
   return (
-    <div className="max-w-[240px] truncate rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-lg">
+    <div className="max-w-[240px] truncate rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-xs font-medium text-cream shadow-lg">
       {name}
     </div>
   );
 }
 
 function selectionToggleClassName(selected: boolean) {
-  const visibleState = "border-primary bg-primary text-primary-foreground opacity-100";
+  const visibleState = "border-charcoal-active bg-charcoal-active text-cream-bright opacity-100";
   const hiddenState = [
-    "pointer-events-none border-white/50 bg-black/55 text-transparent opacity-0",
+    "pointer-events-none border-charcoal-border/50 bg-charcoal-workspace text-transparent opacity-0",
     "group-hover:pointer-events-auto group-hover:opacity-100",
     "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
   ].join(" ");

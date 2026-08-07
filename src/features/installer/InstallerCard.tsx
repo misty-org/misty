@@ -47,11 +47,11 @@ function sameVersion(left?: string | null, right?: string | null) {
 function CheckRow({ check }: { check: InstallCheck }) {
   return (
     <div className="grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 px-8 py-2.5">
-      <CircleAlert aria-hidden="true" className="text-misty-warning" size={16} />
-      <span className="min-w-0 truncate text-foreground" title={check.path}>
+      <CircleAlert aria-hidden="true" className="text-sage-fg" size={16} />
+      <span className="min-w-0 truncate text-cream" title={check.path}>
         {check.name}
       </span>
-      <span className="min-w-0 max-w-[148px] truncate text-right text-[11px] font-medium text-muted-foreground">
+      <span className="min-w-0 max-w-[148px] truncate text-right text-[11px] font-medium text-cream-muted">
         {check.exists ? "Ready" : check.required ? "Missing" : "Pending"}
       </span>
     </div>
@@ -127,11 +127,11 @@ export function InstallerCard({
       className={`flex ${compact ? "w-full" : "h-full w-full"} flex-col overflow-hidden ${
         embedded
           ? "!border-0 !bg-transparent !shadow-none"
-          : "bg-card/95 shadow-2xl shadow-black/25"
+          : "bg-charcoal-card shadow-2xl shadow-black/25"
       } ${className}`}
     >
       <div
-        className={`flex min-w-0 flex-col gap-2 border-b border-border px-4 ${embedded ? "py-3" : "py-4"}`}
+        className={`flex min-w-0 flex-col gap-2 border-b border-charcoal-border px-4 ${embedded ? "py-3" : "py-4"}`}
       >
         <VersionPicker />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -167,25 +167,25 @@ export function InstallerCard({
         </div>
       </div>
 
-      <div className={`border-b border-border px-4 ${embedded ? "py-3" : "py-4"}`}>
+      <div className={`border-b border-charcoal-border px-4 ${embedded ? "py-3" : "py-4"}`}>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
           <div className="grid min-w-0 gap-1 text-left">
-            <p className="text-base font-medium text-foreground">
+            <p className="text-base font-medium text-cream">
               {osLabel} · {archLabel}
             </p>
             {compact ? (
               <>
-                <p className="min-w-0 truncate text-sm text-muted-foreground">
+                <p className="min-w-0 truncate text-sm text-cream-muted">
                   Installed {installedVersionLabel} · Latest {latestVersion}
                 </p>
                 <p
-                  className={`min-w-0 truncate text-sm ${systemError ? "text-destructive" : "text-muted-foreground"}`}
+                  className={`min-w-0 truncate text-sm ${systemError ? "text-cream-bright" : "text-cream-muted"}`}
                 >
                   {readinessLabel}
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-cream-muted">
                 {foldersReady}/{folderChecks.length || 0} folders · {filesReady}/
                 {fileChecks.length || 0} files
               </p>
@@ -193,7 +193,7 @@ export function InstallerCard({
           </div>
           <Button
             aria-label="Refresh install checks"
-            className="shrink-0 text-muted-foreground/70 shadow-none hover:text-foreground"
+            className="shrink-0 text-cream-muted/70 shadow-none hover:text-cream"
             size="icon"
             title="Refresh install checks"
             variant="ghost"
@@ -215,7 +215,7 @@ export function InstallerCard({
       <div
         className={
           allFound
-            ? `px-4 ${embedded ? "py-3" : "py-4"} ${compact ? "text-foreground" : "text-misty-success"}`
+            ? `px-4 ${embedded ? "py-3" : "py-4"} ${compact ? "text-cream" : "text-sage-fg"}`
             : `${compact ? "" : "flex min-h-0 flex-1 flex-col"} py-2 text-xs`
         }
       >
@@ -228,11 +228,11 @@ export function InstallerCard({
           compact ? (
             <div className="flex min-w-0 items-center justify-between gap-3 px-4 py-2">
               <div className="min-w-0">
-                <p className="m-0 truncate text-sm font-semibold text-foreground">
+                <p className="m-0 truncate text-sm font-semibold text-cream">
                   {missingChecks.length} required item{missingChecks.length === 1 ? "" : "s"}{" "}
                   missing
                 </p>
-                <p className="m-0 mt-1 truncate text-xs text-muted-foreground">
+                <p className="m-0 mt-1 truncate text-xs text-cream-muted">
                   Misty can restore these from the selected release.
                 </p>
               </div>
@@ -250,7 +250,7 @@ export function InstallerCard({
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 px-4 pb-2">
-                <p className="text-[11px] font-semibold capitalize text-muted-foreground">
+                <p className="text-[11px] font-semibold capitalize text-cream-muted">
                   Missing Items
                 </p>
                 <Button
@@ -272,7 +272,7 @@ export function InstallerCard({
             </>
           )
         ) : (
-          <div className="px-4 py-2 text-muted-foreground">Resolving install readiness.</div>
+          <div className="px-4 py-2 text-cream-muted">Resolving install readiness.</div>
         )}
       </div>
 

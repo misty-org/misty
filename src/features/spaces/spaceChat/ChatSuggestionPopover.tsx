@@ -59,7 +59,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 id={`${props.listId}-option-${index}`}
                 key={`${suggestion.kind}:${suggestion.id}`}
                 aria-selected={index === props.activeIndex}
-                className={index === props.activeIndex ? "bg-accent" : undefined}
+                className={index === props.activeIndex ? "bg-charcoal-hover" : undefined}
                 value={`${suggestion.kind}:${suggestion.id}`}
                 onMouseEnter={() => props.onHoverIndex(index)}
                 onSelect={() => props.onSelect(suggestion)}
@@ -73,7 +73,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 )}
                 <span className="min-w-0">
                   <span className="block truncate">{suggestion.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="block truncate text-xs text-cream-muted">
                     {suggestion.detail}
                   </span>
                 </span>
@@ -83,11 +83,9 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
           {showEmpty ? (
             <CommandEmpty>No matching Agents, people, or Library items.</CommandEmpty>
           ) : null}
-          {props.loading ? (
-            <p className="p-3 text-sm text-muted-foreground">Loading Library…</p>
-          ) : null}
+          {props.loading ? <p className="p-3 text-sm text-cream-muted">Loading Library…</p> : null}
           {props.error ? (
-            <p className="p-3 text-sm text-destructive">Library: {props.error}</p>
+            <p className="p-3 text-sm text-cream-bright">Library: {props.error}</p>
           ) : null}
         </CommandList>
       </Command>
@@ -99,7 +97,7 @@ function AddActionLabel({ title, detail }: { title: string; detail: string }) {
   return (
     <span>
       <span className="block">{title}</span>
-      <span className="block text-xs text-muted-foreground">{detail}</span>
+      <span className="block text-xs text-cream-muted">{detail}</span>
     </span>
   );
 }

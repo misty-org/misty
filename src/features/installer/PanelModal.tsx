@@ -20,7 +20,7 @@ export function PanelModal({
       }}
     >
       <DialogContent className="flex max-h-[min(80vh,720px)] max-w-xl grid-rows-none flex-col overflow-hidden p-0">
-        <DialogHeader className="border-b border-border px-5 py-4">
+        <DialogHeader className="border-b border-charcoal-border px-5 py-4">
           <DialogTitle>{title}</DialogTitle>
           {subtitle ? <DialogDescription>{subtitle}</DialogDescription> : null}
         </DialogHeader>

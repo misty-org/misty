@@ -1,11 +1,9 @@
-import type { TransferActionFeedback } from "@/models/types/pages/Transfers/desktop/useTransferActions";
-export type { TransferActionFeedback } from "@/models/types/pages/Transfers/desktop/useTransferActions";
+import { isLiveTransfer, transferPaused } from "@/pages/Transfers/desktop/transferModel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
 import { errorText } from "@/lib/format";
 import { useOperationQueueStore } from "@/stores/explorer";
 import { useTransfersStore } from "@/stores/transfers";
-import { isLiveTransfer, transferPaused } from "./transferModel";
 
 export function useTransferActions(options: { workspaceId: string; rows: TransferRecord[] }) {
   const loadTransfers = useTransfersStore((state) => state.load);
@@ -228,3 +226,8 @@ export function useTransferActions(options: { workspaceId: string; rows: Transfe
     queueWorking,
   };
 }
+
+export type TransferActionFeedback = {
+  tone: "busy" | "success" | "error";
+  text: string;
+} | null;

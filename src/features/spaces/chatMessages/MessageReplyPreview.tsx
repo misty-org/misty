@@ -21,11 +21,11 @@ export function MessageReplyPreview({
   return (
     <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-5">
       <div aria-hidden="true" className="relative">
-        <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-muted-foreground/55" />
+        <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-cream-muted/55" />
       </div>
       <Button
         variant="ghost"
-        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground"
+        className="h-auto min-w-0 justify-start gap-1.5 self-start overflow-hidden border-0 bg-transparent p-0 text-left text-[13px] leading-5 text-cream-muted shadow-none hover:bg-transparent hover:text-cream"
         type="button"
         onClick={onOpen}
         aria-label={
@@ -40,12 +40,14 @@ export function MessageReplyPreview({
                 {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>
-            <strong className="shrink-0 font-semibold text-primary">@{message.sender_name}</strong>
-            <span className="min-w-0 truncate text-foreground/80">
+            <strong className="shrink-0 font-semibold text-cream-bright">
+              @{message.sender_name}
+            </strong>
+            <span className="min-w-0 truncate text-cream/80">
               {messageReplyPreviewText(message)}
             </span>
             {hasAnyAttachment(message) ? (
-              <ImageIcon className="size-4 shrink-0 rounded-[2px] bg-foreground p-0.5 text-background" />
+              <ImageIcon className="size-4 shrink-0 rounded-[2px] bg-cream p-0.5 text-charcoal-bg" />
             ) : null}
           </>
         ) : (

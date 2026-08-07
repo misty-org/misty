@@ -1,9 +1,7 @@
-import type { MaterialIconTheme } from "@/models/types/features/explorer/components/FileBrowserIcons";
-export type { MaterialIconTheme } from "@/models/types/features/explorer/components/FileBrowserIcons";
+import { fileBrowserStyles } from "@/features/explorer/components/FileBrowserStyles";
 import { File, Folder } from "lucide-react";
 import materialIconTheme from "material-icon-theme/dist/material-icons.json";
 import type { FileEntry } from "@/models/interfaces/services/misty-api";
-import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const materialTheme = materialIconTheme as MaterialIconTheme;
 const materialIconUrls = import.meta.glob("/node_modules/material-icon-theme/icons/*.svg", {
@@ -97,3 +95,12 @@ function materialIconUrl(iconName: string | undefined): string | null {
   if (!fileName) return null;
   return materialIconUrls[`/node_modules/material-icon-theme/icons/${fileName}`] ?? null;
 }
+
+export type MaterialIconTheme = {
+  iconDefinitions: Record<string, { iconPath?: string }>;
+  fileExtensions: Record<string, string>;
+  fileNames: Record<string, string>;
+  folderNames: Record<string, string>;
+  folder: string;
+  file: string;
+};

@@ -28,7 +28,7 @@ export function VersionPicker() {
             <span className="shrink-0 whitespace-nowrap tabular-nums">
               {release?.version ?? "Loading"}
             </span>
-            <span className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
+            <span className="min-w-0 truncate text-[11px] font-medium text-cream-muted">
               {releasesLoading
                 ? "Fetching releases"
                 : release?.version === latestVersion
@@ -43,9 +43,7 @@ export function VersionPicker() {
               <span className="inline-flex w-full min-w-0 items-center gap-3">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold">{release.version}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {release.date}
-                  </span>
+                  <span className="block truncate text-xs text-cream-muted">{release.date}</span>
                 </span>
                 {release.version === latestVersion ? (
                   <Badge className="ml-auto" variant="secondary">

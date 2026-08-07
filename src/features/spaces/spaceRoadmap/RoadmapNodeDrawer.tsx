@@ -30,11 +30,11 @@ export function RoadmapNodeDrawer(props: {
     <aside
       className={cn(
         "relative z-auto flex h-full w-64 shrink-0 flex-col overflow-hidden",
-        "border-r border-border/70 bg-background/95 backdrop-blur",
+        "border-r border-charcoal-border/70 bg-charcoal-bg ",
       )}
       aria-label="Roadmap node library"
     >
-      <header className="flex h-11 items-center gap-2 border-b border-border/60 px-3">
+      <header className="flex h-11 items-center gap-2 border-b border-charcoal-border/60 px-3">
         <strong className="text-xs">Node tools</strong>
         <Button
           type="button"
@@ -48,7 +48,7 @@ export function RoadmapNodeDrawer(props: {
         </Button>
       </header>
       <div className="relative m-2">
-        <Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-cream-muted" />
         <Input
           className="h-8 pl-8 text-xs"
           value={query}
@@ -62,7 +62,7 @@ export function RoadmapNodeDrawer(props: {
           if (!categoryItems.length) return null;
           return (
             <section className="mb-3" key={category}>
-              <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
                 {category}
               </h3>
               <div className="grid gap-0.5">
@@ -83,7 +83,7 @@ export function RoadmapNodeDrawer(props: {
                       }}
                       onClick={() => props.onAdd(item)}
                     >
-                      <GripVertical className="size-3 text-muted-foreground" />
+                      <GripVertical className="size-3 text-cream-muted" />
                       <span
                         className={cn(
                           "grid size-6 place-items-center rounded",

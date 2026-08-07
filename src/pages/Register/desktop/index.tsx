@@ -56,11 +56,11 @@ export default function RegisterPage() {
     >
       <AuthCard
         footer={
-          <div className="text-center text-sm text-text-muted">
+          <div className="text-center text-sm text-cream-muted">
             <NavLink
               to="/signin"
               state={{ from, addingAccount }}
-              className="transition hover:text-text"
+              className="transition hover:text-cream"
             >
               Already have an account? Sign in
             </NavLink>

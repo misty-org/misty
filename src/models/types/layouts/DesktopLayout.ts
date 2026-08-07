@@ -57,7 +57,6 @@ import {
   runtimeAssetSource,
 } from "@/platform/runtimeAsset";
 import { useAppStore } from "@/stores/app";
-import { useAppThemeStore } from "@/stores/app";
 import type { AppTab } from "@/models/types/routing/types";
 import type { TransferStatus } from "@/models/types/services/misty-api";
 import type { TransferRecord } from "@/models/interfaces/services/misty-api";
@@ -71,8 +70,6 @@ import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import type { SpaceInboxItem } from "@/models/interfaces/features/spaces/types";
-import { AppWallpaperVideo } from "@/layouts/AppWallpaperVideo";
-import { useDocumentSurfaceVariables } from "@/layouts/useDocumentSurfaceVariables";
 import {
   advanceTransferCompletionTracker,
   emptyTransferCompletionTracker,

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { SpaceActionSuggestionBatch } from "@/models/interfaces/features/spaces/types";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
-export function useSpaceActionSuggestions(spaceId: string, conversationId: string) {
+export function useSpaceActionSuggestions(spaceId: string, conversationId: string, enabled = true) {
   const [items, setItems] = useState<SpaceActionSuggestionBatch[]>([]);
   const refresh = useCallback(async () => {
-    if (!spaceId) return;
+    if (!spaceId || !enabled) return;
     try {
       const result = await spacesApi.actionSuggestions(spaceId);
       setItems(
@@ -20,13 +20,30 @@ export function useSpaceActionSuggestions(spaceId: string, conversationId: strin
     } catch {
       // Suggestions are an optional enhancement; chat remains fully usable.
     }
-  }, [conversationId, spaceId]);
+  }, [conversationId, enabled, spaceId]);
 
   useEffect(() => {
+    if (!enabled) {
+      setItems([]);
+      return;
+    }
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 5_000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
+    const onSuggestionEvent = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          space_id?: string;
+          payload?: { conversation_id?: string };
+        }>
+      ).detail;
+      if (detail?.space_id !== spaceId) return;
+      const eventConversationId = String(detail.payload?.conversation_id ?? "");
+      if (eventConversationId !== conversationId) return;
+      void refresh();
+    };
+    window.addEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
+    return () =>
+      window.removeEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
+  }, [conversationId, enabled, refresh, spaceId]);
 
   return { items, refresh };
 }

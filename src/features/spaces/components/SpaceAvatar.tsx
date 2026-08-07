@@ -9,7 +9,7 @@ export function SpaceAvatar({ space, className }: { space: Space; className?: st
       className={cn("shrink-0 rounded-full", className)}
       aria-label={`${space.name} default profile picture`}
     >
-      <AvatarFallback className="rounded-full bg-[var(--misty-bg)] text-[10px] font-bold text-foreground">
+      <AvatarFallback className="rounded-full bg-charcoal-bg text-[10px] font-bold text-cream">
         {initials}
       </AvatarFallback>
     </Avatar>

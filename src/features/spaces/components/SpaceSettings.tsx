@@ -135,18 +135,13 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
 
   if (!space)
     return (
-      <div className="grid h-full place-items-center text-sm text-muted-foreground">
+      <div className="grid h-full place-items-center text-sm text-cream-muted">
         Loading Space settings…
       </div>
     );
 
   return (
-    <WorkspaceOverlay
-      open
-      style={{}}
-      ariaLabel={`${space.name} settings`}
-      onClose={dismissSettings}
-    >
+    <WorkspaceOverlay open ariaLabel={`${space.name} settings`} onClose={dismissSettings}>
       <>
         <DesktopSettingsFrame
           activeId={activeSection}
@@ -171,7 +166,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                 <CardHeader className="flex flex-row items-start justify-between gap-5">
                   <div>
                     <CardTitle id="space-name-heading">Space details</CardTitle>
-                    <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                    <p className="mb-0 mt-1 text-xs text-cream-muted">
                       The name and access model shown across Misty.
                     </p>
                   </div>
@@ -197,7 +192,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     ) : null}
                   </form>
                   {!canRename ? (
-                    <p className="mb-0 mt-3 text-xs text-muted-foreground">
+                    <p className="mb-0 mt-3 text-xs text-cream-muted">
                       Only the Space owner can change its name.
                     </p>
                   ) : null}
@@ -205,8 +200,8 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <Button
                       className={[
                         "mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border",
-                        "border-destructive/25 bg-destructive/10 px-3 py-2 text-left text-xs",
-                        "text-destructive hover:bg-destructive/15 hover:text-destructive",
+                        "border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-left text-xs",
+                        "text-cream-bright hover:bg-charcoal-active hover:text-cream-bright",
                       ].join(" ")}
                       variant="ghost"
                       type="button"
@@ -224,12 +219,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                 </CardContent>
               </Card>
 
-              <Card className="ring-destructive/20" aria-labelledby="space-danger-heading">
+              <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">
                 <CardHeader>
-                  <CardTitle className="text-destructive" id="space-danger-heading">
+                  <CardTitle className="text-cream-bright" id="space-danger-heading">
                     Danger zone
                   </CardTitle>
-                  <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                  <p className="mb-0 mt-1 text-xs text-cream-muted">
                     Actions here can remove access or permanently delete this Space.
                   </p>
                 </CardHeader>
@@ -238,7 +233,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Delete this Space</p>
-                        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
                           Member access is removed immediately. Permanent deletion follows recovery
                           and storage safety checks.
                         </p>
@@ -260,7 +255,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="m-0 text-sm font-medium">Leave this Space</p>
-                        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+                        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
                           You will immediately lose access to chat, Planner, and protected Library
                           items.
                         </p>
@@ -312,7 +307,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             <AlertDialogFooter>
               <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 disabled={dangerBusy}
                 onClick={(event) => {
                   event.preventDefault();
@@ -336,13 +331,15 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-destructive">Delete {space.name}?</AlertDialogTitle>
+              <AlertDialogTitle className="text-cream-bright">
+                Delete {space.name}?
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 This removes member access immediately and schedules permanent deletion. Type the
                 Space name exactly to continue.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <label className="grid gap-2 text-xs font-medium text-muted-foreground">
+            <label className="grid gap-2 text-xs font-medium text-cream-muted">
               Space name
               <Input
                 autoFocus
@@ -355,7 +352,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             <AlertDialogFooter>
               <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
                 disabled={dangerBusy || deleteConfirmation !== space.name}
                 onClick={(event) => {
                   event.preventDefault();
@@ -374,8 +371,8 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg bg-muted/45 px-3 py-2.5">
-      <span className="block text-[10px] text-muted-foreground">{label}</span>
+    <div className="min-w-0 rounded-lg bg-charcoal-card px-3 py-2.5">
+      <span className="block text-[10px] text-cream-muted">{label}</span>
       <span className="mt-0.5 block truncate text-xs font-medium capitalize">{value}</span>
     </div>
   );
@@ -383,7 +380,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function DangerError({ message }: { message: string }) {
   return (
     <p
-      className="m-0 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+      className="m-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
       role="alert"
     >
       {message}
@@ -436,7 +433,7 @@ function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwne
     <Card>
       <CardHeader>
         <CardTitle>Action suggestions</CardTitle>
-        <p className="mb-0 mt-1 text-xs leading-relaxed text-muted-foreground">
+        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
           When people explicitly agree on a plan, Misty may offer a private review card with tasks,
           events, notes, roadmap items, or follow-ups. It never runs an action automatically.
         </p>
@@ -445,7 +442,7 @@ function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwne
         <div className="flex items-start justify-between gap-5">
           <div>
             <p className="m-0 text-sm font-medium">Suggest actions from agreements</p>
-            <p className="mb-0 mt-1 text-xs text-muted-foreground">
+            <p className="mb-0 mt-1 text-xs text-cream-muted">
               Off by default. Any participant can veto analysis in a private conversation.
             </p>
           </div>
@@ -457,17 +454,17 @@ function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwne
           />
         </div>
         {enabled ? (
-          <p className="mb-0 mt-4 text-xs text-muted-foreground">
+          <p className="mb-0 mt-4 text-xs text-cream-muted">
             This week: {usage.used} of {usage.limit} detector checks used.
           </p>
         ) : null}
         {!isOwner ? (
-          <p className="mb-0 mt-4 text-xs text-muted-foreground">
+          <p className="mb-0 mt-4 text-xs text-cream-muted">
             Only the Space owner can change this setting.
           </p>
         ) : null}
         {error ? (
-          <p className="mb-0 mt-4 text-xs text-destructive" role="alert">
+          <p className="mb-0 mt-4 text-xs text-cream-bright" role="alert">
             {error}
           </p>
         ) : null}

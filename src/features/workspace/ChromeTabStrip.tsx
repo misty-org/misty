@@ -2,7 +2,6 @@ import type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces
 export type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces/workspace";
 import { Button } from "@/ui";
 import { Plus, X } from "lucide-react";
-import "./chromeTabs.css";
 import {
   memo,
   useCallback,
@@ -16,14 +15,16 @@ import { useExplorerDropRegistry } from "@/features/explorer/drag/ExplorerDragCo
 import { createExplorerDropTargetSpec } from "@/features/explorer/drag/ExplorerDropTarget";
 
 const chromeTabShellClass = [
-  "misty-chrome-tabs-shell",
-  "flex h-[46px] min-w-0 overflow-hidden",
-  "!bg-[var(--misty-files-panel-bg,transparent)]",
+  "flex h-[46px] min-w-0 overflow-hidden border-b border-charcoal-border bg-charcoal-sidebar",
+].join(" ");
+
+const tabCloseButtonClass = [
+  "mr-1.5 grid size-6 flex-none place-items-center rounded-full border-0",
+  "bg-transparent text-current transition-colors hover:text-cream-bright",
 ].join(" ");
 
 const chromeTabTrayClass = [
-  "misty-chrome-tabs-tray",
-  "flex h-8 flex-none items-center justify-end gap-0.5 rounded-[11px] p-0.5",
+  "mt-1.5 mr-2 flex h-8 flex-none items-center justify-end gap-0.5 rounded-lg p-0.5",
 ].join(" ");
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
@@ -32,6 +33,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
   const draggedTabIdRef = useRef<string | null>(null);
   const suppressSelectionRef = useRef(false);
   const [draggedTabId, setDraggedTabId] = useState("");
+  const [renamingTabId, setRenamingTabId] = useState("");
   const [dropIndicator, setDropIndicator] = useState<{
     tabId: string;
     position: "before" | "after";
@@ -134,7 +136,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     <div ref={shellRef} className={chromeTabShellClass}>
       <div
         ref={tabsRef}
-        className="misty-chrome-tabs"
+        className="flex h-[46px] min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label={props.ariaLabel ?? "Open locations"}
         onWheel={handleWheel}
@@ -142,10 +144,22 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         {props.tabs.map((tab) => {
           const active = tab.id === props.activeTabId;
           const canClose = props.canCloseTab ? props.canCloseTab(tab) : true;
+          const canRename = Boolean(props.onRenameTab && props.canRenameTab?.(tab));
+          const renaming = canRename && renamingTabId === tab.id;
           return (
             <div
               key={tab.id}
-              className="chrome-tab"
+              className={[
+                "chrome-tab relative flex h-9 min-w-[92px] max-w-60 flex-[1_1_180px] items-center overflow-hidden rounded-t-lg border border-charcoal-border",
+                "text-cream-muted transition-colors",
+                // The selected tab takes the colour of the pane it opens onto,
+                // the way a browser tab joins its page, instead of a fill that
+                // belongs to nothing below it.
+                active
+                  ? "shrink-[0.85] border-b-charcoal-bg bg-charcoal-bg text-cream-bright"
+                  : "bg-charcoal-card hover:text-cream-bright",
+                draggedTabId === tab.id ? "opacity-55" : "",
+              ].join(" ")}
               data-tab-id={tab.id}
               data-active={active ? "true" : "false"}
               data-dragging={draggedTabId === tab.id ? "true" : undefined}
@@ -154,7 +168,8 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               }
               data-misty-window-drag-block={props.onReorderTab ? "true" : undefined}
               data-reorder-drag-source={props.onReorderTab ? "true" : undefined}
-              draggable={Boolean(props.onReorderTab)}
+              // Dragging a tab mid-rename would tear the caret out of the field.
+              draggable={Boolean(props.onReorderTab) && !renaming}
               onDragEnd={finishTabDrag}
               onDragOver={(event) => handleDragOver(event, tab.id)}
               onDragLeave={(event) => {
@@ -164,22 +179,42 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               onDragStart={(event) => handleDragStart(event, tab.id)}
               onDrop={(event) => handleDrop(event, tab.id)}
             >
-              <button
-                type="button"
-                className="chrome-tab-select"
-                role="tab"
-                aria-selected={active}
-                title={tab.path}
-                onClick={() => {
-                  if (!suppressSelectionRef.current) props.onSelectTab(tab.id);
-                }}
-              >
-                <span className="chrome-tab-title">{tab.title}</span>
-              </button>
+              {dropIndicator?.tabId === tab.id ? (
+                <span
+                  className={`pointer-events-none absolute inset-y-1 z-[3] w-0.5 rounded-full bg-cream ${dropIndicator.position === "before" ? "left-0.5" : "right-0.5"}`}
+                  aria-hidden="true"
+                />
+              ) : null}
+              {renaming ? (
+                <TabTitleInput
+                  title={tab.title}
+                  onCancel={() => setRenamingTabId("")}
+                  onCommit={(next) => {
+                    setRenamingTabId("");
+                    if (next && next !== tab.title) props.onRenameTab?.(tab.id, next);
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="flex h-full min-w-0 flex-1 items-center overflow-hidden border-0 bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit"
+                  role="tab"
+                  aria-selected={active}
+                  title={tab.path}
+                  onClick={() => {
+                    if (!suppressSelectionRef.current) props.onSelectTab(tab.id);
+                  }}
+                  onDoubleClick={() => {
+                    if (canRename) setRenamingTabId(tab.id);
+                  }}
+                >
+                  <span className="min-w-0 truncate text-[13px] font-medium">{tab.title}</span>
+                </button>
+              )}
               {canClose ? (
                 <button
                   type="button"
-                  className="chrome-tab-close"
+                  className={tabCloseButtonClass}
                   aria-label={`Close ${tab.title}`}
                   title={`Close ${tab.title}`}
                   onClick={(event) => {
@@ -193,11 +228,13 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
             </div>
           );
         })}
-        <div className="misty-chrome-tabs-toolbar">
+        {/* Sits on the tab row's own baseline; the old bottom padding lifted
+            it above the tab titles it belongs beside. */}
+        <div className="flex h-9 flex-none items-center pl-1">
           {props.addTabControl ?? (
             <Button
               type="button"
-              className="misty-chrome-tabs-add"
+              className="grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
               title="New tab"
               onClick={props.onAddTab}
             >
@@ -210,6 +247,47 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     </div>
   );
 });
+
+/**
+ * Inline tab rename. Blur commits rather than cancels, matching how the rest of
+ * the app treats an edited-then-abandoned field; Escape is the way out.
+ */
+function TabTitleInput(props: {
+  title: string;
+  onCancel: () => void;
+  onCommit: (title: string) => void;
+}) {
+  const [value, setValue] = useState(props.title);
+  const canceledRef = useRef(false);
+
+  return (
+    <input
+      className="h-full min-w-0 flex-1 border-none bg-transparent px-3 text-[13px] font-medium text-cream-bright outline-none"
+      value={value}
+      autoFocus
+      maxLength={60}
+      aria-label={`Rename ${props.title}`}
+      onChange={(event) => setValue(event.target.value)}
+      onClick={(event) => event.stopPropagation()}
+      onBlur={() => {
+        if (canceledRef.current) return;
+        props.onCommit(value.trim());
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          props.onCommit(value.trim());
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          canceledRef.current = true;
+          props.onCancel();
+        }
+      }}
+      onFocus={(event) => event.currentTarget.select()}
+    />
+  );
+}
 
 export function workspaceTabDropIndex(
   order: string[],

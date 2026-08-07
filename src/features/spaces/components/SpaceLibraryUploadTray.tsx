@@ -44,8 +44,8 @@ export function SpaceLibraryUploadTray({
         >
           <Upload className={uploading ? "animate-pulse" : ""} size={15} aria-hidden="true" />
           <span
-            className={`absolute -right-1 -top-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold text-white ${
-              failed.length > 0 ? "bg-destructive" : "bg-primary"
+            className={`absolute -right-1 -top-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold text-cream-bright ${
+              failed.length > 0 ? "bg-charcoal-active" : "bg-charcoal-active"
             }`}
           >
             {failed.length > 0 ? failed.length : active.length || jobs.length}
@@ -79,7 +79,7 @@ export function SpaceLibraryUploadTray({
             <li className="border-b px-3 py-2 last:border-b-0" key={job.id}>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="min-w-0 flex-1 truncate text-xs">{job.name}</span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">
+                <span className="shrink-0 text-[10px] text-cream-muted">
                   {job.stage === "failed"
                     ? "Failed"
                     : job.stage === "ready"
@@ -88,7 +88,7 @@ export function SpaceLibraryUploadTray({
                 </span>
               </div>
               {job.stage === "failed" && job.error ? (
-                <p className="m-0 mt-0.5 truncate text-[10px] text-destructive">{job.error}</p>
+                <p className="m-0 mt-0.5 truncate text-[10px] text-cream-bright">{job.error}</p>
               ) : null}
             </li>
           ))}

@@ -33,7 +33,6 @@ import {
 import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { useExplorerStore } from "@/stores/explorer";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { AppWallpaperVideo } from "../AppWallpaperVideo";
 import { DeepSearchOverlay } from "@/features/explorer/components/DeepSearchOverlay";
 import { MediaSearchViewer } from "@/features/explorer/components/MediaSearchViewer";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
@@ -45,7 +44,6 @@ import {
   desktopTitlebarClass,
   desktopTitlebarDoubleClickLayerClass,
   desktopTitlebarTitleClass,
-  desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
   tabletFrameClass,
@@ -75,7 +73,7 @@ function RestoreGlyph() {
   return (
     <span className="relative block size-3" aria-hidden="true">
       <span className="absolute right-0 top-0 size-2 rounded-[1px] border border-current" />
-      <span className="absolute bottom-0 left-0 size-2 rounded-[1px] border border-current bg-[var(--misty-app-titlebar-bg,var(--misty-bg))]" />
+      <span className="absolute bottom-0 left-0 size-2 rounded-[1px] border border-current bg-charcoal-workspace" />
     </span>
   );
 }
@@ -108,14 +106,7 @@ export function DesktopLayout(props: {
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
-  const {
-    appWallpaperPath,
-    appWallpaperSrc,
-    appWallpaperIsVideo,
-    mistyLogoSource,
-    desktopFrameStyle,
-    desktopNavbarStyle,
-  } = useDesktopFrameStyle();
+  const { app: frameApp, mistyLogoSource } = useDesktopFrameStyle();
 
   const localUnreadActivityCount = useExplorerStore(
     (state) => state.notificationHistory.filter((notification) => !notification.read).length,
@@ -205,26 +196,7 @@ export function DesktopLayout(props: {
   const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : tabletRouteShellClass;
 
   return (
-    <main
-      className={frameClass}
-      data-wallpaper-active={appWallpaperSrc ? "true" : "false"}
-      style={desktopFrameStyle}
-    >
-      {appWallpaperSrc ? (
-        <div aria-hidden="true" className={desktopWallpaperLayerClass}>
-          {appWallpaperIsVideo ? (
-            <AppWallpaperVideo path={appWallpaperPath} src={appWallpaperSrc} />
-          ) : (
-            <img
-              alt=""
-              className="h-full w-full object-cover"
-              draggable={false}
-              src={appWallpaperSrc}
-            />
-          )}
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,7,0.04),rgba(5,6,7,0.16))]" />
-        </div>
-      ) : null}
+    <main className={frameClass}>
       {usesNativeWindowChrome ? (
         <header
           className={desktopTitlebarClass}
@@ -282,7 +254,6 @@ export function DesktopLayout(props: {
 
       <nav
         className={navbarClass}
-        style={desktopNavbarStyle}
         aria-label="Primary"
         onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       >
@@ -332,11 +303,7 @@ export function DesktopLayout(props: {
       <WorkStatusPopup />
       <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
-      <ActivityOverlay
-        open={activityOpen}
-        style={desktopFrameStyle}
-        onClose={() => setActivityOpen(false)}
-      />
+      <ActivityOverlay open={activityOpen} onClose={() => setActivityOpen(false)} />
       <ProfilePopover
         anchorRef={profileAnchorRef}
         currentPath={location.pathname}
@@ -344,15 +311,13 @@ export function DesktopLayout(props: {
         onClose={() => setProfileOpen(false)}
         onOpenAccountSettings={openAccountSettings}
       />
-      <RemotesOverlay open={remotesOpen} style={desktopFrameStyle} onClose={closeRemotesOverlay} />
-      <SettingsOverlay
-        open={settingsOpen}
-        style={desktopFrameStyle}
-        onClose={closeSettingsOverlay}
-      />
+      <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
+      <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
       <DeepSearchOverlay
         activePaneId={activePaneId}
-        currentPath={activePanePath || app?.environment.homeDir || ""}
+        currentPath={
+          activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
+        }
       />
       <MediaSearchViewer />
       <SpacesRealtimeBridge />

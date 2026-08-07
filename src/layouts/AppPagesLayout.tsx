@@ -37,7 +37,7 @@ export function AppPagesLayout() {
   }, [refreshLocalAccessToken]);
 
   return (
-    <div className="app-pages-root h-full min-h-0 bg-[var(--misty-app-page-bg,var(--background))] text-text">
+    <div className="app-pages-root h-full min-h-0 bg-charcoal-bg text-cream">
       <main className="h-full min-h-0">
         <Outlet />
       </main>

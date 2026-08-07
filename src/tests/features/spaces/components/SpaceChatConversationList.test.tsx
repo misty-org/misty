@@ -54,6 +54,43 @@ describe("SpaceChatConversationList", () => {
     expect(container.querySelectorAll('[aria-label="Discord conversations"] a')).toHaveLength(2);
     expect(container.querySelector('[aria-label="Create a new discord conversation"]')).toBeNull();
   });
+
+  it("keeps edit and delete inside the conversation context menu", async () => {
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceChatConversationList
+            activeSpaceId="space-1"
+            activeConversationId={null}
+            currentUserId="user-1"
+            conversations={[conversation("group", "Launch", "misty", ["user-1", "user-2"])]}
+            onEditConversation={onEdit}
+            onDeleteConversation={onDelete}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('button[aria-label="Edit Launch"]')).toBeNull();
+    const link = container.querySelector('a[href*="conversation=group"]');
+    expect(link).not.toBeNull();
+    await act(async () => {
+      link!.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: 20,
+          clientY: 20,
+        }),
+      );
+    });
+
+    const menu = document.body.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("Edit conversation");
+    expect(menu?.textContent).toContain("Delete conversation");
+  });
 });
 
 function conversation(

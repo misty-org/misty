@@ -15,7 +15,7 @@ const DragInteractionShield = React.forwardRef<
     aria-hidden="true"
     data-slot="drag-interaction-shield"
     className={cn(
-      "pointer-events-auto fixed inset-0 z-[var(--misty-layer-menu)] cursor-grabbing bg-transparent",
+      "pointer-events-auto fixed inset-0 z-[2147483400] cursor-grabbing bg-transparent",
       className,
     )}
     {...props}
@@ -33,7 +33,7 @@ const DragPreviewCard = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       ref={ref}
       data-slot="drag-preview-card"
       className={cn(
-        "pointer-events-none fixed z-[var(--misty-layer-tooltip)] max-w-64 rounded-lg bg-popover px-3 py-2 text-xs font-semibold text-popover-foreground shadow-md ring-1 ring-foreground/10",
+        "pointer-events-none fixed z-[2147483500] max-w-64 rounded-lg bg-charcoal-card px-3 py-2 text-xs font-semibold text-cream shadow-md ring-1 ring-cream/10",
         className,
       )}
       {...props}

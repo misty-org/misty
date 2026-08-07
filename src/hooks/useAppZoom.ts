@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { hasTauriInternals } from "@/platform/tauri";
-import { isNativeMobileBuild } from "@/platform/buildTarget";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 const appZoomMin = 0.5;
 const appZoomMax = 2;
 const appZoomStep = 0.1;
-const desktopTitlebarHeight = 28;
 
 let nativeZoomSupported: boolean | null = null;
 let zoomApplySequence = 0;
@@ -98,14 +96,7 @@ export function useAppZoom() {
 
 async function applyAppZoom(zoom: number): Promise<void> {
   const applySequence = ++zoomApplySequence;
-  const targetTitlebarInset = titlebarInsetForZoom(zoom);
-  const previousTitlebarInset = titlebarInsetForZoom(appliedAppZoom);
   document.documentElement.dataset.appZoom = String(Math.round(zoom * 100));
-  document.documentElement.style.setProperty("--misty-app-zoom", String(zoom));
-  document.documentElement.style.setProperty(
-    "--misty-window-titlebar-inset",
-    `${Math.max(previousTitlebarInset, targetTitlebarInset)}px`,
-  );
 
   if (nativeZoomSupported !== false && hasTauriInternals()) {
     try {
@@ -114,10 +105,6 @@ async function applyAppZoom(zoom: number): Promise<void> {
       if (applySequence !== zoomApplySequence) return;
       nativeZoomSupported = true;
       appliedAppZoom = zoom;
-      document.documentElement.style.setProperty(
-        "--misty-window-titlebar-inset",
-        `${targetTitlebarInset}px`,
-      );
       clearCssZoomFallback();
       return;
     } catch {
@@ -128,14 +115,6 @@ async function applyAppZoom(zoom: number): Promise<void> {
   if (applySequence !== zoomApplySequence) return;
   applyCssZoomFallback(zoom);
   appliedAppZoom = zoom;
-  document.documentElement.style.setProperty(
-    "--misty-window-titlebar-inset",
-    `${targetTitlebarInset}px`,
-  );
-}
-
-function titlebarInsetForZoom(zoom: number): number {
-  return isNativeMobileBuild ? 0 : desktopTitlebarHeight / zoom;
 }
 
 function loadStoredAppZoom(): number {

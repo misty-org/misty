@@ -64,7 +64,7 @@ export function TaskFilters(props: TaskFiltersProps) {
     <div className="grid gap-3" aria-label="Task filters">
       <div>
         <h3 className="m-0 text-sm font-semibold">Filter tasks</h3>
-        <p className="mb-0 mt-1 text-xs text-muted-foreground">Narrow the current task view.</p>
+        <p className="mb-0 mt-1 text-xs text-cream-muted">Narrow the current task view.</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <TaskFilterSelect

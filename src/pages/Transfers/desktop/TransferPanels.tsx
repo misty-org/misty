@@ -1,24 +1,5 @@
-import type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
-export type { DetailHandlers } from "@/models/types/pages/Transfers/desktop/TransferPanels";
-import { useMemo } from "react";
-import { ListFilter } from "lucide-react";
-import type { TransferType } from "@/models/types/services/misty-api";
-import type { TransferRecord } from "@/models/interfaces/services/misty-api";
-import { EmptyState } from "@/ui";
-import { StatusBadge } from "@/ui";
-import { Button } from "@/ui";
-import { Checkbox } from "@/ui";
-import { Progress } from "@/ui";
-import { RadioGroup, RadioGroupItem } from "@/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
-import { prettyLabel } from "@/lib/format";
-import type {
-  TransferSortDirection,
-  TransferSortKey,
-} from "@/models/types/stores/transfers/useTransfersStore";
-import { transferTypes } from "@/stores/transfers";
-import { remoteSummary } from "../transferUtils";
-import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
+import { PanelRight, ListFilter } from "lucide-react";
+import { remoteSummary } from "@/pages/Transfers/transferUtils";
 import {
   aggregateTransferProgress,
   binaryProgressStatus,
@@ -30,9 +11,33 @@ import {
   targetEndpoint,
   timestampLabel,
   transferStatusTone,
-} from "./transferModel";
+} from "@/pages/Transfers/desktop/transferModel";
+import { transferStyles } from "@/pages/Transfers/desktop/transferStyles";
+import { useMemo } from "react";
+import type { TransferType } from "@/models/types/services/misty-api";
+import type { TransferRecord } from "@/models/interfaces/services/misty-api";
+import {
+  EmptyState,
+  StatusBadge,
+  Button,
+  Checkbox,
+  Progress,
+  RadioGroup,
+  RadioGroupItem,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/ui";
+import { prettyLabel } from "@/lib/format";
+import type {
+  TransferSortDirection,
+  TransferSortKey,
+} from "@/models/types/stores/transfers/useTransfersStore";
+import { transferTypes } from "@/stores/transfers";
+import type { TransferActionHandlers } from "@/models/types/pages/Transfers/desktop/TransferMenus";
 import type { TransferProgressSnapshot } from "@/models/types/pages/Transfers/desktop/transferModel";
-import { transferStyles } from "./transferStyles";
 
 export function TransferFilters(props: {
   providerGroups: Array<{ key: string; label: string; count: number }>;
@@ -54,7 +59,7 @@ export function TransferFilters(props: {
     <div className={transferStyles.contentScroll}>
       <div className={transferStyles.filterHeading}>
         <div className="flex items-center gap-2">
-          <ListFilter aria-hidden="true" className="size-4 text-muted-foreground" />
+          <ListFilter aria-hidden="true" className="size-4 text-cream-muted" />
           <h2 className={transferStyles.filterTitle}>Filters</h2>
         </div>
         <Button
@@ -375,7 +380,7 @@ function DetailActions(props: DetailHandlers & { row: TransferRecord; working: b
         <Button
           variant="outline"
           size="sm"
-          className="text-destructive hover:text-destructive"
+          className="text-cream-bright hover:text-cream-bright"
           disabled={props.working}
           onClick={() => void props.onCancel(row)}
         >
@@ -405,7 +410,7 @@ function DetailActions(props: DetailHandlers & { row: TransferRecord; working: b
           <Button
             variant="outline"
             size="sm"
-            className="text-destructive hover:text-destructive"
+            className="text-cream-bright hover:text-cream-bright"
             disabled={props.working}
             onClick={() => void props.onCancelBatch(row)}
           >
@@ -416,3 +421,13 @@ function DetailActions(props: DetailHandlers & { row: TransferRecord; working: b
     </div>
   );
 }
+
+export type DetailHandlers = Pick<
+  TransferActionHandlers,
+  | "onCancel"
+  | "onRetry"
+  | "onPauseResume"
+  | "onPauseResumeBatch"
+  | "onCancelBatch"
+  | "onResolveConflict"
+>;

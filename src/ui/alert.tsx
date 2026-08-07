@@ -8,9 +8,9 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-card text-card-foreground",
+        default: "bg-charcoal-card text-cream",
         destructive:
-          "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+          "bg-charcoal-card text-cream-bright *:data-[slot=alert-description]:text-cream-bright/90 *:[svg]:text-current",
       },
     },
     defaultVariants: {
@@ -39,7 +39,7 @@ function AlertTitle({ className, ...props }: React.HTMLAttributes<HTMLDivElement
     <div
       data-slot="alert-title"
       className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-cream",
         className,
       )}
       {...props}
@@ -52,7 +52,7 @@ function AlertDescription({ className, ...props }: React.HTMLAttributes<HTMLDivE
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+        "text-sm text-balance text-cream-muted md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-cream [&_p:not(:last-child)]:mb-4",
         className,
       )}
       {...props}
