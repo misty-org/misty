@@ -16,7 +16,7 @@ export function SpaceSidebarLink({
   return (
     <Link className={sidebarLinkClass(active)} to={to} aria-current={active ? "page" : undefined}>
       <span
-        className={`grid size-7 shrink-0 place-items-center transition-colors ${
+        className={`grid size-6 shrink-0 place-items-center transition-colors ${
           active ? "text-cream" : "text-cream-muted"
         }`}
       >
@@ -31,7 +31,7 @@ function sidebarLinkClass(isActive: boolean) {
   return cn(
     [
       "misty-marker-host relative flex h-9 min-w-0",
-      "items-center gap-2 rounded-md px-2.5 text-sm no-underline outline-none",
+      "items-center gap-1.5 rounded-md text-sm no-underline outline-none",
       "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     ].join(" "),
     // Selection is an edge marker, not a filled panel. Every row is a marker

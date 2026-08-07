@@ -42,13 +42,6 @@ const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = 
   { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
-const sectionDescriptions: Record<SpaceSettingsSection, string> = {
-  general: "Name, access, ownership, and Space lifecycle.",
-  members: "Manage member access, invitations, and permissions.",
-  connections: "Services connected to this Space.",
-  suggestions: "Optional action suggestions for explicit agreements in conversations.",
-};
-
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,7 +139,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
         <DesktopSettingsFrame
           activeId={activeSection}
           ariaLabel={`${space.name} settings`}
-          description={sectionDescriptions[activeSection]}
+          hideNavigationLabel
           items={settingsItems}
           navigationLabel="Space settings sections"
           navigationTitle={space.name}

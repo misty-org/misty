@@ -8,10 +8,11 @@ import type {
   SpaceMember,
   SpaceTask,
 } from "@/models/interfaces/features/spaces/types";
-import { Avatar, AvatarFallback } from "@/ui";
+import { Avatar, AvatarFallback, cn } from "@/ui";
 import { Badge } from "@/ui";
 import { Button } from "@/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui";
+import { avatarInkClass } from "@/lib/avatarPalette";
 
 export const taskStatusOptions: Array<[SpaceTaskStatus, string]> = [
   ["todo", "To do"],
@@ -93,10 +94,19 @@ export function TaskMemberAvatar({
 }
 
 export function TaskPriorityBadge({ priority }: { priority: SpaceTaskPriority }) {
+  const toneClass =
+    priority === "high"
+      ? "bg-avatar-red"
+      : priority === "low"
+        ? "bg-avatar-blue"
+        : "bg-avatar-yellow";
   return (
     <Badge
-      variant={priority === "high" ? "destructive" : priority === "low" ? "secondary" : "outline"}
-      className="gap-1 px-1.5 py-0 text-[10px] font-medium capitalize"
+      className={cn(
+        "gap-1 px-1.5 py-0 text-[10px] font-medium capitalize",
+        toneClass,
+        avatarInkClass,
+      )}
     >
       <Flag className="size-3" />
       {priority}
@@ -193,7 +203,7 @@ export function memberInitials(name: string) {
 
 export function statusDot(status: SpaceTaskStatus) {
   if (status === "done") return "bg-status-green";
-  if (status === "in_progress") return "bg-sage-bg";
+  if (status === "in_progress") return "bg-avatar-blue";
   if (status === "canceled") return "bg-cream-muted";
-  return "bg-sage-bg";
+  return "bg-avatar-gray";
 }

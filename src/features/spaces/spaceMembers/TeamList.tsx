@@ -1,15 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Bot,
-  Ellipsis,
-  LoaderCircle,
-  Mail,
-  Pencil,
-  Plus,
-  RefreshCw,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Ellipsis, Mail, Pencil, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Avatar,
@@ -29,24 +19,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
+  cn,
 } from "@/ui";
 import type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
 import type { SpaceAgentMembership, SpaceMember } from "@/models/interfaces/features/spaces/types";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
-import { AgentCreatorDialog } from "@/features/agents/AgentCreatorDialog";
+import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
 import { errorText } from "@/lib/format";
-import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 import { MemberPermissionControls } from "./MemberPermissionControls";
 import { personInitials } from "../personInitials";
 
 const rowClass = "flex min-h-[72px] min-w-0 items-center gap-3 px-4 py-3";
+
+type TeamRow =
+  | { kind: "member"; key: string; name: string; data: SpaceMember }
+  | { kind: "agent"; key: string; name: string; data: SpaceAgentMembership };
 
 export function TeamList({
   spaceId,
@@ -72,26 +61,29 @@ export function TeamList({
   onError: (message: string) => void;
 }) {
   const navigate = useNavigate();
-  const personalAgents = usePersonalAgentsStore((state) => state.agents);
-  const loadPersonalAgents = usePersonalAgentsStore((state) => state.load);
-  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [busy, setBusy] = useState("");
-  const [creatorOpen, setCreatorOpen] = useState(false);
   const [roleAgent, setRoleAgent] = useState<SpaceAgentMembership | null>(null);
   const [roleDraft, setRoleDraft] = useState("");
 
-  useEffect(() => {
-    if (canManageAgents) void loadPersonalAgents();
-  }, [canManageAgents, loadPersonalAgents]);
-
-  const available = useMemo(() => {
-    const installed = new Set(agents.map((agent) => agent.agent_id));
-    return personalAgents.filter((agent) => agent.enabled && !installed.has(agent.id));
-  }, [agents, personalAgents]);
   const memberNames = useMemo(
     () => new Map(members.map((member) => [member.user_id, member.name])),
     [members],
   );
+  const rows = useMemo<TeamRow[]>(() => {
+    const memberRows: TeamRow[] = members.map((member) => ({
+      kind: "member",
+      key: `person:${member.user_id}`,
+      name: member.name,
+      data: member,
+    }));
+    const agentRows: TeamRow[] = agents.map((agent) => ({
+      kind: "agent",
+      key: `agent:${agent.agent_id}`,
+      name: agent.name,
+      data: agent,
+    }));
+    return [...memberRows, ...agentRows].sort((left, right) => left.name.localeCompare(right.name));
+  }, [members, agents]);
 
   const run = async (key: string, operation: () => Promise<unknown>) => {
     setBusy(key);
@@ -118,230 +110,56 @@ export function TeamList({
   return (
     <>
       <Card className="overflow-hidden" aria-label="Space team">
-        {canManageAgents ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-charcoal-card px-4 py-3">
-            <div>
-              <p className="m-0 text-sm font-medium">Agent teammates</p>
-              <p className="mb-0 mt-0.5 text-xs text-cream-muted">
-                Hire an existing Agent or create a specialized coworker.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {available.length ? (
-                <>
-                  <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
-                    <SelectTrigger className="h-8 w-44" aria-label="Choose an Agent">
-                      <SelectValue placeholder="Choose Agent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {available.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!selectedAgentId || Boolean(busy)}
-                    onClick={() =>
-                      void run("add", async () => {
-                        const selected = personalAgents.find(
-                          (agent) => agent.id === selectedAgentId,
-                        );
-                        await spacesApi.addSpaceAgent(
-                          spaceId,
-                          selectedAgentId,
-                          selected?.role ?? "",
-                        );
-                        setSelectedAgentId("");
-                      })
-                    }
-                  >
-                    {busy === "add" ? (
-                      <LoaderCircle className="size-4 animate-spin" />
-                    ) : (
-                      <Plus className="size-4" />
-                    )}
-                    Hire
-                  </Button>
-                </>
-              ) : null}
-              <Button size="sm" onClick={() => setCreatorOpen(true)}>
-                <Plus className="size-4" /> Create Agent
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
         {loading ? <TeamSkeleton /> : null}
         {!loading
-          ? members.map((member, index) => (
-              <div
-                className={`group ${rowClass} transition-colors hover:bg-charcoal-card ${index ? "border-t border-charcoal-border/60" : ""}`}
-                key={`person:${member.user_id}`}
-              >
-                <Avatar className="size-10 shrink-0">
-                  <AvatarFallback className="text-xs font-semibold">
-                    {personInitials(member.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
-                    {member.user_id === currentUserId ? (
-                      <Badge variant="secondary">You</Badge>
-                    ) : null}
-                  </div>
-                  <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
-                    <Mail className="size-3 shrink-0" /> {member.email}
-                  </p>
-                </div>
-                <Badge className="hidden capitalize sm:inline-flex" variant="outline">
-                  {member.role}
-                </Badge>
-                {owner && member.role !== "owner" ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <MemberPermissionControls
-                      spaceId={member.space_id}
-                      userId={member.user_id}
-                      memberName={member.name}
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label={`Actions for ${member.name}`}
-                        >
-                          <Ellipsis className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => onMemberAction({ kind: "transfer", member })}
-                        >
-                          <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-cream-bright focus:text-cream-bright"
-                          onSelect={() => onMemberAction({ kind: "remove", member })}
-                        >
-                          <Trash2 className="mr-2 size-4" /> Remove member
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                ) : null}
-              </div>
-            ))
-          : null}
-
-        {!loading
-          ? agents.map((agent) => (
-              <div
-                key={`agent:${agent.agent_id}`}
-                className={`${rowClass} border-t border-charcoal-border/60 transition-colors hover:bg-charcoal-card`}
-              >
-                <AgentAvatar
-                  agentId={agent.agent_id}
-                  avatar={agent.avatar}
-                  legacyIcon={agent.icon}
-                  name={agent.name}
-                  className="size-10"
+          ? rows.map((row, index) =>
+              row.kind === "member" ? (
+                <MemberRow
+                  key={row.key}
+                  member={row.data}
+                  bordered={index > 0}
+                  currentUserId={currentUserId}
+                  owner={owner}
+                  onMemberAction={onMemberAction}
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="h-auto min-w-0 truncate p-0 text-left text-sm font-medium"
-                      onClick={() => openAgent(agent.agent_id)}
-                    >
-                      {agent.name}
-                    </Button>
-                    <Badge variant="secondary">Agent</Badge>
-                    {(agent.attention_count ?? 0) > 0 ? (
-                      <Badge variant="destructive">{agent.attention_count}</Badge>
-                    ) : null}
-                  </div>
-                  <p className="mb-0 mt-0.5 truncate text-xs text-cream-muted">
-                    {agent.space_role || agent.role || "AI teammate"} · owner{" "}
-                    {memberNames.get(agent.owner_user_id) || "external creator"}
-                  </p>
-                </div>
-                <WorkStateBadge
-                  state={agent.work_state || (agent.enabled ? "ready" : "disabled")}
+              ) : (
+                <AgentRow
+                  key={row.key}
+                  agent={row.data}
+                  bordered={index > 0}
+                  canManageAgents={canManageAgents}
+                  ownerName={memberNames.get(row.data.owner_user_id) || "external creator"}
+                  onOpenAgent={openAgent}
+                  onEditRole={() => {
+                    setRoleAgent(row.data);
+                    setRoleDraft(row.data.space_role || row.data.role || "");
+                  }}
+                  onApproveVersion={() =>
+                    void run(`approve:${row.data.agent_id}`, () =>
+                      spacesApi.approveSpaceAgentVersion(spaceId, row.data.agent_id),
+                    )
+                  }
+                  onToggleEnabled={() =>
+                    void run(`toggle:${row.data.agent_id}`, () =>
+                      spacesApi.updateSpaceAgent(spaceId, row.data, {
+                        enabled: !row.data.enabled,
+                        space_role: row.data.space_role || "",
+                        space_instructions: row.data.space_instructions || "",
+                        permissions: row.data.permissions,
+                      }),
+                    )
+                  }
+                  onRemove={() =>
+                    void run(`remove:${row.data.agent_id}`, () =>
+                      spacesApi.removeSpaceAgent(spaceId, row.data.agent_id),
+                    )
+                  }
                 />
-                {canManageAgents ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="icon" variant="ghost" aria-label={`Manage ${agent.name}`}>
-                        <Ellipsis className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setRoleAgent(agent);
-                          setRoleDraft(agent.space_role || agent.role || "");
-                        }}
-                      >
-                        <Pencil className="mr-2 size-4" /> Edit Space role
-                      </DropdownMenuItem>
-                      {agent.update_available ? (
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            void run(`approve:${agent.agent_id}`, () =>
-                              spacesApi.approveSpaceAgentVersion(spaceId, agent.agent_id),
-                            )
-                          }
-                        >
-                          <RefreshCw className="mr-2 size-4" /> Approve version{" "}
-                          {agent.latest_version}
-                        </DropdownMenuItem>
-                      ) : null}
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          void run(`toggle:${agent.agent_id}`, () =>
-                            spacesApi.updateSpaceAgent(spaceId, agent, {
-                              enabled: !agent.enabled,
-                              space_role: agent.space_role || "",
-                              space_instructions: agent.space_instructions || "",
-                              permissions: agent.permissions,
-                            }),
-                          )
-                        }
-                      >
-                        {agent.enabled ? "Disable Agent" : "Enable Agent"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-cream-bright focus:text-cream-bright"
-                        onSelect={() =>
-                          void run(`remove:${agent.agent_id}`, () =>
-                            spacesApi.removeSpaceAgent(spaceId, agent.agent_id),
-                          )
-                        }
-                      >
-                        <Trash2 className="mr-2 size-4" /> Remove from Space
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
-              </div>
-            ))
+              ),
+            )
           : null}
       </Card>
 
-      <AgentCreatorDialog
-        open={creatorOpen}
-        onOpenChange={setCreatorOpen}
-        defaultSpaceId={spaceId}
-        onCreated={() => void onReload()}
-      />
       <Dialog open={roleAgent !== null} onOpenChange={(open) => !open && setRoleAgent(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -378,6 +196,161 @@ export function TeamList({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function MemberRow({
+  member,
+  bordered,
+  currentUserId,
+  owner,
+  onMemberAction,
+}: {
+  member: SpaceMember;
+  bordered: boolean;
+  currentUserId?: string;
+  owner: boolean;
+  onMemberAction: (action: MemberAction) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "group transition-colors hover:bg-charcoal-card",
+        rowClass,
+        bordered && "border-t border-charcoal-border/60",
+      )}
+    >
+      <Avatar className="size-10 shrink-0">
+        <AvatarFallback
+          className={cn("text-xs font-semibold", avatarColorClass(member.user_id), avatarInkClass)}
+        >
+          {personInitials(member.name)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="m-0 truncate text-sm font-medium text-cream">{member.name}</p>
+          {member.user_id === currentUserId ? <Badge variant="secondary">You</Badge> : null}
+        </div>
+        <p className="mb-0 mt-0.5 flex items-center gap-1.5 truncate text-xs text-cream-muted">
+          <Mail className="size-3 shrink-0" /> {member.email}
+        </p>
+      </div>
+      <Badge className="hidden capitalize sm:inline-flex" variant="outline">
+        {member.role}
+      </Badge>
+      {owner && member.role !== "owner" ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <MemberPermissionControls
+            spaceId={member.space_id}
+            userId={member.user_id}
+            memberName={member.name}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" aria-label={`Actions for ${member.name}`}>
+                <Ellipsis className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onMemberAction({ kind: "transfer", member })}>
+                <ShieldCheck className="mr-2 size-4" /> Transfer ownership
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-cream-bright focus:text-cream-bright"
+                onSelect={() => onMemberAction({ kind: "remove", member })}
+              >
+                <Trash2 className="mr-2 size-4" /> Remove member
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AgentRow({
+  agent,
+  bordered,
+  canManageAgents,
+  ownerName,
+  onOpenAgent,
+  onEditRole,
+  onApproveVersion,
+  onToggleEnabled,
+  onRemove,
+}: {
+  agent: SpaceAgentMembership;
+  bordered: boolean;
+  canManageAgents: boolean;
+  ownerName: string;
+  onOpenAgent: (agentId: string) => void;
+  onEditRole: () => void;
+  onApproveVersion: () => void;
+  onToggleEnabled: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className={cn(rowClass, "transition-colors hover:bg-charcoal-card", bordered && "border-t border-charcoal-border/60")}>
+      <AgentAvatar
+        agentId={agent.agent_id}
+        avatar={agent.avatar}
+        legacyIcon={agent.icon}
+        name={agent.name}
+        className="size-10"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto min-w-0 truncate p-0 text-left text-sm font-medium"
+            onClick={() => onOpenAgent(agent.agent_id)}
+          >
+            {agent.name}
+          </Button>
+          <Badge variant="secondary">Agent</Badge>
+          {(agent.attention_count ?? 0) > 0 ? (
+            <Badge variant="destructive">{agent.attention_count}</Badge>
+          ) : null}
+        </div>
+        <p className="mb-0 mt-0.5 truncate text-xs text-cream-muted">
+          {agent.space_role || agent.role || "AI teammate"} · owner {ownerName}
+        </p>
+      </div>
+      <WorkStateBadge state={agent.work_state || (agent.enabled ? "ready" : "disabled")} />
+      {canManageAgents ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon" variant="ghost" aria-label={`Manage ${agent.name}`}>
+              <Ellipsis className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onEditRole}>
+              <Pencil className="mr-2 size-4" /> Edit Space role
+            </DropdownMenuItem>
+            {agent.update_available ? (
+              <DropdownMenuItem onSelect={onApproveVersion}>
+                <RefreshCw className="mr-2 size-4" /> Approve version {agent.latest_version}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem onSelect={onToggleEnabled}>
+              {agent.enabled ? "Disable Agent" : "Enable Agent"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-cream-bright focus:text-cream-bright"
+              onSelect={onRemove}
+            >
+              <Trash2 className="mr-2 size-4" /> Remove from Space
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </div>
   );
 }
 

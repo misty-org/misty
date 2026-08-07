@@ -1,77 +1,82 @@
-import { PanelRight, Plus, Search, X } from "lucide-react";
+import { useState } from "react";
+import { Plus, Search, X } from "lucide-react";
 import { Button, IconButton, Input } from "@/ui";
-import {
-  SpacesBottomBarActionsPortal,
-  SpacesBottomBarToggle,
-} from "@/features/spaces/components/SpacesBottomBar";
 
 const topBarClass =
-  "flex h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3";
+  "flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5";
 
 export function NotesTopBar(props: NotesTopBarProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showSearch = searchOpen || Boolean(props.query);
+
   return (
-    <>
-      <header className={topBarClass}>
-        <div className="relative min-w-[180px] flex-1">
-          <Search
-            size={14}
-            strokeWidth={2}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
-          />
-          <Input
-            value={props.query}
-            onChange={(event) => props.onQueryChange(event.target.value)}
-            placeholder="Search notes, tags, and Spaces"
-            aria-label="Search notes"
-            className="h-8 rounded-md border-charcoal-border/70 bg-charcoal-card pl-8 pr-8 text-[13px] shadow-none"
-          />
-          {props.query ? (
-            <IconButton
-              title="Clear search"
-              className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
-              onClick={() => props.onQueryChange("")}
-            >
-              <X size={13} />
-            </IconButton>
-          ) : null}
-        </div>
+    <header className={topBarClass}>
+      <h1 className="m-0 min-w-0 shrink truncate text-sm font-semibold">
+        {props.noteTitle ? `Journal - ${props.noteTitle}` : "Journal"}
+      </h1>
 
-        <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-3">
+        {showSearch ? (
+          <div className="relative w-44">
+            <Search
+              size={14}
+              strokeWidth={2}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
+            />
+            <Input
+              autoFocus
+              value={props.query}
+              onChange={(event) => props.onQueryChange(event.target.value)}
+              placeholder="Search notes, tags, and Spaces"
+              aria-label="Search notes"
+              className="h-8 rounded-md border-charcoal-border/70 bg-charcoal-card pl-8 pr-8 text-[13px] shadow-none"
+              onBlur={() => {
+                if (!props.query) setSearchOpen(false);
+              }}
+            />
+            {props.query ? (
+              <IconButton
+                title="Clear search"
+                className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
+                onClick={() => props.onQueryChange("")}
+              >
+                <X size={13} />
+              </IconButton>
+            ) : null}
+          </div>
+        ) : (
           <Button
+            className="size-8"
+            size="icon"
+            variant="ghost"
             type="button"
-            size="sm"
-            className="h-8 gap-1.5"
-            onClick={props.onNewNote}
-            disabled={props.readOnly}
-            title={props.readOnly ? "Reconnect to create a note" : undefined}
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search notes"
           >
-            <Plus size={14} strokeWidth={2.2} />
-            New note
+            <Search className="size-4" />
           </Button>
-        </div>
-      </header>
+        )}
 
-      <SpacesBottomBarActionsPortal>
-        {props.contextPanelAvailable ? (
-          <SpacesBottomBarToggle
-            pressed={props.contextPanelOpen}
-            title={props.contextPanelOpen ? "Hide details" : "Show details"}
-            onClick={props.onToggleContextPanel}
-          >
-            <PanelRight size={15} />
-          </SpacesBottomBarToggle>
-        ) : null}
-      </SpacesBottomBarActionsPortal>
-    </>
+        <Button
+          type="button"
+          size="sm"
+          className="h-8 gap-1.5 text-xs"
+          onClick={props.onNewNote}
+          disabled={props.readOnly}
+          title={props.readOnly ? "Reconnect to create a note" : undefined}
+        >
+          <Plus size={14} strokeWidth={2.2} />
+          New note
+        </Button>
+      </div>
+    </header>
   );
 }
 
 export interface NotesTopBarProps {
   query: string;
-  contextPanelOpen: boolean;
-  contextPanelAvailable?: boolean;
+  noteTitle?: string;
   readOnly?: boolean;
   onQueryChange: (query: string) => void;
   onNewNote: () => void;
-  onToggleContextPanel: () => void;
 }

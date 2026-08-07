@@ -28,8 +28,7 @@ import {
   cn,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
   Popover,
@@ -202,13 +201,20 @@ export function SpaceAgenda({
   };
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
-      <header className="misty-transient-scrollbar min-h-[60px] overflow-x-auto border-b border-charcoal-border/60 px-3 py-2">
-        <div className="flex min-w-max items-center gap-2">
+      <header
+        className={[
+          "misty-transient-scrollbar flex min-h-11 flex-wrap items-center gap-2",
+          "overflow-x-auto border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5",
+        ].join(" ")}
+      >
+        <h1 className="m-0 shrink-0 text-sm font-semibold">Agenda</h1>
+
+        <div className="ml-auto flex min-w-max flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="size-9"
+              className="size-8"
               aria-label="Previous range"
               onClick={() => updateAnchor(moveAnchor(anchor, view, -1))}
             >
@@ -217,8 +223,8 @@ export function SpaceAgenda({
             <Popover>
               <PopoverTrigger asChild>
                 <Button
-                  variant="outline"
-                  className="h-9 min-w-40 justify-between gap-3 px-3 font-medium"
+                  variant="ghost"
+                  className="h-8 min-w-32 justify-between gap-2 px-2.5 text-xs font-medium"
                   aria-label="Choose calendar date"
                 >
                   {agendaTitle(anchor, view)}
@@ -241,18 +247,18 @@ export function SpaceAgenda({
               </PopoverContent>
             </Popover>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="size-9"
+              className="size-8"
               aria-label="Next range"
               onClick={() => updateAnchor(moveAnchor(anchor, view, 1))}
             >
               <ChevronRight className="size-4" />
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="size-9"
+              className="size-8"
               aria-label="Go to today"
               title="Today"
               onClick={() => updateAnchor(new Date())}
@@ -261,99 +267,95 @@ export function SpaceAgenda({
             </Button>
           </div>
 
-          <div className="ml-auto flex items-center gap-1.5 pl-6">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="h-9 min-w-28 justify-between gap-2 px-3 font-medium"
-                  aria-label="Calendar view"
-                >
-                  <CalendarDays className="size-4" />
-                  {view[0].toUpperCase() + view.slice(1)}
-                  <ChevronDown className="size-3.5 text-cream-muted" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuRadioGroup
-                  value={view}
-                  onValueChange={(next) => updateView(next as AgendaView)}
-                >
-                  <DropdownMenuRadioItem value="month">Month</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="week">Week</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="day">Day</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button
-              variant="outline"
-              className="h-9 gap-2 px-3 font-medium"
-              onClick={() => setDrawerOpen(true)}
-            >
-              <CalendarPlus className="size-4" />
-              Calendars
-            </Button>
-
-            {view !== "month" ? (
-              <div
-                className="flex h-9 items-center overflow-hidden rounded-md border border-charcoal-border/80"
-                aria-label="Calendar time interval"
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 rounded-none border-r border-charcoal-border/60"
-                  aria-label="Zoom out calendar"
-                  disabled={zoomMinutes === 60}
-                  onClick={() => updateZoom("out")}
-                >
-                  <Minus className="size-4" />
-                </Button>
-                <span className="min-w-16 px-2 text-center text-xs font-medium">
-                  {zoomMinutes} min
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 rounded-none border-l border-charcoal-border/60"
-                  aria-label="Zoom in calendar"
-                  disabled={zoomMinutes === 15}
-                  onClick={() => updateZoom("in")}
-                >
-                  <Plus className="size-4" />
-                </Button>
-              </div>
-            ) : null}
-
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-9"
-              aria-label="Refresh calendar"
-              onClick={() =>
-                void run("sync", async () => {
-                  await spacesApi.syncCalendarTasks(spaceId);
-                  await load();
-                })
-              }
-            >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RefreshCcw className="size-4" />
-              )}
-            </Button>
-            {canManage ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
-                className="h-9 gap-2 px-4 font-semibold"
-                onClick={() => setCreateEventOpen(true)}
+                variant="ghost"
+                className="h-8 min-w-24 justify-between gap-1.5 px-2.5 text-xs font-medium"
+                aria-label="Calendar view"
               >
-                <Plus className="size-4" />
-                New event
+                <CalendarDays className="size-3.5" />
+                {view[0].toUpperCase() + view.slice(1)}
+                <ChevronDown className="size-3.5 text-cream-muted" />
               </Button>
-            ) : null}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(["month", "week", "day"] as const).map((option) => (
+                <DropdownMenuItem
+                  key={option}
+                  className={view === option ? "bg-charcoal-hover text-cream" : undefined}
+                  onSelect={() => updateView(option)}
+                >
+                  {option[0].toUpperCase() + option.slice(1)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            variant="ghost"
+            className="h-8 gap-1.5 px-2.5 text-xs font-medium"
+            onClick={() => setDrawerOpen(true)}
+          >
+            <CalendarPlus className="size-3.5" />
+            Calendars
+          </Button>
+
+          {view !== "month" ? (
+            <div
+              className="flex h-8 items-center overflow-hidden rounded-md border border-charcoal-border/70"
+              aria-label="Calendar time interval"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-none border-r border-charcoal-border/60"
+                aria-label="Zoom out calendar"
+                disabled={zoomMinutes === 60}
+                onClick={() => updateZoom("out")}
+              >
+                <Minus className="size-3.5" />
+              </Button>
+              <span className="min-w-14 px-2 text-center text-xs font-medium">
+                {zoomMinutes} min
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 rounded-none border-l border-charcoal-border/60"
+                aria-label="Zoom in calendar"
+                disabled={zoomMinutes === 15}
+                onClick={() => updateZoom("in")}
+              >
+                <Plus className="size-3.5" />
+              </Button>
+            </div>
+          ) : null}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
+            aria-label="Refresh calendar"
+            onClick={() =>
+              void run("sync", async () => {
+                await spacesApi.syncCalendarTasks(spaceId);
+                await load();
+              })
+            }
+          >
+            {loading ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <RefreshCcw className="size-4" />
+            )}
+          </Button>
+          {canManage ? (
+            <Button className="h-8 gap-1.5 text-xs" onClick={() => setCreateEventOpen(true)}>
+              <Plus className="size-3.5" />
+              New event
+            </Button>
+          ) : null}
         </div>
       </header>
       <main className="relative min-h-0 overflow-hidden" aria-label={`${view} agenda`}>

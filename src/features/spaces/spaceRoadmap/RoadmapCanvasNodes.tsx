@@ -329,7 +329,7 @@ function edgeView(
       type === "related" || type === "documents"
         ? { strokeDasharray: "5 4" }
         : type === "blocks"
-          ? { stroke: "#443E38" }
+          ? { stroke: "#3E3E3E" }
           : type === "measures"
             ? { stroke: "#52825A" }
             : undefined,

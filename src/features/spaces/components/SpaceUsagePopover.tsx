@@ -52,18 +52,17 @@ export function SpaceUsagePopover({ space }: { space: Space }) {
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
         sideOffset={8}
         className="w-72 overflow-hidden border-charcoal-border/70 p-0"
       >
-        <div className="border-b border-charcoal-border/60 px-3 py-2.5">
+        <div className="border-b border-charcoal-border/60 px-2 py-2.5">
           <p className="m-0 truncate text-sm font-semibold">Usage</p>
           <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">
             Your weekly AI allowance and storage pool
           </p>
         </div>
 
-        <div className="grid gap-3.5 p-3">
+        <div className="grid gap-3.5 px-2 py-3">
           <AiUsageBlock usage={agent} />
           <StorageBlock usage={storage} showsPool={showsPool} />
         </div>

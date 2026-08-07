@@ -1,7 +1,8 @@
 import { Fragment, type FormEvent } from "react";
-import { Sparkles } from "lucide-react";
+import { Bot, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback, AvatarImage, Badge } from "@/ui";
+import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/ui";
+import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/lib/avatarPalette";
 import { MessageOriginBadge } from "@/features/spaces/components/MessageOriginBadge";
 import {
   ChatDateDivider,
@@ -79,8 +80,19 @@ export function ChatMessageRow({
           ) : (
             <Avatar className="mt-0.5 size-10">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="text-xs font-semibold">
-                {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
+              <AvatarFallback
+                className={cn(
+                  "text-xs font-semibold",
+                  message.sender_kind === "agent"
+                    ? cn(robotAvatarClass, avatarInkClass)
+                    : cn(avatarColorClass(message.sender_name), avatarInkClass),
+                )}
+              >
+                {message.sender_kind === "agent" ? (
+                  <Bot className="size-4" strokeWidth={2} />
+                ) : (
+                  initials(message.sender_name)
+                )}
               </AvatarFallback>
             </Avatar>
           )}
@@ -192,7 +204,7 @@ function MessageContent({ span }: { span: MessageSpan }) {
     );
   }
   return (
-    <span className="inline-flex items-center rounded bg-sage-bg px-1.5 py-0.5 text-xs font-medium text-sage-fg">
+    <span className="inline-flex items-center rounded-[3px] bg-mention-bg/35 px-1 py-0.5 font-medium text-cream-bright">
       @{span.label}
     </span>
   );

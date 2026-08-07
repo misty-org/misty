@@ -31,9 +31,9 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
     <div
       ref={props.scrollRef}
       onScroll={props.onScroll}
-      className="min-h-0 flex-1 overflow-y-auto px-[clamp(22px,5vw,72px)] pb-3 pt-4"
+      className="min-h-0 flex-1 overflow-y-auto px-[clamp(16px,2.5vw,32px)] pb-3 pt-4"
     >
-      <div className="mx-auto max-w-4xl">
+      <div>
         {props.error ? (
           <div
             className="mb-4 rounded-lg border border-charcoal-active/30 bg-charcoal-active px-3 py-2 text-sm text-cream-bright"

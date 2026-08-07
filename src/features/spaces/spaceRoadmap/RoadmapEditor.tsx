@@ -88,7 +88,7 @@ export function RoadmapEditor(props: {
   );
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-      <header className="flex min-h-12 items-center gap-2 px-4">
+      <header className="flex min-h-11 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
         <Button
           variant="ghost"
           className="h-auto min-w-0 justify-start px-1 py-0 text-left"

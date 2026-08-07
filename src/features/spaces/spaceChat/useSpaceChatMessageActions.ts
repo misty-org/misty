@@ -69,16 +69,32 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     if (draft.isEmpty) return;
     const value = draft.text.trim();
     const attachmentIds = draft.pendingAttachments.map((item) => item.id);
+    // Everything the request needs, captured before the draft is cleared.
+    const snapshot = {
+      text: draft.text,
+      selectedFileIds: draft.selectedFileIds,
+      selectedLibraryIds: draft.selectedLibraryIds,
+      pendingAttachments: draft.pendingAttachments,
+      replyToMessageId: draft.replyToMessageId,
+      selectedAgentIdsByLabel: draft.selectedAgentIdsByLabel,
+    };
+
+    // The composer clears on submit rather than after the round trip — the
+    // network call happening in the background is what "sending" means to
+    // the person typing, not a reason to leave the box looking stuck. On
+    // failure the draft is restored below so nothing is lost.
+    draft.reset();
+
     try {
       if (conversationId) {
         const response = await spacesApi.sendConversationMessage(
           spaceId,
           conversationId,
-          buildMessageSpans(value, members, agents, draft.selectedAgentIdsByLabel),
-          draft.selectedFileIds,
+          buildMessageSpans(value, members, agents, snapshot.selectedAgentIdsByLabel),
+          snapshot.selectedFileIds,
           attachmentIds,
-          draft.selectedLibraryIds,
-          draft.replyToMessageId,
+          snapshot.selectedLibraryIds,
+          snapshot.replyToMessageId,
         );
         response.message.triggered_runs = (response.triggered_runs ?? []).map((run) => ({
           ...run,
@@ -96,15 +112,20 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         await options.storeSendMessage(
           spaceId,
           value,
-          draft.selectedFileIds,
+          snapshot.selectedFileIds,
           attachmentIds,
-          draft.selectedLibraryIds,
-          draft.replyToMessageId,
-          draft.selectedAgentIdsByLabel,
+          snapshot.selectedLibraryIds,
+          snapshot.replyToMessageId,
+          snapshot.selectedAgentIdsByLabel,
         );
       }
-      draft.reset();
     } catch (reason) {
+      draft.setText(snapshot.text);
+      draft.setSelectedFileIds(snapshot.selectedFileIds);
+      draft.setSelectedLibraryIds(snapshot.selectedLibraryIds);
+      draft.setPendingAttachments(snapshot.pendingAttachments);
+      draft.setReplyToMessageId(snapshot.replyToMessageId);
+      draft.setSelectedAgentIdsByLabel(snapshot.selectedAgentIdsByLabel);
       reportConversationError(reason, "The group message could not be sent.");
     }
   };

@@ -3,7 +3,6 @@ import {
   Image,
   AppWindow,
   ArrowLeftRight,
-  Bell,
   Bot,
   Cloud,
   Copy,
@@ -46,12 +45,7 @@ import { memo, useEffect, useState, type ChangeEvent, type ReactNode } from "rea
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopUpdaterSettings } from "@/features/updater/DesktopUpdaterSettings";
-import {
-  useAppStore,
-  notificationsDeviceKey,
-  selectAgentPreferences,
-  useSettingsStore,
-} from "@/stores/app";
+import { useAppStore, selectAgentPreferences, useSettingsStore } from "@/stores/app";
 import { usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
 import { defaultAgentModelId, selectedAgentModelName } from "@/features/agents/modelSelection";
 import type {
@@ -73,7 +67,6 @@ const appNavItems: NavItem[] = [
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
   { id: "search", label: "Search & Library", icon: Search },
-  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "advanced", label: "Advanced", icon: Settings2 },
 ];
@@ -88,7 +81,6 @@ const sectionDescriptions: Record<SettingsSection, string> = {
   privacy: "Choose what diagnostic data Misty may share.",
   transfers: "Defaults for copies, downloads, and destinations.",
   search: "Keep filenames and connected libraries searchable.",
-  notifications: "Choose which activity should interrupt you.",
   shortcuts: "Review and customize keyboard commands.",
   advanced: "Runtime, developer, and recovery preferences.",
 };
@@ -210,9 +202,6 @@ function SettingsContent(props: {
       {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
       {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
       {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
-      {props.activeSection === "notifications" ? (
-        <NotificationsSettings {...props.controlProps} />
-      ) : null}
       {props.activeSection === "shortcuts" ? <ShortcutsSettings {...props.controlProps} /> : null}
       {props.activeSection === "advanced" ? <AdvancedSettings {...props.controlProps} /> : null}
     </>
@@ -984,108 +973,6 @@ function shortPath(path: string): string {
   return parts.length > 3 ? `…/${parts.slice(-3).join("/")}` : path;
 }
 
-function NotificationsSettings(props: SettingsContentProps) {
-  return (
-    <>
-      <SettingsSectionBlock title="Activity alerts">
-        <SettingsRow
-          label="Desktop notifications"
-          description="Show system-level notifications for important events."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "notifications", notificationsDeviceKey, true)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", notificationsDeviceKey, value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow label="In-app toasts" description="Show transient notifications inside Misty.">
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "notifications",
-              "in_app_notifications_enabled",
-              true,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", "in_app_notifications_enabled", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Play sounds"
-          description="Use sound for completion and error alerts."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "notifications",
-              "sound_notifications_enabled",
-              false,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", "sound_notifications_enabled", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="System notifications">
-        <SettingsRow
-          label="Badge count"
-          description="Show pending activity counts where the platform supports it."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "badge_count_enabled", true)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", "badge_count_enabled", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Digest & quiet hours">
-        <SettingsRow
-          label="Quiet hours"
-          description="Suppress non-critical notifications during focus time."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "notifications", "quiet_hours_enabled", false)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", "quiet_hours_enabled", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Notification digest"
-          description="Bundle lower-priority updates into a lighter summary."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "notifications",
-              "digest_notifications_enabled",
-              false,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("notifications", "digest_notifications_enabled", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-    </>
-  );
-}
-
 function ShortcutsSettings(props: SettingsContentProps) {
   return (
     <>
@@ -1548,7 +1435,6 @@ export type SettingsSection =
   | "privacy"
   | "transfers"
   | "search"
-  | "notifications"
   | "shortcuts"
   | "advanced";
 

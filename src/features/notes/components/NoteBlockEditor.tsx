@@ -487,7 +487,7 @@ function colorForId(id: string): string {
   for (let index = 0; index < id.length; index += 1) {
     hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
   }
-  const colors = ["#443E38", "#A3BFAB", "#52825A", "#948D84", "#E6E1DA", "#28312B"];
+  const colors = ["#3E3E3E", "#A3BFAB", "#52825A", "#8C8C8C", "#E0E0E0", "#28312B"];
   return colors[hash % colors.length];
 }
 

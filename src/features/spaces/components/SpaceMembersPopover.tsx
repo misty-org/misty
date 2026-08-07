@@ -13,6 +13,7 @@ import {
   cn,
 } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
+import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import type {
   Space,
@@ -103,11 +104,10 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
       </PopoverTrigger>
 
       <PopoverContent
-        align="end"
         sideOffset={8}
         className="w-72 overflow-hidden border-charcoal-border/70 p-0"
       >
-        <div className="flex items-center justify-between border-b border-charcoal-border/60 px-3 py-2.5">
+        <div className="flex items-center justify-between border-b border-charcoal-border/60 px-2 py-2.5">
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
             <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">
@@ -119,7 +119,7 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
           ) : null}
         </div>
 
-        <div className="misty-transient-scrollbar max-h-[min(420px,65vh)] overflow-y-auto p-1.5">
+        <div className="misty-transient-scrollbar max-h-[min(420px,65vh)] overflow-y-auto px-1 py-1.5">
           {loading && members.length === 0 ? (
             <MembersSkeleton />
           ) : (
@@ -141,10 +141,10 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
         </div>
 
         {space.role === "owner" || space.permissions?.["agents.manage"] === true ? (
-          <div className="grid grid-cols-2 gap-1 border-t border-charcoal-border/60 p-1.5">
+          <div className="grid grid-cols-2 gap-1 border-t border-charcoal-border/60 px-1 py-1.5">
             <Button
               asChild
-              className="h-8 justify-start gap-2 px-2 text-xs"
+              className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
               onClick={() => setOpen(false)}
             >
@@ -155,7 +155,7 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
             </Button>
             <Button
               asChild
-              className="h-8 justify-start gap-2 px-2 text-xs"
+              className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
               onClick={() => setOpen(false)}
             >
@@ -184,12 +184,18 @@ function TeamRows({
     <div className="grid gap-0.5">
       {members.map((member) => (
         <div
-          className="flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-charcoal-hover"
+          className="flex min-h-10 items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-charcoal-hover"
           key={`person:${member.user_id}`}
         >
           <span className="relative inline-flex shrink-0">
             <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
-              <AvatarFallback className="text-[9px] font-semibold">
+              <AvatarFallback
+                className={cn(
+                  "text-[9px] font-semibold",
+                  avatarColorClass(member.user_id),
+                  avatarInkClass,
+                )}
+              >
                 {personInitials(member.name)}
               </AvatarFallback>
             </Avatar>
@@ -203,7 +209,7 @@ function TeamRows({
         <Button
           type="button"
           variant="ghost"
-          className="h-auto min-h-10 justify-start gap-2.5 rounded-md px-2 py-1.5 text-left"
+          className="h-auto min-h-10 justify-start gap-2.5 rounded-md px-1.5 py-1.5 text-left"
           key={`agent:${agent.agent_id}`}
           onClick={() => onOpenAgent(agent.agent_id)}
         >

@@ -7,7 +7,6 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useNotesStore } from "@/stores/notes";
 import { NotesTopBar } from "./components/NotesTopBar";
 import { NoteReadingPane } from "./components/NoteReadingPane";
-import { NoteContextPanel } from "./components/NoteContextPanel";
 import { NewNoteDialog } from "./components/NewNoteDialog";
 import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
@@ -16,9 +15,6 @@ const shellClass =
   "relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg text-cream";
 
 const bodyClass = "grid min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden";
-
-const bodyWithContextClass =
-  "grid min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)_248px] max-[1100px]:grid-cols-[minmax(0,1fr)]";
 
 export function SpaceNotes(props: SpaceNotesProps) {
   const { user } = useAuth();
@@ -33,7 +29,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
       editingNoteId: state.editingNoteId,
       accountId: state.accountId,
       query: state.query,
-      contextPanelOpen: state.contextPanelOpen,
       registry: state.registry,
     })),
   );
@@ -41,7 +36,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
     useShallow((state) => ({
       load: state.load,
       setQuery: state.setQuery,
-      toggleContextPanel: state.toggleContextPanel,
       setEditingNoteId: state.setEditingNoteId,
       toggleFavorite: state.toggleFavorite,
       createNote: state.createNote,
@@ -91,7 +85,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
   const loading = store.phase === "loading" || store.phase === "idle";
 
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
-  const contextPanelOpen = Boolean(selectedNote) && store.contextPanelOpen;
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
     : undefined;
@@ -100,17 +93,15 @@ export function SpaceNotes(props: SpaceNotesProps) {
     <div className={shellClass}>
       <NotesTopBar
         query={store.query}
-        contextPanelOpen={contextPanelOpen}
-        contextPanelAvailable={Boolean(selectedNote)}
+        noteTitle={selectedNote?.title}
         readOnly={referenceOnly}
         onQueryChange={actions.setQuery}
         onNewNote={() => {
           if (!referenceOnly) setNewNoteOpen(true);
         }}
-        onToggleContextPanel={actions.toggleContextPanel}
       />
 
-      <div className={contextPanelOpen ? bodyWithContextClass : bodyClass}>
+      <div className={bodyClass}>
         <NoteReadingPane
           note={selectedNote}
           hasNotes={store.notes.length > 0}
@@ -141,12 +132,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
             if (!referenceOnly) setNewNoteOpen(true);
           }}
         />
-
-        {contextPanelOpen ? (
-          <div className="min-h-0 max-[1100px]:hidden">
-            <NoteContextPanel note={selectedNote} />
-          </div>
-        ) : null}
       </div>
 
       <NewNoteDialog

@@ -39,17 +39,6 @@ export function SpaceChatConversationList({
 
   return (
     <div className="grid gap-3">
-      <nav className="grid gap-1" aria-label="Space conversations">
-        <Link
-          className={conversationLinkClass(!activeConversationId)}
-          to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat`}
-        >
-          <span className="grid size-7 place-items-center rounded-md bg-charcoal-active text-cream-muted ring-1 ring-charcoal-border/50">
-            <Users size={15} strokeWidth={1.75} />
-          </span>
-          <span className="min-w-0 truncate font-medium">Everyone</span>
-        </Link>
-      </nav>
       <ConversationGroup
         title="Conversations"
         activeSpaceId={activeSpaceId}
@@ -60,6 +49,7 @@ export function SpaceChatConversationList({
         onEdit={onEditConversation}
         onDelete={onDeleteConversation}
         isSpaceOwner={isSpaceOwner}
+        showEveryone
       />
       {discord.length ? (
         <DiscordConversationGroup
@@ -94,8 +84,8 @@ function DiscordConversationGroup({
             className={conversationLinkClass(activeConversationId === conversation.id)}
             to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
           >
-            <span className="grid size-7 place-items-center rounded-md bg-sage-bg text-sage-fg">
-              <SiDiscord className="size-3.5" aria-hidden />
+            <span className="grid size-6 place-items-center text-sage-fg">
+              <SiDiscord className="size-4" aria-hidden />
             </span>
             <span className="min-w-0">
               <span className="block truncate font-medium">
@@ -122,6 +112,7 @@ function ConversationGroup({
   onEdit,
   onDelete,
   isSpaceOwner,
+  showEveryone,
 }: {
   title: string;
   activeSpaceId: string;
@@ -132,6 +123,7 @@ function ConversationGroup({
   onEdit?: (conversation: SpaceConversation) => void;
   onDelete?: (conversation: SpaceConversation) => void;
   isSpaceOwner: boolean;
+  showEveryone?: boolean;
 }) {
   return (
     <SpaceSidebarSection
@@ -142,7 +134,7 @@ function ConversationGroup({
           <Button
             variant="ghost"
             size="icon"
-            className="size-6 shrink-0 opacity-0 shadow-none group-hover/sidebar-header:opacity-100 focus-visible:opacity-100"
+            className="size-6 shrink-0 shadow-none"
             type="button"
             aria-label={`Create a new ${title.toLowerCase()} conversation`}
             onClick={onCreate}
@@ -153,6 +145,17 @@ function ConversationGroup({
       }
     >
       <nav className="grid gap-1" aria-label={`${title} conversations`}>
+        {showEveryone ? (
+          <Link
+            className={conversationLinkClass(!activeConversationId)}
+            to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat`}
+          >
+            <span className="grid size-6 place-items-center text-cream-muted">
+              <Users size={17} strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0 truncate font-medium">Everyone</span>
+          </Link>
+        ) : null}
         {conversations.map((conversation) => {
           const canRename = Boolean(
             onEdit &&
@@ -167,19 +170,10 @@ function ConversationGroup({
               className={conversationLinkClass(activeConversationId === conversation.id)}
               to={`/spaces/${encodeURIComponent(activeSpaceId)}/chat?conversation=${encodeURIComponent(conversation.id)}`}
             >
-              <span className="grid size-7 place-items-center rounded-md bg-charcoal-active text-cream-muted">
-                <MessagesSquare size={15} strokeWidth={1.75} />
+              <span className="grid size-6 place-items-center text-cream-muted">
+                <MessagesSquare size={17} strokeWidth={1.75} />
               </span>
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{conversation.title}</span>
-                <span className="block truncate text-[11px] text-cream-muted">
-                  {conversation.participants
-                    .map((participant) =>
-                      participant.user_id === currentUserId ? "You" : participant.name,
-                    )
-                    .join(", ")}
-                </span>
-              </span>
+              <span className="min-w-0 truncate font-medium">{conversation.title}</span>
             </Link>
           );
           if (!canRename && !canDelete) return <div key={conversation.id}>{link}</div>;
@@ -218,12 +212,12 @@ function ConversationGroup({
 function conversationLinkClass(isActive: boolean) {
   return cn(
     [
-      "relative grid min-h-9 grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-md",
-      "px-2.5 text-[13px] no-underline outline-none transition-colors",
+      "misty-marker-host relative grid min-h-9 grid-cols-[24px_minmax(0,1fr)] items-center gap-1.5 rounded-md",
+      "text-[13px] no-underline outline-none transition-colors",
       "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     ].join(" "),
     isActive
-      ? "bg-charcoal-active text-cream-bright font-medium"
-      : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
+      ? "misty-active-marker-side text-cream-bright font-medium"
+      : "text-cream-muted hover:text-cream",
   );
 }

@@ -548,12 +548,12 @@ function dragPreviewDataUrl(items: ExplorerDragItem[]): string {
   canvas.height = 80;
   const context = canvas.getContext("2d");
   if (!context) return "data:image/png;base64,";
-  context.fillStyle = "#141312";
+  context.fillStyle = "#131313";
   context.roundRect(4, 4, 120, 72, 14);
   context.fill();
   context.fillStyle = "#A3BFAB";
   context.fillRect(17, 22, 28, 24);
-  context.fillStyle = "#F5F2ED";
+  context.fillStyle = "#F1F1F1";
   context.font = "600 13px sans-serif";
   context.fillText(
     items.length > 1 ? `${items.length} items` : (items[0]?.name ?? "Item"),

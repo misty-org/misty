@@ -54,11 +54,12 @@ function NewWorkspaceTabMenu(props: { onOpenTool: (kind: WorkspaceTabKind) => vo
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          className="misty-chrome-tabs-add"
+          variant="ghost"
+          className="size-7 rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
           title="New tab"
           aria-label="New tab"
         >
-          <Plus size={17} strokeWidth={2.4} />
+          <Plus size={15} strokeWidth={2.4} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">

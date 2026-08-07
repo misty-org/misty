@@ -11,9 +11,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Skeleton,
+  cn,
 } from "@/ui";
 import type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
 import type { SpaceMember } from "@/models/interfaces/features/spaces/types";
+import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
 import { MemberPermissionControls } from "./MemberPermissionControls";
 import { personInitials } from "../personInitials";
 
@@ -43,7 +45,13 @@ export function MemberList({
             key={member.user_id}
           >
             <Avatar className="size-10 shrink-0">
-              <AvatarFallback className="text-xs font-semibold">
+              <AvatarFallback
+                className={cn(
+                  "text-xs font-semibold",
+                  avatarColorClass(member.user_id),
+                  avatarInkClass,
+                )}
+              >
                 {personInitials(member.name)}
               </AvatarFallback>
             </Avatar>

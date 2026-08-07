@@ -2,11 +2,9 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotesTopBar } from "@/features/notes/components/NotesTopBar";
-import { spacesBottomBarActionsId } from "@/features/spaces/components/SpacesBottomBar";
 
 describe("NotesTopBar", () => {
   let container: HTMLDivElement;
-  let bottomBarActions: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
@@ -14,43 +12,29 @@ describe("NotesTopBar", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
-    bottomBarActions = document.createElement("div");
-    bottomBarActions.id = spacesBottomBarActionsId;
-    document.body.append(container, bottomBarActions);
+    document.body.append(container);
     root = createRoot(container);
   });
 
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
-    bottomBarActions.remove();
   });
 
-  it("renders the details toggle in the Spaces bottom bar", async () => {
-    const onToggleContextPanel = vi.fn();
+  it("renders search and the new note action", async () => {
+    const onNewNote = vi.fn();
 
     await act(async () => {
       root.render(
-        <NotesTopBar
-          query=""
-          contextPanelOpen
-          contextPanelAvailable
-          onQueryChange={() => {}}
-          onNewNote={() => {}}
-          onToggleContextPanel={onToggleContextPanel}
-        />,
+        <NotesTopBar query="" onQueryChange={() => {}} onNewNote={onNewNote} />,
       );
     });
 
-    expect(container.querySelector('button[aria-label="Hide details"]')).toBeNull();
     expect(container.textContent).toContain("New note");
-
-    const toggle = bottomBarActions.querySelector<HTMLButtonElement>(
-      'button[aria-label="Hide details"]',
+    const button = [...container.querySelectorAll("button")].find((candidate) =>
+      candidate.textContent?.includes("New note"),
     );
-    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
-
-    await act(async () => toggle?.click());
-    expect(onToggleContextPanel).toHaveBeenCalledOnce();
+    await act(async () => button?.click());
+    expect(onNewNote).toHaveBeenCalledOnce();
   });
 });

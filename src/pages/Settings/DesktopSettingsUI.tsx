@@ -26,9 +26,11 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       >
         <nav className="flex min-h-0 flex-col gap-4" aria-label={props.navigationLabel}>
           <div className="grid gap-1">
-            <div className="px-2 pb-1 text-[11px] font-medium text-cream-muted">
-              {overlay ? props.navigationLabel : props.navigationTitle}
-            </div>
+            {props.hideNavigationLabel ? null : (
+              <div className="px-2 pb-1 text-[11px] font-medium text-cream-muted">
+                {overlay ? props.navigationLabel : props.navigationTitle}
+              </div>
+            )}
             {props.items.map((item) => {
               const Icon = item.icon;
               const active = props.activeId === item.id;
@@ -39,14 +41,18 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                   variant="ghost"
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
-                    active
-                      ? "bg-charcoal-active text-cream-bright"
-                      : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
+                    "misty-marker-host h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
+                    "transition-none active:not-aria-[haspopup]:translate-y-0",
+                    active ? "misty-active-marker-side text-cream-bright" : "text-cream-muted hover:text-cream",
                   )}
                   onClick={() => props.onSelect(item.id)}
                 >
-                  <span className="grid size-4 shrink-0 place-items-center">
+                  <span
+                    className={cn(
+                      "grid size-4 shrink-0 place-items-center transition-colors",
+                      active ? "text-cream" : "text-cream-muted",
+                    )}
+                  >
                     <Icon className="size-4" strokeWidth={1.8} />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
@@ -166,6 +172,7 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   ariaLabel: string;
   children: ReactNode;
   description?: ReactNode;
+  hideNavigationLabel?: boolean;
   items: readonly DesktopSettingsNavEntry<Id>[];
   navigationLabel: string;
   navigationTitle: string;

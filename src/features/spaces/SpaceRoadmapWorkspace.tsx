@@ -203,14 +203,25 @@ export function SpaceRoadmapWorkspace({
   };
   if (!roadmapId)
     return (
-      <main className="h-full overflow-auto p-6">
+      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
+        <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
+          <h1 className="m-0 shrink-0 text-sm font-semibold">Views</h1>
+          {canManage && !(createRequested || !roadmaps.length) ? (
+            <div className="ml-auto flex items-center gap-3">
+              <Button
+                className="h-8 gap-1.5 text-xs"
+                onClick={() =>
+                  navigate({ pathname: location.pathname, search: "?create=roadmap" })
+                }
+              >
+                <Plus className="size-3.5" />
+                New roadmap
+              </Button>
+            </div>
+          ) : null}
+        </header>
+        <main className="min-h-0 overflow-auto p-6">
         <div className="mx-auto max-w-4xl">
-          <header className="mb-6">
-            <h1 className="m-0 text-xl font-semibold">Views</h1>
-            <p className="mt-1 text-sm text-cream-muted">
-              Choose a roadmap canvas, then open it when you are ready to edit.
-            </p>
-          </header>
           {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
           {canManage && (createRequested || !roadmaps.length) ? (
             <div className="mb-6 flex max-w-lg gap-2 rounded-xl border border-charcoal-border/70 bg-charcoal-card p-4">
@@ -230,14 +241,6 @@ export function SpaceRoadmapWorkspace({
                 Create
               </Button>
             </div>
-          ) : canManage ? (
-            <Button
-              className="mb-6"
-              onClick={() => navigate({ pathname: location.pathname, search: "?create=roadmap" })}
-            >
-              <Plus className="size-4" />
-              New roadmap
-            </Button>
           ) : null}
           <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
             {roadmaps.map((roadmap) => (
@@ -273,7 +276,8 @@ export function SpaceRoadmapWorkspace({
             ) : null}
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     );
   if (loading && !snapshot)
     return (

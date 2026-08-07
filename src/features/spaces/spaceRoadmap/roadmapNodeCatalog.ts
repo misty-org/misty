@@ -164,7 +164,7 @@ export const roadmapNodeColors: Record<
   slate: {
     accent: "border-l-charcoal-active text-cream-muted",
     soft: "bg-charcoal-card",
-    hex: "#948D84",
+    hex: "#8C8C8C",
   },
   blue: { accent: "border-l-sage-fg text-sage-fg", soft: "bg-sage-bg", hex: "#A3BFAB" },
   cyan: { accent: "border-l-sage-fg text-sage-fg", soft: "bg-sage-bg", hex: "#A3BFAB" },
@@ -177,17 +177,17 @@ export const roadmapNodeColors: Record<
   orange: {
     accent: "border-l-sage-fg text-sage-fg",
     soft: "bg-sage-bg",
-    hex: "#443E38",
+    hex: "#3E3E3E",
   },
   rose: {
     accent: "border-l-charcoal-active text-cream",
     soft: "bg-charcoal-hover",
-    hex: "#443E38",
+    hex: "#3E3E3E",
   },
   violet: {
     accent: "border-l-sage-fg text-sage-fg",
     soft: "bg-sage-bg",
-    hex: "#948D84",
+    hex: "#8C8C8C",
   },
 };
 

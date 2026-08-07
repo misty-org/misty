@@ -69,6 +69,7 @@ export function DrawingHeader(props: {
   return (
     <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
       <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="shrink-0 text-sm font-semibold text-cream-muted">Journal -</span>
         <Input
           value={title}
           aria-label="Drawing title"

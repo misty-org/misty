@@ -1,8 +1,10 @@
 export type { MemberAction } from "@/models/types/features/spaces/components/SpaceMembers";
 
-import { UserPlus } from "lucide-react";
+import { useState } from "react";
+import { Plus, UserPlus } from "lucide-react";
 import { Button } from "@/ui";
 import { useAuth } from "@/features/auth/AuthContext";
+import { AgentCreatorDialog } from "@/features/agents/AgentCreatorDialog";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { InviteMemberDialog } from "../spaceMembers/InviteMemberDialog";
 import { MemberActionDialog } from "../spaceMembers/MemberActionDialog";
@@ -27,6 +29,7 @@ export function SpaceMembers({
   const { space, members, agents, error, clearError } = state;
   const bannerError = error && !dialogs.inviteOpen && !dialogs.memberAction ? error : "";
   const teammatesEnabled = agentTeammatesV1Enabled();
+  const [creatorOpen, setCreatorOpen] = useState(false);
 
   return (
     <div
@@ -49,11 +52,18 @@ export function SpaceMembers({
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
             </p>
           </div>
-          {state.canInvite ? (
-            <Button type="button" onClick={dialogs.openInvite}>
-              <UserPlus className="size-4" /> Invite member
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {state.canManageAgents ? (
+              <Button type="button" variant="outline" onClick={() => setCreatorOpen(true)}>
+                <Plus className="size-4" /> Create Agent
+              </Button>
+            ) : null}
+            {state.canInvite ? (
+              <Button type="button" onClick={dialogs.openInvite}>
+                <UserPlus className="size-4" /> Invite member
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {bannerError ? (
@@ -115,6 +125,12 @@ export function SpaceMembers({
         error={error ?? ""}
       />
       <MemberActionDialog dialogs={dialogs} error={error ?? ""} />
+      <AgentCreatorDialog
+        open={creatorOpen}
+        onOpenChange={setCreatorOpen}
+        defaultSpaceId={spaceId}
+        onCreated={() => void useSpacesStore.getState().loadMembers(spaceId)}
+      />
     </div>
   );
 }

@@ -90,7 +90,7 @@ describe("SpacePlanner", () => {
 
     expect(document.body.textContent).toContain("New task");
     expect(document.querySelector("#space-task-title")).not.toBeNull();
-    expect(document.querySelector('[data-slot="sheet-content"]')?.className).toContain(
+    expect(document.querySelector('[data-slot="dialog-content"]')?.className).toContain(
       "bg-charcoal-card",
     );
   });

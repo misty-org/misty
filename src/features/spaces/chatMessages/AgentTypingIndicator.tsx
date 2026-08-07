@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Square } from "lucide-react";
+import { Bot, Square } from "lucide-react";
 import { Avatar, AvatarFallback, Button } from "@/ui";
+import { avatarInkClass, robotAvatarClass } from "@/lib/avatarPalette";
 import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
 
-const dotClass = "size-1.5 rounded-full bg-charcoal-hover motion-safe:animate-bounce";
+const dotClass = "size-1.5 rounded-full bg-avatar-aqua motion-safe:animate-bounce";
 
 export interface AgentTypingIndicatorProps {
   /** Present once the run exists; without it there is nothing to cancel yet. */
@@ -28,7 +29,9 @@ export function AgentTypingIndicator({ runId }: AgentTypingIndicatorProps) {
     >
       <div className="col-start-1 flex justify-end">
         <Avatar className="mt-0.5 size-10">
-          <AvatarFallback className="text-xs font-semibold">AI</AvatarFallback>
+          <AvatarFallback className={`text-xs font-semibold ${robotAvatarClass} ${avatarInkClass}`}>
+            <Bot className="size-4" strokeWidth={2} />
+          </AvatarFallback>
         </Avatar>
       </div>
       <div className="col-start-2 flex min-w-0 items-center gap-2">

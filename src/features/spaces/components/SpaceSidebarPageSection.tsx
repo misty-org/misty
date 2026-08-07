@@ -20,10 +20,10 @@ export function SpaceSidebarPageSection(props: {
 
   return (
     <section className="grid gap-1">
-      <div className="group/sidebar-page flex min-h-7 min-w-0 items-center gap-1 px-2">
+      <div className="group/sidebar-page flex min-h-7 min-w-0 items-center gap-1 px-1.5">
         <Link
           className={cn(
-            "min-w-0 flex-1 truncate rounded-sm text-xs font-semibold no-underline outline-none",
+            "min-w-0 truncate rounded-sm text-xs font-semibold no-underline outline-none",
             "focus-visible:ring-2 focus-visible:ring-charcoal-active",
             props.active ? "text-cream-bright" : "text-cream-muted hover:text-cream-bright",
           )}
@@ -35,7 +35,6 @@ export function SpaceSidebarPageSection(props: {
             <span className="font-medium text-cream-muted"> - {props.count}</span>
           ) : null}
         </Link>
-        {props.action}
         <Button
           type="button"
           variant="ghost"
@@ -47,6 +46,8 @@ export function SpaceSidebarPageSection(props: {
         >
           <ChevronRight size={13} className={cn("transition-transform", expanded && "rotate-90")} />
         </Button>
+        <span className="flex-1" />
+        {props.action}
       </div>
       {expanded ? <div id={contentId}>{props.children}</div> : null}
     </section>

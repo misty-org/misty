@@ -14,7 +14,13 @@ const validSpaceSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set(["general", "members", "chat", "connections"]);
+const validSettingsSections = new Set([
+  "general",
+  "members",
+  "chat",
+  "connections",
+  "suggestions",
+]);
 const validTaskViews = new Set(["board", "list", "calendar"]);
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(

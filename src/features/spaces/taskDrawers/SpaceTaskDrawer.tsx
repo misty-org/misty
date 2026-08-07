@@ -11,18 +11,18 @@ import {
 } from "lucide-react";
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
   Label,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
   Textarea,
 } from "@/ui";
 import { TaskCalendarNotice } from "@/features/spaces/components/TaskCalendarNotice";
@@ -128,18 +128,23 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
   };
 
   return (
-    <Sheet open onOpenChange={(open) => !open && !busy && onClose()}>
-      <SheetContent className="flex w-[min(600px,96vw)] max-w-none flex-col gap-0 bg-charcoal-card p-0 sm:max-w-none">
+    <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
+      <DialogContent
+        className={[
+          "flex h-[min(760px,calc(100vh-56px))] w-[min(680px,calc(100vw-40px))]",
+          "max-w-none flex-col gap-0 overflow-hidden bg-charcoal-card p-0",
+        ].join(" ")}
+      >
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={props.onSave}>
-          <SheetHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
+          <DialogHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
             <div className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <SheetTitle>{editing ? editing.task_key : "New task"}</SheetTitle>
-                <SheetDescription>
+                <DialogTitle>{editing ? editing.task_key : "New task"}</DialogTitle>
+                <DialogDescription>
                   {editing
                     ? "Update the task details and assignment."
                     : "Create a shared task for this Space."}
-                </SheetDescription>
+                </DialogDescription>
               </div>
               {props.onArchive ? (
                 <DropdownMenu>
@@ -160,7 +165,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                 </DropdownMenu>
               ) : null}
             </div>
-          </SheetHeader>
+          </DialogHeader>
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_240px] overflow-auto max-sm:grid-cols-1">
             <div className="grid content-start gap-5 p-5 sm:p-6">
@@ -229,7 +234,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
             />
           </div>
 
-          <SheetFooter className="flex-row justify-end gap-2 border-t border-charcoal-border/60 px-5 py-4">
+          <DialogFooter className="flex-row justify-end gap-2 border-t border-charcoal-border/60 px-5 py-4">
             <Button variant="outline" type="button" disabled={busy} onClick={onClose}>
               Cancel
             </Button>
@@ -244,9 +249,9 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               )}
               Save
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
+      </DialogContent>
       {pickerOpen ? (
         <MistyPicker
           spaceId={props.spaceId}
@@ -268,7 +273,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
           }}
         />
       ) : null}
-    </Sheet>
+    </Dialog>
   );
 }
 

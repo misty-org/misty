@@ -2,6 +2,7 @@ import type { NotesPanelSidebarProps } from "@/models/interfaces/features/notes/
 export type { NotesPanelSidebarProps } from "@/models/interfaces/features/notes/SpaceNotes";
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/ui";
 import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
@@ -14,6 +15,7 @@ import { NewNoteDialog } from "./NewNoteDialog";
 export function NotesPanelSidebar(
   props: NotesPanelSidebarProps & { section?: { active: boolean; to: string } },
 ) {
+  const navigate = useNavigate();
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const store = useNotesStore(
     useShallow((state) => ({
@@ -38,6 +40,13 @@ export function NotesPanelSidebar(
     [store.notes, store.query, props.spaceId],
   );
 
+  // Picking a note from the sidebar should show it, even when a Drawing (a
+  // sibling section sharing this sidebar) is the current route.
+  const selectNote = (noteId: string) => {
+    actions.selectNote(noteId);
+    if (props.section && !props.section.active) navigate(props.section.to);
+  };
+
   const action = (
     <Button
       type="button"
@@ -60,7 +69,7 @@ export function NotesPanelSidebar(
       showHeader={false}
       selectedNoteId={store.selectedNoteId}
       connectorErrors={store.connectorErrors}
-      onSelectNote={actions.selectNote}
+      onSelectNote={selectNote}
       onNewNote={() => setNewNoteOpen(true)}
       onClearQuery={() => actions.setQuery("")}
     />

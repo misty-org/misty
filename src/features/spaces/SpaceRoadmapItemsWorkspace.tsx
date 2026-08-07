@@ -108,21 +108,13 @@ export function SpaceRoadmapItemsWorkspace({
   const Icon = kind === "goal" ? Target : Flag;
 
   return (
-    <main className="h-full overflow-auto bg-charcoal-bg p-6">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-6 flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
-            <Icon className="size-4" />
-          </div>
-          <div>
-            <h1 className="m-0 text-xl font-semibold">{title}</h1>
-            <p className="mt-1 text-sm text-cream-muted">
-              Configure {title.toLowerCase()} across every roadmap in this Space.
-            </p>
-          </div>
-          {canManage ? (
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
+      <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
+        <h1 className="m-0 shrink-0 text-sm font-semibold">{title}</h1>
+        {canManage ? (
+          <div className="ml-auto flex items-center gap-3">
             <CreateRoadmapItem
-              className="ml-auto"
+              className="h-8 gap-1.5 text-xs"
               kind={kind}
               roadmaps={roadmaps}
               snapshots={snapshots}
@@ -135,9 +127,12 @@ export function SpaceRoadmapItemsWorkspace({
                 )
               }
             />
-          ) : null}
-        </header>
+          </div>
+        ) : null}
+      </header>
 
+      <main className="min-h-0 overflow-auto p-6">
+        <div className="mx-auto max-w-5xl">
         {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
         {loading && !snapshots.length ? (
           <div className="grid min-h-48 place-items-center">
@@ -251,8 +246,9 @@ export function SpaceRoadmapItemsWorkspace({
             </p>
           </div>
         )}
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -291,7 +287,7 @@ function CreateRoadmapItem({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button className={className} disabled={!roadmaps.length}>
-          <Plus className="size-4" />
+          <Plus className="size-3.5" />
           New {kind}
         </Button>
       </PopoverTrigger>

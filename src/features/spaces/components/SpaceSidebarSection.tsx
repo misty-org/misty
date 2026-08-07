@@ -29,7 +29,7 @@ export function SpaceSidebarSection({
   return (
     <section className={cn("grid gap-1", className)}>
       {title || action ? (
-        <div className="group/sidebar-header flex min-h-7 items-center gap-1 px-2">
+        <div className="group/sidebar-header flex min-h-7 items-center gap-1 px-1.5">
           {title && canCollapse ? (
             <Button
               type="button"
@@ -43,7 +43,7 @@ export function SpaceSidebarSection({
               onClick={() => setExpanded((current) => !current)}
             >
               {icon ? <span className="shrink-0">{icon}</span> : null}
-              <span className="min-w-0 flex-1 truncate">
+              <span className="min-w-0 truncate">
                 {title}
                 {typeof count === "number" && count > 0 ? (
                   <span className="text-cream-muted/80"> - {count}</span>
@@ -51,7 +51,7 @@ export function SpaceSidebarSection({
               </span>
               <ChevronRight
                 size={13}
-                className={cn("ml-auto shrink-0 transition-transform", expanded && "rotate-90")}
+                className={cn("shrink-0 transition-transform", expanded && "rotate-90")}
               />
             </Button>
           ) : title ? (
