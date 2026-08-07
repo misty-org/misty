@@ -5,12 +5,7 @@
       "hash": "0444dc36ca36ba69"
     }
   ],
-  "src/features/drawings/components/DrawingHeader.tsx": [
-    {
-      "length": 163,
-      "hash": "8c5a66ebdefd411f"
-    }
-  ],
+
   "src/features/explorer/components/DeepSearchOverlay.tsx": [
     {
       "length": 319,
@@ -363,12 +358,7 @@
       "hash": "37ca8065247c9015"
     }
   ],
-  "src/features/spaces/components/SpaceLibraryChrome.tsx": [
-    {
-      "length": 161,
-      "hash": "27b56d902eebe765"
-    }
-  ],
+
   "src/features/spaces/components/SpaceManagementNavigation.tsx": [
     {
       "length": 165,

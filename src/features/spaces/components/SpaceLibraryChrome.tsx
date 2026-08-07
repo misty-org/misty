@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Image as ImageIcon,
   Grid2X2,
@@ -70,139 +71,162 @@ const sortOptions = [
 ];
 
 export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showSearch = searchOpen || Boolean(props.searchInput);
   const hasVisibleItems = props.visibleItemCount > 0;
 
   return (
-    <div className="shrink-0">
-      <Toolbar label="Library tools" wrap className="min-h-11 px-3 py-1.5">
-        <label
-          className={cn(
-            "!flex h-8 min-w-[220px] flex-1 items-center gap-2 overflow-hidden rounded-md",
-            "border border-charcoal-border/70 bg-charcoal-card px-2.5 text-cream-muted shadow-none",
-            "transition-colors",
-          )}
-        >
-          <Search size={15} aria-hidden="true" />
-          <Input
-            className="!m-0 !h-full !min-h-0 min-w-0 flex-1 !rounded-none !border-0 !bg-transparent !p-0 !shadow-none text-sm leading-none focus-visible:!ring-0"
-            value={props.searchInput}
-            onChange={(event) => props.onSearchInput(event.target.value)}
-            onFocus={props.onSearchFocus}
-            onBlur={props.onSearchBlur}
-            placeholder="Search this Library"
-            aria-label="Search Library"
-          />
-          {props.searchInput ? (
-            <Button
-              className="size-6 shrink-0"
-              size="icon"
-              variant="ghost"
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => props.onSearchInput("")}
-              aria-label="Clear Library search"
-            >
-              <X size={13} />
-            </Button>
-          ) : null}
-        </label>
+    <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
+      <h1 className="m-0 text-sm font-semibold">Library</h1>
 
-        <ToolbarGroup align="end" aria-label="Library view controls">
-          <Select
-            value={props.mediaType || "all"}
-            onValueChange={(value) => props.onMediaType(value === "all" ? "" : value)}
-          >
-            <SelectTrigger className="w-[142px]" aria-label="Filter by media type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {mediaTypeOptions.map((option) => (
-                <SelectItem key={option.value || "all"} value={option.value || "all"}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {hasVisibleItems ? (
-            <>
-              <Select
-                value={`${props.sort}:${props.direction}`}
-                onValueChange={(value) => {
-                  const [sort, direction] = value.split(":") as [
-                    NonNullable<LibraryItemQuery["sort"]>,
-                    NonNullable<LibraryItemQuery["direction"]>,
-                  ];
-                  props.onSort(sort, direction);
-                }}
+      <div className="ml-auto flex items-center gap-2">
+        {showSearch ? (
+          <div className="relative w-44">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+            <Input
+              autoFocus
+              className="h-8 pl-8 pr-8 text-xs"
+              aria-label="Search Library"
+              placeholder="Search Library..."
+              value={props.searchInput}
+              onChange={(event) => props.onSearchInput(event.target.value)}
+              onFocus={props.onSearchFocus}
+              onBlur={() => {
+                props.onSearchBlur();
+                if (!props.searchInput) setSearchOpen(false);
+              }}
+            />
+            {props.searchInput ? (
+              <Button
+                className="absolute right-1 top-1/2 size-6 -translate-y-1/2"
+                size="icon"
+                variant="ghost"
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => props.onSearchInput("")}
+                aria-label="Clear Library search"
               >
-                <SelectTrigger className="w-[154px] max-lg:hidden" aria-label="Sort Library">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(props.albumOrderAvailable
-                    ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
-                    : sortOptions
-                  ).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div role="group" aria-label="Library layout" className={toolbarControlStyles.group}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn(
-                    toolbarControlStyles.button,
-                    props.viewMode === "grid" && toolbarControlStyles.buttonActive,
-                  )}
-                  aria-label="Grid view"
-                  title="Grid view"
-                  aria-pressed={props.viewMode === "grid"}
-                  onClick={() => props.onViewMode("grid")}
-                >
-                  <Grid2X2 size={15} />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn(
-                    toolbarControlStyles.button,
-                    props.viewMode === "list" && toolbarControlStyles.buttonActive,
-                  )}
-                  aria-label="List view"
-                  title="List view"
-                  aria-pressed={props.viewMode === "list"}
-                  onClick={() => props.onViewMode("list")}
-                >
-                  <List size={15} />
-                </Button>
-              </div>
-              <SpaceLibraryScaleControls
-                itemScale={props.itemScale}
-                onItemScale={props.onItemScale}
-              />
-            </>
-          ) : null}
-          <SpaceLibraryUploadTray jobs={props.uploadJobs} onClear={props.onClearUploads} />
-          {props.uploadAvailable ? (
-            <Button
-              className="shrink-0"
-              size="sm"
-              type="button"
-              disabled={props.uploadDisabled}
-              onClick={props.onUpload}
+                <X className="size-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <Button
+            className="size-8"
+            size="icon"
+            variant="ghost"
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search Library"
+          >
+            <Search className="size-4" />
+          </Button>
+        )}
+
+        <Select
+          value={props.mediaType || "all"}
+          onValueChange={(value) => props.onMediaType(value === "all" ? "" : value)}
+        >
+          <SelectTrigger className="h-8 w-[130px] text-xs" aria-label="Filter by media type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {mediaTypeOptions.map((option) => (
+              <SelectItem key={option.value || "all"} value={option.value || "all"}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {hasVisibleItems ? (
+          <>
+            <Select
+              value={`${props.sort}:${props.direction}`}
+              onValueChange={(value) => {
+                const [sort, direction] = value.split(":") as [
+                  NonNullable<LibraryItemQuery["sort"]>,
+                  NonNullable<LibraryItemQuery["direction"]>,
+                ];
+                props.onSort(sort, direction);
+              }}
             >
-              <Upload size={15} aria-hidden="true" />
-              Upload files
-            </Button>
-          ) : null}
-        </ToolbarGroup>
-      </Toolbar>
-    </div>
+              <SelectTrigger
+                className="h-8 w-[140px] text-xs max-lg:hidden"
+                aria-label="Sort Library"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(props.albumOrderAvailable
+                  ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
+                  : sortOptions
+                ).map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div
+              role="group"
+              aria-label="Library layout"
+              className="flex h-8 items-center gap-0.5 rounded-md border border-charcoal-border/80 bg-charcoal-bg px-1"
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-6 rounded-sm text-cream-muted shadow-none",
+                  props.viewMode === "grid" && "bg-charcoal-hover text-cream",
+                )}
+                aria-label="Grid view"
+                title="Grid view"
+                aria-pressed={props.viewMode === "grid"}
+                onClick={() => props.onViewMode("grid")}
+              >
+                <Grid2X2 className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "size-6 rounded-sm text-cream-muted shadow-none",
+                  props.viewMode === "list" && "bg-charcoal-hover text-cream",
+                )}
+                aria-label="List view"
+                title="List view"
+                aria-pressed={props.viewMode === "list"}
+                onClick={() => props.onViewMode("list")}
+              >
+                <List className="size-3.5" />
+              </Button>
+            </div>
+            <SpaceLibraryScaleControls
+              itemScale={props.itemScale}
+              onItemScale={props.onItemScale}
+            />
+          </>
+        ) : null}
+
+        <SpaceLibraryUploadTray jobs={props.uploadJobs} onClear={props.onClearUploads} />
+
+        {props.uploadAvailable ? (
+          <Button
+            className="h-8 gap-1.5 text-xs"
+            type="button"
+            disabled={props.uploadDisabled}
+            onClick={props.onUpload}
+          >
+            <Upload className="size-3.5" aria-hidden="true" />
+            Upload
+          </Button>
+        ) : null}
+      </div>
+    </header>
   );
 }
 
