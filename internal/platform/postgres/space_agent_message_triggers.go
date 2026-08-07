@@ -21,6 +21,19 @@ type SpaceAgentMessageTrigger struct {
 	Created         bool   `json:"-"`
 }
 
+func (db *Database) SpaceAgentMessageTriggerIDForRun(ctx context.Context, userID, runID string) (string, error) {
+	var triggerID string
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		return tx.QueryRowContext(ctx, `SELECT t.id FROM space_agent_message_triggers t
+			JOIN space_runs r ON r.id=t.run_id AND r.space_id=t.space_id
+			WHERE r.id=$1 AND t.requesting_user_id=$2`, runID, userID).Scan(&triggerID)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrSpaceNotFound
+	}
+	return triggerID, err
+}
+
 func (db *Database) QueueSpaceAgentMessageTrigger(ctx context.Context, userID, spaceID, conversationID, sourceMessageID, agentID, triggerKind string) (*SpaceAgentMessageTrigger, error) {
 	if triggerKind != "direct" && triggerKind != "mention" {
 		return nil, ErrSpaceInvalid
@@ -49,7 +62,15 @@ func (db *Database) QueueSpaceAgentMessageTrigger(ctx context.Context, userID, s
 			return err
 		}
 		if out.Created {
-			_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "agent.run.queued", out.ID, out)
+			// Same payload shape every other agent.run.* state publishes. The
+			// trigger struct alone omits conversation_id, so subscribers scoping
+			// events to one conversation dropped the queued state and only saw
+			// the Agent from "working" onward.
+			_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "agent.run.queued", out.ID, map[string]any{
+				"trigger_id": out.ID, "state": out.State, "run_id": out.RunID,
+				"agent_id": out.AgentID, "conversation_id": conversationID,
+				"source_message_id": out.SourceMessageID, "error_code": "", "error_message": "",
+			})
 		}
 		return err
 	})

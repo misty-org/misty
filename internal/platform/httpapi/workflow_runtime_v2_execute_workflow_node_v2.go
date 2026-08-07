@@ -76,7 +76,8 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 				Instructions string `json:"instructions"`
 			}
 			_ = json.Unmarshal(invocation.Config, &config)
-			request := fmt.Sprintf("You are %s. Follow the pinned Agent instructions:\n%s\n\nComplete workflow node %s. Required outcome:\n%s\n\nThe available capabilities are limited to the published workflow envelope. Return a concise result grounded in the supplied input.\n\nInput:\n%s\n\nOriginal user request:\n%s", agent.Name, agent.Instructions, invocation.NodeID, config.Instructions, string(invocation.Input), strings.TrimSpace(prompt))
+			identity := fmt.Sprintf("You are %s. Follow the pinned Agent instructions:\n%s\n\nThe available capabilities are limited to the published workflow envelope. Return a concise result grounded in the supplied input.", agent.Name, agent.Instructions)
+			request := fmt.Sprintf("Complete workflow node %s. Required outcome:\n%s\n\nInput:\n%s\n\nOriginal user request:\n%s", invocation.NodeID, config.Instructions, string(invocation.Input), strings.TrimSpace(prompt))
 			toolNames := make([]string, 0, len(toolProviders))
 			for name := range toolProviders {
 				toolNames = append(toolNames, name)
@@ -117,7 +118,7 @@ func (s *SpacesService) executeWorkflowNodeV2(ctx context.Context, run *db.Space
 			if err != nil {
 				return nil, err
 			}
-			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
+			completion, err := s.agent.CompleteWithToolsContext(ctx, run.RequestingMemberID, run.BillingUserID, identity, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
 				output, toolErr := toolbox.ExecuteWithMiddleware(toolCtx, toolboxInvocation, tool, nil, agentToolboxExecutionJournal(s.database))
 				if errors.Is(toolErr, agenttools.ErrToolNotFound) || errors.Is(toolErr, agenttools.ErrCapabilityDenied) || errors.Is(toolErr, agenttools.ErrApprovalRequired) {
 					return nil, workflowv2.ErrCapabilityDenied

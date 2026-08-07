@@ -200,17 +200,18 @@ func (s *SpacesService) executeCanonicalAgentRun(r *http.Request, run *db.SpaceR
 	if err != nil {
 		return s.finishFailedCanonicalRun(r.Context(), run, err)
 	}
-	request := fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s\n\nUser request:\n%s", resource.Name, resource.Instructions, strings.TrimSpace(prompt))
+	identity := fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s", resource.Name, resource.Instructions)
 	if selectedCapability != nil {
 		capabilityDescription := selectedCapability.Name + ": " + selectedCapability.Description
-		request = fmt.Sprintf("You are %s, an Agent in a Space. Follow these version-pinned instructions:\n%s\n\nExecute the pinned workflow capability %s. Use only its capability envelope.\n\nUser request:\n%s", resource.Name, resource.Instructions, capabilityDescription, strings.TrimSpace(prompt))
+		identity += fmt.Sprintf("\n\nExecute the pinned workflow capability %s. Use only its capability envelope.", capabilityDescription)
 	}
+	request := strings.TrimSpace(prompt)
 	toolbox, invocation, manifest, err := s.resolveCanonicalAgentToolbox(r.Context(), run, prompt)
 	if err != nil {
 		return s.finishFailedCanonicalRun(r.Context(), run, err)
 	}
-	request += "\n\nPermission-checked Misty Space context:\n" + spaceContext + "\n\n" + agentToolboxPromptContext(manifest, manifestToolNames(manifest))
-	completion, err := s.agent.CompleteWithToolsContext(r.Context(), run.RequestingMemberID, run.BillingUserID, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
+	identity += "\n\nPermission-checked Misty Space context:\n" + spaceContext + "\n\n" + agentToolboxPromptContext(manifest, manifestToolNames(manifest))
+	completion, err := s.agent.CompleteWithToolsContext(r.Context(), run.RequestingMemberID, run.BillingUserID, identity, request, serveragent.TierLow, manifest, func(toolCtx context.Context, tool serveragent.ToolRequest) (json.RawMessage, error) {
 		return executeCanonicalAgentToolbox(toolCtx, toolbox, invocation, s.database, tool)
 	})
 	if err != nil {

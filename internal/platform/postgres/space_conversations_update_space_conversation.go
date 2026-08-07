@@ -85,6 +85,10 @@ func (db *Database) DeleteDisconnectedDiscordConversation(
 		if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
+		participantUserIDs, err := humanMemberIDsForConversationTx(ctx, tx, conversationID)
+		if err != nil {
+			return err
+		}
 		result, err := tx.ExecContext(ctx, `DELETE FROM space_conversations
 			WHERE id=$1 AND space_id=$2 AND origin='discord' AND integration_status='disconnected'`,
 			conversationID, spaceID)
@@ -95,7 +99,9 @@ func (db *Database) DeleteDisconnectedDiscordConversation(
 			return ErrSpaceNotFound
 		}
 		_, err = recordSpaceEventTx(ctx, tx, spaceID, userID, "conversation.deleted",
-			conversationID, map[string]any{"conversation_id": conversationID})
+			conversationID, map[string]any{
+				"conversation_id": conversationID, "participant_user_ids": participantUserIDs,
+			})
 		return err
 	})
 }

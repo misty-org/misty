@@ -12,12 +12,13 @@ type namedTestProvider struct {
 	model    string
 	text     string
 	err      error
+	tools    []ToolRequest
 }
 
 func (provider namedTestProvider) ProviderName() string { return provider.provider }
 func (provider namedTestProvider) ModelName() string    { return provider.model }
 func (provider namedTestProvider) Next(ModelRequest) (ModelResponse, error) {
-	return ModelResponse{Text: provider.text, Usage: ModelUsage{InputTokens: 10, OutputTokens: 5}}, provider.err
+	return ModelResponse{Text: provider.text, ToolRequests: provider.tools, Usage: ModelUsage{InputTokens: 10, OutputTokens: 5}}, provider.err
 }
 
 type recordingUsageMeter struct {
@@ -26,6 +27,7 @@ type recordingUsageMeter struct {
 	provider string
 	model    string
 	releases int
+	refunds  int
 }
 
 func (meter *recordingUsageMeter) Reserve(userID string, key string, _ string, provider, model string, _, _ int64) (*UsageReservation, error) {
@@ -52,12 +54,36 @@ func TestAgentJobSessionBillsRequesterWithJobIdempotency(t *testing.T) {
 }
 
 func (*recordingUsageMeter) Settle(*UsageReservation, string, string, string, string, ModelUsage) (UsageSettlement, error) {
-	return UsageSettlement{CreditsUsed: 2, CreditsRemaining: 98}, nil
+	return UsageSettlement{ChargedMicrousd: 2, CreditsUsed: 2, CreditsRemaining: 98}, nil
+}
+
+func TestRejectedToolCallRefundsSettledUsage(t *testing.T) {
+	meter := &recordingUsageMeter{}
+	service := NewService(nil, namedTestProvider{
+		provider: "gateway", model: "model",
+		tools: []ToolRequest{{ID: "tool-1", Name: "tasks.create", Arguments: []byte(`{"title":"Test"}`)}},
+	}, WithUsageMeter(meter))
+	session := service.CreateSession("user")
+	err := service.SendMessage(session.ID, "user", AgentMessageRequest{
+		UserMessage:  "hello",
+		Capabilities: ToolManifest{Tools: []ToolDefinition{{Name: "tasks.query", Risk: RiskRead}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meter.refunds != 1 {
+		t.Fatalf("refunds = %d, want 1", meter.refunds)
+	}
 }
 
 func (meter *recordingUsageMeter) Release(*UsageReservation) error {
 	meter.releases++
 	return nil
+}
+
+func (meter *recordingUsageMeter) Refund(*UsageReservation, string, string) (UsageSettlement, error) {
+	meter.refunds++
+	return UsageSettlement{CreditsRemaining: 100}, nil
 }
 
 func TestAgentRouterUsesTierWithoutChangingBillingIdentity(t *testing.T) {
