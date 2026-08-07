@@ -60,7 +60,11 @@ describe("SpaceLibraryHeader", () => {
     expect(scale?.querySelector('button[aria-label="Zoom in"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Thumbnail density"]')).toBeNull();
     expect(container.querySelector('[aria-label="Library collections"]')).toBeNull();
-    expect(container.querySelector('input[aria-label="Search Library"]')).not.toBeNull();
+    expect(
+      container.querySelector(
+        'button[aria-label="Search Library"], input[aria-label="Search Library"]',
+      ),
+    ).not.toBeNull();
     expect(
       [...container.querySelectorAll("button")].some((button) => button.textContent === "Select"),
     ).toBe(false);

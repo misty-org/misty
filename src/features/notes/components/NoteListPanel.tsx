@@ -4,7 +4,7 @@ import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
 import { relativeTime } from "@/features/notes/noteFilters";
 import { SyncErrorNotice } from "./NotesConnectionCards";
 
-const listPanelClass = "grid h-full min-h-[200px] overflow-hidden";
+const listPanelClass = "flex flex-col min-h-0 overflow-hidden";
 
 const listHeaderClass = "flex h-9 shrink-0 items-center justify-between gap-2 px-2";
 
@@ -16,12 +16,7 @@ const rowSelectedClass = "bg-charcoal-active text-cream-bright";
 export function NoteListPanel(props: NoteListPanelProps) {
   const showHeader = props.showHeader !== false;
   return (
-    <section
-      className={`${listPanelClass} ${
-        showHeader ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]"
-      }`}
-      aria-label="Note list"
-    >
+    <section className={listPanelClass} aria-label="Note list">
       {showHeader ? (
         <div className={listHeaderClass}>
           <h2 className="truncate text-sm font-semibold text-cream-muted">{props.spaceName}</h2>

@@ -4,6 +4,10 @@ export function settingsIndexToThemeMode(_index: number): AppThemeMode {
   return "dark";
 }
 
+export function themeModeToSettingsIndex(_mode: AppThemeMode): number {
+  return 0;
+}
+
 export const useAppThemeStore = create<AppThemeStore>()((set) => ({
   resolvedTheme: "dark",
   themeMode: "dark",

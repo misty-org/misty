@@ -30,12 +30,13 @@ export function SpaceSidebarLink({
 function sidebarLinkClass(isActive: boolean) {
   return cn(
     [
-      "relative flex h-9 min-w-0",
+      "misty-marker-host relative flex h-9 min-w-0",
       "items-center gap-2 rounded-md px-2.5 text-sm no-underline outline-none",
       "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     ].join(" "),
-    // Selection is an edge marker, not a filled panel, and hovering only
-    // brightens the label. See the marker rules in ui/styles/styles.css.
+    // Selection is an edge marker, not a filled panel. Every row is a marker
+    // host so hovering previews the marker; the active row grows it to full
+    // height. See the marker rules in ui/styles/styles.css.
     isActive
       ? "misty-active-marker-side text-cream-bright font-medium"
       : "text-cream-muted hover:text-cream",

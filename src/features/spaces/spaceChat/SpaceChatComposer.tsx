@@ -1,5 +1,5 @@
 import { useId, type FormEvent, type KeyboardEvent } from "react";
-import { Plus, Send } from "lucide-react";
+import { Palette, Plus, Send } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -159,6 +159,15 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
               aria-label="Mention someone"
             >
               <span aria-hidden="true">@</span>
+            </InputGroupButton>
+            <InputGroupButton
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              aria-label="Theme & color palette"
+              title="Color palette"
+            >
+              <Palette className="size-3.5" />
             </InputGroupButton>
             <InputGroupText className="ml-auto tabular-nums">
               {draft.text.length}/{MAX_MESSAGE_LENGTH}

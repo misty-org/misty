@@ -67,12 +67,15 @@ export function DrawingHeader(props: {
   };
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-charcoal-border/60 bg-charcoal-bg px-3">
+    <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <Input
           value={title}
           aria-label="Drawing title"
-          className="h-8 max-w-md border-transparent bg-transparent px-2 font-medium shadow-none hover:border-charcoal-border focus-visible:border-charcoal-border"
+          className={cn(
+            "h-8 max-w-md border-transparent bg-transparent px-2 text-sm font-semibold shadow-none",
+            "hover:border-charcoal-border focus-visible:border-charcoal-border",
+          )}
           onChange={(event) => setTitle(event.target.value)}
           onBlur={() => void saveTitle()}
           onKeyDown={(event) => {

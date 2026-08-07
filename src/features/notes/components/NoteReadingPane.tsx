@@ -23,7 +23,8 @@ const NoteBlockEditor = lazy(() => import("./NoteBlockEditor"));
 
 const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 
-const headerClass = "shrink-0 border-b border-charcoal-border px-5 py-3.5";
+const headerClass =
+  "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5";
 
 const noteBodyClass = "w-full px-[clamp(24px,4vw,56px)] py-6";
 
@@ -77,142 +78,140 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
   return (
     <article className={paneClass} aria-label={note.title}>
       <header className={headerClass}>
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[17px] font-semibold leading-tight text-cream">
-              {note.title}
-            </h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-cream-muted">
-              <span>{note.spaceName}</span>
-              <span aria-hidden="true">·</span>
-              <span>Updated {relativeTime(note.updatedAt)}</span>
-              <NoteSyncIndicator status={note.syncStatus} className="ml-0.5" />
-            </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="m-0 truncate text-sm font-semibold leading-tight text-cream">
+            {note.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-cream-muted">
+            <span>{note.spaceName}</span>
+            <span aria-hidden="true">·</span>
+            <span>Updated {relativeTime(note.updatedAt)}</span>
+            <NoteSyncIndicator status={note.syncStatus} className="ml-0.5" />
           </div>
+        </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            {props.onToggleFavorite ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={note.favorite ? "Remove from favorites" : "Add to favorites"}
-                className="size-8"
-                onClick={() => props.onToggleFavorite?.(note.id)}
-              >
-                <Star size={14} className={cn(note.favorite && "fill-sage-fg text-sage-fg")} />
-              </Button>
-            ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {props.onToggleFavorite ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={note.favorite ? "Remove from favorites" : "Add to favorites"}
+              className="size-8"
+              onClick={() => props.onToggleFavorite?.(note.id)}
+            >
+              <Star size={14} className={cn(note.favorite && "fill-sage-fg text-sage-fg")} />
+            </Button>
+          ) : null}
 
-            {props.onDelete && !editing ? (
-              <AlertDialog
-                open={deleteOpen}
-                onOpenChange={(open) => {
-                  setDeleteOpen(open);
-                  if (!open) setDeleteError("");
-                }}
-              >
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 text-cream-muted hover:text-cream-bright"
-                    title="Delete note"
-                    aria-label="Delete note"
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this note?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      “{note.title}” and its collaborative history will be permanently removed.
-                    </AlertDialogDescription>
-                    {deleteError ? (
-                      <p className="m-0 text-sm text-cream-bright" role="alert">
-                        {deleteError}
-                      </p>
-                    ) : null}
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
-                      disabled={deleting}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        if (deleting) return;
-                        setDeleting(true);
-                        setDeleteError("");
-                        void props
-                          .onDelete?.(note.id)
-                          .then(() => setDeleteOpen(false))
-                          .catch((reason: unknown) => {
-                            setDeleteError(
-                              reason instanceof Error && reason.message
-                                ? reason.message
-                                : "Could not delete this note.",
-                            );
-                          })
-                          .finally(() => setDeleting(false));
-                      }}
-                    >
-                      {deleting ? "Deleting…" : "Delete note"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : null}
-
-            {editable ? (
-              editing ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    onClick={() => {
-                      setDraft(noteContent(note));
-                      props.onEditingNoteChange?.(undefined);
-                    }}
-                  >
-                    <X size={13} />
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    onClick={() => {
-                      if (props.onSaveContent) {
-                        props.onSaveContent(note.id, draft);
-                      } else {
-                        props.onSaveBody?.(note.id, draft.bodyMarkdown ?? draft.body);
-                      }
-                      props.onEditingNoteChange?.(undefined);
-                    }}
-                  >
-                    <Check size={13} />
-                    Save
-                  </Button>
-                </>
-              ) : (
+          {props.onDelete && !editing ? (
+            <AlertDialog
+              open={deleteOpen}
+              onOpenChange={(open) => {
+                setDeleteOpen(open);
+                if (!open) setDeleteError("");
+              }}
+            >
+              <AlertDialogTrigger asChild>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-cream-muted hover:text-cream-bright"
+                  title="Delete note"
+                  aria-label="Delete note"
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    “{note.title}” and its collaborative history will be permanently removed.
+                  </AlertDialogDescription>
+                  {deleteError ? (
+                    <p className="m-0 text-sm text-cream-bright" role="alert">
+                      {deleteError}
+                    </p>
+                  ) : null}
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-charcoal-active text-cream-bright hover:bg-charcoal-active"
+                    disabled={deleting}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      if (deleting) return;
+                      setDeleting(true);
+                      setDeleteError("");
+                      void props
+                        .onDelete?.(note.id)
+                        .then(() => setDeleteOpen(false))
+                        .catch((reason: unknown) => {
+                          setDeleteError(
+                            reason instanceof Error && reason.message
+                              ? reason.message
+                              : "Could not delete this note.",
+                          );
+                        })
+                        .finally(() => setDeleting(false));
+                    }}
+                  >
+                    {deleting ? "Deleting…" : "Delete note"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+
+          {editable ? (
+            editing ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
                   size="sm"
                   className="h-8 gap-1.5"
-                  onClick={() => props.onEditingNoteChange?.(note.id)}
+                  onClick={() => {
+                    setDraft(noteContent(note));
+                    props.onEditingNoteChange?.(undefined);
+                  }}
                 >
-                  <PenLine size={13} />
-                  Edit
+                  <X size={13} />
+                  Cancel
                 </Button>
-              )
-            ) : null}
-          </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  onClick={() => {
+                    if (props.onSaveContent) {
+                      props.onSaveContent(note.id, draft);
+                    } else {
+                      props.onSaveBody?.(note.id, draft.bodyMarkdown ?? draft.body);
+                    }
+                    props.onEditingNoteChange?.(undefined);
+                  }}
+                >
+                  <Check size={13} />
+                  Save
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => props.onEditingNoteChange?.(note.id)}
+              >
+                <PenLine size={13} />
+                Edit
+              </Button>
+            )
+          ) : null}
         </div>
       </header>
 

@@ -1,5 +1,22 @@
 @config "../../../tailwind.config.js";
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* Charcoal/cream palette. `inline` so utilities compile to literal colours
+   rather than var() lookups. */
+@theme inline {
+  --color-charcoal-workspace: #100f0e;
+  --color-charcoal-bg: #141312;
+  --color-charcoal-sidebar: #171615;
+  --color-charcoal-card: #1a1918;
+  --color-charcoal-border: #292624;
+  --color-charcoal-hover: #2e2b29;
+  --color-charcoal-active: #443e38;
+
+  --color-cream: #e6e1da;
+  --color-cream-bright: #f5f2ed;
+  --color-cream-muted: #948d84;
+}
 
 @layer base {
   * {
@@ -87,15 +104,21 @@
   :root {
     --misty-marker: #e6e1da;
     --misty-marker-size: 3px;
+    /* The sidebar pads its children by 12px (px-3). The marker cancels that
+       padding so it sits flush against the panel edge instead of floating
+       inside it. Any surface with different padding overrides this locally. */
+    --misty-marker-inset: 12px;
   }
 
   .misty-active-marker-side,
-  .misty-active-marker-bottom {
+  .misty-active-marker-bottom,
+  .misty-marker-host {
     position: relative;
   }
 
   .misty-active-marker-side::before,
-  .misty-active-marker-bottom::after {
+  .misty-active-marker-bottom::after,
+  .misty-marker-host::before {
     position: absolute;
     z-index: 1;
     display: block;
@@ -104,15 +127,47 @@
     pointer-events: none;
   }
 
-  .misty-active-marker-side::before {
+  /* One geometry for the side marker, whether it is showing because the row is
+     active or because it is hovered. */
+  .misty-active-marker-side::before,
+  .misty-marker-host::before {
     top: 6px;
     bottom: 6px;
-    left: 0;
+    left: calc(var(--misty-marker-inset) * -1);
     width: var(--misty-marker-size);
     border-radius: 0 999px 999px 0;
     transform-origin: center;
+    transition:
+      scale 220ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 160ms linear;
+  }
+
+  /* Hosts start collapsed; hovering previews a short, dimmed marker. */
+  .misty-marker-host::before {
+    opacity: 0;
+    scale: 1 0;
+  }
+
+  .misty-marker-host:hover::before,
+  .misty-marker-host:focus-visible::before {
+    opacity: 0.55;
+    scale: 1 0.45;
+  }
+
+  /* Active wins over hover and grows to the full row. */
+  .misty-active-marker-side::before,
+  .misty-marker-host.misty-active-marker-side::before,
+  .misty-marker-host.misty-active-marker-side:hover::before {
+    opacity: 1;
     scale: 1 1;
-    transition: scale 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Grow in rather than snapping when a row becomes active. */
+  @starting-style {
+    .misty-active-marker-side::before {
+      opacity: 0;
+      scale: 1 0;
+    }
   }
 
   .misty-active-marker-bottom::after {
@@ -145,7 +200,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .misty-active-marker-side::before {
+    .misty-active-marker-side::before,
+    .misty-marker-host::before {
       transition: none;
     }
   }
