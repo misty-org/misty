@@ -46,10 +46,17 @@ export const navItemLabelBaseClass =
   "block max-w-[60px] truncate text-center text-[10px] font-medium leading-tight text-current";
 export const navItemLabelActiveClass = "text-cream-bright";
 
+// Icon-only nav buttons (no label row) still occupy the full 66px rail slot
+// so they line up with the labeled items above them.
+export const navIconOnlyItemBaseClass = [
+  "grid h-[66px] w-16 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
+  "text-cream-muted no-underline shadow-none transition-colors hover:text-cream-bright",
+].join(" ");
+
 export const profileDockClass = [
-  "relative grid size-12 shrink-0 place-items-center rounded-full border border-charcoal-border",
-  "bg-charcoal-card p-0 text-base font-bold text-cream-bright transition-colors",
-  "hover:text-cream-bright",
+  "group/profile relative grid size-[50px] shrink-0 place-items-center rounded-full border-0 bg-transparent p-0",
+  "text-cream-muted outline-none shadow-none transition-colors hover:bg-transparent",
+  "focus-visible:ring-2 focus-visible:ring-charcoal-active",
 ].join(" ");
 
 export const profilePopoverClass = [

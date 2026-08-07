@@ -21,7 +21,6 @@ const SECTIONS: SettingsSection[] = [
   "privacy",
   "transfers",
   "search",
-  "notifications",
   "shortcuts",
   "advanced",
 ];
@@ -137,16 +136,16 @@ describe("SettingsWorkspace", () => {
     expect(heading?.textContent).toBe("Appearance");
   });
 
-  it("uses the solid warm active state for the selected settings section", async () => {
+  it("marks the selected settings section with the active edge marker", async () => {
     await renderWorkspace("general");
 
     const nav = container.querySelector('nav[aria-label="Settings sections"]');
     const activeItem = nav?.querySelector('button[aria-current="page"]');
     const inactiveItem = nav?.querySelector('button:not([aria-current="page"])');
 
-    expect(activeItem?.className).toContain("bg-charcoal-active");
+    expect(activeItem?.className).toContain("misty-active-marker-side");
     expect(activeItem?.className).toContain("text-cream-bright");
-    expect(inactiveItem?.className).toContain("hover:bg-charcoal-hover");
-    expect(inactiveItem?.className).not.toContain("bg-charcoal-active");
+    expect(inactiveItem?.className).toContain("misty-marker-host");
+    expect(inactiveItem?.className).not.toContain("misty-active-marker-side");
   });
 });

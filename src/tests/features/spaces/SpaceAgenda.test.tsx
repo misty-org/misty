@@ -166,7 +166,7 @@ describe("SpaceAgenda", () => {
     expect(document.querySelector('[aria-label="Google Calendar"]')).not.toBeNull();
   });
 
-  it("uses an event-first toolbar and zooms the timeline precision", async () => {
+  it("uses the shared top-bar layout and zooms the timeline precision", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/week?date=2026-08-04"]}>
@@ -177,7 +177,7 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector("h1")).toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("Agenda");
     expect(container.querySelector('[aria-label="Go to today"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Calendar view"]')?.textContent).toContain("Week");
     expect(container.querySelector('[aria-label="Calendar time interval"]')?.textContent).toContain(

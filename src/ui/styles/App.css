@@ -85,21 +85,21 @@
 }
 
 .app-pages-root ::-webkit-scrollbar-track {
-  background: #141312;
+  background: #131313;
 }
 
 .app-pages-root ::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #443e38;
+  background: #3e3e3e;
 }
 
 .app-pages-root ::-webkit-scrollbar-thumb:hover {
-  background: #948d84;
+  background: #8c8c8c;
 }
 
 .app-pages-root .misty-scrollbar,
 .app-pages-root .misty-transient-scrollbar-active {
-  scrollbar-color: #443e38 #141312;
+  scrollbar-color: #3e3e3e #131313;
   scrollbar-width: thin;
 }
 

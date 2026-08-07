@@ -11,7 +11,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-charcoal-active text-cream-bright hover:bg-[#504942]",
+        default: "bg-charcoal-active text-cream-bright hover:bg-[#494949]",
         destructive:
           "border-charcoal-active bg-charcoal-card text-cream-bright hover:bg-charcoal-active focus-visible:border-charcoal-active focus-visible:ring-charcoal-active/40",
         // Unfilled variants brighten on hover rather than growing a background:

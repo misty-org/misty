@@ -5,17 +5,48 @@
 /* Charcoal/cream palette. `inline` so utilities compile to literal colours
    rather than var() lookups. */
 @theme inline {
-  --color-charcoal-workspace: #100f0e;
-  --color-charcoal-bg: #141312;
-  --color-charcoal-sidebar: #171615;
-  --color-charcoal-card: #1a1918;
-  --color-charcoal-border: #292624;
-  --color-charcoal-hover: #2e2b29;
-  --color-charcoal-active: #443e38;
+  --color-charcoal-workspace: #0f0f0f;
+  --color-charcoal-bg: #131313;
+  --color-charcoal-sidebar: #161616;
+  --color-charcoal-card: #191919;
+  --color-charcoal-border: #262626;
+  --color-charcoal-hover: #2b2b2b;
+  --color-charcoal-active: #3e3e3e;
 
-  --color-cream: #e6e1da;
-  --color-cream-bright: #f5f2ed;
-  --color-cream-muted: #948d84;
+  --color-cream: #e0e0e0;
+  --color-cream-bright: #f1f1f1;
+  --color-cream-muted: #8c8c8c;
+
+  --color-sage-fg: #a3bfab;
+  --color-sage-bg: #28312b;
+  --color-status-green: #a3bfab;
+
+  /* Gruvbox-inspired pastels, deterministically assigned per person so the
+     app doesn't read as entirely monochrome. Kept soft (no neon) — these are
+     backgrounds behind dark ink text, not accents on the dark UI itself. */
+  --color-avatar-red: #eab7ab;
+  --color-avatar-orange: #f0c38e;
+  --color-avatar-yellow: #f0d58c;
+  --color-avatar-green: #c5cf8e;
+  --color-avatar-aqua: #a8d1b3;
+  --color-avatar-blue: #a0c4d4;
+  --color-avatar-purple: #d3b3c9;
+  --color-avatar-gray: #d5c9b8;
+  --color-avatar-ink: #3c3836;
+
+  /* Agent accent presets, same pastel family as the avatar palette. */
+  --color-agent-indigo: #a7b4d8;
+  --color-agent-violet: #c9b3d9;
+  --color-agent-blue: #a0c4d4;
+  --color-agent-emerald: #a8d1b3;
+  --color-agent-amber: #eec87a;
+  --color-agent-rose: #e8b8c0;
+
+  /* One consistent look for every @mention, in the composer and in sent
+     messages — a solid, saturated tag rather than the soft avatar pastels,
+     so a mention reads as an action, not just a label. */
+  --color-mention-bg: #5865f2;
+  --color-mention-fg: #f5f2ed;
 }
 
 @layer base {
@@ -40,8 +71,8 @@
   body {
     margin: 0;
     overflow: hidden;
-    background-color: #141312;
-    color: #e6e1da;
+    background-color: #131313;
+    color: #e0e0e0;
     font-family:
       system-ui,
       -apple-system,
@@ -54,7 +85,7 @@
 
   #root {
     overflow: hidden;
-    background-color: #141312;
+    background-color: #131313;
   }
 
   button,
@@ -87,8 +118,8 @@
   }
 
   ::selection {
-    background-color: #443e38;
-    color: #f5f2ed;
+    background-color: #3e3e3e;
+    color: #f1f1f1;
   }
 }
 
@@ -102,7 +133,7 @@
  */
 @layer components {
   :root {
-    --misty-marker: #e6e1da;
+    --misty-marker: #e0e0e0;
     --misty-marker-size: 3px;
     /* The sidebar pads its children by 12px (px-3). The marker cancels that
        padding so it sits flush against the panel edge instead of floating

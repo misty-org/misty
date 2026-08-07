@@ -1,17 +1,8 @@
 import SettingsWorkspace from "@/pages/Settings/desktop";
 import { ProvidersWorkspace } from "@/pages/Providers/desktop";
-import { ActivityFeed } from "./ActivityFeed";
 import { WorkspaceOverlay } from "./WorkspaceOverlay";
 
 type OverlayProps = { open: boolean; onClose: () => void };
-
-export function ActivityOverlay(props: OverlayProps) {
-  return (
-    <WorkspaceOverlay {...props} ariaLabel="Activity">
-      <ActivityFeed onClose={props.onClose} />
-    </WorkspaceOverlay>
-  );
-}
 
 export function SettingsOverlay(props: OverlayProps) {
   return (

@@ -7,10 +7,10 @@ import { cn } from "@/ui";
 
 const statusClasses: Record<StatusTone, string> = {
   neutral: "border-charcoal-border bg-charcoal-card text-cream-muted",
-  info: "border-charcoal-active/25 bg-charcoal-active text-cream-bright",
-  success: "border-status-green/25 bg-status-green text-sage-fg",
-  warning: "border-sage-fg/25 bg-sage-bg text-sage-fg",
-  danger: "border-charcoal-active/25 bg-charcoal-active text-cream-bright",
+  info: "border-transparent bg-avatar-blue text-avatar-ink",
+  success: "border-transparent bg-status-green text-avatar-ink",
+  warning: "border-transparent bg-avatar-yellow text-avatar-ink",
+  danger: "border-transparent bg-avatar-red text-avatar-ink",
 };
 
 function StatusBadge({

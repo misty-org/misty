@@ -4,12 +4,12 @@ import {
   Badge,
   Button,
   Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   Separator,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
 } from "@/ui";
 import type {
   GoogleCalendarChoice,
@@ -51,16 +51,16 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
   );
 
   return (
-    <Sheet open onOpenChange={(open) => !open && props.onClose()}>
-      <SheetContent className="w-[min(480px,96vw)] bg-charcoal-bg p-0 sm:max-w-[480px]">
-        <SheetHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
-          <SheetTitle>Calendars</SheetTitle>
-          <SheetDescription>
+    <Dialog open onOpenChange={(open) => !open && props.onClose()}>
+      <DialogContent className="w-[min(480px,96vw)] max-h-[85dvh] gap-0 overflow-hidden bg-charcoal-bg p-0 sm:max-w-[480px]">
+        <DialogHeader className="border-b border-charcoal-border/60 px-5 py-4 pr-14 text-left">
+          <DialogTitle>Calendars</DialogTitle>
+          <DialogDescription>
             Choose which calendars are visible to members of this Space.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="min-h-0 overflow-auto p-5">
+        <div className="min-h-0 max-h-[calc(85dvh-5rem)] overflow-auto p-5">
           {props.visibility && props.onVisibilityChange ? (
             <>
               <h3 className="mb-2 mt-0 text-sm font-semibold">Visible calendars</h3>
@@ -196,8 +196,8 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
             </>
           ) : null}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

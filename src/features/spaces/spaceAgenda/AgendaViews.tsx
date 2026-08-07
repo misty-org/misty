@@ -158,16 +158,16 @@ export function AgendaTimelineView({
             <div className="border-r border-charcoal-border/60" />
             {days.map((day) => (
               <div
-                className="flex items-center justify-center gap-2 border-r border-charcoal-border/60 px-2 text-center"
+                className="flex items-center justify-center gap-1.5 border-r border-charcoal-border/60 px-2 text-center"
                 key={day.toISOString()}
               >
-                <span className="text-[11px] font-medium uppercase tracking-wide text-cream-muted">
+                <span className="text-xs font-medium text-cream-muted">
                   {day.toLocaleDateString(undefined, { weekday: "short" })}
                 </span>
                 <span
                   className={cn(
-                    "grid size-7 place-items-center rounded-full text-sm font-semibold",
-                    isSameDay(day, now) && "bg-cream text-charcoal-bg",
+                    "grid size-6 place-items-center rounded-full text-[13px] text-cream",
+                    isSameDay(day, now) && "bg-cream font-semibold text-charcoal-bg",
                   )}
                 >
                   {day.getDate()}
@@ -207,16 +207,12 @@ export function AgendaTimelineView({
         >
           <div className="relative border-r border-charcoal-border/60" aria-hidden="true">
             {hours.map((hour) => {
-              const labelTop = hour === 0 ? 8 : hour * hourHeight;
               if (showNow && currentTimeMatchesHour && hour === now.getHours()) return null;
               return (
                 <span
-                  className={cn(
-                    "absolute right-3 text-[11px] text-cream-muted",
-                    hour === 0 ? "top-2" : "-translate-y-1/2",
-                  )}
+                  className="absolute right-3 text-[11px] text-cream-muted"
                   key={hour}
-                  style={hour === 0 ? undefined : { top: labelTop }}
+                  style={{ top: hour * hourHeight + 8 }}
                 >
                   {formatHour(hour)}
                 </span>
@@ -259,12 +255,12 @@ export function AgendaTimelineView({
               aria-label={`Current time ${currentTimeLabel}`}
             >
               <span className="absolute left-[72px] right-0 flex -translate-y-1/2 items-center">
-                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-charcoal-active" />
-                <span className="-ml-1.5 h-px w-2 shrink-0 bg-charcoal-active" />
-                <span className="shrink-0 whitespace-nowrap rounded bg-charcoal-bg px-1.5 py-0.5 text-[10px] font-semibold text-cream-bright">
+                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-avatar-red" />
+                <span className="-ml-1.5 h-px w-2 shrink-0 bg-avatar-red" />
+                <span className="shrink-0 whitespace-nowrap rounded bg-charcoal-bg px-1.5 py-0.5 text-[10px] font-semibold text-avatar-red">
                   {currentTimeLabel}
                 </span>
-                <span className="h-px min-w-0 flex-1 bg-charcoal-active" />
+                <span className="h-px min-w-0 flex-1 bg-avatar-red" />
               </span>
             </div>
           ) : null}
