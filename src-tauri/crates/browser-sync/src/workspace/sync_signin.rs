@@ -34,7 +34,9 @@ impl WorkspaceSync {
             op.slots.iter().any(|s| is_signin(&s.view_node_id, s.slot))
         });
         Ok(SigninStatus {
-            writer: self.roster_confirmed && self.driving() == Some(workspace) && self.lease_ready(),
+            writer: self.roster_confirmed
+                && self.driving() == Some(workspace)
+                && self.lease_ready(),
             current: self.roster_confirmed && self.current.contains(workspace),
             server: self
                 .states
@@ -64,7 +66,9 @@ impl WorkspaceSync {
         if writes.is_empty() || writes.iter().any(|(kind, _)| !is_signin_slot(*kind)) {
             return Err(Error::Invalid);
         }
-        let mut binding = store.device_signin(root, workspace)?.ok_or(Error::Recovery)?;
+        let mut binding = store
+            .device_signin(root, workspace)?
+            .ok_or(Error::Recovery)?;
         binding.written = written;
         binding.validate()?;
         let node = workspace.to_owned();

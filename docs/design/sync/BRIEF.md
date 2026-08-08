@@ -2,6 +2,10 @@
 
 Approved for implementation, revision 2 (September 29, 2026), with the user’s subsequent corrections: black, white and gray only; all preferences use the server account record. Keep the incumbent navbar without its Account footer and show cohesive sections under small headers. `mockup.html` is a historical illustrative review artifact. `live/` renders the actual implementation with isolated sample data; it never connects to a real account.
 
+## October 1 popup simplification
+
+The user approved direct implementation of a minimal popup: icon, title, one small status label, and device actions labeled **Open**. This supersedes the earlier popup-specific requirements for visible descriptive paragraphs and unavailable-action explanations. The popup has no device-section heading or per-device dividers. Detailed sync status remains available to assistive technology and in Settings; required recovery forms and actionable errors still appear when needed. Settings keeps its existing full explanations and controls. The popup has no routine Sync heading or status row, and starts directly with devices when healthy. Every device row has a right-aligned **Open** button, disabled when already open or unavailable. Device rows show one label: This device, Open here, connection state, or Opening…. **Manage sync** uses slightly larger text and no leading icon. Actionable recovery status and forms still appear when required.
+
 ## Purpose and visual direction
 
 Misty desktop users should be able to tell what is syncing, why it stopped, and how to continue on this device. This is an Operate surface. Use black, white and gray only, including status, selection and focus indicators. Preserve the existing charcoal theme, compact typography, bordered settings sections and shared controls. The mockup mirrors those primitives; production must use `DesktopSettingsSection`, `DesktopSettingsRow` and `SettingsControls`, not introduce a parallel settings component system.

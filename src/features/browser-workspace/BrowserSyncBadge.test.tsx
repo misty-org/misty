@@ -93,10 +93,20 @@ async function open(settings = vi.fn()) {
   await act(async () => fireEvent.click(screen.getByRole("button", { name: /^Sync:/ })));
   return settings;
 }
-it("leads with status and detail, shows visible tabs actions and no mode switches", async () => {
+it("shows devices with Open actions without a Sync heading or status row", async () => {
   const settings = await open();
   const popup = screen.getByRole("dialog", { name: "Sync" });
-  expect(within(popup).getByText(/Your workspace and account settings are synced/)).toBeTruthy();
+  expect(within(popup).queryByText(/Your workspace and account settings are synced/)).toBeNull();
+  expect(within(popup).queryByText("Sync")).toBeNull();
+  expect(within(popup).queryByText("Up to date")).toBeNull();
+  expect(within(popup).getAllByText("Open")).toHaveLength(2);
+  expect(
+    within(popup).getByRole<HTMLButtonElement>("button", { name: "Open tabs from MacBook here" })
+      .disabled,
+  ).toBe(true);
+  expect(
+    within(popup).getByRole("button", { name: "Open tabs from Office here" }).textContent,
+  ).toBe("Open");
   expect(within(popup).getByRole("button", { name: "Open tabs from Office here" })).toBeTruthy();
   expect(within(popup).queryByRole("switch")).toBeNull();
   expect(popup.textContent).not.toMatch(/take over|seat|Switch to/);
@@ -116,7 +126,8 @@ it("unlocks with the saved key in place", async () => {
   );
   expect(settings).not.toHaveBeenCalled();
   expect(screen.getByRole("dialog")).toBeTruthy();
-  expect(screen.getByText("Up to date")).toBeTruthy();
+  expect(screen.queryByText("Up to date")).toBeNull();
+  expect(screen.getByText("MacBook")).toBeTruthy();
 });
 it("offers one reconnect action and replaces it with the re-enrollment form", async () => {
   useBrowserSyncStore.setState({ issue: "sync_device_forbidden" });
@@ -143,7 +154,7 @@ it("waits for acknowledged opening and keeps account transitions safe", async ()
     fireEvent.click(screen.getByRole("button", { name: "Open tabs from Office here" })),
   );
   expect(mocks.claim).toHaveBeenCalledWith("s", "other");
-  expect(screen.getByText("Waiting for the device to confirm…")).toBeTruthy();
+  expect(screen.getAllByText("Opening…").length).toBeGreaterThan(0);
   // Opening moves this machine onto the workspace; the online owner keeps its lease.
   act(() =>
     useBrowserSyncStore.setState({
