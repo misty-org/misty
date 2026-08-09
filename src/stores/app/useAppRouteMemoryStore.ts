@@ -1,9 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-const defaultAppRoute = "/spaces";
+const defaultAppRoute = "/home";
 const defaultSpacesRoute = "/spaces";
-const desktopRememberableRoutes = ["/spaces"];
+const desktopRememberableRoutes = [
+  "/home",
+  "/files",
+  "/agents",
+  "/code",
+  "/extensions",
+  "/transfers",
+  "/spaces",
+];
 const validSpaceSections = new Set([
   "chat",
   "planner",
@@ -14,13 +22,7 @@ const validSpaceSections = new Set([
   "members",
   "settings",
 ]);
-const validSettingsSections = new Set([
-  "general",
-  "members",
-  "chat",
-  "connections",
-  "suggestions",
-]);
+const validSettingsSections = new Set(["general", "members", "chat", "connections", "suggestions"]);
 const validTaskViews = new Set(["board", "list", "calendar"]);
 
 export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
@@ -71,8 +73,6 @@ export const useAppRouteMemoryStore = create<AppRouteMemoryStore>()(
 export function isRememberableAppRoute(path: string): boolean {
   const pathname = pathnameFromRoute(path);
   return (
-    pathname === "/files" ||
-    pathname === "/transfers" ||
     pathname === "/account" ||
     desktopRememberableRoutes.includes(pathname) ||
     pathname.startsWith("/spaces/")

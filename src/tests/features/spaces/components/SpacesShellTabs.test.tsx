@@ -13,9 +13,6 @@ vi.mock("@/features/auth/AuthContext", () => ({
 vi.mock("@/features/spaces/components/SpacePanelContent", () => ({
   SpacePanelContent: () => <div>Space panel</div>,
 }));
-vi.mock("@/features/spaces/components/SpacesWorkspaceSurface", () => ({
-  SpacesWorkspaceSurface: ({ tab }: { tab: { kind: string } }) => <div>{tab.kind}</div>,
-}));
 vi.mock("@/features/spaces/spacesShell/CreateSpaceDialog", () => ({
   CreateSpaceDialog: () => null,
 }));
@@ -63,7 +60,7 @@ describe("SpacesShell workspace tabs", () => {
     container.remove();
   });
 
-  it("opens File Manager without creating a duplicate Space tab", async () => {
+  it("opens another Space tab without exposing global tools", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/notes"]}>
@@ -80,14 +77,23 @@ describe("SpacesShell workspace tabs", () => {
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('[aria-label="Open File Manager"]')
+        .querySelector<HTMLButtonElement>('[aria-label="New Space tab"]')
+        ?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    await act(async () => {
+      [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+        .find((option) => option.textContent === "Chat")
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     const session =
       useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-1")];
-    expect(session.tabs.map((tab) => tab.kind)).toEqual(["space", "file-manager"]);
-    expect(session.tabs.find((tab) => tab.id === session.activeTabId)?.kind).toBe("file-manager");
+    expect(session.tabs.map((tab) => tab.kind)).toEqual(["space", "space"]);
+    expect(session.tabs.find((tab) => tab.id === session.activeTabId)).toMatchObject({
+      kind: "space",
+      route: "/spaces/space-1/chat",
+    });
+    expect(container.querySelector('[aria-label="Open File Manager"]')).toBeNull();
   });
 
   it("mounts the Misty redirect whenever no Space is selected", async () => {
@@ -106,7 +112,7 @@ describe("SpacesShell workspace tabs", () => {
     expect(container.textContent).toContain("Opening default Misty Space");
   });
 
-  it("opens Agents as a new active workspace tab", async () => {
+  it("keeps global destinations out of the Space tray", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/notes"]}>
@@ -119,16 +125,9 @@ describe("SpacesShell workspace tabs", () => {
       );
     });
 
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[aria-label="Open Agents"]')
-        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    const session =
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-1")];
-    expect(session.tabs.map((tab) => tab.kind)).toEqual(["space", "agents"]);
-    expect(session.tabs.find((tab) => tab.id === session.activeTabId)?.kind).toBe("agents");
+    expect(container.querySelector('[aria-label="Open Agents"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Open Code"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Open Extensions"]')).toBeNull();
   });
 
   it("keeps invited Space content locked until acceptance", async () => {
@@ -172,7 +171,7 @@ describe("SpacesShell workspace tabs", () => {
 
     expect(container.textContent).toContain("Trying to reconnect to Misty");
     expect(container.textContent).not.toContain("Private Space content");
-    expect(container.querySelector('[aria-label="Open File Manager"]')).toBeNull();
+    expect(container.querySelector('[aria-label="New Space tab"]')).toBeNull();
   });
 });
 

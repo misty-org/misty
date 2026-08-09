@@ -1,46 +1,38 @@
-import { Plus } from "lucide-react";
-import { ChromeTabStrip } from "@/features/workspace";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/ui";
-import type {
-  SpacesTab,
-  SpacesTabsSession,
-  WorkspaceTabKind,
-} from "@/stores/spaces/useSpacesTabsStore";
-import { SpacesUtilityTray, workspaceToolDefinitions } from "./SpacesUtilityTray";
+import { LibraryBig, ListChecks, MessageCircle, Notebook } from "lucide-react";
+import { ChromeTabStrip, NewTabMenu } from "@/features/workspace";
+import type { SpacesTab, SpacesTabsSession } from "@/stores/spaces/useSpacesTabsStore";
+
+export type SpaceTabDestination = "journal" | "planner" | "chat" | "library";
+
+const spaceTabOptions = [
+  { id: "journal", label: "Journal", icon: Notebook },
+  { id: "planner", label: "Planner", icon: ListChecks },
+  { id: "chat", label: "Chat", icon: MessageCircle },
+  { id: "library", label: "Library", icon: LibraryBig },
+] satisfies ReadonlyArray<{
+  id: SpaceTabDestination;
+  label: string;
+  icon: typeof Notebook;
+}>;
 
 export function SpacesHeader(props: {
   session: SpacesTabsSession | undefined;
-  onOpenTool: (kind: WorkspaceTabKind) => void;
+  onAddTab: (destination: SpaceTabDestination) => void;
   onCloseTab: (tabId: string) => void;
   onReorderTab: (tabId: string, fromIndex: number, toIndex: number) => void;
   onSelectTab: (tabId: string) => void;
-  onRenameTab: (tabId: string, title: string) => void;
 }) {
   const tabs = props.session?.tabs ?? [];
-  // Only File Manager tabs own their title; a Space tab's comes from its route.
-  const renameableTabIds = new Set(
-    tabs.filter((tab) => tab.kind === "file-manager").map((tab) => tab.id),
-  );
   return (
     <header className="h-[46px] min-w-0 border-b border-charcoal-border/45 bg-charcoal-bg">
       <ChromeTabStrip
         tabs={tabs.map(tabDescriptor)}
         activeTabId={props.session?.activeTabId ?? ""}
-        ariaLabel="Open workspace tools"
-        addTabControl={<NewWorkspaceTabMenu onOpenTool={props.onOpenTool} />}
-        actions={<SpacesUtilityTray onOpenTool={props.onOpenTool} />}
+        ariaLabel="Open Space tabs"
+        addTabControl={<NewSpaceTabButton onAddTab={props.onAddTab} />}
         canCloseTab={() => true}
-        canRenameTab={(tab) => renameableTabIds.has(tab.id)}
         onAddTab={() => undefined}
         onCloseTab={(tab) => props.onCloseTab(tab.id)}
-        onRenameTab={props.onRenameTab}
         onReorderTab={props.onReorderTab}
         onSelectTab={props.onSelectTab}
       />
@@ -48,37 +40,15 @@ export function SpacesHeader(props: {
   );
 }
 
-function NewWorkspaceTabMenu(props: { onOpenTool: (kind: WorkspaceTabKind) => void }) {
+function NewSpaceTabButton(props: { onAddTab: (destination: SpaceTabDestination) => void }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="size-7 rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
-          title="New tab"
-          aria-label="New tab"
-        >
-          <Plus size={15} strokeWidth={2.4} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel>Open a new tab</DropdownMenuLabel>
-        {workspaceToolDefinitions.map(({ kind, label, description, icon: Icon }) => (
-          <DropdownMenuItem
-            key={kind}
-            className="items-start py-2"
-            onSelect={() => props.onOpenTool(kind)}
-          >
-            <Icon className="mt-0.5 size-4" strokeWidth={1.8} />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium">{label}</span>
-              <span className="block text-xs text-cream-muted">{description}</span>
-            </span>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <NewTabMenu
+      ariaLabel="New Space tab"
+      options={spaceTabOptions.map((option) => ({
+        ...option,
+        onSelect: () => props.onAddTab(option.id),
+      }))}
+    />
   );
 }
 

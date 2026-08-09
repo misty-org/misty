@@ -32,7 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/ui";
-import { Command as CommandIcon, Folder, Search } from "lucide-react";
+import { Command as CommandIcon, Folder } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useExplorerStore, type ExplorerCommandQueryMode, useSearchStore } from "@/stores/explorer";
 import type { ExplorerSearchNavigationTarget } from "@/models/interfaces/features/explorer/utils/searchNavigation";
@@ -224,16 +224,18 @@ export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Search files"
-                title="Search files"
-                aria-keyshortcuts="Meta+K Control+K"
-                onClick={() => void useSearchStore.getState().openSearch(props.path)}
+                aria-label="Explorer commands"
+                title="Explorer commands"
+                onClick={() => {
+                  setSearchFocused(true);
+                  props.onCommandQuery(">");
+                }}
               >
-                <Search size={18} />
+                <CommandIcon size={18} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Search files (⌘K)</TooltipContent>
+          <TooltipContent>Explorer commands</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent

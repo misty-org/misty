@@ -52,4 +52,34 @@ describe("MultiPanelWorkspace", () => {
 
     expect(container.querySelector('[role="tablist"]')).not.toBeNull();
   });
+
+  it("lets a workspace provide its own new-tab control", async () => {
+    const store = createMultiPanelStore({ idPrefix: "custom-add-tab" });
+    store.getState().initialize("/Users/demo/Documents", "Documents");
+
+    await act(async () => {
+      root.render(
+        <MultiPanelWorkspace
+          store={store}
+          renderAddTabControl={(_, addTab) => (
+            <button type="button" onClick={() => addTab("/Users/demo", "Home")}>
+              New Home tab
+            </button>
+          )}
+          renderPane={(_, path) => <output>{path}</output>}
+        />,
+      );
+    });
+
+    await act(async () => {
+      [...container.querySelectorAll<HTMLButtonElement>("button")]
+        .find((button) => button.textContent === "New Home tab")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(store.getState().tabs.map((tab) => tab.path)).toEqual([
+      "/Users/demo/Documents",
+      "/Users/demo",
+    ]);
+  });
 });

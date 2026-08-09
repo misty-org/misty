@@ -5,8 +5,6 @@ import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpaceMembersPopover } from "./SpaceMembersPopover";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 
-export { SpacesUtilityTray } from "./SpacesUtilityTray";
-
 export function SpaceManagementNavigation({
   space,
   section,

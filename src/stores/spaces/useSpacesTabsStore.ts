@@ -6,7 +6,8 @@ const maximumOpenTabs = 16;
 const maximumTabTitleLength = 60;
 const pendingSpaceId = "__pending__";
 
-export type WorkspaceTabKind = "space" | "file-manager" | "agents" | "extensions" | "transfers";
+export type WorkspaceTabKind =
+  "space" | "file-manager" | "agents" | "developer" | "extensions" | "transfers";
 
 interface WorkspaceTabBase {
   id: string;
@@ -36,10 +37,15 @@ export interface TransfersWorkspaceTab extends WorkspaceTabBase {
   kind: "transfers";
 }
 
+export interface DeveloperWorkspaceTab extends WorkspaceTabBase {
+  kind: "developer";
+}
+
 export type SpacesTab =
   | SpaceWorkspaceTab
   | FileManagerWorkspaceTab
   | AgentsWorkspaceTab
+  | DeveloperWorkspaceTab
   | ExtensionsWorkspaceTab
   | TransfersWorkspaceTab;
 
@@ -257,7 +263,7 @@ export const useSpacesTabsStore = create<SpacesTabsStore>()(
     }),
     {
       name: "misty:spaces-tabs",
-      version: 2,
+      version: 3,
       partialize: (state) => ({ sessions: state.sessions }),
       migrate: (persistedState, version) => migratePersistedTabs(persistedState, version),
       merge: (persistedState, currentState) => ({
@@ -342,7 +348,10 @@ function createTab(
 }
 
 function normalizeSession(session: SpacesTabsSession, spaceId: string): SpacesTabsSession {
-  const tabs = session.tabs.map((tab, index) => sanitizeTab(tab, spaceId, index));
+  const tabs = session.tabs
+    .filter((tab) => tab.kind === "space")
+    .map((tab, index) => sanitizeTab(tab, spaceId, index));
+  if (!tabs.length) return createSession(spaceId);
   return {
     tabs,
     activeTabId: tabs.some((tab) => tab.id === session.activeTabId)
@@ -363,8 +372,12 @@ function sanitizeSessions(value: unknown): Record<string, SpacesTabsSession> {
     const sourceTabs = Array.isArray(candidate.tabs) ? candidate.tabs : [];
     const tabs = sourceTabs
       .slice(0, maximumOpenTabs)
+      .filter((tab) => isPersistedSpaceTab(tab))
       .map((tab, index) => sanitizeTab(tab, spaceId, index));
-    if (tabs.length === 0) continue;
+    if (tabs.length === 0) {
+      result[key] = createSession(spaceId);
+      continue;
+    }
     result[key] = {
       tabs,
       activeTabId: tabs.some((tab) => tab.id === candidate.activeTabId)
@@ -374,6 +387,10 @@ function sanitizeSessions(value: unknown): Record<string, SpacesTabsSession> {
     };
   }
   return result;
+}
+
+function isPersistedSpaceTab(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && "kind" in value && value.kind === "space");
 }
 
 function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab {
@@ -388,6 +405,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
     "space",
     "file-manager",
     "agents",
+    "developer",
     "extensions",
     "transfers",
   ].includes(String(candidate.kind))
@@ -415,6 +433,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
 
 function workspaceToolTitle(kind: Exclude<WorkspaceTabKind, "space" | "file-manager">): string {
   if (kind === "agents") return "Agents";
+  if (kind === "developer") return "Code";
   return kind === "extensions" ? "Extensions" : "Transfers";
 }
 

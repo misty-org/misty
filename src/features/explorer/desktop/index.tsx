@@ -46,6 +46,7 @@ import { useNavigate } from "react-router-dom";
 import { routes } from "@/routing/paths";
 import { useShallow } from "zustand/react/shallow";
 import { MultiPanelWorkspace } from "@/features/workspace";
+import { createExplorerAddTabControl } from "./ExplorerNewTabControl";
 import { useTransientScrollbars } from "@/hooks/useTransientScrollbars";
 import { isAndroidBuild } from "@/platform/buildTarget";
 import { useAppRouteMemoryStore, useAppStore } from "@/stores/app";
@@ -380,11 +381,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const activeTabSupportsSidePanels = !isChromeTabPath(activeTabPath);
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
-
   useEffect(() => {
     ensureFilesBrowseTab(homePath);
   }, [homePath, workspacePathSignature]);
-
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
@@ -699,8 +698,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       props.workspaceId,
     ],
   );
+  const renderAddTabControl = useMemo(() => createExplorerAddTabControl(homePath), [homePath]);
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
-
   return (
     <ExplorerDragProvider>
       <section
@@ -715,6 +714,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             className="explorer-multipanel"
             canCloseTab={(tab) => canCloseExplorerTab(tab, useMultiPanelStore.getState().tabs)}
             renderBottomBar={resolveExplorerBottomBarRenderer(props.embedded)}
+            renderAddTabControl={renderAddTabControl}
             renderTabActions={renderTabActions}
             renderToolbar={renderToolbar}
             showTabStrip={!props.embedded}

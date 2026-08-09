@@ -13,6 +13,10 @@ export interface MultiPanelWorkspaceProps {
   store?: MultiPanelStoreHook;
   renderToolbar?: (paneId: string, path: string) => ReactNode;
   renderBottomBar?: (tab: MultiPanelTab) => ReactNode;
+  renderAddTabControl?: (
+    activeTab: MultiPanelTab,
+    addTab: (path: string, title?: string) => string,
+  ) => ReactNode;
   renderTabActions?: () => ReactNode;
   showTabStrip?: boolean;
   showDefaultPaneControls?: boolean;

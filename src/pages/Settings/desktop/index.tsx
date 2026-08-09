@@ -4,6 +4,7 @@ import {
   AppWindow,
   ArrowLeftRight,
   Bot,
+  Bell,
   Cloud,
   Copy,
   Eye,
@@ -41,7 +42,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/pages/Settings/DesktopSettingsUI";
-import { memo, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { memo, useEffect, type ChangeEvent, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopUpdaterSettings } from "@/features/updater/DesktopUpdaterSettings";
@@ -58,12 +59,14 @@ import { useOperationQueueStore, useSearchStore } from "@/stores/explorer";
 import { formatDate } from "@/features/explorer/utils/fileFormat";
 import { userFacingErrorText } from "@/lib/format";
 import { hasTauriInternals } from "@/platform/tauri";
+import { NotificationSettings } from "./NotificationSettings";
 
 const appNavItems: NavItem[] = [
   { id: "general", label: "General", icon: Rows3 },
   { id: "app", label: "App", icon: AppWindow },
   { id: "agent", label: "Agents", icon: Bot },
   { id: "appearance", label: "Appearance", icon: Eye },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "privacy", label: "Privacy", icon: Lock },
   { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
   { id: "search", label: "Search & Library", icon: Search },
@@ -78,6 +81,7 @@ const sectionDescriptions: Record<SettingsSection, string> = {
   app: "Updates, version details, and local support information.",
   agent: "Control Agents and the actions they can perform.",
   appearance: "Density, text size, previews, and motion.",
+  notifications: "Choose when important updates should reach you outside Misty.",
   privacy: "Choose what diagnostic data Misty may share.",
   transfers: "Defaults for copies, downloads, and destinations.",
   search: "Keep filenames and connected libraries searchable.",
@@ -199,6 +203,9 @@ function SettingsContent(props: {
       {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
       {props.activeSection === "agent" ? <AgentSettings {...props.controlProps} /> : null}
       {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
+      {props.activeSection === "notifications" ? (
+        <NotificationSettings {...props.controlProps} />
+      ) : null}
       {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
       {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
       {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
@@ -1432,6 +1439,7 @@ export type SettingsSection =
   | "app"
   | "agent"
   | "appearance"
+  | "notifications"
   | "privacy"
   | "transfers"
   | "search"

@@ -22,9 +22,9 @@ afterAll(() => vi.unstubAllGlobals());
 describe("app route memory", () => {
   beforeEach(() => useAppRouteMemoryStore.getState().resetAppRoute());
 
-  it("defaults to the Spaces workspace mode", () => {
+  it("defaults to Home while preserving the Spaces workspace route", () => {
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces",
+      lastAppRoute: "/home",
       lastSpacesRoute: "/spaces",
     });
   });
@@ -36,6 +36,17 @@ describe("app route memory", () => {
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/files",
       lastSpacesRoute: "/spaces/space-2/chat?conversation=group-4",
+    });
+  });
+
+  it("remembers global navbar pages without changing the last Space", () => {
+    useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/library");
+    for (const route of ["/files", "/agents", "/code", "/extensions"])
+      useAppRouteMemoryStore.getState().rememberAppRoute(route);
+
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/extensions",
+      lastSpacesRoute: "/spaces/space-2/library",
     });
   });
 

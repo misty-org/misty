@@ -12,6 +12,7 @@ import {
   useSettingsStore,
 } from "@/stores/app";
 import { useMediaSearchStore } from "@/stores/media/useMediaSearchStore";
+import { useGlobalSearchStore } from "@/features/global-search";
 import { useProvidersStore } from "@/stores/providers";
 import { useTransfersStore } from "@/stores/transfers";
 import { hasTauriInternals } from "@/platform/tauri";
@@ -113,11 +114,16 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
         return;
       event.preventDefault();
       event.stopPropagation();
-      void useSearchStore.getState().openSearch(activePanePath || app?.environment.homeDir || "");
+      useGlobalSearchStore.getState().activateLauncher();
+      window.setTimeout(
+        () =>
+          document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
+        0,
+      );
     };
     window.addEventListener("keydown", onGlobalSearchShortcut, true);
     return () => window.removeEventListener("keydown", onGlobalSearchShortcut, true);
-  }, [activePanePath, app?.environment.homeDir]);
+  }, []);
 
   useEffect(() => {
     const onGlobalRefreshShortcut = (event: KeyboardEvent) => {

@@ -84,6 +84,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     onNavigationAsideResizeStart,
     onDidClosePane,
     onDidCloseTab,
+    renderAddTabControl,
     renderAside,
     asideWidth = 280,
     renderBottomBar,
@@ -280,6 +281,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
         ) : null}
       </div>
     ) : null;
+  const addTabControl = renderAddTabControl?.(activeTab, addTab);
 
   return (
     <section
@@ -307,6 +309,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
           }}
           onReorderTab={reorderTabs}
           onAddTab={() => addTab(activeTab.path, activeTab.title)}
+          addTabControl={addTabControl}
           actions={tabStripActions}
         />
       ) : null}

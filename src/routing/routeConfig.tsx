@@ -8,10 +8,14 @@ import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { routes } from "./paths";
-import { LegacyWorkspaceToolRedirect } from "./LegacyWorkspaceToolRedirect";
 import { SpaceInvitationRedemption } from "../features/spaces/components/SpaceInvitationRedemption";
 import { spaceNotesEnabled } from "../features/notes/availability";
 import AgentsPage from "../pages/Agents";
+import ExtensionsPage from "../pages/Extensions";
+import FilesPage from "../pages/Files";
+import HomePage from "../pages/Home";
+import TransfersPage from "../pages/Transfers";
+import { DeveloperWorkspace } from "../features/developer-workspace";
 
 export const router = createBrowserRouter([
   {
@@ -26,15 +30,18 @@ export const router = createBrowserRouter([
       {
         element: <AppFrameLayout />,
         children: [
-          { index: true, element: <Navigate to={routes.spaces} replace /> },
-          { path: "files", element: <LegacyWorkspaceToolRedirect kind="file-manager" /> },
+          { index: true, element: <Navigate to={routes.home} replace /> },
           { path: "library", element: <Navigate to={routes.files} replace /> },
           { path: "providers", element: null },
-          { path: "transfers", element: <LegacyWorkspaceToolRedirect kind="transfers" /> },
           {
             element: <AppPagesLayout />,
             children: [
+              { path: "home", element: <HomePage /> },
+              { path: "files", element: <FilesPage /> },
               { path: "agents", element: <AgentsPage /> },
+              { path: "code", element: <DeveloperWorkspace /> },
+              { path: "extensions", element: <ExtensionsPage /> },
+              { path: "transfers", element: <TransfersPage /> },
               { path: "automations", element: <Navigate to={routes.spaces} replace /> },
               { path: "assistant", element: <Navigate to={routes.agents} replace /> },
               {
@@ -56,7 +63,6 @@ export const router = createBrowserRouter([
               { path: "studio", element: <Navigate to={routes.spaces} replace /> },
               { path: "studio/agents", element: <Navigate to={routes.agents} replace /> },
               { path: "studio/workflows", element: <Navigate to={routes.spaces} replace /> },
-              { path: "extensions", element: <LegacyWorkspaceToolRedirect kind="extensions" /> },
               { path: "changelog", element: <Navigate to={routes.spaces} replace /> },
               { path: "signin", element: <SignInPage /> },
               { path: "register", element: <RegisterPage /> },
@@ -71,7 +77,7 @@ export const router = createBrowserRouter([
           { path: "settings", element: null },
           { path: "diagnostics", element: <Navigate to={routes.spaces} replace /> },
           { path: "activity", element: <Navigate to={routes.spaces} replace /> },
-          { path: "*", element: <Navigate to={routes.spaces} replace /> },
+          { path: "*", element: <Navigate to={routes.home} replace /> },
         ],
       },
     ],
