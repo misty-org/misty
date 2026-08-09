@@ -12,39 +12,56 @@ describe("per-Space workspace tabs", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a", "/spaces/space-a/chat");
     store.ensureSession("account-1", "space-b", "/spaces/space-b/library");
-    store.addTab("account-1", "space-a", "transfers");
+    store.addTab("account-1", "space-a", "space", "/spaces/space-a/planner/tasks/board");
 
     const a = useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
     const b = useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-b")];
-    expect(a.tabs.map((tab) => tab.kind)).toEqual(["space", "transfers"]);
+    expect(a.tabs.map((tab) => tab.kind)).toEqual(["space", "space"]);
     expect(b.tabs.map((tab) => tab.kind)).toEqual(["space"]);
   });
 
-  it("always creates new tool instances with distinct File Manager workspaces", () => {
+  it("creates distinct Space tabs with their own routes", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");
-    const firstId = store.addTab("account-1", "space-a", "file-manager");
-    const secondId = store.addTab("account-1", "space-a", "file-manager");
+    const firstId = store.addTab("account-1", "space-a", "space", "/spaces/space-a/chat");
+    const secondId = store.addTab("account-1", "space-a", "space", "/spaces/space-a/library");
     const session =
       useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
-    const fileTabs = session.tabs.filter((tab) => tab.kind === "file-manager");
 
     expect(firstId).not.toBe(secondId);
-    expect(fileTabs).toHaveLength(2);
-    expect(fileTabs[0].kind === "file-manager" ? fileTabs[0].workspaceId : "").not.toBe(
-      fileTabs[1].kind === "file-manager" ? fileTabs[1].workspaceId : "",
-    );
+    expect(session.tabs.map(spaceTabRoute)).toEqual([
+      expect.stringContaining("/spaces/space-a/"),
+      "/spaces/space-a/chat",
+      "/spaces/space-a/library",
+    ]);
   });
 
-  it("creates Agents as a normal top-level workspace tab", () => {
+  it("selects a different Space tab", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");
-    store.addTab("account-1", "space-a", "agents");
+    const nextId = store.addTab("account-1", "space-a", "space", "/spaces/space-a/chat");
+    const first =
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")].tabs[0];
+    store.selectTab("account-1", "space-a", first.id);
 
     const session =
       useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
-    expect(session.tabs.map((tab) => tab.kind)).toEqual(["space", "agents"]);
-    expect(activeSpacesTab(session)).toMatchObject({ kind: "agents", title: "Agents" });
+    expect(nextId).not.toBe(first.id);
+    expect(activeSpacesTab(session)?.id).toBe(first.id);
+  });
+
+  it("updates only the active Space tab route", () => {
+    const store = useSpacesTabsStore.getState();
+    store.ensureSession("account-1", "space-a", "/spaces/space-a/notes");
+    store.addTab("account-1", "space-a", "space", "/spaces/space-a/chat");
+    store.updateActiveSpaceRoute("account-1", "space-a", "/spaces/space-a/library");
+
+    const session =
+      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
+    expect(session.tabs.map(spaceTabRoute)).toEqual([
+      "/spaces/space-a/notes",
+      "/spaces/space-a/library",
+    ]);
   });
 
   it("replaces the final closed tab with a fresh Space tab", () => {
@@ -63,44 +80,20 @@ describe("per-Space workspace tabs", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");
     for (let index = 0; index < 15; index += 1)
-      expect(store.addTab("account-1", "space-a", "extensions")).not.toBeNull();
-    expect(store.addTab("account-1", "space-a", "extensions")).toBeNull();
-  });
-
-  it("renames a File Manager tab and reports the stored title", () => {
-    const store = useSpacesTabsStore.getState();
-    store.ensureSession("account-1", "space-a");
-    const tabId = store.addTab("account-1", "space-a", "file-manager");
-
-    expect(store.renameTab("account-1", "space-a", tabId!, "  Photos  ")).toBe("Photos");
-    const session =
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")];
-    expect(session?.tabs.find((tab) => tab.id === tabId)?.title).toBe("Photos");
-  });
-
-  it("refuses renames that would be overwritten or are empty", () => {
-    const store = useSpacesTabsStore.getState();
-    store.ensureSession("account-1", "space-a");
-    const spaceTab =
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")]?.tabs[0];
-    const fileTab = store.addTab("account-1", "space-a", "file-manager");
-
-    // A Space tab's title comes from its route, so a rename could not survive.
-    expect(store.renameTab("account-1", "space-a", spaceTab!.id, "Anything")).toBe("");
-    expect(store.renameTab("account-1", "space-a", fileTab!, "   ")).toBe("");
-    expect(store.renameTab("account-1", "space-a", "missing-tab", "Photos")).toBe("");
+      expect(store.addTab("account-1", "space-a", "space")).not.toBeNull();
+    expect(store.addTab("account-1", "space-a", "space")).toBeNull();
   });
 
   it("prunes inaccessible Spaces without touching another account", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account-1", "space-a");
-    store.addTab("account-1", "space-a", "file-manager");
+    store.addTab("account-1", "space-a", "space");
     store.ensureSession("account-1", "space-b");
     store.ensureSession("account-2", "space-a");
 
     const removed = store.pruneSessions("account-1", ["space-b"]);
 
-    expect(removed.some((tab) => tab.kind === "file-manager")).toBe(true);
+    expect(removed).toHaveLength(2);
     expect(
       useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account-1", "space-a")],
     ).toBeUndefined();
@@ -109,3 +102,7 @@ describe("per-Space workspace tabs", () => {
     ).toBeDefined();
   });
 });
+
+function spaceTabRoute(tab: { kind: string; route?: string }): string {
+  return tab.kind === "space" ? (tab.route ?? "") : "";
+}

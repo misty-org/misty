@@ -21,4 +21,6 @@ interface ImportMetaEnv {
   readonly VITE_DESKTOP_LICENSE_URL?: string;
   readonly VITE_SUPPORT_URL?: string;
   readonly VITE_SECURITY_URL?: string;
+  /** Optional loopback URL for an embedded Theia/OpenVSCode development workspace. */
+  readonly VITE_MISTY_DEVELOPER_WORKSPACE_URL?: string;
 }

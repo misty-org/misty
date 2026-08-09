@@ -24,7 +24,7 @@ import {
 import { emailName, formatBadgeCount, initialsForProfile } from "./helpers";
 
 const notificationBadgeClass = [
-  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-status-green",
+  "absolute right-px top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-notification-red",
   "px-[5px] text-[10px] font-bold leading-none text-cream-bright ring-2 ring-charcoal-workspace",
 ].join(" ");
 
@@ -33,6 +33,7 @@ export function NavGroup(props: {
   badges?: Partial<Record<string, number>>;
   currentPath: string;
   routeOverrides?: Partial<Record<string, string>>;
+  iconOnly?: boolean;
 }) {
   return (
     <>
@@ -43,7 +44,8 @@ export function NavGroup(props: {
           <NavLink
             aria-current={selected ? "page" : undefined}
             aria-label={item.label}
-            className={`group/nav-item ${navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
+            title={item.label}
+            className={`group/nav-item ${props.iconOnly ? navIconOnlyItemBaseClass : navLinkBaseClass} ${selected ? navLinkActiveClass : ""}`}
             end={item.exact}
             key={item.id}
             to={props.routeOverrides?.[item.id] ?? item.path}
@@ -56,9 +58,13 @@ export function NavGroup(props: {
                 </span>
               ) : null}
             </span>
-            <span className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}>
-              {item.label}
-            </span>
+            {props.iconOnly ? null : (
+              <span
+                className={`${navItemLabelBaseClass} ${selected ? navItemLabelActiveClass : ""}`}
+              >
+                {item.label}
+              </span>
+            )}
           </NavLink>
         );
       })}
@@ -142,14 +148,19 @@ export const ProfileNavButton = memo(
             <AvatarFallback
               className={cn(
                 "rounded-full text-[10px] font-bold",
-                account?.id ? cn(avatarColorClass(account.id), avatarInkClass) : "bg-charcoal-bg text-cream",
+                account?.id
+                  ? cn(avatarColorClass(account.id), avatarInkClass)
+                  : "bg-charcoal-bg text-cream",
               )}
             >
               {initials}
             </AvatarFallback>
           </Avatar>
         ) : (
-          <UserCircle className="size-6 text-cream-muted transition-colors group-hover/profile:text-cream" strokeWidth={1.75} />
+          <UserCircle
+            className="size-6 text-cream-muted transition-colors group-hover/profile:text-cream"
+            strokeWidth={1.75}
+          />
         )}
       </Button>
     );

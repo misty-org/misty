@@ -4,11 +4,13 @@ import { cn } from "@/ui";
 
 export function SpaceSidebarLink({
   active,
+  badgeCount = 0,
   icon: Icon,
   label,
   to,
 }: {
   active: boolean;
+  badgeCount?: number;
   icon: LucideIcon;
   label: string;
   to: string;
@@ -23,6 +25,14 @@ export function SpaceSidebarLink({
         <Icon size={16} strokeWidth={1.75} />
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
+      {badgeCount > 0 ? (
+        <span
+          className="mr-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-notification-red px-1 text-[10px] font-bold leading-none text-white"
+          aria-label={`${badgeCount} new`}
+        >
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      ) : null}
     </Link>
   );
 }

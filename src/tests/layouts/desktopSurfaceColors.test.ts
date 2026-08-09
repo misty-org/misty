@@ -5,7 +5,9 @@ import {
   desktopWallpaperLayerClass,
   navbarBottomClass,
   navbarGroupClass,
+  navbarSpacesClass,
   navButtonActiveClass,
+  navIconOnlyItemBaseClass,
   navItemBaseClass,
   navLinkActiveClass,
   navLinkBaseClass,
@@ -21,12 +23,14 @@ describe("desktop warm charcoal surfaces", () => {
     expect(sidebarStyles.root).not.toContain("transparent");
   });
 
-  it("scrolls overflowing primary navigation without moving its bottom controls", () => {
-    expect(navbarGroupClass).toContain("min-h-0");
-    expect(navbarGroupClass).toContain("flex-1");
-    expect(navbarGroupClass).toContain("overflow-y-auto");
-    expect(navbarGroupClass).toContain("[scrollbar-width:none]");
-    expect(navbarGroupClass).toContain("[&::-webkit-scrollbar]:hidden");
+  it("scrolls Spaces without moving global navigation or bottom controls", () => {
+    expect(navbarGroupClass).toContain("shrink-0");
+    expect(navbarGroupClass).not.toContain("overflow-y-auto");
+    expect(navbarSpacesClass).toContain("min-h-0");
+    expect(navbarSpacesClass).toContain("flex-1");
+    expect(navbarSpacesClass).toContain("overflow-y-auto");
+    expect(navbarSpacesClass).toContain("[scrollbar-width:none]");
+    expect(navbarSpacesClass).toContain("[&::-webkit-scrollbar]:hidden");
     expect(navbarBottomClass).toContain("shrink-0");
   });
 
@@ -35,9 +39,10 @@ describe("desktop warm charcoal surfaces", () => {
   it("marks the active destination with an edge line rather than a filled tile", () => {
     expect(navLinkBaseClass).toContain("rounded-lg");
     expect(navLinkBaseClass).toContain("text-cream-muted");
-    expect(navLinkActiveClass).toContain("misty-navbar-marker-side");
+    expect(navLinkBaseClass).toContain("misty-navbar-marker-side");
+    expect(navIconOnlyItemBaseClass).toContain("misty-navbar-marker-side");
     expect(navLinkActiveClass).toContain("text-cream-bright");
-    expect(navButtonActiveClass).toContain("misty-navbar-marker-side");
+    expect(navButtonActiveClass).toContain("text-cream-bright");
     expect(navLinkActiveClass).not.toContain("bg-charcoal-active");
     expect(navItemBaseClass).not.toContain("hover:bg-");
   });

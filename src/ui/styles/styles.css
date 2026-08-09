@@ -16,6 +16,7 @@
   --color-cream: #e0e0e0;
   --color-cream-bright: #f1f1f1;
   --color-cream-muted: #8c8c8c;
+  --color-notification-red: #c94747;
 
   --color-sage-fg: #a3bfab;
   --color-sage-bg: #28312b;
@@ -209,8 +210,8 @@
     border-radius: 999px;
   }
 
-  /* The navbar's rail items are tall and centred, so the marker tracks the
-     icon tile rather than stretching the full 66px row. */
+  /* Every navbar action except Profile previews the same edge marker on hover.
+     The active route/popover grows it to full height without moving the icon. */
   .misty-navbar-marker-side {
     position: relative;
   }
@@ -218,7 +219,7 @@
   .misty-navbar-marker-side::before {
     position: absolute;
     top: 50%;
-    left: -8px;
+    left: calc((100% - 80px) / 2);
     z-index: 1;
     display: block;
     height: 28px;
@@ -228,11 +229,31 @@
     content: "";
     pointer-events: none;
     translate: 0 -50%;
+    transform-origin: center;
+    opacity: 0;
+    scale: 1 0;
+    transition:
+      scale 220ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 160ms linear;
+  }
+
+  .misty-navbar-marker-side:hover::before,
+  .misty-navbar-marker-side:focus-visible::before {
+    opacity: 0.55;
+    scale: 1 0.45;
+  }
+
+  .misty-navbar-marker-side[aria-current="page"]::before,
+  .misty-navbar-marker-side[aria-expanded="true"]::before,
+  .misty-navbar-marker-side[data-state="open"]::before {
+    opacity: 1;
+    scale: 1 1;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .misty-active-marker-side::before,
-    .misty-marker-host::before {
+    .misty-marker-host::before,
+    .misty-navbar-marker-side::before {
       transition: none;
     }
   }

@@ -39,7 +39,7 @@ import { setAnalyticsAuthenticationState } from "@/analytics/lifecycle";
 import { TelemetryIdentityManager } from "@/analytics/identity";
 import { analytics } from "@/analytics/client";
 import { restoreSavedSession, tryRestoreSavedSession } from "./sessionRecovery";
-
+import { useActivityStore } from "@/features/activity";
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   setUser: () => {},
@@ -415,13 +415,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 function resetAccountScopedState(): void {
   useUserStore.getState().clear();
+  useActivityStore.getState().setAccount("");
   useExplorerStore.setState({ notifications: [], notificationHistory: [] });
   resetSearchAccountState();
   resetSpacesAccountState();
   resetAllAgentAccountState();
   resetNotesAccountState();
 }
-
 function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();
   refreshAllAgentAccountState();

@@ -3,6 +3,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
+import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 
 // Work surfaces only. Management controls live at the opposite end of the top bar.
 const sections = [
@@ -21,6 +22,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);
   const accountId = user?.id ?? "";
+  const activityItems = useActivityStore((state) => state.allItems);
 
   return (
     <nav className="grid min-w-0 gap-1" aria-label="Space sections">
@@ -30,6 +32,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
           active={id === "journal" ? section === "notes" || section === "drawings" : section === id}
           icon={Icon}
           label={label}
+          badgeCount={unreadActivityCountForSpaceSection(activityItems, spaceId, id)}
           to={
             id === "journal"
               ? rememberedJournalRoute(accountId, spaceId)

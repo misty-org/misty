@@ -4,6 +4,9 @@ import { useSetupStore } from "@/stores/app";
 import { routes } from "../routing/paths";
 
 const appPageTitles = new Map<string, string>([
+  [routes.home, "Misty - Home"],
+  [routes.files, "Misty - Files"],
+  [routes.code, "Misty - Code"],
   [routes.extensions, "Misty - Extensions"],
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],

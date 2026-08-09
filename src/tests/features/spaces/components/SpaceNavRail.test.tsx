@@ -9,6 +9,7 @@ import {
 } from "@/features/spaces/components/SpaceNavRail";
 import type { Space, SpaceInvitation } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { useActivityStore } from "@/features/activity";
 
 describe("SpaceNavRail", () => {
   let container: HTMLDivElement;
@@ -30,6 +31,7 @@ describe("SpaceNavRail", () => {
       invitations: [],
       limits: null,
     });
+    useActivityStore.setState({ allItems: [] });
   });
 
   it("preserves the server-provided Space order", async () => {
@@ -41,7 +43,7 @@ describe("SpaceNavRail", () => {
       );
     });
     const links = [
-      ...container.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Spaces"] > a'),
+      ...container.querySelectorAll<HTMLAnchorElement>('[role="group"][aria-label="Spaces"] > a'),
     ];
     expect(links[0]?.getAttribute("aria-label")).toBe("Design team Space");
     expect(links[1]?.getAttribute("aria-label")).toBe("Misty Space");
@@ -50,6 +52,7 @@ describe("SpaceNavRail", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     useSpacesStore.setState({ spaces: [], invitations: [], limits: null });
+    useActivityStore.setState({ allItems: [] });
     container.remove();
   });
 
@@ -104,6 +107,40 @@ describe("SpaceNavRail", () => {
     expect(invitation?.getAttribute("href")).toBe("/spaces/family-space/invitation");
     expect(invitation?.dataset.invitationPending).toBe("true");
     expect(invitation?.textContent).toContain("Invitation pending");
+  });
+
+  it("shows new-item counts on the Space that owns them", async () => {
+    useActivityStore.setState({
+      allItems: [
+        {
+          id: "spaces:7",
+          accountId: "account-1",
+          source: "spaces",
+          sourceId: "7",
+          kind: "mention",
+          title: "Mention",
+          body: "Please review",
+          createdAt: "2026-08-08T12:00:00Z",
+          attention: true,
+          target: { kind: "space-chat", spaceId: "space-1" },
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-2/chat"]}>
+          <SpaceNavRail />
+        </MemoryRouter>,
+      );
+    });
+
+    const space = container.querySelector<HTMLAnchorElement>(
+      '[aria-label="Design team Space, 1 new"]',
+    );
+    expect(space).not.toBeNull();
+    expect(space?.textContent).toContain("1");
+    expect(container.querySelector('[aria-label="Chen family Space, 1 new"]')).toBeNull();
   });
 
   it("reorders Space ids before or after the hovered avatar", () => {

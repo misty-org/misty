@@ -2,6 +2,8 @@ export { ChromeTabStrip } from "./ChromeTabStrip";
 export type { ChromeTabStripProps, ChromeTabStripTab } from "./ChromeTabStrip";
 export { MultiPanelWorkspace } from "./MultiPanelWorkspace";
 export type { MultiPanelWorkspaceProps } from "./MultiPanelWorkspace";
+export { NewTabMenu } from "./NewTabMenu";
+export type { NewTabMenuOption } from "./NewTabMenu";
 export {
   activeMultiPanelTab,
   createMultiPanelStore,

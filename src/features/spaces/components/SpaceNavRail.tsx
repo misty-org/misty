@@ -6,15 +6,26 @@ import type { Space } from "@/models/interfaces/features/spaces/types";
 import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { invitedSpacePreview } from "../spaceInvitation";
 import { SpaceAvatar } from "./SpaceAvatar";
+import {
+  formatActivityBadge,
+  unreadActivityCountForSpace,
+  useActivityStore,
+} from "@/features/activity";
 
 const validRailSections = new Set(["chat", "planner", "notes", "drawings", "library"]);
 const spaceOrderStorageKey = "misty:space-nav-order:v1";
+const spaceBadgeClass = [
+  "absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full",
+  "bg-notification-red px-1 text-[9px] font-bold leading-none text-white",
+  "ring-2 ring-charcoal-workspace",
+].join(" ");
 
 export function SpaceNavRail() {
   const location = useLocation();
   const spaces = useSpacesStore((state) => state.spaces);
   const invitations = useSpacesStore((state) => state.invitations);
   const limits = useSpacesStore((state) => state.limits);
+  const activityItems = useActivityStore((state) => state.allItems);
   const [spaceOrder, setSpaceOrder] = useState(readSpaceOrder);
   const [draggedSpaceId, setDraggedSpaceId] = useState("");
   const [dropTargetId, setDropTargetId] = useState("");
@@ -68,10 +79,18 @@ export function SpaceNavRail() {
   };
 
   return (
-    <nav className="grid w-full justify-items-center gap-1.5" aria-label="Spaces">
+    <div
+      className="grid w-full content-start justify-items-center gap-0.5 py-0.5"
+      role="group"
+      aria-label="Spaces"
+    >
       {orderedSpaces.map((space) => {
         const active = space.id === activeSpaceId;
         const invitation = invitationBySpaceId.get(space.id);
+        const unreadCount = unreadActivityCountForSpace(activityItems, space.id);
+        const accessibleLabel = `${space.name} Space${invitation ? " invitation" : ""}${
+          unreadCount ? `, ${unreadCount} new` : ""
+        }`;
         return (
           <Link
             key={space.id}
@@ -82,7 +101,7 @@ export function SpaceNavRail() {
                 : spaceDestination(location.pathname, space.id)
             }
             state={{ mistySpaceSwitch: true }}
-            aria-label={`${space.name} Space${invitation ? " invitation" : ""}`}
+            aria-label={accessibleLabel}
             aria-current={active ? "page" : undefined}
             title={invitation ? `${space.name} — invitation pending` : space.name}
             data-invitation-pending={invitation ? "true" : undefined}
@@ -128,14 +147,19 @@ export function SpaceNavRail() {
                 <span className="sr-only">Invitation pending</span>
               </span>
             ) : null}
+            {unreadCount > 0 ? (
+              <span className={spaceBadgeClass} aria-hidden="true">
+                {formatActivityBadge(unreadCount)}
+              </span>
+            ) : null}
           </Link>
         );
       })}
 
-      <span className="my-1 h-px w-7 bg-charcoal-border" aria-hidden="true" />
+      <span className="my-0.5 h-px w-7 bg-charcoal-border" aria-hidden="true" />
       <Link
         className={cn(
-          "grid size-[46px] shrink-0 place-items-center rounded-[14px] border border-charcoal-border/55",
+          "misty-navbar-marker-side grid size-[46px] shrink-0 place-items-center rounded-[14px] border border-charcoal-border/55",
           "bg-transparent text-cream-muted no-underline outline-none transition-all",
           "hover:border-charcoal-border hover:text-cream",
           "focus-visible:ring-2 focus-visible:ring-charcoal-active",
@@ -152,7 +176,7 @@ export function SpaceNavRail() {
       >
         <Plus size={19} strokeWidth={2.2} aria-hidden="true" />
       </Link>
-    </nav>
+    </div>
   );
 }
 
@@ -180,7 +204,7 @@ function activeSpaceIdFromPath(pathname: string): string {
 
 function spaceRailLinkClass(active: boolean, dropTarget: boolean): string {
   return cn(
-    "group/space relative grid size-[50px] shrink-0 place-items-center rounded-full bg-transparent outline-none",
+    "misty-navbar-marker-side group/space relative grid size-[50px] shrink-0 place-items-center rounded-full bg-transparent outline-none",
     "transition-all",
     "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     active && "text-cream",

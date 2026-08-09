@@ -21,20 +21,24 @@ export const tabletRouteShellClass =
   "relative z-10 col-start-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
 
 export const navbarGroupClass = [
-  "flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-x-hidden overflow-y-auto",
-  "overscroll-contain px-2 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+  "flex w-full shrink-0 flex-col items-center gap-0.5 overflow-hidden px-1 pt-0",
 ].join(" ");
 
-export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-2 px-2";
+export const navbarSpacesClass = [
+  "flex min-h-0 w-full flex-1 flex-col items-center overflow-x-hidden overflow-y-auto",
+  "overscroll-contain px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+].join(" ");
+
+export const navbarBottomClass = "mt-auto flex w-full shrink-0 flex-col items-center gap-0.5 px-1";
 
 export const navItemBaseClass = [
-  "grid h-[66px] w-16 shrink-0 grid-rows-[44px_18px] place-items-center rounded-lg border-0 bg-transparent p-0",
+  "misty-navbar-marker-side grid h-[66px] w-16 shrink-0 grid-rows-[44px_18px] place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline shadow-none transition-colors hover:text-cream-bright",
 ].join(" ");
 export const navLinkBaseClass = navItemBaseClass;
 // The current destination is marked by a line on the rail's edge rather than a
 // filled tile, so the navbar reads as a rail with a pointer on it.
-export const navLinkActiveClass = "misty-navbar-marker-side text-cream-bright";
+export const navLinkActiveClass = "text-cream-bright";
 export const navButtonActiveClass = navLinkActiveClass;
 
 export const navIconTileBaseClass =
@@ -46,10 +50,10 @@ export const navItemLabelBaseClass =
   "block max-w-[60px] truncate text-center text-[10px] font-medium leading-tight text-current";
 export const navItemLabelActiveClass = "text-cream-bright";
 
-// Icon-only nav buttons (no label row) still occupy the full 66px rail slot
-// so they line up with the labeled items above them.
+// Icon-only nav buttons keep a compact, consistent rail slot. The marker class
+// lives on every item so hover and selection share the same edge animation.
 export const navIconOnlyItemBaseClass = [
-  "grid h-[66px] w-16 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
+  "misty-navbar-marker-side grid h-[52px] w-14 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
   "text-cream-muted no-underline shadow-none transition-colors hover:text-cream-bright",
 ].join(" ");
 

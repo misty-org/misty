@@ -144,7 +144,10 @@ function ConversationGroup({
         ) : undefined
       }
     >
-      <nav className="grid gap-1" aria-label={`${title} conversations`}>
+      <nav
+        className="grid gap-1"
+        aria-label={title === "Conversations" ? "Space conversations" : `${title} conversations`}
+      >
         {showEveryone ? (
           <Link
             className={conversationLinkClass(!activeConversationId)}
