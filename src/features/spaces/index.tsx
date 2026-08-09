@@ -208,6 +208,11 @@ export function SpaceDetail() {
     );
   }
 
+  const canManageMisty = space.permissions?.["space.invite"] === true;
+  if (space.kind === "misty" && section !== "chat" && !(section === "settings" && canManageMisty)) {
+    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
+  }
+
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       {section === "library" ? (

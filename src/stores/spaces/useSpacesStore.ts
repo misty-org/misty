@@ -175,7 +175,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       });
     }
     const tasks = [get().loadMembers(spaceId)];
-    if (canReadMessages) tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
+    if (canReadMessages && space.kind !== "misty") {
+      tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
+    }
     const results = await Promise.allSettled(tasks);
     if (generation !== spacesAccountGeneration) return;
     const rejected = results.find((result) => result.status === "rejected");

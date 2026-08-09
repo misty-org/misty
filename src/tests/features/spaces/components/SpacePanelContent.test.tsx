@@ -53,12 +53,18 @@ describe("SpacePanelContent", () => {
     expect(container.querySelector("nav[aria-label='Space management']")).not.toBeNull();
   });
 
-  it("keeps Journal available in the default Misty Space", async () => {
-    const space = spaceFixture({ id: "misty", kind: "standard", name: "Misty" });
+  it("shows only Chat in the canonical Misty Space", async () => {
+    const space = spaceFixture({
+      id: "misty",
+      kind: "misty",
+      name: "Misty",
+      role: "member",
+      permissions: { "messages.read": true, "space.invite": false },
+    });
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/notes"]}>
+        <MemoryRouter initialEntries={["/spaces/misty/chat"]}>
           <Routes>
             <Route
               path="/spaces/:spaceId/:section"
@@ -69,14 +75,17 @@ describe("SpacePanelContent", () => {
       );
     });
 
-    expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Journal");
+    expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Chat");
+    expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
   });
 
-  it("shows the shared Everyone conversation instead of a Misty support inbox", async () => {
+  it("does not expose the shared Everyone conversation", async () => {
     const space = spaceFixture({
       id: "misty",
-      kind: "standard",
+      kind: "misty",
       name: "Misty",
+      role: "member",
+      permissions: { "messages.read": true, "space.invite": false },
     });
 
     await act(async () => {
@@ -94,9 +103,10 @@ describe("SpacePanelContent", () => {
 
     expect(container.querySelector('[aria-label="Misty support inbox"]')).toBeNull();
     expect(container.querySelector('[aria-label="Space conversations"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Space conversations"] a')?.textContent).toContain(
-      "Everyone",
-    );
+    expect(
+      container.querySelector('[aria-label="Space conversations"]')?.textContent,
+    ).not.toContain("Everyone");
+    expect(container.querySelector('[aria-label^="Create a new"]')).toBeNull();
   });
 
   it("does not render skeleton and active space navigation stacked together", async () => {

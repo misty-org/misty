@@ -106,16 +106,21 @@ export function SpacePanelContent(props: {
       activeConversationId={route.conversationId}
       currentUserId={user?.id}
       activeDrawingId={route.drawingId}
-      onCreateConversation={() => {
-        setEditingConversation(null);
-        setDialogOpen(true);
-      }}
+      onCreateConversation={
+        activeSpace?.kind === "misty"
+          ? undefined
+          : () => {
+              setEditingConversation(null);
+              setDialogOpen(true);
+            }
+      }
       onEditConversation={(conversation) => {
         setEditingConversation(conversation);
         setDialogOpen(true);
       }}
       onDeleteConversation={(conversation) => void handleConversationDeleted(conversation)}
       isSpaceOwner={activeSpace?.role === "owner"}
+      isMistySpace={activeSpace?.kind === "misty"}
     />
   ) : null;
 

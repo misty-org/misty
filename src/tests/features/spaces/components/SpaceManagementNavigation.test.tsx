@@ -40,6 +40,21 @@ describe("SpaceManagementNavigation", () => {
     expect(links[0]?.getAttribute("href")).toBe("/spaces/space-1/settings/general");
     expect(container.querySelector('[aria-label="More Space actions"]')).toBeNull();
   });
+
+  it("hides global management from ordinary Misty members", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceManagementNavigation
+            space={spaceFixture({ kind: "misty", permissions: { "space.invite": false } })}
+            section="chat"
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('nav[aria-label="Space management"]')).toBeNull();
+  });
 });
 
 function spaceFixture(patch: Partial<Space> = {}): Space {

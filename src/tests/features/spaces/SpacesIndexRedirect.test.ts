@@ -21,9 +21,18 @@ describe("Spaces landing route", () => {
 
   it("uses Misty when there is no active or remembered Space", () => {
     const teamSpace = spaceFixture({ id: "team-space" });
-    const mistySpace = spaceFixture({ id: "misty", kind: "standard" });
+    const mistySpace = spaceFixture({ id: "misty", kind: "misty" });
 
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(defaultSpaceRoute("misty"));
+    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe("/spaces/misty/chat");
+  });
+
+  it("prefers the canonical kind even when its display name changes", () => {
+    const teamSpace = spaceFixture({ id: "misty", name: "Personal Misty" });
+    const canonical = spaceFixture({ id: "space_misty_canonical", kind: "misty", name: "Support" });
+
+    expect(resolveSpacesLandingRoute([teamSpace, canonical])).toBe(
+      "/spaces/space_misty_canonical/chat",
+    );
   });
 
   it("recognizes the Misty home Space even when its id is server-generated", () => {

@@ -91,6 +91,25 @@ describe("SpaceChatConversationList", () => {
     expect(menu?.textContent).toContain("Edit conversation");
     expect(menu?.textContent).toContain("Delete conversation");
   });
+
+  it("hides the shared Everyone channel in Misty", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceChatConversationList
+            activeSpaceId="space_misty_canonical"
+            activeConversationId="support"
+            currentUserId="user-1"
+            conversations={[conversation("support", "My support", "misty", ["user-1"])]}
+            isMistySpace
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).not.toContain("Everyone");
+    expect(container.querySelector('a[href$="conversation=support"]')).not.toBeNull();
+  });
 });
 
 function conversation(

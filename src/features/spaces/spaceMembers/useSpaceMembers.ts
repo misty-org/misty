@@ -28,9 +28,11 @@ export function useSpaceMembers(spaceId: string) {
   const agents = store.agentMembershipsBySpace[spaceId] ?? emptyMembers;
   const [membersLoading] = useMinimumSpin(store.loading && members.length === 0);
   const owner = space?.role === "owner";
+  const canManageMembers =
+    space?.permissions?.["space.invite"] === true || (space?.kind !== "misty" && owner);
 
   const loadPendingInvitations = useCallback(async () => {
-    if (!owner) {
+    if (!canManageMembers) {
       setPendingInvitations([]);
       return;
     }
@@ -39,7 +41,7 @@ export function useSpaceMembers(spaceId: string) {
     } catch {
       setPendingInvitations([]);
     }
-  }, [owner, spaceId]);
+  }, [canManageMembers, spaceId]);
 
   useEffect(() => {
     void loadPendingInvitations();
@@ -52,7 +54,8 @@ export function useSpaceMembers(spaceId: string) {
     agents,
     membersLoading,
     owner,
-    canInvite: owner,
+    canManageMembers,
+    canInvite: canManageMembers,
     canManageAgents: owner || space?.permissions?.["agents.manage"] === true,
     pendingInvitations,
     loadPendingInvitations,

@@ -32,7 +32,7 @@ export interface SpaceMessageAgentRun {
 
 export interface SpaceConversation {
   id: string;
-  kind?: "standard" | "direct";
+  kind?: "standard" | "direct" | "misty_support";
   space_id: string;
   title: string;
   created_by_user_id: string;

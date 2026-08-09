@@ -151,14 +151,14 @@ describe("SpaceSectionNavigation", () => {
     expect(labels).not.toContain("Library");
   });
 
-  it("applies normal permissions to the default Misty Space", async () => {
+  it("shows only private Chat in the canonical Misty Space", async () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture({
           id: "misty",
-          kind: "standard",
+          kind: "misty",
           permissions: {
-            "messages.read": false,
+            "messages.read": true,
             "tasks.view": false,
             "library.view": false,
           },
@@ -175,7 +175,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Journal",
+      "Chat",
     ]);
   });
 

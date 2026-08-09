@@ -7,6 +7,7 @@ export function useSpaceConversationChat(
   spaceId: string,
   conversationId: string,
   canRead: boolean,
+  loadConversationsWithoutSelection = false,
 ) {
   const [conversations, setConversations] = useState<SpaceConversation[]>([]);
   const [messages, setMessages] = useState<SpaceMessage[]>([]);
@@ -14,7 +15,7 @@ export function useSpaceConversationChat(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!conversationId || !canRead) {
+    if (!canRead || (!conversationId && !loadConversationsWithoutSelection)) {
       setConversations([]);
       setMessages([]);
       setLoadedConversationId("");
@@ -27,15 +28,18 @@ export function useSpaceConversationChat(
     setError("");
     setMessages([]);
     setLoadedConversationId("");
-    void Promise.all([
-      spacesApi.conversations(spaceId),
-      spacesApi.conversationMessages(spaceId, conversationId),
-    ])
+    const request = conversationId
+      ? Promise.all([
+          spacesApi.conversations(spaceId),
+          spacesApi.conversationMessages(spaceId, conversationId),
+        ])
+      : Promise.all([spacesApi.conversations(spaceId), Promise.resolve({ messages: [] })]);
+    void request
       .then(([conversationResult, messageResult]) => {
         if (!active) return;
         setConversations(conversationResult.conversations);
         setMessages([...messageResult.messages].reverse());
-        setLoadedConversationId(conversationId);
+        if (conversationId) setLoadedConversationId(conversationId);
       })
       .catch((reason) => {
         if (active)
@@ -95,7 +99,7 @@ export function useSpaceConversationChat(
       window.removeEventListener("misty:space-message-event", reload);
       window.removeEventListener("misty:space-agent-run-event", updateAgentRun);
     };
-  }, [canRead, conversationId, spaceId]);
+  }, [canRead, conversationId, loadConversationsWithoutSelection, spaceId]);
   return {
     conversations,
     messages,
