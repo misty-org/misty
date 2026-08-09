@@ -119,3 +119,18 @@ describe("account settings", () => {
     expect(JSON.parse(JSON.stringify(state)).outbox[0].id).toBe("stable-id");
   });
 });
+
+it("validates and queues account tab order preferences", () => {
+  const id = "collections.tabs.journal";
+  const definition = definitionById.get(id)!;
+  for (const invalid of ["{}", "[1]", '["all","all"]', '["bad id"]'])
+    expect(validPreference(definition, invalid)).toBe(false);
+  const state = editPreference(
+    initialProfileState({}),
+    id,
+    '["drawings","all","notes"]',
+    "reorder",
+  );
+  expect(resolveSetting(state, id).value).toBe('["drawings","all","notes"]');
+  expect(state.outbox[0].set[id]).toBe('["drawings","all","notes"]');
+});

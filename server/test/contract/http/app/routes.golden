@@ -260,6 +260,7 @@ GET /api/spaces/{spaceID}/integrations
 GET /api/spaces/{spaceID}/integrations/github/installations
 GET /api/spaces/{spaceID}/integrations/github/installations/{installationID}/repositories
 GET /api/spaces/{spaceID}/invitations
+GET /api/spaces/{spaceID}/item-state
 GET /api/spaces/{spaceID}/library
 GET /api/spaces/{spaceID}/library/album-folders
 GET /api/spaces/{spaceID}/library/albums
@@ -382,6 +383,7 @@ GET /spaces/{spaceID}/integrations
 GET /spaces/{spaceID}/integrations/github/installations
 GET /spaces/{spaceID}/integrations/github/installations/{installationID}/repositories
 GET /spaces/{spaceID}/invitations
+GET /spaces/{spaceID}/item-state
 GET /spaces/{spaceID}/library
 GET /spaces/{spaceID}/library/album-folders
 GET /spaces/{spaceID}/library/albums
@@ -518,6 +520,7 @@ GET /v1/spaces/{spaceID}/integrations
 GET /v1/spaces/{spaceID}/integrations/github/installations
 GET /v1/spaces/{spaceID}/integrations/github/installations/{installationID}/repositories
 GET /v1/spaces/{spaceID}/invitations
+GET /v1/spaces/{spaceID}/item-state
 GET /v1/spaces/{spaceID}/library
 GET /v1/spaces/{spaceID}/library/album-folders
 GET /v1/spaces/{spaceID}/library/albums
@@ -577,6 +580,7 @@ PATCH /api/spaces/{spaceID}
 PATCH /api/spaces/{spaceID}/calendar/events/{eventID}
 PATCH /api/spaces/{spaceID}/conversations/{conversationID}
 PATCH /api/spaces/{spaceID}/drawings/{drawingID}
+PATCH /api/spaces/{spaceID}/item-state
 PATCH /api/spaces/{spaceID}/library/album-folders/{folderID}
 PATCH /api/spaces/{spaceID}/library/albums/{albumID}
 PATCH /api/spaces/{spaceID}/library/asset-stacks/{stackID}
@@ -602,6 +606,7 @@ PATCH /spaces/{spaceID}
 PATCH /spaces/{spaceID}/calendar/events/{eventID}
 PATCH /spaces/{spaceID}/conversations/{conversationID}
 PATCH /spaces/{spaceID}/drawings/{drawingID}
+PATCH /spaces/{spaceID}/item-state
 PATCH /spaces/{spaceID}/library/album-folders/{folderID}
 PATCH /spaces/{spaceID}/library/albums/{albumID}
 PATCH /spaces/{spaceID}/library/asset-stacks/{stackID}
@@ -627,6 +632,7 @@ PATCH /v1/spaces/{spaceID}
 PATCH /v1/spaces/{spaceID}/calendar/events/{eventID}
 PATCH /v1/spaces/{spaceID}/conversations/{conversationID}
 PATCH /v1/spaces/{spaceID}/drawings/{drawingID}
+PATCH /v1/spaces/{spaceID}/item-state
 PATCH /v1/spaces/{spaceID}/library/album-folders/{folderID}
 PATCH /v1/spaces/{spaceID}/library/albums/{albumID}
 PATCH /v1/spaces/{spaceID}/library/asset-stacks/{stackID}
