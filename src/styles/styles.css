@@ -1,0 +1,260 @@
+@config "../../tailwind.config.js";
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Charcoal/cream palette. `inline` so utilities compile to literal colours
+   rather than var() lookups. */
+@theme inline {
+  --color-charcoal-workspace: #0f0f0f;
+  --color-charcoal-bg: #131313;
+  --color-charcoal-sidebar: #161616;
+  --color-charcoal-card: #191919;
+  --color-charcoal-border: #262626;
+  --color-charcoal-hover: #2b2b2b;
+  --color-charcoal-active: #3e3e3e;
+
+  --color-cream: #e0e0e0;
+  --color-cream-bright: #f1f1f1;
+  --color-cream-muted: #8c8c8c;
+  --color-notification-red: #c94747;
+
+  --color-sage-fg: #a3bfab;
+  --color-sage-bg: #28312b;
+  --color-status-green: #a3bfab;
+
+  /* Gruvbox-inspired pastels, deterministically assigned per person so the
+     app doesn't read as entirely monochrome. Kept soft (no neon) — these are
+     backgrounds behind dark ink text, not accents on the dark UI itself. */
+  --color-avatar-red: #eab7ab;
+  --color-avatar-orange: #f0c38e;
+  --color-avatar-yellow: #f0d58c;
+  --color-avatar-green: #c5cf8e;
+  --color-avatar-aqua: #a8d1b3;
+  --color-avatar-blue: #a0c4d4;
+  --color-avatar-purple: #d3b3c9;
+  --color-avatar-gray: #d5c9b8;
+  --color-avatar-ink: #3c3836;
+
+  /* Agent accent presets, same pastel family as the avatar palette. */
+  --color-agent-indigo: #a7b4d8;
+  --color-agent-violet: #c9b3d9;
+  --color-agent-blue: #a0c4d4;
+  --color-agent-emerald: #a8d1b3;
+  --color-agent-amber: #eec87a;
+  --color-agent-rose: #e8b8c0;
+
+  /* One consistent look for every @mention, in the composer and in sent
+     messages — a solid, saturated tag rather than the soft avatar pastels,
+     so a mention reads as an action, not just a label. */
+  --color-mention-bg: #5865f2;
+  --color-mention-fg: #f5f2ed;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  html {
+    color-scheme: dark;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #131313;
+    color: #e0e0e0;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    font-size: 15px;
+  }
+
+  #root {
+    overflow: hidden;
+    background-color: #131313;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    margin: 0;
+  }
+
+  ::selection {
+    background-color: #3e3e3e;
+    color: #f1f1f1;
+  }
+}
+
+/*
+ * Selection and hover language.
+ *
+ * Selected things are marked with a line on their edge rather than a filled
+ * panel, and hovering brightens what is already there instead of adding a
+ * background. Both live here so every surface reads the same way, and so the
+ * marker colour tracks the theme from one place.
+ */
+@layer components {
+  :root {
+    --misty-marker: #e0e0e0;
+    --misty-marker-size: 3px;
+    /* The sidebar pads its children by 12px (px-3). The marker cancels that
+       padding so it sits flush against the panel edge instead of floating
+       inside it. Any surface with different padding overrides this locally. */
+    --misty-marker-inset: 12px;
+  }
+
+  .misty-active-marker-side,
+  .misty-active-marker-bottom,
+  .misty-marker-host {
+    position: relative;
+  }
+
+  .misty-active-marker-side::before,
+  .misty-active-marker-bottom::after,
+  .misty-marker-host::before {
+    position: absolute;
+    z-index: 1;
+    display: block;
+    background: var(--misty-marker);
+    content: "";
+    pointer-events: none;
+  }
+
+  /* One geometry for the side marker, whether it is showing because the row is
+     active or because it is hovered. */
+  .misty-active-marker-side::before,
+  .misty-marker-host::before {
+    top: 6px;
+    bottom: 6px;
+    left: calc(var(--misty-marker-inset) * -1);
+    width: var(--misty-marker-size);
+    border-radius: 0 999px 999px 0;
+    transform-origin: center;
+    transition:
+      scale 220ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 160ms linear;
+  }
+
+  /* Hosts start collapsed; hovering previews a short, dimmed marker. */
+  .misty-marker-host::before {
+    opacity: 0;
+    scale: 1 0;
+  }
+
+  .misty-marker-host:hover::before,
+  .misty-marker-host:focus-visible::before {
+    opacity: 0.55;
+    scale: 1 0.45;
+  }
+
+  /* Active wins over hover and grows to the full row. */
+  .misty-active-marker-side::before,
+  .misty-marker-host.misty-active-marker-side::before,
+  .misty-marker-host.misty-active-marker-side:hover::before {
+    opacity: 1;
+    scale: 1 1;
+  }
+
+  /* Grow in rather than snapping when a row becomes active. */
+  @starting-style {
+    .misty-active-marker-side::before {
+      opacity: 0;
+      scale: 1 0;
+    }
+  }
+
+  .misty-active-marker-bottom::after {
+    right: 8px;
+    bottom: 0;
+    left: 8px;
+    height: 2px;
+    border-radius: 999px;
+  }
+
+  /* Every navbar action except Profile previews the same edge marker on hover.
+     The active route/popover grows it to full height without moving the icon. */
+  .misty-navbar-marker-side {
+    position: relative;
+  }
+
+  .misty-navbar-marker-side::before {
+    position: absolute;
+    top: 50%;
+    left: calc((100% - 80px) / 2);
+    z-index: 1;
+    display: block;
+    height: 28px;
+    width: var(--misty-marker-size);
+    border-radius: 0 999px 999px 0;
+    background: var(--misty-marker);
+    content: "";
+    pointer-events: none;
+    translate: 0 -50%;
+    transform-origin: center;
+    opacity: 0;
+    scale: 1 0;
+    transition:
+      scale 220ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 160ms linear;
+  }
+
+  .misty-navbar-marker-side:hover::before,
+  .misty-navbar-marker-side:focus-visible::before {
+    opacity: 0.55;
+    scale: 1 0.45;
+  }
+
+  .misty-navbar-marker-side[aria-current="page"]::before,
+  .misty-navbar-marker-side[aria-expanded="true"]::before,
+  .misty-navbar-marker-side[data-state="open"]::before {
+    opacity: 1;
+    scale: 1 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .misty-active-marker-side::before,
+    .misty-marker-host::before,
+    .misty-navbar-marker-side::before {
+      transition: none;
+    }
+  }
+}

@@ -1,5 +1,3 @@
-import { Check, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,7 +12,9 @@ import {
   Button,
   Input,
   cn,
-} from "@/ui";
+} from "@/shared/ui";
+import { Check, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { DrawingConnectionState, SpaceDrawing } from "../types";
 
 export function DrawingHeader(props: {

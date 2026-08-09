@@ -1,4 +1,4 @@
-import { Input, Label } from "@/ui";
+import { Input, Label } from "@/shared/ui";
 
 export default function AuthField({
   id,

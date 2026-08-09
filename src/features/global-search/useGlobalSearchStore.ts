@@ -1,11 +1,26 @@
-import { create } from "zustand";
 import {
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
-} from "@/features/explorer/utils/globalSearch";
-import { useExplorerStore } from "@/stores/explorer";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+  useExplorerStore,
+} from "@/features/file-explorer";
+import { useSpacesStore } from "@/features/spaces";
+import { create } from "zustand";
+import {
+  globalMistyError,
+  globalMistyId,
+  normalizeActionState,
+  proposeAction,
+} from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
+import { mergeGlobalMistyContext, uniqueGlobalMistyContext } from "./globalMistyContext";
+import {
+  buildLocalIndex,
+  globalSearchContext,
+  mapFileResults,
+  mergeResults,
+  searchDocuments,
+  searchServerTasks,
+} from "./globalSearchDocuments";
 import type {
   GlobalAiActionProposal,
   GlobalAiContextRef,
@@ -16,21 +31,6 @@ import type {
   GlobalSearchDocument,
   GlobalSearchResult,
 } from "./types";
-import {
-  buildLocalIndex,
-  globalSearchContext,
-  mapFileResults,
-  mergeResults,
-  searchDocuments,
-  searchServerTasks,
-} from "./globalSearchDocuments";
-import {
-  globalMistyError,
-  globalMistyId,
-  normalizeActionState,
-  proposeAction,
-} from "./globalMistyActions";
-import { mergeGlobalMistyContext, uniqueGlobalMistyContext } from "./globalMistyContext";
 export { globalSearchContext } from "./globalSearchDocuments";
 
 export interface GlobalSearchState {

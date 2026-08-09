@@ -1,8 +1,8 @@
+import { useAuth } from "@/features/auth";
+import { useSpacesStore } from "@/features/spaces";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { activityItemsFromSpaces, activityTargetMatchesLocation } from "./activityModel";
 import { syncNativeBadge } from "./nativeNotifications";
 import { useActivityStore } from "./useActivityStore";

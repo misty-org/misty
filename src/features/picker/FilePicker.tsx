@@ -1,16 +1,30 @@
+import { useAppStore } from "@/features/app-shell";
 import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
-import { FolderOpen, CloudDownload } from "lucide-react";
-import { FileBrowser } from "@/features/explorer/components/FileBrowser";
-import { ExplorerPickerToolbar } from "@/features/explorer/components/ExplorerPickerToolbar";
+  ExplorerPickerToolbar,
+  FileBrowser,
+  sortListing,
+  useExplorerStore,
+  type ExplorerSortColumn,
+  type ExplorerSortState,
+} from "@/features/file-explorer";
+import { useProvidersStore } from "@/features/providers";
 import {
+  selectAdvancedPreferences,
+  selectGeneralPreferences,
+  useSettingsStore,
+} from "@/features/settings";
+import { useMultiPanelStore } from "@/features/workspace";
+import { devicesSnapshot, explorerListDirectory } from "@/services/backend";
+import type {
+  DirectoryListing,
+  FileEntry,
+  MountedDevice,
+  ProviderRemote,
+} from "@/services/misty/model/misty-api";
+import { errorText } from "@/shared/lib/format";
+import {
+  Alert,
+  AlertDescription,
   Button,
   Dialog,
   DialogContent,
@@ -18,32 +32,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Alert,
-  AlertDescription,
-} from "@/ui";
-import { devicesSnapshot, explorerListDirectory } from "@/stores/backend";
-import type {
-  DirectoryListing,
-  FileEntry,
-  MountedDevice,
-  ProviderRemote,
-} from "@/models/interfaces/services/misty-api";
+} from "@/shared/ui";
+import { CloudDownload } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { PickerPlaces } from "./PickerPlaces";
-import { errorText } from "@/lib/format";
-import { useMultiPanelStore } from "@/features/workspace";
-import {
-  useAppStore,
-  selectAdvancedPreferences,
-  selectGeneralPreferences,
-  useSettingsStore,
-} from "@/stores/app";
-import {
-  sortListing,
-  useExplorerStore,
-  type ExplorerSortColumn,
-  type ExplorerSortState,
-} from "@/stores/explorer";
-import { useProvidersStore } from "@/stores/providers";
 
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];

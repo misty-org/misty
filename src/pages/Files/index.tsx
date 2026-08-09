@@ -1,1 +1,1 @@
-export { default, preloadDesktopFilesPage } from "@/features/explorer";
+export { default, preloadDesktopFilesPage } from "@/features/file-explorer";

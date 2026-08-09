@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { readAccountAuthToken, readAccountSessionGeneration } from "@/features/auth";
+import { httpRequest } from "@/services/http";
+import { resolveSpacesApiBase } from "@/services/spaces/api";
+import { cn } from "@/shared/ui";
 import { Bot, CalendarDays, Code2, PenLine, Search, Sparkles, type LucideIcon } from "lucide-react";
-import { cn } from "@/ui";
-import type { AgentAvatar as AgentAvatarValue } from "@/models/interfaces/features/agents/personal";
-import { resolveSpacesApiBase } from "@/stores/spaces/useSpacesBackendStore";
-import {
-  readAccountAuthToken,
-  readAccountSessionGeneration,
-} from "@/stores/account/useAuthTokenStore";
+import { useEffect, useMemo, useState } from "react";
+import type { AgentAvatar as AgentAvatarValue } from "./model/interfaces/personal";
 
 const presetIcons: Record<string, LucideIcon> = {
   bot: Bot,
@@ -53,11 +51,16 @@ export function AgentAvatar({
   className?: string;
   iconClassName?: string;
 }) {
-  const resolved = avatar ?? {
-    kind: "preset" as const,
-    preset_id: legacyIcon || "bot",
-    accent: "indigo",
-  };
+  const resolved = useMemo(
+    () =>
+      avatar ?? {
+        kind: "preset" as const,
+        preset_id: legacyIcon || "bot",
+        accent: "indigo",
+      },
+    [avatar, legacyIcon],
+  );
+  const resolvedVersion = resolved.kind === "upload" ? resolved.version : undefined;
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export function AgentAvatar({
       .then(async ([base, token]) => {
         const headers = new Headers();
         if (token) headers.set("Authorization", `Bearer ${token}`);
-        const response = await fetch(
+        const response = await httpRequest(
           `${base}/agents/${encodeURIComponent(agentId)}/avatar?version=${resolved.version}`,
           { credentials: "include", headers },
         );
@@ -85,7 +88,7 @@ export function AgentAvatar({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [agentId, resolved.kind, resolved.kind === "upload" ? resolved.version : undefined]);
+  }, [agentId, resolved, resolvedVersion]);
 
   const PresetIcon = useMemo(
     () =>

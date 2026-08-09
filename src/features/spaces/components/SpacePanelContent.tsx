@@ -1,29 +1,29 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useMinimumSpin } from "@/hooks/useMinimumSpin";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import { useAuth } from "@/features/auth";
+import { spacesApi } from "@/services/spaces/api";
 import type {
   Space,
   SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
-} from "@/models/interfaces/features/spaces/types";
+} from "@/services/spaces/dto/interfaces/types";
+import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import { useEffect, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
+import { preferredMistySpace } from "../mistySpace";
+import { useSpacesStore } from "../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
 import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
 import { SpaceSectionNavigation } from "./SpaceSectionNavigation";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
 import { SpaceSidebarHeader } from "./spacePanel/SpaceSidebarHeader";
-import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 import {
   spaceConversationPath,
   spaceSectionPath,
   useSpacePanelRoute,
 } from "./spacePanel/spacePanelRoute";
-import { preferredMistySpace } from "../mistySpace";
+import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyAgents: SpaceAgentMembership[] = [];

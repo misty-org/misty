@@ -1,6 +1,6 @@
-import type { UnifiedNote } from "@/models/types/features/notes/types";
+import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/shared/ui";
 import { Star } from "lucide-react";
-import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/ui";
+import type { UnifiedNote } from "../model/types/types";
 import { SyncErrorNotice } from "./NotesConnectionCards";
 
 const listPanelClass = "flex flex-col min-h-0 overflow-hidden";

@@ -1,3 +1,6 @@
+import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { matchesQuery, nowIso, previewFrom } from "../connectorUtils";
+import { NOTION_CONNECTOR_ID } from "../mockData";
 import type {
   AppendNoteInput,
   NoteSourceOption,
@@ -6,23 +9,16 @@ import type {
   PublishNoteResult,
   SyncResult,
   UpdateNoteInput,
-} from "@/models/interfaces/features/notes/connectors";
-import type {
-  NotionBlock,
-  NotionClient,
-  NotionPage,
-} from "@/models/interfaces/features/notes/notion";
-import type { NoteProviderStatus, UnifiedNote } from "@/models/types/features/notes/types";
-import type { NoteConnectorCapabilities } from "@/models/types/features/notes/capabilities";
-import { NOTION_CONNECTOR_ID } from "@/features/notes/mockData";
-import { matchesQuery, nowIso, previewFrom } from "@/features/notes/connectorUtils";
+} from "../model/interfaces/connectors";
+import type { NotionBlock, NotionClient, NotionPage } from "../model/interfaces/notion";
+import type { NoteConnectorCapabilities } from "../model/types/capabilities";
+import type { NoteProviderStatus, UnifiedNote } from "../model/types/types";
 import {
   activeNotionAccountId,
   activeNotionSpaceId,
   createNotionApiClient,
   toNoteWriteError,
-} from "@/stores/notes/notionApi";
-import { openExternalLink } from "@/platform/openExternalLink";
+} from "../store/notionApi";
 import {
   buildCreatePagePayload,
   buildPropertyPatch,

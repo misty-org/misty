@@ -1,5 +1,5 @@
-import type { NoteGroup, NoteGroupId, UnifiedNote } from "@/models/types/features/notes/types";
-import { matchesQuery } from "@/features/notes/connectorUtils";
+import { matchesQuery } from "./connectorUtils";
+import type { NoteGroup, NoteGroupId, UnifiedNote } from "./model/types/types";
 
 export const noteGroups: NoteGroup[] = [{ id: "space", label: "Notes" }];
 
@@ -16,7 +16,7 @@ export function isNoteGroupId(value: string): value is NoteGroupId {
 export function notesInGroup(
   notes: UnifiedNote[],
   group: NoteGroupId,
-  now = Date.now(),
+  _now = Date.now(),
   spaceId?: string,
 ) {
   switch (group) {

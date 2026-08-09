@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, cn } from "@/ui";
+import { Alert, AlertDescription, cn } from "@/shared/ui";
 
 const toneClasses: Record<AuthMessageProps["tone"], string> = {
   error: "border-charcoal-active/30 bg-charcoal-active text-cream-bright",

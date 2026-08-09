@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { hasTauriInternals } from "@/platform/tauri";
-import { settingsBoolean, useSettingsStore } from "@/stores/app";
-import { Button, Progress } from "@/ui";
-import { DesktopSettingsRow } from "@/pages/Settings/DesktopSettingsUI";
+import { DesktopSettingsRow, settingsBoolean, useSettingsStore } from "@/features/settings";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { Button, Progress } from "@/shared/ui";
 import {
   applyUpdateProgress,
   EMPTY_UPDATE_PROGRESS,

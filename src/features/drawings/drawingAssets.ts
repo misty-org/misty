@@ -1,10 +1,11 @@
-import type { FileId } from "@excalidraw/excalidraw/element/types";
-import type { BinaryFileData, DataURL } from "@excalidraw/excalidraw/types";
 import {
   journalAssetDownloadPath,
   resolveJournalAssetUrl,
   uploadJournalAsset,
-} from "@/features/journal/assets/journalAssetTransfer";
+} from "@/features/journal";
+import { httpBlob } from "@/services/http";
+import type { FileId } from "@excalidraw/excalidraw/element/types";
+import type { BinaryFileData, DataURL } from "@excalidraw/excalidraw/types";
 import type { DrawingAssetReference } from "./types";
 
 const drawingAssetExtensions: Record<string, string> = {
@@ -28,7 +29,7 @@ export async function uploadDrawingBinaryFile(
   if (!extension) {
     throw new Error("This image format cannot be shared safely.");
   }
-  const blob = await fetch(file.dataURL).then((response) => response.blob());
+  const blob = await httpBlob(file.dataURL);
   const uploaded = await uploadJournalAsset({
     kind: "drawing",
     spaceId,

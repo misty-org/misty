@@ -1,7 +1,4 @@
-import {
-  activateAccountSession,
-  listSavedAccountSessions,
-} from "@/stores/account/useAuthTokenStore";
+import { activateAccountSession, listSavedAccountSessions } from "./store/useAuthTokenStore";
 
 export async function restoreSavedSession(accountId: string): Promise<void> {
   if (!accountId) return;

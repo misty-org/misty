@@ -1,14 +1,13 @@
+import { useAuth } from "@/features/auth";
+import { useSetupStore } from "./store/useSetupStore";
+import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
+import { Button, Card } from "@/shared/ui";
 import { CheckCircle2, CircleAlert, Download, Expand, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useAuth } from "@/features/auth/AuthContext";
-import { Button } from "@/ui";
-import { Card } from "@/ui";
+import type { InstallCheck } from "./model/types/types";
 import { PanelModal } from "./PanelModal";
 import { VersionPicker } from "./VersionPicker";
-import { useSetupStore } from "@/stores/app";
-import { useMinimumSpin } from "@/hooks/useMinimumSpin";
-import type { InstallCheck } from "@/models/types/features/installer/types";
 
 function countReady(checks: InstallCheck[]) {
   return checks.filter((check) => check.exists).length;

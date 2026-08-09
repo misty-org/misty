@@ -1,6 +1,6 @@
+import { spaceNotesEnabled } from "@/features/notes";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { spaceNotesEnabled } from "@/features/notes/availability";
 
 const validSections = new Set([
   "chat",

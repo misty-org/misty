@@ -1,13 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { spaceNotesEnabled } from "@/features/notes/availability";
-import { openExternalLink } from "@/platform/openExternalLink";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+import { spaceNotesEnabled } from "@/features/notes";
+import { spacesApi } from "@/services/spaces/api";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegrationProvider,
   SpaceTemplate,
-} from "@/models/interfaces/features/spaces/types";
+} from "@/services/spaces/dto/interfaces/types";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { restoreDocumentInteractivityAfterModalClose } from "./spacesShellStorage";
 
 export const CREATE_STEP_COUNT = 3;

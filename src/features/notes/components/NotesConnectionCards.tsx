@@ -1,7 +1,7 @@
+import { Button, Card, StatusBadge, cn } from "@/shared/ui";
 import { AlertTriangle, ArrowRight, Clock3 } from "lucide-react";
 import { SiNotion } from "react-icons/si";
-import type { NoteProviderStatus } from "@/models/types/features/notes/types";
-import { Button, Card, StatusBadge, cn } from "@/ui";
+import type { NoteProviderStatus } from "../model/types/types";
 import { providerStatusPresentation } from "./NoteSourceBadge";
 
 /**

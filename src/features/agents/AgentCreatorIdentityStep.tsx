@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import { Button, Input, Label, Textarea, cn } from "@/shared/ui";
 import { Upload } from "lucide-react";
-import { Button, Input, Label, Textarea, cn } from "@/ui";
+import type { ReactNode } from "react";
 import { AgentAvatar, agentAvatarAccents, agentAvatarPresets } from "./AgentAvatar";
 
 const accentSwatches: Record<string, string> = {

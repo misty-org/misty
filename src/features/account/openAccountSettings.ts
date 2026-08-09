@@ -1,6 +1,6 @@
-import type { AccountHandoffPath } from "@/models/interfaces/stores/account/useAccountStore";
-import { accountCreateHandoffUrl, resolveAccountApiBase } from "@/stores/account/useAccountStore";
-import { openSystemExternalLink } from "@/platform/openExternalLink";
+import type { AccountHandoffPath } from "@/features/auth";
+import { accountCreateHandoffUrl, resolveAccountApiBase } from "@/features/auth";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 
 /**
  * Opens the account surface on the website, already signed in.

@@ -1,6 +1,3 @@
-import type { NewNoteDialogProps } from "@/models/interfaces/features/notes/components/NotesIntegrationsDialog";
-export type { NewNoteDialogProps } from "@/models/interfaces/features/notes/components/NotesIntegrationsDialog";
-import { useEffect, useState } from "react";
 import {
   Button,
   Dialog,
@@ -10,7 +7,10 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@/ui";
+} from "@/shared/ui";
+import { useEffect, useState } from "react";
+import type { NewNoteDialogProps } from "../model/interfaces/components/NotesIntegrationsDialog";
+export type { NewNoteDialogProps } from "../model/interfaces/components/NotesIntegrationsDialog";
 
 export function NewNoteDialog(props: NewNoteDialogProps) {
   const [title, setTitle] = useState("");

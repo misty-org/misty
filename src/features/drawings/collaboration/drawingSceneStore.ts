@@ -1,5 +1,5 @@
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import * as Y from "yjs";
+import type * as Y from "yjs";
 
 export const localDrawingOrigin = Symbol("misty-drawing-local");
 

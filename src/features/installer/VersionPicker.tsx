@@ -1,7 +1,6 @@
+import { useSetupStore } from "./store/useSetupStore";
+import { Badge, Select, SelectContent, SelectItem, SelectTrigger } from "@/shared/ui";
 import { useShallow } from "zustand/react/shallow";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/ui";
-import { Badge } from "@/ui";
-import { useSetupStore } from "@/stores/app";
 
 export function VersionPicker() {
   const { busy, releases, releasesLoading, selectedVersion, setSelectedVersion } = useSetupStore(

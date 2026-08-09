@@ -1,17 +1,17 @@
-import { useEffect, useState } from "react";
 import { LoaderCircle, Plug, UserPlus, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
 import { Link } from "react-router-dom";
 
+import { spacesApi } from "@/services/spaces/api";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegration,
   SpaceIntegrationProvider,
   SpaceSetup,
-} from "@/models/interfaces/features/spaces/types";
-import { openExternalLink } from "@/platform/openExternalLink";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { Button, Card } from "@/ui";
+} from "@/services/spaces/dto/interfaces/types";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { Button, Card } from "@/shared/ui";
 
 export function SpaceSetupCards({
   spaceId,

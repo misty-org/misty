@@ -1,0 +1,80 @@
+export type {
+  SpaceChatMessagesProps,
+  SpaceChatStarter,
+} from "@/services/spaces/dto/interfaces/components/SpaceChatMessages";
+export { DeleteMessageDialog } from "./DeleteMessageDialog";
+export { messageReplyPreviewText } from "./messageHelpers";
+
+import type { SpaceChatMessagesProps } from "@/services/spaces/dto/interfaces/components/SpaceChatMessages";
+import { useMemo } from "react";
+import { AgentTypingIndicator } from "./AgentTypingIndicator";
+import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
+import { ChatMessageRow } from "./ChatMessageRow";
+import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
+import { SpaceChatStarters } from "./ChatStarters";
+import { SpaceDirectMessageIntro } from "./DirectMessageIntro";
+
+export function SpaceChatMessages(props: SpaceChatMessagesProps) {
+  const displayRows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
+  const memberAvatarUrls = useMemberAvatarUrls(props.spaceId, props.messages);
+  const pendingRun = props.pendingAgentRuns?.[0];
+
+  const avatarFor = (message: {
+    origin?: { author_avatar_url?: string };
+    sender_user_id: string;
+  }) => message.origin?.author_avatar_url || memberAvatarUrls.get(message.sender_user_id) || "";
+
+  return (
+    <div
+      ref={props.scrollRef}
+      onScroll={props.onScroll}
+      className="min-h-0 flex-1 overflow-y-auto px-[clamp(16px,2.5vw,32px)] pb-3 pt-4"
+    >
+      <div>
+        {props.error ? (
+          <div
+            className="mb-4 rounded-lg border border-charcoal-active/30 bg-charcoal-active px-3 py-2 text-sm text-cream-bright"
+            role="alert"
+          >
+            {props.error}
+          </div>
+        ) : null}
+
+        {props.loading ? (
+          <ChatMessagesSkeleton />
+        ) : props.messages.length === 0 ? (
+          props.directRecipient ? (
+            <SpaceDirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
+          ) : (
+            <SpaceChatStarters
+              spaceName={props.spaceName}
+              onStarter={props.canWrite ? props.onStarter : undefined}
+            />
+          )
+        ) : (
+          displayRows.map(({ message, compact, dateLabel }) => {
+            const repliedToMessage = message.reply_to_message_id
+              ? props.messages.find((item) => item.id === message.reply_to_message_id)
+              : undefined;
+            return (
+              <ChatMessageRow
+                key={message.id}
+                message={message}
+                compact={compact}
+                dateLabel={dateLabel}
+                avatarUrl={avatarFor(message)}
+                repliedToMessage={repliedToMessage}
+                repliedToAvatarUrl={repliedToMessage ? avatarFor(repliedToMessage) : ""}
+                props={props}
+              />
+            );
+          })
+        )}
+
+        {pendingRun ? <AgentTypingIndicator runId={pendingRun.runId || undefined} /> : null}
+
+        <div ref={props.endRef} />
+      </div>
+    </div>
+  );
+}

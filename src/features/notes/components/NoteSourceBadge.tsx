@@ -1,9 +1,5 @@
-import type {
-  NoteSource,
-  NoteProviderStatus,
-  NoteSyncStatus,
-} from "@/models/types/features/notes/types";
-import { SiDropbox, SiGoogledrive, SiNotion, SiObsidian } from "react-icons/si";
+import { StatusBadge, cn } from "@/shared/ui";
+import type { StatusTone } from "@/shared/ui/model/types/status-badge";
 import {
   AlertTriangle,
   CircleDot,
@@ -12,8 +8,8 @@ import {
   PenLine,
   RefreshCw,
 } from "lucide-react";
-import type { StatusTone } from "@/models/types/ui/status-badge";
-import { StatusBadge, cn } from "@/ui";
+import { SiDropbox, SiGoogledrive, SiNotion, SiObsidian } from "react-icons/si";
+import type { NoteProviderStatus, NoteSource, NoteSyncStatus } from "../model/types/types";
 
 const notionBrand = "#E16259";
 

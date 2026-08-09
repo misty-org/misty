@@ -1,6 +1,3 @@
-import type { NoteBodyFormat, UnifiedNote } from "@/models/types/features/notes/types";
-import { Suspense, lazy, useEffect, useState } from "react";
-import { Check, PenLine, Star, Trash2, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,8 +12,11 @@ import {
   EmptyState,
   Skeleton,
   cn,
-} from "@/ui";
-import { relativeTime } from "@/features/notes/noteFilters";
+} from "@/shared/ui";
+import { Check, PenLine, Star, Trash2, X } from "lucide-react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import type { NoteBodyFormat, UnifiedNote } from "../model/types/types";
+import { relativeTime } from "../noteFilters";
 import { NoteSyncIndicator } from "./NoteSourceBadge";
 
 const NoteBlockEditor = lazy(() => import("./NoteBlockEditor"));
@@ -44,7 +44,7 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
 
   useEffect(() => {
     if (!editing) setDraft(noteContent(note));
-  }, [editing, note?.body, note?.bodyFormat, note?.bodyMarkdown, note?.id]);
+  }, [editing, note]);
   useEffect(() => {
     setDeleteOpen(false);
     setDeleting(false);

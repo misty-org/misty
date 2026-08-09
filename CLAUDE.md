@@ -98,12 +98,17 @@ Zustand stores hold state and actions. They do **not** call `fetch`.
 All network access goes through `src/services/`:
 
 ```ts
-// services/http/client.ts — auth, base URL, correlation IDs, error mapping
-// services/spaces.ts      — typed request functions + DTOs
+// services/http.ts        — auth, base URL, correlation IDs, generation checks, errors
+// services/spaces/*.ts    — domain request functions; DTOs live in services/spaces/dto/
 ```
 
 A store calls a service function and stores the result. This keeps stores small
 and makes the backend surface greppable in one directory.
+
+Spaces state is domain-owned: `features/spaces` owns directory and realtime
+state, while chat, members, library, and planner state live in their respective
+features. The complete chat surface—including thread, composer, message actions,
+scroll restoration, and tests—lives in `features/space-chat/`.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-import type { UnifiedNote } from "@/models/types/features/notes/types";
+import type { UnifiedNote } from "./model/types/types";
 
 let idCounter = 0;
 

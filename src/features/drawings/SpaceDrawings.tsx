@@ -1,13 +1,13 @@
+import { useAuth, type AuthUser } from "@/features/auth";
+import { JournalAttribution } from "@/features/journal";
+import { Button, EmptyState, PermissionState, Spinner } from "@/shared/ui";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, EmptyState, PermissionState, Spinner } from "@/ui";
-import { useAuth, type AuthUser } from "@/features/auth/AuthContext";
-import { useSpaceDrawings } from "./hooks/useSpaceDrawings";
-import { useDrawingRoom } from "./hooks/useDrawingRoom";
 import { DrawingHeader } from "./components/DrawingHeader";
 import { NewDrawingDialog } from "./components/NewDrawingDialog";
+import { useDrawingRoom } from "./hooks/useDrawingRoom";
+import { useSpaceDrawings } from "./hooks/useSpaceDrawings";
 import type { SpaceDrawing } from "./types";
-import { JournalAttribution } from "@/features/journal/components/JournalAttribution";
 
 const CollaborativeDrawingCanvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
 

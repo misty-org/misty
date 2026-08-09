@@ -1,12 +1,43 @@
 {
+  "src/app/layouts/DesktopLayout/styles.ts": [
+    {
+      "length": 161,
+      "hash": "b02e0bc0481ad599"
+    },
+    {
+      "length": 169,
+      "hash": "33323ac7f5c59123"
+    }
+  ],
+  "src/app/layouts/RootLayout.tsx": [
+    {
+      "length": 308,
+      "hash": "5aab0420a6de0452"
+    }
+  ],
   "src/features/agents/AgentSources.tsx": [
     {
       "length": 287,
       "hash": "0444dc36ca36ba69"
     }
   ],
-
-  "src/features/explorer/components/DeepSearchOverlay.tsx": [
+  "src/features/auth/SignInPage.tsx": [
+    {
+      "length": 185,
+      "hash": "29926a8b06e56b2e"
+    },
+    {
+      "length": 195,
+      "hash": "2f0b6b91eb5e48b6"
+    }
+  ],
+  "src/features/extensions/components/ExtensionCatalogIcon.tsx": [
+    {
+      "length": 165,
+      "hash": "f241d940f605b239"
+    }
+  ],
+  "src/features/file-explorer/components/DeepSearchOverlay.tsx": [
     {
       "length": 319,
       "hash": "043bcc5b43e4abfb"
@@ -20,13 +51,13 @@
       "hash": "e36571c94fea60c0"
     }
   ],
-  "src/features/explorer/components/ExplorerSidebar.tsx": [
+  "src/features/file-explorer/components/ExplorerSidebar.tsx": [
     {
       "length": 169,
       "hash": "2bb169cfe552f236"
     }
   ],
-  "src/features/explorer/components/ExplorerSidebarSupport.tsx": [
+  "src/features/file-explorer/components/ExplorerSidebarSupport.tsx": [
     {
       "length": 189,
       "hash": "5d2346243a5b423a"
@@ -48,7 +79,7 @@
       "hash": "1dc414f69ca412b9"
     }
   ],
-  "src/features/explorer/components/ExplorerToolbarSupport.tsx": [
+  "src/features/file-explorer/components/ExplorerToolbarSupport.tsx": [
     {
       "length": 189,
       "hash": "15d6f32e30f68564"
@@ -70,7 +101,7 @@
       "hash": "7e98b31fa6357fc1"
     }
   ],
-  "src/features/explorer/components/FileBrowserStyles.ts": [
+  "src/features/file-explorer/components/FileBrowserStyles.ts": [
     {
       "length": 293,
       "hash": "bdd8303a6f9758ed"
@@ -108,25 +139,25 @@
       "hash": "63094f68c2bd11c8"
     }
   ],
-  "src/features/explorer/components/MediaSearchViewer.tsx": [
+  "src/features/file-explorer/components/MediaSearchViewer.tsx": [
     {
       "length": 168,
       "hash": "346027b027925317"
     }
   ],
-  "src/features/explorer/components/fileBrowser/FileGridItem.tsx": [
+  "src/features/file-explorer/components/fileBrowser/FileGridItem.tsx": [
     {
       "length": 280,
       "hash": "5ee2a3673e83c23f"
     }
   ],
-  "src/features/explorer/components/fileBrowser/FileTableRow.tsx": [
+  "src/features/file-explorer/components/fileBrowser/FileTableRow.tsx": [
     {
       "length": 287,
       "hash": "b4c2e7423e99897f"
     }
   ],
-  "src/features/explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
+  "src/features/file-explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
     {
       "length": 161,
       "hash": "54f971eaa0cb4590"
@@ -136,25 +167,25 @@
       "hash": "ff8fd46c3a758db7"
     }
   ],
-  "src/features/explorer/components/globalPreview/GlobalPreviewDialog.tsx": [
+  "src/features/file-explorer/components/globalPreview/GlobalPreviewDialog.tsx": [
     {
       "length": 252,
       "hash": "5c7e40e14f4fbc2c"
     }
   ],
-  "src/features/explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
+  "src/features/file-explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
     {
       "length": 312,
       "hash": "d6fecc00bf4b053b"
     }
   ],
-  "src/features/explorer/components/libraryWorkspace/LibraryGallery.tsx": [
+  "src/features/file-explorer/components/libraryWorkspace/LibraryGallery.tsx": [
     {
       "length": 195,
       "hash": "b21f214321697811"
     }
   ],
-  "src/features/explorer/desktop/ExplorerBatchRenameDialog.tsx": [
+  "src/features/file-explorer/workspace/ExplorerBatchRenameDialog.tsx": [
     {
       "length": 185,
       "hash": "8eacfb597700938c"
@@ -164,19 +195,19 @@
       "hash": "cfa4e7ac0886c148"
     }
   ],
-  "src/features/explorer/desktop/ExplorerCompareDialog.tsx": [
+  "src/features/file-explorer/workspace/ExplorerCompareDialog.tsx": [
     {
       "length": 176,
       "hash": "7f7194965c3d66f6"
     }
   ],
-  "src/features/explorer/desktop/ExplorerDesktopDialogStyles.ts": [
+  "src/features/file-explorer/workspace/ExplorerDesktopDialogStyles.ts": [
     {
       "length": 177,
       "hash": "0c987fdfe42144b1"
     }
   ],
-  "src/features/explorer/desktop/ExplorerDesktopPluginStyles.ts": [
+  "src/features/file-explorer/workspace/ExplorerDesktopPluginStyles.ts": [
     {
       "length": 215,
       "hash": "0d6076bdd5155271"
@@ -238,7 +269,7 @@
       "hash": "e53f69af37473d31"
     }
   ],
-  "src/features/explorer/desktop/ExplorerDesktopStatus.tsx": [
+  "src/features/file-explorer/workspace/ExplorerDesktopStatus.tsx": [
     {
       "length": 254,
       "hash": "8e82f1e129bb7caf"
@@ -248,13 +279,13 @@
       "hash": "57115d7e374e89ba"
     }
   ],
-  "src/features/explorer/desktop/ExplorerDuplicateFinderDialog.tsx": [
+  "src/features/file-explorer/workspace/ExplorerDuplicateFinderDialog.tsx": [
     {
       "length": 173,
       "hash": "be43f7e77e8aecdf"
     }
   ],
-  "src/features/explorer/desktop/ExplorerShellStyles.ts": [
+  "src/features/file-explorer/workspace/ExplorerShellStyles.ts": [
     {
       "length": 161,
       "hash": "64555a1d3f492d81"
@@ -264,7 +295,7 @@
       "hash": "a01f57c9537dfb2c"
     }
   ],
-  "src/features/explorer/desktop/ExplorerSmartLibraryDialog.tsx": [
+  "src/features/file-explorer/workspace/ExplorerSmartLibraryDialog.tsx": [
     {
       "length": 196,
       "hash": "218f209fa74ac0aa"
@@ -290,10 +321,22 @@
       "hash": "4eb6b129628c27e7"
     }
   ],
-  "src/features/explorer/desktop/ExplorerSmartLibraryViews.tsx": [
+  "src/features/file-explorer/workspace/ExplorerSmartLibraryViews.tsx": [
     {
       "length": 206,
       "hash": "927a2c3f702b9865"
+    }
+  ],
+  "src/features/global-search/GlobalMisty.tsx": [
+    {
+      "length": 164,
+      "hash": "0e4a31905cfa0a79"
+    }
+  ],
+  "src/features/global-search/GlobalMistyLauncher.tsx": [
+    {
+      "length": 302,
+      "hash": "4be5808e61ae50d9"
     }
   ],
   "src/features/journal/components/JournalAttribution.tsx": [
@@ -302,7 +345,69 @@
       "hash": "b696271c03ef9587"
     }
   ],
-  "src/features/spaces/SpaceLibraryPlayback.tsx": [
+  "src/features/providers/ProvidersPage.tsx": [
+    {
+      "length": 198,
+      "hash": "fd2ec3cf22d7eb39"
+    }
+  ],
+  "src/features/providers/components/RemoteListPanel.tsx": [
+    {
+      "length": 184,
+      "hash": "99c8dc05c6c0ef8d"
+    }
+  ],
+  "src/features/settings/settingsConstants.ts": [
+    {
+      "length": 162,
+      "hash": "3d7dcf66ddbb7e89"
+    }
+  ],
+  "src/features/settings/settingsControls.tsx": [
+    {
+      "length": 175,
+      "hash": "e976147355e1cb29"
+    },
+    {
+      "length": 173,
+      "hash": "a31d88740c6ecdc9"
+    },
+    {
+      "length": 184,
+      "hash": "de5f715a25619ef0"
+    }
+  ],
+  "src/features/settings/settingsSearchSection.tsx": [
+    {
+      "length": 162,
+      "hash": "216a79dbb34e0bd0"
+    }
+  ],
+  "src/features/settings/settingsSystemSections.tsx": [
+    {
+      "length": 198,
+      "hash": "4cd5c39f34abc3e0"
+    }
+  ],
+  "src/features/space-chat/components/ChatReplyBanner.tsx": [
+    {
+      "length": 164,
+      "hash": "07c67054587410af"
+    }
+  ],
+  "src/features/space-chat/components/MessageHoverActions.tsx": [
+    {
+      "length": 269,
+      "hash": "97552c91ea127eaf"
+    }
+  ],
+  "src/features/space-chat/components/MessageReplyPreview.tsx": [
+    {
+      "length": 210,
+      "hash": "37ca8065247c9015"
+    }
+  ],
+  "src/features/space-library/SpaceLibraryPlayback.tsx": [
     {
       "length": 252,
       "hash": "d2e929a3713d95d5"
@@ -320,13 +425,13 @@
       "hash": "42c12f99adc9e758"
     }
   ],
-  "src/features/spaces/SpaceLibraryViewer.tsx": [
+  "src/features/space-library/SpaceLibraryViewer.tsx": [
     {
       "length": 291,
       "hash": "03af4067d4776828"
     }
   ],
-  "src/features/spaces/SpaceLibraryViewerUtils.tsx": [
+  "src/features/space-library/SpaceLibraryViewerUtils.tsx": [
     {
       "length": 642,
       "hash": "54a785654ae45689"
@@ -336,7 +441,37 @@
       "hash": "3ef5be5894d35e4f"
     }
   ],
-  "src/features/spaces/SpaceTaskCalendarGrid.tsx": [
+  "src/features/space-library/libraryCollections/useLibraryMaintenance.ts": [
+    {
+      "length": 165,
+      "hash": "80b68ed6b80d10b1"
+    }
+  ],
+  "src/features/space-library/libraryPrimitives/LibraryCollectionCard.tsx": [
+    {
+      "length": 228,
+      "hash": "1b388d6418022c4a"
+    }
+  ],
+  "src/features/space-library/libraryPrimitives/LibraryDiscoveryCard.tsx": [
+    {
+      "length": 243,
+      "hash": "9b9fef24deefcdec"
+    }
+  ],
+  "src/features/space-library/libraryViewer/LibraryViewerStage.tsx": [
+    {
+      "length": 181,
+      "hash": "8979054a15fb7190"
+    }
+  ],
+  "src/features/space-members/components/SpaceMembers.tsx": [
+    {
+      "length": 232,
+      "hash": "85f8fa0410b314ea"
+    }
+  ],
+  "src/features/space-planner/SpaceTaskCalendarGrid.tsx": [
     {
       "length": 172,
       "hash": "47c6597f6ef6c873"
@@ -346,29 +481,16 @@
       "hash": "6112a241b5a46bac"
     }
   ],
-  "src/features/spaces/chatMessages/MessageHoverActions.tsx": [
+  "src/features/space-planner/taskDrawers/TaskDrawerProperties.tsx": [
     {
-      "length": 269,
-      "hash": "97552c91ea127eaf"
+      "length": 171,
+      "hash": "bd6f2b6a85059e8b"
     }
   ],
-  "src/features/spaces/chatMessages/MessageReplyPreview.tsx": [
-    {
-      "length": 210,
-      "hash": "37ca8065247c9015"
-    }
-  ],
-
   "src/features/spaces/components/SpaceManagementNavigation.tsx": [
     {
       "length": 165,
       "hash": "c4977d3628e797c7"
-    }
-  ],
-  "src/features/spaces/components/SpaceMembers.tsx": [
-    {
-      "length": 232,
-      "hash": "85f8fa0410b314ea"
     }
   ],
   "src/features/spaces/components/SpacesLoadingPlaceholder.tsx": [
@@ -377,117 +499,7 @@
       "hash": "bab522c30f72415c"
     }
   ],
-  "src/features/spaces/libraryCollections/useLibraryMaintenance.ts": [
-    {
-      "length": 165,
-      "hash": "80b68ed6b80d10b1"
-    }
-  ],
-  "src/features/spaces/libraryPrimitives/LibraryCollectionCard.tsx": [
-    {
-      "length": 228,
-      "hash": "1b388d6418022c4a"
-    }
-  ],
-  "src/features/spaces/libraryPrimitives/LibraryDiscoveryCard.tsx": [
-    {
-      "length": 243,
-      "hash": "9b9fef24deefcdec"
-    }
-  ],
-  "src/features/spaces/libraryViewer/LibraryViewerStage.tsx": [
-    {
-      "length": 181,
-      "hash": "8979054a15fb7190"
-    }
-  ],
-  "src/features/spaces/spaceChat/ChatReplyBanner.tsx": [
-    {
-      "length": 164,
-      "hash": "07c67054587410af"
-    }
-  ],
-  "src/features/spaces/taskDrawers/TaskDrawerProperties.tsx": [
-    {
-      "length": 171,
-      "hash": "bd6f2b6a85059e8b"
-    }
-  ],
-  "src/features/workspace/ChromeTabStrip.tsx": [
-    {
-      "length": 161,
-      "hash": "667b2934839f0389"
-    },
-    {
-      "length": 170,
-      "hash": "a1902bf61947a3b8"
-    }
-  ],
-  "src/layouts/DesktopLayout/styles.ts": [
-    {
-      "length": 161,
-      "hash": "b02e0bc0481ad599"
-    },
-    {
-      "length": 169,
-      "hash": "33323ac7f5c59123"
-    }
-  ],
-  "src/layouts/RootLayout.tsx": [
-    {
-      "length": 308,
-      "hash": "5aab0420a6de0452"
-    }
-  ],
-  "src/pages/Providers/components/RemoteListPanel.tsx": [
-    {
-      "length": 184,
-      "hash": "99c8dc05c6c0ef8d"
-    }
-  ],
-  "src/pages/Providers/desktop/index.tsx": [
-    {
-      "length": 198,
-      "hash": "fd2ec3cf22d7eb39"
-    }
-  ],
-  "src/pages/Settings/desktop/index.tsx": [
-    {
-      "length": 162,
-      "hash": "3d7dcf66ddbb7e89"
-    },
-    {
-      "length": 162,
-      "hash": "216a79dbb34e0bd0"
-    },
-    {
-      "length": 198,
-      "hash": "4cd5c39f34abc3e0"
-    },
-    {
-      "length": 175,
-      "hash": "e976147355e1cb29"
-    },
-    {
-      "length": 173,
-      "hash": "a31d88740c6ecdc9"
-    },
-    {
-      "length": 184,
-      "hash": "de5f715a25619ef0"
-    }
-  ],
-  "src/pages/SignIn/desktop/index.tsx": [
-    {
-      "length": 185,
-      "hash": "29926a8b06e56b2e"
-    },
-    {
-      "length": 195,
-      "hash": "2f0b6b91eb5e48b6"
-    }
-  ],
-  "src/pages/Transfers/desktop/transferStyles.ts": [
+  "src/features/transfers/transferStyles.ts": [
     {
       "length": 172,
       "hash": "4e25f08e16f5df05"
@@ -505,25 +517,29 @@
       "hash": "fa6dd583568aa7e4"
     }
   ],
-  "src/plugins/ExtensionCatalogIcon.tsx": [
+  "src/features/workspace/ChromeTabStrip.tsx": [
     {
-      "length": 165,
-      "hash": "f241d940f605b239"
+      "length": 161,
+      "hash": "667b2934839f0389"
+    },
+    {
+      "length": 170,
+      "hash": "a1902bf61947a3b8"
     }
   ],
-  "src/ui/alert-dialog.tsx": [
+  "src/shared/ui/alert-dialog.tsx": [
     {
       "length": 179,
       "hash": "57a90c121cb67190"
     }
   ],
-  "src/ui/alert.tsx": [
+  "src/shared/ui/alert.tsx": [
     {
       "length": 318,
       "hash": "99a36f81b1dcd188"
     }
   ],
-  "src/ui/avatar.tsx": [
+  "src/shared/ui/avatar.tsx": [
     {
       "length": 202,
       "hash": "ea35c9437cb52838"
@@ -537,13 +553,13 @@
       "hash": "b5d6686e3c7cf320"
     }
   ],
-  "src/ui/badge.tsx": [
+  "src/shared/ui/badge.tsx": [
     {
       "length": 344,
       "hash": "c55227b71cc33062"
     }
   ],
-  "src/ui/button.tsx": [
+  "src/shared/ui/button.tsx": [
     {
       "length": 635,
       "hash": "0c4d96199007caca"
@@ -557,7 +573,7 @@
       "hash": "f9b1e240d32f08fd"
     }
   ],
-  "src/ui/card.tsx": [
+  "src/shared/ui/card.tsx": [
     {
       "length": 285,
       "hash": "6f80747f55e0d299"
@@ -567,13 +583,13 @@
       "hash": "0fd31895d3e806d9"
     }
   ],
-  "src/ui/checkbox.tsx": [
+  "src/shared/ui/checkbox.tsx": [
     {
       "length": 426,
       "hash": "168a9cc7daf92dbf"
     }
   ],
-  "src/ui/command.tsx": [
+  "src/shared/ui/command.tsx": [
     {
       "length": 388,
       "hash": "df5bb95f1e54869e"
@@ -587,7 +603,7 @@
       "hash": "101e6de7ba486f2f"
     }
   ],
-  "src/ui/context-menu.tsx": [
+  "src/shared/ui/context-menu.tsx": [
     {
       "length": 291,
       "hash": "88d485f81ca29eb3"
@@ -613,7 +629,7 @@
       "hash": "dd1c5dc9e8552c35"
     }
   ],
-  "src/ui/dialog.tsx": [
+  "src/shared/ui/dialog.tsx": [
     {
       "length": 179,
       "hash": "601db1ecebb28de6"
@@ -623,13 +639,13 @@
       "hash": "68a00f7845be8b17"
     }
   ],
-  "src/ui/drag-layer.tsx": [
+  "src/shared/ui/drag-layer.tsx": [
     {
       "length": 162,
       "hash": "1d858e9f0ea727ff"
     }
   ],
-  "src/ui/dropdown-menu.tsx": [
+  "src/shared/ui/dropdown-menu.tsx": [
     {
       "length": 344,
       "hash": "938ac8a13a38bba6"
@@ -655,25 +671,25 @@
       "hash": "7fa0b7e7ce65792b"
     }
   ],
-  "src/ui/popover.tsx": [
+  "src/shared/ui/popover.tsx": [
     {
       "length": 468,
       "hash": "a9ab7707cefa0acc"
     }
   ],
-  "src/ui/radio-group.tsx": [
+  "src/shared/ui/radio-group.tsx": [
     {
       "length": 278,
       "hash": "50ba02f7e7e3ffe3"
     }
   ],
-  "src/ui/resizable.tsx": [
+  "src/shared/ui/resizable.tsx": [
     {
       "length": 676,
       "hash": "68340d3a904d0f8a"
     }
   ],
-  "src/ui/select.tsx": [
+  "src/shared/ui/select.tsx": [
     {
       "length": 539,
       "hash": "ba3b6856afe22c60"
@@ -683,7 +699,7 @@
       "hash": "437ae662e3920950"
     }
   ],
-  "src/ui/sheet.tsx": [
+  "src/shared/ui/sheet.tsx": [
     {
       "length": 179,
       "hash": "601db1ecebb28de6"
@@ -697,7 +713,7 @@
       "hash": "8be6d06314d8c0df"
     }
   ],
-  "src/ui/tabs.tsx": [
+  "src/shared/ui/tabs.tsx": [
     {
       "length": 231,
       "hash": "b27539ee55cd7744"
@@ -711,7 +727,7 @@
       "hash": "2cd65f256ce42f1d"
     }
   ],
-  "src/ui/toggle-group.tsx": [
+  "src/shared/ui/toggle-group.tsx": [
     {
       "length": 174,
       "hash": "67c111461cb5f1b5"

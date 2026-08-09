@@ -1,5 +1,3 @@
-import { useMemo, useState } from "react";
-import { Check, ChevronDown, Sparkles } from "lucide-react";
 import {
   Button,
   Command,
@@ -12,9 +10,11 @@ import {
   PopoverContent,
   PopoverTrigger,
   cn,
-} from "@/ui";
-import type { GatewayModel } from "@/models/interfaces/features/agents/personal";
-import { selectedAgentModelName } from "@/features/agents/modelSelection";
+} from "@/shared/ui";
+import { Check, ChevronDown, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { GatewayModel } from "../model/interfaces/personal";
+import { selectedAgentModelName } from "../modelSelection";
 import { ModelProviderLogo } from "./ModelProviderLogo";
 
 export function AgentModelPicker({

@@ -1,4 +1,4 @@
-import { Skeleton } from "@/ui";
+import { Skeleton } from "@/shared/ui";
 
 export function SpacePanelSkeleton() {
   return (

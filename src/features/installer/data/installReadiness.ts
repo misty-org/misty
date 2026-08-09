@@ -5,7 +5,7 @@ import type {
   MistyTemplateStatus,
   NativeSystemInfo,
   PathProbe,
-} from "@/models/types/features/installer/types";
+} from "../model/types/types";
 
 export const browserTemplateEntries: MistyTemplateEntry[] = [
   templateEntry("dir", ".local"),

@@ -1,4 +1,3 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -7,7 +6,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/ui";
+} from "@/shared/ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   CreateSpaceConnectionsStep,
   CreateSpaceNameStep,

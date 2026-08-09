@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Button,
   Dialog,
@@ -8,7 +7,8 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@/ui";
+} from "@/shared/ui";
+import { useEffect, useState } from "react";
 
 export function NewDrawingDialog(props: {
   open: boolean;

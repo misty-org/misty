@@ -1,6 +1,6 @@
+import { useSpacesStore } from "@/features/spaces";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 import { compareActivityNewestFirst } from "./activityModel";
 import { publishNativeActivity, syncNativeBadge } from "./nativeNotifications";
 import type { ActivityItem, ActivityTarget, LocalActivityInput } from "./types";

@@ -1,4 +1,4 @@
-import { ToggleGroup, ToggleGroupItem } from "@/ui";
+import { ToggleGroup, ToggleGroupItem } from "@/shared/ui";
 
 export function SpaceViewModeToggle<T extends string>(props: {
   label: string;

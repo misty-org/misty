@@ -1,13 +1,3 @@
-import type {
-  ConnectorCardProps,
-  NotesIntegrationsDialogProps,
-} from "@/models/interfaces/features/notes/components/NotesIntegrationsDialog";
-export type {
-  ConnectorCardProps,
-  NotesIntegrationsDialogProps,
-} from "@/models/interfaces/features/notes/components/NotesIntegrationsDialog";
-import { Settings2 } from "lucide-react";
-import type { NotesIntegrationCard } from "@/models/interfaces/features/notes/connectors";
 import {
   Button,
   Card,
@@ -18,9 +8,19 @@ import {
   DialogTitle,
   ScrollArea,
   StatusBadge,
-} from "@/ui";
-import { relativeTime } from "@/features/notes/noteFilters";
+} from "@/shared/ui";
+import { Settings2 } from "lucide-react";
+import type {
+  ConnectorCardProps,
+  NotesIntegrationsDialogProps,
+} from "../model/interfaces/components/NotesIntegrationsDialog";
+import type { NotesIntegrationCard } from "../model/interfaces/connectors";
+import { relativeTime } from "../noteFilters";
 import { ProviderGlyph, providerStatusPresentation } from "./NoteSourceBadge";
+export type {
+  ConnectorCardProps,
+  NotesIntegrationsDialogProps,
+} from "../model/interfaces/components/NotesIntegrationsDialog";
 
 const sectionTitleClass =
   "mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-cream-muted/70";

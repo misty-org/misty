@@ -1,24 +1,46 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { repositoryPath, walk } from "./repositoryPolicy";
 
 const extensions = new Set([".ts", ".tsx"]);
-const uiImplementationRoots = ["src/ui/", "src/models/interfaces/ui/", "src/models/types/ui/"];
+const uiImplementationRoots = ["src/shared/ui/"];
 const protectedRoots = [
-  "src/features/explorer/",
+  "src/features/file-explorer/",
+  "src/features/file-preview/",
+  "src/features/file-search/",
+  "src/features/providers/",
+  "src/features/settings/",
+  "src/features/space-chat/",
+  "src/features/space-connections/",
+  "src/features/space-library/",
+  "src/features/space-members/",
+  "src/features/space-planner/",
+  "src/features/space-roadmap/",
   "src/features/spaces/",
-  "src/pages/Agents/",
-  "src/pages/Files/",
-  "src/pages/Providers/",
-  "src/pages/Settings/",
-  "src/pages/Spaces/",
-  "src/pages/Studio/",
-  "src/pages/Transfers/",
+  "src/features/transfers/",
 ];
 
+const allowedSourceRoots = new Set([
+  "app",
+  "features",
+  "pages",
+  "services",
+  "shared",
+  "styles",
+  "tests",
+]);
+
 describe("UI architecture contract", () => {
+  it("keeps the frontend inside the documented top-level layers", () => {
+    const failures = walk("src", extensions)
+      .map(repositoryPath)
+      .filter((path) => path !== "src/vite-env.d.ts")
+      .map((path) => path.split("/")[1])
+      .filter((root) => root && !allowedSourceRoots.has(root));
+    expect([...new Set(failures)], failures.join("\n")).toEqual([]);
+  });
+
   it("keeps shared primitives at the UI boundary", () => {
     const failures: string[] = [];
     for (const path of walk("src", extensions)) {
@@ -29,7 +51,7 @@ describe("UI architecture contract", () => {
         !uiImplementationRoots.some((root) => relative.startsWith(root)) &&
         /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)
       ) {
-        failures.push(`${relative}: import Radix only inside src/ui`);
+        failures.push(`${relative}: import Radix only inside src/shared/ui`);
       }
       if (/var\(--|["']--[a-z][a-z0-9-]*["']\s*:/.test(text)) {
         failures.push(`${relative}: use Tailwind classes instead of CSS custom properties`);

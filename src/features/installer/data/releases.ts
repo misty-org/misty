@@ -1,4 +1,4 @@
-import type { ReleaseVersion } from "@/models/types/features/installer/types";
+import type { ReleaseVersion } from "../model/types/types";
 
 function githubReleaseUrl(version: string) {
   return `https://github.com/misty-org/misty-public/releases/tag/${version}`;

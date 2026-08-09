@@ -1,8 +1,8 @@
 import { CircleAlert, LoaderCircle, Send } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 
-import { Badge } from "@/ui";
-import type { MessageOrigin } from "@/models/interfaces/features/spaces/connections/discord";
+import type { MessageOrigin } from "@/services/spaces/dto/interfaces/connections/discord";
+import { Badge } from "@/shared/ui";
 
 /**
  * Says where a message came from, and — for Misty messages mirrored outward —

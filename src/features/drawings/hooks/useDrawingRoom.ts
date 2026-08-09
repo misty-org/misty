@@ -1,15 +1,12 @@
+import type { AuthUser } from "@/features/auth";
+import { journalDocumentStatusMessage, parseJournalDocumentStatus } from "@/features/journal";
 import { useEffect, useRef, useState } from "react";
-import type { AuthUser } from "@/features/auth/AuthContext";
 import {
   acquireDrawingSession,
   releaseDrawingSession,
   type DrawingCollaborationSession,
 } from "../collaboration/drawingCollaboration";
 import type { DrawingConnectionState } from "../types";
-import {
-  journalDocumentStatusMessage,
-  parseJournalDocumentStatus,
-} from "@/features/journal/collaborationStatus";
 
 export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUser) {
   const [session, setSession] = useState<DrawingCollaborationSession | null>(null);

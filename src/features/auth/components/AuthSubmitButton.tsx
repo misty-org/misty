@@ -1,4 +1,4 @@
-import { Button } from "@/ui";
+import { Button } from "@/shared/ui";
 
 export default function AuthSubmitButton({
   idleLabel,

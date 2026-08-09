@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Check, ChevronDown, PanelsTopLeft, Plus } from "lucide-react";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
 import {
   Button,
   DropdownMenu,
@@ -7,8 +6,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/ui";
-import type { Space } from "@/models/interfaces/features/spaces/types";
+} from "@/shared/ui";
+import { Check, ChevronDown, PanelsTopLeft, Plus } from "lucide-react";
+import { useState } from "react";
 
 /**
  * A dedicated Space switcher.

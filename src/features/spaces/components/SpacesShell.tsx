@@ -1,34 +1,34 @@
+import { useAppStore } from "@/features/app-shell";
+import { useAuth } from "@/features/auth";
+import { Button, PermissionState } from "@/shared/ui";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useShallow } from "zustand/react/shallow";
-import { Button, PermissionState } from "@/ui";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { useAppStore } from "@/stores/app";
+import { preferredMistySpace } from "../mistySpace";
+import { CreateSpaceDialog } from "../spacesShell/CreateSpaceDialog";
+import type { SpacesShellOutletContext } from "../spacesShell/outletContext";
+import { SpaceInvitationSidebar, SpaceInvitationView } from "../spacesShell/SpaceInvitationView";
+import { readPanelVisible, writePanelVisible } from "../spacesShell/spacesShellStorage";
+import { rememberSpaceSubpageRoute } from "../spacesShell/spaceSubpageMemory";
+import { useCreateSpaceDialog } from "../spacesShell/useCreateSpaceDialog";
+import { useCreateSpaceRouteRequest } from "../spacesShell/useCreateSpaceRouteRequest";
+import { useSpacesStore } from "../store/useSpacesStore";
 import {
   activeSpacesTab,
   defaultSpaceRoute,
   normalizeSpacesTabRoute,
   spacesTabsSessionKey,
   useSpacesTabsStore,
-} from "@/stores/spaces/useSpacesTabsStore";
+} from "../store/useSpacesTabsStore";
+import { SpacePageFrame } from "./SpacePageLayout";
+import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
 import { SpacesHeader, type SpaceTabDestination } from "./SpacesHeader";
-import { SpacePageFrame } from "./SpacePageLayout";
-import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
-import { CreateSpaceDialog } from "../spacesShell/CreateSpaceDialog";
-import { SpaceInvitationSidebar, SpaceInvitationView } from "../spacesShell/SpaceInvitationView";
-import { useCreateSpaceDialog } from "../spacesShell/useCreateSpaceDialog";
-import { useCreateSpaceRouteRequest } from "../spacesShell/useCreateSpaceRouteRequest";
-import { readPanelVisible, writePanelVisible } from "../spacesShell/spacesShellStorage";
-import { rememberSpaceSubpageRoute } from "../spacesShell/spaceSubpageMemory";
-import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
-import type { SpacesShellOutletContext } from "../spacesShell/outletContext";
-import { preferredMistySpace } from "../mistySpace";
+import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 
 export { SpacesIndexRedirect } from "../spacesShell/SpacesIndexRedirect";
 
@@ -119,7 +119,7 @@ export default function SpacesShell() {
     // Re-fires on account switch so Spaces reloads for the new account
     // instead of leaving whatever was last fetched (or was in flight) for
     // the previous one sitting in the shared store.
-  }, [load, user?.id]);
+  }, [load, user]);
   useEffect(() => {
     if (!user?.id) return;
     const refresh = () => void load({ force: true, accountId: user.id });

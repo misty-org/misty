@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { Button, Input } from "@/shared/ui";
 import { ExternalLink, PlugZap, RefreshCw, Unplug } from "lucide-react";
-import { Button, Input } from "@/ui";
-import { openSystemExternalLink } from "@/platform/openExternalLink";
+import { useState } from "react";
 import {
   normalizeLocalDeveloperWorkspaceUrl,
   readDeveloperWorkspaceUrl,

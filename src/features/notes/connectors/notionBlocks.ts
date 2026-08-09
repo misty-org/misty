@@ -5,7 +5,7 @@ import type {
   NotionPage,
   NotionPropertyValue,
   NotionRichText,
-} from "@/models/interfaces/features/notes/notion";
+} from "../model/interfaces/notion";
 
 /**
  * Markdown ↔ Notion block translation.

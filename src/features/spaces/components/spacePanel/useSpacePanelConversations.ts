@@ -1,6 +1,6 @@
+import { spacesApi } from "@/services/spaces/api";
+import type { Space, SpaceConversation } from "@/services/spaces/dto/interfaces/types";
 import { useEffect, useState } from "react";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import type { Space, SpaceConversation } from "@/models/interfaces/features/spaces/types";
 
 /**
  * Group conversations for the active Space, kept in step with realtime events.

@@ -1,6 +1,6 @@
+import { cn } from "@/shared/ui";
 import type { LucideIcon } from "lucide-react";
 import { Link } from "react-router-dom";
-import { cn } from "@/ui";
 
 export function SpaceSidebarLink({
   active,

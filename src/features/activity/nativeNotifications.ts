@@ -1,11 +1,11 @@
+import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   isPermissionGranted,
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { hasTauriInternals } from "@/platform/tauri";
-import { selectNotificationPreferences, useSettingsStore } from "@/stores/app";
 import type { ActivityItem, NativeNotificationPermission } from "./types";
 
 const permissionDeniedStorageKey = "misty:activity:notification-permission-denied";

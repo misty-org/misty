@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   Label,
   Select,
@@ -7,9 +6,10 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-} from "@/ui";
-import type { GatewayModel, ReasoningEffort } from "@/models/interfaces/features/agents/personal";
+} from "@/shared/ui";
+import type { ReactNode } from "react";
 import { AgentModelPicker } from "./components/AgentModelPicker";
+import type { GatewayModel, ReasoningEffort } from "./model/interfaces/personal";
 
 export function AgentCreatorBehaviorStep({
   personality,

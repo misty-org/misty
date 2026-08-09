@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useAuth } from "@/features/auth";
+import type { AgentUsage } from "@/services/spaces/dto/interfaces/agentUsageTypes";
+import type { Space, SpaceStorageUsage } from "@/services/spaces/dto/interfaces/types";
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Progress,
+  Skeleton,
+  cn,
+} from "@/shared/ui";
 import { Gauge } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger, Progress, Skeleton, cn } from "@/ui";
-import { Button } from "@/ui";
-import { useAuth } from "@/features/auth/AuthContext";
-import type { Space } from "@/models/interfaces/features/spaces/types";
-import type { AgentUsage } from "@/models/interfaces/features/spaces/agentUsageTypes";
-import type { SpaceStorageUsage } from "@/models/interfaces/features/spaces/types";
+import { useState } from "react";
 import { formatStorageBytes } from "./spacePanel/storageFormat";
 import { useAgentUsage } from "./spacePanel/useAgentUsage";
 import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
@@ -51,10 +57,7 @@ export function SpaceUsagePopover({ space }: { space: Space }) {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent
-        sideOffset={8}
-        className="w-72 overflow-hidden border-charcoal-border/70 p-0"
-      >
+      <PopoverContent sideOffset={8} className="w-72 overflow-hidden border-charcoal-border/70 p-0">
         <div className="border-b border-charcoal-border/60 px-2 py-2.5">
           <p className="m-0 truncate text-sm font-semibold">Usage</p>
           <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">

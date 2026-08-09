@@ -1,11 +1,11 @@
-import { Plus, type LucideIcon } from "lucide-react";
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/ui";
+} from "@/shared/ui";
+import { Plus, type LucideIcon } from "lucide-react";
 
 export interface NewTabMenuOption {
   id: string;

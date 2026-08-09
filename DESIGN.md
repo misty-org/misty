@@ -339,9 +339,9 @@ Before merging a UI change, confirm:
 ## Sources of Truth
 
 - shadcn configuration: `components.json`
-- Global tokens and themes: `src/ui/styles/styles.css`
-- Global platform behavior: `src/ui/styles/base.css`
-- Shared primitives: `src/ui/`
-- Desktop frame and overlay geometry: `src/layouts/DesktopLayout/`
+- Global tokens and themes: `src/styles/styles.css`
+- Global platform behavior: `src/styles/base.css`
+- Shared primitives: `src/shared/ui/`
+- Application frame and overlay geometry: `src/app/layouts/DesktopLayout/`
 
 When this document and the implementation disagree, resolve the mismatch deliberately: update the component or token first, then update this document in the same change.

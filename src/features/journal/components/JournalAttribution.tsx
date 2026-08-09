@@ -1,6 +1,5 @@
+import { cn } from "@/shared/ui";
 import { ExternalLink } from "lucide-react";
-import { handleExternalLinkClick } from "@/platform/openExternalLink";
-import { cn } from "@/ui";
 
 export function JournalAttribution({
   technology,

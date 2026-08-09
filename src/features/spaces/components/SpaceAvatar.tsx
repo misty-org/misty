@@ -1,6 +1,6 @@
-import { Avatar, AvatarFallback, cn } from "@/ui";
-import { avatarColorClass, avatarInkClass } from "@/lib/avatarPalette";
-import type { Space } from "@/models/interfaces/features/spaces/types";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
+import { Avatar, AvatarFallback, cn } from "@/shared/ui";
 
 export function SpaceAvatar({ space, className }: { space: Space; className?: string }) {
   const initials = spaceInitials(space.name);
