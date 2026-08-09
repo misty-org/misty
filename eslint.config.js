@@ -4,7 +4,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 /**
- * Architecture boundaries. See CLAUDE.md.
+ * Frontend architecture boundaries.
  *
  *   app  →  pages  →  features  →  services  →  shared
  *
@@ -40,7 +40,6 @@ export default tseslint.config(
       "build/**",
       "src-tauri/**",
       // Tooling and scratch trees that are not application source.
-      ".claude/**",
       ".codex/**",
       ".codex-qa/**",
       ".demo/**",
