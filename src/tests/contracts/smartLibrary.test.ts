@@ -1,5 +1,5 @@
+import { estimateSmartLibraryTokens } from "@/features/space-library/smartLibrary";
 import { describe, expect, it } from "vitest";
-import { estimateSmartLibraryTokens } from "@/features/spaces/smartLibrary";
 
 describe("estimateSmartLibraryTokens", () => {
   it("includes one shared prompt per bounded eight-file batch", () => {

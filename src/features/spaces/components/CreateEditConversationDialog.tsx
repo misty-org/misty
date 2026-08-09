@@ -1,22 +1,22 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { spacesApi } from "@/services/spaces/api";
+import type {
+  SpaceActorRef,
+  SpaceAgentMembership,
+  SpaceConversation,
+  SpaceMember,
+} from "@/services/spaces/dto/interfaces/types";
 import {
+  Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/ui";
-import { Checkbox } from "@/ui";
-import { Input } from "@/ui";
-import { Button } from "@/ui";
-import type {
-  SpaceActorRef,
-  SpaceAgentMembership,
-  SpaceConversation,
-  SpaceMember,
-} from "@/models/interfaces/features/spaces/types";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
+  Input,
+} from "@/shared/ui";
+import { useEffect, useState, type FormEvent } from "react";
 
 export function CreateEditConversationDialog({
   spaceId,

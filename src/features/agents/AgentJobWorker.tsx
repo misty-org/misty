@@ -1,7 +1,7 @@
+import { readAccountAuthToken } from "@/features/auth";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
-import { hasTauriInternals } from "@/platform/tauri";
 import { useAuth } from "../auth/AuthContext";
-import { readAccountAuthToken } from "@/stores/account/useAuthTokenStore";
 import { DesktopAgentJobWorker } from "./worker";
 
 export function AgentJobWorker(): null {

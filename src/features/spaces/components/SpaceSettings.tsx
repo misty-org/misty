@@ -1,7 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Cable, Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
+import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings";
+import {
+  DiscordConnectionPanel,
+  GoogleCalendarConnectionPanel,
+  NotionConnectionPanel,
+} from "@/features/space-connections";
+import { SpaceMembers } from "@/features/space-members";
+import { spacesApi } from "@/services/spaces/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,27 +15,23 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/ui";
-import { Badge } from "@/ui";
-import { Button } from "@/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui";
-import { Input } from "@/ui";
-import { Separator } from "@/ui";
-import { Switch } from "@/ui";
-import {
-  DiscordConnectionPanel,
-  GoogleCalendarConnectionPanel,
-  NotionConnectionPanel,
-} from "@/features/spaces/connections";
-import { WorkspaceOverlay } from "@/layouts/DesktopLayout/WorkspaceOverlay";
-import {
-  DesktopSettingsFrame,
-  type DesktopSettingsNavEntry,
-} from "@/pages/Settings/DesktopSettingsUI";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { SpaceMembers } from "./SpaceMembers";
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Separator,
+  Switch,
+} from "@/shared/ui";
+import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
+import { Cable, Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { canManageSpaceLifecycle } from "../mistySpace";
+import { useSpacesStore } from "../store/useSpacesStore";
 
 type SpaceSettingsSection = "general" | "members" | "connections" | "suggestions";
 

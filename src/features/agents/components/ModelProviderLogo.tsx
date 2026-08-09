@@ -1,3 +1,4 @@
+import { Aperture, Bot, BrainCircuit, Cpu, Sparkles, Wand2, Zap } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
   SiAlibabacloud,
@@ -13,7 +14,6 @@ import {
   SiVercel,
 } from "react-icons/si";
 import { TbBrandAws } from "react-icons/tb";
-import { Aperture, Bot, BrainCircuit, Cpu, Sparkles, Wand2, Zap } from "lucide-react";
 
 export type ModelProviderLogoSpec =
   | { kind: "react"; icon: IconType; color?: string }

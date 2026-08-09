@@ -1,6 +1,7 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
-import type { FilerobotImageEditorConfig } from "react-filerobot-image-editor";
+import { httpBlob } from "@/services/http";
+import { Button } from "@/shared/ui";
 import { Copy, Loader2, X } from "lucide-react";
 import {
   lazy,
@@ -10,7 +11,7 @@ import {
   type FunctionComponent,
   type ReactNode,
 } from "react";
-import { Button } from "@/ui";
+import type { FilerobotImageEditorConfig } from "react-filerobot-image-editor";
 import "./photoEditor.css";
 
 const FilerobotImageEditor = lazy(() => import("react-filerobot-image-editor"));
@@ -119,7 +120,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob
 
 async function renderedToBlob(image: RenderedImage, mimeType: string): Promise<Blob> {
   if (image.imageCanvas) return canvasToBlob(image.imageCanvas, mimeType);
-  if (image.imageBase64) return (await fetch(image.imageBase64)).blob();
+  if (image.imageBase64) return httpBlob(image.imageBase64);
   throw new Error("The editor did not produce an image.");
 }
 

@@ -1,6 +1,6 @@
+import type { SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import { Button } from "@/shared/ui";
 import { Check } from "lucide-react";
-import { Button } from "@/ui";
-import type { SpaceInvitation } from "@/models/interfaces/features/spaces/types";
 
 /** Pending Space invitations, shown above the Space list in the side panel. */
 export function SpaceInvitationsNotice({

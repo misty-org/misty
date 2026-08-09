@@ -1,8 +1,8 @@
-import { messageReplyPreviewText } from "@/features/spaces/chatMessages/messageHelpers";
 import { activityTargetHref, useActivityStore } from "@/features/activity";
-import type { SearchResult } from "@/models/interfaces/services/misty-api";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { messageReplyPreviewText } from "@/features/space-chat";
+import { useSpacesStore } from "@/features/spaces";
+import type { SearchResult } from "@/services/misty/model/misty-api";
+import { spacesApi } from "@/services/spaces/api";
 import type { GlobalSearchContextItem, GlobalSearchDocument, GlobalSearchResult } from "./types";
 
 export function globalSearchContext(

@@ -1,11 +1,11 @@
-import { mistyDeviceJobsEnabled } from "@/features/agents/flags";
-import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "@/stores/agents/useAgentsStore";
+import { mistyDeviceJobsEnabled } from "./flags";
+import type { AgentDevice } from "./model/interfaces/types";
 import {
   ensureServerAgentDevice,
   heartbeatServerAgentDevice,
   signedAgentDeviceRequest,
-} from "@/stores/agents/useAgentDeviceStore";
-import type { AgentDevice } from "@/models/interfaces/features/agents/types";
+} from "./store/useAgentDeviceStore";
+import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
 
 const leaseHeartbeatMs = 20_000;
 const activePollMs = 750;

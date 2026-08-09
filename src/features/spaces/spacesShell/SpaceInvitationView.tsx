@@ -1,9 +1,9 @@
-import { useState } from "react";
+import type { SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import { Button } from "@/shared/ui";
 import { Check, LockKeyhole } from "lucide-react";
-import { Button } from "@/ui";
-import type { SpaceInvitation } from "@/models/interfaces/features/spaces/types";
-import { invitedSpacePreview } from "../spaceInvitation";
+import { useState } from "react";
 import { SpaceAvatar } from "../components/SpaceAvatar";
+import { invitedSpacePreview } from "../spaceInvitation";
 
 export function SpaceInvitationSidebar({ invitation }: { invitation: SpaceInvitation }) {
   const space = invitedSpacePreview(invitation);

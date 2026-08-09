@@ -1,15 +1,13 @@
-import type { MultiPanelWorkspaceProps } from "@/models/interfaces/workspace";
-export type { MultiPanelWorkspaceProps } from "@/models/interfaces/workspace";
-import { Button } from "@/ui";
+import { Button } from "@/shared/ui";
 import { Columns2, GripVertical, PanelTopClose, Rows2 } from "lucide-react";
+import type { CSSProperties, PointerEvent } from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ChromeTabStrip } from "./ChromeTabStrip";
-import type { MultiPanelTab } from "@/models/interfaces/workspace";
-import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./useMultiPanelStore";
-import type { MultiPanelStoreHook } from "@/models/types/workspace/useMultiPanelStore";
+import type { MultiPanelTab, MultiPanelWorkspaceProps } from "./model/interfaces";
 import { sidePanelGridStyle } from "./sidePanelGridStyle";
+import { activeMultiPanelTab, maxMultiPanelPanes, useMultiPanelStore } from "./useMultiPanelStore";
+export type { MultiPanelWorkspaceProps } from "./model/interfaces";
 
 // Shared pane edges are owned here so adjacent panels never draw duplicate borders.
 const paneResizeDividerClass = [
@@ -92,6 +90,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     renderNavigationAside,
     navigationAsideWidth = 260,
     renderPane,
+    registerTabDropTarget,
     renderTabActions,
     renderToolbar,
     showTabStrip = true,
@@ -136,7 +135,6 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
   const activeTab = activeMultiPanelTab({ tabs, activeTabId });
   const canSplit = Boolean(activeTab && activeTab.panes.length < maxMultiPanelPanes());
   const lanes = activeTab ? normalizedLanes(activeTab) : [];
-  const paneCount = lanes.flat().length;
   const gridSplitRatio = clampRatio(activeTab?.layout.gridSplitRatio ?? 0.5);
   const laneSplitRatios = activeTab?.layout.laneSplitRatios ?? [0.5, 0.5];
   const panelStyle = splitPanelStyle(lanes, gridSplitRatio);
@@ -308,6 +306,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
             if (matchingTab) handleCloseTab(matchingTab);
           }}
           onReorderTab={reorderTabs}
+          registerTabDropTarget={registerTabDropTarget}
           onAddTab={() => addTab(activeTab.path, activeTab.title)}
           addTabControl={addTabControl}
           actions={tabStripActions}

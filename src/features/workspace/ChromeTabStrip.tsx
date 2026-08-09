@@ -1,6 +1,4 @@
-import type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces/workspace";
-export type { ChromeTabStripTab, ChromeTabStripProps } from "@/models/interfaces/workspace";
-import { Button } from "@/ui";
+import { Button } from "@/shared/ui";
 import { Plus, X } from "lucide-react";
 import {
   memo,
@@ -11,8 +9,8 @@ import {
   type DragEvent,
   type WheelEvent,
 } from "react";
-import { useExplorerDropRegistry } from "@/features/explorer/drag/ExplorerDragContext";
-import { createExplorerDropTargetSpec } from "@/features/explorer/drag/ExplorerDropTarget";
+import type { ChromeTabStripProps } from "./model/interfaces";
+export type { ChromeTabStripProps, ChromeTabStripTab } from "./model/interfaces";
 
 const chromeTabShellClass = [
   "flex h-[46px] min-w-0 overflow-hidden border-b border-charcoal-border bg-charcoal-sidebar",
@@ -38,10 +36,10 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     tabId: string;
     position: "before" | "after";
   }>();
-  const registerDropZone = useExplorerDropRegistry();
+  const registerTabDropTarget = props.registerTabDropTarget;
 
   useEffect(() => {
-    if (!registerDropZone) return;
+    if (!registerTabDropTarget) return;
     let disposed = false;
     let cleanups: Array<() => void> = [];
     const frame = window.requestAnimationFrame(() => {
@@ -51,14 +49,14 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
           shellRef.current?.querySelectorAll<HTMLElement>(".chrome-tab[data-tab-id]") ?? [],
         ).find((candidate) => candidate.dataset.tabId === tab.id);
         if (!element) return [];
-        const spec = createExplorerDropTargetSpec({
-          id: `tab:${tab.id}`,
-          path: tab.path,
-          paneId: tab.paneId,
-          springLoad: tab.id !== props.activeTabId,
-          onSpringLoad: () => props.onSelectTab(tab.id),
-        });
-        return [registerDropZone(element, spec)];
+        return [
+          registerTabDropTarget(
+            element,
+            tab,
+            () => props.onSelectTab(tab.id),
+            tab.id !== props.activeTabId,
+          ),
+        ];
       });
     });
     return () => {
@@ -66,7 +64,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
       window.cancelAnimationFrame(frame);
       cleanups.forEach((cleanup) => cleanup());
     };
-  }, [props.activeTabId, props.onSelectTab, props.tabs, registerDropZone]);
+  }, [props, registerTabDropTarget]);
 
   const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
     const tabs = tabsRef.current;
@@ -129,7 +127,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
       props.onReorderTab(sourceTabId, fromIndex, toIndex);
       finishTabDrag();
     },
-    [finishTabDrag, props.onReorderTab, props.tabs],
+    [finishTabDrag, props],
   );
 
   return (

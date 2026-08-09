@@ -1,6 +1,4 @@
-import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
-import { Link } from "react-router-dom";
+import type { SpaceConversation } from "@/services/spaces/dto/interfaces/types";
 import {
   Button,
   ContextMenu,
@@ -9,8 +7,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   cn,
-} from "@/ui";
-import type { SpaceConversation } from "@/models/interfaces/features/spaces/types";
+} from "@/shared/ui";
+import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { SiDiscord } from "react-icons/si";
+import { Link } from "react-router-dom";
 import { SpaceSidebarSection } from "./SpaceSidebarSection";
 
 export function SpaceChatConversationList({

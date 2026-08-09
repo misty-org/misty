@@ -1,4 +1,5 @@
-import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
+import { httpRequest } from "@/services/http";
+import { spaceRequest } from "@/services/spaces/api";
 
 export const MAX_JOURNAL_ASSET_BYTES = 15 * 1024 * 1024;
 
@@ -112,7 +113,7 @@ async function putDirectlyToR2(transfer: UploadReservation["transfer"], file: Fi
   if (!/^https:\/\//i.test(transfer.url)) {
     throw new Error("Journal assets require a direct Cloudflare R2 upload.");
   }
-  const response = await fetch(transfer.url, {
+  const response = await httpRequest(transfer.url, {
     method: transfer.method || "PUT",
     headers: transfer.headers,
     body: file,
@@ -154,7 +155,7 @@ async function downloadAndVerifyJournalAsset(downloadPath: string): Promise<stri
   ) {
     throw new Error("Misty returned an invalid Journal asset descriptor.");
   }
-  const response = await fetch(descriptor.url, { credentials: "omit" });
+  const response = await httpRequest(descriptor.url, { credentials: "omit" });
   if (!response.ok) {
     throw new Error(`Cloudflare R2 could not load the Journal asset (${response.status}).`);
   }

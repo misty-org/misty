@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Database, FileText, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import {
   Button,
@@ -11,11 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
   ScrollArea,
-} from "@/ui";
-import type {
-  NotesConnector,
-  NoteSourceOption,
-} from "@/models/interfaces/features/notes/connectors";
+} from "@/shared/ui";
+import type { NotesConnector, NoteSourceOption } from "../model/interfaces/connectors";
 
 /**
  * Chooses which Notion pages and databases a Space reads as notes.

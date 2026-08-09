@@ -1,5 +1,5 @@
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/shared/ui";
 import type { ReactNode } from "react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/ui";
 
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (

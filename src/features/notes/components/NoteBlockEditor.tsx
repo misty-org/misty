@@ -2,25 +2,20 @@ import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import "./noteBlockEditor.css";
 
-import type { NoteBodyFormat } from "@/models/types/features/notes/types";
-import {
-  BlockNoteSchema,
-  createCodeBlockSpec,
-  defaultBlockSpecs,
-  type Block,
-} from "@blocknote/core";
+import { usePointerDrag, type PointerDragPayload } from "@/features/dnd";
+import { useAppThemeStore } from "@/features/settings";
+import { cn } from "@/shared/ui";
 import { codeBlockOptions } from "@blocknote/code-block";
-import { withCollaboration } from "@blocknote/core/yjs";
+import { BlockNoteSchema, createCodeBlockSpec, defaultBlockSpecs } from "@blocknote/core";
 import { SideMenuExtension } from "@blocknote/core/extensions";
+import { withCollaboration } from "@blocknote/core/yjs";
 import { BlockNoteView } from "@blocknote/mantine";
 import { useBlockNoteEditor, useCreateBlockNote } from "@blocknote/react";
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
-import { useAppThemeStore } from "@/stores/app/useAppThemeStore";
-import { cn } from "@/ui";
-import type { NoteCollaborationSession } from "@/features/notes/noteCollaboration";
-import { resolveNoteAssetUrl, uploadNoteAsset } from "@/features/notes/noteAssets";
-import { usePointerDrag, type PointerDragPayload } from "@/features/dnd/PointerDragContext";
-import { useNoteCollaborationRoom } from "@/features/notes/hooks/useNoteCollaborationRoom";
+import { useCallback, useEffect, useRef, type PointerEvent, type ReactNode } from "react";
+import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
+import type { NoteBodyFormat } from "../model/types/types";
+import { resolveNoteAssetUrl, uploadNoteAsset } from "../noteAssets";
+import type { NoteCollaborationSession } from "../noteCollaboration";
 
 const mistyNotesSchema = BlockNoteSchema.create({
   blockSpecs: {
@@ -28,6 +23,7 @@ const mistyNotesSchema = BlockNoteSchema.create({
     codeBlock: createCodeBlockSpec(codeBlockOptions),
   },
 });
+type NoteBlock = typeof mistyNotesSchema.Block;
 
 const NOTE_BLOCK_DRAG_KIND = "note-block";
 
@@ -320,7 +316,7 @@ function MistyBlockPointerDragBridge() {
   return null;
 }
 
-function NoteBlockDragPreview({ block }: { block: Block<any, any, any> }) {
+function NoteBlockDragPreview({ block }: { block: BlockPreviewSource }) {
   return (
     <div className="max-w-[260px] rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-sm text-cream shadow-lg">
       {blockPreviewText(block)}
@@ -440,10 +436,7 @@ export function noteBlockTargetAt(root: HTMLElement, sourceBlockId: string, poin
   return closest;
 }
 
-function findBlockById(
-  blocks: Block<any, any, any>[],
-  blockId: string,
-): Block<any, any, any> | null {
+function findBlockById(blocks: NoteBlock[], blockId: string): NoteBlock | null {
   for (const block of blocks) {
     if (block.id === blockId) return block;
     const child = findBlockById(block.children, blockId);
@@ -454,7 +447,7 @@ function findBlockById(
 
 function moveNoteBlock(
   editor: ReturnType<typeof useCreateBlockNote>,
-  sourceBlock: Block<any, any, any>,
+  sourceBlock: NoteBlock,
   targetBlockId: string,
   placement: "before" | "after",
 ) {
@@ -464,14 +457,23 @@ function moveNoteBlock(
   });
 }
 
-function blockPreviewText(block: Block<any, any, any>): ReactNode {
+function blockPreviewText(block: BlockPreviewSource): ReactNode {
   const content = Array.isArray(block.content)
     ? block.content
-        .map((item) => ("text" in item ? item.text : ""))
+        .map((item) =>
+          item && typeof item === "object" && "text" in item && typeof item.text === "string"
+            ? item.text
+            : "",
+        )
         .join("")
         .trim()
     : "";
   return content || block.type;
+}
+
+interface BlockPreviewSource {
+  type: string;
+  content?: unknown;
 }
 
 function collaborationUser(accountId?: string) {

@@ -1,9 +1,16 @@
+import { SpaceSidebarPageSection, SpaceSidebarSection } from "@/features/spaces";
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  Skeleton,
+  cn,
+} from "@/shared/ui";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, Skeleton, cn } from "@/ui";
-import { SpaceSidebarSection } from "@/features/spaces/components/SpaceSidebarSection";
-import { SpaceSidebarPageSection } from "@/features/spaces/components/SpaceSidebarPageSection";
 import { useSpaceDrawings } from "../hooks/useSpaceDrawings";
 import { NewDrawingDialog } from "./NewDrawingDialog";
 

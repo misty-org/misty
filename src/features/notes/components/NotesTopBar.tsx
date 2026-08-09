@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { Button, IconButton, Input } from "@/shared/ui";
 import { Plus, Search, X } from "lucide-react";
-import { Button, IconButton, Input } from "@/ui";
+import { useState } from "react";
 
 const topBarClass =
   "flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5";

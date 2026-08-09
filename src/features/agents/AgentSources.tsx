@@ -1,7 +1,7 @@
-import { Button } from "@/ui";
+import { Button } from "@/shared/ui";
 import { FileText, Presentation, Sheet, TextQuote } from "lucide-react";
-import { agentsOpenCitation } from "@/stores/agents/useAgentsStore";
-import type { AgentCitation } from "@/models/interfaces/features/agents/types";
+import type { AgentCitation } from "./model/interfaces/types";
+import { agentsOpenCitation } from "./store/useAgentsStore";
 
 export function AgentSources({ citations, compact = false, onOpen }: AgentSourcesProps) {
   if (citations.length === 0) return null;

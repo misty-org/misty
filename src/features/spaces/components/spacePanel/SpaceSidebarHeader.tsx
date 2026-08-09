@@ -1,5 +1,5 @@
+import type { Space } from "@/services/spaces/dto/interfaces/types";
 import type { ReactNode } from "react";
-import type { Space } from "@/models/interfaces/features/spaces/types";
 
 export function SpaceSidebarHeader({ space, actions }: { space: Space; actions?: ReactNode }) {
   return (

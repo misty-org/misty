@@ -1,4 +1,4 @@
-import type { Space } from "@/models/interfaces/features/spaces/types";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
 
 /** Misty is the home Space whenever there is no valid active selection. */
 export function preferredMistySpace(spaces: Space[]): Space | undefined {

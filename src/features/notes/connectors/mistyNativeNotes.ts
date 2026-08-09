@@ -1,13 +1,13 @@
+import { spaceRequest } from "@/services/spaces/api";
+import { nowIso, previewFrom } from "../connectorUtils";
+import { MISTY_CONNECTOR_ID } from "../mockData";
 import type {
   CreateNoteInput,
   NotesConnector,
   SyncResult,
   UpdateNoteInput,
-} from "@/models/interfaces/features/notes/connectors";
-import type { UnifiedNote } from "@/models/types/features/notes/types";
-import { MISTY_CONNECTOR_ID } from "@/features/notes/mockData";
-import { nowIso, previewFrom } from "@/features/notes/connectorUtils";
-import { spaceRequest } from "@/stores/spaces/useSpacesBackendStore";
+} from "../model/interfaces/connectors";
+import type { UnifiedNote } from "../model/types/types";
 
 type ServerSpaceNote = {
   id: string;

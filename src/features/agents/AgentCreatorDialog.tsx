@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useAuth } from "@/features/auth";
+import { useSpacesStore } from "@/features/spaces";
+import { spacesApi } from "@/services/spaces/api";
+import type { AgentToolboxAction } from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
+import { analytics } from "@/services/telemetry/client";
 import {
   Badge,
   Button,
@@ -20,19 +23,16 @@ import {
   SelectValue,
   Textarea,
   cn,
-} from "@/ui";
+} from "@/shared/ui";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { AgentAvatar } from "./AgentAvatar";
 import { AgentCreatorBehaviorStep } from "./AgentCreatorBehaviorStep";
 import { AgentCreatorIdentityStep } from "./AgentCreatorIdentityStep";
 import { agentSpaceAudienceGrants, composeAgentInstructions } from "./agentCreatorState";
+import type { ReasoningEffort } from "./model/interfaces/personal";
 import { initialAgentModelId, modelSupportsReasoning } from "./modelSelection";
-import { personalAgentsApi, usePersonalAgentsStore } from "@/stores/agents/usePersonalAgentsStore";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import type { ReasoningEffort } from "@/models/interfaces/features/agents/personal";
-import type { AgentToolboxAction } from "@/models/interfaces/features/spaces/agentArchitectureTypes";
-import { analytics } from "@/analytics/client";
-import { useAuth } from "@/features/auth/AuthContext";
+import { personalAgentsApi, usePersonalAgentsStore } from "./store/usePersonalAgentsStore";
 
 const steps = ["Identity", "Behavior", "Responsibilities", "Team placement"];
 const readableContext = {

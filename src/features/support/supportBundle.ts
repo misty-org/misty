@@ -1,6 +1,6 @@
-import { clientMetadata } from "@/analytics/metadata";
-import { redactRecord } from "@/analytics/redaction";
-import { readClientDebugEvents } from "@/platform/clientDebug";
+import { clientMetadata } from "@/services/telemetry/metadata";
+import { redactRecord } from "@/services/telemetry/redaction";
+import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
 export interface SupportBundle {
   schema_version: 1;

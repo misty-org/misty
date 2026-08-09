@@ -1,9 +1,9 @@
-import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
-import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
+import { useAuth } from "@/features/auth";
+import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
+import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
+import { useSpacesStore } from "../store/useSpacesStore";
+import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
 // Work surfaces only. Management controls live at the opposite end of the top bar.
 const sections = [

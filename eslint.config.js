@@ -11,12 +11,10 @@ import tseslint from "typescript-eslint";
  * A layer may import from layers to its right, never to its left. Features are
  * mutually opaque: they talk to each other through `index.ts` only.
  *
- * REFACTOR is the severity for rules the in-flight structural refactor is
- * actively resolving. They report as warnings so `npm run check` stays green
- * mid-refactor, and flip to "error" in Phase 4 once the tree matches CLAUDE.md.
- * Anything set to "error" below is a real defect, not a layout violation.
+ * Architectural, state-safety, and readability rules are release-blocking.
+ * The reset has no migration-warning baseline: every finding is an error.
  */
-const REFACTOR = "warn";
+const REFACTOR = "error";
 
 /** @param {Array<[string[], string]>} groups */
 const restrict = (groups) => [
@@ -139,6 +137,12 @@ export default tseslint.config(
         [["@/app/*"], "pages/ must not import from app/."],
         FEATURE_INTERNALS,
       ]),
+    },
+  },
+  {
+    files: ["src/app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
     },
   },
 

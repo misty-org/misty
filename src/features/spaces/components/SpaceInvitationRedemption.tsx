@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
 import { LoaderCircle, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { useAuth } from "@/features/auth/AuthContext";
-import { spaceNotesEnabled } from "@/features/notes/availability";
-import type { SpaceInvitationPreview } from "@/models/interfaces/features/spaces/types";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { Button, Card } from "@/ui";
+import { useAuth } from "@/features/auth";
+import { spaceNotesEnabled } from "@/features/notes";
+import { spacesApi } from "@/services/spaces/api";
+import type { SpaceInvitationPreview } from "@/services/spaces/dto/interfaces/types";
+import { Button, Card } from "@/shared/ui";
+import { useSpacesStore } from "../store/useSpacesStore";
 
 export function SpaceInvitationRedemption() {
   const { token = "" } = useParams();

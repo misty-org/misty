@@ -1,13 +1,13 @@
+import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { Button } from "@/shared/ui";
 import { useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { Button } from "@/ui";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { defaultSpaceRoute } from "@/stores/spaces/useSpacesTabsStore";
-import type { Space } from "@/models/interfaces/features/spaces/types";
 import { SpacePageLoadingPlaceholder } from "../components/SpacesLoadingPlaceholder";
-import type { SpacesShellOutletContext } from "./outletContext";
 import { preferredMistySpace } from "../mistySpace";
+import { useSpacesStore } from "../store/useSpacesStore";
+import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
+import type { SpacesShellOutletContext } from "./outletContext";
 
 /** Redirects /spaces into remembered work, preferring Misty when no route is remembered. */
 export function SpacesIndexRedirect() {

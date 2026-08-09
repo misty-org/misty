@@ -1,5 +1,12 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  cn,
+} from "@/shared/ui";
 import {
   Bell,
   Bot,
@@ -24,15 +31,8 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  cn,
-} from "@/ui";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import type {
   GlobalAiActionProposal,
   GlobalAiConversation,

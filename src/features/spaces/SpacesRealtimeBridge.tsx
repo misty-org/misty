@@ -1,7 +1,7 @@
+import { useExplorerStore } from "@/features/file-explorer";
 import { useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { useExplorerStore } from "@/stores/explorer";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
+import { useSpacesStore } from "./store/useSpacesStore";
 
 export function SpacesRealtimeBridge() {
   const { user, transitioning } = useAuth();
@@ -23,7 +23,7 @@ export function SpacesRealtimeBridge() {
     void connectRealtime(user.id);
     void Promise.all([load(), loadInbox()]);
     return disconnectRealtime;
-  }, [connectRealtime, disconnectRealtime, load, loadInbox, transitioning, user?.id]);
+  }, [connectRealtime, disconnectRealtime, load, loadInbox, transitioning, user]);
 
   useEffect(() => {
     if (!error) {

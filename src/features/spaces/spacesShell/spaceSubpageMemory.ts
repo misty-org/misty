@@ -1,4 +1,4 @@
-import { spaceNotesEnabled } from "@/features/notes/availability";
+import { spaceNotesEnabled } from "@/features/notes";
 
 type PlannerSubpage = "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";

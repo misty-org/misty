@@ -1,4 +1,4 @@
-import type { UnifiedNote } from "@/models/types/features/notes/types";
+import type { UnifiedNote } from "./model/types/types";
 
 // Fixed clock so the demo renders identical relative timestamps on every run.
 const now = new Date("2026-07-20T16:40:00.000Z").getTime();

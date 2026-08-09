@@ -1,25 +1,25 @@
+import { useAppThemeStore } from "@/features/settings";
+import { CaptureUpdateAction, Excalidraw, reconcileElements } from "@excalidraw/excalidraw";
+import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
+import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import "@excalidraw/excalidraw/index.css";
 import type {
   AppState,
   BinaryFileData,
   BinaryFiles,
   ExcalidrawImperativeAPI,
 } from "@excalidraw/excalidraw/types";
-import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
-import { CaptureUpdateAction, Excalidraw, reconcileElements } from "@excalidraw/excalidraw";
-import "@excalidraw/excalidraw/index.css";
-import "./collaborativeDrawingCanvas.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAppThemeStore } from "@/stores/app";
+import type { DrawingCollaborationSession } from "../collaboration/drawingCollaboration";
+import { collaboratorsFromAwareness, DrawingFollowTracker } from "../collaboration/drawingPresence";
 import {
   localDrawingOrigin,
   readDrawingElements,
   writeDrawingElements,
 } from "../collaboration/drawingSceneStore";
-import { collaboratorsFromAwareness, DrawingFollowTracker } from "../collaboration/drawingPresence";
-import type { DrawingCollaborationSession } from "../collaboration/drawingCollaboration";
 import { hydrateDrawingBinaryFile, uploadDrawingBinaryFile } from "../drawingAssets";
 import type { SpaceDrawing } from "../types";
+import "./collaborativeDrawingCanvas.css";
 
 interface CollaborativeDrawingCanvasProps {
   drawing: SpaceDrawing;
@@ -33,7 +33,7 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
   const fileUploadsRef = useRef(new Map<string, Promise<void>>());
   const fileHydrationsRef = useRef(new Map<string, Promise<void>>());
   const pointerPublisher = useMemo(() => createPointerPublisher(props.session), [props.session]);
-  const followTracker = useMemo(() => new DrawingFollowTracker(), [props.session]);
+  const followTracker = useMemo(() => new DrawingFollowTracker(), []);
 
   const shareBinaryFiles = useCallback(
     async (files: readonly BinaryFileData[]) => {

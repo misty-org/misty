@@ -1,9 +1,7 @@
-import type { MountedDevice, ProviderRemote } from "@/models/interfaces/services/misty-api";
+import type { MountedDevice, ProviderRemote } from "@/services/misty/model/misty-api";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
-import { AssetIcon, Button, cn } from "@/ui";
-import { providerIconForType } from "@/assets/icons";
 import {
   buildDeviceEntries,
   dedupePinnedPathsForQuickAccess,
@@ -13,7 +11,9 @@ import {
   pathIsInside,
   pinnedPathLabel,
   quickAccessPathHidden,
-} from "../explorer/components/ExplorerSidebarSupport";
+} from "@/features/file-explorer";
+import { providerIconForType } from "@/shared/assets/icons";
+import { AssetIcon, Button, cn } from "@/shared/ui";
 
 /**
  * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace

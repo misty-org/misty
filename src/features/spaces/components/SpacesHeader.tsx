@@ -1,6 +1,6 @@
-import { LibraryBig, ListChecks, MessageCircle, Notebook } from "lucide-react";
 import { ChromeTabStrip, NewTabMenu } from "@/features/workspace";
-import type { SpacesTab, SpacesTabsSession } from "@/stores/spaces/useSpacesTabsStore";
+import { LibraryBig, ListChecks, MessageCircle, Notebook } from "lucide-react";
+import type { SpacesTab, SpacesTabsSession } from "../store/useSpacesTabsStore";
 
 export type SpaceTabDestination = "journal" | "planner" | "chat" | "library";
 

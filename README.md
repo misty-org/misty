@@ -4,14 +4,13 @@ Misty is a Tauri application with one desktop React interface for desktop, iPad,
 
 ## Repository layout
 
-- `src/` — React application, shared desktop/tablet layout, stores, and frontend services.
-- `src/features/` — human-owned product areas. Start here for feature work:
-  - `explorer/` — Files/Explorer browser, sidebars, toolbars, inspector, library workspace, drag/drop, search, and Explorer store internals.
-  - `spaces/` — Spaces shell, chat, library, tasks, members, settings, utilities, and tests.
-- `src/pages/` — thin route wrappers and legacy route entrypoints. Product implementation should live in `src/features/`.
-- `src/components/ui/` — shared shadcn/Radix primitives and small generic UI compositions.
-- `src/services/misty-api/` — frontend API and Tauri bridge types/functions. `src/api/` is a compatibility re-export layer.
-- `src/stores/` — cross-feature Zustand stores only. Feature-specific state should live with its feature.
+- `src/app/` — bootstrap, routing, layouts, providers, telemetry lifecycle, and error boundaries.
+- `src/pages/` — thin route composers. Product behavior belongs to a feature.
+- `src/features/` — product-owned UI, hooks, types, and Zustand state. Spaces is split into `spaces`, `space-chat`, `space-library`, `space-members`, `space-planner`, `space-roadmap`, and `space-connections`; Files is split into `file-explorer`, `file-search`, and `file-preview`.
+- `src/services/` — the only frontend network boundary. Shared HTTP behavior lives in `http.ts`; Spaces endpoints and DTOs are grouped under `services/spaces/`.
+- `src/shared/` — generic UI, hooks, utilities, drag infrastructure, platform bridges, and assets with no feature knowledge.
+- `src/styles/` — global styling and design tokens.
+- `src/tests/` — test setup and architecture contracts only; behavior tests are colocated with their source.
 - `src-tauri/` — Rust application core and tracked iOS/Android platform projects.
 - `src-tauri/src/services/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
 - `src/tests/contracts/` — executable architecture, source-size, readability, and UI contracts.
@@ -65,7 +64,7 @@ cd src-tauri && cargo fmt --check && cargo check && cargo test
 
 `npm run format` formats frontend source with Prettier. Vitest enforces the repository's readability, source-size, and UI architecture contracts.
 
-New hand-written source is limited to 500 lines. Existing larger files are frozen at their recorded ceilings and must leave the fixture baseline after they are split below the limit.
+All hand-written frontend source is limited to 500 lines. Lint findings and frontend file-size exceptions have no migration baseline.
 
 ## Generated-file cleanup
 

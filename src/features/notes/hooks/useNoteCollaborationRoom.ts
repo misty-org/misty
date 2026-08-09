@@ -1,13 +1,10 @@
+import { journalDocumentStatusMessage, parseJournalDocumentStatus } from "@/features/journal";
 import { useEffect, useState } from "react";
 import {
   acquireNoteCollaborationSession,
   releaseNoteCollaborationSession,
   type NoteCollaborationSession,
-} from "@/features/notes/noteCollaboration";
-import {
-  journalDocumentStatusMessage,
-  parseJournalDocumentStatus,
-} from "@/features/journal/collaborationStatus";
+} from "../noteCollaboration";
 
 export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
   const [session, setSession] = useState<NoteCollaborationSession | null>(null);

@@ -1,9 +1,9 @@
+import { useSpacesStore } from "@/features/spaces";
+import { spacesApi } from "@/services/spaces/api";
+import type { SpaceAgendaEntry } from "@/services/spaces/dto/interfaces/plannerExpansionTypes";
+import type { Space } from "@/services/spaces/dto/interfaces/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { Space } from "@/models/interfaces/features/spaces/types";
-import type { SpaceAgendaEntry } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
 
 export interface HomeAgendaItem extends SpaceAgendaEntry {
   spaceId: string;

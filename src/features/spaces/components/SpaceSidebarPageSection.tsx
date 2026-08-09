@@ -1,7 +1,7 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { Button, cn } from "@/shared/ui";
 import { ChevronRight } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Button, cn } from "@/ui";
 
 export function SpaceSidebarPageSection(props: {
   active: boolean;

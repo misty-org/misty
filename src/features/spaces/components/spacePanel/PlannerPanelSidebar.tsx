@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useAuth } from "@/features/auth";
+import { spacesApi } from "@/services/spaces/api";
+import type { SpaceRoadmap } from "@/services/spaces/dto/interfaces/plannerExpansionTypes";
+import { Button } from "@/shared/ui";
 import { CalendarDays, Flag, GitFork, KanbanSquare, List, Plus, Target } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/features/auth/AuthContext";
-import type { SpaceRoadmap } from "@/models/interfaces/features/spaces/plannerExpansionTypes";
-import { spacesApi } from "@/stores/spaces/useSpacesBackendStore";
-import { useSpacesStore } from "@/stores/spaces/useSpacesStore";
-import { Button } from "@/ui";
 import { rememberedPlannerRoute } from "../../spacesShell/spaceSubpageMemory";
+import { useSpacesStore } from "../../store/useSpacesStore";
 import { SpaceSidebarPageSection } from "../SpaceSidebarPageSection";
 import { SpaceSidebarLink } from "./SpaceSidebarLink";
 
