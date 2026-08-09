@@ -1,6 +1,6 @@
 export type { ChatComposerSuggestion } from "@/models/types/features/spaces/SpaceChat";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lightbulb, LightbulbOff, MessagesSquare, Trash2 } from "lucide-react";
 import { Button } from "@/ui";
 
@@ -33,6 +33,7 @@ import { useChatScrollRestoration } from "./spaceChat/useChatScrollRestoration";
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const setupUser = useSetupStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
@@ -46,6 +47,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     spaceId,
     conversationId,
     initialAccess.canReadMessages,
+    initialAccess.activeSpace?.kind === "misty",
   );
   const scope = useSpaceChatScope({
     spaceId,
@@ -59,8 +61,26 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const actionSuggestions = useSpaceActionSuggestions(
     spaceId,
     conversationId,
-    !scope.activeConversation?.direct_agent_id,
+    initialAccess.activeSpace?.kind !== "misty" && !scope.activeConversation?.direct_agent_id,
   );
+
+  useEffect(() => {
+    if (initialAccess.activeSpace?.kind !== "misty" || conversationId) return;
+    const supportConversation = conversationChat.conversations.find(
+      (conversation) => conversation.kind === "misty_support",
+    );
+    if (!supportConversation) return;
+    navigate(
+      `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(supportConversation.id)}`,
+      { replace: true },
+    );
+  }, [
+    conversationChat.conversations,
+    conversationId,
+    initialAccess.activeSpace?.kind,
+    navigate,
+    spaceId,
+  ]);
 
   const agentTurns = usePendingAgentRuns(spaceId, conversationId);
   const draft = useSpaceChatDraft(spaceId, conversationId);
@@ -115,7 +135,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     openPicker,
   });
   const mentionNames = useMemo(
-    () => [...scope.members.map((member) => member.name), ...scope.agents.map((agent) => agent.name)],
+    () => [
+      ...scope.members.map((member) => member.name),
+      ...scope.agents.map((agent) => agent.name),
+    ],
     [scope.members, scope.agents],
   );
 
@@ -163,8 +186,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     suggestions.setOpen(false);
     setPickerOpen(false);
     store.clearSpacesError();
-    if (!store.referenceOnly) void store.loadChatAgents(spaceId);
-  }, [spaceId, user?.id]);
+    if (!store.referenceOnly && initialAccess.activeSpace?.kind !== "misty") {
+      void store.loadChatAgents(spaceId);
+    }
+  }, [initialAccess.activeSpace?.kind, spaceId, user?.id]);
 
   useEffect(() => {
     const last = scope.messages[scope.messages.length - 1];
@@ -186,6 +211,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     await spacesApi.clearEveryoneConversation(spaceId);
     await store.loadMessages(spaceId);
   };
+
+  if (initialAccess.activeSpace?.kind === "misty" && !conversationId) {
+    return (
+      <div className="grid h-full place-items-center bg-charcoal-bg text-sm text-cream-muted">
+        Opening your Misty conversation…
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream">

@@ -83,7 +83,7 @@ export function SpaceMembers({
             members={members}
             agents={agents}
             loading={state.membersLoading}
-            owner={state.owner}
+            owner={state.canManageMembers}
             canManageAgents={state.canManageAgents}
             currentUserId={user?.id}
             onMemberAction={dialogs.setMemberAction}
@@ -95,7 +95,7 @@ export function SpaceMembers({
             <MemberList
               members={members}
               loading={state.membersLoading}
-              owner={state.owner}
+              owner={state.canManageMembers}
               currentUserId={user?.id}
               onAction={dialogs.setMemberAction}
             />
@@ -109,7 +109,7 @@ export function SpaceMembers({
           </>
         )}
 
-        {state.owner ? (
+        {state.canInvite ? (
           <PendingInvitationsCard
             spaceId={spaceId}
             invitations={state.pendingInvitations}

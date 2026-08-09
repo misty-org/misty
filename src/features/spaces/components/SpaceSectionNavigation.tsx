@@ -18,6 +18,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const permissions = space?.permissions;
   const visibleSections = sections
+    .filter(({ id }) => space?.kind !== "misty" || id === "chat")
     .filter(({ id }) => id !== "chat" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);

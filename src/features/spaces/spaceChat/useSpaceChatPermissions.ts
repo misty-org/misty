@@ -22,7 +22,7 @@ export interface SpaceChatPermissions {
 export function useSpaceChatPermissions(
   spaceId: string,
   _conversationId = "",
-  _conversationKind?: "standard" | "direct",
+  _conversationKind?: "standard" | "direct" | "misty_support",
 ): SpaceChatPermissions {
   const activeSpace = useSpacesStore((state) => state.spaces.find((space) => space.id === spaceId));
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);

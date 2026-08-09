@@ -27,30 +27,33 @@ describe("default Misty Space", () => {
     container.remove();
   });
 
-  it("allows ordinary management but respects operator-only deletion", () => {
+  it("reserves lifecycle management for operators", () => {
     const space = mistySpace();
-    expect(canManageSpaceLifecycle(space, "rename")).toBe(true);
-    expect(canManageSpaceLifecycle(space, "invite")).toBe(true);
+    expect(canManageSpaceLifecycle(space, "rename")).toBe(false);
+    expect(canManageSpaceLifecycle(space, "invite")).toBe(false);
     expect(canManageSpaceLifecycle(space, "delete")).toBe(false);
   });
 
-  it("uses normal Space permissions in every conversation", async () => {
-    await renderProbe("conversation-1", "standard");
+  it("keeps private support chat writable without exposing the shared library", async () => {
+    await renderProbe("conversation-1", "misty_support");
     expect(readProbe()).toMatchObject({
       canWriteMessages: true,
       canUploadAttachments: true,
-      canBrowseLibrary: true,
+      canBrowseLibrary: false,
     });
 
     await renderProbe("", undefined);
     expect(readProbe().canWriteMessages).toBe(true);
 
     useSpacesStore.setState({ referenceOnly: true });
-    await renderProbe("conversation-1", "standard");
+    await renderProbe("conversation-1", "misty_support");
     expect(readProbe().canWriteMessages).toBe(false);
   });
 
-  async function renderProbe(conversationId: string, conversationKind: "standard" | undefined) {
+  async function renderProbe(
+    conversationId: string,
+    conversationKind: "misty_support" | undefined,
+  ) {
     await act(async () => {
       root.render(
         <PermissionProbe conversationId={conversationId} conversationKind={conversationKind} />,
@@ -65,7 +68,7 @@ describe("default Misty Space", () => {
 
 function PermissionProbe(props: {
   conversationId: string;
-  conversationKind: "standard" | undefined;
+  conversationKind: "misty_support" | undefined;
 }) {
   const permissions = useSpaceChatPermissions(
     "misty",
@@ -78,10 +81,10 @@ function PermissionProbe(props: {
 function mistySpace(): Space {
   return {
     id: "misty",
-    kind: "standard",
+    kind: "misty",
     owner_user_id: "owner",
     name: "Misty",
-    role: "owner",
+    role: "member",
     member_count: 0,
     pending_count: 0,
     is_shared: false,
@@ -89,7 +92,9 @@ function mistySpace(): Space {
       "messages.read": true,
       "messages.write": true,
       "attachments.upload": true,
-      "library.view": true,
+      "library.view": false,
+      "space.rename": false,
+      "space.invite": false,
       "space.delete": false,
     },
     created_at: "2026-08-03T00:00:00Z",
