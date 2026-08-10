@@ -1,4 +1,4 @@
-import { useExplorerStore } from "@/features/file-explorer";
+import { useExplorerStore } from "@/features/files/explorer";
 import { useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { useSpacesStore } from "./store/useSpacesStore";

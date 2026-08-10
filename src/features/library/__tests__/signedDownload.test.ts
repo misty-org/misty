@@ -4,7 +4,7 @@ import {
   SIGNED_DOWNLOAD_HEADER,
   parseSignedDownload,
   readDownloadBlob,
-} from "@/services/spaces/signed-download";
+} from "@/api/spaces/signed-download";
 
 function signedResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {

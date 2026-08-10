@@ -1,7 +1,7 @@
 import { useAppStore } from "@/features/app-shell";
-import { analytics } from "@/services/telemetry/client";
-import { initializeAnalyticsLifecycle } from "@/services/telemetry/lifecycle";
-import { TelemetryErrorBoundary } from "@/services/telemetry/TelemetryErrorBoundary";
+import { analytics } from "@/telemetry/client";
+import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
+import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { configureAssetIconEnvironment } from "@/shared/ui/asset-icon";
 import ReactDOM from "react-dom/client";

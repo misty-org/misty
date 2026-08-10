@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SpaceConversation } from "@/services/spaces/dto/interfaces/types";
+import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
 import { SpaceChatConversationList } from "../../components/SpaceChatConversationList";
 
 describe("SpaceChatConversationList", () => {

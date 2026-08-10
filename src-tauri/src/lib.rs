@@ -1,24 +1,25 @@
+// Several platform-gated and migration paths are intentionally compiled but
+// not active in every desktop build. Keep those paths available to the mobile
+// and upgrade targets without treating their absence from this target as lint
+// failures.
 #![allow(dead_code, unused_imports, unused_variables)]
 
-mod commands;
-mod core;
+mod app;
+mod domain;
 mod error;
-#[cfg(desktop)]
-mod extension_protocol;
-mod plugins;
-mod runtime;
-mod services;
+mod infra;
+mod platform;
 mod telemetry;
 
 #[cfg(desktop)]
-use commands::{
+use app::commands::{
     agents_device_identity_load, agents_device_identity_store,
     media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
     media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
     media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
     media_search_set_asset_state, media_search_snapshot,
 };
-use commands::{
+use app::commands::{
     agents_device_snapshot, agents_open_citation, agents_prepare_document,
     agents_prepare_scoped_document, agents_register_folder_scope, app_environment_snapshot,
     app_snapshot, archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
@@ -64,23 +65,23 @@ use commands::{
     transfers_snapshot, workspaces_save, workspaces_snapshot,
 };
 #[cfg(target_os = "android")]
-use commands::{
+use app::commands::{
     android_all_files_access_status, android_grant_local_folder,
     android_open_all_files_access_settings,
 };
-use plugins::mac_rounded_corners;
-use runtime::MistyRuntime;
-use services::misty::{
+use app::runtime::MistyRuntime;
+use infra::misty::{
     check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
     install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
     save_authenticated_user, save_verified_license, scan_local_plugins, set_plugin_enabled,
     sign_out_misty, stop_misty, uninstall_plugin,
 };
-use services::misty_template::{
+use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
 #[cfg(desktop)]
-use services::tray;
+use infra::tray;
+use platform::plugins::mac_rounded_corners;
 use tauri::Manager;
 use telemetry::TelemetryReporter;
 
@@ -129,7 +130,7 @@ pub fn run() {
                     .ok()
                     .map(|path| path.join("Misty"));
                 if let Some(root) = &data_root {
-                    services::paths::set_mobile_data_root(root.clone());
+                    infra::paths::set_mobile_data_root(root.clone());
                 }
                 MistyRuntime::new_with_data_root(data_root)
             };
@@ -144,13 +145,13 @@ pub fn run() {
                 return Err(error.into());
             }
             #[cfg(target_os = "macos")]
-            services::devices::start_device_change_listener(app.handle().clone());
+            infra::devices::start_device_change_listener(app.handle().clone());
             Ok(())
         });
 
     #[cfg(desktop)]
-    let builder =
-        builder.register_uri_scheme_protocol("misty-extension", extension_protocol::handle);
+    let builder = builder
+        .register_uri_scheme_protocol("misty-extension", platform::extension_protocol::handle);
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {

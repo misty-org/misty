@@ -1,9 +1,0 @@
-{
-  "pkg": "@misty/desktop",
-  "globalName": "MistyUI",
-  "projectId": "f00799f7-e8eb-4955-97f7-307280262212",
-  "shape": "package",
-  "srcDir": "src/ui",
-  "tsconfig": ".design-sync/tsconfig.sync.json",
-  "cssEntry": "src/ui/styles/styles.css"
-}

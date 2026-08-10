@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/auth";
-import { spacesApi } from "@/services/spaces/api";
-import type { SpaceRoadmap } from "@/services/spaces/dto/interfaces/plannerExpansionTypes";
+import { spacesApi } from "@/api/spaces/api";
+import type { SpaceRoadmap } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import { Button } from "@/shared/ui";
 import { CalendarDays, Flag, GitFork, KanbanSquare, List, Plus, Target } from "lucide-react";
 import { useEffect, useState } from "react";

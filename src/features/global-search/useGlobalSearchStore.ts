@@ -2,7 +2,7 @@ import {
   queryIndexedExplorerSearch,
   querySemanticExplorerSearch,
   useExplorerStore,
-} from "@/features/file-explorer";
+} from "@/features/files/explorer";
 import { useSpacesStore } from "@/features/spaces";
 import { create } from "zustand";
 import {

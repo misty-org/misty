@@ -1,4 +1,4 @@
-import { configureSpaceSession } from "@/services/spaces/session";
+import { configureSpaceSession } from "@/api/spaces/session";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";

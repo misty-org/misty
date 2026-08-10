@@ -6,8 +6,8 @@ import type {
   SpaceNode,
   SpaceTaskPage,
   SpacesSnapshot,
-} from "@/services/spaces/dto/interfaces/types";
-import { readSpaceAccountToken } from "@/services/spaces/session";
+} from "@/api/spaces/dto/interfaces/types";
+import { readSpaceAccountToken } from "@/api/spaces/session";
 
 const cacheVersion = 1;
 const cacheDatabaseName = "misty-space-reference-cache-v1";

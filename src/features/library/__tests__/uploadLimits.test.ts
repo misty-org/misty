@@ -4,7 +4,7 @@ import {
   UPLOAD_LIMIT_BYTES,
   formatUploadLimit,
   uploadLimitError,
-} from "@/services/spaces/upload-limits";
+} from "@/api/spaces/upload-limits";
 
 const MB = 1024 * 1024;
 

@@ -1,5 +1,5 @@
-import { SpaceMembersPopover } from "@/features/space-members";
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { SpaceMembersPopover } from "@/features/spaces/members";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
 import { Settings2, type LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";

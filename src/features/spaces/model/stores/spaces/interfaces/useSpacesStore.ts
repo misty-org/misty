@@ -11,7 +11,7 @@ import type {
   SpaceRun,
   SpaceStudioResource,
   SpacesSnapshot,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import type { SpacePresenceViewer } from "../types/useSpacesBackendStore";
 
 import type { ActivityTab } from "../../../../store/useSpacesStore";

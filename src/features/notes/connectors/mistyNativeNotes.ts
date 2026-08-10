@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/services/spaces/api";
+import { spaceRequest } from "@/api/spaces/api";
 import { nowIso, previewFrom } from "../connectorUtils";
 import { MISTY_CONNECTOR_ID } from "../mockData";
 import type {

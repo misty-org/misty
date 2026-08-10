@@ -6,7 +6,7 @@ import {
   useExplorerStore,
   type ExplorerSortColumn,
   type ExplorerSortState,
-} from "@/features/file-explorer";
+} from "@/features/files/explorer";
 import { useProvidersStore } from "@/features/providers";
 import {
   selectAdvancedPreferences,
@@ -14,13 +14,13 @@ import {
   useSettingsStore,
 } from "@/features/settings";
 import { useMultiPanelStore } from "@/features/workspace";
-import { devicesSnapshot, explorerListDirectory } from "@/services/backend";
+import { devicesSnapshot, explorerListDirectory } from "@/features/files/native";
 import type {
   DirectoryListing,
   FileEntry,
   MountedDevice,
   ProviderRemote,
-} from "@/services/misty/model/misty-api";
+} from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import {
   Alert,

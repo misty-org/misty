@@ -9,7 +9,7 @@ vi.mock("@/features/auth", () => ({
   useAuth: () => ({ user: { id: "account-beta" } }),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: spaceRequestMock,
 }));
 

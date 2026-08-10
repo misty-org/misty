@@ -5,7 +5,7 @@ import {
   providersSelectRemote,
   providersSnapshot,
   providersTestRemote,
-} from "@/services/backend";
+} from "@/native";
 import { errorText } from "@/shared/lib/format";
 import type { ProvidersStore } from "../model/stores/providers/interfaces/useProvidersStore";
 import { updateTokenField } from "../providerUtils";

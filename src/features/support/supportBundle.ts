@@ -1,5 +1,5 @@
-import { clientMetadata } from "@/services/telemetry/metadata";
-import { redactRecord } from "@/services/telemetry/redaction";
+import { clientMetadata } from "@/telemetry/metadata";
+import { redactRecord } from "@/telemetry/redaction";
 import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
 export interface SupportBundle {

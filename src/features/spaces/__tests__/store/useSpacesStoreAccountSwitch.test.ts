@@ -1,4 +1,4 @@
-import type { Space, SpaceMember, SpacesSnapshot } from "@/services/spaces/dto/interfaces/types";
+import type { Space, SpaceMember, SpacesSnapshot } from "@/api/spaces/dto/interfaces/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetSpacesAccountState, useSpacesStore } from "../../store/useSpacesStore";
 
@@ -8,7 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   inbox: vi.fn(),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
   spacesApi: {
     snapshot: apiMocks.snapshot,

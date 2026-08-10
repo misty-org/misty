@@ -1,21 +1,25 @@
 import { routes } from "@/features/app-shell";
+import { AgentsPage } from "@/features/agents";
+import { RegisterPage, SignInPage } from "@/features/auth";
 import { DeveloperWorkspace } from "@/features/developer-workspace";
+import { ExtensionsPage } from "@/features/extensions";
+import FilesPage from "@/features/files/explorer";
+import { HomeDashboard } from "@/features/home";
 import { spaceNotesEnabled } from "@/features/notes";
+import { SettingsPage } from "@/features/settings";
 import { SpaceInvitationRedemption } from "@/features/spaces";
-import AgentsPage from "@/pages/Agents";
-import ExtensionsPage from "@/pages/Extensions";
-import FilesPage from "@/pages/Files";
-import HomePage from "@/pages/Home";
-import RegisterPage from "@/pages/Register";
-import SettingsPage from "@/pages/Settings";
-import SignInPage from "@/pages/SignIn";
-import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/pages/Spaces";
-import TransfersPage from "@/pages/Transfers";
+import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/features/spaces";
+import { TransfersPage } from "@/features/transfers";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
+import { WebUnavailablePage } from "../layouts/WebUnavailablePage";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
+import { isWebBuild } from "@/shared/platform/buildTarget";
+
+const desktopOnlyRoute = (feature: string) =>
+  isWebBuild ? <WebUnavailablePage feature={feature} /> : null;
 
 export const router = createBrowserRouter([
   {
@@ -30,18 +34,21 @@ export const router = createBrowserRouter([
       {
         element: <AppFrameLayout />,
         children: [
-          { index: true, element: <Navigate to={routes.home} replace /> },
+          {
+            index: true,
+            element: <Navigate to={isWebBuild ? routes.spaces : routes.home} replace />,
+          },
           { path: "library", element: <Navigate to={routes.files} replace /> },
           { path: "providers", element: null },
           {
             element: <AppPagesLayout />,
             children: [
-              { path: "home", element: <HomePage /> },
-              { path: "files", element: <FilesPage /> },
-              { path: "agents", element: <AgentsPage /> },
-              { path: "code", element: <DeveloperWorkspace /> },
-              { path: "extensions", element: <ExtensionsPage /> },
-              { path: "transfers", element: <TransfersPage /> },
+              { path: "home", element: desktopOnlyRoute("Home dashboard") ?? <HomeDashboard /> },
+              { path: "files", element: desktopOnlyRoute("Files") ?? <FilesPage /> },
+              { path: "agents", element: desktopOnlyRoute("Agents") ?? <AgentsPage /> },
+              { path: "code", element: desktopOnlyRoute("Code") ?? <DeveloperWorkspace /> },
+              { path: "extensions", element: desktopOnlyRoute("Extensions") ?? <ExtensionsPage /> },
+              { path: "transfers", element: desktopOnlyRoute("Transfers") ?? <TransfersPage /> },
               { path: "automations", element: <Navigate to={routes.spaces} replace /> },
               { path: "assistant", element: <Navigate to={routes.agents} replace /> },
               {
@@ -71,7 +78,10 @@ export const router = createBrowserRouter([
               { path: "account", element: <Navigate to={routes.spaces} replace /> },
               { path: "account/signin", element: <Navigate to={routes.signIn} replace /> },
               { path: "account/register", element: <Navigate to={routes.register} replace /> },
-              { path: "account/settings", element: <SettingsPage /> },
+              {
+                path: "account/settings",
+                element: desktopOnlyRoute("Account settings") ?? <SettingsPage />,
+              },
             ],
           },
           { path: "settings", element: null },

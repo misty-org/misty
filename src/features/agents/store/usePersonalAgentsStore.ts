@@ -1,5 +1,5 @@
-import { spaceRequest } from "@/services/spaces/api";
-import type { AgentToolboxResponse } from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
+import { spaceRequest } from "@/api/spaces/api";
+import type { AgentToolboxResponse } from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import type { GatewayModel, PersonalAgent, PersonalAgentGrant } from "../model/interfaces/personal";

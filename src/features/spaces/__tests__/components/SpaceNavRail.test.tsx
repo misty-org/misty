@@ -1,5 +1,5 @@
 import { useActivityStore } from "@/features/activity";
-import type { Space, SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import type { Space, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";

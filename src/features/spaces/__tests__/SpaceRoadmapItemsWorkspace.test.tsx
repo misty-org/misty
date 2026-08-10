@@ -8,11 +8,11 @@ const { roadmaps, roadmap, tasks } = vi.hoisted(() => ({
   tasks: vi.fn(),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spacesApi: { roadmaps, roadmap, tasks },
 }));
 
-import { SpaceRoadmapItemsWorkspace } from "@/features/space-roadmap/SpaceRoadmapItemsWorkspace";
+import { SpaceRoadmapItemsWorkspace } from "@/features/spaces/roadmap/SpaceRoadmapItemsWorkspace";
 
 describe("SpaceRoadmapItemsWorkspace", () => {
   let container: HTMLDivElement;

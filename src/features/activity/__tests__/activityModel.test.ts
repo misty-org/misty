@@ -1,4 +1,4 @@
-import type { SpaceInboxItem, SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import type { SpaceInboxItem, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import { describe, expect, it } from "vitest";
 import {
   activityItemsFromSpaces,

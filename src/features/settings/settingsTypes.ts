@@ -3,7 +3,7 @@ import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
   ShortcutBinding,
-} from "@/services/misty/model/misty-api";
+} from "@/native/contracts";
 import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =

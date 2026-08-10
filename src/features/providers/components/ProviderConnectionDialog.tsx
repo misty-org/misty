@@ -1,4 +1,4 @@
-import type { ProviderWorkflow, ProviderWorkflowOption } from "@/services/misty/model/misty-api";
+import type { ProviderWorkflow, ProviderWorkflowOption } from "@/native/contracts";
 import { iconAssets } from "@/shared/assets/icons";
 import {
   Alert,

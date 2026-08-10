@@ -4,8 +4,8 @@ import type {
   ProviderRemote,
   ProvidersSnapshot,
   RemoteEditDraft,
-} from "@/services/misty/model/misty-api";
-import type { ProviderConfigMode } from "@/services/misty/model/types/misty-api";
+} from "@/native/contracts";
+import type { ProviderConfigMode } from "@/native/contracts/primitives";
 import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 
 export interface ProviderConnectionSession {

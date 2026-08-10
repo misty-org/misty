@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SettingsSection } from "@/features/settings";
 import type * as AppShell from "@/features/app-shell";
-import type * as FileSearch from "@/features/file-search";
+import type * as FileSearch from "@/features/files/search";
 import type * as SettingsStoreModule from "../store/useSettingsStore";
 
 /**
@@ -74,7 +74,7 @@ vi.mock("../store/useSettingsStore", async (importOriginal) => {
   return { ...actual, useSettingsStore };
 });
 
-vi.mock("@/features/file-search", async (importOriginal) => {
+vi.mock("@/features/files/search", async (importOriginal) => {
   const actual = await importOriginal<typeof FileSearch>();
   const useSearchStore = (selector?: (state: unknown) => unknown) =>
     selector ? selector(mocks.searchState) : mocks.searchState;

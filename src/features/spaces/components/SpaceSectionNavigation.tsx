@@ -1,5 +1,6 @@
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
+import { isWebBuild } from "@/shared/platform/buildTarget";
 import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
@@ -21,6 +22,7 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
     .filter(({ id }) => space?.kind !== "misty" || id === "chat")
     .filter(({ id }) => id !== "chat" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
+    .filter(({ id }) => id !== "library" || !isWebBuild)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);
   const accountId = user?.id ?? "";
   const activityItems = useActivityStore((state) => state.allItems);

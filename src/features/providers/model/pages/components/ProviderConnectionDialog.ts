@@ -1,4 +1,4 @@
-import type { ProviderWorkflow } from "@/services/misty/model/misty-api";
+import type { ProviderWorkflow } from "@/native/contracts";
 import type { ProviderConnectionSession } from "../../stores/providers/interfaces/useProvidersStore";
 
 export interface ProviderConnectionDialogProps {

@@ -3,7 +3,7 @@ import {
   resolveJournalAssetUrl,
   uploadJournalAsset,
 } from "@/features/journal";
-import { httpBlob } from "@/services/http";
+import { httpBlob } from "@/api/http";
 import type { FileId } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFileData, DataURL } from "@excalidraw/excalidraw/types";
 import type { DrawingAssetReference } from "./types";
