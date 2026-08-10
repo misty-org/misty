@@ -1,5 +1,5 @@
-import { remoteDisplayName } from "@/services/backend";
-import type { ProviderRemote } from "@/services/misty/model/misty-api";
+import { remoteDisplayName } from "@/native";
+import type { ProviderRemote } from "@/native/contracts";
 import { iconAssets } from "@/shared/assets/icons";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import {

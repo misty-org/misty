@@ -1,7 +1,7 @@
 import type {
   AgentToolboxAction,
   AgentToolboxActivity,
-} from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
+} from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
 import { useRef, useState } from "react";
 import { personalAgentsApi } from "./store/usePersonalAgentsStore";
 

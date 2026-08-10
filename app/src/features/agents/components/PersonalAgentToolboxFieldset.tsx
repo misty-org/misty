@@ -1,7 +1,7 @@
 import type {
   AgentToolboxAction,
   AgentToolboxActivity,
-} from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
+} from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
 import { Checkbox, Label } from "@/shared/ui";
 
 export function PersonalAgentToolboxFieldset({

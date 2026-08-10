@@ -1,11 +1,13 @@
 import { useState } from "react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { toInitials } from "@/lib/format";
 import { updateProfile, type MeResponse } from "../api";
+import { AvatarUpload } from "./components/AvatarUpload";
+import { DangerZone } from "./components/DangerZone";
+import { DataExport } from "./components/DataExport";
+import { LicenseDevice } from "./components/LicenseDevice";
 import { SaveFeedback } from "../components/SaveFeedback";
 import {
   customRowClass,
@@ -18,9 +20,13 @@ import { useSave } from "../useSave";
 export function AccountPanel({
   me,
   onUpdated,
+  onAvatarUploaded,
+  onDeleted,
 }: {
   me: MeResponse;
   onUpdated: (name: string) => void;
+  onAvatarUploaded: () => void;
+  onDeleted: () => void;
 }) {
   const [name, setName] = useState(me.name);
   const { saving, error, ok, save } = useSave(async () => {
@@ -33,27 +39,12 @@ export function AccountPanel({
     month: "long",
     day: "numeric",
   });
-  const initials = toInitials(name.trim() || me.name || me.email);
 
   return (
     <div>
       <Section title="Profile">
         <div className={`${customRowClass} flex flex-col gap-4 py-5`}>
-          <div className="flex items-center gap-4">
-            <Avatar className="size-14">
-              <AvatarFallback className="text-base font-semibold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">
-                {me.name}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {me.email}
-              </p>
-            </div>
-          </div>
+          <AvatarUpload me={me} onUploaded={onAvatarUploaded} />
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div>
@@ -117,6 +108,10 @@ export function AccountPanel({
         </Row>
       </Section>
 
+      <Section title="License">
+        <LicenseDevice me={me} />
+      </Section>
+
       <Section title="Security">
         <div
           className={`${customRowClass} flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-6`}
@@ -132,6 +127,14 @@ export function AccountPanel({
           </Button>
         </div>
         <GhostRow label="Two-factor authentication" value="Coming soon" />
+      </Section>
+
+      <Section title="Your data">
+        <DataExport />
+      </Section>
+
+      <Section title="Danger zone">
+        <DangerZone onDeleted={onDeleted} />
       </Section>
     </div>
   );

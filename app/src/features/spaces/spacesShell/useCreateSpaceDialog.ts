@@ -1,10 +1,10 @@
 import { spaceNotesEnabled } from "@/features/notes";
-import { spacesApi } from "@/services/spaces/api";
+import { spacesApi } from "@/api/spaces/api";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegrationProvider,
   SpaceTemplate,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";

@@ -1,4 +1,4 @@
-import type { OperationQueueSnapshot, TransferRecord } from "@/services/misty/model/misty-api";
+import type { OperationQueueSnapshot, TransferRecord } from "@/native/contracts";
 import { describe, expect, it } from "vitest";
 import {
   aggregateTransferProgress,

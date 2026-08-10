@@ -8,7 +8,18 @@ test.beforeEach(async ({ page }) => {
 test("the homepage tells the complete collaboration story", async ({
   page,
 }) => {
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "The operating system for human and agent work.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Launch a collaborative, agentic workspace for any group in seconds.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect(
     page.getByRole("img", {
       name: "Misty Space Library with shared research and files",

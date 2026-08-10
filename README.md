@@ -9,6 +9,7 @@ Misty is a single repository for the desktop application, browser application, p
 | [`app`](./app) | Tauri desktop application and browser build | React, TypeScript, Rust |
 | [`website`](./website) | Public Misty website | React, TypeScript |
 | [`server`](./server) | Misty HTTP API and background services | Go |
+| [`cli`](./cli) | Misty command-line interface | Rust |
 
 ## Common commands
 
@@ -20,7 +21,7 @@ npm run dev:website
 npm run build:website
 ```
 
-Run server commands from [`server`](./server); its Go module remains self-contained.
+Run server commands from [`server`](./server) and CLI commands from [`cli`](./cli); both remain self-contained modules.
 
 ## Cloudflare Pages
 

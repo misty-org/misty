@@ -11,6 +11,7 @@ import {
   logoutRequest,
   type MeResponse,
 } from "./pages/AccountSettings/api";
+import { safeInternalPath } from "./lib/navigation";
 import { useUserStore } from "./store/userStore";
 
 interface User {
@@ -24,7 +25,7 @@ interface AuthContextType {
   sessionReady: boolean;
   setUser: (user: User | null) => void;
   refreshSession: () => Promise<MeResponse>;
-  logout: () => void;
+  logout: (destination?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -85,22 +86,28 @@ export function AuthProvider({ children, onLogout }: AuthProviderProps) {
     });
   }, [refreshSession]);
 
-  const logout = useCallback(() => {
-    useUserStore.getState().clear();
-    setUser(null);
-    void (async () => {
-      try {
-        await logoutRequest();
-      } catch {
-        // The local session is still cleared if the server is unavailable.
-      }
-      try {
-        await onLogout?.();
-      } finally {
-        window.location.replace("/");
-      }
-    })();
-  }, [onLogout, setUser]);
+  const logout = useCallback(
+    (destination?: string) => {
+      useUserStore.getState().clear();
+      setUser(null);
+      void (async () => {
+        try {
+          await logoutRequest();
+        } catch {
+          // The local session is still cleared if the server is unavailable.
+        }
+        try {
+          await onLogout?.();
+        } finally {
+          // This hard navigation always wins over any router navigate() the
+          // caller may also have issued, so the destination has to be passed in
+          // here rather than raced against.
+          window.location.replace(safeInternalPath(destination) ?? "/");
+        }
+      })();
+    },
+    [onLogout, setUser],
+  );
 
   return (
     <AuthContext.Provider

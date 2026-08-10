@@ -1,5 +1,5 @@
 import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model/types";
-import { enableModernWindowStyle } from "@/services/backend";
+import { enableModernWindowStyle } from "@/native";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";

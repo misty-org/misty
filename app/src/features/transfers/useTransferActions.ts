@@ -1,5 +1,5 @@
-import { useOperationQueueStore } from "@/features/file-explorer";
-import type { TransferRecord } from "@/services/misty/model/misty-api";
+import { useOperationQueueStore } from "@/features/files/explorer";
+import type { TransferRecord } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTransfersStore } from "./store";

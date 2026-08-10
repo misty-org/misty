@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   spaceRequest: vi.fn(),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: mocks.spaceRequest,
 }));
 

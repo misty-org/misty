@@ -2,7 +2,7 @@ import type {
   ProviderConnectionAvailability,
   SpaceIntegrationProvider,
   SpaceTemplate,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import { Button, Input } from "@/shared/ui";
 import { Check } from "lucide-react";
 import type { ComponentType } from "react";

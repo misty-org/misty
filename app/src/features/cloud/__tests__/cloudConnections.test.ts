@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/services/spaces/api";
+import { spaceRequest } from "@/api/spaces/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   beginCloudAuthorization,
@@ -7,7 +7,7 @@ import {
   deleteCloudConnection,
 } from "../cloudConnections";
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: vi.fn(),
 }));
 

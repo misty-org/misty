@@ -4,6 +4,12 @@ import { AuthProvider } from "./AuthContext";
 import Navbar from "./components/layout/NavBar";
 import Footer from "./components/layout/Footer";
 import { AccountSettingsDialog } from "./pages/AccountSettings";
+import {
+  isSettingsPathname,
+  settingsPathForTab,
+  settingsTabFromPathname,
+} from "./pages/AccountSettings/settingsRoute";
+import { TABS } from "./pages/AccountSettings/tabs";
 import { SITE_URL } from "./lib/site";
 
 type Handle = { title?: string; description?: string };
@@ -26,6 +32,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const previousPathRef = useRef(location.pathname);
+
+  const onSettingsRoute = isSettingsPathname(location.pathname);
+  const routeTab = settingsTabFromPathname(location.pathname);
 
   useEffect(() => {
     const match = [...matches]
@@ -79,7 +88,9 @@ export default function App() {
     const previousPath = previousPathRef.current;
     previousPathRef.current = location.pathname;
 
-    if (previousPath === location.pathname || location.pathname === "/settings") return;
+    // The dialog owns its own focus trap, so never steal focus to the page h1
+    // underneath it.
+    if (previousPath === location.pathname || onSettingsRoute) return;
 
     const frame = window.requestAnimationFrame(() => {
       const heading = mainRef.current?.querySelector<HTMLElement>("h1");
@@ -89,7 +100,7 @@ export default function App() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [location.pathname]);
+  }, [location.pathname, onSettingsRoute]);
 
   useEffect(() => {
     const { hash } = window.location;
@@ -100,14 +111,25 @@ export default function App() {
     navigate(hash.slice(1), { replace: true });
   }, [navigate]);
 
+  // A settings URL drives the dialog directly: the path stays put so the page is
+  // shareable, reloadable, and a valid desktop hand-off target. An unknown tab
+  // falls back to the default rather than rendering an empty page.
   useEffect(() => {
-    if (location.pathname !== "/settings") return;
+    if (!onSettingsRoute || routeTab !== null) return;
 
-    void Promise.resolve().then(() => {
+    navigate(settingsPathForTab(TABS[0].id), { replace: true });
+  }, [onSettingsRoute, routeTab, navigate]);
+
+  function handleSettingsOpenChange(next: boolean) {
+    if (next) {
       setSettingsOpen(true);
-      navigate("/", { replace: true });
-    });
-  }, [location.pathname, navigate]);
+      return;
+    }
+    setSettingsOpen(false);
+    // Closing a settings URL has to leave the URL too, or the dialog reopens on
+    // the next render.
+    if (onSettingsRoute) navigate("/", { replace: true });
+  }
 
   return (
     <AuthProvider>
@@ -139,7 +161,16 @@ export default function App() {
         </main>
 
         <Footer />
-        <AccountSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <AccountSettingsDialog
+          open={settingsOpen || routeTab !== null}
+          onOpenChange={handleSettingsOpenChange}
+          tab={routeTab ?? undefined}
+          onTabChange={
+            routeTab !== null
+              ? (tab) => navigate(settingsPathForTab(tab), { replace: true })
+              : undefined
+          }
+        />
 
       </div>
     </AuthProvider>

@@ -1,9 +1,9 @@
 import { useAppRouteMemoryStore } from "@/features/app-shell";
 import { useSetupStore } from "@/features/installer";
 import { removeSpaceReferenceCache } from "@/features/spaces";
-import { analytics } from "@/services/telemetry/client";
-import { TelemetryIdentityManager } from "@/services/telemetry/identity";
-import { setAnalyticsAuthenticationState } from "@/services/telemetry/lifecycle";
+import { analytics } from "@/telemetry/client";
+import { TelemetryIdentityManager } from "@/telemetry/identity";
+import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
 import {
   createContext,
   useCallback,

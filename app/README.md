@@ -1,18 +1,19 @@
 # Misty
 
-Misty is a Tauri application with one desktop React interface for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Phone-sized iOS and Android devices are not supported.
+Misty is a React product with a native Tauri shell for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Its browser build is a server-backed companion: it provides Spaces and account flows while clearly gating local-device features. Phone-sized iOS and Android devices are not supported.
 
 ## Repository layout
 
 - `src/app/` — bootstrap, routing, layouts, providers, telemetry lifecycle, and error boundaries.
-- `src/pages/` — thin route composers. Product behavior belongs to a feature.
-- `src/features/` — product-owned UI, hooks, types, and Zustand state. Spaces is split into `spaces`, `space-chat`, `space-library`, `space-members`, `space-planner`, `space-roadmap`, and `space-connections`; Files is split into `file-explorer`, `file-search`, and `file-preview`.
-- `src/services/` — the only frontend network boundary. Shared HTTP behavior lives in `http.ts`; Spaces endpoints and DTOs are grouped under `services/spaces/`.
-- `src/shared/` — generic UI, hooks, utilities, drag infrastructure, platform bridges, and assets with no feature knowledge.
+- `src/features/` — product-owned UI, hooks, types, and Zustand state. A feature exposes its intentional public API from `index.ts` and owns its implementation details.
+- `src/api/` — remote Misty HTTP client and resource-specific API modules.
+- `src/native/` — small shared Tauri/OS integrations. Desktop-only filesystem IPC lives with the Files feature at `src/features/files/native.ts`.
+- `src/telemetry/` — error reporting and product telemetry.
+- `src/shared/` — generic UI, hooks, utilities, drag infrastructure, and assets with no feature or native-runtime knowledge.
 - `src/styles/` — global styling and design tokens.
 - `src/tests/` — test setup and architecture contracts only; behavior tests are colocated with their source.
-- `src-tauri/` — Rust application core and tracked iOS/Android platform projects.
-- `src-tauri/src/services/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
+- `src-tauri/` — Rust desktop application and tracked iOS/Android platform projects. Its source is layered as `app/` (Tauri commands/runtime), `domain/` (business models and workflows), `infra/` (storage, network, OS adapters), `platform/` (Tauri and desktop integration), and `telemetry/`.
+- `src-tauri/src/infra/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
 - `src/tests/contracts/` — executable architecture, source-size, readability, and UI contracts.
 
 ## Setup
@@ -29,11 +30,36 @@ The storage build compiles the narrow direct-provider adapter into the Rust targ
 ```sh
 npm run dev:desktop
 npm run dev:mobile
+npm run dev:web
 npm run build:desktop
 npm run build:mobile
 npm run build:android
+npm run build:web
 misty-cli desktop windows stage-assets
 ```
+
+The web build requires `VITE_MISTY_PUBLIC_API_URL` to point at the public
+Misty API base (for example, `https://mistysys.com/api`). The browser sends
+the server's HttpOnly session cookie with credentialed API requests; it does
+not persist the desktop bearer token. The API must explicitly allow the web
+origin, such as `https://app.mistysys.com`.
+
+## Cloudflare Pages
+
+The Pages project is declared in `wrangler.jsonc` as `misty-web-app`; it serves
+the web build's `dist/` output. Connect this repository to Cloudflare Pages
+with Git integration, then configure:
+
+- Production branch: your default branch.
+- Root directory: `app`.
+- Build command: `npm run build:web`.
+- Build output directory: `dist`.
+- Build environment variable: `MISTY_PUBLIC_API_URL=https://mistysys.com/api`.
+- Custom domain: `app.mistysys.com`.
+
+Cloudflare Pages produces preview deployments for pull requests automatically.
+The production API must allow `https://app.mistysys.com` in
+`MISTY_ALLOWED_ORIGINS`; see the Misty Server production environment template.
 
 Use the Tauri desktop runner when you need native app behavior:
 

@@ -21,6 +21,24 @@ function storageQuotaNotice(storage: BillingUsageResponse["storage"]): string {
   return `New hosted uploads are paused because the pooled owner storage is over quota. Existing data remains intact, and nothing is automatically deleted.${followUp}`;
 }
 
+/**
+ * `agent_usage` is the current server field and reports a percentage;
+ * `hosted_ai` is the deprecated mirror and reports a 0–1 ratio. Read the new
+ * one when present so this keeps working once the old field is dropped.
+ */
+function agentUsagePercent(usage: BillingUsageResponse): number {
+  const raw =
+    usage.agent_usage?.percentage_used ??
+    (usage.hosted_ai ? usage.hosted_ai.used_ratio * 100 : 0);
+  return Math.round(Math.min(100, Math.max(0, raw)));
+}
+
+function formatDateOrDash(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleDateString();
+}
+
 function agentUsageNotice(usedPercent: number): string {
   if (usedPercent >= 100) {
     return "Agent usage is paused until the weekly reset or a Pro upgrade. Files and collaboration still work, with no automatic overage.";
@@ -45,9 +63,10 @@ export function UsagePanel({
   error: string;
   onRetry: () => void;
 }) {
-  const agentUsedPercent = usage
-    ? Math.round(Math.min(1, Math.max(0, usage.hosted_ai.used_ratio)) * 100)
-    : 0;
+  const agentUsedPercent = usage ? agentUsagePercent(usage) : 0;
+  const agentResetAt = usage
+    ? (usage.agent_usage?.reset_at ?? usage.hosted_ai?.reset_at ?? null)
+    : null;
   const storageUsedPercent = usage
     ? usage.storage.limit_bytes > 0
       ? Math.min(
@@ -103,9 +122,7 @@ export function UsagePanel({
         {state === "ready" && usage ? (
           <>
             <Row label="This week">{agentUsedPercent}% used</Row>
-            <Row label="Weekly reset">
-              {new Date(usage.hosted_ai.reset_at).toLocaleDateString()}
-            </Row>
+            <Row label="Weekly reset">{formatDateOrDash(agentResetAt)}</Row>
             <div className={customRowClass}>
               <Progress
                 value={agentUsedPercent}

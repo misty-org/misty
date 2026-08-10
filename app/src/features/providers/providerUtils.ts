@@ -2,8 +2,8 @@ import type {
   ProviderConfigStep,
   ProviderWorkflow,
   ProviderWorkflowOption,
-} from "@/services/misty/model/misty-api";
-import type { ProviderConfigMode } from "@/services/misty/model/types/misty-api";
+} from "@/native/contracts";
+import type { ProviderConfigMode } from "@/native/contracts/primitives";
 
 const preferredConfigKeys = [
   "root_folder_id",

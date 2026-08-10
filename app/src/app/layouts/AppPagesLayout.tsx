@@ -1,5 +1,6 @@
 import { routes } from "@/features/app-shell";
 import { useSetupStore } from "@/features/installer";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 
@@ -30,6 +31,7 @@ export function AppPagesLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!hasTauriInternals()) return;
     const interval = window.setInterval(
       () => {
         void refreshLocalAccessToken();

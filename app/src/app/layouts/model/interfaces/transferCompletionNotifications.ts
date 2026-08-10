@@ -1,5 +1,5 @@
-import type { TransferRecord } from "@/services/misty/model/misty-api";
-import type { TransferStatus } from "@/services/misty/model/types/misty-api";
+import type { TransferRecord } from "@/native/contracts";
+import type { TransferStatus } from "@/native/contracts/primitives";
 
 export interface TransferCompletionTracker {
   ready: boolean;

@@ -1,7 +1,7 @@
 import { useActivityStore } from "@/features/activity";
 import { refreshAllAgentAccountState, resetAllAgentAccountState } from "@/features/agents";
-import { useExplorerStore } from "@/features/file-explorer";
-import { resetSearchAccountState } from "@/features/file-search";
+import { useExplorerStore } from "@/features/files/explorer";
+import { resetSearchAccountState } from "@/features/files/search";
 import type { CurrentLicense } from "@/features/installer";
 import { resetNotesAccountState } from "@/features/notes";
 import { resetSpacesAccountState, useSpacesStore } from "@/features/spaces";

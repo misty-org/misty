@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
 import { Link } from "react-router-dom";
 
-import { spacesApi } from "@/services/spaces/api";
+import { spacesApi } from "@/api/spaces/api";
 import type {
   ProviderConnectionAvailability,
   SpaceIntegration,
   SpaceIntegrationProvider,
   SpaceSetup,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, Card } from "@/shared/ui";
 

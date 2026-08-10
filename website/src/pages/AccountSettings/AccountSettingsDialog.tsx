@@ -19,11 +19,25 @@ import { useAccountSettings } from "./useAccountSettings";
 export function AccountSettingsDialog({
   open,
   onOpenChange,
+  tab: controlledTab,
+  onTabChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Supplied only when the dialog was opened from a settings URL. Left
+   * undefined for the nav-menu overlay, which must not touch the address bar.
+   */
+  tab?: Tab;
+  onTabChange?: (tab: Tab) => void;
 }) {
-  const [tab, setTab] = useState<Tab>("account");
+  const [localTab, setLocalTab] = useState<Tab>("account");
+  const tab = controlledTab ?? localTab;
+
+  function setTab(next: Tab) {
+    setLocalTab(next);
+    onTabChange?.(next);
+  }
   const {
     me,
     loading,
@@ -35,6 +49,8 @@ export function AccountSettingsDialog({
     billingError,
     openBillingAction,
     renameAccount,
+    bumpAvatarVersion,
+    finishDeletion,
     retryUsage,
   } = useAccountSettings({ open, onOpenChange });
 
@@ -65,7 +81,12 @@ export function AccountSettingsDialog({
         >
           {tab === "account" ? (
             me ? (
-              <AccountPanel me={me} onUpdated={renameAccount} />
+              <AccountPanel
+                me={me}
+                onUpdated={renameAccount}
+                onAvatarUploaded={bumpAvatarVersion}
+                onDeleted={finishDeletion}
+              />
             ) : loading ? (
               <div className="flex min-h-40 items-center justify-center gap-2 text-muted-foreground">
                 <Spinner aria-hidden="true" className="size-4" />

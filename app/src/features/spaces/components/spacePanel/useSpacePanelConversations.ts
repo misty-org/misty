@@ -1,5 +1,5 @@
-import { spacesApi } from "@/services/spaces/api";
-import type { Space, SpaceConversation } from "@/services/spaces/dto/interfaces/types";
+import { spacesApi } from "@/api/spaces/api";
+import type { Space, SpaceConversation } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState } from "react";
 
 /**

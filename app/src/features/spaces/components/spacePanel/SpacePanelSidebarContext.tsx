@@ -1,6 +1,6 @@
 import { DrawingPanelSidebar } from "@/features/drawings";
 import { NotesPanelSidebar, spaceNotesEnabled } from "@/features/notes";
-import type { SpaceConversation } from "@/services/spaces/dto/interfaces/types";
+import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
 import { rememberedJournalRoute } from "../../spacesShell/spaceSubpageMemory";
 import { SpaceChatConversationList } from "../SpaceChatConversationList";
 import { SpaceSidebarSection } from "../SpaceSidebarSection";

@@ -37,7 +37,7 @@
       "hash": "f241d940f605b239"
     }
   ],
-  "src/features/file-explorer/components/DeepSearchOverlay.tsx": [
+  "src/features/files/explorer/components/DeepSearchOverlay.tsx": [
     {
       "length": 319,
       "hash": "043bcc5b43e4abfb"
@@ -51,13 +51,13 @@
       "hash": "e36571c94fea60c0"
     }
   ],
-  "src/features/file-explorer/components/ExplorerSidebar.tsx": [
+  "src/features/files/explorer/components/ExplorerSidebar.tsx": [
     {
       "length": 169,
       "hash": "2bb169cfe552f236"
     }
   ],
-  "src/features/file-explorer/components/ExplorerSidebarSupport.tsx": [
+  "src/features/files/explorer/components/ExplorerSidebarSupport.tsx": [
     {
       "length": 189,
       "hash": "5d2346243a5b423a"
@@ -79,7 +79,7 @@
       "hash": "1dc414f69ca412b9"
     }
   ],
-  "src/features/file-explorer/components/ExplorerToolbarSupport.tsx": [
+  "src/features/files/explorer/components/ExplorerToolbarSupport.tsx": [
     {
       "length": 189,
       "hash": "15d6f32e30f68564"
@@ -101,7 +101,7 @@
       "hash": "7e98b31fa6357fc1"
     }
   ],
-  "src/features/file-explorer/components/FileBrowserStyles.ts": [
+  "src/features/files/explorer/components/FileBrowserStyles.ts": [
     {
       "length": 293,
       "hash": "bdd8303a6f9758ed"
@@ -139,25 +139,25 @@
       "hash": "63094f68c2bd11c8"
     }
   ],
-  "src/features/file-explorer/components/MediaSearchViewer.tsx": [
+  "src/features/files/explorer/components/MediaSearchViewer.tsx": [
     {
       "length": 168,
       "hash": "346027b027925317"
     }
   ],
-  "src/features/file-explorer/components/fileBrowser/FileGridItem.tsx": [
+  "src/features/files/explorer/components/fileBrowser/FileGridItem.tsx": [
     {
       "length": 280,
       "hash": "5ee2a3673e83c23f"
     }
   ],
-  "src/features/file-explorer/components/fileBrowser/FileTableRow.tsx": [
+  "src/features/files/explorer/components/fileBrowser/FileTableRow.tsx": [
     {
       "length": 287,
       "hash": "b4c2e7423e99897f"
     }
   ],
-  "src/features/file-explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
+  "src/features/files/explorer/components/globalPreview/EmbeddedUniversalPreview.tsx": [
     {
       "length": 161,
       "hash": "54f971eaa0cb4590"
@@ -167,25 +167,25 @@
       "hash": "ff8fd46c3a758db7"
     }
   ],
-  "src/features/file-explorer/components/globalPreview/GlobalPreviewDialog.tsx": [
+  "src/features/files/explorer/components/globalPreview/GlobalPreviewDialog.tsx": [
     {
       "length": 252,
       "hash": "5c7e40e14f4fbc2c"
     }
   ],
-  "src/features/file-explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
+  "src/features/files/explorer/components/libraryWorkspace/LegacyLibraryAssetViewer.tsx": [
     {
       "length": 312,
       "hash": "d6fecc00bf4b053b"
     }
   ],
-  "src/features/file-explorer/components/libraryWorkspace/LibraryGallery.tsx": [
+  "src/features/files/explorer/components/libraryWorkspace/LibraryGallery.tsx": [
     {
       "length": 195,
       "hash": "b21f214321697811"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerBatchRenameDialog.tsx": [
+  "src/features/files/explorer/workspace/ExplorerBatchRenameDialog.tsx": [
     {
       "length": 185,
       "hash": "8eacfb597700938c"
@@ -195,19 +195,19 @@
       "hash": "cfa4e7ac0886c148"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerCompareDialog.tsx": [
+  "src/features/files/explorer/workspace/ExplorerCompareDialog.tsx": [
     {
       "length": 176,
       "hash": "7f7194965c3d66f6"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerDesktopDialogStyles.ts": [
+  "src/features/files/explorer/workspace/ExplorerDesktopDialogStyles.ts": [
     {
       "length": 177,
       "hash": "0c987fdfe42144b1"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerDesktopPluginStyles.ts": [
+  "src/features/files/explorer/workspace/ExplorerDesktopPluginStyles.ts": [
     {
       "length": 215,
       "hash": "0d6076bdd5155271"
@@ -269,7 +269,7 @@
       "hash": "e53f69af37473d31"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerDesktopStatus.tsx": [
+  "src/features/files/explorer/workspace/ExplorerDesktopStatus.tsx": [
     {
       "length": 254,
       "hash": "8e82f1e129bb7caf"
@@ -279,13 +279,13 @@
       "hash": "57115d7e374e89ba"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerDuplicateFinderDialog.tsx": [
+  "src/features/files/explorer/workspace/ExplorerDuplicateFinderDialog.tsx": [
     {
       "length": 173,
       "hash": "be43f7e77e8aecdf"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerShellStyles.ts": [
+  "src/features/files/explorer/workspace/ExplorerShellStyles.ts": [
     {
       "length": 161,
       "hash": "64555a1d3f492d81"
@@ -295,7 +295,7 @@
       "hash": "a01f57c9537dfb2c"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerSmartLibraryDialog.tsx": [
+  "src/features/files/explorer/workspace/ExplorerSmartLibraryDialog.tsx": [
     {
       "length": 196,
       "hash": "218f209fa74ac0aa"
@@ -321,7 +321,7 @@
       "hash": "4eb6b129628c27e7"
     }
   ],
-  "src/features/file-explorer/workspace/ExplorerSmartLibraryViews.tsx": [
+  "src/features/files/explorer/workspace/ExplorerSmartLibraryViews.tsx": [
     {
       "length": 206,
       "hash": "927a2c3f702b9865"
@@ -389,25 +389,25 @@
       "hash": "4cd5c39f34abc3e0"
     }
   ],
-  "src/features/space-chat/components/ChatReplyBanner.tsx": [
+  "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
     {
       "length": 164,
       "hash": "07c67054587410af"
     }
   ],
-  "src/features/space-chat/components/MessageHoverActions.tsx": [
+  "src/features/spaces/chat/components/MessageHoverActions.tsx": [
     {
       "length": 269,
       "hash": "97552c91ea127eaf"
     }
   ],
-  "src/features/space-chat/components/MessageReplyPreview.tsx": [
+  "src/features/spaces/chat/components/MessageReplyPreview.tsx": [
     {
       "length": 210,
       "hash": "37ca8065247c9015"
     }
   ],
-  "src/features/space-library/SpaceLibraryPlayback.tsx": [
+  "src/features/spaces/library/SpaceLibraryPlayback.tsx": [
     {
       "length": 252,
       "hash": "d2e929a3713d95d5"
@@ -425,13 +425,13 @@
       "hash": "42c12f99adc9e758"
     }
   ],
-  "src/features/space-library/SpaceLibraryViewer.tsx": [
+  "src/features/spaces/library/SpaceLibraryViewer.tsx": [
     {
       "length": 291,
       "hash": "03af4067d4776828"
     }
   ],
-  "src/features/space-library/SpaceLibraryViewerUtils.tsx": [
+  "src/features/spaces/library/SpaceLibraryViewerUtils.tsx": [
     {
       "length": 642,
       "hash": "54a785654ae45689"
@@ -441,37 +441,37 @@
       "hash": "3ef5be5894d35e4f"
     }
   ],
-  "src/features/space-library/libraryCollections/useLibraryMaintenance.ts": [
+  "src/features/spaces/library/libraryCollections/useLibraryMaintenance.ts": [
     {
       "length": 165,
       "hash": "80b68ed6b80d10b1"
     }
   ],
-  "src/features/space-library/libraryPrimitives/LibraryCollectionCard.tsx": [
+  "src/features/spaces/library/libraryPrimitives/LibraryCollectionCard.tsx": [
     {
       "length": 228,
       "hash": "1b388d6418022c4a"
     }
   ],
-  "src/features/space-library/libraryPrimitives/LibraryDiscoveryCard.tsx": [
+  "src/features/spaces/library/libraryPrimitives/LibraryDiscoveryCard.tsx": [
     {
       "length": 243,
       "hash": "9b9fef24deefcdec"
     }
   ],
-  "src/features/space-library/libraryViewer/LibraryViewerStage.tsx": [
+  "src/features/spaces/library/libraryViewer/LibraryViewerStage.tsx": [
     {
       "length": 181,
       "hash": "8979054a15fb7190"
     }
   ],
-  "src/features/space-members/components/SpaceMembers.tsx": [
+  "src/features/spaces/members/components/SpaceMembers.tsx": [
     {
       "length": 232,
       "hash": "85f8fa0410b314ea"
     }
   ],
-  "src/features/space-planner/SpaceTaskCalendarGrid.tsx": [
+  "src/features/spaces/planner/SpaceTaskCalendarGrid.tsx": [
     {
       "length": 172,
       "hash": "47c6597f6ef6c873"
@@ -481,7 +481,7 @@
       "hash": "6112a241b5a46bac"
     }
   ],
-  "src/features/space-planner/taskDrawers/TaskDrawerProperties.tsx": [
+  "src/features/spaces/planner/taskDrawers/TaskDrawerProperties.tsx": [
     {
       "length": 171,
       "hash": "bd6f2b6a85059e8b"

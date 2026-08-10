@@ -80,9 +80,7 @@ fn development_compose() -> CommandSpec {
     ])
 }
 
-fn development_tunnel_url_command() -> CommandSpec {
-    development_compose().args(["exec", "--no-TTY", "tunnel", "cat", "/run/misty/tunnel-url"])
-}
+const DEFAULT_DEVELOPMENT_TUNNEL_HOSTNAME: &str = "dev.mistysys.com";
 
 fn development_tunnel_connection_command() -> CommandSpec {
     development_compose().args([
@@ -91,7 +89,7 @@ fn development_tunnel_connection_command() -> CommandSpec {
         "tunnel",
         "sh",
         "-c",
-        "test -s /run/misty/tunnel-url && wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'",
+        "wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'",
     ])
 }
 
@@ -109,15 +107,19 @@ fn development_worker_refresh_command() -> CommandSpec {
     ])
 }
 
-fn development_api_url(workspace: &Workspace) -> Result<String> {
-    let output = development_tunnel_url_command()
-        .capture(&workspace.server)
-        .context("development tunnel is not ready; start it with `misty-cli server up --detach`")?;
-    normalize_development_api_url(&output)
+fn development_tunnel_hostname() -> String {
+    env::var("MISTY_DEV_TUNNEL_HOSTNAME")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_DEVELOPMENT_TUNNEL_HOSTNAME.to_owned())
+}
+
+fn development_api_url() -> String {
+    format!("https://{}/api", development_tunnel_hostname())
 }
 
 fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
-    let url = development_api_url(workspace)?;
+    let url = development_api_url();
     if development_tunnel_connection_command()
         .capture(&workspace.server)
         .is_ok()
@@ -129,7 +131,7 @@ fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
         return wait_for_development_tunnel(workspace);
     }
 
-    eprintln!("Development tunnel is unreachable; creating a fresh URL...");
+    eprintln!("Development tunnel is unreachable; restarting cloudflared...");
     development_tunnel_refresh_command().run(&workspace.server)?;
     eprintln!("Waiting for cloudflared and Cloudflare DNS...");
     let url = wait_for_development_tunnel(workspace)?;
@@ -141,30 +143,25 @@ fn wait_for_development_tunnel(workspace: &Workspace) -> Result<String> {
     let started = Instant::now();
     let timeout = Duration::from_secs(30);
     let mut next_progress = Duration::from_secs(5);
-    let last_error = loop {
-        let error = match development_api_url(workspace) {
-            Ok(url)
-                if development_tunnel_connection_command()
-                    .capture(&workspace.server)
-                    .is_ok()
-                    && development_tunnel_dns_is_published(workspace, &url).is_ok() =>
-            {
-                return Ok(url);
-            }
-            Ok(_) => "cloudflared or Cloudflare DNS is not ready yet".to_owned(),
-            Err(error) => format!("{error:#}"),
-        };
+    let url = development_api_url();
+    loop {
+        if development_tunnel_connection_command()
+            .capture(&workspace.server)
+            .is_ok()
+            && development_tunnel_dns_is_published(workspace, &url).is_ok()
+        {
+            return Ok(url);
+        }
         let elapsed = started.elapsed();
         if elapsed >= timeout {
-            break format!("{error:#}");
+            bail!("cloudflared did not establish a connection within 30 seconds");
         }
         if elapsed >= next_progress {
             eprintln!("Still waiting for Cloudflare... ({}s)", elapsed.as_secs());
             next_progress += Duration::from_secs(5);
         }
         thread::sleep(Duration::from_millis(500));
-    };
-    bail!("cloudflared did not establish a connection within 30 seconds: {last_error}")
+    }
 }
 
 fn development_tunnel_dns_is_published(workspace: &Workspace, api_url: &str) -> Result<()> {
@@ -183,26 +180,6 @@ fn development_tunnel_dns_is_published(workspace: &Workspace, api_url: &str) -> 
         return Ok(());
     }
     bail!("Cloudflare DNS has not published the development tunnel yet")
-}
-
-fn normalize_development_api_url(raw: &str) -> Result<String> {
-    let mut url = Url::parse(raw.trim()).context("development tunnel returned an invalid URL")?;
-    let host = url
-        .host_str()
-        .context("development tunnel URL has no hostname")?;
-    if url.scheme() != "https"
-        || !host.ends_with(".trycloudflare.com")
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.port().is_some()
-        || !matches!(url.path(), "" | "/")
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        bail!("development tunnel returned an unexpected URL");
-    }
-    url.set_path("/api");
-    Ok(url.to_string().trim_end_matches('/').to_owned())
 }
 
 pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
@@ -799,13 +776,12 @@ mod tests {
             development_compose().args(["logs", "--follow"]).display(),
             "docker compose --env-file .env.dev --file compose.dev.yml logs --follow"
         );
-        assert_eq!(
-            development_tunnel_url_command().display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml exec --no-TTY tunnel cat /run/misty/tunnel-url"
-        );
         assert!(development_tunnel_connection_command()
             .display()
             .contains("cloudflared_tunnel_ha_connections"));
+        assert!(!development_tunnel_connection_command()
+            .display()
+            .contains("tunnel-url"));
         assert_eq!(
             development_tunnel_refresh_command().display(),
             "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps tunnel"
@@ -817,19 +793,9 @@ mod tests {
     }
 
     #[test]
-    fn development_tunnel_url_becomes_the_public_api_base() {
-        assert_eq!(
-            normalize_development_api_url("https://misty-dev.trycloudflare.com\n").unwrap(),
-            "https://misty-dev.trycloudflare.com/api"
-        );
-        for invalid in [
-            "http://misty-dev.trycloudflare.com",
-            "https://mistysys.com",
-            "https://misty-dev.trycloudflare.com/other",
-            "https://misty-dev.trycloudflare.com?secret=value",
-        ] {
-            assert!(normalize_development_api_url(invalid).is_err());
-        }
+    fn development_api_url_uses_the_static_tunnel_hostname_by_default() {
+        assert!(env::var("MISTY_DEV_TUNNEL_HOSTNAME").is_err());
+        assert_eq!(development_api_url(), "https://dev.mistysys.com/api");
     }
 
     #[test]
@@ -912,6 +878,7 @@ mod tests {
         let workspace = Workspace {
             root: temporary.path().to_path_buf(),
             misty: temporary.path().join("misty"),
+            file_manager: temporary.path().join("misty-file-manager"),
             server: server.clone(),
             cli: temporary.path().join("misty-cli"),
         };

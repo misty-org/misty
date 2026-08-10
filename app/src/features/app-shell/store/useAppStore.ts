@@ -1,6 +1,6 @@
 import type { AppTab } from "../types";
-import { appSnapshot } from "@/services/backend";
-import type { AppSnapshot } from "@/services/misty/model/misty-api";
+import { appSnapshot } from "@/native";
+import type { AppSnapshot } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 

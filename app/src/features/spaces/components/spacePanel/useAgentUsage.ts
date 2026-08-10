@@ -1,5 +1,5 @@
-import { spacesApi } from "@/services/spaces/api";
-import type { AgentUsage } from "@/services/spaces/dto/interfaces/agentUsageTypes";
+import { spacesApi } from "@/api/spaces/api";
+import type { AgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { useEffect, useState } from "react";
 
 /**

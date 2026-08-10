@@ -9,7 +9,7 @@ const { roadmaps, tasks, createRoadmap } = vi.hoisted(() => ({
   createRoadmap: vi.fn(),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   SpaceRequestError: class SpaceRequestError extends Error {
     constructor(
       message: string,
@@ -21,7 +21,7 @@ vi.mock("@/services/spaces/api", () => ({
   spacesApi: { roadmaps, tasks, createRoadmap },
 }));
 
-import { SpaceRoadmapWorkspace } from "@/features/space-roadmap/SpaceRoadmapWorkspace";
+import { SpaceRoadmapWorkspace } from "@/features/spaces/roadmap/SpaceRoadmapWorkspace";
 
 describe("SpaceRoadmapWorkspace", () => {
   let container: HTMLDivElement;

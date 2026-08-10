@@ -1,8 +1,26 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+const require = createRequire(import.meta.url);
+
 function packageJson(name: string): { license?: string } {
-  return JSON.parse(readFileSync(`node_modules/${name}/package.json`, "utf8"));
+  let directory = dirname(require.resolve(name));
+
+  while (directory !== dirname(directory)) {
+    const packageJsonPath = join(directory, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+        name?: string;
+        license?: string;
+      };
+      if (packageJson.name === name) return packageJson;
+    }
+    directory = dirname(directory);
+  }
+
+  throw new Error(`Could not find package.json for ${name}`);
 }
 
 describe("BlockNote beta licensing", () => {

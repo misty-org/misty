@@ -1,4 +1,4 @@
-import type { MountedDevice, ProviderRemote } from "@/services/misty/model/misty-api";
+import type { MountedDevice, ProviderRemote } from "@/native/contracts";
 import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
@@ -11,7 +11,7 @@ import {
   pathIsInside,
   pinnedPathLabel,
   quickAccessPathHidden,
-} from "@/features/file-explorer";
+} from "@/features/files/explorer";
 import { providerIconForType } from "@/shared/assets/icons";
 import { AssetIcon, Button, cn } from "@/shared/ui";
 

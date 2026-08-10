@@ -6,6 +6,7 @@ use anyhow::{bail, Context, Result};
 pub struct Workspace {
     pub root: PathBuf,
     pub misty: PathBuf,
+    pub file_manager: PathBuf,
     pub server: PathBuf,
     pub cli: PathBuf,
 }
@@ -15,6 +16,7 @@ impl Workspace {
         let root = absolute(root)?;
         Ok(Self {
             misty: root.join("misty"),
+            file_manager: root.join("misty-file-manager"),
             server: root.join("misty-server"),
             cli: root.join("misty-cli"),
             root,
@@ -26,6 +28,10 @@ impl Workspace {
         require_repository(&self.server, "misty-server")?;
         require_repository(&self.cli, "misty-cli")?;
         Ok(())
+    }
+
+    pub fn validate_file_manager(&self) -> Result<()> {
+        require_repository(&self.file_manager, "misty-file-manager")
     }
 }
 

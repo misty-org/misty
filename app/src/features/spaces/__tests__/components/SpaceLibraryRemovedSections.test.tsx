@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/features/space-library/SpaceLibraryContext", () => ({
+vi.mock("@/features/spaces/library/SpaceLibraryContext", () => ({
   useSpaceLibraryContext: () => ({
     data: {
       spaceId: "space-1",
@@ -20,8 +20,8 @@ vi.mock("@/features/space-library/SpaceLibraryContext", () => ({
   }),
 }));
 
-import { libraryCollectionKinds } from "@/features/space-library";
-import { SpaceLibraryCollectionOverview } from "@/features/space-library/components/SpaceLibraryCollections";
+import { libraryCollectionKinds } from "@/features/spaces/library";
+import { SpaceLibraryCollectionOverview } from "@/features/spaces/library/components/SpaceLibraryCollections";
 import { librarySidebarItems } from "../../components/spacePanel/librarySidebarItems";
 
 describe("removed Library sections", () => {

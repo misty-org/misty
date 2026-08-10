@@ -1,5 +1,5 @@
-import { httpRequest } from "@/services/http";
-import { spaceRequest } from "@/services/spaces/api";
+import { httpRequest } from "@/api/http";
+import { spaceRequest } from "@/api/spaces/api";
 
 export const MAX_JOURNAL_ASSET_BYTES = 15 * 1024 * 1024;
 

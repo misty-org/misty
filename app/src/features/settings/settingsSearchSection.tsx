@@ -1,6 +1,6 @@
-import { formatDate } from "@/features/file-explorer";
-import { useSearchStore } from "@/features/file-search";
-import type { SearchStatus } from "@/services/misty/model/misty-api";
+import { formatDate } from "@/features/files/explorer";
+import { useSearchStore } from "@/features/files/search";
+import type { SearchStatus } from "@/native/contracts";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { Badge, Button, Spinner } from "@/shared/ui";
 import { Cloud, FolderOpen, HardDrive, Search } from "lucide-react";

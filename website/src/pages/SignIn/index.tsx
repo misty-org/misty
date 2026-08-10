@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import { useAuth } from "../../AuthContext";
+import { safeInternalPath } from "@/lib/navigation";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
 import { forgotPasswordRequest, signInRequest, type AuthUser } from "../Auth/api";
@@ -22,6 +24,11 @@ interface SignInProps {
 
 export default function SignIn({ onSignedIn }: SignInProps = {}) {
   const { refreshSession } = useAuth();
+  const location = useLocation();
+  // The nav links have always set this state; until now nothing read it.
+  const returnTo = safeInternalPath(
+    (location.state as { from?: string } | null)?.from,
+  );
 
   const [mode, setMode] = useState<SignInMode>("signin");
   const [email, setEmail] = useState("");
@@ -58,7 +65,9 @@ export default function SignIn({ onSignedIn }: SignInProps = {}) {
       const user = await signInRequest(email, password);
       const me = await refreshSession();
       await onSignedIn?.(user, { email, password, me });
-      window.location.replace("/");
+      // Return to wherever the visitor was headed — a settings deep link from
+      // the desktop app, say — instead of always dropping them on home.
+      window.location.replace(returnTo ?? "/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not connect to server");
     } finally {

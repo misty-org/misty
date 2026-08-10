@@ -1,7 +1,7 @@
 import { CircleAlert, LoaderCircle, Send } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 
-import type { MessageOrigin } from "@/services/spaces/dto/interfaces/connections/discord";
+import type { MessageOrigin } from "@/api/spaces/dto/interfaces/connections/discord";
 import { Badge } from "@/shared/ui";
 
 /**

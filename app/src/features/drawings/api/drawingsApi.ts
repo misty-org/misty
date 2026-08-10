@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/services/spaces/api";
+import { spaceRequest } from "@/api/spaces/api";
 import type { DrawingCollaborationTicket, SpaceDrawing } from "../types";
 
 function drawingPath(spaceId: string, drawingId?: string): string {

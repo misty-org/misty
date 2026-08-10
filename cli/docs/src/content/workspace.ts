@@ -351,6 +351,29 @@ export const workspacePages: DocPage[] = [
         ],
       },
       {
+        id: "test-database",
+        title: "The test database connection",
+        blocks: [
+          p(
+            "Database-backed server tests read TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME, and TEST_DB_SSLMODE. Each one falls back to the matching DB_* value from misty-server/.env.dev, so an ordinary development checkout needs no extra configuration.",
+          ),
+          list([
+            "TEST_DB_NAME defaults to DB_NAME with a _test suffix, so tests never truncate the development database.",
+            "The migration role is preferred over DB_USER, because the application role is unprivileged and cannot reset tables between tests.",
+            "Loopback hosts force sslmode=disable, because the local container serves no TLS.",
+            "Set any TEST_DB_* value explicitly to point the suite at a different PostgreSQL instance.",
+          ]),
+          p(
+            "./test.sh bootstraps the container and recreates the test database before running the suite. Once it has run, go test in misty-server resolves the same connection, so targeted reruns such as go test ./test/contract/postgres/... -run TestName work without the full harness.",
+          ),
+          note(
+            "Windows",
+            "check server runs go test -p 1 ./... -count=1 instead of ./test.sh, which never bootstraps anything. Start the stack with misty-cli server up --detach first, or the database-backed tests have no PostgreSQL to reach.",
+            "warning",
+          ),
+        ],
+      },
+      {
         id: "behavior",
         title: "Execution behavior",
         blocks: [

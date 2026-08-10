@@ -1,7 +1,7 @@
 # misty-cli
 
 `misty-cli` is the local developer and release interface for the Misty desktop
-application and server. GitHub Actions runs repository-native checks on Ubuntu;
+application, standalone file manager, and server. GitHub Actions runs repository-native checks on Ubuntu;
 platform builds and releases run through this CLI on the developer machines
 that will ship the artifacts.
 
@@ -24,6 +24,7 @@ an Apple Keychain notary profile.
 
 ```bash
 misty-cli check all
+misty-cli file-manager
 misty-cli desktop dev --profile owner
 misty-cli desktop build
 misty-cli server up --detach
@@ -33,6 +34,10 @@ misty-cli server image build --tag misty-server:local
 misty-cli server worker generate-secrets --target production
 misty-cli server worker deploy --target production --dry-run
 ```
+
+`misty-cli file-manager` opens the standalone file manager from the
+`misty-file-manager` checkout. The npm workspace commands used to start Vite and
+Tauri are implementation details of that repository.
 
 The server commands always select `misty-server/compose.dev.yml` with
 `misty-server/.env.dev`. Detached startup prints the temporary Cloudflare API

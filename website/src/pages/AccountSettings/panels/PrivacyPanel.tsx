@@ -1,8 +1,5 @@
-import {
-  customRowClass,
-  GhostRow,
-  Section,
-} from "../components/SettingsRows";
+import { customRowClass, Row, Section } from "../components/SettingsRows";
+import { DataSharing } from "./DataSharing";
 
 export function PrivacyPanel() {
   return (
@@ -21,10 +18,26 @@ export function PrivacyPanel() {
         </div>
       </Section>
 
+      <Section title="Data sharing">
+        <DataSharing />
+      </Section>
+
       <Section title="Legal">
-        <GhostRow label="Privacy Policy" value="Coming soon" />
-        <GhostRow label="Terms of Service" value="Coming soon" />
-        <GhostRow label="License Agreement" value="Coming soon" />
+        <Row label="Privacy Policy">
+          <a className="underline underline-offset-4" href="/privacy">
+            Read
+          </a>
+        </Row>
+        <Row label="Terms of Service">
+          <a className="underline underline-offset-4" href="/terms">
+            Read
+          </a>
+        </Row>
+        <Row label="License Agreement">
+          <a className="underline underline-offset-4" href="/license">
+            Read
+          </a>
+        </Row>
       </Section>
     </div>
   );
