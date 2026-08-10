@@ -1,4 +1,4 @@
-import type { ProviderRemote } from "@/services/misty/model/misty-api";
+import type { ProviderRemote } from "@/native/contracts";
 
 export interface RemoteListPanelProps {
   remotes: ProviderRemote[];

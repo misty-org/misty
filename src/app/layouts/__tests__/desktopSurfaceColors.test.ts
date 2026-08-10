@@ -10,7 +10,7 @@ import {
   navLinkActiveClass,
   navLinkBaseClass,
 } from "@/app/layouts/DesktopLayout/styles";
-import { sidebarStyles } from "@/features/file-explorer/components/ExplorerSidebarSupport";
+import { sidebarStyles } from "@/features/files/explorer/components/ExplorerSidebarSupport";
 import { describe, expect, it } from "vitest";
 
 describe("desktop warm charcoal surfaces", () => {

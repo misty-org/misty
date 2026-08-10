@@ -1,4 +1,4 @@
-import { createTaskInput, emptyDraft } from "@/features/space-planner/spaceTasks/taskDraft";
+import { createTaskInput, emptyDraft } from "@/features/spaces/planner/spaceTasks/taskDraft";
 import { describe, expect, it } from "vitest";
 
 describe("Agent task drafts", () => {

@@ -3,8 +3,9 @@ import {
   readAccountAuthToken,
   readAccountSessionGeneration,
 } from "@/features/auth";
-import { appSnapshot, normalizeApiBaseUrl, withDefaultApiPath } from "@/services/backend";
-import { httpRequest } from "@/services/http";
+import { appSnapshot } from "@/native";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/baseUrl";
+import { httpRequest } from "@/api/http";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 
 interface ManagedAiErrorPayload {

@@ -1,8 +1,8 @@
-import { useExplorerStore } from "@/features/file-explorer";
+import { useExplorerStore } from "@/features/files/explorer";
 import { useSetupStore } from "@/features/installer";
 import { useTransfersStore } from "@/features/transfers";
-import type { TransferRecord } from "@/services/misty/model/misty-api";
-import type { TransferStatus } from "@/services/misty/model/types/misty-api";
+import type { TransferRecord } from "@/native/contracts";
+import type { TransferStatus } from "@/native/contracts/primitives";
 import { memo, useEffect, useRef, useState } from "react";
 import {
   advanceTransferCompletionTracker,

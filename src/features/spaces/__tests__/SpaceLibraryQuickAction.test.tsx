@@ -8,61 +8,61 @@ const { setFilePickerOpen, libraryData } = vi.hoisted(() => ({
   libraryData: { canUploadLibrary: true },
 }));
 
-vi.mock("@/features/space-library/useSpaceLibraryData", () => ({
+vi.mock("@/features/spaces/library/useSpaceLibraryData", () => ({
   useSpaceLibraryData: () => ({
     ...libraryData,
     canEditLibrary: true,
     setFilePickerOpen,
   }),
 }));
-vi.mock("@/features/space-library/useSpaceLibraryItemActions", () => ({
+vi.mock("@/features/spaces/library/useSpaceLibraryItemActions", () => ({
   useSpaceLibraryItemActions: () => ({}),
 }));
-vi.mock("@/features/space-library/useSpaceLibraryCollectionActions", () => ({
+vi.mock("@/features/spaces/library/useSpaceLibraryCollectionActions", () => ({
   useSpaceLibraryCollectionActions: () => ({}),
 }));
-vi.mock("@/features/space-library/SpaceLibraryContext", () => ({
+vi.mock("@/features/spaces/library/SpaceLibraryContext", () => ({
   SpaceLibraryProvider: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("@/features/space-library/SpaceLibraryPrimitives", () => ({
+vi.mock("@/features/spaces/library/SpaceLibraryPrimitives", () => ({
   LibraryCanEditContext: { Provider: ({ children }: { children: ReactNode }) => children },
 }));
 
-vi.mock("@/features/space-library/components/SpaceLibraryCollections", () => ({
+vi.mock("@/features/spaces/library/components/SpaceLibraryCollections", () => ({
   SpaceLibraryCollectionOverview: () => null,
 }));
-vi.mock("@/features/space-library/components/SpaceLibraryOverlays", () => ({
+vi.mock("@/features/spaces/library/components/SpaceLibraryOverlays", () => ({
   SpaceLibraryOverlays: () => null,
 }));
-vi.mock("@/features/space-library/components/SpaceLibraryStatus", () => ({
+vi.mock("@/features/spaces/library/components/SpaceLibraryStatus", () => ({
   SpaceLibraryTopChrome: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/AlbumsIndex", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/AlbumsIndex", () => ({
   AlbumsIndex: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/DateGroupIndex", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/DateGroupIndex", () => ({
   DateGroupIndex: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/DuplicatesIndex", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/DuplicatesIndex", () => ({
   DuplicatesIndex: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/ImportHistoryIndex", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/ImportHistoryIndex", () => ({
   ImportHistoryIndex: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/LibraryCollectionHeader", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/LibraryCollectionHeader", () => ({
   LibraryCollectionHeader: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/LibraryItemsRegion", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/LibraryItemsRegion", () => ({
   LibraryItemsRegion: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/MemoryControls", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/MemoryControls", () => ({
   MemoryControls: () => null,
 }));
-vi.mock("@/features/space-library/librarySurfaces/SharedReferencesIndex", () => ({
+vi.mock("@/features/spaces/library/librarySurfaces/SharedReferencesIndex", () => ({
   SharedReferencesIndex: () => null,
 }));
 
-import { SpaceLibrary } from "@/features/space-library/SpaceLibrary";
+import { SpaceLibrary } from "@/features/spaces/library/SpaceLibrary";
 
 function LocationProbe() {
   return <output data-testid="location">{useLocation().search}</output>;

@@ -3,7 +3,7 @@ import type {
   ProviderWorkflow,
   ProviderWorkflowOption,
   RemoteEditDraft,
-} from "@/services/misty/model/misty-api";
+} from "@/native/contracts";
 import { iconAssets } from "@/shared/assets/icons";
 import { prettyLabel } from "@/shared/lib/format";
 import {

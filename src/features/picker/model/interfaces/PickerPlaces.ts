@@ -1,4 +1,4 @@
-import type { MountedDevice, ProviderRemote } from "@/services/misty/model/misty-api";
+import type { MountedDevice, ProviderRemote } from "@/native/contracts";
 
 export interface PickerPlacesProps {
   homePath: string;

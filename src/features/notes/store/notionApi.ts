@@ -1,4 +1,4 @@
-import { SpaceRequestError, spaceRequest } from "@/services/spaces/api";
+import { SpaceRequestError, spaceRequest } from "@/api/spaces/api";
 import type {
   NoteWriteError,
   NotionAppendPayload,

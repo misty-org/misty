@@ -1,6 +1,6 @@
 import { readAccountAuthToken, readAccountSessionGeneration } from "@/features/auth";
-import { httpRequest } from "@/services/http";
-import { resolveSpacesApiBase } from "@/services/spaces/api";
+import { httpRequest } from "@/api/http";
+import { resolveSpacesApiBase } from "@/api/spaces/api";
 import { cn } from "@/shared/ui";
 import { Bot, CalendarDays, Code2, PenLine, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

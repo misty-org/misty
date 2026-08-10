@@ -1,4 +1,4 @@
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";

@@ -22,7 +22,7 @@ const { createTask, loadTasks, loadCalendarSources, loadIntegrations } = vi.hois
 }));
 
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spacesApi: {
     tasks: loadTasks,
     calendarEvents: vi.fn().mockResolvedValue({ events: [] }),
@@ -32,7 +32,7 @@ vi.mock("@/services/spaces/api", () => ({
   },
 }));
 
-import { SpacePlanner } from "@/features/space-planner/SpacePlanner";
+import { SpacePlanner } from "@/features/spaces/planner/SpacePlanner";
 import { useSpacesStore } from "../store/useSpacesStore";
 
 describe("SpacePlanner", () => {

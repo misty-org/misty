@@ -50,6 +50,7 @@ export function RootLayout(props: {
   }, []);
 
   useEffect(() => {
+    if (!hasTauriInternals()) return;
     if (setupLoadStarted.current) return;
     setupLoadStarted.current = true;
     void loadSystem();

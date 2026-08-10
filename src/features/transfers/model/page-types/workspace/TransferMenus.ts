@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/services/misty/model/misty-api";
+import type { TransferRecord } from "@/native/contracts";
 import type { ReactNode } from "react";
 
 export type TransferActionHandlers = {

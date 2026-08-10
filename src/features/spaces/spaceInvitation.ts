@@ -1,4 +1,4 @@
-import type { Space, SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import type { Space, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 
 /** A restricted Space-shaped preview used until an invitation is accepted. */
 export function invitedSpacePreview(invitation: SpaceInvitation): Space {

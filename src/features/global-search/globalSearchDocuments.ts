@@ -1,8 +1,8 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
-import { messageReplyPreviewText } from "@/features/space-chat";
+import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { useSpacesStore } from "@/features/spaces";
-import type { SearchResult } from "@/services/misty/model/misty-api";
-import { spacesApi } from "@/services/spaces/api";
+import type { SearchResult } from "@/native/contracts";
+import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchContextItem, GlobalSearchDocument, GlobalSearchResult } from "./types";
 
 export function globalSearchContext(

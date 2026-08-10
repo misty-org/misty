@@ -1,11 +1,11 @@
 import { useAuth } from "@/features/auth";
-import { spacesApi } from "@/services/spaces/api";
+import { spacesApi } from "@/api/spaces/api";
 import type {
   Space,
   SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";

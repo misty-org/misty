@@ -10,8 +10,8 @@ import {
   providersImportCloudConnection,
   providersRefresh,
   providersSelectRemote,
-} from "@/services/backend";
-import type { ProviderConfigStep } from "@/services/misty/model/misty-api";
+} from "@/native";
+import type { ProviderConfigStep } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import type {

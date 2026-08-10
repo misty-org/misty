@@ -4,7 +4,7 @@ import { ActivityBridge, unreadActivityCountForTool, useActivityStore } from "@/
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
-import { MediaSearchViewer } from "@/features/file-explorer";
+import { MediaSearchViewer } from "@/features/files/explorer";
 import { GlobalMisty } from "@/features/global-search";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { SpaceNavRail, SpacesRealtimeBridge } from "@/features/spaces";

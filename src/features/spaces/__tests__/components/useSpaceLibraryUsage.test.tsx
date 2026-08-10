@@ -1,5 +1,5 @@
-import { spacesApi } from "@/services/spaces/api";
-import type { Space, SpaceStorageUsage } from "@/services/spaces/dto/interfaces/types";
+import { spacesApi } from "@/api/spaces/api";
+import type { Space, SpaceStorageUsage } from "@/api/spaces/dto/interfaces/types";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

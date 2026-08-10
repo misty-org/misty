@@ -1,7 +1,7 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { preloadDesktopFilesPage, useExplorerStore } from "@/features/file-explorer";
-import { useMediaSearchStore, useSearchStore } from "@/features/file-search";
+import { preloadDesktopFilesPage, useExplorerStore } from "@/features/files/explorer";
+import { useMediaSearchStore, useSearchStore } from "@/features/files/search";
 import { useGlobalSearchStore } from "@/features/global-search";
 import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";

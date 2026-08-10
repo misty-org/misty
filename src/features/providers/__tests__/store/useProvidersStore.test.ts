@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/services/backend", () => ({
+vi.mock("@/native", () => ({
   providersConfigureRemote: vi.fn(),
   providersConfigPaths: vi.fn(),
   providersDisconnectRemote: vi.fn(),
@@ -11,8 +11,8 @@ vi.mock("@/services/backend", () => ({
   providersTestRemote: vi.fn(),
 }));
 
-import { providersSaveRemote, providersTestRemote } from "@/services/backend";
-import type { RemoteEditDraft } from "@/services/misty/model/misty-api";
+import { providersSaveRemote, providersTestRemote } from "@/native";
+import type { RemoteEditDraft } from "@/native/contracts";
 import { createProvidersWorkspaceState, useProvidersStore } from "../../store/useProvidersStore";
 
 function draft(name: string): RemoteEditDraft {

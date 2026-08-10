@@ -1,5 +1,5 @@
 import { useProvidersStore } from "@/features/providers";
-import type { TransferRecord } from "@/services/misty/model/misty-api";
+import type { TransferRecord } from "@/native/contracts";
 import { prettyLabel } from "@/shared/lib/format";
 import { Input, Toolbar, ToolbarGroup } from "@/shared/ui";
 import { Search } from "lucide-react";

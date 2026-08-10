@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/services/misty/model/misty-api";
+import type { TransferRecord } from "@/native/contracts";
 import type { TransferSortKey } from "../../stores/transfers/types/useTransfersStore";
 
 export type TransferTableColumn =

@@ -1,4 +1,4 @@
-import type { ProviderRemote, RemoteEditDraft } from "@/services/misty/model/misty-api";
+import type { ProviderRemote, RemoteEditDraft } from "@/native/contracts";
 import type {
   CachedRemoteDraft,
   ProvidersWorkspaceState,

@@ -1,8 +1,8 @@
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/services/spaces/api";
-import type { AgentToolboxAction } from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
-import { analytics } from "@/services/telemetry/client";
+import { spacesApi } from "@/api/spaces/api";
+import type { AgentToolboxAction } from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
+import { analytics } from "@/telemetry/client";
 import {
   Badge,
   Button,

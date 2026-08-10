@@ -1,5 +1,5 @@
 import { selectGeneralPreferences, useSettingsStore } from "@/features/settings";
-import { transfersDeleteAll, transfersDeleteSelected, transfersSnapshot } from "@/services/backend";
+import { transfersDeleteAll, transfersDeleteSelected, transfersSnapshot } from "@/native";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import type { TransferSortDirection } from "../model/stores/transfers/types/useTransfersStore";

@@ -3,14 +3,15 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom"
 import { useShallow } from "zustand/react/shallow";
 
 import { useAuth } from "@/features/auth";
+import { isWebBuild } from "@/shared/platform/buildTarget";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { useSpacesStore } from "./store/useSpacesStore";
 
 import { SpaceDrawings } from "@/features/drawings";
 import { SpaceNotes, spaceNotesEnabled } from "@/features/notes";
-import { SpaceChat } from "@/features/space-chat";
-import { SpaceLibrary } from "@/features/space-library";
-import { SpacePlanner } from "@/features/space-planner";
+import { SpaceChat } from "@/features/spaces/chat";
+import { SpaceLibrary } from "@/features/spaces/library";
+import { SpacePlanner } from "@/features/spaces/planner";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 
@@ -214,7 +215,16 @@ export function SpaceDetail() {
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       {section === "library" ? (
-        space.permissions?.["library.view"] === false ? (
+        isWebBuild ? (
+          <PermissionState
+            className="h-full"
+            title="Space Library is available in the Misty desktop app"
+            description={
+              "This Library currently depends on local-device file indexing and transfers. " +
+              "Cloud-backed Space chat, planning, notes, and drawings are available on the web."
+            }
+          />
+        ) : space.permissions?.["library.view"] === false ? (
           <SpacePermissionDenied
             title="Library access required"
             detail="You do not have permission to view this Space's Library."

@@ -1,5 +1,5 @@
-import type { TransferRecord } from "@/services/misty/model/misty-api";
-import type { TransferType } from "@/services/misty/model/types/misty-api";
+import type { TransferRecord } from "@/native/contracts";
+import type { TransferType } from "@/native/contracts/primitives";
 import { prettyLabel } from "@/shared/lib/format";
 import {
   Button,

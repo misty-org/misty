@@ -1,7 +1,7 @@
 import { useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/services/spaces/api";
-import type { SpaceAgendaEntry } from "@/services/spaces/dto/interfaces/plannerExpansionTypes";
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import { spacesApi } from "@/api/spaces/api";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 

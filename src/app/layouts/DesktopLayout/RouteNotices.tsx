@@ -1,8 +1,8 @@
 import type { AppNoticeEntry, AppNoticeKind, AppNoticeSource } from "@/app/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
-import type { ExplorerNotificationType } from "@/features/file-explorer";
-import { useExplorerStore } from "@/features/file-explorer";
+import type { ExplorerNotificationType } from "@/features/files/explorer";
+import { useExplorerStore } from "@/features/files/explorer";
 import { useProvidersStore } from "@/features/providers";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
 import { useTransfersStore } from "@/features/transfers";

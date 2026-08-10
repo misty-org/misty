@@ -1,7 +1,8 @@
-import { appSnapshot, normalizeApiBaseUrl, withDefaultApiPath } from "@/services/backend";
-import { httpRequest } from "@/services/http";
-import { analytics } from "@/services/telemetry/client";
-import { configureTelemetryPreferencesSync } from "@/services/telemetry/lifecycle";
+import { appSnapshot } from "@/native";
+import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/baseUrl";
+import { httpRequest } from "@/api/http";
+import { analytics } from "@/telemetry/client";
+import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import type {

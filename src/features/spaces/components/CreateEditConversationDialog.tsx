@@ -1,10 +1,10 @@
-import { spacesApi } from "@/services/spaces/api";
+import { spacesApi } from "@/api/spaces/api";
 import type {
   SpaceActorRef,
   SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import {
   Button,
   Checkbox,

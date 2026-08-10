@@ -1,5 +1,5 @@
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
-import type { SpaceEvent, SpaceMessage } from "@/services/spaces/dto/interfaces/types";
+import type { SpaceEvent, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 
 export function applyAgentRunEvent(
   event: SpaceEvent,

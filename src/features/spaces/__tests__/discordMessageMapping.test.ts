@@ -8,12 +8,12 @@ import {
   shouldPublishToDiscord,
   spaceMessageToDiscordPayload,
   spansToText,
-} from "@/features/space-connections/discordMessageMapping";
+} from "@/features/spaces/integrations/discordMessageMapping";
 import type {
   DiscordMessage,
   SpaceDiscordLink,
-} from "@/services/spaces/dto/interfaces/connections/discord";
-import type { SpaceMessage } from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/connections/discord";
+import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 
 function discordMessage(overrides: Partial<DiscordMessage> = {}): DiscordMessage {
   return {

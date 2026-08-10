@@ -1,4 +1,4 @@
-import type { TransferProfileOptions } from "@/services/misty/model/misty-api";
+import type { TransferProfileOptions } from "@/native/contracts";
 
 export const BUILT_IN_TRANSFER_PROFILE_IDS = new Set([
   "balanced",
