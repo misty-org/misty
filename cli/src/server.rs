@@ -1,0 +1,993 @@
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    net::Ipv4Addr,
+    path::Path,
+    thread,
+    time::{Duration, Instant},
+};
+
+use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use ed25519_dalek::{
+    pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    SigningKey, VerifyingKey,
+};
+use rand::{rngs::OsRng, RngCore};
+use serde_json::json;
+use url::Url;
+
+use crate::{artifacts::write_private, process::CommandSpec, workspace::Workspace};
+
+const TICKET_PRIVATE_KEY: &str = "JOURNAL_COLLAB_TICKET_PRIVATE_KEY";
+const TICKET_PUBLIC_KEY: &str = "JOURNAL_COLLAB_TICKET_PUBLIC_KEY";
+const CONTROL_SECRET: &str = "JOURNAL_COLLAB_CONTROL_SECRET";
+const PROJECTION_SECRET: &str = "JOURNAL_COLLAB_PROJECTION_SECRET";
+const ROOM_SALT: &str = "JOURNAL_COLLAB_ROOM_SALT";
+
+pub fn up(workspace: &Workspace, detach: bool, build: bool) -> Result<()> {
+    development_up_command(detach, build).run(&workspace.server)?;
+    if detach {
+        println!(
+            "Server running at {}",
+            ensure_active_development_api_url(workspace)?
+        );
+    }
+    Ok(())
+}
+
+pub fn down(workspace: &Workspace, volumes: bool) -> Result<()> {
+    development_down_command(volumes).run(&workspace.server)
+}
+
+pub fn url(workspace: &Workspace) -> Result<()> {
+    println!("{}", ensure_active_development_api_url(workspace)?);
+    Ok(())
+}
+
+fn development_up_command(detach: bool, build: bool) -> CommandSpec {
+    let mut command = development_compose().arg("up");
+    if build {
+        command = command.arg("--build");
+    }
+    if detach {
+        command = command.arg("--detach");
+    }
+    command
+}
+
+fn development_down_command(volumes: bool) -> CommandSpec {
+    let mut command = development_compose().arg("down");
+    if volumes {
+        command = command.arg("--volumes");
+    }
+    command.arg("--remove-orphans")
+}
+
+pub fn logs(workspace: &Workspace) -> Result<()> {
+    development_compose()
+        .args(["logs", "--follow"])
+        .run(&workspace.server)
+}
+
+fn development_compose() -> CommandSpec {
+    CommandSpec::new("docker").args([
+        "compose",
+        "--env-file",
+        ".env.dev",
+        "--file",
+        "compose.dev.yml",
+    ])
+}
+
+fn development_tunnel_url_command() -> CommandSpec {
+    development_compose().args(["exec", "--no-TTY", "tunnel", "cat", "/run/misty/tunnel-url"])
+}
+
+fn development_tunnel_connection_command() -> CommandSpec {
+    development_compose().args([
+        "exec",
+        "--no-TTY",
+        "tunnel",
+        "sh",
+        "-c",
+        "test -s /run/misty/tunnel-url && wget -q -O - http://127.0.0.1:20241/metrics | grep -Eq '^cloudflared_tunnel_ha_connections [1-9][0-9]*(\\.[0-9]+)?$'",
+    ])
+}
+
+fn development_tunnel_refresh_command() -> CommandSpec {
+    development_compose().args(["up", "--detach", "--force-recreate", "--no-deps", "tunnel"])
+}
+
+fn development_worker_refresh_command() -> CommandSpec {
+    development_compose().args([
+        "up",
+        "--detach",
+        "--force-recreate",
+        "--no-deps",
+        "cloudflare-deploy",
+    ])
+}
+
+fn development_api_url(workspace: &Workspace) -> Result<String> {
+    let output = development_tunnel_url_command()
+        .capture(&workspace.server)
+        .context("development tunnel is not ready; start it with `misty-cli server up --detach`")?;
+    normalize_development_api_url(&output)
+}
+
+fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
+    let url = development_api_url(workspace)?;
+    if development_tunnel_connection_command()
+        .capture(&workspace.server)
+        .is_ok()
+    {
+        if development_tunnel_dns_is_published(workspace, &url).is_ok() {
+            return Ok(url);
+        }
+        eprintln!("Tunnel connected; waiting for Cloudflare DNS...");
+        return wait_for_development_tunnel(workspace);
+    }
+
+    eprintln!("Development tunnel is unreachable; creating a fresh URL...");
+    development_tunnel_refresh_command().run(&workspace.server)?;
+    eprintln!("Waiting for cloudflared and Cloudflare DNS...");
+    let url = wait_for_development_tunnel(workspace)?;
+    development_worker_refresh_command().run(&workspace.server)?;
+    Ok(url)
+}
+
+fn wait_for_development_tunnel(workspace: &Workspace) -> Result<String> {
+    let started = Instant::now();
+    let timeout = Duration::from_secs(30);
+    let mut next_progress = Duration::from_secs(5);
+    let last_error = loop {
+        let error = match development_api_url(workspace) {
+            Ok(url)
+                if development_tunnel_connection_command()
+                    .capture(&workspace.server)
+                    .is_ok()
+                    && development_tunnel_dns_is_published(workspace, &url).is_ok() =>
+            {
+                return Ok(url);
+            }
+            Ok(_) => "cloudflared or Cloudflare DNS is not ready yet".to_owned(),
+            Err(error) => format!("{error:#}"),
+        };
+        let elapsed = started.elapsed();
+        if elapsed >= timeout {
+            break format!("{error:#}");
+        }
+        if elapsed >= next_progress {
+            eprintln!("Still waiting for Cloudflare... ({}s)", elapsed.as_secs());
+            next_progress += Duration::from_secs(5);
+        }
+        thread::sleep(Duration::from_millis(500));
+    };
+    bail!("cloudflared did not establish a connection within 30 seconds: {last_error}")
+}
+
+fn development_tunnel_dns_is_published(workspace: &Workspace, api_url: &str) -> Result<()> {
+    let url = Url::parse(api_url).context("development API returned an invalid URL")?;
+    let host = url
+        .host_str()
+        .context("development API URL has no hostname")?;
+    let output = CommandSpec::new("dig")
+        .args(["+short", "+time=1", "+tries=1", host, "A"])
+        .capture(&workspace.server)
+        .context("could not query the configured DNS resolver")?;
+    if output
+        .lines()
+        .any(|line| line.trim().parse::<Ipv4Addr>().is_ok())
+    {
+        return Ok(());
+    }
+    bail!("Cloudflare DNS has not published the development tunnel yet")
+}
+
+fn normalize_development_api_url(raw: &str) -> Result<String> {
+    let mut url = Url::parse(raw.trim()).context("development tunnel returned an invalid URL")?;
+    let host = url
+        .host_str()
+        .context("development tunnel URL has no hostname")?;
+    if url.scheme() != "https"
+        || !host.ends_with(".trycloudflare.com")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.port().is_some()
+        || !matches!(url.path(), "" | "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        bail!("development tunnel returned an unexpected URL");
+    }
+    url.set_path("/api");
+    Ok(url.to_string().trim_end_matches('/').to_owned())
+}
+
+pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
+    if tag.trim().is_empty() {
+        bail!("image tag cannot be empty");
+    }
+    CommandSpec::new("docker")
+        .args(["build", "--tag", tag, "."])
+        .run(&workspace.server)
+}
+
+pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
+    let worker = workspace.server.join("cloudflare/journal-collab");
+    let development_environment = workspace.server.join(".env.dev");
+    let mut random = OsRng;
+    let secrets = JournalSecrets::generate(&mut random)?;
+    ensure_room_salt(&development_environment, &mut random)?;
+
+    let dev_vars = secrets.worker_environment();
+    write_private(&worker.join(".dev.vars"), dev_vars.as_bytes())?;
+
+    let server_env = secrets.server_environment();
+    write_private(&worker.join(".secrets/server.env"), server_env.as_bytes())?;
+
+    println!("Wrote Cloudflare local secrets to:");
+    println!("  {}", worker.join(".dev.vars").display());
+    println!("  {}", worker.join(".secrets/server.env").display());
+    println!(
+        "Kept the server room salt in {}.",
+        development_environment.display()
+    );
+    println!("The private signing key was not printed.");
+    println!("Set the three public Worker values with `wrangler secret put`.");
+    Ok(())
+}
+
+pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
+    let production_environment = workspace.server.join(".env.prod");
+    let worker_environment = workspace
+        .server
+        .join("cloudflare/journal-collab/.secrets/worker.prod.env");
+    let existing = fs::read_to_string(&production_environment)
+        .with_context(|| format!("could not read {}", production_environment.display()))?;
+    validate_room_salt(&existing, &production_environment)?;
+
+    let mut random = OsRng;
+    let secrets = JournalSecrets::generate(&mut random)?;
+    let updated =
+        replace_production_secret_placeholders(&existing, &production_environment, &secrets)?;
+
+    // Write the Worker half first. If the server environment write fails, the
+    // production placeholders remain and a retry can safely replace this file.
+    write_private(&worker_environment, secrets.worker_environment().as_bytes())?;
+    write_private(&production_environment, updated.as_bytes())?;
+
+    println!("Configured first-use production Journal secrets:");
+    println!("  server: {}", production_environment.display());
+    println!("  Worker: {}", worker_environment.display());
+    println!("The private signing key was not printed or sent to Cloudflare.");
+    println!("The production room salt was preserved.");
+    println!(
+        "Deploy the Worker values with Wrangler only after reviewing the production configuration."
+    );
+    Ok(())
+}
+
+pub fn deploy_production_worker(workspace: &Workspace, dry_run: bool) -> Result<()> {
+    let production_environment = workspace.server.join(".env.prod");
+    let worker = workspace.server.join("cloudflare/journal-collab");
+    let worker_environment = worker.join(".secrets/worker.prod.env");
+    require_private_file(&production_environment)?;
+    require_private_file(&worker_environment)?;
+
+    let production = read_environment(&production_environment)?;
+    let worker_secrets = read_environment(&worker_environment)?;
+    validate_production_worker_bundle(
+        &production,
+        &production_environment,
+        &worker_secrets,
+        &worker_environment,
+    )?;
+
+    let token = env::var("CLOUDFLARE_API_TOKEN")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| production.get("CLOUDFLARE_API_TOKEN").cloned())
+        .filter(|value| !value.trim().is_empty())
+        .context("CLOUDFLARE_API_TOKEN is required for production Worker deployment")?;
+    let worker_name = env::var("MISTY_CLOUDFLARE_WORKER_NAME")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| production.get("MISTY_CLOUDFLARE_WORKER_NAME").cloned())
+        .unwrap_or_else(|| "misty-journal-collab".to_owned());
+    validate_worker_name(&worker_name)?;
+    validate_worker_hostname(&production, &worker_name)?;
+    let api_base = required_map_value(&production, "MISTY_PUBLIC_API_URL")?;
+    let api_url = Url::parse(api_base).context("MISTY_PUBLIC_API_URL is not a valid URL")?;
+    if api_url.scheme() != "https" || api_url.host_str().is_none() {
+        bail!("MISTY_PUBLIC_API_URL must be an absolute HTTPS URL");
+    }
+
+    let wrangler = worker.join("node_modules/.bin").join(if cfg!(windows) {
+        "wrangler.cmd"
+    } else {
+        "wrangler"
+    });
+    if !wrangler.is_file() {
+        bail!(
+            "Wrangler is not installed at {}; run npm ci in {}",
+            wrangler.display(),
+            worker.display()
+        );
+    }
+
+    let temporary = tempfile::Builder::new()
+        .prefix("misty-worker-dry-run-")
+        .tempdir()?;
+    production_worker_deploy_command(
+        &wrangler,
+        &token,
+        &worker_name,
+        api_base,
+        &worker_environment,
+        true,
+        Some(temporary.path()),
+    )
+    .run(&worker)?;
+    if dry_run {
+        println!("Production Worker dry run passed for {worker_name}.");
+        return Ok(());
+    }
+
+    production_worker_deploy_command(
+        &wrangler,
+        &token,
+        &worker_name,
+        api_base,
+        &worker_environment,
+        false,
+        None,
+    )
+    .run(&worker)?;
+    CommandSpec::new(wrangler.as_os_str())
+        .env("CLOUDFLARE_API_TOKEN", token)
+        .args(["deployments", "list", "--name", worker_name.as_str()])
+        .run(&worker)?;
+    println!("Production Worker deployment completed and was verified.");
+    Ok(())
+}
+
+fn production_worker_deploy_command(
+    wrangler: &Path,
+    token: &str,
+    worker_name: &str,
+    api_base: &str,
+    secrets_file: &Path,
+    dry_run: bool,
+    outdir: Option<&Path>,
+) -> CommandSpec {
+    let mut command = CommandSpec::new(wrangler.as_os_str())
+        .env("CLOUDFLARE_API_TOKEN", token)
+        .args(["deploy", "--name", worker_name])
+        .arg("--var")
+        .arg(format!("MISTY_INTERNAL_API_BASE:{api_base}"))
+        .arg("--secrets-file")
+        .arg(secrets_file.as_os_str());
+    if dry_run {
+        command = command.arg("--dry-run");
+        if let Some(outdir) = outdir {
+            command = command.arg("--outdir").arg(outdir.as_os_str());
+        }
+    }
+    command
+}
+
+fn validate_production_worker_bundle(
+    production: &BTreeMap<String, String>,
+    production_path: &Path,
+    worker: &BTreeMap<String, String>,
+    worker_path: &Path,
+) -> Result<()> {
+    let production_contents = fs::read_to_string(production_path)
+        .with_context(|| format!("could not read {}", production_path.display()))?;
+    validate_room_salt(&production_contents, production_path)?;
+
+    let expected_worker_names = [TICKET_PUBLIC_KEY, CONTROL_SECRET, PROJECTION_SECRET];
+    for name in &expected_worker_names {
+        required_map_value(worker, name)?;
+    }
+    let unexpected = worker
+        .keys()
+        .filter(|name| !expected_worker_names.contains(&name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unexpected.is_empty() {
+        bail!(
+            "{} contains unexpected Worker secrets: {}",
+            worker_path.display(),
+            unexpected.join(", ")
+        );
+    }
+
+    let private = STANDARD
+        .decode(required_map_value(production, TICKET_PRIVATE_KEY)?)
+        .context("production Journal ticket private key is not valid base64")?;
+    let signing = SigningKey::from_pkcs8_der(&private)
+        .context("production Journal ticket private key is not Ed25519 PKCS#8")?;
+    let public = STANDARD
+        .decode(required_map_value(worker, TICKET_PUBLIC_KEY)?)
+        .context("production Worker ticket public key is not valid base64")?;
+    if public.as_slice() != VerifyingKey::from(&signing).as_bytes() {
+        bail!("production API private key does not match the Worker public key");
+    }
+    for name in [CONTROL_SECRET, PROJECTION_SECRET] {
+        let server_value = required_map_value(production, name)?;
+        let worker_value = required_map_value(worker, name)?;
+        if server_value != worker_value {
+            bail!("{name} does not match between the production API and Worker");
+        }
+        let decoded = STANDARD
+            .decode(server_value)
+            .with_context(|| format!("{name} is not valid base64"))?;
+        if decoded.len() < 32 {
+            bail!("{name} must contain at least 32 bytes");
+        }
+    }
+    Ok(())
+}
+
+fn read_environment(path: &Path) -> Result<BTreeMap<String, String>> {
+    let contents =
+        fs::read_to_string(path).with_context(|| format!("could not read {}", path.display()))?;
+    let mut values = BTreeMap::new();
+    for item in dotenvy::from_read_iter(contents.as_bytes()) {
+        let (name, value) = item.with_context(|| format!("could not parse {}", path.display()))?;
+        if values.insert(name.clone(), value).is_some() {
+            bail!("{name} is defined more than once in {}", path.display());
+        }
+    }
+    Ok(values)
+}
+
+fn required_map_value<'a>(values: &'a BTreeMap<String, String>, name: &str) -> Result<&'a str> {
+    values
+        .get(name)
+        .map(String::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .with_context(|| format!("{name} is required"))
+}
+
+fn validate_worker_name(name: &str) -> Result<()> {
+    let valid = !name.is_empty()
+        && name.len() <= 63
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-');
+    if !valid {
+        bail!("invalid production Worker name: {name}");
+    }
+    Ok(())
+}
+
+fn validate_worker_hostname(
+    production: &BTreeMap<String, String>,
+    worker_name: &str,
+) -> Result<()> {
+    let hostname = required_map_value(production, "PARTYKIT_HOST")?;
+    if hostname.contains(['/', ':']) {
+        bail!("PARTYKIT_HOST must be a bare hostname");
+    }
+    if hostname.ends_with(".workers.dev") && !hostname.starts_with(&format!("{worker_name}.")) {
+        bail!("PARTYKIT_HOST does not match production Worker name {worker_name}");
+    }
+    Ok(())
+}
+
+fn require_private_file(path: &Path) -> Result<()> {
+    if !path.is_file() {
+        bail!("required private file is missing: {}", path.display());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = fs::metadata(path)?.permissions().mode() & 0o077;
+        if mode != 0 {
+            bail!(
+                "{} must not be accessible by group or others",
+                path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+struct JournalSecrets {
+    private: String,
+    public: String,
+    control: String,
+    projection: String,
+}
+
+impl JournalSecrets {
+    fn generate(random: &mut OsRng) -> Result<Self> {
+        let signing = SigningKey::generate(random);
+        verify_pair(&signing)?;
+        Ok(Self {
+            private: STANDARD.encode(signing.to_pkcs8_der()?.as_bytes()),
+            public: STANDARD.encode(VerifyingKey::from(&signing).to_bytes()),
+            control: random_secret(random),
+            projection: random_secret(random),
+        })
+    }
+
+    fn server_environment(&self) -> String {
+        format!(
+            "# Append to the Misty server environment.\n\
+         # The private signing key must never be sent to Cloudflare.\n\
+         {TICKET_PRIVATE_KEY}={}\n\
+         {CONTROL_SECRET}={}\n\
+         {PROJECTION_SECRET}={}\n",
+            self.private, self.control, self.projection
+        )
+    }
+
+    fn worker_environment(&self) -> String {
+        format!(
+            "{TICKET_PUBLIC_KEY}={}\n\
+             {CONTROL_SECRET}={}\n\
+             {PROJECTION_SECRET}={}\n",
+            self.public, self.control, self.projection
+        )
+    }
+}
+
+fn replace_production_secret_placeholders(
+    contents: &str,
+    path: &std::path::Path,
+    secrets: &JournalSecrets,
+) -> Result<String> {
+    let replacements = [
+        (TICKET_PRIVATE_KEY, secrets.private.as_str()),
+        (CONTROL_SECRET, secrets.control.as_str()),
+        (PROJECTION_SECRET, secrets.projection.as_str()),
+    ];
+    for (name, _) in replacements {
+        let values = environment_values(contents, name);
+        if values.len() != 1 {
+            bail!(
+                "{name} must be defined exactly once in {}; found {}",
+                path.display(),
+                values.len()
+            );
+        }
+        if !is_placeholder(values[0]) {
+            bail!(
+                "{name} in {} is already configured; refusing an uncoordinated production rotation",
+                path.display()
+            );
+        }
+    }
+
+    let ended_with_newline = contents.ends_with('\n');
+    let mut lines = Vec::new();
+    for line in contents.lines() {
+        let key = line
+            .split_once('=')
+            .map(|(key, _)| key.trim())
+            .unwrap_or_default();
+        if let Some((name, replacement)) = replacements.iter().find(|(name, _)| *name == key) {
+            lines.push(format!("{name}={replacement}"));
+        } else {
+            lines.push(line.to_owned());
+        }
+    }
+    let mut updated = lines.join("\n");
+    if ended_with_newline {
+        updated.push('\n');
+    }
+    Ok(updated)
+}
+
+fn is_placeholder(value: &str) -> bool {
+    let value = value.trim();
+    let lower = value.to_ascii_lowercase();
+    value.is_empty()
+        || (value.starts_with('<') && value.ends_with('>'))
+        || lower.contains("replace-me")
+        || lower.contains("replace-with")
+        || matches!(lower.as_str(), "todo" | "tbd" | "changeme")
+}
+
+fn validate_room_salt(contents: &str, path: &std::path::Path) -> Result<()> {
+    let values = environment_values(contents, ROOM_SALT);
+    if values.len() != 1 {
+        bail!(
+            "{ROOM_SALT} must be defined exactly once in {}; found {}",
+            path.display(),
+            values.len()
+        );
+    }
+    let decoded = STANDARD
+        .decode(values[0])
+        .with_context(|| format!("{ROOM_SALT} in {} is not valid base64", path.display()))?;
+    if decoded.len() < 32 {
+        bail!(
+            "{ROOM_SALT} in {} must contain at least 32 bytes",
+            path.display()
+        );
+    }
+    Ok(())
+}
+
+fn ensure_room_salt(path: &std::path::Path, random: &mut OsRng) -> Result<()> {
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(error).with_context(|| format!("could not read {}", path.display()));
+        }
+    };
+    let existing = environment_values(&contents, ROOM_SALT);
+    if existing.len() > 1 {
+        bail!(
+            "{ROOM_SALT} is defined more than once in {}",
+            path.display()
+        );
+    }
+    if let Some(value) = existing.first() {
+        let decoded = STANDARD
+            .decode(value)
+            .with_context(|| format!("{ROOM_SALT} in {} is not valid base64", path.display()))?;
+        if decoded.len() < 32 {
+            bail!(
+                "{ROOM_SALT} in {} must contain at least 32 bytes",
+                path.display()
+            );
+        }
+        write_private(path, contents.as_bytes())?;
+        return Ok(());
+    }
+
+    let mut updated = contents;
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str(&format!("{ROOM_SALT}={}\n", random_secret(random)));
+    write_private(path, updated.as_bytes())
+}
+
+fn environment_values<'a>(contents: &'a str, name: &str) -> Vec<&'a str> {
+    contents
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            let (key, value) = line.split_once('=')?;
+            (key.trim() == name).then_some(value.trim())
+        })
+        .collect()
+}
+
+pub fn configure_r2_cors(workspace: &Workspace, apply: bool) -> Result<()> {
+    let bucket = required_environment("R2_BUCKET")?;
+    let raw_origins = required_environment("MISTY_R2_ALLOWED_ORIGINS")?;
+    let mut origins = raw_origins
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    origins.sort();
+    let original_count = origins.len();
+    origins.dedup();
+    if origins.is_empty() || origins.len() != original_count {
+        bail!("MISTY_R2_ALLOWED_ORIGINS must contain unique comma-separated origins");
+    }
+    for origin in &origins {
+        validate_r2_origin(origin)?;
+    }
+    let policy = json!({
+        "rules": [{
+            "allowed": {
+                "origins": origins,
+                "methods": ["GET", "HEAD", "PUT"],
+                "headers": [
+                    "content-type",
+                    "x-amz-checksum-sha256",
+                    "x-amz-meta-misty-library-sha256"
+                ]
+            },
+            "exposeHeaders": ["etag", "x-amz-checksum-sha256"],
+            "maxAgeSeconds": 3600
+        }]
+    });
+    if !apply {
+        println!("{}", serde_json::to_string_pretty(&policy)?);
+        println!("Dry run only. Pass --apply to update bucket {bucket}.");
+        return Ok(());
+    }
+
+    let temporary = tempfile::Builder::new()
+        .prefix("misty-r2-cors-")
+        .tempdir()?;
+    let policy_path = temporary.path().join("cors.json");
+    fs::write(&policy_path, serde_json::to_vec_pretty(&policy)?)?;
+    let worker = workspace.server.join("cloudflare/journal-collab");
+    let wrangler = worker.join("node_modules/.bin").join(if cfg!(windows) {
+        "wrangler.cmd"
+    } else {
+        "wrangler"
+    });
+    CommandSpec::new(wrangler.as_os_str())
+        .args(["r2", "bucket", "cors", "set"])
+        .arg(&bucket)
+        .arg("--file")
+        .arg(policy_path.as_os_str())
+        .arg("--force")
+        .run(&worker)?;
+    CommandSpec::new(wrangler.as_os_str())
+        .args(["r2", "bucket", "cors", "list"])
+        .arg(&bucket)
+        .run(&worker)
+}
+
+fn verify_pair(signing: &SigningKey) -> Result<()> {
+    use ed25519_dalek::{Signer, Verifier};
+    let probe = b"misty-journal-collab-keycheck";
+    let signature = signing.sign(probe);
+    VerifyingKey::from(signing)
+        .verify(probe, &signature)
+        .context("generated Ed25519 keypair failed verification")
+}
+
+fn random_secret(random: &mut OsRng) -> String {
+    let mut bytes = [0_u8; 32];
+    random.fill_bytes(&mut bytes);
+    STANDARD.encode(bytes)
+}
+
+fn required_environment(name: &str) -> Result<String> {
+    let value = env::var(name).unwrap_or_default();
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("{name} is required");
+    }
+    Ok(value.to_owned())
+}
+
+fn validate_r2_origin(raw: &str) -> Result<()> {
+    if raw.contains('*') {
+        bail!("wildcard R2 origin is forbidden: {raw}");
+    }
+    let value = Url::parse(raw).with_context(|| format!("invalid R2 origin: {raw}"))?;
+    if !value.username().is_empty()
+        || value.password().is_some()
+        || !matches!(value.path(), "" | "/")
+        || value.query().is_some()
+        || value.fragment().is_some()
+    {
+        bail!("R2 origins must not contain credentials, paths, queries, or fragments: {raw}");
+    }
+    let approved = value.scheme() == "https"
+        || (value.scheme() == "tauri" && value.host_str() == Some("localhost"))
+        || (value.scheme() == "http"
+            && matches!(
+                value.host_str(),
+                Some("localhost" | "127.0.0.1" | "tauri.localhost")
+            ));
+    if !approved {
+        bail!("R2 origin must use HTTPS or be an approved local/Tauri origin: {raw}");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn development_commands_select_the_explicit_compose_file() {
+        assert_eq!(
+            development_up_command(true, true).display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml up --build --detach"
+        );
+        assert_eq!(
+            development_down_command(true).display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml down --volumes --remove-orphans"
+        );
+        assert_eq!(
+            development_compose().args(["logs", "--follow"]).display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml logs --follow"
+        );
+        assert_eq!(
+            development_tunnel_url_command().display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml exec --no-TTY tunnel cat /run/misty/tunnel-url"
+        );
+        assert!(development_tunnel_connection_command()
+            .display()
+            .contains("cloudflared_tunnel_ha_connections"));
+        assert_eq!(
+            development_tunnel_refresh_command().display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps tunnel"
+        );
+        assert_eq!(
+            development_worker_refresh_command().display(),
+            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps cloudflare-deploy"
+        );
+    }
+
+    #[test]
+    fn development_tunnel_url_becomes_the_public_api_base() {
+        assert_eq!(
+            normalize_development_api_url("https://misty-dev.trycloudflare.com\n").unwrap(),
+            "https://misty-dev.trycloudflare.com/api"
+        );
+        for invalid in [
+            "http://misty-dev.trycloudflare.com",
+            "https://mistysys.com",
+            "https://misty-dev.trycloudflare.com/other",
+            "https://misty-dev.trycloudflare.com?secret=value",
+        ] {
+            assert!(normalize_development_api_url(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn environment_values_find_only_exact_active_keys() {
+        let contents = "# JOURNAL_COLLAB_ROOM_SALT=ignored\n\
+                        OTHER_JOURNAL_COLLAB_ROOM_SALT=ignored\n\
+                        JOURNAL_COLLAB_ROOM_SALT=kept\n";
+        assert_eq!(
+            environment_values(contents, "JOURNAL_COLLAB_ROOM_SALT"),
+            vec!["kept"]
+        );
+    }
+
+    #[test]
+    fn production_generation_replaces_only_placeholders_and_keeps_room_salt() {
+        let room_salt = STANDARD.encode([7_u8; 32]);
+        let contents = format!(
+            "MISTY_ENVIRONMENT=production\n\
+             {ROOM_SALT}={room_salt}\n\
+             {TICKET_PRIVATE_KEY}=<replace-private>\n\
+             {CONTROL_SECRET}=replace-with-control\n\
+             {PROJECTION_SECRET}=replace-me\n"
+        );
+        let secrets = JournalSecrets {
+            private: "private".to_owned(),
+            public: "public".to_owned(),
+            control: "control".to_owned(),
+            projection: "projection".to_owned(),
+        };
+        let updated = replace_production_secret_placeholders(
+            &contents,
+            std::path::Path::new(".env.prod"),
+            &secrets,
+        )
+        .unwrap();
+        assert!(updated.contains(&format!("{ROOM_SALT}={room_salt}\n")));
+        assert!(updated.contains(&format!("{TICKET_PRIVATE_KEY}=private\n")));
+        assert!(updated.contains(&format!("{CONTROL_SECRET}=control\n")));
+        assert!(updated.contains(&format!("{PROJECTION_SECRET}=projection\n")));
+    }
+
+    #[test]
+    fn production_generation_refuses_existing_secrets() {
+        let contents = format!(
+            "{TICKET_PRIVATE_KEY}=already-configured\n\
+             {CONTROL_SECRET}=replace-me\n\
+             {PROJECTION_SECRET}=replace-me\n"
+        );
+        let secrets = JournalSecrets {
+            private: "private".to_owned(),
+            public: "public".to_owned(),
+            control: "control".to_owned(),
+            projection: "projection".to_owned(),
+        };
+        assert!(replace_production_secret_placeholders(
+            &contents,
+            std::path::Path::new(".env.prod"),
+            &secrets
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn production_generation_writes_a_matched_private_bundle_once() {
+        let temporary = tempfile::tempdir().unwrap();
+        let server = temporary.path().join("misty-server");
+        fs::create_dir_all(&server).unwrap();
+        let room_salt = STANDARD.encode([9_u8; 32]);
+        fs::write(
+            server.join(".env.prod"),
+            format!(
+                "MISTY_ENVIRONMENT=production\n\
+                 {ROOM_SALT}={room_salt}\n\
+                 {TICKET_PRIVATE_KEY}=<replace-private>\n\
+                 {CONTROL_SECRET}=replace-with-control\n\
+                 {PROJECTION_SECRET}=replace-with-projection\n"
+            ),
+        )
+        .unwrap();
+        let workspace = Workspace {
+            root: temporary.path().to_path_buf(),
+            misty: temporary.path().join("misty"),
+            server: server.clone(),
+            cli: temporary.path().join("misty-cli"),
+        };
+
+        generate_production_worker_secrets(&workspace).unwrap();
+
+        let production = fs::read_to_string(server.join(".env.prod")).unwrap();
+        let worker =
+            fs::read_to_string(server.join("cloudflare/journal-collab/.secrets/worker.prod.env"))
+                .unwrap();
+        assert!(production.contains(&format!("{ROOM_SALT}={room_salt}\n")));
+        assert!(!production.contains("replace-"));
+        assert!(!worker.contains(TICKET_PRIVATE_KEY));
+        assert!(worker.contains(TICKET_PUBLIC_KEY));
+        for name in [CONTROL_SECRET, PROJECTION_SECRET] {
+            assert_eq!(
+                environment_values(&production, name),
+                environment_values(&worker, name)
+            );
+        }
+        assert!(generate_production_worker_secrets(&workspace).is_err());
+        let production_values = read_environment(&server.join(".env.prod")).unwrap();
+        let worker_path = server.join("cloudflare/journal-collab/.secrets/worker.prod.env");
+        let worker_values = read_environment(&worker_path).unwrap();
+        validate_production_worker_bundle(
+            &production_values,
+            &server.join(".env.prod"),
+            &worker_values,
+            &worker_path,
+        )
+        .unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(server.join(".env.prod"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+            assert_eq!(
+                fs::metadata(server.join("cloudflare/journal-collab/.secrets/worker.prod.env"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
+        }
+    }
+
+    #[test]
+    fn production_deploy_command_never_displays_the_api_token() {
+        let command = production_worker_deploy_command(
+            Path::new("/workspace/wrangler"),
+            "cloudflare-secret-token",
+            "misty-journal-collab",
+            "https://mistysys.com/api",
+            Path::new("/workspace/worker.prod.env"),
+            true,
+            Some(Path::new("/tmp/output")),
+        );
+        let display = command.display();
+        assert!(!display.contains("cloudflare-secret-token"));
+        assert!(display.contains("--dry-run"));
+        assert!(display.contains("misty-journal-collab"));
+    }
+
+    #[test]
+    fn r2_origins_are_narrow() {
+        assert!(validate_r2_origin("https://mistysys.com").is_ok());
+        assert!(validate_r2_origin("tauri://localhost").is_ok());
+        assert!(validate_r2_origin("https://mistysys.com/path").is_err());
+        assert!(validate_r2_origin("https://*.mistysys.com").is_err());
+    }
+}
