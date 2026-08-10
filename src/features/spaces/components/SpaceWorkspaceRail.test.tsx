@@ -14,6 +14,12 @@ import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 
 const { preload } = vi.hoisted(() => ({ preload: vi.fn(async () => {}) }));
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "one" } }) }));
+vi.mock("../useSpaceOverview", () => ({
+  useSpaceOverview: () => ({ items: [], loading: false, failed: false, retry: vi.fn() }),
+}));
+vi.mock("../useSpacePersonalItems", () => ({
+  useSpacePersonalItems: () => ({ items: [], ready: true, error: "", retry: vi.fn() }),
+}));
 vi.mock("../SpaceSectionView", () => ({ preloadSpaceSection: preload }));
 vi.mock("./spacePanel/useSpaceLibraryUsage", () => ({ useSpaceLibraryUsage: () => undefined }));
 vi.mock("../chat/sidebar/useSpaceConversations", () => ({
@@ -91,14 +97,14 @@ it("opens a section in the owning Space tab after loading it", async () => {
     within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent),
-  ).toEqual(["Chat", "Planner", "Journal", "Library"]);
+  ).toEqual(["All", "Chat", "Planner", "Journal", "Library"]);
   expect(within(nav).getByRole("link", { name: "Journal" }).getAttribute("aria-current")).toBe(
     "page",
   );
   fireEvent.click(within(nav).getByRole("link", { name: "Planner" }));
   await waitFor(() =>
     expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe(
-      "/spaces/family/planner/tasks/board",
+      "/spaces/family/planner",
     ),
   );
   expect(preload).toHaveBeenCalledWith("planner");
@@ -115,7 +121,7 @@ it("follows the focused Space and hides pages the user cannot access", () => {
   mount();
   act(() => open("/spaces/work/social"));
   expect(screen.getByRole("heading", { name: "Work" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "Channels" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Recent items" })).toBeTruthy();
   const nav = screen.getByRole("navigation", { name: "Space sections" });
   expect(within(nav).queryByRole("link", { name: "Planner" })).toBeNull();
   expect(within(nav).queryByRole("link", { name: "Library" })).toBeNull();
@@ -128,7 +134,10 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(screen.queryByRole("button", { name: /Switch Space/ })).toBeNull();
   const management = screen.getByRole("navigation", { name: "Space management" });
   expect(within(management).getByRole("button", { name: "Members" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Family options" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Family options" })).toBeNull();
+  expect(
+    management.closest("header")?.contains(screen.getByRole("heading", { name: "Family" })),
+  ).toBe(true);
   fireEvent.click(within(management).getByRole("button", { name: "Usage" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
   expect(screen.getByText("Storage")).toBeTruthy();
@@ -160,4 +169,20 @@ it("keeps the current page on load failure and ignores loads after the pane rout
   act(() => open("/files"));
   await act(async () => finish());
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/files");
+});
+
+it("keeps Library selected for Trash without duplicating Trash in the rail", () => {
+  open("/spaces/family/library?collection=deleted");
+  mount();
+  expect(screen.queryByRole("link", { name: "Trash" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "New item" })).toBeNull();
+  expect(screen.getByRole("link", { name: "Library" }).getAttribute("aria-current")).toBe("page");
+});
+
+it("hides Trash when Library access is denied", () => {
+  useSpacesStore.setState({
+    spaces: [{ ...space("family", "Family"), permissions: { "library.view": false } }],
+  });
+  mount();
+  expect(screen.queryByRole("link", { name: "Trash" })).toBeNull();
 });

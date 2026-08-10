@@ -11,7 +11,11 @@ export function formatLocalTime(localTime: string): string {
 
 /** A one-line reading of a schedule, e.g. "Weekdays at 9:00 AM". */
 export function describeSchedule(schedule: ScheduledTaskSchedule): string {
-  const time = formatLocalTime(schedule.local_time);
+  return `${describeFrequency(schedule)} at ${formatLocalTime(schedule.local_time)}`;
+}
+
+/** Frequency and calendar constraints, without the clock time. */
+export function describeFrequency(schedule: ScheduledTaskSchedule): string {
   switch (schedule.cadence) {
     case "once": {
       const day = schedule.run_on
@@ -19,16 +23,16 @@ export function describeSchedule(schedule: ScheduledTaskSchedule): string {
             new Date(`${schedule.run_on}T00:00:00`),
           )
         : "";
-      return `Once on ${day} at ${time}`;
+      return day ? `Once on ${day}` : "Once";
     }
     case "daily":
-      return `Daily at ${time}`;
+      return "Daily";
     case "weekdays":
-      return `Weekdays at ${time}`;
+      return "Weekdays";
     case "weekly":
-      return `${weekdays[schedule.weekday] ?? "Weekly"}s at ${time}`;
+      return weekdays[schedule.weekday] ? `${weekdays[schedule.weekday]}s` : "Weekly";
     case "monthly":
-      return `Monthly on day ${schedule.month_day} at ${time}`;
+      return `Monthly on day ${schedule.month_day}`;
   }
 }
 

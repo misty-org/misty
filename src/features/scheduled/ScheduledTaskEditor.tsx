@@ -1,3 +1,4 @@
+import { useAuth } from "@/features/auth";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import type { ScheduledTask, ScheduledTaskCadence, ScheduledTaskInput } from "@/api/scheduled/api";
 import {
@@ -15,6 +16,7 @@ import {
 import { useState, type FormEvent } from "react";
 import { weekdayNames } from "./scheduleFormat";
 import { useScheduledTasksStore } from "./useScheduledTasksStore";
+import type { ScheduledStarter } from "./ScheduledWelcome";
 
 const cadenceOptions: { value: ScheduledTaskCadence; label: string }[] = [
   { value: "once", label: "Once" },
@@ -54,15 +56,30 @@ export function ScheduledTaskEditor(props: {
   open: boolean;
   task?: ScheduledTask;
   defaultAgentId?: string;
+  starter?: ScheduledStarter;
   onOpenChange: (open: boolean) => void;
   onSaved?: (task: ScheduledTask) => void;
 }) {
-  const agents = usePersonalAgentsStore((s) => s.agents);
+  const { user } = useAuth();
+  const {
+    agents,
+    loading: agentsLoading,
+    error: agentsError,
+    load: loadAgents,
+  } = usePersonalAgentsStore();
   const [draft, setDraft] = useState(() => ({
     ...draftFrom(props.task),
+    ...(!props.task ? props.starter : undefined),
     agent_id:
       props.task?.agent_id ?? props.defaultAgentId ?? agents.find((a) => a.system_managed)?.id,
   }));
+  const availableAgents = agents.filter((agent) => agent.enabled);
+  const agentId =
+    draft.agent_id ||
+    props.defaultAgentId ||
+    availableAgents.find((agent) => agent.system_managed)?.id ||
+    availableAgents[0]?.id;
+  const hasAgent = availableAgents.some((agent) => agent.id === agentId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const set = <K extends keyof ScheduledTaskInput>(key: K, value: ScheduledTaskInput[K]) =>
@@ -77,7 +94,11 @@ export function ScheduledTaskEditor(props: {
     setSaving(true);
     setError("");
     try {
-      const input = { ...draft, run_on: draft.cadence === "once" ? draft.run_on : undefined };
+      const input = {
+        ...draft,
+        agent_id: agentId,
+        run_on: draft.cadence === "once" ? draft.run_on : undefined,
+      };
       const store = useScheduledTasksStore.getState();
       const saved = props.task
         ? await store.update(props.task.id, input)
@@ -106,13 +127,33 @@ export function ScheduledTaskEditor(props: {
               hint="This agent handles every run and follow-up in the task’s conversation."
             >
               <OptionSelect
-                value={draft.agent_id ?? ""}
+                value={agentId ?? ""}
+                disabled={agentsLoading || !availableAgents.length}
+                placeholder={agentsLoading ? "Loading agents…" : "No available agents"}
                 options={agents
                   .filter((a) => a.enabled)
                   .map((a) => ({ value: a.id, label: a.name }))}
                 onValueChange={(value) => set("agent_id", value)}
               />
             </Field>
+          )}
+          {!props.task && agentsError && (
+            <div role="alert" className="flex items-center gap-2 text-sm text-cream-muted">
+              Agents couldn’t load.
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadAgents(user?.id ?? "")}
+              >
+                Retry agents
+              </Button>
+            </div>
+          )}
+          {!props.task && !agentsLoading && !agentsError && !availableAgents.length && (
+            <p role="status" className="text-sm text-cream-muted">
+              Enable an agent in Agents to create a task.
+            </p>
           )}
           <Field label="Name">
             <Input
@@ -131,7 +172,7 @@ export function ScheduledTaskEditor(props: {
               onChange={(event) => set("prompt", event.target.value)}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Repeats">
               <OptionSelect
                 value={draft.cadence}
@@ -190,7 +231,7 @@ export function ScheduledTaskEditor(props: {
             <Button type="button" variant="ghost" onClick={() => props.onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || (!props.task && !draft.agent_id)}>
+            <Button type="submit" disabled={saving || (!props.task && !hasAgent)}>
               {saving ? "Saving…" : props.task ? "Save" : "Create task"}
             </Button>
           </DialogFooter>

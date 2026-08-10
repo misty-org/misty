@@ -87,7 +87,7 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
           {overflowCount > 0 ? (
             <span className="text-[10px] font-medium text-cream-muted">+{overflowCount}</span>
           ) : null}
-          <span className="size-1.5 rounded-full bg-status-green" aria-hidden="true" />
+          <span className="size-1.5 rounded-full bg-cream-muted" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
 
@@ -100,7 +100,7 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
             key={member.user_id}
             className="flex min-h-8 items-center gap-2 rounded-md px-2 text-sm"
           >
-            <span className="size-1.5 shrink-0 rounded-full bg-status-green" />
+            <span className="size-1.5 shrink-0 rounded-full bg-cream-muted" />
             <span className="truncate font-medium">
               {member.user_id === user?.id ? `${member.name} (You)` : member.name}
             </span>

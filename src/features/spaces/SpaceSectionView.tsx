@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/auth";
-import { HomeDashboard } from "@/features/home";
+import { SpaceOverview } from "./SpaceOverview";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,8 +30,8 @@ const Library = lazy(loadLibrary);
 async function loadChat() {
   const { initializeHostSocialRuntime } = await import("./chat/hostSocialRuntime");
   initializeHostSocialRuntime();
-  const { SpaceSocial } = await import("./chat/SpaceChat");
-  return { default: SpaceSocial };
+  const { SpaceChatEntry } = await import("./chat/SpaceChatEntry");
+  return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
 
@@ -158,7 +158,7 @@ export function SpaceSectionView(props: {
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
         {section === "home" ? (
-          <HomeDashboard key={`home:${spaceId}`} spaceId={spaceId} />
+          <SpaceOverview key={`home:${spaceId}`} space={space} />
         ) : section === "settings" ? (
           <SpaceSettings
             key={`settings:${spaceId}:${studioKind}`}

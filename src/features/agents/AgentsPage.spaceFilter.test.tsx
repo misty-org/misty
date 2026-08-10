@@ -1,10 +1,12 @@
 import "./components/agentCloudAvatars.testFixtures";
+import type * as AgentsRuntimeModule from "./AgentsRuntime";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { useWorkspaceStore } from "@/features/workspace";
 
 const fixture = vi.hoisted(() => ({
+  includeSecond: false,
   load: vi.fn(async () => {}),
   submit: vi.fn(async () => {}),
   save: vi.fn(async () => ({ id: "communications" })),
@@ -20,9 +22,17 @@ const fixture = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
+vi.mock("./AgentsRuntime", async (original) => ({
+  ...(await original<typeof AgentsRuntimeModule>()),
+  useAgentsAuth: () => ({ user: { id: "owner" } }),
+  runtimeAiApi: { activity: async () => ({ entries: [] }) },
+}));
 vi.mock("./personalAgentsStore", () => ({
   usePersonalAgentsStore: () => ({
-    agents: [fixture.agent],
+    agents: [
+      fixture.agent,
+      ...(fixture.includeSecond ? [{ ...fixture.agent, id: "research", name: "Research" }] : []),
+    ],
     loading: false,
     error: "",
     load: fixture.load,
@@ -45,6 +55,7 @@ import AgentsPage from "./AgentsPage";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 
 beforeEach(() => {
+  fixture.includeSecond = false;
   fixture.save.mockClear();
   fixture.submit.mockClear();
   fixture.agent.avatar = {};
@@ -84,9 +95,8 @@ it("omits model and app permission setup for a new global agent", async () => {
       <AgentsPage />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "New chat" }));
-  fireEvent.click(screen.getByRole("button", { name: "Create new agent" }));
-  fireEvent.click(screen.getByText("Instructions and memory"));
+  fireEvent.click(screen.getByRole("button", { name: "New agent" }));
+  fireEvent.click(screen.getByText("Instructions", { selector: "summary" }));
   expect(screen.queryByRole("group", { name: "Personal apps" })).toBeNull();
   expect(screen.queryByRole("checkbox", { name: "browser" })).toBeNull();
   expect(within(screen.getByRole("dialog")).queryByLabelText("Model")).toBeNull();
@@ -123,8 +133,8 @@ it("reopens historical conversations and starts new personal work without their 
       <AgentsPage />
     </MemoryRouter>,
   );
-  expect(screen.getByText("Launch draft")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
+  expect(screen.getByText("Launch draft")).toBeTruthy();
   expect(screen.getByText("Other Space draft")).toBeTruthy();
   fireEvent.click(screen.getByText("Other Space draft"));
   fireEvent.change(screen.getByLabelText("Message Misty"), {
@@ -177,6 +187,7 @@ it("preserves an unsent message until a new chat is explicitly confirmed", () =>
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.change(screen.getByLabelText("Message Misty"), {
     target: { value: "Keep this message" },
   });
@@ -188,7 +199,11 @@ it("preserves an unsent message until a new chat is explicitly confirmed", () =>
   );
   fireEvent.click(screen.getByRole("button", { name: "New chat" }));
   fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
-  fireEvent.click(screen.getAllByRole("button", { name: "Communications" })[1]);
+  fireEvent.click(
+    within(screen.getByRole("group", { name: "Choose an agent" })).getByRole("button", {
+      name: "Communications",
+    }),
+  );
   expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
 });
 
@@ -199,6 +214,7 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.click(screen.getByRole("button", { name: "Profile" }));
   await waitFor(() => expect(screen.getByLabelText("Name")).toBeTruthy());
   fireEvent.click(screen.getByRole("button", { name: "Edit agent avatar" }));
@@ -239,27 +255,30 @@ it("searches chat titles and clears the filter without changing the active conve
       <AgentsPage />
     </MemoryRouter>,
   );
-  fireEvent.change(screen.getByRole("textbox", { name: "Search agents and chats" }), {
+  fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Search conversations" }), {
     target: { value: "launch" },
   });
   expect(screen.getByText("Launch draft")).toBeTruthy();
-  fireEvent.change(screen.getByRole("textbox", { name: "Search agents and chats" }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Search conversations" }), {
     target: { value: "unmatched" },
   });
-  expect(screen.getByText("No results.")).toBeTruthy();
+  expect(screen.queryByText("No matching items")).toBeNull();
+  expect(screen.getAllByRole("row")).toHaveLength(1);
   expect(useMistyStore.getState().activeConversationId).toBe("draft");
-  fireEvent.keyDown(screen.getByRole("textbox", { name: "Search agents and chats" }), {
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Search conversations" }), {
     key: "Escape",
   });
   expect(screen.getByText("Launch draft")).toBeTruthy();
 });
 
-it("discloses chat history without resetting a draft and returns to the draft guard from the compact roster", () => {
+it("discloses chat history without resetting a draft and guards returning to the collection", () => {
   render(
     <MemoryRouter>
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.change(screen.getByLabelText("Message Misty"), { target: { value: "Keep my draft" } });
   fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
   fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
@@ -267,14 +286,7 @@ it("discloses chat history without resetting a draft and returns to the draft gu
   expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(
     "Keep my draft",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Show agents" }));
-  expect(document.querySelector(".agents-workspace")?.getAttribute("data-roster-open")).toBe(
-    "true",
-  );
-  fireEvent.click(screen.getByRole("button", { name: "New chat" }));
-  expect(document.querySelector(".agents-workspace")?.getAttribute("data-roster-open")).toBe(
-    "true",
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Back to agents" }));
   expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
   expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(
@@ -288,6 +300,7 @@ it("protects unsaved profile edits when closing settings while preserving the co
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.change(screen.getByLabelText("Message Misty"), { target: { value: "Unsent draft" } });
   fireEvent.click(screen.getByRole("button", { name: "Profile" }));
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Unsaved name" } });
@@ -309,9 +322,10 @@ it("toggles the text-only navigation island without losing the conversation draf
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.change(screen.getByLabelText("Message Misty"), { target: { value: "Keep my draft" } });
-  const identity = screen.getByRole("button", { name: "Agent details" });
-  expect(identity.getAttribute("aria-expanded")).toBe("true");
+  const identity = screen.getByRole("button", { name: "Show agent panel" });
+  expect(identity.getAttribute("aria-pressed")).toBe("true");
   const island = screen.getByRole("navigation", { name: "Agent navigation" });
   expect(island.querySelector("svg")).toBeNull();
   fireEvent.click(within(island).getByRole("button", { name: "Conversations" }));
@@ -333,6 +347,7 @@ it("guards profile edits when switching dropdowns or hiding the island", async (
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.click(screen.getByRole("button", { name: "Profile" }));
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Keep this name" } });
   fireEvent.click(screen.getByRole("button", { name: "Conversations" }));
@@ -340,24 +355,22 @@ it("guards profile edits when switching dropdowns or hiding the island", async (
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(document.activeElement?.getAttribute("aria-label")).toBe("Profile"));
   expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Keep this name");
-  fireEvent.click(screen.getByRole("button", { name: "Agent details" }));
+  fireEvent.click(screen.getByRole("button", { name: "Show agent panel" }));
   fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
   expect(screen.queryByRole("navigation", { name: "Agent navigation" })).toBeNull();
   expect(screen.queryByLabelText("Name")).toBeNull();
 });
 
-it("keeps the requested roster action when discarding profile edits", async () => {
+it("keeps the requested chat action when discarding profile edits", async () => {
   render(
     <MemoryRouter>
       <AgentsPage />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
   fireEvent.click(screen.getByRole("button", { name: "Profile" }));
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Unsaved name" } });
-  const newChat = within(screen.getByRole("complementary", { name: "Your agents" })).getByRole(
-    "button",
-    { name: "New chat" },
-  );
+  const newChat = screen.getByRole("button", { name: "New chat" });
   fireEvent.pointerDown(newChat);
   fireEvent.click(newChat);
   fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
@@ -365,4 +378,86 @@ it("keeps the requested roster action when discarding profile edits", async () =
     expect(document.activeElement).toBe(screen.getByLabelText("Search or create agents")),
   );
   expect(screen.queryByLabelText("Name")).toBeNull();
+});
+
+it("switches agents in place, guarding drafts and leaving the current agent untouched", async () => {
+  fixture.includeSecond = true;
+  render(
+    <MemoryRouter>
+      <AgentsPage />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
+  fireEvent.change(screen.getByLabelText("Message Misty"), { target: { value: "Keep my work" } });
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  fireEvent.click(screen.getByRole("option", { name: /Communications/ }));
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+  expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(
+    "Keep my work",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  fireEvent.click(screen.getByRole("option", { name: "Research" }));
+  expect(screen.getByRole("alertdialog")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+  expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe(
+    "Keep my work",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  fireEvent.click(screen.getByRole("option", { name: "Research" }));
+  fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
+  expect(screen.getByRole("button", { name: "Switch agent: Research" })).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
+  expect(useMistyStore.getState().selectedAgentId).toBe("research");
+});
+
+it("finds and opens another agent's historical conversation through the switcher", async () => {
+  fixture.includeSecond = true;
+  const selectConversation = vi.fn(async (id: string) => {
+    useMistyStore.setState({ activeConversationId: id });
+  });
+  useMistyStore.setState({
+    selectConversation,
+    conversations: [
+      {
+        id: "research-chat",
+        agentId: "research",
+        title: "Solar research",
+        spaceId: "",
+        createdAt: "2026-09-30",
+        updatedAt: "2026-09-30",
+        messages: [],
+        remote: true,
+      },
+    ],
+  });
+  render(
+    <MemoryRouter>
+      <AgentsPage />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Switch agent or conversation" }), {
+    target: { value: "Solar" },
+  });
+  fireEvent.click(screen.getByRole("option", { name: /Solar research/ }));
+  expect(selectConversation).toHaveBeenCalledWith("research-chat");
+  expect(useMistyStore.getState().activeConversationId).toBe("research-chat");
+  expect(screen.getByRole("button", { name: "Switch agent: Research" })).toBeTruthy();
+});
+
+it("prevents switching while a response is running", () => {
+  fixture.includeSecond = true;
+  render(
+    <MemoryRouter>
+      <AgentsPage />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
+  act(() => useMistyStore.setState({ working: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
+  const research = screen.getByRole("option", { name: "Research" });
+  expect(research.getAttribute("aria-disabled")).toBe("true");
+  fireEvent.click(research);
+  expect(useMistyStore.getState().selectedAgentId).toBe("communications");
 });

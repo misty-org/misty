@@ -7,7 +7,6 @@ import {
   NavigatorHeaderFilesButton,
   NavigatorHeaderSearchButton,
   NavigatorHomeLink,
-  NavigatorScheduledLink,
 } from "./NavigatorUtilityIsland";
 import { useLocation } from "react-router-dom";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
@@ -84,9 +83,8 @@ export function GlobalNavigator(props: {
             />
             <NavigatorHeaderAgentsButton
               path="/agents"
-              active={activeTab?.surfaceId === "agents"}
+              active={activeTab?.surfaceId === "agents" || activeTab?.surfaceId === "scheduled"}
             />
-            <NavigatorScheduledLink active={activeTab?.surfaceId === "scheduled"} />
             <NavigatorHeaderFilesButton path="/files" active={activeTab?.surfaceId === "files"} />
             <WorkspaceSpaceNavigation activeTab={activeTab} />
           </div>

@@ -15,10 +15,12 @@ export function LibraryItemThumbnail({
   spaceId,
   item,
   reauthenticationToken = "",
+  api = spacesApi,
 }: {
   spaceId: string;
   item: SpaceLibraryItem;
   reauthenticationToken?: string;
+  api?: Pick<typeof spacesApi, "libraryPreview" | "libraryContent">;
 }) {
   const [preview, setPreview] = useState<{ url: string; kind: "image" | "pdf" } | null>(null);
   const mimeType = libraryItemMIME(item);
@@ -33,11 +35,11 @@ export function LibraryItemThumbnail({
     }
     let current = true;
     let objectUrl = "";
-    void spacesApi
+    void api
       .libraryPreview(spaceId, item.id, reauthenticationToken, item.version)
       .catch(() =>
         mimeType.startsWith("image/") || mimeType === "application/pdf"
-          ? spacesApi.libraryContent(spaceId, item.id, reauthenticationToken)
+          ? api.libraryContent(spaceId, item.id, reauthenticationToken)
           : Promise.reject(new Error("The file reader could not load this item")),
       )
       .then((blob) => {
@@ -57,7 +59,7 @@ export function LibraryItemThumbnail({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
+  }, [api, item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
 
   if (preview?.kind === "image")
     return <img className="size-full object-cover" src={preview.url} alt="" />;

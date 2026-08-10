@@ -1,4 +1,3 @@
-import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { mapLayoutViews } from "./layoutTabs";
 import {
   browserViewTitle,
@@ -24,15 +23,17 @@ export function migrateRetiredWorkspaceView(
   tab: WorkspaceView,
   _scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceView {
-  const destination = workspaceSurfaceFromRoute(tab.route);
-  if (tab.surfaceId === "scheduled" || destination?.surfaceId === "scheduled")
+  if (tab.surfaceId === "scheduled") {
+    const params = new URL(tab.route, "https://misty.local").searchParams;
+    params.set("view", "scheduled");
     return {
       ...tab,
-      surfaceId: "scheduled",
-      groupKey: "tool:scheduled",
-      title: tab.surfaceId === "scheduled" ? tab.title : "Scheduled",
-      route: destination?.route ?? "/scheduled",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: `/agents?${params}`,
     };
+  }
   if (tab.surfaceId === "home" && tab.route === "/home") return tab;
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
   const retiredTransfers =

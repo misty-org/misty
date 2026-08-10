@@ -133,3 +133,34 @@ function messageFixture(): SpaceMessage {
     created_at: "2026-08-15T20:00:00Z",
   };
 }
+
+it("routes late message completions to the original conversation after switching", async () => {
+  const { renderHook, waitFor, cleanup } = await import("@testing-library/react");
+  apiMocks.conversations.mockResolvedValue({ conversations: [] });
+  apiMocks.conversationMessages.mockResolvedValue({ messages: [] });
+  const hook = renderHook(({ id }) => useSpaceConversationChat("switching-space", id, true), {
+    initialProps: { id: "a" },
+  });
+  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+  const updateA = hook.result.current.setMessages;
+  const pending = {
+    ...messageFixture(),
+    id: "optimistic",
+    conversation_id: "a",
+    client_nonce: "switch-nonce",
+    local_delivery_state: "sending" as const,
+  };
+  act(() => updateA([pending]));
+  hook.rerender({ id: "b" });
+  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+  act(() =>
+    updateA((current) =>
+      current.map((message) => ({ ...message, local_delivery_state: "failed" })),
+    ),
+  );
+  expect(hook.result.current.messages).toEqual([]);
+  hook.rerender({ id: "a" });
+  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+  expect(hook.result.current.messages[0].local_delivery_state).toBe("failed");
+  cleanup();
+});

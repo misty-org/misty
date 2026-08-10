@@ -79,6 +79,8 @@ export function NoteReadingPaneView(
               spaceId={note.spaceId}
               noteId={note.sourceId}
               initialTitle={note.title}
+              renameRequested={props.renameRequested}
+              onRenameHandled={props.onRenameHandled}
             />
           ) : (
             <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">{note.title}</h1>
@@ -166,10 +168,27 @@ function CollaborativeTitleInput(props: {
   spaceId: string;
   noteId: string;
   initialTitle: string;
+  renameRequested?: boolean;
+  onRenameHandled?: () => void;
 }) {
   const { session } = props.runtime.useCollaborationRoom(props.spaceId, props.noteId);
   const [title, setTitle] = useState(props.initialTitle);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { renameRequested, onRenameHandled } = props;
+  useEffect(() => {
+    if (!renameRequested || !session) return;
+    const focus = () => {
+      if (!session.provider.synced) return;
+      if (session.role !== "viewer") {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+      onRenameHandled?.();
+    };
+    focus();
+    session.provider.on("sync", focus);
+    return () => session.provider.off("sync", focus);
+  }, [renameRequested, onRenameHandled, session]);
   useEffect(() => {
     if (!session) return;
     let initialized = false;
@@ -358,6 +377,8 @@ export interface NoteContentDraft {
   bodyMarkdown?: string;
 }
 export interface NoteReadingPaneProps {
+  renameRequested?: boolean;
+  onRenameHandled?: () => void;
   note?: UnifiedNote;
   hasNotes?: boolean;
   accountId?: string;

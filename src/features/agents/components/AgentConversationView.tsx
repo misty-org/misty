@@ -218,8 +218,7 @@ function AgentActionStatus(props: {
   return (
     <div
       className={cn(
-        "mt-4 overflow-hidden rounded-xl border bg-charcoal-card/70",
-        proposal.state === "failed" ? "border-notification-red/30" : "border-charcoal-border",
+        "mt-4 overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card/70",
       )}
     >
       <div className="flex items-start gap-3 px-3.5 py-3">
@@ -348,14 +347,14 @@ function actionStatus(state: GlobalAiActionProposal["state"]) {
       return {
         label: "Completed",
         icon: CheckCircle2,
-        tone: "bg-green-500/10 text-green-400",
+        tone: "bg-control-active text-cream",
         spin: false,
       };
     case "failed":
       return {
         label: "Needs attention",
         icon: AlertCircle,
-        tone: "bg-notification-red/10 text-notification-red",
+        tone: "bg-control-active text-cream",
         spin: false,
       };
     case "rejected":
@@ -364,18 +363,18 @@ function actionStatus(state: GlobalAiActionProposal["state"]) {
       return {
         label: "Approval needed",
         icon: AlertCircle,
-        tone: "bg-amber-400/10 text-amber-300",
+        tone: "bg-control-active text-cream",
         spin: false,
       };
     case "proposed":
       return {
         label: "Ready to review",
         icon: CheckCircle2,
-        tone: "bg-amber-400/10 text-amber-300",
+        tone: "bg-control-active text-cream",
         spin: false,
       };
     default:
-      return { label: "Working", icon: Loader2, tone: "bg-blue-400/10 text-blue-300", spin: true };
+      return { label: "Working", icon: Loader2, tone: "bg-control-active text-cream", spin: true };
   }
 }
 

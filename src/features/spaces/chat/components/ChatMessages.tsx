@@ -5,6 +5,7 @@ import type { SpaceActionSuggestionBatch } from "@/api/spaces/dto/interfaces/act
 export type SpaceChatStarter = "mention" | "files" | "library";
 
 export interface SpaceChatMessagesProps {
+  onRetry?: (message: SpaceMessage) => void;
   error: string;
   loading: boolean;
   messages: SpaceMessage[];
@@ -84,7 +85,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
               className="mb-3 flex items-start gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"
               role="alert"
             >
-              <CircleAlert className="mt-0.5 size-4 shrink-0 text-notification-red" />
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-cream-muted" />
               <div className="min-w-0 flex-1">
                 <p className="m-0 text-sm font-medium text-cream-bright">
                   Messages couldn’t be loaded

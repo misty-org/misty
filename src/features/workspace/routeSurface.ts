@@ -16,19 +16,15 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   )
     return null;
   const url = new URL(pathname, "https://misty.local");
-  if (
-    path === "/scheduled" ||
-    ((path === "/agents" || path === "/apps/agents") &&
-      url.searchParams.get("view") === "scheduled")
-  ) {
-    url.searchParams.delete("view");
+  if (path === "/scheduled") {
+    url.searchParams.set("view", "scheduled");
     return {
       ...request(
-        "scheduled",
-        "tool:scheduled",
-        "Scheduled",
-        `/scheduled${url.search}${url.hash}`,
-        "scheduled",
+        "agents",
+        "tool:agents",
+        "Agents",
+        `/agents${url.search}${url.hash}`,
+        "agents",
         "single",
       ),
       scopeKey: "global",

@@ -29,10 +29,12 @@ export function SpaceDrawings(props: {
   workspaceTabId?: string;
 }) {
   const { user } = useAuth();
+  const readOnly = useSpacesStore((state) => state.referenceOnly);
   const members = useSpacesStore((state) => state.membersBySpace[props.spaceId] ?? emptyMembers);
   const runtime = useMemo<DrawingsViewRuntime>(
     () => ({
       user,
+      readOnly,
       members,
       useList: useSpaceDrawings,
       useRoom: (space, id, _user, options) => useDrawingRoom(space, id, user!, options),
@@ -48,7 +50,7 @@ export function SpaceDrawings(props: {
       NewDialog: (props) => <NewDrawingDialog {...props} reportError={reportSystemError} />,
       Canvas,
     }),
-    [user, members],
+    [user, members, readOnly],
   );
   return <SpaceDrawingsView {...props} runtime={runtime} />;
 }
