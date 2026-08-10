@@ -238,9 +238,7 @@ export async function applyRealtimeEvent(
         },
       }));
     else if (!conversationId)
-      await coalescedReload(`messages:${event.space_id}`, () =>
-        get().loadMessages(event.space_id),
-      );
+      await coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id));
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)

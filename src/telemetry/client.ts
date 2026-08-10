@@ -113,7 +113,8 @@ export class PostHogTelemetryClient implements TelemetryClient {
     if (sentAt !== undefined && now - sentAt < 10 * 60_000) return;
     this.recentErrors.set(key, now);
     if (this.recentErrors.size > 200) {
-      for (const [entry, at] of this.recentErrors) if (now - at >= 10 * 60_000) this.recentErrors.delete(entry);
+      for (const [entry, at] of this.recentErrors)
+        if (now - at >= 10 * 60_000) this.recentErrors.delete(entry);
       if (this.recentErrors.size > 200) this.recentErrors.clear();
     }
     this.instance.captureException(redacted, {

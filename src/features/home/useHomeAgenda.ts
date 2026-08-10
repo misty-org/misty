@@ -91,5 +91,8 @@ async function loadHomeAgenda(
     .filter((entry) => entry.status !== "completed")
     .sort((left, right) => Date.parse(left.starts_at) - Date.parse(right.starts_at))
     .slice(0, limit);
-  return { entries, state: results.some((result) => result.status === "rejected") ? "error" : "ready" };
+  return {
+    entries,
+    state: results.some((result) => result.status === "rejected") ? "error" : "ready",
+  };
 }
