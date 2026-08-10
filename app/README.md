@@ -44,20 +44,19 @@ the server's HttpOnly session cookie with credentialed API requests; it does
 not persist the desktop bearer token. The API must explicitly allow the web
 origin, such as `https://app.mistysys.com`.
 
-## Cloudflare Pages
+## Cloudflare Workers
 
-The Pages project is declared in `wrangler.jsonc` as `misty-web-app`; it serves
-the web build's `dist/` output. Connect this repository to Cloudflare Pages
-with Git integration, then configure:
+The Worker is declared in `wrangler.jsonc` as `misty-web-app`; it serves the web
+build's `dist/` output as static assets and falls back to `index.html` for SPA
+routes. Connect this repository to Cloudflare Workers Builds, then configure:
 
 - Production branch: your default branch.
 - Root directory: `app`.
 - Build command: `npm run build:web`.
-- Build output directory: `dist`.
+- Deploy command: `npx wrangler deploy`.
 - Build environment variable: `MISTY_PUBLIC_API_URL=https://mistysys.com/api`.
 - Custom domain: `app.mistysys.com`.
 
-Cloudflare Pages produces preview deployments for pull requests automatically.
 The production API must allow `https://app.mistysys.com` in
 `MISTY_ALLOWED_ORIGINS`; see the Misty Server production environment template.
 

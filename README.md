@@ -19,13 +19,22 @@ npm run dev:app
 npm run build:app
 npm run dev:website
 npm run build:website
+npm run check:web
 ```
 
 Run server commands from [`server`](./server) and CLI commands from [`cli`](./cli); both remain self-contained modules.
 
-## Cloudflare Pages
+## Cloudflare Workers
 
-Create one Pages project for each browser-facing application:
+Create one Worker Builds project for each browser-facing application. Both
+projects use Wrangler's static-assets deployment with SPA navigation fallback.
 
-- `misty-web-app`: root directory `app`, build command `npm run build:web`, output directory `dist`.
-- `misty-website`: root directory `website`, build command `npm run build`, output directory `dist`.
+- `misty-web-app`: root directory `app`, build command `npm run build:web`,
+  deploy command `npx wrangler deploy`, and build variable
+  `MISTY_PUBLIC_API_URL=https://mistysys.com/api`.
+- `misty-website`: root directory `website`, build command `npm run build`, and
+  deploy command `npx wrangler deploy`.
+
+The asset directories and Worker names are declared in each project's
+`wrangler.jsonc`. Attach `app.mistysys.com` to `misty-web-app` and
+`mistysys.com` to `misty-website` from each Worker's Domains & Routes settings.
