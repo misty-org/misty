@@ -36,6 +36,11 @@
   --radius: 0.625rem;
   --showcase-surface: oklch(0.141 0.005 285.823);
   --showcase-foreground: oklch(0.985 0 0);
+  --marketing-surface: oklch(1 0 0);
+  --marketing-border: oklch(0.92 0.004 286.32);
+  --marketing-border-strong: oklch(0.83 0.007 286.26);
+  --marketing-foreground: oklch(0.141 0.005 285.823);
+  --marketing-muted: oklch(0.45 0.016 285.938);
   --misty-cloud-accent: oklch(0.74 0.13 236);
   --misty-folder-accent: oklch(0.82 0.14 84);
   --sidebar: oklch(0.985 0 0);
@@ -84,6 +89,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+  --marketing-surface: oklch(0.16 0.006 285.823);
+  --marketing-border: oklch(1 0 0 / 10%);
+  --marketing-border-strong: oklch(1 0 0 / 18%);
+  --marketing-foreground: oklch(0.985 0 0);
+  --marketing-muted: oklch(0.705 0.015 286.067);
 }
 
 /* Account settings intentionally mirrors the desktop app's denser 16px-root
@@ -167,7 +177,6 @@
   --color-text-secondary: var(--muted-foreground);
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
-  --color-primary-glow: color-mix(in oklch, var(--primary) 20%, transparent);
   --color-danger: var(--destructive);
   --color-danger-hover: color-mix(in oklch, var(--destructive) 85%, var(--foreground));
   --color-success-hover: color-mix(in oklch, var(--success) 85%, var(--foreground));
@@ -248,82 +257,6 @@ body {
   color: var(--foreground);
 }
 
-/* Radial glow */
-.radial-glow {
-  background: radial-gradient(ellipse 300px 200px at 50% 0%, color-mix(in oklch, var(--foreground) 8%, transparent), transparent);
-}
-@media (min-width: 640px) {
-  .radial-glow {
-    background: radial-gradient(ellipse 600px 400px at 50% 0%, color-mix(in oklch, var(--foreground) 8%, transparent), transparent);
-  }
-}
-
-/* Static atmospheric fields for product-led marketing surfaces.
-   Monochrome (white glows on the dark surface) to match Misty's
-   black / gray / white theme. */
-.misty-hero-field {
-  background:
-    radial-gradient(
-      ellipse 55% 48% at 15% 0%,
-      color-mix(in oklch, var(--showcase-foreground) 14%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 48% 40% at 88% 6%,
-      color-mix(in oklch, var(--showcase-foreground) 9%, transparent),
-      transparent 72%
-    ),
-    radial-gradient(
-      ellipse 64% 50% at 50% 30%,
-      color-mix(in oklch, var(--showcase-foreground) 8%, transparent),
-      transparent 76%
-    );
-}
-
-.misty-cta-field {
-  background:
-    radial-gradient(
-      ellipse 46% 82% at 15% 100%,
-      color-mix(in oklch, var(--showcase-foreground) 12%, transparent),
-      transparent 72%
-    ),
-    radial-gradient(
-      ellipse 40% 72% at 88% 100%,
-      color-mix(in oklch, var(--showcase-foreground) 8%, transparent),
-      transparent 74%
-    );
-}
-
-/* Repeating page-wide atmospheric gradient. Tiles vertically down the whole
-   page so every section shares the same misty backdrop. Monochrome, so it
-   reads as soft light rather than color. */
-.misty-page-field {
-  background-color: var(--background);
-  background-image:
-    radial-gradient(
-      ellipse 42% 26% at 12% 8%,
-      color-mix(in oklch, var(--foreground) 7%, transparent),
-      transparent 68%
-    ),
-    radial-gradient(
-      ellipse 36% 24% at 88% 34%,
-      color-mix(in oklch, var(--foreground) 5%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 48% 30% at 46% 72%,
-      color-mix(in oklch, var(--foreground) 6%, transparent),
-      transparent 72%
-    ),
-    radial-gradient(
-      ellipse 30% 22% at 72% 94%,
-      color-mix(in oklch, var(--foreground) 4%, transparent),
-      transparent 70%
-    );
-  background-size: 100% 1500px;
-  background-repeat: repeat;
-}
-
 /* Disable Inter contextual alternates in inputs (fixes @ jiggle) */
 input, textarea {
   font-variant-ligatures: no-contextual;
@@ -360,35 +293,6 @@ button:disabled {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
-}
-
-/*
- * Hero "Space" link. The sweep sits on top of a static underline, so when the
- * reduced-motion rule below kills the animation the bar simply rests at
- * translateX(0) — a solid underline rather than a missing one.
- */
-@keyframes underline-sweep {
-  0% {
-    transform: translateX(-100%);
-  }
-  55% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* Typing caret in the hero headline. Not rendered at all under reduced motion. */
-@keyframes caret-blink {
-  0%,
-  49% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
 }
 
 /*
@@ -444,9 +348,53 @@ button:disabled {
   }
 }
 
+/* ── Hero entrance animations ────────────────────────────────────────── */
+
+.hero-animate {
+  opacity: 0;
+  transform: translateY(1rem);
+  animation: hero-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hero-animate-delay-1 { animation-delay: 0.05s; }
+.hero-animate-delay-2 { animation-delay: 0.15s; }
+.hero-animate-delay-3 { animation-delay: 0.25s; }
+.hero-animate-delay-4 { animation-delay: 0.35s; }
+.hero-animate-delay-5 { animation-delay: 0.5s; }
+
+@keyframes hero-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Scroll-triggered reveal (used by sections below the fold) ─────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(1rem);
+    transition:
+      opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .hero-animate,
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

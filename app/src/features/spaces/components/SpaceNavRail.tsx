@@ -3,7 +3,7 @@ import {
   unreadActivityCountForSpace,
   useActivityStore,
 } from "@/features/activity";
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { cn } from "@/shared/ui";
 import { LockKeyhole, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";

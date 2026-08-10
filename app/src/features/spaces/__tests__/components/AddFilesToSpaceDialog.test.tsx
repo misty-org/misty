@@ -29,13 +29,13 @@ vi.mock("react-router-dom", async () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/features/file-explorer", () => ({
+vi.mock("@/features/files/explorer", () => ({
   useExplorerStore: {
     getState: () => ({ pushNotification: mocks.pushNotification }),
   },
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spacesApi: { uploadLibraryPath: mocks.uploadLibraryPath },
 }));
 
@@ -95,7 +95,7 @@ vi.mock("@/shared/ui", () => {
   };
 });
 
-import { AddFilesToSpaceDialog } from "@/features/space-library";
+import { AddFilesToSpaceDialog } from "@/features/spaces/library";
 
 describe("AddFilesToSpaceDialog", () => {
   let container: HTMLDivElement;

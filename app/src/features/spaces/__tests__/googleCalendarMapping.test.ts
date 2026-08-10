@@ -11,12 +11,12 @@ import {
   taskCalendarKind,
   taskSyncState,
   unpublishedFields,
-} from "@/features/space-connections";
+} from "@/features/spaces/integrations";
 import type {
   GoogleCalendarEvent,
   TaskCalendarLink,
   TaskSchedule,
-} from "@/services/spaces/dto/interfaces/connections/calendarTasks";
+} from "@/api/spaces/dto/interfaces/connections/calendarTasks";
 
 function schedule(overrides: Partial<TaskSchedule> = {}): TaskSchedule {
   return {

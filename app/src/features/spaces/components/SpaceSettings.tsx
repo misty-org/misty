@@ -3,9 +3,9 @@ import {
   DiscordConnectionPanel,
   GoogleCalendarConnectionPanel,
   NotionConnectionPanel,
-} from "@/features/space-connections";
-import { SpaceMembers } from "@/features/space-members";
-import { spacesApi } from "@/services/spaces/api";
+} from "@/features/spaces/integrations";
+import { SpaceMembers } from "@/features/spaces/members";
+import { spacesApi } from "@/api/spaces/api";
 import {
   AlertDialog,
   AlertDialogAction,

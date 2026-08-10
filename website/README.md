@@ -71,3 +71,10 @@ export default defineConfig([
   },
 ])
 ```
+# Cloudflare Pages
+
+Deploy the public website as the `misty-website` Cloudflare Pages project with:
+
+- Root directory: `website`
+- Build command: `npm run build`
+- Build output directory: `dist`

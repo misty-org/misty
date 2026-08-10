@@ -1,5 +1,6 @@
 **/.env*
 !**/.env.example
+!**/.env.web.example
 **/.venv
 scripts/.signing.env
 .windows-test/

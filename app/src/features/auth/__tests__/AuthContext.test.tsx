@@ -116,10 +116,10 @@ vi.mock("@/features/app-shell", () => {
     ),
   };
 });
-vi.mock("@/features/file-explorer", () => ({
+vi.mock("@/features/files/explorer", () => ({
   useExplorerStore: { setState: mocks.explorerSetState },
 }));
-vi.mock("@/features/file-search", () => ({
+vi.mock("@/features/files/search", () => ({
   resetSearchAccountState: mocks.resetSearchAccountState,
 }));
 vi.mock("@/features/spaces", () => ({
@@ -145,9 +145,9 @@ vi.mock("@/features/agents", () => ({
 vi.mock("@/features/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
 }));
-vi.mock("@/services/telemetry/lifecycle", () => ({ setAnalyticsAuthenticationState: vi.fn() }));
-vi.mock("@/services/telemetry/client", () => ({ analytics: {} }));
-vi.mock("@/services/telemetry/identity", () => ({
+vi.mock("@/telemetry/lifecycle", () => ({ setAnalyticsAuthenticationState: vi.fn() }));
+vi.mock("@/telemetry/client", () => ({ analytics: {} }));
+vi.mock("@/telemetry/identity", () => ({
   TelemetryIdentityManager: class {
     sync() {}
   },

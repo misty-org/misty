@@ -1,5 +1,5 @@
-import type { AgentCapabilityGrant } from "@/services/spaces/dto/interfaces/agentArchitectureTypes";
-import type { SpaceLibraryItem } from "@/services/spaces/dto/interfaces/types";
+import type { AgentCapabilityGrant } from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 
 export type ReasoningEffort = "" | "low" | "medium" | "high";
 

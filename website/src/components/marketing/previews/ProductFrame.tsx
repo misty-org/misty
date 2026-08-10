@@ -17,7 +17,7 @@ export function ProductFrame({
   return (
     <Card
       className={cn(
-        "gap-0 overflow-hidden rounded-xl py-0 shadow-sm",
+        "gap-0 overflow-hidden rounded-none py-0 shadow-none",
         className,
       )}
     >

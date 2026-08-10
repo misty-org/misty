@@ -16,3 +16,4 @@
 # Generated native projects
 **/src-tauri/gen/**/build/
 **/src-tauri/gen/**/.gradle/
+**/src-tauri/vendor/**/.gradle/

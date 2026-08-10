@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 /**
  * Frontend architecture boundaries.
  *
- *   app  →  pages  →  features  →  services  →  shared
+ *   app  →  features  →  api / native / telemetry / shared
  *
  * A layer may import from layers to its right, never to its left. Features are
  * mutually opaque: they talk to each other through `index.ts` only.
@@ -24,12 +24,12 @@ const restrict = (groups) => [
 
 const MODELS_BAN = [
   ["@/models", "@/models/*"],
-  "src/models/ is being removed. Colocate types with their owner: component props in the component, feature types in features/<f>/types.ts, API DTOs in services/.",
+  "src/models/ is being removed. Colocate types with their owner: component props in the component, feature types in features/<f>/types.ts, API contracts in api/ or native/.",
 ];
 
 const FEATURE_INTERNALS = [
-  ["@/features/*/*"],
-  "Import a feature through its index.ts (@/features/<name>), not its internals.",
+  ["@/features/*/*/*"],
+  "Import a feature through its public entrypoint, not its internals.",
 ];
 
 export default tseslint.config(
@@ -103,18 +103,39 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/app/*", "@/pages/*", "@/features/*", "@/services/*"],
+          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/platform/*", "@/telemetry/*"],
           "shared/ must not depend on any layer above it.",
         ],
       ]),
     },
   },
   {
-    files: ["src/services/**/*.{ts,tsx}"],
+    files: ["src/api/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/app/*", "@/pages/*", "@/features/*"], "services/ may only import from shared/."],
+        [["@/app/*", "@/features/*", "@/telemetry/*"], "api/ must not depend on app or features."],
+      ]),
+    },
+  },
+  {
+    files: ["src/native/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrict([
+        MODELS_BAN,
+        [
+          ["@/api/*", "@/app/*", "@/features/*", "@/telemetry/*"],
+          "native/ must not depend on application layers.",
+        ],
+      ]),
+    },
+  },
+  {
+    files: ["src/telemetry/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrict([
+        MODELS_BAN,
+        [["@/app/*", "@/features/*"], "telemetry/ must not depend on app or features."],
       ]),
     },
   },
@@ -123,17 +144,7 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/app/*", "@/pages/*"], "features/ must not import from app/ or pages/."],
-        FEATURE_INTERNALS,
-      ]),
-    },
-  },
-  {
-    files: ["src/pages/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrict([
-        MODELS_BAN,
-        [["@/app/*"], "pages/ must not import from app/."],
+        [["@/app/*"], "features/ must not import from app/."],
         FEATURE_INTERNALS,
       ]),
     },
@@ -145,16 +156,17 @@ export default tseslint.config(
     },
   },
 
-  // Only services/ may reach the network.
+  // Network access belongs to the API and telemetry boundaries.
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/services/**", "src/tests/**", "src/**/*.test.{ts,tsx}"],
+    ignores: ["src/api/**", "src/telemetry/**", "src/tests/**", "src/**/*.test.{ts,tsx}"],
     rules: {
       "no-restricted-globals": [
         REFACTOR,
         {
           name: "fetch",
-          message: "Network access belongs in src/services/. Stores hold state, not HTTP.",
+          message:
+            "Network access belongs in src/api/ or src/telemetry/. Stores hold state, not HTTP.",
         },
       ],
     },

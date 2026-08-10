@@ -1,4 +1,4 @@
-import type { ProviderRemote, ProviderWorkflow } from "@/services/misty/model/misty-api";
+import type { ProviderRemote, ProviderWorkflow } from "@/native/contracts";
 import { Button } from "@/shared/ui";
 import { X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";

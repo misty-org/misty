@@ -6,7 +6,7 @@ import {
 } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { SpaceAvatar } from "@/features/spaces";
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/shared/ui";
 import {
   AtSign,

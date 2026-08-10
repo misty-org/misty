@@ -2,13 +2,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spacesApi: {
     libraryItems: vi.fn().mockResolvedValue({ items: [] }),
   },
 }));
 
-import { MistyLibraryPicker } from "@/features/space-library";
+import { MistyLibraryPicker } from "@/features/spaces/library";
 
 describe("MistyLibraryPicker", () => {
   let container: HTMLDivElement;

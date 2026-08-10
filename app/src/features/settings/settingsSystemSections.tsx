@@ -1,4 +1,4 @@
-import { useOperationQueueStore } from "@/features/file-explorer";
+import { useOperationQueueStore } from "@/features/files/explorer";
 import { Button, Input } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import {

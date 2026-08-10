@@ -3,7 +3,7 @@ import type {
   OpenWithAssociation,
   SettingsSnapshot,
   ShortcutsSnapshot,
-} from "@/services/misty/model/misty-api";
+} from "@/native/contracts";
 
 import type { SettingsScaleToken, SettingsSection, SettingValue } from "@/features/settings";
 

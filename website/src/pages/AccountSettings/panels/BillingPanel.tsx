@@ -16,6 +16,17 @@ import {
   Section,
 } from "../components/SettingsRows";
 
+/**
+ * The server returns these period dates as nullable timestamps — a trial with no
+ * recorded end, a subscription mid-transition. `new Date(null)` yields an
+ * Invalid Date and renders as literal "Invalid Date", so guard first.
+ */
+function formatDateOrDash(value: string | null | undefined): string {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleDateString();
+}
+
 function PlanRows({
   me,
   usage,
@@ -33,9 +44,7 @@ function PlanRows({
       {trial ? (
         <>
           <Row label="Trial status">{formatStatus(trial.status)}</Row>
-          <Row label="Trial ends">
-            {new Date(trial.ends_at).toLocaleDateString()}
-          </Row>
+          <Row label="Trial ends">{formatDateOrDash(trial.ends_at)}</Row>
         </>
       ) : subscription ? (
         <>
@@ -52,7 +61,7 @@ function PlanRows({
               subscription.cancel_at_period_end ? "Access until" : "Renews"
             }
           >
-            {new Date(subscription.current_period_end).toLocaleDateString()}
+            {formatDateOrDash(subscription.current_period_end)}
           </Row>
         </>
       ) : (

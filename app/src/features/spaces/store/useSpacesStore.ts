@@ -1,7 +1,7 @@
 import { notifyAccountScopeReset } from "@/features/auth";
 import * as referenceMode from "./reference-mode";
-import * as accessErrors from "@/services/spaces/access-errors";
-import { SpaceRequestError, spacesApi } from "@/services/spaces/api";
+import * as accessErrors from "@/api/spaces/access-errors";
+import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
@@ -10,7 +10,7 @@ import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./createSpacesRealtimeActions";
-export { buildMessageSpans } from "@/features/space-chat";
+export { buildMessageSpans } from "@/features/spaces/chat";
 
 const snapshotAutoMinIntervalMs = 1_500;
 const snapshotRateLimitCooldownMs = 10_000;

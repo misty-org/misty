@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export const publicPageContainer =
-  "mx-auto w-full max-w-[1280px] px-6 sm:px-10 lg:px-16";
+  "mx-auto w-full max-w-[1280px] px-8 sm:px-16 lg:px-28";
 
 export function PublicPage({
   children,

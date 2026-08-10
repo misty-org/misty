@@ -11,7 +11,7 @@ const { agenda, calendarSources, integrations, syncCalendarTasks } = vi.hoisted(
 }));
 
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account-1" } }) }));
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spacesApi: {
     agenda,
     calendarSources,
@@ -23,7 +23,7 @@ vi.mock("@/services/spaces/api", () => ({
   },
 }));
 
-import { SpaceAgenda } from "@/features/space-planner/SpaceAgenda";
+import { SpaceAgenda } from "@/features/spaces/planner/SpaceAgenda";
 
 describe("SpaceAgenda", () => {
   let container: HTMLDivElement;

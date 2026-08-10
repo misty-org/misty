@@ -1,4 +1,4 @@
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { describe, expect, it } from "vitest";
 import { resolveSpacesLandingRoute } from "../spacesShell/SpacesIndexRedirect";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";

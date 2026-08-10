@@ -1,4 +1,4 @@
-import { estimateSmartLibraryTokens } from "@/features/space-library/smartLibrary";
+import { estimateSmartLibraryTokens } from "@/features/spaces/library/smartLibrary";
 import { describe, expect, it } from "vitest";
 
 describe("estimateSmartLibraryTokens", () => {

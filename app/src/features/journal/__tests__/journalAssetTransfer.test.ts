@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spaceRequestMock = vi.fn();
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: (...args: unknown[]) => spaceRequestMock(...args),
 }));
 

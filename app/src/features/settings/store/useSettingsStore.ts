@@ -7,14 +7,14 @@ import {
   settingsSnapshot,
   shortcutsSave,
   shortcutsSnapshot,
-} from "@/services/backend";
+} from "@/native";
 import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
   SettingsSnapshot,
   ShortcutsSnapshot,
-} from "@/services/misty/model/misty-api";
-import { telemetryPreferencesChanged } from "@/services/telemetry/lifecycle";
+} from "@/native/contracts";
+import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { configureExternalLinkPreference } from "@/shared/platform/openExternalLink";
 import { create } from "zustand";

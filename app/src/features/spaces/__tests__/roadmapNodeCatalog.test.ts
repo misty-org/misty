@@ -2,7 +2,7 @@ import {
   allowedRoadmapEdgeTypes,
   builtInRoadmapPalette,
   roadmapPalette,
-} from "@/features/space-roadmap/spaceRoadmap/roadmapNodeCatalog";
+} from "@/features/spaces/roadmap/spaceRoadmap/roadmapNodeCatalog";
 import { describe, expect, it } from "vitest";
 
 describe("roadmap node catalog", () => {

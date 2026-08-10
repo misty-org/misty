@@ -108,6 +108,19 @@ async function prepareAccount(
       return;
     }
 
+    if (url.pathname.endsWith("/me/settings")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          email_updates_enabled: true,
+          analytics_enabled: false,
+          error_reporting_enabled: true,
+        }),
+      });
+      return;
+    }
+
     if (url.pathname.endsWith("/me")) {
       await route.fulfill({
         status: 200,
@@ -424,18 +437,182 @@ test("storage over quota pauses uploads without threatening existing data", asyn
   ).toBeVisible();
 });
 
-test("an authenticated legacy settings URL opens the dialog over home", async ({
+test("privacy exposes the server-backed sharing preferences", async ({
   page,
 }) => {
   await prepareAccount(page, "dark");
+  await page.goto("/settings/privacy");
 
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await expect(dialog.getByLabel("Product update emails")).toBeChecked();
+  await expect(dialog.getByLabel("Anonymous usage analytics")).not.toBeChecked();
+  await expect(dialog.getByLabel("Anonymous crash reports")).toBeChecked();
+});
+
+test("saving a preference sends all three booleans", async ({ page }) => {
+  let body: Record<string, boolean> | null = null;
+  await prepareAccount(page, "dark", baseMe, (route) => {
+    const request = route.request();
+    if (
+      request.method() === "PUT" &&
+      new URL(request.url()).pathname.endsWith("/me/settings")
+    ) {
+      body = request.postDataJSON();
+    }
+  });
+
+  await page.goto("/settings/privacy");
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await dialog.getByLabel("Anonymous usage analytics").click();
+
+  // The handler decodes into plain booleans, so an omitted key is written as
+  // false. A partial patch here would silently disable the other two.
+  await expect.poll(() => body).not.toBeNull();
+  expect(body).toEqual({
+    email_updates_enabled: true,
+    analytics_enabled: true,
+    error_reporting_enabled: true,
+  });
+});
+
+test("privacy links to the real legal pages", async ({ page }) => {
+  await prepareAccount(page, "dark");
+  await page.goto("/settings/privacy");
+
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await expect(dialog.getByRole("link", { name: "Read" })).toHaveCount(3);
+  await expect(
+    dialog.locator('a[href="/privacy"], a[href="/terms"], a[href="/license"]'),
+  ).toHaveCount(3);
+  await expect(dialog.getByText("Coming soon")).toHaveCount(0);
+});
+
+test("the account tab owns license, export, and deletion", async ({ page }) => {
+  await prepareAccount(page, "dark");
+  await page.goto("/settings/account");
+
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await expect(dialog.getByLabel("Licensed device")).toHaveValue("Studio Mac");
+  await expect(dialog.getByLabel("Profile picture")).toBeAttached();
+  await expect(
+    dialog.getByRole("button", { name: "Download my data" }),
+  ).toBeDisabled();
+
+  // Deletion stays disabled until both the password and the typed confirmation
+  // are present.
+  const deleteButton = dialog.getByRole("button", {
+    name: "Delete my account",
+  });
+  await expect(deleteButton).toBeDisabled();
+  await dialog.getByLabel("Password", { exact: true }).last().fill("hunter2");
+  await expect(deleteButton).toBeDisabled();
+  await dialog.getByLabel("Type DELETE to confirm").fill("DELETE");
+  await expect(deleteButton).toBeEnabled();
+});
+
+test("deletion is blocked while the account still owns Spaces", async ({
+  page,
+}) => {
+  await prepareAccount(page, "dark");
+  await page.route("**/api/me/deletion", async (route) => {
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({
+        spaces: [{ id: "space-1", name: "Design Team" }],
+      }),
+    });
+  });
+
+  await page.goto("/settings/account");
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await dialog.getByLabel("Password", { exact: true }).last().fill("hunter2");
+  await dialog.getByLabel("Type DELETE to confirm").fill("DELETE");
+  await dialog.getByRole("button", { name: "Delete my account" }).click();
+  await page.getByRole("button", { name: "Delete account" }).click();
+
+  // The blocker list is the only way the visitor can act on the refusal.
+  await expect(dialog.getByText("Design Team")).toBeVisible();
+});
+
+test("a settings URL is addressable and keeps its path", async ({ page }) => {
+  await prepareAccount(page, "dark");
+
+  // The desktop app hands off to this URL, so it has to survive as a real
+  // destination rather than redirecting to home. Bare /settings is canonical
+  // for the default tab and is left alone rather than bounced.
   await page.goto("/settings");
 
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/settings$/);
   await expect(
     page.getByRole("dialog", { name: "Account settings" }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 1, name: "Account" }),
   ).toBeVisible();
+});
+
+test("a settings URL can target a tab directly", async ({ page }) => {
+  await prepareAccount(page, "dark");
+
+  await page.goto("/settings/billing");
+
+  await expect(page).toHaveURL(/\/settings\/billing$/);
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await expect(dialog).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Billing" }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Billing", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
+test("switching tabs on a settings URL updates the path", async ({ page }) => {
+  await prepareAccount(page, "dark");
+
+  await page.goto("/settings/account");
+  const dialog = page.getByRole("dialog", { name: "Account settings" });
+  await dialog.getByRole("button", { name: "Usage", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/settings\/usage$/);
+});
+
+test("an unknown settings tab falls back to the default tab", async ({
+  page,
+}) => {
+  await prepareAccount(page, "dark");
+
+  await page.goto("/settings/not-a-tab");
+
+  await expect(page).toHaveURL(/\/settings\/account$/);
+  await expect(
+    page.getByRole("dialog", { name: "Account settings" }),
+  ).toBeVisible();
+});
+
+test("a signed-out settings deep link returns after sign-in", async ({
+  page,
+}) => {
+  // No prepareAccount: /me 401s, which is the state a fresh browser is in when
+  // the desktop app hands off without a session.
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/me")) {
+      await route.fulfill({ status: 401, body: "unauthorized" });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{}",
+    });
+  });
+
+  await page.goto("/settings/billing");
+
+  await expect(page).toHaveURL(/\/signin$/);
+  // The destination is carried in router state so sign-in can return to it.
+  const carried = await page.evaluate(() => window.history.state?.usr?.from);
+  expect(carried).toBe("/settings/billing");
 });

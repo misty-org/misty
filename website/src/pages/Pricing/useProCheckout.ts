@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@/AuthContext";
 import type { MeResponse } from "@/pages/AccountSettings/api";
 import { useUserStore } from "@/store/userStore";
-import { createSubscriptionCheckout } from "./api";
+import { createSubscriptionCheckout } from "../AccountSettings/api";
 import type { PaidTier, PricingInterval } from "./data";
 
 function effectivePaidTier(me: MeResponse | null): PaidTier | null {
@@ -80,7 +80,7 @@ export function usePaidCheckout(
       setPendingTier(tier);
       setError("");
       try {
-        const url = await createSubscriptionCheckout(tier, selectedInterval);
+        const { url } = await createSubscriptionCheckout(tier, selectedInterval);
         window.location.assign(url);
       } catch (error) {
         if (shouldRefreshAfterCheckoutError(error)) {

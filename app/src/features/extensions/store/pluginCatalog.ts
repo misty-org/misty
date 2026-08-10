@@ -1,4 +1,4 @@
-import { httpRequest } from "@/services/http";
+import { httpRequest } from "@/api/http";
 import { hasTauriInternals, safeTauriAssetUrl } from "@/shared/platform/tauri";
 import type {
   LocalPluginRecord,

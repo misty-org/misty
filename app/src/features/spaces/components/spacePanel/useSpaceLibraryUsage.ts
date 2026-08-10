@@ -1,5 +1,5 @@
-import { spacesApi } from "@/services/spaces/api";
-import type { Space, SpaceStorageUsage } from "@/services/spaces/dto/interfaces/types";
+import { spacesApi } from "@/api/spaces/api";
+import type { Space, SpaceStorageUsage } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useMemo, useState } from "react";
 import { useSpacesStore } from "../../store/useSpacesStore";
 

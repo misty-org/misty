@@ -1,9 +1,9 @@
-import type { Space } from "@/services/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const apiMocks = vi.hoisted(() => ({ snapshot: vi.fn(), members: vi.fn() }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
   SpaceRequestError: class SpaceRequestError extends Error {
     constructor(
@@ -18,7 +18,7 @@ vi.mock("@/services/spaces/api", () => ({
   spacesApi: { snapshot: apiMocks.snapshot, members: apiMocks.members },
 }));
 
-import { SpaceRequestError } from "@/services/spaces/api";
+import { SpaceRequestError } from "@/api/spaces/api";
 import { resetSpacesAccountState, useSpacesStore } from "../../store/useSpacesStore";
 
 describe("Spaces snapshot background refresh", () => {

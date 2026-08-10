@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const spaceRequestMock = vi.hoisted(() => vi.fn());
 const providerDestroyMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: spaceRequestMock,
 }));
 

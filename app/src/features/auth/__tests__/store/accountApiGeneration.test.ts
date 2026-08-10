@@ -6,10 +6,8 @@ const mocks = vi.hoisted(() => ({
   appSnapshot: vi.fn().mockResolvedValue({ environment: { serverUrl: "https://api.test" } }),
 }));
 
-vi.mock("@/services/backend", () => ({
+vi.mock("@/native", () => ({
   appSnapshot: mocks.appSnapshot,
-  normalizeApiBaseUrl: (value: string | null | undefined) => value || null,
-  withDefaultApiPath: (value: string | null | undefined) => `${value ?? ""}/api`,
 }));
 vi.mock("../../store/useAuthTokenStore", () => ({
   clearAccountAuthToken: vi.fn().mockResolvedValue(null),
@@ -21,7 +19,7 @@ vi.mock("@/shared/platform/buildTarget", () => ({
   isAndroidBuild: false,
   isNativeMobileBuild: false,
 }));
-vi.mock("@/services/telemetry/client", () => ({
+vi.mock("@/telemetry/client", () => ({
   analytics: { isAnalyticsEnabled: () => false },
 }));
 

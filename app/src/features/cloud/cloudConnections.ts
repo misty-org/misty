@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/services/spaces/api";
+import { spaceRequest } from "@/api/spaces/api";
 
 export type CloudProvider = "drive" | "dropbox" | "onedrive";
 

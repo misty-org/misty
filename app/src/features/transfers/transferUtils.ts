@@ -1,4 +1,4 @@
-import type { TransferRecord } from "@/services/misty/model/misty-api";
+import type { TransferRecord } from "@/native/contracts";
 
 export function transferProgress(row: TransferRecord): string {
   if (

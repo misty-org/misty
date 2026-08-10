@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { useAuth } from "@/AuthContext";
 import { useUserStore } from "@/store/userStore";
+import { isSettingsPathname } from "./settingsRoute";
 import {
   fetchBillingUsage,
   fetchMe,
@@ -25,6 +26,7 @@ export function useAccountSettings({
 }) {
   const { user, sessionReady, logout, setUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { me, loading, setMe, setLoading, patchMe } = useUserStore();
   const [loadError, setLoadError] = useState("");
   const [usage, setUsage] = useState<BillingUsageResponse | null>(null);
@@ -34,15 +36,22 @@ export function useAccountSettings({
   const [billingWorking, setBillingWorking] = useState(false);
   const [billingError, setBillingError] = useState("");
 
+  // A signed-out visitor who arrived on a settings URL — the desktop hand-off
+  // when the browser has no session — is sent to sign-in and brought back here
+  // afterwards, rather than dumped on the home page.
+  const returnTo = isSettingsPathname(location.pathname)
+    ? location.pathname
+    : undefined;
+
   useEffect(() => {
     if (!open || !sessionReady) return;
     if (user) return;
 
     void Promise.resolve().then(() => {
       onOpenChange(false);
-      navigate("/signin");
+      navigate("/signin", { state: returnTo ? { from: returnTo } : undefined });
     });
-  }, [open, user, sessionReady, navigate, onOpenChange]);
+  }, [open, user, sessionReady, navigate, onOpenChange, returnTo]);
 
   useEffect(() => {
     if (!open || !user || me) return;
@@ -60,8 +69,9 @@ export function useAccountSettings({
         const requestError = error as Error & { status?: number };
         if (requestError.status === 401) {
           onOpenChange(false);
-          logout();
-          navigate("/signin", { replace: true });
+          // logout() ends in a hard navigation, so the destination goes through
+          // it. A navigate() here would be overwritten.
+          logout("/signin");
           return;
         }
         setLoadError(
@@ -127,6 +137,19 @@ export function useAccountSettings({
     if (user) setUser({ ...user, name });
   }
 
+  /**
+   * Bumps the cached version so the avatar `<img>` URL changes and the browser
+   * refetches instead of serving the old picture from cache.
+   */
+  function bumpAvatarVersion() {
+    patchMe({ avatar_version: (me?.avatar_version ?? 0) + 1 });
+  }
+
+  /** A scheduled deletion invalidates the session, so end it here. */
+  function finishDeletion() {
+    logout("/");
+  }
+
   return {
     me,
     loading,
@@ -138,6 +161,8 @@ export function useAccountSettings({
     billingError,
     openBillingAction,
     renameAccount,
+    bumpAvatarVersion,
+    finishDeletion,
     retryUsage: () => setUsageRequest((request) => request + 1),
   };
 }

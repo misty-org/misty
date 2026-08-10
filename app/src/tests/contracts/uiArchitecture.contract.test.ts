@@ -6,28 +6,29 @@ import { repositoryPath, walk } from "./repositoryPolicy";
 const extensions = new Set([".ts", ".tsx"]);
 const uiImplementationRoots = ["src/shared/ui/"];
 const protectedRoots = [
-  "src/features/file-explorer/",
-  "src/features/file-preview/",
-  "src/features/file-search/",
+  "src/features/files/explorer/",
+  "src/features/files/preview/",
+  "src/features/files/search/",
   "src/features/providers/",
   "src/features/settings/",
-  "src/features/space-chat/",
-  "src/features/space-connections/",
-  "src/features/space-library/",
-  "src/features/space-members/",
-  "src/features/space-planner/",
-  "src/features/space-roadmap/",
+  "src/features/spaces/chat/",
+  "src/features/spaces/integrations/",
+  "src/features/spaces/library/",
+  "src/features/spaces/members/",
+  "src/features/spaces/planner/",
+  "src/features/spaces/roadmap/",
   "src/features/spaces/",
   "src/features/transfers/",
 ];
 
 const allowedSourceRoots = new Set([
+  "api",
   "app",
   "features",
-  "pages",
-  "services",
+  "native",
   "shared",
   "styles",
+  "telemetry",
   "tests",
 ]);
 

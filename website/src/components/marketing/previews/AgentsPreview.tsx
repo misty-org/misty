@@ -3,7 +3,7 @@ import { ProductFrame } from "./ProductFrame";
 export function AgentsPreview() {
   return (
     <ProductFrame title="Agents" meta="Collaborative AI">
-      <div className="flex min-h-80 flex-col justify-end gap-4 p-4 sm:p-6">
+      <div className="flex min-h-[22rem] flex-col justify-center gap-4 p-4 sm:p-6">
         <div className="ml-auto max-w-[82%] rounded-xl rounded-br-md bg-foreground px-4 py-3 text-sm leading-6 text-background">
           What still needs a decision before launch?
         </div>

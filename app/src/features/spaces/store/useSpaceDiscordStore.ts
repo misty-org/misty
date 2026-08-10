@@ -1,10 +1,10 @@
-import { spaceRequest } from "@/services/spaces/api";
+import { spaceRequest } from "@/api/spaces/api";
 import type {
   DiscordSyncResult,
   SpaceDiscordLink,
-} from "@/services/spaces/dto/interfaces/connections/discord";
-import type { SpaceMessage } from "@/services/spaces/dto/interfaces/types";
-import type { DiscordLinkDirection } from "@/services/spaces/dto/types/connections/discord";
+} from "@/api/spaces/dto/interfaces/connections/discord";
+import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { DiscordLinkDirection } from "@/api/spaces/dto/types/connections/discord";
 
 const part = encodeURIComponent;
 

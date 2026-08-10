@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SpaceLibraryHeader } from "@/features/space-library/components/SpaceLibraryChrome";
+import { SpaceLibraryHeader } from "@/features/spaces/library/components/SpaceLibraryChrome";
 
 describe("SpaceLibraryHeader", () => {
   let container: HTMLDivElement;

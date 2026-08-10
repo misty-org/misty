@@ -27,12 +27,22 @@ export const router = createBrowserRouter([
         index: true,
         element: <Home />,
         handle: {
-          title: "Misty — One shared Space for everyone",
+          title: "Misty — The operating system for human and agent work",
           description: marketingCopy.metadata.home,
         },
       },
       {
         path: "settings",
+        element: <Settings />,
+        handle: {
+          title: "Account settings — Misty",
+          description: "Manage your Misty account, usage, and billing.",
+        },
+      },
+      {
+        // Addressable tabs, so the desktop app can hand off straight to billing
+        // and a reload or share keeps you where you were.
+        path: "settings/:tab",
         element: <Settings />,
         handle: {
           title: "Account settings — Misty",

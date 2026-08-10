@@ -5,8 +5,8 @@ import {
   formatChatMessageTime,
   isInFlightRun,
   messageReplyPreviewText,
-} from "@/features/space-chat";
-import type { SpaceMessage } from "@/services/spaces/dto/interfaces/types";
+} from "@/features/spaces/chat";
+import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 
 function message(id: string, sender: string, createdAt: string): SpaceMessage {
   return {

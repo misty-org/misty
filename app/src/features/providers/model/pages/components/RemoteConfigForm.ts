@@ -1,8 +1,4 @@
-import type {
-  CloudConfigPaths,
-  ProviderWorkflow,
-  RemoteEditDraft,
-} from "@/services/misty/model/misty-api";
+import type { CloudConfigPaths, ProviderWorkflow, RemoteEditDraft } from "@/native/contracts";
 
 export interface RemoteConfigFormProps {
   draft: RemoteEditDraft;

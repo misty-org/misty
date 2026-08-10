@@ -1,4 +1,4 @@
-import type { SpaceInboxItem, SpaceInvitation } from "@/services/spaces/dto/interfaces/types";
+import type { SpaceInboxItem, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import type { ActivityItem, ActivityKind, ActivityTarget } from "./types";
 
 const failureWords = /\b(fail(?:ed|ure)?|error|blocked|needs attention)\b/i;

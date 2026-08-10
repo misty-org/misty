@@ -13,8 +13,8 @@ export function ProductScreenshot({
 }) {
   return (
     <figure className={className}>
-      <div className="overflow-hidden rounded-xl border border-border bg-showcase p-1.5 shadow-lg shadow-foreground/10 sm:p-2">
-        <div className="aspect-[16/10] overflow-hidden rounded-lg bg-showcase">
+      <div className="overflow-hidden rounded-none border border-border bg-showcase p-1.5 sm:p-2">
+        <div className="aspect-[16/10] overflow-hidden rounded-none bg-showcase">
           <img
             src={src}
             alt={alt}

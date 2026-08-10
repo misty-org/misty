@@ -1,4 +1,4 @@
-import type { ProviderWorkflow } from "@/services/misty/model/misty-api";
+import type { ProviderWorkflow } from "@/native/contracts";
 import { describe, expect, it } from "vitest";
 import { providerOptionsForConnection } from "../providerUtils";
 

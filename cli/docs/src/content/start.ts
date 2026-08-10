@@ -15,7 +15,7 @@ export const startPages: DocPage[] = [
         title: "One command surface",
         blocks: [
           p(
-            "misty-cli coordinates the three private checkouts in your Misty workspace: the desktop application, the Go server, and the CLI itself. It does not replace their native tools. It gives the recurring workflows one consistent, guarded entry point.",
+            "misty-cli coordinates the Misty desktop application, standalone file manager, Go server, and the CLI itself. It does not replace their native tools. It gives recurring workflows one consistent, guarded entry point.",
           ),
           table(
             ["Area", "What the CLI owns"],
@@ -66,7 +66,7 @@ export const startPages: DocPage[] = [
         title: "Command families",
         blocks: [
           code(
-            "misty-cli configure --workspace ~/misty-org\nmisty-cli doctor\nmisty-cli check <misty|server|all>\nmisty-cli desktop <command>\nmisty-cli server <command>\nmisty-cli release <command>",
+            "misty-cli configure --workspace ~/misty-org\nmisty-cli doctor\nmisty-cli check <misty|server|all>\nmisty-cli file-manager\nmisty-cli desktop <command>\nmisty-cli server <command>\nmisty-cli release <command>",
           ),
           list([
             "Use --help or -h at any level to inspect available commands and options.",

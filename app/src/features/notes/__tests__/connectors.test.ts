@@ -6,7 +6,7 @@ vi.mock("@/shared/platform/openExternalLink", () => ({
   openExternalLink: vi.fn(async () => {}),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   spaceRequest: spaceRequestMock,
 }));
 

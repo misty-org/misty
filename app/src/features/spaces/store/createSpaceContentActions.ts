@@ -1,9 +1,9 @@
-import { buildMessageSpans, mergeSpaceMessages } from "@/features/space-chat";
-import { resolveSpacesApiBase, spacesApi } from "@/services/spaces/api";
+import { buildMessageSpans, mergeSpaceMessages } from "@/features/spaces/chat";
+import { resolveSpacesApiBase, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
-export { buildMessageSpans } from "@/features/space-chat";
+export { buildMessageSpans } from "@/features/spaces/chat";
 
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),

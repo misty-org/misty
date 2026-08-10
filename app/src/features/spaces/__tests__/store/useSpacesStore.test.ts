@@ -1,10 +1,10 @@
-import { SpaceRequestError } from "@/services/spaces/api";
+import { SpaceRequestError } from "@/api/spaces/api";
 import type {
   Space,
   SpaceMember,
   SpaceMessage,
   SpaceStudioResource,
-} from "@/services/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/interfaces/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildMessageSpans,
@@ -33,7 +33,7 @@ const apiMocks = vi.hoisted(() => ({
   chatAgents: vi.fn(),
 }));
 
-vi.mock("@/services/spaces/api", () => ({
+vi.mock("@/api/spaces/api", () => ({
   resolveSpacesApiBase: vi.fn(async () => "http://localhost:8081/api"),
   SpaceRequestError: class SpaceRequestError extends Error {
     constructor(

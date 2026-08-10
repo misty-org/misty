@@ -1,5 +1,5 @@
-import { SpacePlannerHeader } from "@/features/space-planner/components/SpacePlannerHeader";
-import { spacesApi } from "@/services/spaces/api";
+import { SpacePlannerHeader } from "@/features/spaces/planner/components/SpacePlannerHeader";
+import { spacesApi } from "@/api/spaces/api";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";

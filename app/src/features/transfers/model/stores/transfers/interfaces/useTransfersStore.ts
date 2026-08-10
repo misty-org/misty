@@ -1,5 +1,5 @@
-import type { TransferPage } from "@/services/misty/model/misty-api";
-import type { TransferType } from "@/services/misty/model/types/misty-api";
+import type { TransferPage } from "@/native/contracts";
+import type { TransferType } from "@/native/contracts/primitives";
 
 import type {
   TransferLocationScope,

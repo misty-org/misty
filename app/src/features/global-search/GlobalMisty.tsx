@@ -2,7 +2,7 @@ import {
   revealSearchResultInPane,
   searchResultNavigationTarget,
   useExplorerStore,
-} from "@/features/file-explorer";
+} from "@/features/files/explorer";
 import { Button, ScrollArea, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
 import { ArrowUp, CircleAlert, Loader2, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";

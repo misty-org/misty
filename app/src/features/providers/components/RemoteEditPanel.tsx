@@ -1,8 +1,4 @@
-import type {
-  CloudConfigPaths,
-  ProviderWorkflow,
-  RemoteEditDraft,
-} from "@/services/misty/model/misty-api";
+import type { CloudConfigPaths, ProviderWorkflow, RemoteEditDraft } from "@/native/contracts";
 import { iconAssets } from "@/shared/assets/icons";
 import {
   Alert,

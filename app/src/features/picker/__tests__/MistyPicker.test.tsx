@@ -8,7 +8,7 @@ vi.mock("../FilePicker", () => ({
   ),
 }));
 
-vi.mock("@/features/space-library", () => ({
+vi.mock("@/features/spaces/library", () => ({
   MistyLibraryPicker: ({ active }: { active?: boolean }) => (
     <div data-testid="library-panel" data-active={active ? "true" : "false"} />
   ),

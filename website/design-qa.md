@@ -55,6 +55,59 @@ final result: passed
 
 ---
 
+# Homepage editorial-frame redesign QA
+
+## Comparison target and evidence
+
+- Source visual truth: `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/misty-feature-showcase-audit/03-figjam-audit-board.png`, which captures the approved direction: one dominant product story, one shared frame, and one supporting detail.
+- Implementation captures:
+  - `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/misty-feature-showcase-audit/04-home-redesign-desktop-1660x1040.png`
+  - `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/misty-feature-showcase-audit/05-home-redesign-mobile-390x844.png`
+  - `/var/folders/hd/3cy894z92v70m7crvhv8rwmr0000gn/T/misty-feature-showcase-audit/06-home-agents-desktop-1660x1040.png`
+- State: homepage, dark theme, signed out, default navigation and feature states.
+- Viewport and density: desktop implementation captured at 1660 × 1040 CSS pixels, DPR 1. Mobile implementation captured at 390 × 844 CSS pixels, DPR 1. The FigJam board is 3480 × 2100 canvas pixels and is a directional composition reference rather than a pixel-identical homepage mock, so no density scaling was used.
+- Full-view and focused comparison: the FigJam board and the desktop hero were opened in the same visual comparison input. The board and the focused Agents implementation were also opened together in the same comparison input.
+
+## Required fidelity surfaces
+
+- Typography: Inter Variable remains the sole typeface. The hero display scale was reduced after the first review so it no longer overwhelms the product view. Feature headlines use a consistent smaller display scale, with readable body and context copy.
+- Spacing and layout rhythm: the hero, feature panels, connection strip, workflow, updates, and CTA now use a single outlined outer frame. Feature content follows a consistent copy-left/product-right structure without stacked secondary mocks.
+- Colors and tokens: the existing dark neutral tokens are preserved. The navigation is now opaque rather than blurred, and no radial background glow or elevated showcase shadow remains.
+- Image quality and assets: the existing Space Library screenshot and product preview assets are reused. The hero image loaded at its native 1600 × 1000 dimensions without crop or decode errors. No generated, CSS-drawn, or replacement image assets were introduced.
+- Copy and content: the approved positioning remains intact. Feature context lines explain the permission, shared-space, and private-file benefits without adding a second app panel.
+- Icons and interactions: existing brand and connection icons are preserved. The hero CTA still routes to registration. No browser console errors were found in the reviewed desktop state.
+- Responsive and accessibility checks: the 390 px mobile view retains the bordered hierarchy, has no horizontal overflow, and the public route accessibility coverage passes in light and dark themes.
+
+## Findings
+
+- [P3] The Space Library product image remains intentionally low contrast because the supplied screenshot is itself a dark application capture. Its frame, crop, and loading state are correct; brightening it would alter the source asset and conflict with the no-glow direction.
+
+No actionable P0, P1, or P2 differences remain relative to the approved editorial-frame direction.
+
+## Comparison history
+
+- Pass 1: the desktop hero headline was visually too dominant relative to the product canvas. The headline used a 4.5rem desktop scale, creating an unnecessarily tall five-line stack.
+- Fix: reduced the desktop display scale to 3.5rem at large widths and 3.75rem at extra-large widths, while widening the left hero track.
+- Pass 2: recaptured desktop, mobile, and the Agents focus state. The shared frame is balanced; mobile stacks without overflow; each feature has exactly one primary product moment.
+
+## Interaction and verification
+
+- Browser console errors on the reviewed desktop homepage: none.
+- Hero CTA routing: passed on desktop and mobile.
+- Homepage content, responsive overflow, and CTA Playwright checks: 6 passed.
+- Homepage accessibility route checks in desktop and mobile, light and dark themes: 4 passed.
+- TypeScript typecheck, ESLint, production build, and `git diff --check`: passed.
+
+## Implementation checklist
+
+1. Keep future feature additions inside the shared outlined frame pattern.
+2. Add a second product panel only when it represents a genuinely separate decision, not supporting detail.
+3. Preserve the opaque navigation surface and flat, no-glow treatment.
+
+final result: passed
+
+---
+
 # Checkout Success Design QA
 
 ## Comparison Target

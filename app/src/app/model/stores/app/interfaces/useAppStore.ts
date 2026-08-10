@@ -1,5 +1,5 @@
 import type { AppTab } from "@/features/app-shell";
-import type { AppSnapshot } from "@/services/misty/model/misty-api";
+import type { AppSnapshot } from "@/native/contracts";
 
 export interface AppStore {
   app: AppSnapshot | null;
