@@ -33,6 +33,7 @@ export const referencePages: DocPage[] = [
                 "Run Go, database, container, and Worker checks.",
               ],
               ["check all", "Run Misty checks followed by server checks."],
+              ["file-manager", "Open the standalone file manager."],
             ],
           ),
         ],

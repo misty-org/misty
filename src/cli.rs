@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, release, server};
+use crate::{checks, config::Settings, desktop, file_manager, release, server};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty-cli", version, about)]
@@ -20,6 +20,8 @@ enum Command {
     Doctor,
     Check(Check),
     Desktop(Desktop),
+    /// Open the standalone Misty File Manager.
+    FileManager,
     Server(Server),
     Release(Release),
 }
@@ -244,6 +246,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 ),
             },
         },
+        Command::FileManager => file_manager::open(&settings.workspace),
         Command::Server(command) => match command.command {
             ServerCommand::Up { detach, no_build } => {
                 server::up(&settings.workspace, detach, !no_build)
@@ -424,6 +427,7 @@ mod tests {
             vec!["misty-cli", "desktop", "clean", "--apply"],
             vec!["misty-cli", "desktop", "icons", "sync"],
             vec!["misty-cli", "desktop", "windows", "stage-assets"],
+            vec!["misty-cli", "file-manager"],
             vec!["misty-cli", "server", "up", "--detach", "--no-build"],
             vec!["misty-cli", "server", "url"],
             vec!["misty-cli", "server", "down", "--volumes"],
