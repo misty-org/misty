@@ -1,0 +1,50 @@
+/* Force the filerobot image editor to match Misty's dark chrome.
+   Filerobot's palette tokens are computed at runtime and only partially cover
+   its surfaces, so we pin the rest to its stable FIE_* class hooks. Everything
+   here is scoped under .FIE_root, which only exists inside the editor. */
+
+.FIE_root {
+  background: #0f0f0f !important;
+  color: #e0e0e0 !important;
+  border: 0 !important;
+}
+
+/* Chrome: top bar, left tab rail, bottom tool bar. */
+.FIE_topbar,
+.FIE_tabs,
+.FIE_tabs-drawer,
+.FIE_tools-bar,
+.FIE_tools-bar-wrapper {
+  background-color: #161616 !important;
+  border-color: #262626 !important;
+}
+
+/* The editing canvas well (konva stage bg is set via the backgroundColor prop;
+   this covers the surrounding container so no white seams show through). */
+.FIE_canvas-container,
+.FIE_canvas-node {
+  background-color: #0f0f0f !important;
+}
+
+/* Zoom label + generic text/icons that inherit filerobot's light defaults. */
+.FIE_topbar-zoom-label,
+.FIE_crop-tool-label,
+.FIE_filters-item-label,
+.FIE_annotations-options {
+  color: #e0e0e0 !important;
+}
+
+/* Primary "Save" button -> app accent (light pill on dark, like other primary
+   buttons in the app) instead of filerobot's default lavender. */
+.FIE_topbar-save,
+.FIE_topbar-save-button {
+  background-color: #3e3e3e !important;
+  color: #f1f1f1 !important;
+  border-color: transparent !important;
+}
+
+.FIE_topbar-save:hover,
+.FIE_topbar-save-button:hover {
+  background-color: #494949 !important;
+  color: #f1f1f1 !important;
+}
