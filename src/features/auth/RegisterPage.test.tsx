@@ -7,10 +7,6 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   authenticateAccount: vi.fn(),
   accountRegister: vi.fn(),
-  fetchCurrentInstanceDescriptor: vi.fn().mockResolvedValue({
-    deployment: "cloud",
-    bootstrap_required: false,
-  }),
 }));
 
 vi.mock("@/api/account/api", () => ({
@@ -33,10 +29,6 @@ vi.mock("./AuthContext", () => ({
 
 vi.mock("./store/useAccountStore", () => ({
   accountRegister: mocks.accountRegister,
-}));
-
-vi.mock("@/api/deployment/api", () => ({
-  fetchCurrentInstanceDescriptor: mocks.fetchCurrentInstanceDescriptor,
 }));
 
 import RegisterPage from "./RegisterPage";
@@ -182,7 +174,6 @@ describe("RegisterPage", () => {
       "carol_user",
       "carol@example.com",
       "secret12345",
-      "",
     );
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });

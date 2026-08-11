@@ -12,17 +12,6 @@ paths = [
   '''^vendor/''',
 ]
 
-# CI pins v8.24.3, before multiple global allowlists. Extend only the JWT rule
-# for these public, test-only proof tokens; keep path AND field matching.
-[[rules]]
-id = "jwt"
-[[rules.allowlists]]
-description = "Public cross-language fixtures signed with a documented test-only key"
-condition = "AND"
-paths = ['''(?:^|/)server/test/fixtures/compatibility/self-host-proofs\.json$''']
-regexTarget = "line"
-regexes = ['''"(?:goToken|nodeToken)"''']
-
 [[rules]]
 id = "google-service-account-bound-api-key"
 description = "Google API key bound to a service account"

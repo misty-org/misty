@@ -43,7 +43,6 @@ func main() {
 		Addr:          *addr,
 		APIURL:        *apiURL,
 		MetricsToken:  envconfig.Getenv("MISTY_METRICS_TOKEN"),
-		Mode:          envconfig.DeploymentMode(),
 		Environment:   envconfig.Getenv("MISTY_ENVIRONMENT"),
 		HandoffPath:   *handoff,
 		ServerDir:     serverDir,

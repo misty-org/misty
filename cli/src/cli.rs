@@ -257,6 +257,19 @@ enum ProdCommand {
         volumes: bool,
     },
     Logs,
+    /// Encrypt both databases with age and upload them to the backup bucket.
+    Backup,
+    /// Replace both databases with a backup from the bucket.
+    Restore {
+        /// Backup timestamp such as 20271003T020000Z, or `latest`.
+        backup: String,
+        /// age identity file that decrypts the backup.
+        #[arg(long)]
+        identity: PathBuf,
+        /// Confirm that production data will be replaced.
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -482,6 +495,12 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                     server::production_down(&settings.workspace, volumes)
                 }
                 ProdCommand::Logs => server::production_logs(&settings.workspace),
+                ProdCommand::Backup => server::production_backup(&settings.workspace),
+                ProdCommand::Restore {
+                    backup,
+                    identity,
+                    yes,
+                } => server::production_restore(&settings.workspace, &backup, &identity, yes),
             },
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),

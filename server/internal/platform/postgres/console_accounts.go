@@ -12,18 +12,15 @@ import (
 // mounted on the public API.
 
 type ConsoleAccount struct {
-	ID         string
-	Email      string
-	Username   string
-	Name       string
-	State      string
-	Tier       string
-	CreatedAt  time.Time
-	SelfHosted bool
-	Disabled   bool
-	Admin      bool
-	Devices    int
-	Sessions   int
+	ID        string
+	Email     string
+	Username  string
+	Name      string
+	State     string
+	Tier      string
+	CreatedAt time.Time
+	Devices   int
+	Sessions  int
 }
 
 type ConsoleDevice struct {
@@ -47,17 +44,15 @@ func (db *Database) consoleTx(ctx context.Context, fn func(*sql.Tx) error) error
 
 const consoleAccountColumns = `
 	u.id, u.email, u.username, u.name, u.lifecycle_state, u.created_at,
-	COALESCE(l.tier, ''), sha.user_id IS NOT NULL,
-	COALESCE(sha.disabled_at IS NOT NULL, false), COALESCE(sha.is_admin, false),
+	COALESCE(l.tier, ''),
 	(SELECT count(*) FROM trusted_devices d WHERE d.user_id = u.id AND d.revoked_at IS NULL),
 	(SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > now())
 	FROM users u
-	LEFT JOIN licenses l ON l.id = u.license_id
-	LEFT JOIN self_host_accounts sha ON sha.user_id = u.id`
+	LEFT JOIN licenses l ON l.id = u.license_id`
 
 func scanConsoleAccount(row interface{ Scan(...any) error }, a *ConsoleAccount) error {
 	return row.Scan(&a.ID, &a.Email, &a.Username, &a.Name, &a.State, &a.CreatedAt,
-		&a.Tier, &a.SelfHosted, &a.Disabled, &a.Admin, &a.Devices, &a.Sessions)
+		&a.Tier, &a.Devices, &a.Sessions)
 }
 
 // ConsoleListAccounts returns the newest accounts matching an email, username
@@ -134,35 +129,4 @@ func (db *Database) ConsoleRevokeSessions(ctx context.Context, userID string) (i
 		return err
 	})
 	return revoked, err
-}
-
-// ConsoleSetSelfHostDisabled disables (and signs out) or re-enables a
-// self-hosted account. Hosted accounts have no disabled state.
-func (db *Database) ConsoleSetSelfHostDisabled(ctx context.Context, userID string, disabled bool) error {
-	return db.consoleTx(ctx, func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `
-			UPDATE self_host_accounts
-			SET disabled_at = CASE WHEN $2 THEN now() ELSE NULL END, updated_at = now()
-			WHERE user_id = $1`, userID, disabled)
-		if err != nil {
-			return err
-		}
-		if rows, _ := result.RowsAffected(); rows != 1 {
-			return sql.ErrNoRows
-		}
-		if disabled {
-			_, err = tx.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = $1`, userID)
-		}
-		return err
-	})
-}
-
-// ConsoleInstanceBootstrapped reports whether a self-hosted instance already
-// has its first administrator.
-func (db *Database) ConsoleInstanceBootstrapped(ctx context.Context) (bool, error) {
-	var bootstrapped bool
-	err := db.consoleTx(ctx, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM self_host_accounts)`).Scan(&bootstrapped)
-	})
-	return bootstrapped, err
 }

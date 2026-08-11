@@ -137,7 +137,6 @@ func (config libraryS3Config) empty() bool {
 func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	config := libraryS3ConfigFromEnv()
 	environment := strings.TrimSpace(envconfig.Getenv("MISTY_ENVIRONMENT"))
-	deployment := envconfig.DeploymentMode()
 	backend := strings.ToLower(strings.TrimSpace(envconfig.Getenv("MISTY_LIBRARY_BACKEND")))
 	localRoot := firstConfigured("MISTY_LIBRARY_FILESYSTEM_DIR", "MISTY_LIBRARY_LOCAL_DIR")
 	if backend == "" {
@@ -148,8 +147,8 @@ func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 		}
 	}
 	if backend == "filesystem" {
-		if strings.EqualFold(environment, "production") && deployment != "self_hosted" {
-			return nil, fmt.Errorf("filesystem Library storage is allowed in production only for self-hosted deployments")
+		if strings.EqualFold(environment, "production") {
+			return nil, fmt.Errorf("filesystem Library storage is not allowed in production")
 		}
 		store, err := api.NewLocalLibraryObjectStore(localRoot)
 		if err != nil {
@@ -170,7 +169,6 @@ func TestingLibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 		Endpoint: config.endpoint, Region: config.region, Bucket: config.bucket,
 		AccessKeyID: config.accessKey, SecretAccessKey: config.secretKey,
 		ForcePathStyle: config.forcePathStyle, BucketPrivate: true, PermanentObjects: true,
-		AllowInsecureLocal: deployment == "self_hosted",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("configure R2 Library store: %w", err)
@@ -256,7 +254,6 @@ var allowedCORSRequestHeaders = []string{
 	"X-Misty-Attachment-Upload-Token",
 	"X-Misty-Library-Upload-Token",
 	"X-Misty-Library-Reauthentication",
-	"X-Misty-Self-Hosted-Entitlement",
 }
 
 func TestingIsAllowedCORSOrigin(origin string) bool {

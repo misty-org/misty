@@ -25,7 +25,7 @@ func TestDisabledRequiresNoService(t *testing.T) {
 	}
 }
 func TestConfigurationFailsClosed(t *testing.T) {
-	for _, c := range []Config{{Hosted: true}, {Mode: "none", Hosted: true}, {Mode: "htp"}, {Mode: "http", URL: "http://example.com", Secret: "12345678901234567890123456789012"}, {Mode: "http", URL: "https://billing.example", Secret: "short"}} {
+	for _, c := range []Config{{Required: true}, {Mode: "none", Required: true}, {Mode: "htp"}, {Mode: "http", URL: "http://example.com", Secret: "12345678901234567890123456789012"}, {Mode: "http", URL: "https://billing.example", Secret: "short"}} {
 		if _, err := New(c); err == nil {
 			t.Fatalf("accepted %+v", c)
 		}

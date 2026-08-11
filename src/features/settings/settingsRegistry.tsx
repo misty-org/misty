@@ -10,7 +10,6 @@ import {
   Palette,
   PanelsTopLeft,
   RefreshCw,
-  Server,
   Shield,
   SlidersHorizontal,
   Sparkles,
@@ -41,7 +40,6 @@ import { MistySection } from "./sections/MistySection";
 import { NotificationsSection } from "./sections/NotificationsSection";
 import { PrivacySection } from "./sections/PrivacySection";
 import { SearchSection } from "./sections/SearchSection";
-import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
@@ -62,7 +60,6 @@ export type SettingsArea =
   | "agents"
   | "sync"
   | "devices"
-  | "server"
   | "privacy"
   | "about";
 export const settingsAreas: Record<
@@ -80,7 +77,6 @@ export const settingsAreas: Record<
   agents: { label: "Agents", icon: Sparkles },
   sync: { label: "Sync", icon: RefreshCw, breakBefore: true },
   devices: { label: "File sharing", icon: MonitorSmartphone },
-  server: { label: "Server", icon: Server },
   privacy: { label: "Privacy", icon: Shield },
   about: { label: "About", icon: Info },
 };
@@ -162,7 +158,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("agents", "agents-companion", "Companion", CompanionSection, "account"),
   page("sync", "sync", "Sync", BrowserSyncSettings),
   page("devices", "devices", "File sharing", DevicesSection, "account"),
-  page("server", "server", "Server", ServerSection, "account", true),
   page("privacy", "privacy", "Privacy", PrivacySection, "account"),
   page("about", "about", "Version", AboutSection, "account"),
   page("about", "updates", "Updates", UpdatesSection, "account", true),
@@ -176,6 +171,7 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
         advanced: "diagnostics",
         agents: "agents-defaults",
         support: "about",
+        server: "about",
         account: "general",
         profiles: "sync",
         "browser-handoff": "sync",

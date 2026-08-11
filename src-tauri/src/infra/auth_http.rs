@@ -84,8 +84,6 @@ pub async fn auth_http_start(
             "/login",
             "/auth/google/complete",
             "/register",
-            "/self-host/bootstrap",
-            "/self-host/enroll",
         ]
         .iter()
         .any(|path| url.path().ends_with(path));

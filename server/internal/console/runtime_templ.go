@@ -533,11 +533,9 @@ func aiPage(v aiView) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if !v.Config.SelfHosted() {
-			templ_7745c5c3_Err = note("Hosted instances route every model through the AI gateway. Per-account budgets are enforced by the billing adapter.").Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		templ_7745c5c3_Err = note("Every model routes through the AI gateway. Per-account budgets are enforced by the billing adapter.").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
 		if v.Err != "" {
 			templ_7745c5c3_Err = problem(v.Err).Render(ctx, templ_7745c5c3_Buffer)
@@ -577,7 +575,7 @@ func aiPage(v aiView) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(f.State)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 119, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 117, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -590,7 +588,7 @@ func aiPage(v aiView) templ.Component {
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(f.Count))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 119, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 117, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -676,7 +674,7 @@ func settingRow(s setting) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(s.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 135, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 133, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -711,7 +709,7 @@ func settingRow(s setting) templ.Component {
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(s.display())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 137, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 135, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -794,7 +792,7 @@ func billingPage(v billingView) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(humanize(l.Kind))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 158, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 156, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -815,7 +813,7 @@ func billingPage(v billingView) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(l.Count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 162, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `runtime.templ`, Line: 160, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {

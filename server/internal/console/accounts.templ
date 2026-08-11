@@ -89,28 +89,7 @@ templ accountDetail(v accountDetailView) {
 					hx-confirm={ "Sign " + v.Account.Email + " out on every device?" }
 					hx-disabled-elt="this"
 				>Revoke sessions</button>
-				if v.Config.SelfHosted() && v.Account.SelfHosted {
-					if v.Account.Disabled {
-						<button class="button" hx-post={ v.actionPath("enable") } hx-target="#account-detail" hx-swap="outerHTML" hx-disabled-elt="this">Enable</button>
-					} else {
-						<button
-							class="button"
-							hx-post={ v.actionPath("disable") }
-							hx-target="#account-detail"
-							hx-swap="outerHTML"
-							hx-confirm={ "Disable " + v.Account.Email + "? They'll be signed out everywhere." }
-							hx-disabled-elt="this"
-						>Disable</button>
-					}
-				}
 			</div>
-			if v.Config.SelfHosted() && v.Account.SelfHosted {
-				@sectionLabel("Reset password")
-				<form class="inline-form" hx-post={ v.actionPath("reset-password") } hx-target="#account-detail" hx-swap="outerHTML">
-					<input type="password" name="password" minlength="8" required autocomplete="new-password" aria-label="New password" placeholder="New password"/>
-					<button class="button" type="submit">Reset password</button>
-				</form>
-			}
 		}
 	</aside>
 }
@@ -124,35 +103,4 @@ templ deviceIcon(platform string) {
 		default:
 			@iconMonitor()
 	}
-}
-
-templ bootstrapPage(v bootstrapView) {
-	@pageHeader("Bootstrap", "Create the first administrator of this self-hosted instance")
-	@bootstrapPanel(v)
-}
-
-templ bootstrapPanel(v bootstrapView) {
-	<section id="bootstrap">
-		if v.Err != "" {
-			@problem(v.Err)
-		}
-		if v.Bootstrapped {
-			<p class="row-label">
-				@iconCheck()
-				<span>This instance already has an administrator. Invite people from the desktop app.</span>
-			</p>
-		} else if v.Token != "" {
-			@flash("Bootstrap token issued. It works once and expires in 30 minutes.")
-			<pre class="token"><code>{ v.Token }</code></pre>
-			@note("Paste it into the desktop app's self-host setup. It won't be shown again.")
-		} else {
-			<p class="muted">Generate a single-use token, then enter it in the desktop app to create the admin account.</p>
-			<div class="actions">
-				<button class="button" hx-post="/bootstrap/token" hx-target="#bootstrap" hx-swap="outerHTML" hx-disabled-elt="this">
-					@iconKey()
-					<span>Generate token</span>
-				</button>
-			</div>
-		}
-	</section>
 }

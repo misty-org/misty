@@ -106,13 +106,7 @@ type aiView struct {
 
 func (s *Server) aiPage(r *http.Request) templ.Component {
 	view := aiView{Config: s.cfg}
-	if s.cfg.SelfHosted() {
-		for _, name := range []string{"MISTY_AGENT_MODEL_PROVIDER", "MISTY_AGENT_MODEL", "MISTY_AGENT_MODEL_API_KEY", "MISTY_AGENT_MODEL_BASE_URL"} {
-			view.Model = append(view.Model, s.setting(name, name != "MISTY_AGENT_MODEL_BASE_URL"))
-		}
-	} else {
-		view.Model = []setting{s.setting("AI_GATEWAY_API_KEY", true)}
-	}
+	view.Model = []setting{s.setting("AI_GATEWAY_API_KEY", true)}
 	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
 	if snapshot, err := s.health.Fetch(ctx); err == nil {
