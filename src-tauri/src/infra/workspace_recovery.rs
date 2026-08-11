@@ -17,10 +17,21 @@ struct Client {
     _lock: std::fs::File,
 }
 static CLIENT: OnceLock<Mutex<Option<Client>>> = OnceLock::new();
+/// Keys whose newest save reached neither the database nor its pending slot.
+/// They exist only in the renderer, so quitting now would lose them.
+static UNSAVED: Mutex<std::collections::BTreeSet<String>> =
+    Mutex::new(std::collections::BTreeSet::new());
+pub(crate) fn unsaved_count() -> usize {
+    UNSAVED.lock().map_or(0, |keys| keys.len())
+}
 fn client() -> &'static Mutex<Option<Client>> {
     CLIENT.get_or_init(|| Mutex::new(None))
 }
 pub(super) fn close_account() -> Result<(), String> {
+    // Keys are per account; the next account starts with its own record.
+    if let Ok(mut unsaved) = UNSAVED.lock() {
+        unsaved.clear();
+    }
     *client()
         .lock()
         .map_err(|_| "Workspace recovery is unavailable")? = None;
@@ -66,6 +77,13 @@ fn remove_recovery_files(directory: &std::path::Path) -> Result<(), String> {
                     "Could not remove workspace recovery. Retry removing this account.".into(),
                 )
             }
+        }
+    }
+    match std::fs::remove_dir_all(directory.join("recovery-pending")) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => {
+            return Err("Could not remove workspace recovery. Retry removing this account.".into())
         }
     }
     // Retain the lock inode: deleting it after releasing our process lock could
@@ -126,6 +144,8 @@ pub async fn browser_recovery_forget(
 #[derive(Serialize)]
 pub struct RecoverySession {
     session_id: String,
+    /// Keys whose newest value still waits in a pending slot (see `recovery_pending`).
+    pending: Vec<String>,
 }
 
 #[tauri::command]
@@ -151,6 +171,7 @@ pub async fn browser_recovery_open(
         {
             return Ok(RecoverySession {
                 session_id: active.id.clone(),
+                pending: active.store.pending_keys().unwrap_or_default(),
             });
         }
         let scope = VaultScope {
@@ -173,6 +194,7 @@ pub async fn browser_recovery_open(
         let lock = super::browser_sync::lock_database(&path)?;
         let key = secure_store::workspace_recovery_root(&scope, !path.exists()).map_err(error)?;
         let store = RecoveryStore::open(&path, scope, key).map_err(error)?;
+        let pending = store.pending_keys().unwrap_or_default();
         let id = uuid::Uuid::new_v4().to_string();
         *current = Some(Client {
             id: id.clone(),
@@ -181,7 +203,10 @@ pub async fn browser_recovery_open(
             store,
             _lock: lock,
         });
-        Ok(RecoverySession { session_id: id })
+        Ok(RecoverySession {
+            session_id: id,
+            pending,
+        })
     })
     .await
     .map_err(|_| "Workspace recovery was interrupted")?
@@ -231,7 +256,15 @@ pub async fn browser_recovery_write(
             .filter(|v| v.id == session_id)
             .ok_or("The workspace account changed")?;
         super::browser_sync::account_api(&active.deployment, &active.account)?;
-        active.store.write(&key, revision, &value).map_err(error)
+        let result = active.store.write(&key, revision, &value);
+        if let Ok(mut unsaved) = UNSAVED.lock() {
+            if result.is_ok() {
+                unsaved.remove(&key);
+            } else {
+                unsaved.insert(key);
+            }
+        }
+        result.map_err(error)
     })
     .await
     .map_err(|_| "Workspace recovery was interrupted")?

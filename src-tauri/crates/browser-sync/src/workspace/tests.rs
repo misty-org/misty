@@ -423,6 +423,33 @@ fn the_ui_view_shows_unacknowledged_edits_and_the_verified_view_does_not() {
     let mut shown = ids(sync.optimistic_view(&store, &f.root).unwrap());
     shown.sort();
     assert_eq!(shown, ["l1", "t1", "w1"]);
+
+    // Each waiting record is listed once for the renderer to name per tab.
+    let unsynced = |view: super::sync::SyncState| -> Vec<(String, bool)> {
+        let mut records: Vec<_> =
+            view.unsynced.into_iter().map(|r| (r.id, r.deleted)).collect();
+        records.sort();
+        records
+    };
+    let waiting = |id: &str, deleted| (id.to_owned(), deleted);
+    assert_eq!(
+        unsynced(sync.optimistic_view(&store, &f.root).unwrap()),
+        [waiting("l1", false), waiting("t1", false), waiting("w1", false)]
+    );
+    let view = workspace().into_iter().find(|r| r.id == "t1").unwrap();
+    sync.apply_changes(
+        &mut store,
+        &f.root,
+        vec![crate::document::Change::Delete { kind: view.kind, id: view.id }],
+    )
+    .unwrap();
+    // A later close replaces the entry instead of adding a second one.
+    assert_eq!(
+        unsynced(sync.optimistic_view(&store, &f.root).unwrap()),
+        [waiting("l1", false), waiting("t1", true), waiting("w1", false)]
+    );
+    assert!(sync.view(&store).unwrap().unsynced.is_empty());
+    assert_eq!(sync.optimistic_view(&store, &f.root).unwrap().retired_edits, 0);
 }
 
 mod multi_writer_rebase {

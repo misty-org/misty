@@ -30,19 +30,33 @@ const compareId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 function panes(tree: SplitTree): string[] {
   return tree.type === "leaf" ? [tree.id] : [...panes(tree.first), ...panes(tree.second)];
 }
+/** Where a synced tool view opens when its record carries no route: records
+ * from older clients may omit it, and the model allows null. */
+const surfaceRoutes = {
+  files: "/files",
+  agents: "/agents",
+  space: "/spaces",
+  home: "/home",
+} as const;
 /** A synced view as the pane content the workspace UI renders. */
 function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {
   const fields = record.fields;
+  const toolRoute =
+    fields.surface === "browser"
+      ? "/browser"
+      : typeof fields.tool_route === "string" && fields.tool_route
+        ? fields.tool_route
+        : surfaceRoutes[fields.surface];
   return {
     id: record.id,
     instanceKey: record.id,
     surfaceId: fields.surface,
     groupKey:
       fields.surface === "space"
-        ? (workspaceSurfaceFromRoute(fields.tool_route!)?.groupKey ?? "tool:space")
+        ? (workspaceSurfaceFromRoute(toolRoute)?.groupKey ?? "tool:space")
         : `tool:${fields.surface}`,
     title: fields.title,
-    route: fields.surface === "browser" ? "/browser" : fields.tool_route!,
+    route: toolRoute,
     sidebarVisible: false,
     state:
       fields.surface === "browser"
