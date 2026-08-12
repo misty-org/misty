@@ -64,6 +64,19 @@ Misty is hosted only: one VPS runs the whole stack from `compose.prod.yml`.
 
 The collaboration Worker stays on Cloudflare and deploys separately.
 
+### Billing
+
+The private billing service (`misty-org/misty-billing`) runs on the same VPS as
+its own Compose project with its own PostgreSQL, listening on `127.0.0.1:8091`.
+Publish it as `billing.mistysys.com` through the same production tunnel: in the
+Cloudflare dashboard open the tunnel's public hostnames and add
+`billing.mistysys.com` → `http://127.0.0.1:8091`. Later
+`misty setup cloudflare --target prod` runs keep that extra route. Stripe sends
+webhooks to `https://billing.mistysys.com/stripe/webhook`; the API calls
+`MISTY_BILLING_URL=https://billing.mistysys.com/adapter`, signed with the
+`MISTY_BILLING_SECRET` both services share. See that repository's README for
+its variables and first-time setup.
+
 ### Releases
 
 Push a `server-vX.Y.Z` tag. The `Server release` workflow runs the tests,
@@ -80,9 +93,40 @@ The packages are private. Log the VPS in once with a classic personal access
 token that has only `read:packages`: `docker login ghcr.io`. Roll back by
 pasting a previous release's digests and running `up` again.
 
+### Production environment
+
+This computer is the source of truth for production configuration. Generate it
+once; existing values are never overwritten:
+
+```sh
+misty env init prod      # server/.env/prod and misty-billing/.env/prod/billing.env
+misty env status prod    # names still missing, values never shown
+```
+
+That generates database passwords, signing keys, the agent runtime secret, the
+billing adapter secret (written to both repos so they match), device keys and
+Journal keys. Fill in the rest with `misty env set prod NAME` (value from
+stdin). Run `misty setup cloudflare --target prod` here too, so the tunnel
+token lands in this copy. Keep an encrypted copy of both `.env/prod` folders
+off this computer: losing the signing keys signs everyone out and breaks
+Journal tickets.
+
+Set `MISTY_DEPLOY_HOST=misty@your-vps` in `misty/cli/.env/common.env`, then:
+
+```sh
+misty server prod push     # copy both .env/prod folders to the VPS
+misty server prod deploy   # push, then git pull and start billing and the server there
+```
+
+`push` validates the environment first, streams it over SSH, and backs up the
+VPS's previous copy under `.env-backups/`; files that exist only on the VPS are
+kept. `deploy` expects both repositories cloned in the SSH user's home (`misty`
+and `misty-billing`; override with `--dir` and `--billing-dir`), `misty` on the
+VPS's PATH, and a read-only deploy key for the private billing repository.
+
 ### Deploy
 
-Populate the real private files under `.env/prod/`. Besides the image digests,
+Populate the real private files under `.env/prod/` (see above). Besides the image digests,
 production requires `AGENT_RUNTIME_DB_PASSWORD`,
 `MISTY_AGENT_RUNTIME_CONTROL_SECRET` (`openssl rand -base64 32`), and the HTTP
 billing adapter. The CLI validates file ownership, permissions, duplicate
@@ -101,7 +145,8 @@ the first boot; a missing security setting logs a warning instead of failing.
 
 ### Backups
 
-`misty server prod backup` dumps both databases with `pg_dump`, streams each
+`misty server prod backup` dumps Misty's and the workflow database with
+`pg_dump` (and billing's, when the misty-billing stack runs on the same host), streams each
 dump straight into `age` (plaintext never touches the disk), and uploads the
 ciphertext to the R2 bucket named by `MISTY_BACKUP_BUCKET` using the `R2_*`
 credentials. Set `MISTY_BACKUP_AGE_RECIPIENT` to an age public key and keep the

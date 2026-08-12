@@ -862,6 +862,7 @@ fn cli_owner(name: &str) -> Result<&'static str> {
             | "MISTY_DEV_SIGNING_IDENTITY"
             | "MISTY_DESKTOP_DEV_PORT"
             | "MISTY_DESKTOP_INITIAL_ROUTE"
+            | "MISTY_DEPLOY_HOST"
     ) {
         return Ok("common.env");
     }

@@ -90,7 +90,7 @@ pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
     }
 }
 
-fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
+pub(crate) fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
     let mut contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
