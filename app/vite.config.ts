@@ -16,6 +16,11 @@ export default defineConfig(({ command, mode }) => {
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
+  if (command === "build" && mode === "web" && !publicApiUrl) {
+    throw new Error(
+      "Web builds require MISTY_PUBLIC_API_URL to point at the deployed Misty API.",
+    );
+  }
   const uploadSourceMaps = Boolean(
     command === "build" &&
       sourceMapKey &&
