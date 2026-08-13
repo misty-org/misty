@@ -7,6 +7,11 @@
     "website"
   ],
   "scripts": {
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build:web": "npm run build:website && npm run build:app",
+    "check:web": "npm run typecheck && npm run lint && npm run test && npm run build:web",
     "dev:app": "npm run dev:web --workspace=@misty/app",
     "build:app": "npm run build:web --workspace=@misty/app",
     "test:app": "npm run test --workspace=@misty/app",
