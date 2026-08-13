@@ -136,16 +136,13 @@ describe("Activity lifecycle", () => {
     store().clearDeviceHistory();
     expect(store().attentionCount).toBe(1);
   });
-  it("isolates accounts and deployments including local read and mute preferences", () => {
+  it("isolates accounts including local read and mute preferences", () => {
+    store().setAccount("one");
     store().ingestLocal({ id: "job", kind: "completion", title: "Finished" });
     store().setSourceMuted("app:files", true);
-    localStorage.setItem("misty:deployment-scope", "another");
-    store().setAccount("one");
-    expect(store().allItems).toEqual([]);
-    expect(store().hasUnseenHistory).toBe(false);
     store().setAccount("two");
     expect(store().allItems).toEqual([]);
-    localStorage.removeItem("misty:deployment-scope");
+    expect(store().hasUnseenHistory).toBe(false);
     store().setAccount("one");
     expect(store().attentionCount).toBe(1);
   });

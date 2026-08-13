@@ -1,6 +1,7 @@
 //! Production secrets live on the operator's computer under server/.env/prod
 //! (and misty-billing/.env/prod). `push` copies them to the VPS over SSH and
-//! `deploy` then updates and starts both stacks there.
+//! `deploy` then updates and starts both stacks there. The public misty repo is
+//! cloned on the VPS; billing's private source is not, only its deploy files.
 
 use std::{
     fs,
@@ -235,14 +236,62 @@ tar -xf - --no-same-owner"
     Ok(())
 }
 
-/// Pushes the environment, then pulls each checkout and starts its stack.
+/// The private billing source never lives on the VPS. Its stack needs only
+/// these committed files; the service itself comes from the GHCR image.
+const BILLING_DEPLOY_FILES: [&str; 4] = [
+    "compose.prod.yml",
+    "deploy/prod.sh",
+    "deploy/prod-database-permissions.sh",
+    "deploy/runtime-grants.sql",
+];
+
+fn push_billing_files(billing: &Path, remote: &Remote) -> Result<()> {
+    let dirty = Command::new("git")
+        .arg("-C")
+        .arg(billing)
+        .args(["status", "--porcelain", "--"])
+        .args(BILLING_DEPLOY_FILES)
+        .output()
+        .context("could not run git in misty-billing")?;
+    if !dirty.status.success() || !dirty.stdout.is_empty() {
+        bail!("commit misty-billing's deploy files before deploying: {}", BILLING_DEPLOY_FILES.join(", "));
+    }
+    println!("Sending billing deploy files to {}:{}", remote.host, remote.billing_dir);
+    let mut archive = Command::new("git")
+        .arg("-C")
+        .arg(billing)
+        .args(["archive", "--format=tar", "HEAD", "--"])
+        .args(BILLING_DEPLOY_FILES)
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("could not start git archive")?;
+    let stdout = archive.stdout.take().context("git archive has no output")?;
+    let status = remote
+        .ssh(&format!(
+            "set -eu; mkdir -p {dir}; tar -xf - --no-same-owner -C {dir}",
+            dir = remote.billing_dir
+        ))
+        .stdin(stdout)
+        .status()
+        .context("could not start ssh")?;
+    let archived = archive.wait()?;
+    if !archived.success() || !status.success() {
+        bail!("sending billing deploy files failed (git archive {archived}, ssh {status})");
+    }
+    Ok(())
+}
+
+/// Pushes the environment and billing's deploy files, then starts billing and
+/// pulls and starts the Misty server.
 pub fn deploy(workspace: &Workspace, remote: &Remote) -> Result<()> {
     push(workspace, remote)?;
     let path = r#"PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH""#;
-    if workspace.root.join("misty-billing/.env/prod").is_dir() {
+    let billing = workspace.root.join("misty-billing");
+    if billing.join(".env/prod").is_dir() {
+        push_billing_files(&billing, remote)?;
         println!("Starting billing on {}", remote.host);
         remote.run(&format!(
-            "set -eu; {path}; cd {}; git pull --ff-only; deploy/prod.sh up",
+            "set -eu; cd {}; deploy/prod.sh up",
             remote.billing_dir
         ))?;
     }
