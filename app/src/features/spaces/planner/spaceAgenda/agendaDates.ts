@@ -66,9 +66,26 @@ export function dayKey(value: Date | string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+export function agendaEntryDayKey(entry: SpaceAgendaEntry) {
+  if (!entry.all_day) return dayKey(entry.starts_at);
+
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "2-digit",
+      timeZone: entry.timezone || "UTC",
+      year: "numeric",
+    }).formatToParts(new Date(entry.starts_at));
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return dayKey(entry.starts_at);
+  }
+}
+
 export function groupAgendaEntries(entries: SpaceAgendaEntry[]) {
   return entries.reduce<Record<string, SpaceAgendaEntry[]>>((groups, entry) => {
-    (groups[dayKey(entry.starts_at)] ??= []).push(entry);
+    (groups[agendaEntryDayKey(entry)] ??= []).push(entry);
     return groups;
   }, {});
 }
