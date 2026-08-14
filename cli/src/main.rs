@@ -13,6 +13,7 @@ mod home;
 mod process;
 mod release;
 mod server;
+mod server_release;
 mod setup;
 mod website;
 mod workspace;

@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, deploy, desktop, environment, home, release, server, website};
+use crate::{
+    checks, config::Settings, deploy, desktop, environment, home, release, server, server_release,
+    website,
+};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -229,6 +232,12 @@ enum ServerCommand {
         follow: bool,
         #[arg(long, default_value_t = 100)]
         tail: u32,
+    },
+    /// Test, build and push the production images from this computer, tag the
+    /// commit, and save the image digests in server/.env/prod.
+    Release {
+        /// Release version, such as 0.1.0 (tagged server-v0.1.0).
+        version: String,
     },
     /// Operate the production Compose stack explicitly.
     Prod {
@@ -522,6 +531,9 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 follow,
                 tail,
             } => server::logs(&settings.workspace, service.as_deref(), follow, tail),
+            ServerCommand::Release { version } => {
+                server_release::release(&settings.workspace, &version)
+            }
             ServerCommand::Prod { command } => match command {
                 ProdCommand::Check => server::production_check(&settings.workspace),
                 ProdCommand::Up => server::production_up(&settings.workspace),
