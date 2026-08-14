@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { paneViewLabel } from "@/features/workspace/layoutTabs";
-import { setWorkspaceUnsaved } from "@/features/workspace/unsavedChanges";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 vi.mock("./WorkspaceDockTree", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
@@ -119,25 +118,6 @@ it("shows only close for a single pane and only a dropdown for multiple panes", 
     expect(screen.getByRole("button", { name: `Close tab ${title}` })).toBeTruthy(),
   );
   expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
-});
-it("does not close a pane with unsaved work from the dropdown", async () => {
-  const state = useWorkspaceStore.getState();
-  const browser = dockLeaves(useWorkspaceStore.getState().layout.root)[0].views[0];
-  const title = paneViewLabel(browser);
-  state.splitPane(useWorkspaceStore.getState().layout.focusedPaneId, "right");
-  mount();
-  setWorkspaceUnsaved(browser.id, true);
-  try {
-    fireEvent.pointerDown(screen.getByRole("button", { name: `Show panes in ${title}` }), {
-      button: 0,
-      ctrlKey: false,
-      pointerType: "mouse",
-    });
-    fireEvent.click((await screen.findAllByRole("menuitem", { name: `Close pane ${title}` }))[0]);
-    expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
-  } finally {
-    setWorkspaceUnsaved(browser.id, false);
-  }
 });
 
 it.each(["left", "right"] as const)(

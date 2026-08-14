@@ -43,13 +43,6 @@ describe("shortcut platform defaults", () => {
     });
   });
 
-  it("uses the curated Harpoon defaults", () => {
-    const harpoon = shortcutCommandsById.get("code.harpoon")!;
-    expect(harpoon.defaults.macos.primary).toBe("Cmd+Shift+E");
-    expect(harpoon.defaults.windows.primary).toBe("Ctrl+E");
-    expect(shortcutCommandsById.get("code.mark_1")?.defaults.macos.primary).toBe("Cmd+Option+1");
-  });
-
   it("uses Vim directions for pane focus and numbered virtual windows", () => {
     expect(shortcutCommandsById.get("workspace.focus_pane_left")?.defaults.macos.primary).toBe(
       "Option+H",

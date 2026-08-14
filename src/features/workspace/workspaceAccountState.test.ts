@@ -21,8 +21,8 @@ describe("workspaceAccountState per-account isolation", () => {
     // User A sets up their workspace
     useWorkspaceStore.getState().setScope("space:family");
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code Editor",
       route: "/code",
       forceNew: true,

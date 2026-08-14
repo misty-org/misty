@@ -70,6 +70,7 @@ export default tseslint.config(
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
+      "**/.output/**",
       "dist-*/**",
       "build/**",
       "vendor/**",
@@ -94,11 +95,19 @@ export default tseslint.config(
       "service/**",
       "*.config.js",
       "*.config.ts",
+      // Vendored, minified third-party bundles (e.g. the operator console's htmx).
+      "**/*.min.js",
     ],
   },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
+
+  // The operator console's page script runs in the browser as a classic script.
+  {
+    files: ["server/internal/console/assets/**/*.js"],
+    languageOptions: { sourceType: "script", globals: globals.browser },
+  },
 
   {
     files: ["**/*.{ts,tsx}"],

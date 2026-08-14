@@ -80,13 +80,9 @@ pub async fn auth_http_start(
     let method =
         reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "Invalid HTTP method")?;
     let login = method == reqwest::Method::POST
-        && [
-            "/login",
-            "/auth/google/complete",
-            "/register",
-        ]
-        .iter()
-        .any(|path| url.path().ends_with(path));
+        && ["/login", "/auth/google/complete", "/register"]
+            .iter()
+            .any(|path| url.path().ends_with(path));
     let refresh = method == reqwest::Method::POST && url.path().ends_with("/auth/refresh");
     // A failed attempt to add another account must not change the active jar.
     let client = if login {

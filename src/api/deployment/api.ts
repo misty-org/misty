@@ -2,12 +2,6 @@ import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/client/base-url";
 
 /** Misty is hosted only, so every client uses the one Hosted namespace. */
 const hostedScope = "hosted";
-let officialAppRuntimeApiBase = "";
-
-/** Configures the API origin for a separately packaged official app. */
-export function configureOfficialAppRuntimeApiBase(apiBase: string): void {
-  officialAppRuntimeApiBase = normalizeApiBaseUrl(apiBase) ?? "";
-}
 
 export function readDeploymentScope(): string {
   return hostedScope;
@@ -28,7 +22,7 @@ export function readDeploymentStorageItem(key: string): string | null {
 }
 
 export async function resolveApiBase(): Promise<string> {
-  return officialAppRuntimeApiBase || resolveHostedApiBase();
+  return resolveHostedApiBase();
 }
 
 export function resolveHostedApiBase(): string {

@@ -79,11 +79,17 @@ fn record(object: &mut Map<String, Value>, direction: Direction) {
     };
     let (stored_kind, new_kind) = match direction {
         Direction::ToRenderer => {
-            let renderer = KINDS.iter().find(|(stored, _)| *stored == kind).map_or(kind, |(_, r)| *r);
+            let renderer = KINDS
+                .iter()
+                .find(|(stored, _)| *stored == kind)
+                .map_or(kind, |(_, r)| *r);
             (kind.to_owned(), renderer.to_owned())
         }
         Direction::FromRenderer => {
-            let stored = KINDS.iter().find(|(_, renderer)| *renderer == kind).map_or(kind, |(s, _)| *s);
+            let stored = KINDS
+                .iter()
+                .find(|(_, renderer)| *renderer == kind)
+                .map_or(kind, |(s, _)| *s);
             (stored.to_owned(), stored.to_owned())
         }
     };
@@ -169,9 +175,15 @@ mod tests {
     fn deletes_and_unrelated_objects_are_left_alone() {
         let mut change = json!({"action": "delete", "kind": "view", "id": "v1"});
         from_renderer(&mut change);
-        assert_eq!(change, json!({"action": "delete", "kind": "tab", "id": "v1"}));
+        assert_eq!(
+            change,
+            json!({"action": "delete", "kind": "tab", "id": "v1"})
+        );
         let mut area = json!({"kind": "session_storage", "origin": "https://a.test"});
         to_renderer(&mut area);
-        assert_eq!(area, json!({"kind": "session_storage", "origin": "https://a.test"}));
+        assert_eq!(
+            area,
+            json!({"kind": "session_storage", "origin": "https://a.test"})
+        );
     }
 }

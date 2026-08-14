@@ -157,8 +157,18 @@ impl Slots {
             coverage.skipped(&host, skip.kind, skip.reason, skip.count);
         }
         let fields = [
-            (Area::LocalStorage { origin: origin.into() }, "local"),
-            (Area::IndexedDb { origin: origin.into() }, "indexed"),
+            (
+                Area::LocalStorage {
+                    origin: origin.into(),
+                },
+                "local",
+            ),
+            (
+                Area::IndexedDb {
+                    origin: origin.into(),
+                },
+                "indexed",
+            ),
         ];
         for (area, field) in fields {
             let mut payload = value[field].clone();
@@ -204,9 +214,10 @@ pub(super) async fn capture(
     // Keep already captured, closed origins in the complete observation. They
     // cannot be mistaken for deletions merely because their tab isn't mounted.
     let mut slots = Slots::default();
-    for record in previous.iter().filter(|record| {
-        !matches!(record.area, Area::Cookies | Area::SessionStorage { .. })
-    }) {
+    for record in previous
+        .iter()
+        .filter(|record| !matches!(record.area, Area::Cookies | Area::SessionStorage { .. }))
+    {
         slots.candidates.insert(
             Held::key(&record.area),
             Candidate {
@@ -322,10 +333,7 @@ mod observed_tests {
         merge_observed(&mut cache, &mut first, ORIGIN, now);
         // The next pass offers the stamps it holds...
         let (_, known) = read_request(&cache, ORIGIN, now);
-        assert_eq!(
-            known,
-            json!({"local": "l1", "indexed": "i1"})
-        );
+        assert_eq!(known, json!({"local": "l1", "indexed": "i1"}));
         // ...and a page that reports everything unchanged sends no data.
         let mut report = json!({
             "origin": ORIGIN, "local": null, "indexed": null,

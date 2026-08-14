@@ -1,6 +1,6 @@
-import { Folder, Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 
-import { Button, Pressable } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 
 import { formatBytes, formatTime } from "../libraryFormat";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
@@ -27,121 +27,6 @@ export function SpaceLibraryCollectionOverview() {
     <div className="grid gap-8">
       <RecentlyAddedRail />
       <AlbumsRail />
-    </div>
-  );
-}
-
-export function SpaceLibraryAlbumsOverview() {
-  const {
-    data: {
-      spaceId,
-      canEditLibrary,
-      currentAlbumFolder,
-      visibleAlbumFolders,
-      visibleAlbumsForFolder,
-      setSelectedAlbumFolderId,
-    },
-    collectionActions: {
-      createAlbumFolder,
-      deleteAlbumFolder,
-      openCreateAlbum,
-      renameAlbumFolder,
-      selectCollection,
-    },
-  } = useSpaceLibraryContext();
-
-  return (
-    <div className="mb-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {currentAlbumFolder ? (
-            <Button
-              variant="link"
-              size="none"
-              className="text-xs text-cream-muted"
-              onClick={() => setSelectedAlbumFolderId(currentAlbumFolder.parent_folder_id ?? "")}
-            >
-              ←
-            </Button>
-          ) : null}
-          <h4 className="m-0 text-sm">{currentAlbumFolder?.name ?? "Albums"}</h4>
-        </div>
-        {canEditLibrary ? (
-          <div className="flex gap-2">
-            {currentAlbumFolder ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onClick={() => void renameAlbumFolder()}
-                >
-                  <Pencil size={12} />
-                  Rename
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onClick={() => void deleteAlbumFolder()}
-                >
-                  <Trash2 size={12} />
-                  Delete
-                </Button>
-              </>
-            ) : null}
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              onClick={() => void createAlbumFolder()}
-            >
-              <Folder size={13} />
-              New folder
-            </Button>
-            <Button size="sm" variant="outline" type="button" onClick={openCreateAlbum}>
-              <Plus size={13} />
-              New album
-            </Button>
-          </div>
-        ) : null}
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-        {visibleAlbumFolders.map((folder) => (
-          <Pressable
-            className={`${collectionCardClassName} p-4`}
-            key={folder.id}
-            onClick={() => setSelectedAlbumFolderId(folder.id)}
-          >
-            {/* An explicit size class opts out of Button's [&_svg]:size-4 rule. */}
-            <Folder className="size-[26px]" />
-            <span className="mt-5 block truncate text-xs font-medium">{folder.name}</span>
-            <span className="mt-1 block text-[10px] text-cream-muted">
-              {folder.album_count + folder.folder_count} items
-            </span>
-          </Pressable>
-        ))}
-        {visibleAlbumsForFolder.map((album) => (
-          <Pressable
-            className={collectionCardClassName}
-            key={album.id}
-            onClick={() => selectCollection("albums", album.id)}
-          >
-            <AlbumCover spaceId={spaceId} itemId={album.cover_item_id} />
-            <span className="block p-3">
-              <span className="block truncate text-xs font-medium">{album.name}</span>
-              <span className="mt-1 block text-[10px] text-cream-muted">
-                {album.item_count} items
-              </span>
-            </span>
-          </Pressable>
-        ))}
-      </div>
-      {visibleAlbumFolders.length === 0 && visibleAlbumsForFolder.length === 0 ? (
-        <div className="grid min-h-48 place-items-center text-sm text-cream-muted">
-          Nothing to see here...
-        </div>
-      ) : null}
     </div>
   );
 }

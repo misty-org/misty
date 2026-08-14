@@ -10,14 +10,18 @@ use crate::{protocol::MAX_COUNTER, Error, Result};
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Area {
     Cookies,
-    LocalStorage { origin: String },
+    LocalStorage {
+        origin: String,
+    },
     SessionStorage {
         origin: String,
         // Stored name: this area is encrypted credential content.
         #[serde(rename = "tab_id")]
         view_id: String,
     },
-    IndexedDb { origin: String },
+    IndexedDb {
+        origin: String,
+    },
 }
 
 impl Area {

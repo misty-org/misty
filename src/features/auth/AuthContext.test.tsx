@@ -109,7 +109,7 @@ vi.mock("./store/useAuthTokenStore", () => ({
 vi.mock("./store/useUserStore", () => ({
   useUserStore: mocks.useUserStore,
 }));
-vi.mock("@/features/installer", () => {
+vi.mock("@/features/native-session", () => {
   const state = {
     signOut: mocks.signOut,
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
@@ -119,7 +119,7 @@ vi.mock("@/features/installer", () => {
     },
   };
   return {
-    useSetupStore: Object.assign(
+    useNativeSessionStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
       {
         getState: () => state,
@@ -137,7 +137,7 @@ vi.mock("@/features/app-shell", () => {
     },
   };
   return {
-    useSetupStore: Object.assign(
+    useNativeSessionStore: Object.assign(
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
       {
         getState: () => state,

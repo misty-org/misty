@@ -1,13 +1,6 @@
 use super::*;
 
 impl ExplorerService {
-    pub async fn create_item(
-        &self,
-        request: CreateItemRequest,
-    ) -> ApiResult<ExplorerOperationResult> {
-        self.create_item_impl(request, None, None).await
-    }
-
     pub async fn create_item_with_cancellation(
         &self,
         request: CreateItemRequest,
@@ -55,13 +48,6 @@ impl ExplorerService {
         ensure_not_canceled_if(cancellation)?;
         let result = create_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
-    }
-
-    pub async fn rename_item(
-        &self,
-        request: RenameItemRequest,
-    ) -> ApiResult<ExplorerOperationResult> {
-        self.rename_item_impl(request, None, None).await
     }
 
     pub async fn rename_item_with_cancellation(
@@ -121,13 +107,6 @@ impl ExplorerService {
         ensure_not_canceled_if(cancellation)?;
         let result = rename_local_item_cancellable(request, cancellation).await;
         self.finish_transfer(transfer_id, result).await
-    }
-
-    pub async fn delete_items(
-        &self,
-        request: DeleteItemsRequest,
-    ) -> ApiResult<ExplorerOperationResult> {
-        self.delete_items_impl(request, None, None).await
     }
 
     pub async fn delete_items_with_cancellation(

@@ -9,6 +9,13 @@ mod browser_cookie_restore;
 #[path = "../src/infra/browser_cookie_store.rs"]
 mod browser_cookie_store;
 #[cfg(target_os = "macos")]
+#[allow(
+    dead_code,
+    reason = "the cookie modules use only part of the coverage helpers"
+)]
+#[path = "../src/infra/browser_data_coverage.rs"]
+mod browser_data_coverage;
+#[cfg(target_os = "macos")]
 // This macOS probe only needs WebKit identifiers; folder helpers belong to the host.
 #[expect(
     dead_code,
@@ -56,9 +63,14 @@ mod probe {
     }
 
     async fn read(view: &Webview, id: &str) -> Result<Vec<Cookie>> {
-        cookies::read(view, id)
+        let read = cookies::read(view, id)
             .await
-            .map_err(|_| "native read failed")
+            .map_err(|_| "native read failed")?;
+        // Every probe cookie is synthetic and valid; a skip is a regression.
+        if !read.skipped.is_empty() {
+            return Err("native read skipped a cookie");
+        }
+        Ok(read.cookies)
     }
 
     async fn write(view: &Webview, id: &str, cookie: Cookie, delete: bool) -> Result<()> {

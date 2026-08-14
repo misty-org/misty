@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_NAVIGATOR_APP_IDS, NAVIGATOR_APP_IDS } from "./navigatorApps";
 import {
   navigatorAppIdsForAccount,
-  navigatorAppsCollapsedForAccount,
   navigatorAppsStorageKey,
   useNavigatorAppsStore,
 } from "./useNavigatorAppsStore";
@@ -50,17 +49,6 @@ describe("useNavigatorAppsStore", () => {
     expect(navigatorAppIdsForAccount(useNavigatorAppsStore.getState(), "account-1")).toEqual([]);
     expect(navigatorAppIdsForAccount(useNavigatorAppsStore.getState(), "account-2")).toEqual(
       DEFAULT_NAVIGATOR_APP_IDS,
-    );
-  });
-
-  it("persists the collapsed preference per account", () => {
-    useNavigatorAppsStore.getState().setCollapsed("account-1", true);
-
-    expect(navigatorAppsCollapsedForAccount(useNavigatorAppsStore.getState(), "account-1")).toBe(
-      true,
-    );
-    expect(navigatorAppsCollapsedForAccount(useNavigatorAppsStore.getState(), "account-2")).toBe(
-      false,
     );
   });
 

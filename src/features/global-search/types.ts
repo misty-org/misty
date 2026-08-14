@@ -76,15 +76,6 @@ export type UnifiedMistyCandidate =
       prompt: string;
     });
 
-export interface GlobalSearchContextItem {
-  kind: GlobalSearchKind;
-  title: string;
-  snippet: string;
-  href: string;
-  space?: string;
-  source: GlobalSearchDocument["source"];
-}
-
 export interface GlobalAiContextRef {
   id: string;
   kind: string;

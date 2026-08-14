@@ -83,10 +83,6 @@ impl ClipboardService {
         state.device_name = device_name;
     }
 
-    pub fn set_on_change(&self, callback: Option<ClipboardChangeCallback>) {
-        self.state.lock().expect("clipboard state lock").on_change = callback;
-    }
-
     pub fn current_local(&self) -> ClipboardPayload {
         self.state
             .lock()
@@ -113,10 +109,6 @@ impl ClipboardService {
                 .shared_client
                 .as_ref()
                 .is_some_and(|client| client.publish(payload))
-    }
-
-    pub fn apply_shared_to_system(&self) -> bool {
-        self.apply_payload_to_system(self.latest_shared())
     }
 
     pub fn apply_shared_to_system_async(self: &Arc<Self>) -> bool {
@@ -164,19 +156,6 @@ impl ClipboardService {
         let payload = self.finalize_payload(payload, ClipboardOrigin::LocalSystem);
         self.set_local_payload(payload.clone());
         self.publish_payload_to_shared(&payload)
-    }
-
-    pub fn make_text_payload(&self, text: String, origin: ClipboardOrigin) -> ClipboardPayload {
-        let payload = ClipboardPayload {
-            kind: if text.is_empty() {
-                ClipboardPayloadKind::Empty
-            } else {
-                ClipboardPayloadKind::Text
-            },
-            text,
-            ..ClipboardPayload::default()
-        };
-        self.finalize_payload(payload, origin)
     }
 
     pub fn finalize_payload(
@@ -306,18 +285,6 @@ impl ClipboardService {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn finalizes_payload_with_device_revision_and_identity() {
-        let service = ClipboardService::new(None, None);
-        service.set_device_identity("device-a".into(), "Laptop".into());
-        let first = service.make_text_payload("hello".into(), ClipboardOrigin::LocalMisty);
-        let second = service.make_text_payload("world".into(), ClipboardOrigin::LocalMisty);
-        assert_eq!(first.source_device_id, "device-a");
-        assert_eq!(first.revision, 1);
-        assert_eq!(second.revision, 2);
-        assert!(first.payload_id.starts_with("device-a:1:"));
-    }
 
     #[test]
     fn fingerprint_changes_with_binary_image_content() {

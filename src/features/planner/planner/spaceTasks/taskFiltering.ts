@@ -46,12 +46,3 @@ export function matchesDueFilter(task: SpaceTask, filter: DueFilter) {
     );
   return true;
 }
-
-export function isTypingTarget(target: EventTarget | null) {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}

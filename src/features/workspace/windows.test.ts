@@ -26,16 +26,16 @@ describe("workspace virtual windows", () => {
     store.setScope("space:family");
     const firstWindowId = useWorkspaceStore.getState().activeWindowId;
     store.openSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       forceNew: true,
     });
     const secondWindow = useWorkspaceStore.getState().createWindow("Research");
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
       title: "Terminal",
       route: "/terminal",
       forceNew: true,
@@ -43,11 +43,11 @@ describe("workspace virtual windows", () => {
 
     expect(useWorkspaceStore.getState().switchWindow(firstWindowId)).toBe(true);
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toContainEqual(
-      expect.objectContaining({ surfaceId: "code" }),
+      expect.objectContaining({ surfaceId: "browser" }),
     );
     expect(useWorkspaceStore.getState().switchWindow(secondWindow.id)).toBe(true);
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toContainEqual(
-      expect.objectContaining({ surfaceId: "terminal" }),
+      expect.objectContaining({ surfaceId: "files" }),
     );
     useWorkspaceStore.getState().setScope("space:work");
     expect(useWorkspaceStore.getState().windowsByScope["space:work"]).toHaveLength(1);
@@ -132,8 +132,8 @@ describe("workspace virtual windows", () => {
     });
     const second = useWorkspaceStore.getState().createWindow("Research");
     store.openSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       forceNew: true,
@@ -151,8 +151,8 @@ describe("workspace virtual windows", () => {
     const firstPane = useWorkspaceStore.getState().layout.focusedPaneId;
     const secondPane = useWorkspaceStore.getState().splitPane(firstPane, "right")!;
     const code = useWorkspaceStore.getState().openSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "browser",
+      groupKey: "tool:browser",
       title: "Code",
       route: "/code",
       forceNew: true,
@@ -257,8 +257,8 @@ describe("workspace virtual windows", () => {
     const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
     const terminal = useWorkspaceStore.getState().openSurface({
-      surfaceId: "terminal",
-      groupKey: "tool:terminal",
+      surfaceId: "files",
+      groupKey: "tool:files",
       title: "Terminal",
       route: "/terminal",
       forceNew: true,

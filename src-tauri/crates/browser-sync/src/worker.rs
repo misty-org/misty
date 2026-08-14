@@ -22,7 +22,7 @@ use crate::{
         PendingSnapshot, Store,
     },
     transport::{SyncApi, SyncSocket},
-    workspace::sync::{Outgoing, WorkspaceSync, SyncState},
+    workspace::sync::{Outgoing, SyncState, WorkspaceSync},
     Error, Result,
 };
 
@@ -101,7 +101,10 @@ enum Command {
     WorkspaceChanges(Vec<crate::document::Change>, oneshot::Sender<Result<()>>),
     WorkspaceClaim(String, oneshot::Sender<Result<()>>),
     WorkspaceOpen(String, oneshot::Sender<Result<()>>),
-    RecordsList(String, oneshot::Sender<Result<(u64, Vec<crate::document::ViewRecord>)>>),
+    RecordsList(
+        String,
+        oneshot::Sender<Result<(u64, Vec<crate::document::ViewRecord>)>>,
+    ),
     RecordsWrite(
         String,
         Vec<(String, Option<crate::document::ViewRecord>)>,
@@ -442,13 +445,15 @@ impl WorkerHandle {
     /// Moves this device's sign-in lease to `workspace_id` (the machine most
     /// recently active on a device publishes its sign-ins). Requires a connection.
     pub async fn claim_workspace(&self, workspace_id: String) -> Result<()> {
-        self.call(|reply| Command::WorkspaceClaim(workspace_id, reply)).await
+        self.call(|reply| Command::WorkspaceClaim(workspace_id, reply))
+            .await
     }
 
     /// Shows and edits `workspace_id` on this machine. Works offline; any number
     /// of machines may be on one workspace at once.
     pub async fn open_workspace(&self, workspace_id: String) -> Result<()> {
-        self.call(|reply| Command::WorkspaceOpen(workspace_id, reply)).await
+        self.call(|reply| Command::WorkspaceOpen(workspace_id, reply))
+            .await
     }
 
     /// Native-only: a pulled collection as shown here (pending writes on
@@ -457,7 +462,8 @@ impl WorkerHandle {
         &self,
         collection: String,
     ) -> Result<(u64, Vec<crate::document::ViewRecord>)> {
-        self.call(|reply| Command::RecordsList(collection, reply)).await
+        self.call(|reply| Command::RecordsList(collection, reply))
+            .await
     }
 
     /// Native-only: replaces whole records (`None` deletes); queued durably
@@ -467,7 +473,8 @@ impl WorkerHandle {
         collection: String,
         writes: Vec<(String, Option<crate::document::ViewRecord>)>,
     ) -> Result<()> {
-        self.call(|reply| Command::RecordsWrite(collection, writes, reply)).await
+        self.call(|reply| Command::RecordsWrite(collection, writes, reply))
+            .await
     }
 
     /// Native-only: slot plaintext (page state, history) may hold form data.
@@ -493,7 +500,10 @@ impl WorkerHandle {
 
     /// Native-only: whether this session holds a device's lock, the device's
     /// verified sign-in slots, and this machine's store binding for it.
-    pub async fn signin_status(&self, workspace_id: String) -> Result<crate::workspace::sync::SigninStatus> {
+    pub async fn signin_status(
+        &self,
+        workspace_id: String,
+    ) -> Result<crate::workspace::sync::SigninStatus> {
         self.call(|reply| Command::SigninStatus(workspace_id, reply))
             .await
     }
@@ -607,7 +617,8 @@ where
                 grants: &HashMap::new(),
             },
         )?;
-        let (sync_state, workspaces_rx) = watch::channel(workspaces.optimistic_view(&store, &root)?);
+        let (sync_state, workspaces_rx) =
+            watch::channel(workspaces.optimistic_view(&store, &root)?);
         let handle = WorkerHandle {
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
             commands: commands_tx,
@@ -845,7 +856,8 @@ where
                     if rest.is_empty() {
                         Ok(())
                     } else {
-                        self.workspaces.apply_changes(&mut self.store, &self.root, rest)
+                        self.workspaces
+                            .apply_changes(&mut self.store, &self.root, rest)
                     }
                 });
                 let _ = reply.send(result);
@@ -902,7 +914,11 @@ where
                 self.publish_sync_state()?;
             }
             Command::SigninStatus(workspace, reply) => {
-                let _ = reply.send(self.workspaces.signin_status(&self.store, &self.root, &workspace));
+                let _ = reply.send(self.workspaces.signin_status(
+                    &self.store,
+                    &self.root,
+                    &workspace,
+                ));
             }
             Command::SigninWrite(workspace, writes, written, reply) => {
                 let _ = reply.send(self.workspaces.write_signin(
@@ -923,7 +939,10 @@ where
                 }
             }
             Command::SigninBind(workspace, binding, reply) => {
-                let _ = reply.send(self.store.set_device_signin(&self.root, &workspace, &binding));
+                let _ = reply.send(
+                    self.store
+                        .set_device_signin(&self.root, &workspace, &binding),
+                );
             }
             Command::WorkspaceSlotRead(workspace, tab, slot, reply) => {
                 if self.connected_now {
@@ -1118,9 +1137,11 @@ where
                 .unwrap_or_default()
                 .as_millis() as u64;
             if self.workspaces.idle() {
-                self.store.resync_workspace_counter(own.workspace_last_counter)?;
+                self.store
+                    .resync_workspace_counter(own.workspace_last_counter)?;
             } else {
-                self.store.observe_workspace_counter(own.workspace_last_counter)?;
+                self.store
+                    .observe_workspace_counter(own.workspace_last_counter)?;
             }
             // Workspace protocol: the target signs a claim reusing the request ID,
             // which the server checks against the request's workspace and expiry.

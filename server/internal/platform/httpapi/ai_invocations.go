@@ -340,13 +340,6 @@ func TestingConversationSpaceChanged(boundSpaceID, requestedSpaceID string) bool
 	return conversationSpaceChanged(boundSpaceID, requestedSpaceID)
 }
 
-func firstAIError(primary, fallback error) error {
-	if primary != nil {
-		return primary
-	}
-	return fallback
-}
-
 func writeAIInvocationCreated(w http.ResponseWriter, record *aiInvocationRecord) {
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"invocationId":   record.ID,

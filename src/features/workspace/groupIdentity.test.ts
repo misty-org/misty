@@ -5,11 +5,11 @@ import type { WorkspaceLayout, WorkspaceView } from "./model";
 const tab = (id: string) =>
   ({
     id,
-    groupKey: "app:chat",
+    groupKey: "tool:files",
     title: id,
-    surfaceId: "official-app",
+    surfaceId: "files",
     instanceKey: id,
-    route: "/apps/chat",
+    route: "/files",
     sidebarVisible: true,
     state: null,
     createdAt: 1,

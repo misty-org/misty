@@ -1,18 +1,5 @@
 import { isRememberableAppRoute } from "@/features/app-shell";
 
-const videoWallpaperExtensions = new Set(["m4v", "mov", "mp4", "ogv", "webm"]);
-
-export function isVideoWallpaperPath(path: string): boolean {
-  const cleanPath = path.split(/[?#]/, 1)[0] ?? "";
-  const extensionStart = cleanPath.lastIndexOf(".");
-  if (extensionStart < 0) return false;
-  return videoWallpaperExtensions.has(cleanPath.slice(extensionStart + 1).toLowerCase());
-}
-
-export function formatBadgeCount(count: number): string {
-  return count > 99 ? "99+" : String(count);
-}
-
 export function initialsForProfile(name: string, email: string): string {
   const initials = name
     .split(" ")

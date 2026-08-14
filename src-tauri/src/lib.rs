@@ -4,8 +4,6 @@
 // failures.
 #![allow(dead_code, unused_imports, unused_variables)]
 
-#[cfg(not(target_os = "macos"))]
-use crate::app::commands::agents_prepare_document;
 mod app;
 #[cfg(all(desktop, debug_assertions))]
 mod development_profile;
@@ -25,67 +23,52 @@ use app::commands::{
     media_search_set_asset_state, media_search_snapshot,
 };
 use app::commands::{
-    agents_device_snapshot, agents_open_citation, agents_prepare_scoped_document,
-    agents_register_folder_scope, agents_revoke_folder_scope, app_environment_snapshot,
-    app_snapshot, archive_create, archive_extract, archive_list,
-    claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
+    agents_device_snapshot, agents_prepare_scoped_document, agents_revoke_folder_scope,
+    app_snapshot, archive_create, archive_extract, archive_list, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
-    clipboard_write_file_bytes, clipboard_write_file_refs, coding_ai_clear_api_key,
-    coding_ai_read_api_key, coding_ai_write_api_key, compare_apply_text_merge, compare_files,
+    clipboard_write_file_bytes, clipboard_write_file_refs, compare_apply_text_merge, compare_files,
     compare_folders, devices_snapshot, devices_unmount, duplicates_cancel, duplicates_scan,
-    explorer_calculate_directory_sizes, explorer_cancel_drag_preparation, explorer_create_item,
-    explorer_delete_items, explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
-    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
-    explorer_library_snapshot, explorer_list_directory, explorer_open_association,
-    explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
-    explorer_path_is_directory, explorer_prepare_drag_items, explorer_prepare_open_item,
-    explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
-    explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
-    explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
-    explorer_save_preview_item, explorer_set_open_association, file_metadata_snapshot,
-    file_sync_apply, file_sync_compare, file_sync_pair_remove, file_sync_pair_save,
-    file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod, file_tools_create_symlink,
-    file_tools_read_symlink, file_tools_set_readonly, navigation_names_snapshot, navigation_names_update, notes_store_asset,
-    open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
-    operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
-    operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
-    operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
-    operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
-    operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
+    explorer_calculate_directory_sizes, explorer_cancel_drag_preparation,
+    explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
+    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_snapshot,
+    explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
+    explorer_path_exists, explorer_path_is_directory, explorer_prepare_drag_items,
+    explorer_prepare_open_item, explorer_preview_item, explorer_queue_create_item,
+    explorer_queue_delete_items, explorer_queue_paste_blob, explorer_queue_paste_items,
+    explorer_queue_paste_text, explorer_queue_rename_item, explorer_queue_rename_items,
+    explorer_save_preview_item, file_metadata_snapshot, file_sync_apply, file_sync_compare,
+    file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
+    file_tools_create_symlink, file_tools_read_symlink, navigation_names_snapshot,
+    navigation_names_update, open_terminal_at_path, operation_queue_redo,
+    operation_queue_resolve_conflict, operation_queue_snapshot, operation_queue_undo,
     saved_searches_delete, saved_searches_save, saved_searches_snapshot, search_cancel_scan,
     search_get_status, search_init, search_query, search_start_scan,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_profile_commit, settings_profile_state,
-    settings_remove_open_with_association, settings_save, settings_snapshot,
-    smart_library_apply_results, smart_library_assets_page, smart_library_delete,
-    smart_library_import_files, smart_library_preflight_import, smart_library_prepare_previews,
-    smart_library_resolve_assets, smart_library_scan, smart_library_search,
-    smart_library_set_server_folder_id, smart_library_snapshot, transfers_delete_all,
-    transfers_delete_selected, transfers_snapshot, workspaces_save, workspaces_snapshot,
+    settings_save, settings_snapshot, smart_library_apply_results, smart_library_assets_page,
+    smart_library_delete, smart_library_import_files, smart_library_preflight_import,
+    smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
+    smart_library_set_server_folder_id, smart_library_snapshot, transfers_snapshot,
 };
 
 #[cfg(desktop)]
 use app::commands::{
-    connected_devices_connect, connected_devices_initialize, connected_devices_list_directory,
-    connected_devices_media_url, connected_devices_open_workspace_route,
-    connected_devices_prepare_clipboard_files, connected_devices_read_file,
-    connected_devices_roots, connected_devices_snapshot, connected_devices_subscribe_directory,
+    connected_devices_connect, connected_devices_initialize, connected_devices_media_url,
+    connected_devices_prepare_clipboard_files, connected_devices_roots, connected_devices_snapshot,
+    connected_devices_subscribe_directory,
 };
 use app::runtime::MistyRuntime;
-use app::shortcut_commands::{
-    shortcuts_reassign, shortcuts_replace, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
-};
+use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
     browser_webview_create, browser_webview_forward, browser_webview_hide,
-    browser_webview_preview_document,
-    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload,
-    browser_webview_set_bounds, browser_webview_set_pane_dim, browser_webview_set_theme,
+    browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
+    browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
     browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
-    browser_webviews_park_all, browser_webviews_set_companion, browser_webviews_set_overlay_active,
+    browser_webviews_park_all, browser_webviews_set_overlay_active,
     browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble, BrowserSessionState,
 };
 #[cfg(desktop)]
@@ -112,39 +95,12 @@ use infra::browser_library::{
 use infra::browser_search_suggest::browser_search_suggest;
 #[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
-#[cfg(all(desktop, not(target_os = "macos")))]
-use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
 use infra::misty::{
-    check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
-    launch_misty, open_external_url, probe_paths, restart_misty, save_authenticated_user,
-    save_verified_license, sign_out_misty, stop_misty,
-};
-use infra::misty_template::{
-    build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
-};
-#[cfg(desktop)]
-use infra::ssh_terminal::{
-    terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
-};
-#[cfg(desktop)]
-use infra::terminal::{
-    terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
-};
-#[cfg(target_os = "macos")]
-use infra::terminal_service::{
-    terminal_service_call, terminal_service_close, terminal_service_create,
-    terminal_service_request,
+    check_system, ensure_local_access_token, save_authenticated_user, save_verified_license,
+    sign_out_misty,
 };
 #[cfg(desktop)]
 use infra::tray;
-#[cfg(target_os = "macos")]
-use platform::mini_app::permissions::mini_app_duplicate_file_grant;
-#[cfg(target_os = "macos")]
-use platform::mini_app::permissions::peer::{
-    space_peer_connect, space_peer_local_identity, space_peer_prepare, space_peer_read,
-    space_peer_request, space_peer_set_peers, space_peer_snapshot, space_peer_start,
-    space_peer_stop,
-};
 use platform::plugins::mac_rounded_corners;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
@@ -210,6 +166,13 @@ pub fn run() {
                     .join("com.misty.desktop/device-keys"),
             )?;
 
+            // Runs only in the primary instance, before any service opens a
+            // file under ~/.misty. Services still create what they need, so a
+            // failure here is reported rather than blocking launch.
+            if let Err(error) = infra::misty_home::ensure_misty_home() {
+                telemetry::PostHogTelemetryReporter
+                    .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
+            }
             let runtime = MistyRuntime::new();
             #[cfg(desktop)]
             {
@@ -296,8 +259,6 @@ pub fn run() {
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
                     crate::infra::browser_sync::browser_sync_availability,
-                    crate::infra::browser_sync::handoff::browser_sync_restore_credentials,
-                    crate::infra::browser_sync::handoff::browser_sync_capture_credentials,
                     crate::infra::workspace_recovery::browser_recovery_open,
                     crate::infra::workspace_recovery::browser_recovery_read,
                     crate::infra::workspace_recovery::browser_recovery_write,
@@ -336,31 +297,12 @@ pub fn run() {
                     platform::mini_app::builtin_service_open,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_close,
-                    #[cfg(desktop)]
-                    platform::mini_app::permissions::mini_app_permission_status,
-                    #[cfg(desktop)]
-                    platform::mini_app::permissions::mini_app_permission_decide,
-                    #[cfg(desktop)]
-                    platform::mini_app::permissions::mini_app_permission_list,
-                    #[cfg(desktop)]
-                    platform::mini_app::permissions::mini_app_context,
-                    #[cfg(desktop)]
-                    platform::mini_app::permissions::mini_app_device_call,
-                    platform::mini_app::permissions::host_files::mini_app_host_file,
                     mac_rounded_corners::reveal_main_window,
-                    mac_rounded_corners::enable_rounded_corners,
                     mac_rounded_corners::enable_modern_window_style,
-                    mac_rounded_corners::enable_custom_titlebar_window_style,
-                    mac_rounded_corners::reposition_traffic_lights,
                     mac_rounded_corners::set_native_wallpaper_video,
                     app_snapshot,
-                    app_environment_snapshot,
                     agents_device_snapshot,
-                    agents_register_folder_scope,
                     agents_revoke_folder_scope,
-                    agents_open_citation,
-                    #[cfg(not(target_os = "macos"))]
-                    agents_prepare_document,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
                     agents_device_identity_load,
@@ -375,87 +317,16 @@ pub fn run() {
                     #[cfg(desktop)]
                     connected_devices_connect,
                     #[cfg(desktop)]
-                    connected_devices_open_workspace_route,
-                    #[cfg(desktop)]
                     connected_devices_roots,
-                    #[cfg(desktop)]
-                    connected_devices_list_directory,
-                    #[cfg(desktop)]
-                    connected_devices_read_file,
                     #[cfg(desktop)]
                     connected_devices_media_url,
                     #[cfg(desktop)]
                     connected_devices_prepare_clipboard_files,
-                    claude_status,
-                    claude_send_message,
-                    claude_drain_events,
-                    claude_abort,
                     check_system,
-                    probe_paths,
-                    misty_template_status,
-                    build_misty_template,
-                    install_misty_template,
-                    restart_misty_app,
                     ensure_local_access_token,
-                    fetch_misty_releases,
                     save_authenticated_user,
                     save_verified_license,
                     sign_out_misty,
-                    launch_misty,
-                    restart_misty,
-                    stop_misty,
-                    get_misty_process_status,
-                    open_external_url,
-                    #[cfg(desktop)]
-                    terminal_create,
-                    #[cfg(target_os = "macos")]
-                    terminal_service_create,
-                    #[cfg(target_os = "macos")]
-                    mini_app_duplicate_file_grant,
-                    #[cfg(target_os = "macos")]
-                    space_peer_start,
-                    #[cfg(target_os = "macos")]
-                    space_peer_local_identity,
-                    #[cfg(target_os = "macos")]
-                    space_peer_snapshot,
-                    #[cfg(target_os = "macos")]
-                    space_peer_set_peers,
-                    #[cfg(target_os = "macos")]
-                    space_peer_stop,
-                    #[cfg(target_os = "macos")]
-                    space_peer_connect,
-                    #[cfg(target_os = "macos")]
-                    space_peer_request,
-                    #[cfg(target_os = "macos")]
-                    space_peer_read,
-                    #[cfg(target_os = "macos")]
-                    space_peer_prepare,
-                    #[cfg(target_os = "macos")]
-                    terminal_service_call,
-                    #[cfg(target_os = "macos")]
-                    terminal_service_close,
-                    #[cfg(target_os = "macos")]
-                    terminal_service_request,
-                    #[cfg(desktop)]
-                    terminal_write,
-                    #[cfg(desktop)]
-                    terminal_resize,
-                    #[cfg(desktop)]
-                    terminal_interrupt,
-                    #[cfg(desktop)]
-                    terminal_kill,
-                    #[cfg(desktop)]
-                    terminal_ssh_environments,
-                    #[cfg(desktop)]
-                    terminal_ssh_preflight,
-                    #[cfg(desktop)]
-                    terminal_ssh_trust_host,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
-                    code_lsp_start,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
-                    code_lsp_send,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
-                    code_lsp_stop,
                     #[cfg(desktop)]
                     browser_webview_create,
                     infra::agent_workspace::agent_window_open,
@@ -485,9 +356,6 @@ pub fn run() {
                     infra::agent_workspace::agent_browser_session_id,
                     #[cfg(target_os = "macos")]
                     crate::infra::browser::browser_context_menu_select,
-                    #[cfg(desktop)]
-                    crate::infra::browser::browser_profile_persistence,
-                    crate::infra::browser::browser_profile_remove,
                     #[cfg(desktop)]
                     browser_shortcuts_update,
                     #[cfg(desktop)]
@@ -572,9 +440,6 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_downloads_remove,
                     #[cfg(desktop)]
-                    browser_webview_set_pane_dim,
-                    browser_webviews_set_companion,
-                    #[cfg(desktop)]
                     browser_webview_hide,
                     #[cfg(desktop)]
                     browser_webviews_hide_all,
@@ -603,16 +468,11 @@ pub fn run() {
                     clipboard_native_file_refs,
                     clipboard_write_file_bytes,
                     clipboard_write_file_refs,
-                    notes_store_asset,
                     devices_snapshot,
                     devices_unmount,
                     explorer_list_directory,
                     explorer_directory_size_snapshot,
                     explorer_calculate_directory_sizes,
-                    explorer_create_item,
-                    explorer_rename_item,
-                    explorer_delete_items,
-                    explorer_paste_items,
                     explorer_prepare_open_item,
                     explorer_prepare_drag_items,
                     explorer_cancel_drag_preparation,
@@ -628,13 +488,11 @@ pub fn run() {
                     explorer_open_path,
                     explorer_open_with,
                     explorer_open_association,
-                    explorer_set_open_association,
                     explorer_path_is_directory,
                     explorer_path_exists,
                     explorer_library_snapshot,
                     explorer_library_record_recent,
                     explorer_library_record_last_opened,
-                    explorer_library_set_tags,
                     smart_library_snapshot,
                     smart_library_scan,
                     smart_library_import_files,
@@ -642,7 +500,6 @@ pub fn run() {
                     smart_library_prepare_previews,
                     smart_library_apply_results,
                     smart_library_set_server_folder_id,
-                    smart_library_search,
                     smart_library_resolve_assets,
                     smart_library_assets_page,
                     smart_library_delete,
@@ -682,8 +539,6 @@ pub fn run() {
                     file_sync_apply,
                     navigation_names_snapshot,
                     navigation_names_update,
-                    workspaces_snapshot,
-                    workspaces_save,
                     settings_snapshot,
                     settings_profile_state,
                     settings_profile_commit,
@@ -691,36 +546,14 @@ pub fn run() {
                     settings_launch_on_login_snapshot,
                     settings_apply_launch_on_login,
                     settings_open_with_associations,
-                    settings_remove_open_with_association,
-                    coding_ai_read_api_key,
-                    coding_ai_write_api_key,
-                    coding_ai_clear_api_key,
                     shortcuts_snapshot,
-                    shortcuts_update,
-                    shortcuts_reassign,
-                    shortcuts_reset,
                     shortcuts_replace,
                     transfers_snapshot,
-                    transfers_delete_selected,
-                    transfers_delete_all,
                     open_terminal_at_path,
                     operation_queue_snapshot,
-                    operation_queue_cancel,
-                    operation_queue_cancel_batch,
-                    operation_queue_retry,
-                    operation_queue_pause,
-                    operation_queue_resume,
-                    operation_queue_pause_batch,
-                    operation_queue_resume_batch,
-                    operation_queue_pause_all,
-                    operation_queue_resume_all,
-                    operation_queue_retry_transfer,
-                    operation_queue_set_bandwidth_limit,
-                    operation_queue_set_transfer_profile,
                     operation_queue_undo,
                     operation_queue_redo,
                     operation_queue_resolve_conflict,
-                    operation_queue_clear_terminal,
                     archive_list,
                     archive_create,
                     archive_extract,
@@ -733,8 +566,6 @@ pub fn run() {
                     compare_folders,
                     compare_apply_text_merge,
                     file_tools_checksum,
-                    file_tools_set_readonly,
-                    file_tools_chmod,
                     file_tools_create_symlink,
                     file_tools_read_symlink,
                     telemetry::telemetry_set_error_reporting_enabled,

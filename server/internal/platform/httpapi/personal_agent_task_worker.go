@@ -9,16 +9,6 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// ProcessAssignedPersonalAgentRuns runs both dispatcher queues once.
-func (s *SpacesService) ProcessAssignedPersonalAgentRuns(ctx context.Context, workerID string, limit int) (int, error) {
-	delivered, err := s.ProcessAgentRuntimeDeliveries(ctx, limit)
-	if err != nil {
-		return delivered, err
-	}
-	processed, err := s.ProcessPersonalAgentTasks(ctx, workerID, limit)
-	return delivered + processed, err
-}
-
 // ProcessPersonalAgentTasks advances Space run waits and dispatches claimable
 // jobs. The count includes every wait transition as well as dispatched jobs, so
 // a pass that made progress is not mistaken for lock contention.

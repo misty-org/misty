@@ -16,7 +16,6 @@ import {
   type NoteEditorRuntime,
   type NoteAiSelection,
 } from "./NoteBlockEditorView";
-export type { NotesInlineProposal } from "./NoteBlockEditorView";
 
 export const hostNoteEditorRuntime: NoteEditorRuntime = {
   useCollaborationRoom(spaceId, noteId) {

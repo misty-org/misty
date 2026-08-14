@@ -61,7 +61,10 @@ async fn eval_json(webview: &Webview, script: String) -> Result<String, String> 
 }
 
 #[tauri::command]
-pub fn browser_webview_stop(app: AppHandle, request: BrowserWebviewIdRequest) -> Result<(), String> {
+pub fn browser_webview_stop(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<(), String> {
     let webview = running_webview(&app, &request.id)?;
     #[cfg(target_os = "macos")]
     webview
@@ -71,7 +74,9 @@ pub fn browser_webview_stop(app: AppHandle, request: BrowserWebviewIdRequest) ->
         })
         .map_err(|error| error.to_string())?;
     #[cfg(not(target_os = "macos"))]
-    webview.eval("window.stop();").map_err(|error| error.to_string())?;
+    webview
+        .eval("window.stop();")
+        .map_err(|error| error.to_string())?;
     // A cancelled load never reports that it finished.
     let _ = webview.eval(browser_status_update_script(&json!({ "loading": false })));
     Ok(())
@@ -89,8 +94,14 @@ pub async fn browser_webview_find(
     };
     let query: String = request.query.chars().take(MAX_FIND_QUERY).collect();
     let script = FIND_SCRIPT
-        .replace("__MISTY_FIND_QUERY__", &serde_json::to_string(&query).map_err(|e| e.to_string())?)
-        .replace("__MISTY_FIND_DIRECTION__", &serde_json::to_string(direction).map_err(|e| e.to_string())?);
+        .replace(
+            "__MISTY_FIND_QUERY__",
+            &serde_json::to_string(&query).map_err(|e| e.to_string())?,
+        )
+        .replace(
+            "__MISTY_FIND_DIRECTION__",
+            &serde_json::to_string(direction).map_err(|e| e.to_string())?,
+        );
     let value = eval_json(&webview, script).await?;
     Ok(serde_json::from_str::<Option<BrowserFindResult>>(&value)
         .ok()
@@ -99,37 +110,46 @@ pub async fn browser_webview_find(
 }
 
 #[tauri::command]
-pub fn browser_webview_print(app: AppHandle, request: BrowserWebviewIdRequest) -> Result<(), String> {
+pub fn browser_webview_print(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<(), String> {
     let webview = running_webview(&app, &request.id)?;
     #[cfg(target_os = "macos")]
     return webview
-            .with_webview(|platform_webview| unsafe {
-                use objc2::runtime::{AnyObject, Sel};
-                use objc2_foundation::NSRect;
-                let view: &AnyObject = &*platform_webview.inner().cast();
-                let info: *mut AnyObject = objc2::msg_send![objc2::class!(NSPrintInfo), sharedPrintInfo];
-                let operation: *mut AnyObject = objc2::msg_send![view, printOperationWithPrintInfo: info];
-                let Some(operation) = operation.as_ref() else { return };
-                let _: () = objc2::msg_send![operation, setShowsPrintPanel: true];
-                let _: () = objc2::msg_send![operation, setShowsProgressPanel: true];
-                // WebKit's print view prints blank pages until it has a frame.
-                let print_view: *mut AnyObject = objc2::msg_send![operation, view];
-                let bounds: NSRect = objc2::msg_send![view, bounds];
-                if let Some(print_view) = print_view.as_ref() {
-                    let _: () = objc2::msg_send![print_view, setFrame: bounds];
-                }
-                let window: *mut AnyObject = objc2::msg_send![view, window];
-                let _: () = objc2::msg_send![
-                    operation,
-                    runOperationModalForWindow: window,
-                    delegate: std::ptr::null_mut::<AnyObject>(),
-                    didRunSelector: None::<Sel>,
-                    contextInfo: std::ptr::null_mut::<std::ffi::c_void>()
-                ];
-            })
-            .map_err(|error| error.to_string());
+        .with_webview(|platform_webview| unsafe {
+            use objc2::runtime::{AnyObject, Sel};
+            use objc2_foundation::NSRect;
+            let view: &AnyObject = &*platform_webview.inner().cast();
+            let info: *mut AnyObject =
+                objc2::msg_send![objc2::class!(NSPrintInfo), sharedPrintInfo];
+            let operation: *mut AnyObject =
+                objc2::msg_send![view, printOperationWithPrintInfo: info];
+            let Some(operation) = operation.as_ref() else {
+                return;
+            };
+            let _: () = objc2::msg_send![operation, setShowsPrintPanel: true];
+            let _: () = objc2::msg_send![operation, setShowsProgressPanel: true];
+            // WebKit's print view prints blank pages until it has a frame.
+            let print_view: *mut AnyObject = objc2::msg_send![operation, view];
+            let bounds: NSRect = objc2::msg_send![view, bounds];
+            if let Some(print_view) = print_view.as_ref() {
+                let _: () = objc2::msg_send![print_view, setFrame: bounds];
+            }
+            let window: *mut AnyObject = objc2::msg_send![view, window];
+            let _: () = objc2::msg_send![
+                operation,
+                runOperationModalForWindow: window,
+                delegate: std::ptr::null_mut::<AnyObject>(),
+                didRunSelector: None::<Sel>,
+                contextInfo: std::ptr::null_mut::<std::ffi::c_void>()
+            ];
+        })
+        .map_err(|error| error.to_string());
     #[cfg(not(target_os = "macos"))]
-    return webview.eval("window.print();").map_err(|error| error.to_string());
+    return webview
+        .eval("window.print();")
+        .map_err(|error| error.to_string());
 }
 
 #[tauri::command]
@@ -174,7 +194,8 @@ async fn web_archive(webview: &Webview) -> Result<Vec<u8>, String> {
                     let _ = sender.send(result);
                 }
             });
-            let _: () = objc2::msg_send![view, createWebArchiveDataWithCompletionHandler: &*handler];
+            let _: () =
+                objc2::msg_send![view, createWebArchiveDataWithCompletionHandler: &*handler];
         })
         .map_err(|error| error.to_string())?;
     tokio::time::timeout(Duration::from_secs(30), receiver)
@@ -195,7 +216,8 @@ pub fn browser_webview_developer_tools(
     webview
         .with_webview(|platform_webview| unsafe {
             let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();
-            let supported: bool = objc2::msg_send![view, respondsToSelector: objc2::sel!(setInspectable:)];
+            let supported: bool =
+                objc2::msg_send![view, respondsToSelector: objc2::sel!(setInspectable:)];
             if supported {
                 let _: () = objc2::msg_send![view, setInspectable: true];
             }
@@ -203,7 +225,9 @@ pub fn browser_webview_developer_tools(
         .map_err(|error| error.to_string())?;
     #[cfg(debug_assertions)]
     webview.open_devtools();
-    Ok(BrowserDeveloperToolsResult { opened: cfg!(debug_assertions) })
+    Ok(BrowserDeveloperToolsResult {
+        opened: cfg!(debug_assertions),
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -273,7 +297,8 @@ pub struct BrowserMuteRequest {
     pub muted: bool,
 }
 
-const MUTE_MEDIA_SCRIPT: &str = "document.querySelectorAll('audio, video').forEach((media) => { media.muted = __MUTED__; });";
+const MUTE_MEDIA_SCRIPT: &str =
+    "document.querySelectorAll('audio, video').forEach((media) => { media.muted = __MUTED__; });";
 
 /// Mutes or unmutes everything a page plays. On macOS WebKit mutes the whole
 /// page, including Web Audio, and keeps it muted across navigations.

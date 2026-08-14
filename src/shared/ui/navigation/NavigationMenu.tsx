@@ -9,13 +9,10 @@ import {
 } from "react";
 import { cn } from "../utils";
 import {
-  navigationTreeGroupClass,
   navigationTreeIconClass,
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
 } from "./NavigationTree";
-
-export const navigationMenuGroupClass = navigationTreeGroupClass;
 export const navigationMenuPrimaryLayoutClass =
   "grid grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5";
 export const navigationMenuPrimaryIconClass = cn(
@@ -44,16 +41,6 @@ export const navigationMenuRowClass = cn(
   "aria-[current=page]:bg-charcoal-hover",
   "aria-[current=page]:text-cream-bright",
 );
-export const navigationMenuActionClass = cn(
-  "misty-navigator-icon-target grid size-8 shrink-0 place-items-center",
-  "rounded-md border-0 bg-transparent p-0 text-cream-muted opacity-100",
-  "visible focus-visible:underline focus-visible:decoration-cream-muted",
-  "focus-visible:underline-offset-4 outline-none hover:bg-charcoal-hover",
-  "hover:text-cream-bright data-[state=open]:bg-charcoal-hover",
-  "focus-visible:ring-2 focus-visible:ring-cream-muted",
-);
-// A disclosure belongs to its row's surface, including when that row is selected.
-export const navigationMenuDisclosureActionClass = `${navigationMenuActionClass} !w-6 !bg-transparent`;
 export const navigationMenuDisclosureLayoutClass =
   "grid grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5 px-2.5";
 export const navigationMenuLinkClass = `${navigationMenuRowClass} ${navigationMenuPrimaryLayoutClass} px-2.5 ${focusClass}`;

@@ -7,8 +7,8 @@ use super::{
     merkle::{self, Leaf},
     model::{self, NodeBody},
     protocol::{
-        content_hash, NodeWrite, SlotMeta, SlotWrite, WorkspaceChange, WorkspaceDelta, WorkspaceNode, WorkspaceOp,
-        WorkspaceSnapshot,
+        content_hash, NodeWrite, SlotMeta, SlotWrite, WorkspaceChange, WorkspaceDelta,
+        WorkspaceNode, WorkspaceOp, WorkspaceSnapshot,
     },
     seal::{self, Position},
 };

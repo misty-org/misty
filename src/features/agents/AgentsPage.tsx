@@ -1,28 +1,11 @@
 import { ScheduledPage } from "@/features/scheduled/ScheduledPage";
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useAuth } from "@/features/auth";
-import { MistyComposer } from "@/features/global-search/MistyComposer";
-import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  Button,
-  IconButton,
-  Input,
-} from "@/shared/ui";
-import { ArrowLeft, PanelRight, Plus, X } from "lucide-react";
+import { Button } from "@/shared/ui";
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./agentsWorkspace.css";
-import { AgentAvatar } from "./components/AgentAvatar";
-import { AgentSwitcher } from "./components/AgentSwitcher";
-import { AgentEditor } from "./components/AgentEditor";
 import { AgentNavigationIsland, type AgentSection } from "./components/AgentNavigationIsland";
 import { AgentSettingsModal, type AgentSettingsTab } from "./components/AgentSettingsModal";
 import { AgentCollection } from "./components/AgentCollection";
@@ -37,6 +20,11 @@ import {
 } from "./components/AgentWorkspaceConversation";
 import { MistyDashboard } from "./components/MistyDashboard";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { AgentConversationHeading } from "./page/AgentConversationHeading";
+import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
+import { AgentNewChat } from "./page/AgentNewChat";
+import { AgentProfileSection, AgentWelcome } from "./page/AgentProfileSection";
+import { useAgentChangeGuard } from "./page/useAgentChangeGuard";
 
 /*
  * THESIS: An ongoing conversation with an agent whose context and work remain visible.
@@ -45,7 +33,8 @@ import { usePersonalAgentsStore } from "./personalAgentsStore";
  * FIRST VIEWPORT: Journal collection header, section and view islands, and shared item rows.
  * FORM: Desktop-only Journal entry; existing conversations and overview open from real rows.
  * SIGNATURE: The identity control reveals the overview without replacing the conversation or its draft.
- * FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+ * FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
+ *   the verdict, DESIGN.md, and every shipping raster carrying its provenance
  */
 export default function NativeAgentsPage() {
   const { user } = useAuth();
@@ -73,11 +62,10 @@ export default function NativeAgentsPage() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
-  const [editorStatus, setEditorStatus] = useState({ dirty: false, busy: false });
   const [chatRevision, setChatRevision] = useState(0);
-  const [conversationStatus, setConversationStatus] = useState({ dirty: false, busy: false });
-  const [pendingChange, setPendingChange] = useState<() => void>();
   const working = useMistyStore((s) => s.working);
+  const guard = useAgentChangeGuard(working);
+  const { change, setEditorStatus } = guard;
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
@@ -123,17 +111,6 @@ export default function NativeAgentsPage() {
     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
-  const change = (action: () => void, replacesConversation = true) => {
-    if (
-      pendingChange ||
-      editorStatus.busy ||
-      (replacesConversation && (conversationStatus.busy || working))
-    )
-      return;
-    if (editorStatus.dirty || (replacesConversation && conversationStatus.dirty)) {
-      setPendingChange(() => action);
-    } else action();
-  };
   const openSettingsModal = (tab: AgentSettingsTab = "settings") =>
     change(() => {
       setSettingsModalMode("edit");
@@ -216,7 +193,7 @@ export default function NativeAgentsPage() {
     setSettingsModalTab(companion ? "companion" : "settings");
     setSettingsModalOpen(companion);
     setActiveSection(undefined);
-    setPendingChange(undefined);
+    guard.cancel();
   };
   const removeProfile = async () => {
     setSelected(undefined);
@@ -233,7 +210,7 @@ export default function NativeAgentsPage() {
       next.delete("conversation");
       setParams(next, { replace: true });
     });
-  const disabled = working || editorStatus.busy || conversationStatus.busy;
+  const disabled = working || guard.busy;
   const navigation = (
     <AgentNavigationIsland
       id={islandId}
@@ -242,7 +219,7 @@ export default function NativeAgentsPage() {
       collisionBoundary={workspaceRef.current}
       profileDisabled={!profile}
       contentRef={dropdownRef}
-      dismissalBlocked={Boolean(pendingChange)}
+      dismissalBlocked={guard.pending}
       restoreTriggerFocus={!settingsModalOpen}
       conversations={
         <AgentHistory
@@ -256,35 +233,17 @@ export default function NativeAgentsPage() {
       activity={<MistyDashboard spaceId={spaceId} agentId={profile?.id} />}
       profile={
         profile && (
-          <>
-            <AgentEditor
-              key={`${user?.id}:${profile.id}:${spaceId}`}
-              profile={profile}
-              onStatusChange={setEditorStatus}
-              onTalk={() => openSection()}
-              spaceId={spaceId}
-              onSaved={saveProfile}
-              onRemoved={removeProfile}
-            />
-            {conversation && (
-              <div className="agent-profile-model">
-                <MistyModelPicker
-                  inline
-                  conversationId={conversation.id}
-                  modelId={conversation.modelId}
-                  reasoningEffort={conversation.reasoningEffort}
-                  disabled={working}
-                  onChange={(changes) =>
-                    useMistyStore.setState((s) => ({
-                      conversations: s.conversations.map((c) =>
-                        c.id === conversation.id ? { ...c, ...changes } : c,
-                      ),
-                    }))
-                  }
-                />
-              </div>
-            )}
-          </>
+          <AgentProfileSection
+            key={`${user?.id}:${profile.id}:${spaceId}`}
+            profile={profile}
+            conversation={conversation}
+            working={working}
+            onStatusChange={setEditorStatus}
+            onTalk={() => openSection()}
+            spaceId={spaceId}
+            onSaved={saveProfile}
+            onRemoved={removeProfile}
+          />
         )
       }
     />
@@ -334,119 +293,39 @@ export default function NativeAgentsPage() {
                 </Button>
               </div>
             )}
-            <header
-              className="agent-conversation-heading"
-              data-window-toolbar
-              data-tauri-drag-region
-              data-misty-window-titlebar-region="true"
-            >
-              <div className="agent-heading-start">
-                <IconButton label="Back to agents" onClick={browseAgents}>
-                  <ArrowLeft size={16} />
-                </IconButton>
-              </div>
-              {newChat ? (
-                <>
-                  <label className="agent-recipient-input">
-                    <span>To:</span>
-                    <Input
-                      ref={recipientInputRef}
-                      variant="bare"
-                      autoFocus
-                      aria-label="Search or create agents"
-                      placeholder="Search or create agents"
-                      value={recipientSearch}
-                      onChange={(e) => setRecipientSearch(e.target.value)}
-                    />
-                  </label>
-                  <IconButton label="Close new chat" onClick={() => setNewChat(false)}>
-                    <X size={16} />
-                  </IconButton>
-                </>
-              ) : (
-                <>
-                  <AgentSwitcher
-                    agents={agents}
-                    conversations={conversations}
-                    selectedAgent={profile}
-                    conversationId={activeConversationId}
-                    disabled={disabled}
-                    restoreTriggerFocus={!pendingChange && !settingsModalOpen}
-                    triggerRef={identityRef}
-                    onSelect={select}
-                    onCreate={create}
-                    onBrowse={browseAgents}
-                  />
-                  <div className="agent-heading-end">
-                    <IconButton
-                      label="New chat"
-                      data-agent-navigation-control
-                      disabled={disabled}
-                      onClick={beginNewChat}
-                    >
-                      <Plus />
-                    </IconButton>
-                    <IconButton
-                      label="Show agent panel"
-                      disabled={!profile}
-                      data-agent-navigation-control
-                      aria-pressed={islandVisible}
-                      onClick={toggleIsland}
-                    >
-                      <PanelRight size={16} />
-                    </IconButton>
-                  </div>
-                </>
-              )}
-            </header>
+            <AgentConversationHeading
+              newChat={newChat}
+              recipientSearch={recipientSearch}
+              recipientInputRef={recipientInputRef}
+              switcher={{
+                agents,
+                conversations,
+                selectedAgent: profile,
+                conversationId: activeConversationId,
+                disabled,
+                restoreTriggerFocus: !guard.pending && !settingsModalOpen,
+                triggerRef: identityRef,
+                onSelect: select,
+                onCreate: create,
+                onBrowse: browseAgents,
+              }}
+              disabled={disabled}
+              panelDisabled={!profile}
+              panelVisible={islandVisible}
+              onBack={browseAgents}
+              onRecipientSearch={setRecipientSearch}
+              onCloseNewChat={() => setNewChat(false)}
+              onNewChat={beginNewChat}
+              onTogglePanel={toggleIsland}
+            />
             {!profile && activeSection && navigation}
             {newChat ? (
-              <section className="agent-new-chat">
-                <div className="agent-recipient-results" role="group" aria-label="Choose an agent">
-                  <Button
-                    variant="ghost"
-                    justify="start"
-                    className="agent-recipient-row"
-                    onClick={create}
-                  >
-                    <Plus size={16} />
-                    Create new agent
-                  </Button>
-                  {agents
-                    .filter((a) =>
-                      a.name
-                        .toLocaleLowerCase()
-                        .includes(recipientSearch.trim().toLocaleLowerCase()),
-                    )
-                    .map((a) => (
-                      <Button
-                        variant="ghost"
-                        justify="start"
-                        key={a.id}
-                        className="agent-recipient-row"
-                        onClick={() => select(a.id, true)}
-                      >
-                        <AgentAvatar agent={a} />
-                        <span className="truncate">{a.name}</span>
-                      </Button>
-                    ))}
-                </div>
-                <div className="agent-compose-area">
-                  <MistyComposer
-                    layout="conversation"
-                    value=""
-                    onChange={() => {}}
-                    mode="ask"
-                    attachments={[]}
-                    maxAttachments={4}
-                    onAddFiles={() => {}}
-                    onRemoveAttachment={() => {}}
-                    onSubmit={() => {}}
-                    placeholder="Message…"
-                    disabled
-                  />
-                </div>
-              </section>
+              <AgentNewChat
+                agents={agents}
+                search={recipientSearch}
+                onCreate={create}
+                onSelect={(id) => select(id, true)}
+              />
             ) : (
               <AgentWorkspaceConversation
                 key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
@@ -455,24 +334,16 @@ export default function NativeAgentsPage() {
                 accountId={user?.id ?? ""}
                 voiceControlRef={voiceRef}
                 onVoiceStateChange={setVoiceState}
-                onDraftStateChange={setConversationStatus}
+                onDraftStateChange={guard.setConversationStatus}
                 emptyContent={
                   profile ? (
-                    <div className="agent-welcome">
-                      <AgentAvatar agent={profile} large />
-                      <h1>Hi, I’m {profile.name}.</h1>
-                      <p>{profile.description || "What would you like to work on?"}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIslandVisible(true);
-                          setActiveSection("profile");
-                        }}
-                      >
-                        Customize agent
-                      </Button>
-                    </div>
+                    <AgentWelcome
+                      profile={profile}
+                      onCustomize={() => {
+                        setIslandVisible(true);
+                        setActiveSection("profile");
+                      }}
+                    />
                   ) : undefined
                 }
                 onCreate={create}
@@ -508,36 +379,16 @@ export default function NativeAgentsPage() {
           />
         )}
       </AgentSettingsModal>
-      <AlertDialog
-        open={Boolean(pendingChange)}
-        onOpenChange={(open) => !open && setPendingChange(undefined)}
-      >
-        <AlertDialogContent
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            if (dropdownRef.current?.isConnected) dropdownRef.current.focus();
-            else if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
-            else identityRef.current?.focus();
-          }}
-        >
-          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-          <AlertDialogDescription>
-            You have unsaved changes or an unsent message.
-          </AlertDialogDescription>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                pendingChange?.();
-                setPendingChange(undefined);
-                setEditorStatus({ dirty: false, busy: false });
-              }}
-            >
-              Discard and switch
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AgentDiscardDialog
+        open={guard.pending}
+        onCancel={guard.cancel}
+        onDiscard={guard.discard}
+        restoreFocus={() => {
+          if (dropdownRef.current?.isConnected) dropdownRef.current.focus();
+          else if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
+          else identityRef.current?.focus();
+        }}
+      />
     </main>
   );
 }

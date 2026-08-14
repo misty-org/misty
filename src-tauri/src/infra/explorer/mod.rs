@@ -1,15 +1,12 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     ffi::OsStr,
-    fs::File,
-    io::{BufReader, BufWriter, Cursor},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, LazyLock, Mutex as StdMutex,
     },
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::UNIX_EPOCH,
 };
 
 #[cfg(not(target_os = "macos"))]
@@ -25,14 +22,13 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::domain::clipboard::ClipboardCache;
 use crate::domain::explorer::{
     list_directory, paste_items, CreateItemRequest, DeleteItemsRequest, DirectoryListing,
-    ExplorerLocation, ExplorerLocationKind, ExplorerOperationResult, ExplorerPreviewPayload,
-    FileEntry, FileKind, GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest,
-    PasteItem, PasteItemsRequest, PasteTextRequest, PrepareDragItemRequest,
-    PrepareDragItemsRequest, PrepareOpenItemRequest, PreparedDragItem, PreparedDragItemsResult,
-    PreparedDragSkippedItem, PreparedOpenItem, RenameItemRequest,
+    ExplorerLocation, ExplorerOperationResult, ExplorerPreviewPayload, FileEntry, FileKind,
+    GeneratedImageThumbnail, ListDirectoryRequest, PasteBlobRequest, PasteItemsRequest,
+    PasteTextRequest, PrepareDragItemRequest, PrepareDragItemsRequest, PrepareOpenItemRequest,
+    PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem, PreparedOpenItem,
+    RenameItemRequest,
 };
 use crate::domain::file_transfer::now_epoch_ms;
 use crate::domain::file_transfer::{FileTransferItemType, FileTransferRecord, FileTransferType};

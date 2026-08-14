@@ -1,0 +1,53 @@
+{
+  "layoutVersion": 2,
+  "directories": [
+    ".auth",
+    ".cache",
+    ".cache/remotes",
+    ".cache/search",
+    ".cache/thumbnails",
+    ".cache/trash",
+    ".local/bin",
+    "config",
+    "db",
+    "tmp/downloads",
+    "tmp/transfers"
+  ],
+  "privateFiles": [
+    "config/jwt.secret",
+    "config/misty.json",
+    "config/settings.json",
+    "config/workspaces.json",
+    "db/data.db",
+    "db/token.key",
+    "home.json"
+  ],
+  "retired": [
+    ".cache/mail",
+    ".cache/sessions",
+    ".local/bin/misty-proxy",
+    ".profiles",
+    ".release",
+    ".template",
+    ".version",
+    "assets",
+    "cloud",
+    "config/automations",
+    "config/file_sidebar.json",
+    "config/imgui.ini",
+    "config/sessions",
+    "config/settings.before-profiles.json",
+    "db/misty.db",
+    "forms",
+    "local",
+    "logs",
+    "mnt",
+    "notes",
+    "plugins",
+    "public",
+    "rclone",
+    "restic",
+    "scripts",
+    "workflows"
+  ]
+}

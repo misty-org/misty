@@ -1,7 +1,6 @@
 import type { SmartLibraryAsset } from "@/native/ipc";
 
 export const DEFAULT_LIBRARY_TAG_LIMIT = 12;
-export const DEFAULT_ASSET_TAG_LIMIT = 5;
 
 export function aggregateLibraryTags(assets: SmartLibraryAsset[]): LibraryTagCount[] {
   const counts = new Map<string, LibraryTagCount>();
@@ -29,15 +28,6 @@ export function visibleLibraryTags(
     ? tags.find((tag) => tag.name.toLocaleLowerCase() === options.selectedTag?.toLocaleLowerCase())
     : null;
   return selected && !visible.includes(selected) ? [...visible, selected] : visible;
-}
-
-export function visibleAssetTags(tags: string[], expanded: boolean): string[] {
-  return expanded ? tags : tags.slice(0, DEFAULT_ASSET_TAG_LIMIT);
-}
-
-export function tagsWithout(tags: string[], removedTag: string): string[] {
-  const removed = removedTag.toLocaleLowerCase();
-  return tags.filter((tag) => tag.toLocaleLowerCase() !== removed);
 }
 
 export interface LibraryTagCount {

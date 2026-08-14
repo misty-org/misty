@@ -1,7 +1,3 @@
-export type ApiResult<T> = Promise<T>;
-
-export type ClaudeEventKind = "system" | "text" | "tool_use" | "tool_result" | "result" | "error";
-
 export type ClipboardPayloadKind = "empty" | "text" | "html" | "image" | "file_refs";
 
 export type ClipboardOrigin = "local_system" | "local_misty" | "remote_shared";
@@ -28,10 +24,6 @@ export type SmartLibrarySourceKind = "local" | "cloud";
 
 export type SmartLibraryAssetStatus =
   "pending" | "queued" | "analyzed" | "failed" | "changed" | "unsupported";
-
-export type ShortcutSource = "default" | "user";
-
-export type PowerToolEndpointKind = "local" | "remote";
 
 export type TransferType =
   "upload" | "download" | "create" | "copy" | "move" | "rename" | "delete" | "archive";

@@ -11,9 +11,6 @@ export function configureWorkspaceDefaultView(index: number): void {
   defaultIndex =
     Number.isInteger(index) && index >= 0 && index < workspaceDefaultViewOptions.length ? index : 0;
 }
-export function workspaceDefaultViewIndex(): number {
-  return defaultIndex;
-}
 function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;
@@ -35,9 +32,6 @@ function createTab(index: number, placeholder: boolean): WorkspaceView {
     lastFocusedAt: now,
     placeholder,
   };
-}
-export function createHomeWorkspaceView(_scopeKey: WorkspaceScopeKey): WorkspaceView {
-  return createTab(0, false);
 }
 export function createDefaultWorkspaceView(_scopeKey: WorkspaceScopeKey): WorkspaceView {
   return createTab(defaultIndex, true);

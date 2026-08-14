@@ -2,7 +2,7 @@ import { cn } from "@/shared/ui";
 import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
@@ -23,7 +23,7 @@ export function RootLayout(props: {
   useShortcutHandler("app.zoom_reset", appZoom.resetZoom);
   useDocumentAppAppearance();
   const setupLoadStarted = useRef(false);
-  const { loadSystem } = useSetupStore(
+  const { loadSystem } = useNativeSessionStore(
     useShallow((state) => ({
       loadSystem: state.loadSystem,
     })),

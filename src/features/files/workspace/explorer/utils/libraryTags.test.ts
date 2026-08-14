@@ -1,13 +1,6 @@
 import type { SmartLibraryAsset } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
-import {
-  aggregateLibraryTags,
-  DEFAULT_ASSET_TAG_LIMIT,
-  DEFAULT_LIBRARY_TAG_LIMIT,
-  tagsWithout,
-  visibleAssetTags,
-  visibleLibraryTags,
-} from "./libraryTags";
+import { aggregateLibraryTags, DEFAULT_LIBRARY_TAG_LIMIT, visibleLibraryTags } from "./libraryTags";
 
 function asset(assetId: string, tags: string[]): SmartLibraryAsset {
   return {
@@ -56,12 +49,5 @@ describe("library tag disclosure", () => {
       visibleLibraryTags(tags, { query: "", expanded: false, selectedTag: "Tag 13" }).slice(-1)[0]
         ?.name,
     ).toBe("Tag 13");
-  });
-
-  it("shows five file tags until expanded and removes only the confirmed value", () => {
-    const tags = ["one", "two", "three", "four", "five", "six"];
-    expect(visibleAssetTags(tags, false)).toHaveLength(DEFAULT_ASSET_TAG_LIMIT);
-    expect(visibleAssetTags(tags, true)).toEqual(tags);
-    expect(tagsWithout(tags, "THREE")).toEqual(["one", "two", "four", "five", "six"]);
   });
 });

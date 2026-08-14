@@ -31,7 +31,9 @@ pub fn release(workspace: &Workspace, version: &str) -> Result<()> {
         let Some((name, value)) = line.split_once('=') else {
             continue;
         };
-        if !matches!(name, "MISTY_API_IMAGE" | "MISTY_AGENT_RUNTIME_IMAGE") || !value.contains("@sha256:") {
+        if !matches!(name, "MISTY_API_IMAGE" | "MISTY_AGENT_RUNTIME_IMAGE")
+            || !value.contains("@sha256:")
+        {
             bail!("unexpected release output: {name}");
         }
         environment::set(workspace, Target::Prod, name, value)?;

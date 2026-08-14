@@ -1,4 +1,3 @@
-import type { MultiPanelTab, useMultiPanelStore } from "@/features/workspace";
 import type { ExplorerLibrarySnapshot, MountedDevice } from "@/native/ipc";
 import { isRetiredCloudLocation } from "@/shared/lib/fileLocations";
 import {
@@ -104,21 +103,6 @@ export function mountedDevicesEqual(left: MountedDevice[], right: MountedDevice[
     );
   });
 }
-export function workspaceSearchPaths(tabs: MultiPanelTab[]): string[] {
-  const paths: string[] = [];
-  const seen = new Set<string>();
-  const add = (path: string) => {
-    const key = normalizedPath(path) || "/";
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    paths.push(path);
-  };
-  for (const tab of tabs) {
-    add(tab.path);
-    for (const pane of tab.panes) add(pane.path);
-  }
-  return paths;
-}
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -152,15 +136,4 @@ function titleFromPath(path: string): string {
 function joinPath(...parts: string[]): string {
   const [first, ...rest] = parts;
   return joinExplorerPath(first, ...rest);
-}
-export function multiPanelWorkspaceNeedsSave(
-  state: ReturnType<typeof useMultiPanelStore.getState>,
-  previous: ReturnType<typeof useMultiPanelStore.getState>,
-): boolean {
-  return (
-    state.tabs !== previous.tabs ||
-    state.activeTabId !== previous.activeTabId ||
-    state.nextPaneIndex !== previous.nextPaneIndex ||
-    state.nextTabIndex !== previous.nextTabIndex
-  );
 }

@@ -40,6 +40,10 @@ vi.mock("@/features/library/library/components/SpaceLibraryOverlays", () => ({
 }));
 vi.mock("@/features/library/library/components/SpaceLibraryStatus", () => ({
   SpaceLibraryTopChrome: () => null,
+  SpaceLibraryInlineStatus: () => null,
+}));
+vi.mock("@/features/library/library/components/LibraryEntryHeader", () => ({
+  LibraryEntryHeader: () => null,
 }));
 vi.mock("@/features/library/library/librarySurfaces/AlbumsIndex", () => ({
   AlbumsIndex: () => null,
@@ -64,6 +68,9 @@ vi.mock("@/features/library/library/librarySurfaces/MemoryControls", () => ({
 }));
 vi.mock("@/features/library/library/librarySurfaces/SharedReferencesIndex", () => ({
   SharedReferencesIndex: () => null,
+}));
+vi.mock("@/features/library/library/librarySurfaces/SmartLibrarySection", () => ({
+  SmartLibrarySection: () => null,
 }));
 
 import { SpaceLibrary } from "@/features/library/library/SpaceLibrary";

@@ -128,11 +128,6 @@ export type WorkspaceChange = {
         id: string;
       };
 }[RecordKind];
-export type WorkspacePayload = {
-  kind: "workspace";
-  version: 1;
-  changes: WorkspaceChange[];
-};
 
 /** Persisted only on this device. Receiving another device's resume record never
  * writes this object; Continue here explicitly selects one when requested. */

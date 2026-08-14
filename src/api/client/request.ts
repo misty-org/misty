@@ -11,13 +11,7 @@ import {
   readApiSessionGeneration,
 } from "./session";
 
-export type ApiRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
-
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
-
-export function clearInFlightApiRequests(): void {
-  inFlightGetRequests.clear();
-}
 
 /** Authenticated request primitive for every Misty server domain. */
 export async function apiRequest<T = void>(path: string, init: RequestInit = {}): Promise<T> {

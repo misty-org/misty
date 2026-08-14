@@ -100,17 +100,6 @@ impl FileTransferRecord {
         }
     }
 
-    pub fn is_alive(&self) -> bool {
-        self.error_message.is_empty()
-            && matches!(
-                self.status,
-                FileTransferStatus::Queued
-                    | FileTransferStatus::Pending
-                    | FileTransferStatus::InProgress
-                    | FileTransferStatus::WaitingForResolution
-            )
-    }
-
     pub fn mark_started(&mut self) {
         self.status = FileTransferStatus::InProgress;
         if self.started_at_ms <= 0 {
@@ -228,31 +217,6 @@ pub fn now_epoch_ms() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn lifecycle_matches_native_transfer_semantics() {
-        let mut transfer = FileTransferRecord::new(
-            FileTransferType::Download,
-            FileTransferItemType::Remote,
-            "report.pdf",
-        );
-        assert!(transfer.is_alive());
-        transfer.mark_started();
-        transfer.update_progress(5, 10);
-        transfer.complete();
-        assert_eq!(transfer.status, FileTransferStatus::Completed);
-        assert_eq!(transfer.transferred_bytes, 10);
-        assert!(!transfer.is_alive());
-    }
-
-    #[test]
-    fn failed_transfers_are_retryable() {
-        let mut transfer = FileTransferRecord::default();
-        transfer.fail("network unavailable");
-        assert_eq!(transfer.status, FileTransferStatus::Failed);
-        assert!(transfer.retryable);
-        assert!(!transfer.is_alive());
-    }
 
     #[test]
     fn progress_updates_are_monotonic() {

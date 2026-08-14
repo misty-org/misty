@@ -71,11 +71,7 @@ impl CachedVault {
             Some(remote) => self.check_remote(&remote)?,
             None if self.bootstrap_pending => {
                 match api
-                    .bootstrap(
-                        &self.vault.root_public_key,
-                        &self.vault.key_envelope,
-                        grant,
-                    )
+                    .bootstrap(&self.vault.root_public_key, &self.vault.key_envelope, grant)
                     .await
                 {
                     Ok(()) => {}
@@ -231,10 +227,13 @@ impl Store {
 }
 
 fn read(connection: &Connection) -> Result<Option<CachedVault>> {
-    let row: Option<(String, bool, bool)> = connection.query_row(
-        "SELECT vault,bootstrap_pending,enrollment_pending FROM sync_vault WHERE singleton=1", [],
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-    ).optional()?;
+    let row: Option<(String, bool, bool)> = connection
+        .query_row(
+            "SELECT vault,bootstrap_pending,enrollment_pending FROM sync_vault WHERE singleton=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
     row.map(|(vault, bootstrap_pending, enrollment_pending)| {
         Ok(CachedVault {
             vault: serde_json::from_str(&vault)?,

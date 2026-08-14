@@ -92,6 +92,3 @@ export function NewDrawingDialog({
     </Dialog>
   );
 }
-
-/** @deprecated Use NewDrawingDialog directly */
-export const NewDrawingDialogView = NewDrawingDialog;

@@ -3,51 +3,6 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { contributionDates, dateKey, type HomeActivity } from "./homeActivity";
 
 export const contributionWeeks = 40;
-export const contributionDays = contributionWeeks * 7;
-
-/** Visit heatmap shared by the global Home page and each Space's home. */
-export function OverviewContributions(props: { dates: Date[]; activity: HomeActivity }) {
-  return (
-    <div className="min-w-0 pb-1 [container-type:inline-size]">
-      <div className="min-w-0">
-        <div
-          className="mb-1.5 flex justify-between px-0.5 text-[10px] text-cream-muted"
-          aria-hidden="true"
-        >
-          {monthLabels(props.dates).map((label) => (
-            <span key={label.key}>{label.label}</span>
-          ))}
-        </div>
-        <div
-          className="grid min-w-0 grid-flow-col grid-rows-[repeat(7,auto)] auto-cols-fr place-items-center gap-[clamp(0.125rem,0.25cqw,0.25rem)]"
-          aria-label={`${contributionWeeks} weeks of Home activity`}
-        >
-          {props.dates.map((date) => {
-            const key = dateKey(date);
-            const count = props.activity[key] ?? 0;
-            return (
-              <span
-                key={key}
-                className={cn(
-                  "aspect-square w-full max-w-[clamp(1.125rem,1.4cqw,1.5rem)] rounded-[5px]",
-                  contributionClass(count),
-                )}
-                title={`${count} ${count === 1 ? "visit" : "visits"} on ${date.toLocaleDateString()}`}
-              />
-            );
-          })}
-        </div>
-        <div className="mt-2 flex items-center justify-end gap-1.5 text-[10px] text-cream-muted">
-          <span>Less</span>
-          {[0, 1, 2, 4].map((count) => (
-            <span key={count} className={cn("size-2.5 rounded-[3px]", contributionClass(count))} />
-          ))}
-          <span>More</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 const fillGap = 4;
 
 /**
@@ -118,24 +73,4 @@ function contributionClass(count: number): string {
   if (count >= 2) return "bg-cream-bright/70";
   if (count >= 1) return "bg-cream-bright/40";
   return "bg-charcoal-active/75";
-}
-function monthLabels(dates: Date[]): {
-  key: string;
-  label: string;
-}[] {
-  const labels: {
-    key: string;
-    label: string;
-  }[] = [];
-  for (const date of dates) {
-    const key = `${date.getFullYear()}-${date.getMonth()}`;
-    if (labels.some((label) => label.key === key)) continue;
-    labels.push({
-      key,
-      label: new Intl.DateTimeFormat(undefined, {
-        month: "short",
-      }).format(date),
-    });
-  }
-  return labels;
 }

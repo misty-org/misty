@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -26,11 +26,7 @@ use walkdir::WalkDir;
 use crate::{
     domain::{
         explorer::{ExplorerLocation, ExplorerLocationKind, FileEntry, FileKind},
-        file_master::{
-            join_remote_path, normalize_remote_path, RemoteBrowseTarget, RemoteJobStart,
-            RemoteJobStatus, RemoteListItem,
-        },
-        listing_cache::ListingCache,
+        file_master::RemoteBrowseTarget,
     },
     error::{ApiError, ApiResult},
     infra::environment::AppEnvironmentService,
@@ -40,8 +36,6 @@ const SEARCH_SCHEMA_VERSION: u32 = 1;
 const INDEX_MEMORY_BUDGET_BYTES: usize = 96 * 1024 * 1024;
 const DEFAULT_RESULT_LIMIT: usize = 100;
 const DEFAULT_MAX_DEPTH: usize = 18;
-const DEFAULT_REMOTE_MAX_DEPTH: usize = 12;
-const REMOTE_DIRECTORY_LIMIT: usize = 20_000;
 const SEARCH_MANIFEST_FILE: &str = "manifest.sqlite3";
 const SCAN_LOCK_FILE: &str = ".scan.lock";
 /// A scan that another process finished this recently is not repeated.

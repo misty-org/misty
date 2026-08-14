@@ -198,7 +198,11 @@ pub(super) fn set_status_bubble_enabled(enabled: bool) {
 pub(super) fn browser_status_script() -> String {
     include_str!("browser_status.js").replace(
         "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
-        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) { "true" } else { "false" },
+        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
+            "true"
+        } else {
+            "false"
+        },
     )
 }
 
@@ -273,7 +277,7 @@ struct BrowserPointerEvent {
 
 pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPointerNavigation) {
     let _ = app.emit_to(
-        crate::infra::browser::browser_owner_label(app,id),
+        crate::infra::browser::browser_owner_label(app, id),
         "misty://browser-pointer",
         BrowserPointerEvent {
             id: id.to_owned(),

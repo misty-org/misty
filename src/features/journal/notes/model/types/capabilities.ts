@@ -26,16 +26,3 @@ export interface NoteConnectorCapabilities {
 
 /** A Notion page or database a Space can subscribe to as a note source. */
 export type NoteSourceKind = "page" | "database";
-
-/**
- * Why a write was refused. These map to calm sentences in the UI — Notion's own
- * error bodies are not user-facing copy.
- */
-export type NoteWriteErrorCode =
-  | "not_connected"
-  | "permission_denied"
-  | "not_found"
-  | "unsupported_schema"
-  | "rate_limited"
-  | "conflict"
-  | "unknown";

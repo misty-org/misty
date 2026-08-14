@@ -83,9 +83,6 @@ enum HomeCommand {
         /// Exact output directory. Defaults to ~/.misty.
         #[arg(long)]
         destination: Option<PathBuf>,
-        /// Existing Misty home whose portable plugins should be copied.
-        #[arg(long)]
-        source: Option<PathBuf>,
     },
     /// Validate layout, permissions, and retired paths without displaying values.
     Check {
@@ -360,17 +357,21 @@ struct Release {
 
 #[derive(Debug, Subcommand)]
 enum ReleaseCommand {
+    /// Validate locally saved release configuration before compiling or uploading.
+    Check,
     Start {
         version: String,
         #[arg(long)]
         dry_run: bool,
-        #[arg(long)]
-        no_macos: bool,
-        #[arg(long)]
-        no_windows: bool,
+        /// Release operating systems, comma-separated; defaults to the current OS.
+        #[arg(long, value_enum, value_delimiter = ',')]
+        os: Vec<release::ReleaseOs>,
     },
     Build {
         version: String,
+        /// Upload verified local artifacts to the draft after building.
+        #[arg(long)]
+        upload: bool,
         #[arg(long)]
         dry_run: bool,
     },
@@ -458,10 +459,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             EnvCommand::Status { target } => environment::status(&settings.workspace, target),
         },
         Command::Home(command) => match command.command {
-            HomeCommand::Generate {
-                destination,
-                source,
-            } => home::generate(destination.as_deref(), source.as_deref()),
+            HomeCommand::Generate { destination } => home::generate(destination.as_deref()),
             HomeCommand::Check { path } => home::check(path.as_deref()),
         },
         Command::Check(command) => match command.target {
@@ -542,9 +540,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 }
                 ProdCommand::Logs => server::production_logs(&settings.workspace),
                 ProdCommand::Backup => server::production_backup(&settings.workspace),
-                ProdCommand::Push(target) => {
-                    deploy::push(&settings.workspace, &target.remote()?)
-                }
+                ProdCommand::Push(target) => deploy::push(&settings.workspace, &target.remote()?),
                 ProdCommand::Deploy(target) => {
                     deploy::deploy(&settings.workspace, &target.remote()?)
                 }
@@ -579,14 +575,22 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             },
         },
         Command::Release(command) => match command.command {
+            ReleaseCommand::Check => release::check(&settings.workspace),
             ReleaseCommand::Start {
                 version,
                 dry_run,
-                no_macos,
-                no_windows,
-            } => release::start(&settings.workspace, &version, dry_run, no_macos, no_windows),
-            ReleaseCommand::Build { version, dry_run } => {
-                release::build(&settings.workspace, &version, dry_run)
+                os,
+            } => release::start(&settings.workspace, &version, dry_run, &os),
+            ReleaseCommand::Build {
+                version,
+                dry_run,
+                upload,
+            } => {
+                release::build(&settings.workspace, &version, dry_run)?;
+                if upload && !dry_run {
+                    release::upload(&settings.workspace, &version, false)?;
+                }
+                Ok(())
             }
             ReleaseCommand::Upload { version, dry_run } => {
                 release::upload(&settings.workspace, &version, dry_run)
@@ -690,7 +694,7 @@ fn doctor(settings: &Settings) -> Result<()> {
     crate::process::CommandSpec::new("cargo")
         .args(["cyclonedx", "--version"])
         .run(&settings.workspace.misty)?;
-    report_release_inputs();
+    release::check(&settings.workspace)?;
     report_repository_status(settings)?;
     println!("workspace  {}", settings.workspace.root.display());
     Ok(())
@@ -720,33 +724,6 @@ fn verify_rust_targets(settings: &Settings) -> Result<()> {
     }
     println!("Rust targets       ready");
     Ok(())
-}
-
-fn report_release_inputs() {
-    let mut names = vec![
-        "TAURI_UPDATER_PUBLIC_KEY",
-        "TAURI_UPDATER_ENDPOINT",
-        "TAURI_CSP_CONNECT_SOURCES",
-        "TAURI_CSP_IMAGE_SOURCES",
-        "TAURI_SIGNING_PRIVATE_KEY",
-        "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
-    ];
-    if cfg!(target_os = "macos") {
-        names.extend(["APPLE_SIGNING_IDENTITY", "MISTY_NOTARY_KEYCHAIN_PROFILE"]);
-    }
-    let missing = names
-        .into_iter()
-        .filter(|name| {
-            std::env::var(name)
-                .map(|value| value.trim().is_empty())
-                .unwrap_or(true)
-        })
-        .collect::<Vec<_>>();
-    if missing.is_empty() {
-        println!("Release inputs     ready");
-    } else {
-        println!("Release inputs     missing: {}", missing.join(", "));
-    }
 }
 
 fn report_repository_status(settings: &Settings) -> Result<()> {
@@ -788,15 +765,7 @@ mod tests {
             vec!["misty", "env", "check", "prod"],
             vec!["misty", "env", "status", "dev"],
             vec!["misty", "home", "generate"],
-            vec![
-                "misty",
-                "home",
-                "generate",
-                "--destination",
-                "/tmp/.misty",
-                "--source",
-                "/tmp/source/.misty",
-            ],
+            vec!["misty", "home", "generate", "--destination", "/tmp/.misty"],
             vec!["misty", "home", "check"],
             vec!["misty", "check", "all"],
             vec!["misty", "check", "app"],
@@ -837,11 +806,40 @@ mod tests {
                 "--dry-run",
             ],
             vec!["misty", "server", "r2", "configure-cors", "--apply"],
-            vec!["misty", "release", "start", "0.1.0", "--no-windows"],
-            vec!["misty", "release", "start", "0.1.0", "--no-macos"],
+            vec!["misty", "release", "start", "0.1.0"],
+            vec!["misty", "release", "start", "0.1.0", "--os", "macos"],
+            vec!["misty", "release", "start", "0.1.0", "--os", "windows"],
             vec!["misty", "release", "verify", "0.1.0", "--dry-run"],
         ] {
             Cli::try_parse_from(arguments).unwrap();
+        }
+    }
+
+    #[test]
+    fn release_os_accepts_multiple_platforms_and_rejects_invalid_values() {
+        let parsed = Cli::try_parse_from([
+            "misty",
+            "release",
+            "start",
+            "0.1.0",
+            "--os",
+            "macos,windows",
+        ])
+        .unwrap();
+        let Command::Release(Release {
+            command: ReleaseCommand::Start { os, .. },
+        }) = parsed.command
+        else {
+            panic!("expected release start");
+        };
+        assert_eq!(os, [release::ReleaseOs::Macos, release::ReleaseOs::Windows]);
+        for value in ["linux", "", "macos,linux"] {
+            assert!(
+                Cli::try_parse_from(["misty", "release", "start", "0.1.0", "--os", value]).is_err()
+            );
+        }
+        for flag in ["--no-macos", "--no-windows"] {
+            assert!(Cli::try_parse_from(["misty", "release", "start", "0.1.0", flag]).is_err());
         }
     }
 

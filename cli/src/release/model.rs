@@ -6,7 +6,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifacts;
 
-pub const PUBLIC_REPOSITORY: &str = "misty-org/misty-public";
+pub const PUBLIC_REPOSITORY: &str = "misty-org/misty";
+/// The `latest.json` feed installed apps poll for updates.
+pub fn updater_endpoint() -> String {
+    format!("https://github.com/{PUBLIC_REPOSITORY}/releases/latest/download/latest.json")
+}
+
 pub const RELEASE_MANIFEST_NAME: &str = "misty-release-manifest.json";
 pub const MACOS_PLATFORM: &str = "macos-universal";
 pub const WINDOWS_PLATFORM: &str = "windows-x86_64";
@@ -20,6 +25,9 @@ pub struct ReleaseManifest {
     pub config_sha256: String,
     pub created_at: DateTime<Utc>,
     pub platforms: Vec<String>,
+    /// Public endpoints compiled into the app, independent of development .env.
+    #[serde(default)]
+    pub build_environment: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

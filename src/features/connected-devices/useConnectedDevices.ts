@@ -1,5 +1,4 @@
 import { useAuth } from "@/features/auth";
-import { withBuiltinService } from "@/features/builtin-services";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   connectedDevicesConnect,
@@ -19,38 +18,22 @@ import { subscribeAccountEvents } from "@/api/accountEvents";
 import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  connectedDevicePlatform,
+  connectedDevicesErrorMessage,
+  peerIsOnline,
+  type ServerConnectedPeer,
+} from "./connectedDeviceModel";
+import { useDevicePairing, type LocalConnectedDevice } from "./useDevicePairing";
+import { useFilesDeviceService } from "./useFilesDeviceService";
 
-export interface ServerConnectedPeer {
-  pairId: string;
-  deviceId: string;
-  name: string;
-  platform: string;
-  p2pEndpointId: string;
-  protocolVersions: string[];
-  addressing: unknown;
-  protocolVersion?: string;
-  connectionHint: "unknown" | "direct" | "relay";
-  lastHeartbeatAt?: string | null;
-  clipboardCanSend: boolean;
-  clipboardCanReceive: boolean;
-}
-
-export interface PairingSession {
-  id: string;
-  creatorDeviceId: string;
-  requesterDeviceId?: string;
-  state: "pending" | "redeemed" | "confirmed" | "expired" | "locked";
-  expiresAt: string;
-  creatorName: string;
-  requesterName?: string;
-}
-
-export interface PairingView {
-  session: PairingSession;
-  manualCode?: string;
-  deepLink?: string;
-  fingerprint?: string;
-}
+export {
+  connectedDevicesErrorMessage,
+  peerIsOnline,
+  type PairingSession,
+  type PairingView,
+  type ServerConnectedPeer,
+} from "./connectedDeviceModel";
 
 const refreshIntervalMs = 30_000;
 
@@ -59,69 +42,13 @@ export function useConnectedDevices() {
   const { user } = useAuth();
   const accountId = user?.id;
   const packaged = hasTauriInternals() && platform() === "macos";
-  const [deviceInstance, setDeviceInstance] = useState("");
-  const [serviceError, setServiceError] = useState("");
-  useEffect(() => {
-    if (!packaged || !accountId) return;
-    const controller = new AbortController();
-    let retry: ReturnType<typeof setTimeout> | undefined;
-    // Restarts back off exponentially (30s to 5 minutes, jittered) and reset
-    // once the service is up, so a broken service is not retried every 30s.
-    let failures = 0;
-    setDeviceInstance("");
-    const start = async () => {
-      let detach = () => {};
-      try {
-        setServiceError("");
-        await withBuiltinService(
-          "files",
-          spaceId,
-          (instance) =>
-            new Promise<void>((resolve) => {
-              if (controller.signal.aborted) {
-                resolve();
-                return;
-              }
-              failures = 0;
-              setDeviceInstance(instance);
-              const stop = () => resolve();
-              controller.signal.addEventListener("abort", stop, { once: true });
-              detach = () => {
-                controller.signal.removeEventListener("abort", stop);
-                resolve();
-              };
-            }),
-          controller.signal,
-          "devices",
-        );
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setDeviceInstance("");
-          setServiceError(
-            error instanceof Error ? error.message : "Files device service is unavailable.",
-          );
-        }
-      } finally {
-        detach();
-        if (!controller.signal.aborted) {
-          const backoff = Math.min(5 * 60_000, refreshIntervalMs * 2 ** failures++);
-          retry = setTimeout(() => void start(), backoff * (0.75 + Math.random() * 0.5));
-        }
-      }
-    };
-    void start();
-    return () => {
-      controller.abort();
-      clearTimeout(retry);
-    };
-  }, [packaged, accountId, spaceId]);
+  const { deviceInstance, serviceError } = useFilesDeviceService(packaged, accountId);
   const [snapshot, setSnapshot] = useState<ConnectedDevicesSnapshot | null>(null);
   const [peers, setPeers] = useState<ServerConnectedPeer[]>([]);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pairing, setPairing] = useState<PairingView | null>(null);
-  const localRef = useRef<{ localId: string; serverId: string; name: string } | null>(null);
+  const localRef = useRef<LocalConnectedDevice | null>(null);
   const refreshInFlight = useRef(false);
   const currentScope = useRef("");
   currentScope.current = JSON.stringify([accountId, spaceId, deviceInstance]);
@@ -131,7 +58,7 @@ export function useConnectedDevices() {
   // re-registered the device and re-fetched keys every 30 seconds.
   const setupRef = useRef<{
     scope: string;
-    local: { localId: string; serverId: string; name: string };
+    local: LocalConnectedDevice;
     endpointId: string;
   } | null>(null);
 
@@ -340,109 +267,7 @@ export function useConnectedDevices() {
     return () => window.clearTimeout(timer);
   }, [peers]);
 
-  const createPairing = useCallback(async () => {
-    const local = localRef.current;
-    if (!local) throw new Error("Connected Devices is still starting.");
-    const result = await devicesApi.createPairing<PairingView>(
-      signedAgentDeviceRequest,
-      local.localId,
-      local.serverId,
-    );
-    setPairing(result);
-    return result;
-  }, []);
-
-  const redeemPairing = useCallback(async (codeOrLink: string) => {
-    const local = localRef.current;
-    if (!local) throw new Error("Connected Devices is still starting.");
-    const parsed = parsePairingInput(codeOrLink);
-    const result = await devicesApi.redeemPairing<PairingView>(
-      signedAgentDeviceRequest,
-      local.localId,
-      local.serverId,
-      parsed,
-    );
-    setPairing(result);
-    return result;
-  }, []);
-
-  const refreshPairing = useCallback(async () => {
-    const local = localRef.current;
-    if (!local || !pairing) return null;
-    const result = await devicesApi.pairing<PairingView>(
-      signedAgentDeviceRequest,
-      local.localId,
-      local.serverId,
-      pairing.session.id,
-    );
-    setPairing((current) => ({
-      ...result,
-      manualCode: current?.manualCode,
-      deepLink: current?.deepLink,
-    }));
-    return result;
-  }, [pairing]);
-
-  const confirmPairing = useCallback(async () => {
-    const local = localRef.current;
-    if (!local || !pairing) throw new Error("No pairing is ready to confirm.");
-    await devicesApi.confirmPairing(
-      signedAgentDeviceRequest,
-      local.localId,
-      local.serverId,
-      pairing.session.id,
-    );
-    setPairing(null);
-    await refresh();
-  }, [pairing, refresh]);
-
-  const setClipboardConsent = useCallback(
-    async (peer: ServerConnectedPeer, enabled: boolean) => {
-      const local = localRef.current;
-      if (!local) return;
-      await devicesApi.setClipboardConsent(
-        signedAgentDeviceRequest,
-        local.localId,
-        local.serverId,
-        peer.pairId,
-        enabled,
-      );
-      await refresh();
-    },
-    [refresh],
-  );
-
-  const renamePeer = useCallback(
-    async (peer: ServerConnectedPeer, name: string) => {
-      const local = localRef.current;
-      const trimmed = name.trim();
-      if (!local || !trimmed) return;
-      await devicesApi.renamePair(
-        signedAgentDeviceRequest,
-        local.localId,
-        local.serverId,
-        peer.pairId,
-        trimmed,
-      );
-      await refresh();
-    },
-    [refresh],
-  );
-
-  const unpair = useCallback(
-    async (peer: ServerConnectedPeer) => {
-      const local = localRef.current;
-      if (!local) return;
-      await devicesApi.revokePair(
-        signedAgentDeviceRequest,
-        local.localId,
-        local.serverId,
-        peer.pairId,
-      );
-      await refresh();
-    },
-    [refresh],
-  );
+  const pairingActions = useDevicePairing(localRef, refresh);
 
   return {
     localServerDeviceId: localRef.current?.serverId ?? null,
@@ -452,53 +277,7 @@ export function useConnectedDevices() {
     loading,
     ready,
     error,
-    pairing,
-    setPairing,
     refresh,
-    createPairing,
-    redeemPairing,
-    refreshPairing,
-    confirmPairing,
-    setClipboardConsent,
-    renamePeer,
-    unpair,
+    ...pairingActions,
   };
-}
-
-export function connectedDevicesErrorMessage(cause: unknown): string {
-  if (cause instanceof ManagedAiRequestError) {
-    if (cause.status === 404) return "Connected Devices isn’t enabled on this Misty server.";
-    if (cause.status === 503) return "Connected Devices is temporarily unavailable.";
-    // Cloudflare edge failures (e.g. 1033: tunnel offline) arrive as a bare
-    // "error code: NNNN" body. That means the server is unreachable, not broken.
-    if (cause.status === 530 || /^error code: \d+$/i.test(cause.message.trim())) {
-      return "Can’t reach the Misty server right now. Misty will keep retrying.";
-    }
-  }
-  return cause instanceof Error ? cause.message : "Connected Devices is unavailable.";
-}
-
-export function peerIsOnline(peer: ServerConnectedPeer): boolean {
-  const heartbeat = peer.lastHeartbeatAt ? Date.parse(peer.lastHeartbeatAt) : 0;
-  return heartbeat > Date.now() - 90_000;
-}
-
-function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {
-  const value = navigator.userAgent.toLowerCase();
-  if (value.includes("mac")) return "macos";
-  if (value.includes("win")) return "windows";
-  if (value.includes("linux")) return "linux";
-  return "unknown";
-}
-
-function parsePairingInput(input: string): { sessionId?: string; secret?: string; code?: string } {
-  const value = input.trim();
-  if (value.startsWith("misty://")) {
-    const url = new URL(value);
-    return {
-      sessionId: url.searchParams.get("session") || undefined,
-      secret: url.searchParams.get("secret") || undefined,
-    };
-  }
-  return { code: value.toUpperCase().replace(/[^A-Z2-7]/g, "") };
 }

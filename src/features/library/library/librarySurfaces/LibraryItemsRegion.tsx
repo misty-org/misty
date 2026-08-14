@@ -8,7 +8,7 @@ import { useLibraryUploadState } from "./useLibraryUploadState";
 const skeletonCells = Array.from({ length: 10 }, (_, index) => index);
 
 /** Collections that render their own index above instead of an item grid. */
-const OWN_INDEX = ["collections", "shared", "imports"];
+const OWN_INDEX = ["collections", "shared", "imports", "smart"];
 const OWN_INDEX_UNTIL_SELECTED = ["recent-days", "months", "years", "albums", "duplicate"];
 
 function rendersOwnIndex(collection: string, selectedCollectionId: string) {

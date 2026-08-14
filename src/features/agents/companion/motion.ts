@@ -3,7 +3,6 @@ export interface Point {
   x: number;
   y: number;
 }
-export const FOLLOW_OFFSET = { x: 35, y: 25 };
 export const POINT_HOLD_MS = 3000;
 export const BUBBLE_FADE_MS = 500;
 export function flight(from: Point, to: Point, elapsedMs: number) {

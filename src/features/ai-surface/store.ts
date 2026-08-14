@@ -4,7 +4,6 @@ import { aiSurfaceApi } from "./api";
 import { aiPaneSession, aiSessionKey } from "./storeHelpers";
 import {
   clearSpeechTimer,
-  conciseSpeech,
   failInvocation,
   makeSpeech,
   patchArtifact,
@@ -389,9 +388,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
     }));
   },
 }));
-
-export const testingAiPaneSession = aiPaneSession;
-export const testingConciseSpeech = conciseSpeech;
 
 export function resetAiSurfaceAccountState(accountId?: string): void {
   if (accountId) {

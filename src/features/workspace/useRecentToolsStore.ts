@@ -13,14 +13,9 @@ export type WorkspaceToolId =
   | "social"
   | "library"
   | "browser"
-  | "code"
   | "files"
-  | "terminal"
   | "scheduled"
-  | "agents"
-  | "marketplace"
-  | "music"
-  | "media";
+  | "agents";
 
 export interface WorkspaceToolMeta {
   id: WorkspaceToolId;
@@ -41,9 +36,7 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
     icon: appIcon("library", "space")!,
   },
   browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
-  code: { id: "code", label: "Code", surfaceId: "code", icon: appIcons.code },
   files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
-  terminal: { id: "terminal", label: "Terminal", surfaceId: "terminal", icon: appIcons.terminal },
   scheduled: {
     id: "scheduled",
     label: "Scheduled",
@@ -51,27 +44,13 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
     icon: appIcons.scheduled,
   },
   agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: appIcons.agents },
-  marketplace: {
-    id: "marketplace",
-    label: "Discover",
-    surfaceId: "marketplace",
-    icon: appIcons.marketplace,
-  },
-  music: { id: "music", label: "Music", surfaceId: "official-app", icon: appIcons.music },
-  media: { id: "media", label: "Media", surfaceId: "official-app", icon: appIcons.media },
 };
 
 export function isWorkspaceToolId(value: string): value is WorkspaceToolId {
   return Object.prototype.hasOwnProperty.call(WORKSPACE_TOOLS_META, value);
 }
 
-export const DEFAULT_RECENT_TOOLS: WorkspaceToolId[] = [
-  "journal",
-  "code",
-  "terminal",
-  "browser",
-  "files",
-];
+export const DEFAULT_RECENT_TOOLS: WorkspaceToolId[] = ["journal", "browser", "files", "agents"];
 
 export function toolIdFromView(tab: Pick<WorkspaceView, "surfaceId" | "route">): WorkspaceToolId {
   if (tab.surfaceId === "space") {
@@ -82,20 +61,6 @@ export function toolIdFromView(tab: Pick<WorkspaceView, "surfaceId" | "route">):
     return "journal";
   }
   return tab.surfaceId as WorkspaceToolId;
-}
-
-export function toolIdFromSurfaceId(
-  surfaceId: WorkspaceSurfaceId,
-  label?: string,
-): WorkspaceToolId {
-  if (surfaceId === "space") {
-    const lower = (label ?? "").toLowerCase();
-    if (lower.includes("planner")) return "planner";
-    if (lower.includes("social") || lower.includes("chat")) return "social";
-    if (lower.includes("library")) return "library";
-    return "journal";
-  }
-  return surfaceId as WorkspaceToolId;
 }
 
 interface RecentToolsState {

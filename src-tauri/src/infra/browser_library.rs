@@ -24,7 +24,10 @@ pub(crate) fn now_ms() -> i64 {
 
 pub(crate) fn library(app: &AppHandle) -> Result<MutexGuard<'static, Connection>, String> {
     if LIBRARY.get().is_none() {
-        let directory = app.path().app_data_dir().map_err(|error| error.to_string())?;
+        let directory = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| error.to_string())?;
         let connection = open(&directory.join("browser-library.sqlite"))?;
         let _ = LIBRARY.set(Mutex::new(connection));
     }
@@ -100,7 +103,10 @@ fn migrate(connection: &Connection) -> Result<(), String> {
         .max(0) as usize;
     for (index, migration) in MIGRATIONS.iter().enumerate().skip(version) {
         connection
-            .execute_batch(&format!("BEGIN; {migration} PRAGMA user_version = {}; COMMIT;", index + 1))
+            .execute_batch(&format!(
+                "BEGIN; {migration} PRAGMA user_version = {}; COMMIT;",
+                index + 1
+            ))
             .map_err(|error| error.to_string())?;
     }
     Ok(())
@@ -141,7 +147,11 @@ pub(crate) fn download_started(app: &AppHandle, id: &str, url: &str, path: &Path
 pub(crate) fn download_finished(app: &AppHandle, id: &str, success: bool, error: Option<&str>) {
     let Ok(connection) = library(app) else { return };
     let size = connection
-        .query_row("SELECT path FROM downloads WHERE id = ?1", params![id], |row| row.get::<_, String>(0))
+        .query_row(
+            "SELECT path FROM downloads WHERE id = ?1",
+            params![id],
+            |row| row.get::<_, String>(0),
+        )
         .optional()
         .ok()
         .flatten()
@@ -195,7 +205,9 @@ const DOWNLOAD_COLUMNS: &str =
 pub fn browser_downloads_list(app: AppHandle) -> Result<Vec<BrowserDownloadEntry>, String> {
     let connection = library(&app)?;
     let mut statement = connection
-        .prepare(&format!("SELECT {DOWNLOAD_COLUMNS} FROM downloads ORDER BY started_at DESC"))
+        .prepare(&format!(
+            "SELECT {DOWNLOAD_COLUMNS} FROM downloads ORDER BY started_at DESC"
+        ))
         .map_err(|error| error.to_string())?;
     let rows = statement
         .query_map([], entry)
@@ -208,9 +220,16 @@ pub fn browser_downloads_list(app: AppHandle) -> Result<Vec<BrowserDownloadEntry
 fn download_path(app: &AppHandle, id: &str) -> Result<(PathBuf, String), String> {
     let connection = library(app)?;
     connection
-        .query_row("SELECT path, state FROM downloads WHERE id = ?1", params![id], |row| {
-            Ok((PathBuf::from(row.get::<_, String>(0)?), row.get::<_, String>(1)?))
-        })
+        .query_row(
+            "SELECT path, state FROM downloads WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok((
+                    PathBuf::from(row.get::<_, String>(0)?),
+                    row.get::<_, String>(1)?,
+                ))
+            },
+        )
         .optional()
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "That download is no longer in the list.".to_owned())
@@ -226,14 +245,18 @@ pub struct BrowserDownloadProgress {
 
 /// Bytes received so far for every download still in progress.
 #[tauri::command]
-pub async fn browser_downloads_progress(app: AppHandle) -> Result<Vec<BrowserDownloadProgress>, String> {
+pub async fn browser_downloads_progress(
+    app: AppHandle,
+) -> Result<Vec<BrowserDownloadProgress>, String> {
     let active = {
         let connection = library(&app)?;
         let mut statement = connection
             .prepare("SELECT id, path FROM downloads WHERE state = 'in_progress'")
             .map_err(|error| error.to_string())?;
         let rows = statement
-            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
             .map_err(|error| error.to_string())?
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
@@ -265,15 +288,26 @@ async fn native_progress(
             .into_iter()
             .map(|(id, path)| {
                 let (received, total) = wry::download_progress(&path).unwrap_or_else(|| {
-                    (std::fs::metadata(&path).map(|meta| meta.len() as i64).unwrap_or(0), -1)
+                    (
+                        std::fs::metadata(&path)
+                            .map(|meta| meta.len() as i64)
+                            .unwrap_or(0),
+                        -1,
+                    )
                 });
-                BrowserDownloadProgress { id, received, total }
+                BrowserDownloadProgress {
+                    id,
+                    received,
+                    total,
+                }
             })
             .collect::<Vec<_>>();
         let _ = sender.send(progress);
     })
     .map_err(|error| error.to_string())?;
-    receiver.await.map_err(|_| "Download progress is unavailable.".to_owned())
+    receiver
+        .await
+        .map_err(|_| "Download progress is unavailable.".to_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -285,7 +319,9 @@ async fn native_progress(
         .into_iter()
         .map(|(id, path)| BrowserDownloadProgress {
             id,
-            received: std::fs::metadata(&path).map(|meta| meta.len() as i64).unwrap_or(0),
+            received: std::fs::metadata(&path)
+                .map(|meta| meta.len() as i64)
+                .unwrap_or(0),
             total: -1,
         })
         .collect())
@@ -330,7 +366,10 @@ pub async fn browser_download_cancel(
 }
 
 #[tauri::command]
-pub fn browser_download_open(app: AppHandle, request: BrowserDownloadIdRequest) -> Result<(), String> {
+pub fn browser_download_open(
+    app: AppHandle,
+    request: BrowserDownloadIdRequest,
+) -> Result<(), String> {
     let (path, _) = download_path(&app, &request.id)?;
     if !path.is_file() {
         return Err("The file was moved or deleted.".to_owned());
@@ -341,7 +380,10 @@ pub fn browser_download_open(app: AppHandle, request: BrowserDownloadIdRequest) 
 }
 
 #[tauri::command]
-pub fn browser_download_reveal(app: AppHandle, request: BrowserDownloadIdRequest) -> Result<(), String> {
+pub fn browser_download_reveal(
+    app: AppHandle,
+    request: BrowserDownloadIdRequest,
+) -> Result<(), String> {
     let (path, _) = download_path(&app, &request.id)?;
     if !path.exists() {
         return Err("The file was moved or deleted.".to_owned());
@@ -378,7 +420,10 @@ pub fn browser_downloads_remove(
     } else {
         for id in &request.ids {
             connection
-                .execute("DELETE FROM downloads WHERE id = ?1 AND state != 'in_progress'", params![id])
+                .execute(
+                    "DELETE FROM downloads WHERE id = ?1 AND state != 'in_progress'",
+                    params![id],
+                )
                 .map_err(|error| error.to_string())?;
         }
     }

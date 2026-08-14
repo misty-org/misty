@@ -42,20 +42,6 @@ export function nextWorkspaceFocusTimestamp(
   return Math.max(Date.now(), latest + 1);
 }
 
-export function nextViewTitle(
-  tabs: WorkspaceView[] | undefined,
-  surfaceId: WorkspaceView["surfaceId"],
-  baseLabel: string,
-): string {
-  if (!tabs?.length) return baseLabel;
-  const existing = tabs.filter(
-    (t) =>
-      t.surfaceId === surfaceId && (t.title === baseLabel || t.title.startsWith(`${baseLabel} `)),
-  );
-  if (existing.length === 0) return baseLabel;
-  return `${baseLabel} ${existing.length + 1}`;
-}
-
 export function lastUsedUpdatesForView(
   tab: { groupKey: WorkspaceView["groupKey"]; surfaceId: WorkspaceView["surfaceId"] },
   tabId: string,

@@ -114,25 +114,6 @@ pub(super) async fn copy_local_path_cancellable(
     }
 }
 
-pub(super) async fn copy_cached_remote_file_to_destination(
-    source: &Path,
-    destination: &Path,
-    cancellation: Option<&AtomicBool>,
-) -> ApiResult<()> {
-    ensure_not_canceled_if(cancellation)?;
-    tokio::fs::copy(source, destination)
-        .await
-        .map_err(|error| {
-            ApiError::Message(format!(
-                "Failed to copy cached remote file from {} to {}: {error}",
-                source.display(),
-                destination.display()
-            ))
-        })?;
-    ensure_not_canceled_if(cancellation)?;
-    Ok(())
-}
-
 pub(super) async fn copy_local_directory_cancellable(
     source: &Path,
     destination: &Path,

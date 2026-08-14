@@ -43,10 +43,3 @@ export const providerLoginUrls: Record<ProviderId, string> = {
   crunchyroll: "https://www.crunchyroll.com/login",
   "prime-video": "https://www.primevideo.com/",
 };
-
-/** Upgrade a former default without replacing a user's document or workspace URL. */
-export function providerLaunchUrl(provider: ProviderId, saved?: string): string {
-  return !saved || saved === mistyBrowserProviders[provider].url
-    ? providerLoginUrls[provider]
-    : saved;
-}

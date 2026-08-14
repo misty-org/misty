@@ -394,6 +394,3 @@ export interface NoteReadingPaneProps {
   linkableNotes?: UnifiedNote[];
   onSelectNote?: (noteId: string) => void;
 }
-export interface NoteConflictNoticeProps {
-  note: UnifiedNote;
-}

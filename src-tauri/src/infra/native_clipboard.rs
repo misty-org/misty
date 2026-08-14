@@ -50,8 +50,13 @@ fn decode_clipboard_image(bytes: &[u8]) -> Option<image::DynamicImage> {
                 | image::ImageFormat::WebP
         )
     ) {
-        let png = native_clipboard_png(bytes)?;
-        return image::load_from_memory_with_format(&png, image::ImageFormat::Png).ok();
+        // AppKit applies color management, but it rejects some valid encodings
+        // (for example 32-bit BMPs with alpha); those still decode in Rust.
+        if let Some(image) = native_clipboard_png(bytes)
+            .and_then(|png| image::load_from_memory_with_format(&png, image::ImageFormat::Png).ok())
+        {
+            return Some(image);
+        }
     }
     image::load_from_memory(bytes).ok()
 }

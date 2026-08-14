@@ -69,8 +69,8 @@ describe("shortcut bindings", () => {
   });
 
   it("recognizes overlapping context hierarchies", () => {
-    expect(scopesOverlap("global", "tool:code")).toBe(true);
+    expect(scopesOverlap("global", "tool:browser")).toBe(true);
     expect(scopesOverlap("workspace", "tool:files")).toBe(true);
-    expect(scopesOverlap("tool:code", "tool:files")).toBe(false);
+    expect(scopesOverlap("tool:browser", "tool:files")).toBe(false);
   });
 });

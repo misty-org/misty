@@ -132,7 +132,6 @@ func (s *Server) MountHandlers() error {
 		s.Router.Put(prefix+"/me/profile", api.UpdateProfile(s.Database))
 		s.Router.Post(prefix+"/me/export", s.Spaces.AccountExportManifest())
 		s.Router.Post(prefix+"/me/deletion", s.Spaces.BeginAccountDeletion())
-		s.Router.Post(prefix+"/account/deletion/status", s.Spaces.AccountDeletionStatus())
 		s.Router.MethodFunc(http.MethodGet, prefix+"/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 		s.Router.MethodFunc(http.MethodPut, prefix+"/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))
 		s.Router.Put(prefix+"/me/device", api.UpdateDevice(s.Database))
@@ -149,7 +148,6 @@ func (s *Server) MountHandlers() error {
 		s.Router.Post(prefix+"/me/agent-interventions/{waitID}", s.Spaces.AIUserInterventionControl())
 
 		s.Router.Get(prefix+"/me/home", api.HomeDashboard(s.Database))
-		s.Router.Post(prefix+"/me/home/visits", api.RecordHomeVisit(s.Database))
 		s.Router.Post(prefix+"/me/home/apps", api.RecordHomeAppActivity(s.Database))
 		s.Router.Put(prefix+"/me/telemetry", api.UpdateTelemetryPreferences(s.Database))
 		s.Router.Post(prefix+"/billing/checkout-session", api.CreateCheckoutSession(s.Database))
@@ -202,7 +200,6 @@ func (s *Server) mountLibraryRoutes(prefix string, library *api.SpaceLibraryServ
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/pins", library.PinnedCollections())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/library/pins", library.PinnedCollections())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/duplicates/merge", library.MergeDuplicates())
-	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/exports/download", library.ExportItems())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/library/imports", library.ImportItems())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/imports/history", library.ImportHistory())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/library/shared", library.SharedReferences())

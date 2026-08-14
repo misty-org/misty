@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UnifiedNote } from "./model/types/types";
-import {
-  groupCounts,
-  notesInGroup,
-  relativeTime,
-  searchNotes,
-  selectVisibleNotes,
-} from "./noteFilters";
+import { notesInGroup, searchNotes, selectVisibleNotes } from "./noteFilters";
 
 const now = Date.parse("2026-07-20T12:00:00.000Z");
 
@@ -90,20 +84,5 @@ describe("selectVisibleNotes", () => {
 
   it("does not surface unlinked notes in the beta view", () => {
     expect(selectVisibleNotes(notes, "old", now, "s1")).toEqual([]);
-  });
-});
-
-describe("groupCounts", () => {
-  it("counts only the active Space", () => {
-    expect(groupCounts(notes, now, "s1")).toEqual({ space: 2 });
-  });
-});
-
-describe("relativeTime", () => {
-  it("formats recent timestamps compactly", () => {
-    expect(relativeTime(new Date(now - 30_000).toISOString(), now)).toBe("just now");
-    expect(relativeTime(new Date(now - 5 * 60_000).toISOString(), now)).toBe("5m ago");
-    expect(relativeTime(new Date(now - 3 * 3_600_000).toISOString(), now)).toBe("3h ago");
-    expect(relativeTime(new Date(now - 3 * 86_400_000).toISOString(), now)).toBe("3d ago");
   });
 });

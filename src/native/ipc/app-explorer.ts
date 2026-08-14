@@ -1,5 +1,4 @@
 import type {
-  ClaudeEventKind,
   ClipboardOrigin,
   ClipboardPayloadKind,
   DirectorySizeStatus,
@@ -24,43 +23,12 @@ export interface AppEnvironmentSnapshot {
   dbDir: string;
   cacheDir: string;
   tmpDir: string;
-  notesDir: string;
-  pluginsPublicDir: string;
-  pluginsPrivateDir: string;
   settingsPath: string;
   mistyConfigPath: string;
   workspacesPath: string;
   commandsPath: string;
-  grpcAddress: string;
   mountPath: string;
   configExists: boolean;
-  derivedEnv: Record<string, string>;
-}
-export interface StorageSnapshot {
-  ready: boolean;
-  statusCode: number | null;
-  error: string | null;
-}
-export interface ClaudeStatus {
-  installed: boolean;
-  running: boolean;
-  sessionId: string | null;
-  error: string | null;
-}
-export interface ClaudeSendRequest {
-  prompt: string;
-  cwd?: string | null;
-  resumeSession?: boolean;
-}
-export interface ClaudeStreamEvent {
-  kind: ClaudeEventKind;
-  sessionId: string | null;
-  text: string;
-  toolName: string;
-  toolInput: string;
-  toolUseId: string;
-  toolResult: string;
-  costUsd: number;
 }
 export interface ClipboardFileRef {
   display_name: string;
@@ -94,20 +62,6 @@ export interface ClipboardPayload {
 export interface ClipboardSnapshot {
   local: ClipboardPayload;
   shared: ClipboardPayload;
-}
-export interface NoteAssetStoreRequest {
-  accountId: string;
-  spaceId: string;
-  noteId: string;
-  fileName: string;
-  mimeType?: string | null;
-  bytes: number[];
-}
-export interface NoteAssetStoreResult {
-  path: string;
-  name: string;
-  mimeType: string | null;
-  byteSize: number;
 }
 export interface MountedDevice {
   id: string;
@@ -146,50 +100,6 @@ export interface PeerRoot {
   kind: "system" | "volume" | "folder";
   readonly: true;
 }
-export interface PeerEntry {
-  name: string;
-  path: string;
-  kind: "file" | "directory" | "symlink";
-  sizeBytes: number | null;
-  modifiedMs: number | null;
-  snapshot: string;
-  readonly: true;
-  hidden: boolean;
-}
-export type PeerResponse =
-  | {
-      type: "roots";
-      data: {
-        roots: PeerRoot[];
-      };
-    }
-  | {
-      type: "directory";
-      data: {
-        path: string;
-        entries: PeerEntry[];
-        snapshot: string;
-      };
-    }
-  | {
-      type: "stat";
-      data: {
-        entry: PeerEntry;
-      };
-    }
-  | {
-      type: "symlink";
-      data: {
-        target: number[];
-        snapshot: string;
-      };
-    }
-  | {
-      type: "pong";
-      data: {
-        nonce: number;
-      };
-    };
 export interface ExplorerLocation {
   kind: ExplorerLocationKind;
   providerType: string | null;

@@ -53,7 +53,10 @@ export function AgentCollection({
 }) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const section = params.get("view") || initialSection;
+  const requestedSection = params.get("view");
+  // Old automation links now land on the activity dashboard.
+  const section =
+    requestedSection === "automations" ? "activity" : requestedSection || initialSection;
   const [creatingSchedule, setCreatingSchedule] = useState(false);
   const searchLabel =
     section === "scheduled"

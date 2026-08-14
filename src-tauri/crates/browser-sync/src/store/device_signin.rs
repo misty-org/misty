@@ -87,8 +87,12 @@ impl Store {
             return Ok(None);
         };
         let envelope: Envelope = serde_json::from_str(&sealed)?;
-        let plain =
-            root.open_local(&self.scope, &self.grant.device_id, &record(workspace), &envelope)?;
+        let plain = root.open_local(
+            &self.scope,
+            &self.grant.device_id,
+            &record(workspace),
+            &envelope,
+        )?;
         let binding: DeviceSignin = serde_json::from_slice(&plain)?;
         binding.validate()?;
         Ok(Some(binding))

@@ -205,6 +205,30 @@ export class DevelopmentTelemetryClient extends NoopTelemetryClient {
   }
 }
 
+function makeTelemetryClient(): TelemetryClient {
+  if (import.meta.env.MODE === "test") return new NoopTelemetryClient();
+  if (import.meta.env.DEV) return new DevelopmentTelemetryClient();
+  return new PostHogTelemetryClient();
+}
+
+function readBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === "true";
+  } catch {
+    return fallback;
+  }
+}
+function writeBoolean(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    /* in-memory state remains authoritative */
+  }
+}
+
+export const analytics = makeTelemetryClient();
+
 export class MockTelemetryClient extends DevelopmentTelemetryClient {
   readonly events: Array<{ event: AnalyticsEventName; properties: Record<string, unknown> }> = [];
   readonly errors: Error[] = [];
@@ -235,27 +259,3 @@ export class MockTelemetryClient extends DevelopmentTelemetryClient {
     if (this.isErrorReportingEnabled()) this.errors.push(redactedError(error));
   }
 }
-
-function makeTelemetryClient(): TelemetryClient {
-  if (import.meta.env.MODE === "test") return new NoopTelemetryClient();
-  if (import.meta.env.DEV) return new DevelopmentTelemetryClient();
-  return new PostHogTelemetryClient();
-}
-
-function readBoolean(key: string, fallback: boolean): boolean {
-  try {
-    const value = localStorage.getItem(key);
-    return value === null ? fallback : value === "true";
-  } catch {
-    return fallback;
-  }
-}
-function writeBoolean(key: string, value: boolean): void {
-  try {
-    localStorage.setItem(key, String(value));
-  } catch {
-    /* in-memory state remains authoritative */
-  }
-}
-
-export const analytics = makeTelemetryClient();

@@ -53,8 +53,7 @@ fn encrypted_binding_selects_only_activated_native_generations() {
     assert!(select_bound_profile(&logical, &replacement, Some(&selected)).is_err());
     // Incomplete recovery cannot fall back to a different, empty store.
     assert!(
-        select_bound_profile(&logical, &BrowserProfileBinding::default(), Some(&selected))
-            .is_err()
+        select_bound_profile(&logical, &BrowserProfileBinding::default(), Some(&selected)).is_err()
     );
     binding.staged = Some(BrowserGeneration {
         id: uuid::Uuid::new_v4().to_string(),

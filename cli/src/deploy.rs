@@ -64,10 +64,7 @@ impl Remote {
     }
 
     fn run(&self, script: &str) -> Result<()> {
-        let status = self
-            .ssh(script)
-            .status()
-            .context("could not start ssh")?;
+        let status = self.ssh(script).status().context("could not start ssh")?;
         if !status.success() {
             bail!("remote command on {} exited with {status}", self.host);
         }
@@ -79,7 +76,11 @@ impl Remote {
 pub fn initialize_production_secrets(workspace: &Workspace) -> Result<()> {
     environment::init(workspace, Target::Prod)?;
     let existing = environment::read(workspace, Target::Prod)?;
-    let missing = |name: &str| existing.get(name).is_none_or(|value| value.trim().is_empty());
+    let missing = |name: &str| {
+        existing
+            .get(name)
+            .is_none_or(|value| value.trim().is_empty())
+    };
     let generated: [(&str, String); 15] = [
         ("MISTY_ENVIRONMENT", "production".into()),
         ("TRUST_PROXY_HEADERS", "true".into()),
@@ -139,7 +140,9 @@ fn initialize_billing_environment(workspace: &Workspace, secret: &str) -> Result
     let mut contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => return Err(error).with_context(|| format!("could not read {}", path.display())),
+        Err(error) => {
+            return Err(error).with_context(|| format!("could not read {}", path.display()))
+        }
     };
     let configured = |contents: &str, name: &str| {
         contents
@@ -183,7 +186,10 @@ fn initialize_billing_environment(workspace: &Workspace, secret: &str) -> Result
         }
     }
     write_private(&path, contents.as_bytes())?;
-    println!("  misty-billing/.env/prod/billing.env: added {}", added.join(", "));
+    println!(
+        "  misty-billing/.env/prod/billing.env: added {}",
+        added.join(", ")
+    );
     Ok(())
 }
 
@@ -206,7 +212,11 @@ pub fn push(workspace: &Workspace, remote: &Remote) -> Result<()> {
 }
 
 fn push_directory(env_dir: &Path, remote: &Remote, remote_parent: &str) -> Result<()> {
-    println!("Pushing {}/prod to {}:{remote_parent}/.env/prod", env_dir.display(), remote.host);
+    println!(
+        "Pushing {}/prod to {}:{remote_parent}/.env/prod",
+        env_dir.display(),
+        remote.host
+    );
     let script = format!(
         "set -eu; umask 077; mkdir -p {remote_parent}/.env; cd {remote_parent}/.env; \
 if [ -d prod ]; then mkdir -p ../.env-backups; cp -Rp prod ../.env-backups/prod-$(date -u +%Y%m%dT%H%M%SZ); fi; \
@@ -230,7 +240,10 @@ tar -xf - --no-same-owner"
         .context("could not start ssh")?;
     let archived = archive.wait()?;
     if !archived.success() || !status.success() {
-        bail!("pushing {} failed (tar {archived}, ssh {status})", env_dir.display());
+        bail!(
+            "pushing {} failed (tar {archived}, ssh {status})",
+            env_dir.display()
+        );
     }
     std::io::stdout().flush()?;
     Ok(())
@@ -254,9 +267,15 @@ fn push_billing_files(billing: &Path, remote: &Remote) -> Result<()> {
         .output()
         .context("could not run git in misty-billing")?;
     if !dirty.status.success() || !dirty.stdout.is_empty() {
-        bail!("commit misty-billing's deploy files before deploying: {}", BILLING_DEPLOY_FILES.join(", "));
+        bail!(
+            "commit misty-billing's deploy files before deploying: {}",
+            BILLING_DEPLOY_FILES.join(", ")
+        );
     }
-    println!("Sending billing deploy files to {}:{}", remote.host, remote.billing_dir);
+    println!(
+        "Sending billing deploy files to {}:{}",
+        remote.host, remote.billing_dir
+    );
     let mut archive = Command::new("git")
         .arg("-C")
         .arg(billing)
@@ -300,7 +319,9 @@ pub fn deploy(workspace: &Workspace, remote: &Remote) -> Result<()> {
         "set -eu; {path}; cd {}; git pull --ff-only; misty server prod up",
         remote.dir
     ))?;
-    println!("Deployed. Check https://api.mistysys.com/v1/health and the API log for SECURITY: lines.");
+    println!(
+        "Deployed. Check https://api.mistysys.com/v1/health and the API log for SECURITY: lines."
+    );
     Ok(())
 }
 

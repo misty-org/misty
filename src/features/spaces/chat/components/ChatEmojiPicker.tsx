@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { IconButton, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 
 const emojis = [
   ["👍", "thumbs up"],
@@ -39,12 +39,13 @@ export function ChatEmojiPicker({
         />
         <div className="mt-3 grid grid-cols-4 gap-1">
           {matches.map(([emoji, name]) => (
-            <Button
+            <IconButton
               key={name}
               variant="ghost"
-              size="icon"
+              size="md"
               className="text-xl"
-              aria-label={name}
+              label={name}
+              tooltip={false}
               onClick={() => {
                 onSelect(emoji);
                 setOpen(false);
@@ -52,7 +53,7 @@ export function ChatEmojiPicker({
               }}
             >
               {emoji}
-            </Button>
+            </IconButton>
           ))}
         </div>
         {!matches.length && <p className="mt-3 text-sm text-cream-muted">No matching emoji.</p>}

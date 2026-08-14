@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fs::{self, File},
-    io::{self, Read, Write},
+    io::{self, Read},
     path::{Component, Path, PathBuf},
     process::Command,
     sync::Arc,
@@ -14,7 +14,6 @@ use tokio::sync::Mutex;
 use walkdir::WalkDir;
 use zip::{write::SimpleFileOptions, ZipArchive, ZipWriter};
 
-use crate::domain::explorer::{FileKind, ListDirectoryRequest};
 use crate::error::{ApiError, ApiResult};
 use crate::infra::{
     environment::AppEnvironmentService, explorer::ExplorerService,

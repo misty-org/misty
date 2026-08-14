@@ -13,9 +13,9 @@ type Pilot struct {
 	AllowedOrigins []string
 }
 
-func (p Pilot) ID() string        { return p.Name }
-func (p Pilot) Version() int      { return 1 }
-func (p Pilot) Origins() []string { return p.AllowedOrigins }
+func (p Pilot) ID() string                { return p.Name }
+func (p Pilot) Version() int              { return 1 }
+func (p Pilot) Origins() []string         { return p.AllowedOrigins }
 func (p Pilot) Supports(name string) bool { return name == "tasks.create" }
 
 var Pilots, _ = NewRegistry(
@@ -87,11 +87,6 @@ func (p Pilot) Commit(page Page, e cap.Execution, target cap.Target) (*Action, e
 	}
 	action, _, err := control(page, name, "browser.click", nil)
 	return action, err
-}
-func same(a, b any) bool {
-	ra, _ := json.Marshal(a)
-	rb, _ := json.Marshal(b)
-	return cap.EqualJSON(ra, rb)
 }
 func (p Pilot) Verify(page Page, e cap.Execution, review Prepared) (json.RawMessage, bool, error) {
 	now := time.Now().UTC().Format(time.RFC3339Nano)

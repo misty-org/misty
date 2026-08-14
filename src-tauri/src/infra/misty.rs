@@ -10,15 +10,12 @@ use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use rand::{rngs::OsRng, RngCore};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
-    io::{self, Read},
+    io::{self},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    thread,
-    time::{Duration, Instant},
 };
 use uuid::Uuid;
 
@@ -148,39 +145,6 @@ fn find_running_pid(name: &str) -> Option<u32> {
         .find_map(|line| line.trim().parse::<u32>().ok())
 }
 
-fn current_misty_process_status() -> MistyProcessStatus {
-    let misty_pid = find_running_pid("misty");
-    MistyProcessStatus {
-        misty_pid,
-        storage_ready: true,
-    }
-}
-
-#[tauri::command]
-pub async fn fetch_misty_releases() -> Result<Vec<ReleaseCatalogEntry>, String> {
-    let client = reqwest::Client::new();
-    let releases = authed_get(
-        &client,
-        "https://api.github.com/repos/misty-org/misty-public/releases",
-    )
-    .header("Accept", "application/vnd.github+json")
-    .header("User-Agent", "Misty Desktop")
-    .send()
-    .await
-    .map_err(|error| format!("Could not fetch Misty releases: {error}"))?
-    .error_for_status()
-    .map_err(|error| format!("Misty releases request failed: {error}"))?
-    .json::<Vec<GithubRelease>>()
-    .await
-    .map_err(|error| format!("Misty releases JSON was invalid: {error}"))?;
-
-    Ok(releases
-        .into_iter()
-        .filter(|release| !release.draft)
-        .map(release_catalog_entry)
-        .collect())
-}
-
 #[derive(Debug, Deserialize)]
 struct GithubRelease {
     tag_name: String,
@@ -195,85 +159,6 @@ struct GithubRelease {
 struct GithubReleaseAsset {
     name: String,
     browser_download_url: String,
-}
-
-fn release_catalog_entry(release: GithubRelease) -> ReleaseCatalogEntry {
-    let version = release.tag_name;
-    let semver = version.trim_start_matches('v');
-    let manifest_name = format!("manifest-{semver}.json");
-    let manifest_url = release
-        .assets
-        .iter()
-        .find(|asset| asset.name == manifest_name || asset.name.starts_with("manifest-"))
-        .map(|asset| asset.browser_download_url.clone())
-        .unwrap_or_else(|| {
-            format!(
-                "https://github.com/misty-org/misty-public/releases/download/{version}/{manifest_name}"
-            )
-        });
-    let downloads = release
-        .assets
-        .into_iter()
-        .filter(|asset| asset.name != manifest_name && !asset.name.starts_with("manifest-"))
-        .map(release_download)
-        .collect();
-    let changes = release_changes(release.body.as_deref());
-    let summary = release
-        .name
-        .filter(|name| !name.trim().is_empty())
-        .or_else(|| changes.first().cloned())
-        .unwrap_or_else(|| "Misty release".to_owned());
-
-    ReleaseCatalogEntry {
-        version,
-        date: release_date_label(release.published_at.as_deref()),
-        summary,
-        manifest_url,
-        changes,
-        downloads,
-    }
-}
-
-fn release_download(asset: GithubReleaseAsset) -> ReleaseDownload {
-    ReleaseDownload {
-        platform: release_asset_platform(&asset.name),
-        sha256: String::new(),
-        name: asset.name,
-        url: asset.browser_download_url,
-    }
-}
-
-fn release_asset_platform(name: &str) -> String {
-    let lowered = name.to_ascii_lowercase();
-    for platform in [
-        "macos-aarch64",
-        "macos-x86_64",
-        "windows-x86_64",
-        "linux-x86_64",
-    ] {
-        if lowered.contains(platform) {
-            return platform.to_owned();
-        }
-    }
-    "unknown".to_owned()
-}
-
-fn release_changes(body: Option<&str>) -> Vec<String> {
-    body.unwrap_or_default()
-        .lines()
-        .map(|line| line.trim().trim_start_matches(['-', '*']).trim())
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .take(8)
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
-fn release_date_label(published_at: Option<&str>) -> String {
-    published_at
-        .and_then(|value| value.split('T').next())
-        .filter(|value| !value.is_empty())
-        .unwrap_or("Unpublished")
-        .to_owned()
 }
 
 #[tauri::command]
@@ -311,133 +196,8 @@ fn build_system_info(
 }
 
 #[tauri::command]
-pub fn probe_paths(paths: Vec<String>) -> Result<Vec<PathProbe>, String> {
-    Ok(paths
-        .iter()
-        .map(|path| probe_path(Path::new(path)))
-        .collect())
-}
-
-#[tauri::command]
-pub fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    if !can_open_external_url(&url) {
-        return Err("Only http, https, and mailto links can be opened externally.".to_string());
-    }
-
-    if url.starts_with("https://") || url.starts_with("http://") {
-        use tauri::Emitter;
-        let parsed = url::Url::parse(&url).map_err(|error| error.to_string())?;
-        if !parsed.username().is_empty() || parsed.password().is_some() {
-            return Err("Web addresses cannot contain credentials.".into());
-        }
-        return app
-            .emit_to("main", "misty://open-web-url", parsed.as_str())
-            .map_err(|error| error.to_string());
-    }
-    open_url_in_system_browser(&url)
-        .map_err(|error| format!("Could not open {url} in the system browser: {error}"))
-}
-
-#[tauri::command]
-pub fn get_misty_process_status() -> MistyProcessStatus {
-    current_misty_process_status()
-}
-
-#[tauri::command]
-pub fn launch_misty(
-    state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
-) -> Result<String, String> {
-    Ok("Misty is running.".to_string())
-}
-
-fn wait_for_proxy_port() -> Option<u16> {
-    let deadline = Instant::now() + Duration::from_secs(2);
-    while Instant::now() < deadline {
-        if let Some(port) = read_proxy_port_from_config() {
-            return Some(port);
-        }
-        thread::sleep(Duration::from_millis(100));
-    }
-    read_proxy_port_from_config()
-}
-
-fn read_proxy_port_from_config() -> Option<u16> {
-    let config_path = misty_home_dir().ok()?.join("config").join("misty.json");
-    let body = fs::read_to_string(config_path).ok()?;
-    let value: Value = serde_json::from_str(&body).ok()?;
-    let port = value.get("proxy")?.get("port")?.as_u64()?;
-    u16::try_from(port).ok()
-}
-
-fn stop_named_processes(names: &[&str]) -> Result<usize, String> {
-    #[cfg(target_os = "windows")]
-    {
-        let mut stopped = 0;
-        for name in names {
-            let target = format!("{name}.exe");
-            let output = Command::new("taskkill")
-                .args(["/IM", &target, "/F"])
-                .output()
-                .map_err(|error| format!("Could not run taskkill for {target}: {error}"))?;
-
-            if output.status.success() {
-                stopped += 1;
-                continue;
-            }
-
-            let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
-            if stderr.contains("not found") || stderr.contains("no running instance") {
-                continue;
-            }
-
-            return Err(format!(
-                "Could not stop {target}: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
-        }
-
-        Ok(stopped)
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let mut stopped = 0;
-        for name in names {
-            let status = Command::new("pkill")
-                .args(["-x", name])
-                .status()
-                .map_err(|error| format!("Could not run pkill for {name}: {error}"))?;
-
-            match status.code() {
-                Some(0) => stopped += 1,
-                Some(1) => {}
-                Some(code) => {
-                    return Err(format!(
-                        "pkill exited with status {code} while stopping {name}."
-                    ));
-                }
-                None => {
-                    return Err(format!(
-                        "pkill terminated unexpectedly while stopping {name}."
-                    ))
-                }
-            }
-        }
-
-        Ok(stopped)
-    }
-}
-
-#[tauri::command]
 pub fn stop_misty() -> Result<String, String> {
     Ok("Misty stops when the app exits.".to_string())
-}
-
-#[tauri::command]
-pub fn restart_misty(
-    state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
-) -> Result<String, String> {
-    Ok("Restart Misty to reload the application.".to_string())
 }
 
 #[tauri::command]

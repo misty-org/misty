@@ -2,14 +2,10 @@ import type {
   LaunchOnLoginSnapshot,
   NativeShortcutsSnapshot,
   OpenWithAssociation,
-  ReassignShortcutRequest,
-  ResetShortcutRequest,
   SaveSettingsRequest,
   SettingsSnapshot,
   ShortcutsSnapshot,
-  UpdateShortcutRequest,
 } from "@/native/ipc";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
 // eslint-disable-next-line no-restricted-imports -- shortcut hydration is the adapter boundary for the native snapshot
 import { detectShortcutPlatform, normalizeShortcut } from "@/features/shortcuts/bindings";
 // eslint-disable-next-line no-restricted-imports -- the registry supplies transport-neutral command metadata
@@ -36,10 +32,6 @@ export function settingsOpenWithAssociations(): Promise<OpenWithAssociation[]> {
   return invoke("settings_open_with_associations");
 }
 
-export function settingsRemoveOpenWithAssociation(key: string): Promise<SettingsSnapshot> {
-  return invoke("settings_remove_open_with_association", { key });
-}
-
 export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
   return hydrateShortcutsSnapshot(await invoke<NativeShortcutsSnapshot>("shortcuts_snapshot"));
 }
@@ -49,28 +41,6 @@ export async function shortcutsReplace(
 ): Promise<ShortcutsSnapshot> {
   return hydrateShortcutsSnapshot(
     await invoke<NativeShortcutsSnapshot>("shortcuts_replace", { overrides }),
-  );
-}
-
-export async function shortcutsReset(
-  request: ResetShortcutRequest = {},
-): Promise<ShortcutsSnapshot> {
-  return hydrateShortcutsSnapshot(
-    await invoke<NativeShortcutsSnapshot>("shortcuts_reset", { request }),
-  );
-}
-
-export async function shortcutsUpdate(request: UpdateShortcutRequest): Promise<ShortcutsSnapshot> {
-  return hydrateShortcutsSnapshot(
-    await invoke<NativeShortcutsSnapshot>("shortcuts_update", { request }),
-  );
-}
-
-export async function shortcutsReassign(
-  request: ReassignShortcutRequest,
-): Promise<ShortcutsSnapshot> {
-  return hydrateShortcutsSnapshot(
-    await invoke<NativeShortcutsSnapshot>("shortcuts_reassign", { request }),
   );
 }
 
@@ -131,20 +101,4 @@ function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsS
     () => undefined,
   );
   return hydrated;
-}
-
-export function openExternalUrl(url: string): Promise<void> {
-  return openExternalLink(url);
-}
-
-export function codingAiReadApiKey(providerId: string): Promise<string | null> {
-  return invoke("coding_ai_read_api_key", { providerId });
-}
-
-export function codingAiWriteApiKey(providerId: string, key: string): Promise<void> {
-  return invoke("coding_ai_write_api_key", { providerId, key });
-}
-
-export function codingAiClearApiKey(providerId: string): Promise<void> {
-  return invoke("coding_ai_clear_api_key", { providerId });
 }

@@ -2,7 +2,7 @@ import { shortcutCommandRegistry } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace/core";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import type { GlobalSearchFilters, GlobalSearchResult, UnifiedMistyCandidate } from "./types";
-export { mistyIntent } from "./mistyIntent";
+
 const coreToolCommandIds = new Set([
   "tool.home",
   "tool.journal",

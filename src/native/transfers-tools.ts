@@ -18,8 +18,6 @@ import type {
   FileToolsActionResult,
   FileToolsChecksumRequest,
   FileToolsChecksumResult,
-  FileToolsChmodRequest,
-  FileToolsReadonlyRequest,
   FileToolsSymlinkRequest,
   FileToolsSymlinkTargetRequest,
   FileToolsSymlinkTargetResult,
@@ -99,16 +97,6 @@ export function fileToolsChecksum(
   request: FileToolsChecksumRequest,
 ): Promise<FileToolsChecksumResult> {
   return invoke("file_tools_checksum", { request });
-}
-
-export function fileToolsSetReadonly(
-  request: FileToolsReadonlyRequest,
-): Promise<FileToolsActionResult> {
-  return invoke("file_tools_set_readonly", { request });
-}
-
-export function fileToolsChmod(request: FileToolsChmodRequest): Promise<FileToolsActionResult> {
-  return invoke("file_tools_chmod", { request });
 }
 
 export function fileToolsCreateSymlink(

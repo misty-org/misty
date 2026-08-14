@@ -4,7 +4,6 @@ import { createBrowserViewState, type WorkspaceView } from "@/features/workspace
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import {
   browserRuntimeId,
-  closeBrowserRuntime,
   hideBrowserWebview,
   syncBrowserWebview,
   useBrowserRuntimeStore,
@@ -70,7 +69,6 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await hideBrowserWebview(tab);
-  await closeBrowserRuntime(tab);
 });
 
 describe("synced browser navigation", () => {

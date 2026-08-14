@@ -105,15 +105,6 @@ export function TaskPriorityBadge({ priority }: { priority: SpaceTaskPriority })
   );
 }
 
-export function TaskStatusBadge({ status }: { status: SpaceTaskStatus }) {
-  return (
-    <Badge variant="secondary" className="gap-1.5 font-medium">
-      <span className={`size-1.5 rounded-full ${statusDot(status)}`} />
-      {taskStatusOptions.find(([id]) => id === status)?.[1] ?? status}
-    </Badge>
-  );
-}
-
 export function TaskEmptyState({
   title = "No tasks yet",
   description = "Tasks matching this view will appear here.",
@@ -145,10 +136,6 @@ export function memberName(members: SpaceMember[], id?: string) {
   return id
     ? (members.find((member) => member.user_id === id)?.name ?? "Former member")
     : "Unassigned";
-}
-
-export function taskAssigneeName(members: SpaceMember[], task: SpaceTask) {
-  return memberName(members, task.assignee_user_id);
 }
 
 export function toLocalInput(value: string) {

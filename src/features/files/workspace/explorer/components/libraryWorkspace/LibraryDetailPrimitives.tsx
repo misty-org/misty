@@ -2,20 +2,6 @@ import type { SmartLibraryAsset } from "@/native/ipc";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { Images } from "lucide-react";
 import { joinPath } from "./savedSearchRules";
-
-export function DetailLabel(props: { children: React.ReactNode }) {
-  return <strong className="text-xs capitalize text-cream-muted">{props.children}</strong>;
-}
-export function DetailStat(props: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <span className="block text-[11px] capitalize text-cream-muted">{props.label}</span>
-      <strong className="mt-0.5 block truncate font-medium" title={props.value}>
-        {props.value}
-      </strong>
-    </div>
-  );
-}
 export function libraryAssetPreview(asset: SmartLibraryAsset, rootPath: string) {
   return asset.sourceKind === "local" && asset.mimeType.startsWith("image/")
     ? safeTauriAssetUrl(joinPath(rootPath, asset.relativePath))

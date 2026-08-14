@@ -1,7 +1,7 @@
 import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
 import { reportSystemError } from "@/features/activity";
 import { routes } from "@/features/app-shell";
-import { useSetupStore } from "@/features/installer";
+import { useNativeSessionStore } from "@/features/native-session";
 import {
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -27,7 +27,7 @@ function Initials(props: { children: string }) {
 export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
-  const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount, logout } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({ id: state.me?.id, email: state.me?.email, name: state.me?.name })),
