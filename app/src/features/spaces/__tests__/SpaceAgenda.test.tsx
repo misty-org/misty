@@ -101,9 +101,13 @@ describe("SpaceAgenda", () => {
       await Promise.resolve();
     });
     expect(container.textContent).toContain("Ship beta");
-    expect(container.textContent).toContain("Launch goal");
-    if (view === "day") expect(container.textContent).not.toContain("Launch dependency risk");
-    else expect(container.textContent).toContain("Launch dependency risk");
+    if (view === "day") {
+      expect(container.textContent).not.toContain("Launch goal");
+      expect(container.textContent).not.toContain("Launch dependency risk");
+    } else {
+      expect(container.textContent).toContain("Launch goal");
+      expect(container.textContent).toContain("Launch dependency risk");
+    }
     expect(container.querySelector(`main[aria-label="${view} agenda"]`)).not.toBeNull();
     expect(container.querySelector('[aria-label="Agenda view"]')).toBeNull();
   });
