@@ -3,6 +3,7 @@ import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import { CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { JOIN_HREF } from "@/lib/site";
 import { navItems, resourceLinks, type NavLinkEntry } from "./navLinks";
 
 const mobileLinkClass =
@@ -93,7 +94,7 @@ export default function MobileNav({
                 </NavLink>
               </Button>
               <Button asChild>
-                <NavLink to="/signin" onClick={onClose}>
+                <NavLink to={JOIN_HREF} onClick={onClose}>
                   Join now
                 </NavLink>
               </Button>

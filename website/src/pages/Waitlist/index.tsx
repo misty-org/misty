@@ -35,7 +35,7 @@ export default function Waitlist() {
               with your group.
             </p>
             <Button asChild size="lg" className="mt-6 h-11 w-full">
-              <NavLink to="/signin">Join now</NavLink>
+              <NavLink to="/register">Join now</NavLink>
             </Button>
           </CardContent>
         </Card>

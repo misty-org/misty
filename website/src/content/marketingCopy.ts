@@ -81,9 +81,9 @@ export const marketingCopy: MarketingCopy = {
   },
   auth: {
     signInDescription:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+      "Sign in to pick up where you left off in Misty.",
     forgotDescription:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod.",
+      "Enter your email and we’ll send you a link to reset your password.",
     registerTitle: "Create an account",
     registerDescription: "Sign up to get started with Misty.",
     resetDescription:
