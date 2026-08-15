@@ -1,8 +1,8 @@
 [package]
-name = "misty-cli"
+name = "misty"
 version = "0.1.0"
 edition = "2021"
-description = "Local development and release tooling for Misty"
+description = "Monorepo development and release tooling for Misty"
 license = "MIT"
 
 [dependencies]

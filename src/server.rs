@@ -877,10 +877,10 @@ mod tests {
         .unwrap();
         let workspace = Workspace {
             root: temporary.path().to_path_buf(),
-            misty: temporary.path().join("misty"),
-            file_manager: temporary.path().join("misty-file-manager"),
+            misty: temporary.path().join("app"),
             server: server.clone(),
-            cli: temporary.path().join("misty-cli"),
+            website: temporary.path().join("website"),
+            cli: temporary.path().join("cli"),
         };
 
         generate_production_worker_secrets(&workspace).unwrap();

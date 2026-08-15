@@ -4,12 +4,14 @@ import { releasePages } from "./release";
 import { serverPages } from "./server";
 import { startPages } from "./start";
 import type { NavGroup } from "./types";
+import { websitePages } from "./website";
 import { workspacePages } from "./workspace";
 
 export const pages = [
   ...startPages,
   ...workspacePages,
   ...desktopPages,
+  ...websitePages,
   ...serverPages,
   ...releasePages,
   ...referencePages,
@@ -47,6 +49,13 @@ export const navGroups: NavGroup[] = [
         path: "/desktop/windows",
         command: true,
       },
+    ],
+  },
+  {
+    title: "Website",
+    items: [
+      { label: "Overview", path: "/website" },
+      { label: "website dev", path: "/website/dev", command: true },
     ],
   },
   {
