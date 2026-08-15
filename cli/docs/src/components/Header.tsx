@@ -55,10 +55,10 @@ export function Header({
         </button>
         <a
           className="icon-button"
-          href="https://github.com/misty-org/misty-cli"
+          href="https://github.com/misty-org/misty"
           target="_blank"
           rel="noreferrer"
-          aria-label="View misty-cli on GitHub"
+          aria-label="View Misty on GitHub"
         >
           <GithubIcon />
         </a>

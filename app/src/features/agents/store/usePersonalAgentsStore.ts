@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/api/spaces/api";
+import { agentsApi } from "@/api/agents/api";
 import type { AgentToolboxResponse } from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
@@ -22,37 +22,19 @@ type AgentInput = Pick<
 > & { version?: number };
 
 export const personalAgentsApi = {
-  list: () => spaceRequest<{ agents: PersonalAgent[] }>("/agents"),
-  create: (input: AgentInput) =>
-    spaceRequest<PersonalAgent>("/agents", { method: "POST", body: JSON.stringify(input) }),
-  update: (id: string, input: AgentInput) =>
-    spaceRequest<PersonalAgent>(`/agents/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      body: JSON.stringify(input),
-    }),
-  remove: (id: string) => spaceRequest(`/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  grants: (id: string) =>
-    spaceRequest<{ grants: PersonalAgentGrant[] }>(
-      `/agents/${encodeURIComponent(id)}/space-grants`,
-    ),
-  toolboxCatalog: () => spaceRequest<AgentToolboxResponse>("/agents/toolbox"),
-  toolbox: (id: string) =>
-    spaceRequest<AgentToolboxResponse>(`/agents/${encodeURIComponent(id)}/toolbox`),
-  uploadAvatar: (id: string, file: File) =>
-    spaceRequest<PersonalAgent>(`/agents/${encodeURIComponent(id)}/avatar`, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
-    }),
+  list: () => agentsApi.list<PersonalAgent>(),
+  create: (input: AgentInput) => agentsApi.create<PersonalAgent>(input),
+  update: (id: string, input: AgentInput) => agentsApi.update<PersonalAgent>(id, input),
+  remove: agentsApi.remove,
+  grants: (id: string) => agentsApi.grants<PersonalAgentGrant>(id),
+  toolboxCatalog: () => agentsApi.toolboxCatalog<AgentToolboxResponse>(),
+  toolbox: (id: string) => agentsApi.toolbox<AgentToolboxResponse>(id),
+  uploadAvatar: (id: string, file: File) => agentsApi.uploadAvatar<PersonalAgent>(id, file),
   replaceGrants: (
     id: string,
     spaces: Array<{ space_id: string; all_members: boolean; member_user_ids: string[] }>,
-  ) =>
-    spaceRequest<{ grants: PersonalAgentGrant[] }>(
-      `/agents/${encodeURIComponent(id)}/space-grants`,
-      { method: "PUT", body: JSON.stringify({ spaces }) },
-    ),
-  models: () => spaceRequest<{ catalog_version: string; models: GatewayModel[] }>("/ai/models"),
+  ) => agentsApi.replaceGrants<PersonalAgentGrant>(id, spaces),
+  models: () => agentsApi.models<GatewayModel>(),
 };
 
 // The gateway exposes dozens of providers; surface only the ones people recognize.

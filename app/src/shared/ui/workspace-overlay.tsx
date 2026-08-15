@@ -3,10 +3,11 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
 const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace py-8 pl-28 pr-8";
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace py-8 pl-28 pr-8 animate-in fade-in-0 duration-200";
 const settingsOverlayPanelClass = [
   "h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100dvw-144px))]",
   "min-w-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card shadow-2xl",
+  "animate-in fade-in-0 zoom-in-98 duration-200 ease-out",
 ].join(" ");
 
 /**

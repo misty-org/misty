@@ -33,6 +33,28 @@ export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
 }
 
+export function appConfigureServer(
+  mode: "hosted" | "self_hosted",
+  url?: string | null,
+  deploymentId?: string | null,
+  name?: string | null,
+): Promise<void> {
+  return invoke("app_configure_server", {
+    mode,
+    url: url ?? null,
+    deploymentId: deploymentId ?? null,
+    name: name ?? null,
+  });
+}
+
+export function selfHostEntitlementStore(token: string): Promise<void> {
+  return invoke("self_host_entitlement_store", { token });
+}
+
+export function selfHostEntitlementLoad(): Promise<string | null> {
+  return invoke("self_host_entitlement_load");
+}
+
 export function storageSnapshot(): Promise<StorageSnapshot> {
   return invoke("storage_snapshot");
 }

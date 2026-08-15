@@ -1,3 +1,4 @@
+import { activityApi } from "@/api/activity/api";
 import { notifyAccountScopeReset } from "@/features/auth";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
@@ -241,8 +242,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     const generation = spacesAccountGeneration;
     try {
       const [unreads, mentions] = await Promise.all([
-        spacesApi.inbox("unreads"),
-        spacesApi.inbox("mentions"),
+        activityApi.inbox("unreads"),
+        activityApi.inbox("mentions"),
       ]);
       if (generation !== spacesAccountGeneration) return;
       set({ inbox: { unreads: unreads.items, mentions: mentions.items } });

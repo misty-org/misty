@@ -1,4 +1,5 @@
-import { SpaceRequestError, spaceRequest } from "@/api/spaces/api";
+import { notionApi as serverNotionApi } from "@/api/notes/api";
+import { SpaceRequestError } from "@/api/spaces/api";
 import type {
   NoteWriteError,
   NotionAppendPayload,
@@ -11,8 +12,6 @@ import type {
   NotionSourceOption,
 } from "../model/interfaces/notion";
 import type { NoteWriteErrorCode } from "../model/types/capabilities";
-
-const part = encodeURIComponent;
 
 /**
  * Notion credentials are stored per Space, so every proxied call is
@@ -36,11 +35,6 @@ export function activeNotionAccountId(): string {
   return activeAccountId;
 }
 
-function notionPath(suffix: string): string {
-  if (!activeSpaceId) throw notConnectedError();
-  return `/spaces/${part(activeSpaceId)}/integrations/notion${suffix}`;
-}
-
 function notConnectedError(): NoteWriteError {
   const error = new Error("Open a Space to use Notion notes.") as NoteWriteError;
   error.code = "not_connected";
@@ -59,7 +53,7 @@ export function createNotionApiClient(): NotionClient {
     async isConnected() {
       try {
         if (!activeSpaceId) return false;
-        const result = await spaceRequest<{ connected: boolean }>(notionPath("/status"));
+        const result = await serverNotionApi.status(activeSpaceId);
         return result.connected;
       } catch {
         // A server that cannot answer is treated as "not connected" rather than
@@ -70,66 +64,61 @@ export function createNotionApiClient(): NotionClient {
 
     async connect() {
       if (!activeSpaceId) throw notConnectedError();
-      const start = await spaceRequest<{ authorization_url: string }>(
-        `/spaces/${part(activeSpaceId)}/integrations/notion/authorize`,
-        { method: "POST", body: JSON.stringify({ return_to: `/spaces/${activeSpaceId}/notes` }) },
+      const start = await serverNotionApi.authorize(
+        activeSpaceId,
+        `/spaces/${activeSpaceId}/notes`,
       );
       const { openExternalLink } = await import("@/shared/platform/openExternalLink");
       await openExternalLink(start.authorization_url);
     },
 
-    disconnect: () => notionRequest<void>(notionPath("/connection"), { method: "DELETE" }),
+    disconnect: () => notionRequest(() => serverNotionApi.disconnect(activeSpaceId)),
 
     listSources: () =>
-      notionRequest<{ sources: NotionSourceOption[] }>(notionPath("/sources")).then(
+      notionRequest(() => serverNotionApi.listSources<NotionSourceOption>(activeSpaceId)).then(
         (result) => result.sources,
       ),
 
-    getPage: (pageId) => notionRequest<NotionPage>(notionPath(`/pages/${part(pageId)}`)),
+    getPage: (pageId) =>
+      notionRequest(() => serverNotionApi.getPage<NotionPage>(activeSpaceId, pageId)),
 
     getPageBlocks: (pageId) =>
-      notionRequest<{ blocks: NotionBlock[] }>(notionPath(`/pages/${part(pageId)}/blocks`)).then(
+      notionRequest(() => serverNotionApi.getPageBlocks<NotionBlock>(activeSpaceId, pageId)).then(
         (result) => result.blocks,
       ),
 
     queryDatabase: (databaseId) =>
-      notionRequest<{ pages: NotionPage[] }>(notionPath(`/databases/${part(databaseId)}/query`), {
-        method: "POST",
-        body: JSON.stringify({}),
-      }).then((result) => result.pages),
+      notionRequest(() =>
+        serverNotionApi.queryDatabase<NotionPage>(activeSpaceId, databaseId),
+      ).then((result) => result.pages),
 
     getDatabase: (databaseId) =>
-      notionRequest<NotionDatabase>(notionPath(`/databases/${part(databaseId)}`)),
+      notionRequest(() => serverNotionApi.getDatabase<NotionDatabase>(activeSpaceId, databaseId)),
 
     search: (query) =>
-      notionRequest<{ pages: NotionPage[] }>(notionPath(`/search?q=${part(query)}`)).then(
+      notionRequest(() => serverNotionApi.search<NotionPage>(activeSpaceId, query)).then(
         (result) => result.pages,
       ),
 
     createPage: (payload: NotionCreatePagePayload) =>
-      notionRequest<NotionPage>(notionPath("/pages"), {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }),
+      notionRequest(() => serverNotionApi.createPage<NotionPage>(activeSpaceId, payload)),
 
     appendBlocks: (payload: NotionAppendPayload) =>
-      notionRequest<void>(notionPath(`/blocks/${part(payload.block_id)}/children`), {
-        method: "PATCH",
-        body: JSON.stringify({ children: payload.children }),
-      }),
+      notionRequest(() =>
+        serverNotionApi.appendBlocks(activeSpaceId, payload.block_id, payload.children),
+      ),
 
     updatePageProperties: (pageId: string, properties: Record<string, NotionPropertyValue>) =>
-      notionRequest<NotionPage>(notionPath(`/pages/${part(pageId)}`), {
-        method: "PATCH",
-        body: JSON.stringify({ properties }),
-      }),
+      notionRequest(() =>
+        serverNotionApi.updatePageProperties<NotionPage>(activeSpaceId, pageId, properties),
+      ),
   };
 }
 
 /** Wraps transport failures in a coded error the UI can phrase calmly. */
-async function notionRequest<T>(path: string, init?: RequestInit): Promise<T> {
+async function notionRequest<T>(operation: () => Promise<T>): Promise<T> {
   try {
-    return await spaceRequest<T>(path, init);
+    return await operation();
   } catch (reason) {
     throw toNoteWriteError(reason);
   }

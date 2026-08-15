@@ -3,10 +3,10 @@ mod checks;
 mod cli;
 mod config;
 mod desktop;
-mod file_manager;
 mod process;
 mod release;
 mod server;
+mod website;
 mod workspace;
 
 use anyhow::Result;

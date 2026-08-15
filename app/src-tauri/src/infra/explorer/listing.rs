@@ -247,6 +247,7 @@ impl ExplorerService {
                 provider_type: Some(target.provider_type),
                 remote_name: Some(target.remote_name),
                 remote_path: Some(target.remote_path),
+                ..Default::default()
             })
             .unwrap_or_else(ExplorerLocation::local);
         let size_bytes = if item.size > 0 && !item.is_dir {

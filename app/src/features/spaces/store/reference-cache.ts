@@ -7,7 +7,7 @@ import type {
   SpaceTaskPage,
   SpacesSnapshot,
 } from "@/api/spaces/dto/interfaces/types";
-import { readSpaceAccountToken } from "@/api/spaces/session";
+import { readApiAuthToken } from "@/api/client/session";
 
 const cacheVersion = 1;
 const cacheDatabaseName = "misty-space-reference-cache-v1";
@@ -242,7 +242,7 @@ async function persistCache(value: SpaceReferenceCache): Promise<void> {
 }
 
 async function cacheEncryptionKey(accountId: string): Promise<CryptoKey | null> {
-  const token = await readSpaceAccountToken();
+  const token = await readApiAuthToken();
   if (!token) return null;
   const digest = await crypto.subtle.digest(
     "SHA-256",

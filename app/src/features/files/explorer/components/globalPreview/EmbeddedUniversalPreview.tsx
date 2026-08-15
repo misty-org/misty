@@ -1,4 +1,4 @@
-import { fetchPreviewBytes } from "@/api/preview";
+import { fetchPreviewBytes } from "@/api/preview/api";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";

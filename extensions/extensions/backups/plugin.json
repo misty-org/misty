@@ -1,0 +1,10 @@
+{
+  "schema_version": 1, "id": "backups", "name": "Backups", "version": "0.3.0", "author": "Misty", "status": "installed",
+  "overview": "Backups creates encrypted, verifiable Restic snapshots on a writable non-system volume or a connected Misty cloud remote. Credentials stay in the OS vault.",
+  "capabilities": ["Initialize encrypted local or cloud repositories", "Create and verify manual snapshots with cancellation", "Browse snapshots and restore into a new collision-safe local folder"], "where_it_appears": ["Global extension popup"],
+  "permissions": ["Read access to chosen local source folders", "Write access to the chosen repository and restore destination", "OS credential-vault access", "Execute verified bundled Restic and rclone tools"],
+  "getting_started": ["Add a writable non-system volume or connected cloud remote.", "Initialize the encrypted repository after reviewing the destination.", "Select local source folders and choose Back up now."],
+  "changelog": ["v0.3.0 - Initial production release with manual backup, verification, snapshot browsing, safe restore, and credential-vault storage."],
+  "included_tools": [{"name":"Restic","version":"0.18.0"},{"name":"rclone","version":"1.70.3"}], "links": [{"label":"Documentation","url":"https://mistysys.com/docs/extensions/backups"}], "actions": [{"label":"Open","kind":"open"}],
+  "launcher": { "views": ["all"], "show_in_launcher": true, "requires_selected_file": false, "open_mode": "popup" }
+}

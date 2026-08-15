@@ -1,5 +1,6 @@
 import { useMultiPanelStore } from "@/features/workspace";
 import {
+  connectedDevicesSubscribeDirectory,
   explorerCalculateDirectorySizes,
   explorerDirectorySizeSnapshot,
   explorerListDirectory,
@@ -128,6 +129,9 @@ export function createNavigationActions(
             H.sortForPane(get(), paneId),
             get().directorySizes,
           );
+          if (listing.path.startsWith("misty://device/")) {
+            void connectedDevicesSubscribeDirectory(listing.path);
+          }
           if (mode !== "replace") void get().recordLastOpenedPath(listing.path);
           const multi = useMultiPanelStore.getState();
           const tab = multi.tabs.find((candidate) =>

@@ -1,7 +1,11 @@
 use std::{path::PathBuf, sync::Arc};
 
 use crate::domain::clipboard::ClipboardService;
+#[cfg(desktop)]
+use crate::domain::clipboard::{NativeClipboard, SharedClipboardClient};
 use crate::domain::file_sync::FileSyncPairStore;
+#[cfg(desktop)]
+use crate::infra::connected_devices::ConnectedDevicesService;
 #[cfg(desktop)]
 use crate::infra::extension_runtime::ExtensionRuntimeService;
 #[cfg(desktop)]
@@ -31,6 +35,8 @@ pub struct MistyRuntime {
     pub settings: SettingsService,
     pub commands: CommandService,
     pub devices: DeviceService,
+    #[cfg(desktop)]
+    pub connected_devices: ConnectedDevicesService,
     pub directory_size: DirectorySizeService,
     pub metadata: MetadataService,
     #[cfg(desktop)]
@@ -58,8 +64,27 @@ impl MistyRuntime {
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         let environment = AppEnvironmentService::new_with_data_root(data_root);
         let storage_runtime = StorageRuntimeService::start(&environment);
+        #[cfg(desktop)]
+        let connected_devices = ConnectedDevicesService::new(environment.cache_dir());
+        #[cfg(desktop)]
+        let native_clipboard: Arc<dyn NativeClipboard> =
+            crate::infra::native_clipboard::SystemClipboardAdapter::new();
+        #[cfg(desktop)]
+        let shared_clipboard: Arc<dyn SharedClipboardClient> = Arc::new(connected_devices.clone());
+        #[cfg(desktop)]
+        let clipboard = ClipboardService::new(Some(native_clipboard), Some(shared_clipboard));
+        #[cfg(not(desktop))]
         let clipboard = ClipboardService::new(None, None);
         clipboard.set_device_identity("local".to_owned(), "This Misty".to_owned());
+        #[cfg(desktop)]
+        {
+            let clipboard_for_peer = clipboard.clone();
+            let _ = connected_devices.set_clipboard_handler(Arc::new(move |payload| {
+                clipboard_for_peer.accept_remote_payload(payload);
+                let _ = clipboard_for_peer.apply_shared_to_system_async();
+            }));
+            let _ = clipboard.start();
+        }
         let storage = StorageService::new_with_storage_runtime(
             environment.clone(),
             Some(storage_runtime.clone()),
@@ -119,6 +144,8 @@ impl MistyRuntime {
             settings,
             commands,
             devices,
+            #[cfg(desktop)]
+            connected_devices,
             directory_size,
             metadata,
             #[cfg(desktop)]

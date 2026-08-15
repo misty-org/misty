@@ -1,4 +1,5 @@
 import { mistyDeviceJobsEnabled } from "./flags";
+import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "./model/interfaces/types";
 import {
   ensureServerAgentDevice,
@@ -55,12 +56,15 @@ export class DesktopAgentJobWorker {
   ): Promise<void> {
     const deviceId = this.serverDeviceId;
     if (!deviceId) return;
-    const base = `/devices/${encodeURIComponent(deviceId)}/workflow-node-jobs/${encodeURIComponent(claim.job.id)}`;
     const heartbeat = window.setInterval(() => {
-      void signedAgentDeviceRequest(localDeviceId, `${base}/lease`, {
-        method: "POST",
-        body: JSON.stringify({ leaseToken: claim.leaseToken }),
-      })
+      void devicesApi
+        .renewWorkflowJobLease(
+          signedAgentDeviceRequest,
+          localDeviceId,
+          deviceId,
+          claim.job.id,
+          claim.leaseToken,
+        )
         .then(() => heartbeatServerAgentDevice(deviceId, localDeviceId))
         .catch(() => undefined);
     }, leaseHeartbeatMs);
@@ -69,18 +73,20 @@ export class DesktopAgentJobWorker {
         executeWorkflowNodeOnDevice(claim.job),
         nodeExecutionTimeoutMs,
       );
-      await signedAgentDeviceRequest(localDeviceId, `${base}/complete`, {
-        method: "POST",
-        body: JSON.stringify({ leaseToken: claim.leaseToken, output }),
-      });
+      await devicesApi.completeWorkflowJob(
+        signedAgentDeviceRequest,
+        localDeviceId,
+        deviceId,
+        claim.job.id,
+        { leaseToken: claim.leaseToken, output },
+      );
     } catch (error) {
-      await signedAgentDeviceRequest(localDeviceId, `${base}/fail`, {
-        method: "POST",
-        body: JSON.stringify({
+      await devicesApi
+        .failWorkflowJob(signedAgentDeviceRequest, localDeviceId, deviceId, claim.job.id, {
           leaseToken: claim.leaseToken,
           errorCode: deviceWorkflowErrorCode(error),
-        }),
-      }).catch(() => undefined);
+        })
+        .catch(() => undefined);
     } finally {
       window.clearInterval(heartbeat);
     }
@@ -91,10 +97,10 @@ async function claimNextWorkflowNodeJob(
   deviceId: string,
   localDeviceId: string,
 ): Promise<ClaimedWorkflowNodeJob | null> {
-  const claim = await signedAgentDeviceRequest<ClaimedWorkflowNodeJob | undefined>(
+  const claim = await devicesApi.claimWorkflowJob<ClaimedWorkflowNodeJob | undefined>(
+    signedAgentDeviceRequest,
     localDeviceId,
-    `/devices/${encodeURIComponent(deviceId)}/workflow-node-jobs/claim`,
-    { method: "POST" },
+    deviceId,
   );
   return claim ?? null;
 }

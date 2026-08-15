@@ -1,5 +1,6 @@
+import { fetchCurrentInstanceDescriptor } from "@/api/deployment/api";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import AuthCard from "./components/AuthCard";
@@ -20,8 +21,20 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selfHostToken, setSelfHostToken] = useState("");
+  const [selfHosted, setSelfHosted] = useState(false);
+  const [bootstrapRequired, setBootstrapRequired] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    void fetchCurrentInstanceDescriptor()
+      .then((descriptor) => {
+        setSelfHosted(descriptor.deployment === "self_hosted");
+        setBootstrapRequired(descriptor.bootstrap_required);
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,7 +47,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await authenticateAccount(() => accountRegister(name, normalizedUsername, email, password));
+      await authenticateAccount(() =>
+        accountRegister(name, normalizedUsername, email, password, selfHostToken),
+      );
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
@@ -49,9 +64,13 @@ export default function RegisterPage() {
     <AuthShell
       title={addingAccount ? "Create another account" : "Create an account"}
       description={
-        addingAccount
-          ? "Your current account will remain signed in on this device."
-          : "Sign up to get started."
+        selfHosted
+          ? bootstrapRequired
+            ? "Create the first administrator with the 30-minute bootstrap token."
+            : "Create an isolated account with an administrator enrollment invitation."
+          : addingAccount
+            ? "Your current account will remain signed in on this device."
+            : "Sign up to get started."
       }
       onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
     >
@@ -114,6 +133,20 @@ export default function RegisterPage() {
             disabled={loading}
             onChange={setPassword}
           />
+          {selfHosted ? (
+            <AuthField
+              id="register-self-host-token"
+              label={bootstrapRequired ? "Bootstrap token" : "Enrollment invitation"}
+              value={selfHostToken}
+              autoComplete="off"
+              placeholder={
+                bootstrapRequired ? "Single-use bootstrap token" : "Single-use invitation"
+              }
+              required
+              disabled={loading}
+              onChange={setSelfHostToken}
+            />
+          ) : null}
           {error ? <AuthMessage tone="error" message={error} /> : null}
           <AuthSubmitButton
             idleLabel="Create account"

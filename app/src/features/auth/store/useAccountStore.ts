@@ -1,207 +1,39 @@
-import { appSnapshot } from "@/native";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/baseUrl";
-import { httpRequest } from "@/api/http";
-import { analytics } from "@/telemetry/client";
-import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
-import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
+import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type {
   AccountAuthUser,
   AccountHandoffPath,
   AccountMeResponse,
   LoginResponse,
-} from "../model/stores/account/interfaces/useAccountStore";
-import {
-  readAccountAuthToken,
-  readAccountSessionGeneration,
-  saveAccountAuthToken,
-} from "./useAuthTokenStore";
+} from "@/api/account/types";
+import { fetchCurrentInstanceDescriptor, resolveDeploymentTarget } from "@/api/deployment/api";
+import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
+import { analytics } from "@/telemetry/client";
+import { saveAccountAuthToken } from "./useAuthTokenStore";
+
 export type {
   AccountAuthUser,
   AccountHandoffPath,
   AccountMeResponse,
   LoginResponse,
-} from "../model/stores/account/interfaces/useAccountStore";
+} from "@/api/account/types";
+export { isAccountUnauthorizedError } from "@/api/account/api";
 
-async function postJson<T>(path: string, body?: unknown): Promise<T> {
-  return requestJson<T>("POST", path, body);
+configureAccountApi({ readAnalyticsEnabled: () => analytics.isAnalyticsEnabled() });
+
+function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {
+  const id = data.user_id ?? data.id;
+  if (!id) throw new AccountApiError(`${operation} response did not include a user id.`);
+  return { id, name: data.name, username: data.username, email: data.email };
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  return requestJson<T>("GET", path);
-}
-
-async function requestJson<T>(
-  method: "GET" | "POST" | "PUT",
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const accountGeneration = readAccountSessionGeneration();
-  const apiBase = await resolveAccountApiBase();
-  assertAccountGeneration(accountGeneration);
-  const url = `${apiBase}${path}`;
-  try {
-    const token = shouldAttachAuthToken(path) ? await readAccountAuthToken() : null;
-    assertAccountGeneration(accountGeneration);
-    const headers = addRequestCorrelation(requestHeaders(body, token) ?? new Headers());
-    const response = await httpRequest(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: "include",
-    });
-    assertAccountGeneration(accountGeneration);
-    const result = await parseResponse<T>(response, method, path, url);
-    assertAccountGeneration(accountGeneration);
-    return result;
-  } catch (error) {
-    if (error instanceof AccountApiError || error instanceof AccountSessionChangedError)
-      throw error;
-    const message = apiBase
-      ? `Could not reach Misty server at ${apiBase}. ${errorMessage(error)}`
-      : `Missing Misty API base URL for ${method} ${path}.`;
-    recordAccountApiDebugEvent({
-      level: "error",
-      scope: "account-api",
-      message,
-      detail: `${method} ${url}`,
-    });
-    throw new Error(message);
-  }
-}
-
-function assertAccountGeneration(expected: number): void {
-  if (readAccountSessionGeneration() !== expected) {
-    throw new AccountSessionChangedError();
-  }
-}
-
-async function parseResponse<T>(
-  response: Response,
-  method: string,
-  path: string,
-  url: string,
-): Promise<T> {
-  const payload = await parsePayload(response, method, path);
-
-  if (!response.ok) {
-    const message =
-      typeof payload === "string"
-        ? payload.trim()
-        : responseMessage(payload) || responseError(payload);
-    const requestUrl = response.url || url;
-    const fallback = `${method} ${requestUrl} failed: ${response.status} ${response.statusText || "HTTP error"}`;
-    const errorMessage = message || fallback;
-    recordAccountApiDebugEvent({
-      level: "error",
-      scope: "account-api",
-      message: errorMessage,
-      detail: `${fallback}\n${payloadDetail(payload)}`,
-    });
-    throw new AccountApiError(errorMessage, response.status);
-  }
-
-  return payload as T;
-}
-
-function recordAccountApiDebugEvent(event: {
-  level: "info" | "warn" | "error";
-  scope: string;
-  message: string;
-  detail?: string;
-}): void {
-  if (!accountDebugEnabled()) return;
-  void import("@/shared/platform/clientDebug").then(({ recordClientDebugEvent }) => {
-    recordClientDebugEvent(event);
-  });
-}
-
-function accountDebugEnabled(): boolean {
-  return !isNativeMobileBuild && (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
-}
-
-async function parsePayload(response: Response, method: string, path: string): Promise<unknown> {
-  const text = await response.text();
-  const contentType = response.headers.get("Content-Type") ?? "";
-  if (!contentType.includes("application/json")) return text;
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    const firstJsonValue = firstJsonValueText(text);
-    if (firstJsonValue) return JSON.parse(firstJsonValue);
-    throw new AccountApiError(
-      `Misty server returned malformed JSON for ${method} ${path}: ${textPreview(text)}${error instanceof Error ? ` (${error.message})` : ""}`,
-      response.status,
-    );
-  }
-}
-
-function textPreview(value: string): string {
-  return value.replace(/\s+/g, " ").trim().slice(0, 160) || "empty response";
-}
-
-function firstJsonValueText(value: string): string | null {
-  const start = value.search(/[[{]/);
-  if (start < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = start; index < value.length; index += 1) {
-    const char = value[index];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-    if (char === "{" || char === "[") {
-      depth += 1;
-    } else if (char === "}" || char === "]") {
-      depth -= 1;
-      if (depth === 0) return value.slice(start, index + 1);
-      if (depth < 0) return null;
-    }
-  }
-  return null;
-}
-
-function responseMessage(payload: unknown): string {
-  if (!payload || typeof payload !== "object") return "";
-  const message = (payload as { message?: unknown }).message;
-  return typeof message === "string" ? message : "";
-}
-
-function responseError(payload: unknown): string {
-  if (!payload || typeof payload !== "object") return "";
-  const error = (payload as { error?: unknown }).error;
-  return typeof error === "string" ? error : "";
+async function persistLogin(data: LoginResponse, operation: string): Promise<AccountAuthUser> {
+  const user = authenticatedUser(data, operation);
+  if (data.token) await saveAccountAuthToken(data.token, user);
+  return user;
 }
 
 export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
-  const data = await postJson<LoginResponse>("/login", { email, password });
-  const id = data.user_id ?? data.id;
-  if (!id) {
-    throw new AccountApiError("Sign-in response did not include a user id.");
-  }
-  const user = {
-    id,
-    name: data.name,
-    username: data.username,
-    email: data.email,
-  };
-  if (data.token) {
-    await saveAccountAuthToken(data.token, user);
-  }
-  return user;
+  return persistLogin(await accountApi.signIn(email, password), "Sign-in");
 }
 
 export async function accountRegister(
@@ -209,167 +41,45 @@ export async function accountRegister(
   username: string,
   email: string,
   password: string,
+  selfHostToken?: string,
 ): Promise<AccountAuthUser> {
-  const data = await postJson<LoginResponse>("/register", { name, username, email, password });
-  const id = data.user_id ?? data.id;
-  if (!id) {
-    throw new AccountApiError("Registration response did not include a user id.");
+  let path: "/register" | "/self-host/bootstrap" | "/self-host/enroll" = "/register";
+  const body: Record<string, string> = { name, username, email, password };
+  if ((await resolveDeploymentTarget()).mode === "self_hosted") {
+    const descriptor = await fetchCurrentInstanceDescriptor();
+    if (!selfHostToken?.trim()) throw new Error("An enrollment token is required.");
+    if (descriptor.bootstrap_required) {
+      path = "/self-host/bootstrap";
+      body.bootstrap_token = selfHostToken.trim();
+    } else {
+      path = "/self-host/enroll";
+      body.invitation = selfHostToken.trim();
+    }
   }
-  const user = {
-    id,
-    name: data.name,
-    username: data.username,
-    email: data.email,
-  };
-  if (data.token) {
-    await saveAccountAuthToken(data.token, user);
-  }
-  return user;
+  return persistLogin(await accountApi.register(path, body), "Registration");
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {
-  return getJson("/me");
+  return accountApi.me();
 }
 
-/**
- * Mints a single-use URL that opens the website already signed in.
- *
- * Account management lives on the web now: a browser is a better place to show
- * someone what data is held about them and to run irreversible actions. The
- * desktop app still reads `/me` for license gating, but it no longer edits
- * anything about the account.
- */
 export function accountCreateHandoffUrl(path?: AccountHandoffPath): Promise<{ url: string }> {
-  return postJson("/auth/handoff", path ? { path } : {});
+  return accountApi.handoff(path);
 }
 
-export async function accountFetchAvatar(): Promise<Blob> {
-  const response = await accountAvatarRequest("GET");
-  return response.blob();
+export function accountFetchAvatar(): Promise<Blob> {
+  return accountApi.avatar();
 }
 
-async function accountAvatarRequest(method: "GET", body?: Blob): Promise<Response> {
-  const accountGeneration = readAccountSessionGeneration();
-  const apiBase = await resolveAccountApiBase();
-  assertAccountGeneration(accountGeneration);
-  const token = await readAccountAuthToken();
-  assertAccountGeneration(accountGeneration);
-  const headers = addRequestCorrelation(requestHeaders(undefined, token) ?? new Headers());
-  if (body) headers.set("Content-Type", "image/png");
-  const response = await httpRequest(`${apiBase}/me/avatar`, {
-    method,
-    headers,
-    body,
-    credentials: "include",
-  });
-  assertAccountGeneration(accountGeneration);
-  if (!response.ok) {
-    const message = (await response.text()).trim();
-    throw new AccountApiError(
-      message || `Profile image request failed (${response.status}).`,
-      response.status,
-    );
-  }
-  return response;
-}
-
-export async function accountUpdateTelemetryPreferences(
+export function accountUpdateTelemetryPreferences(
   analyticsEnabled: boolean,
   errorReportingEnabled: boolean,
 ): Promise<void> {
-  await requestJson("PUT", "/me/telemetry", {
-    analytics_enabled: analyticsEnabled,
-    error_reporting_enabled: errorReportingEnabled,
-  });
+  return accountApi.updateTelemetry(analyticsEnabled, errorReportingEnabled);
+}
+
+export function resolveAccountApiBase(): Promise<string> {
+  return accountApi.resolveBase();
 }
 
 configureTelemetryPreferencesSync(accountUpdateTelemetryPreferences);
-
-class AccountApiError extends Error {
-  name = "AccountApiError";
-
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
-    super(message);
-  }
-}
-
-class AccountSessionChangedError extends Error {
-  name = "AccountSessionChangedError";
-
-  constructor() {
-    super("The active Misty account changed before this request finished. Please try again.");
-  }
-}
-
-export function isAccountUnauthorizedError(error: unknown): boolean {
-  return error instanceof AccountApiError && error.status === 401;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === "string") return error;
-  return "Network request failed.";
-}
-
-function payloadDetail(payload: unknown): string {
-  if (typeof payload === "string") return payload.slice(0, 800);
-  try {
-    return JSON.stringify(payload, null, 2).slice(0, 800);
-  } catch {
-    return "";
-  }
-}
-
-export async function resolveAccountApiBase(): Promise<string> {
-  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
-  const explicitServerUrl = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
-  const envApiBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
-  const nativeServerUrl = normalizeApiBaseUrl(
-    (await loadAppSnapshotForAccountApi())?.environment.serverUrl,
-  );
-  return withDefaultApiPath(publicApiBase ?? explicitServerUrl ?? envApiBase ?? nativeServerUrl);
-}
-
-async function loadAppSnapshotForAccountApi() {
-  try {
-    return await appSnapshot();
-  } catch {
-    return null;
-  }
-}
-
-function requestHeaders(body: unknown, token: string | null): Headers | undefined {
-  if (body === undefined && !token) return undefined;
-
-  const headers = new Headers();
-  headers.set("X-Misty-Platform", accountClientPlatform());
-  headers.set(
-    "X-Misty-Release-Channel",
-    import.meta.env.VITE_RELEASE_CHANNEL?.trim() ||
-      (import.meta.env.DEV ? "development" : "production"),
-  );
-  headers.set("X-Misty-Analytics-Enabled", String(analytics.isAnalyticsEnabled()));
-  if (body !== undefined) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  return headers;
-}
-
-function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "ios" {
-  if (isAndroidBuild) return "android";
-  if (isNativeMobileBuild) return "ios";
-  const platform = navigator.platform.toLowerCase();
-  if (platform.includes("win")) return "windows";
-  if (platform.includes("mac")) return "macos";
-  return "linux";
-}
-
-function shouldAttachAuthToken(path: string): boolean {
-  return path !== "/login" && path !== "/register";
-}

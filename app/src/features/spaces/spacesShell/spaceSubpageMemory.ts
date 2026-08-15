@@ -1,3 +1,4 @@
+import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { spaceNotesEnabled } from "@/features/notes";
 
 type PlannerSubpage = "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
@@ -27,7 +28,10 @@ export function rememberSpaceSubpageRoute(accountId: string, spaceId: string, ro
     };
   }
   try {
-    window.localStorage.setItem(memoryKey(accountId, spaceId), JSON.stringify(current));
+    window.localStorage.setItem(
+      deploymentStorageKey(memoryKey(accountId, spaceId)),
+      JSON.stringify(current),
+    );
   } catch {
     // Route memory is an optional navigation enhancement.
   }
@@ -115,7 +119,7 @@ function validRememberedRoute(
 function readMemory(accountId: string, spaceId: string): SpaceSubpageMemory {
   try {
     const value = JSON.parse(
-      window.localStorage.getItem(memoryKey(accountId, spaceId)) ?? "{}",
+      readDeploymentStorageItem(memoryKey(accountId, spaceId)) ?? "{}",
     ) as SpaceSubpageMemory;
     return value && typeof value === "object" ? value : {};
   } catch {

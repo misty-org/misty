@@ -144,12 +144,8 @@ pub fn sync_icons(workspace: &Workspace, source: Option<&Path>) -> Result<()> {
     let temporary = tempfile::Builder::new().prefix("misty-icons-").tempdir()?;
     let master = temporary.path().join("misty-icon.png");
     fs::write(&master, png)?;
-    let tauri = workspace
-        .misty
-        .join("node_modules/.bin")
-        .join(if cfg!(windows) { "tauri.cmd" } else { "tauri" });
-    CommandSpec::new(tauri.as_os_str())
-        .arg("icon")
+    CommandSpec::new(npm())
+        .args(["run", "tauri", "--", "icon"])
         .arg(master.as_os_str())
         .run(&workspace.misty)?;
     fs::copy(&source, workspace.misty.join("src-tauri/icons/icon.icns"))?;

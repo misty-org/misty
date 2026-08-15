@@ -42,7 +42,7 @@ export const desktopPages: DocPage[] = [
         title: "Recommended loop",
         blocks: [
           code(
-            "misty-cli server up --detach\nmisty-cli desktop dev --profile owner\n\n# Before pushing\nmisty-cli check misty",
+            "misty server up --detach\nmisty desktop dev --profile owner\n\n# Before pushing\nmisty check app",
           ),
         ],
       },
@@ -50,11 +50,11 @@ export const desktopPages: DocPage[] = [
   },
   {
     path: "/desktop/dev",
-    title: "misty-cli desktop dev",
+    title: "misty desktop dev",
     eyebrow: "Desktop",
     description:
       "Run the desktop app with an available Vite port, optional isolated profile, and optional initial route.",
-    command: "misty-cli desktop dev [--profile <NAME>] [--route <PATH>]",
+    command: "misty desktop dev [--profile <NAME>] [--route <PATH>]",
     sections: [
       {
         id: "options",
@@ -88,7 +88,7 @@ export const desktopPages: DocPage[] = [
         title: "Examples",
         blocks: [
           code(
-            "# Standard development\nmisty-cli desktop dev\n\n# Open a specific screen\nmisty-cli desktop dev --route /spaces\n\n# Isolated identity and local data\nmisty-cli desktop dev --profile owner\n\n# Combine both\nmisty-cli desktop dev --profile testing --route /settings",
+            "# Standard development\nmisty desktop dev\n\n# Open a specific screen\nmisty desktop dev --route /spaces\n\n# Isolated identity and local data\nmisty desktop dev --profile owner\n\n# Combine both\nmisty desktop dev --profile testing --route /settings",
           ),
         ],
       },
@@ -100,7 +100,7 @@ export const desktopPages: DocPage[] = [
             "The CLI starts at MISTY_DESKTOP_DEV_PORT or 5173 and probes up to 50 consecutive localhost ports.",
             "A temporary Tauri config points devUrl at http://127.0.0.1:<port><route>.",
             "Tauri runs npm run dev:desktop as its beforeDevCommand.",
-            "The CLI runs npm run tauri -- dev --config <temporary-config> from the misty checkout.",
+            "The CLI runs npm run tauri -- dev --config <temporary-config> from the monorepo.",
             "The temporary configuration is deleted after the process exits.",
           ]),
         ],
@@ -151,19 +151,19 @@ export const desktopPages: DocPage[] = [
   },
   {
     path: "/desktop/build",
-    title: "misty-cli desktop build",
+    title: "misty desktop build",
     eyebrow: "Desktop",
     description:
       "Create a normal native Tauri build for the operating system you are currently using.",
-    command: "misty-cli desktop build",
+    command: "misty desktop build",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
-          code("misty-cli desktop build"),
+          code("misty desktop build"),
           p(
-            "The CLI runs npm run tauri -- build in the misty checkout. Tauri uses the repository’s normal configuration and produces native output under src-tauri/target.",
+            "The CLI runs npm run tauri -- build in the monorepo. Tauri uses the repository’s normal configuration and produces native output under src-tauri/target.",
           ),
         ],
       },
@@ -195,17 +195,17 @@ export const desktopPages: DocPage[] = [
   },
   {
     path: "/desktop/clean",
-    title: "misty-cli desktop clean",
+    title: "misty desktop clean",
     eyebrow: "Desktop",
     description:
       "Preview or remove known generated files without touching source, environment, or signing material.",
-    command: "misty-cli desktop clean [--apply]",
+    command: "misty desktop clean [--apply]",
     sections: [
       {
         id: "dry-run",
         title: "Dry-run by default",
         blocks: [
-          code("misty-cli desktop clean"),
+          code("misty desktop clean"),
           p(
             "Without --apply, the command prints every existing candidate as “would remove” and finishes with instructions to opt in. Nothing is deleted.",
           ),
@@ -215,7 +215,7 @@ export const desktopPages: DocPage[] = [
         id: "apply",
         title: "Apply cleanup",
         blocks: [
-          code("misty-cli desktop clean --apply"),
+          code("misty desktop clean --apply"),
           note(
             "Destructive but bounded",
             "--apply permanently removes the listed generated files. Review the dry-run output first.",
@@ -255,18 +255,18 @@ export const desktopPages: DocPage[] = [
   },
   {
     path: "/desktop/icons",
-    title: "misty-cli desktop icons sync",
+    title: "misty desktop icons sync",
     eyebrow: "Desktop",
     description:
       "Regenerate Tauri’s platform icon set from the canonical Misty ICNS file.",
-    command: "misty-cli desktop icons sync [--source <PATH>]",
+    command: "misty desktop icons sync [--source <PATH>]",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "# Use the canonical local asset\nmisty-cli desktop icons sync\n\n# Use another ICNS source\nmisty-cli desktop icons sync --source /path/to/misty-logo.icns",
+            "# Use the canonical local asset\nmisty desktop icons sync\n\n# Use another ICNS source\nmisty desktop icons sync --source /path/to/misty-logo.icns",
           ),
           table(
             ["Option", "Default", "Description"],
@@ -288,11 +288,11 @@ export const desktopPages: DocPage[] = [
             "The command validates the ICNS header.",
             "It selects the largest supported embedded PNG variant.",
             "The local Tauri binary generates the platform icon set.",
-            "The source ICNS is copied to misty/src-tauri/icons/icon.icns.",
+            "The source ICNS is copied to app/src-tauri/icons/icon.icns.",
           ]),
           note(
             "Install dependencies first",
-            "Icon synchronization uses misty/node_modules/.bin/tauri. Run npm ci in the misty checkout if that binary is missing.",
+            "Icon synchronization uses the app workspace’s Tauri npm script. Run npm install at the monorepo root if dependencies are missing.",
           ),
         ],
       },
@@ -300,12 +300,12 @@ export const desktopPages: DocPage[] = [
   },
   {
     path: "/desktop/windows",
-    title: "misty-cli desktop windows stage-assets",
+    title: "misty desktop windows stage-assets",
     eyebrow: "Desktop",
     description:
       "Copy local Misty assets into a Windows-friendly test destination.",
     command:
-      "misty-cli desktop windows stage-assets [--source <PATH>] [--destination <PATH>]",
+      "misty desktop windows stage-assets [--source <PATH>] [--destination <PATH>]",
     sections: [
       {
         id: "options",
@@ -323,7 +323,7 @@ export const desktopPages: DocPage[] = [
             ],
           ),
           code(
-            "misty-cli desktop windows stage-assets\nmisty-cli desktop windows stage-assets \\\n  --source D:\\MistyAssets \\\n  --destination D:\\MistyTest\\.misty\\assets",
+            "misty desktop windows stage-assets\nmisty desktop windows stage-assets \\\n  --source D:\\MistyAssets \\\n  --destination D:\\MistyTest\\.misty\\assets",
           ),
         ],
       },
