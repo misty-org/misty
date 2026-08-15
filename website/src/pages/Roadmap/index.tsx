@@ -76,7 +76,7 @@ export default function Roadmap() {
           </p>
         </div>
         <Button asChild size="lg" className="px-5">
-          <Link to="/signin">Join now</Link>
+          <Link to="/register">Join now</Link>
         </Button>
       </section>
     </PublicPage>

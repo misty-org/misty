@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { JOIN_HREF } from "@/lib/site";
 import AccountMenu from "./AccountMenu";
 import { navItems, resourceLinks } from "./navLinks";
 
@@ -141,7 +142,7 @@ export default function DesktopNav({
               Sign in
             </NavLink>
             <Button asChild size="sm" className="rounded-full px-4">
-              <NavLink to="/signin">Join now</NavLink>
+              <NavLink to={JOIN_HREF}>Join now</NavLink>
             </Button>
           </>
         )}

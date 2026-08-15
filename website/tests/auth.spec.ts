@@ -124,6 +124,47 @@ test("signed-out navigation waits for the session check", async ({ page }) => {
   await expect(navigation.getByRole("link", { name: "Join now" })).toBeVisible();
 });
 
+test("signed-out visitors can reach account creation from navigation and sign in", async ({
+  page,
+}) => {
+  await provideAuthApi(page, false);
+  await page.goto("/");
+
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    await page.getByRole("button", { name: "Open navigation menu" }).click();
+  }
+
+  const joinLink = page
+    .getByRole("navigation", { name: "Primary navigation" })
+    .getByRole("link", { name: "Join now" });
+  await expect(joinLink).toHaveAttribute("href", "/register");
+
+  await page.goto("/signin");
+  await expect(page.getByText("Sign in to pick up where you left off in Misty.")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Don’t have an account? Create one" }),
+  ).toHaveAttribute("href", "/register");
+});
+
+test("client-side route focus announces sign in without drawing a heading outline", async ({
+  page,
+}) => {
+  await provideAuthApi(page, false);
+  await page.goto("/pricing");
+
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    await page.getByRole("button", { name: "Open navigation menu" }).click();
+  }
+  await page
+    .getByRole("navigation", { name: "Primary navigation" })
+    .getByRole("link", { name: "Sign in" })
+    .click();
+
+  const heading = page.getByRole("heading", { name: "Welcome back" });
+  await expect(heading).toBeFocused();
+  await expect(heading).toHaveCSS("outline-style", "none");
+});
+
 test("signing in reloads the document at home", async ({ page }) => {
   await provideAuthApi(page, false);
   let documentRequests = 0;
