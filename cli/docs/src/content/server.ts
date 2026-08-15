@@ -47,13 +47,13 @@ export const serverPages: DocPage[] = [
         title: "Full local system",
         blocks: [
           code(
-            "misty-cli server up --detach\nmisty-cli server logs\n\n# When finished\nmisty-cli server down",
+            "misty server up --detach\nmisty server logs\n\n# When finished\nmisty server down",
           ),
           p(
             "The CLI intentionally wraps misty-server’s existing Docker Compose stack. Compose remains the source of truth for PostgreSQL, migrations, permissions, the API, Stripe forwarding, Cloudflare development services, and any other declared dependency.",
           ),
           p(
-            "Detached startup prints the public HTTPS API base after the Cloudflare tunnel is ready. Run misty-cli server url later to print the same value again.",
+            "Detached startup prints the public HTTPS API base after the Cloudflare tunnel is ready. Run misty server url later to print the same value again.",
           ),
         ],
       },
@@ -61,11 +61,11 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/up",
-    title: "misty-cli server up",
+    title: "misty server up",
     eyebrow: "Server",
     description:
       "Start the complete misty-server Docker Compose stack, rebuilding images by default.",
-    command: "misty-cli server up [--detach] [--no-build]",
+    command: "misty server up [--detach] [--no-build]",
     sections: [
       {
         id: "options",
@@ -89,7 +89,7 @@ export const serverPages: DocPage[] = [
         title: "Examples",
         blocks: [
           code(
-            "# Attached; rebuild images and stream output\nmisty-cli server up\n\n# Background; rebuild images\nmisty-cli server up --detach\n\n# Background; reuse existing images\nmisty-cli server up --detach --no-build",
+            "# Attached; rebuild images and stream output\nmisty server up\n\n# Background; rebuild images\nmisty server up --detach\n\n# Background; reuse existing images\nmisty server up --detach --no-build",
           ),
         ],
       },
@@ -128,7 +128,7 @@ export const serverPages: DocPage[] = [
         title: "Environment behavior",
         blocks: [
           p(
-            "The command runs from the misty-server checkout and explicitly selects compose.dev.yml with .env.dev. The Go server itself does not load an environment file.",
+            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. The Go server itself does not load an environment file.",
           ),
           note(
             "Attached mode",
@@ -140,18 +140,18 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/url",
-    title: "misty-cli server url",
+    title: "misty server url",
     eyebrow: "Server",
     description:
       "Print the current temporary Cloudflare URL for the development API.",
-    command: "misty-cli server url",
+    command: "misty server url",
     sections: [
       {
         id: "usage",
         title: "Use the public development endpoint",
         blocks: [
           code(
-            'misty-cli server up --detach\nmisty-cli server url\n# https://example.trycloudflare.com/api\n\nMISTY_PUBLIC_API_URL="$(misty-cli server url)" misty-cli desktop dev',
+            'misty server up --detach\nmisty server url\n# https://example.trycloudflare.com/api\n\nMISTY_PUBLIC_API_URL="$(misty server url)" misty desktop dev',
           ),
           p(
             "The URL reaches the same API container as localhost:8081, but travels through Cloudflare over HTTPS. It is useful for production-like desktop testing and clients that cannot reach your machine’s loopback interface.",
@@ -166,19 +166,19 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/down",
-    title: "misty-cli server down",
+    title: "misty server down",
     eyebrow: "Server",
     description:
       "Stop and remove Compose containers and networks, with an explicit opt-in for deleting volumes.",
-    command: "misty-cli server down [--volumes]",
+    command: "misty server down [--volumes]",
     sections: [
       {
         id: "safe-default",
         title: "Safe default",
         blocks: [
-          code("misty-cli server down"),
+          code("misty server down"),
           p(
-            "This selects compose.dev.yml and runs Docker Compose down from misty-server. Containers and the Compose network are removed, while named volumes are preserved. Your local PostgreSQL data survives the next server up.",
+            "This selects compose.dev.yml and runs Docker Compose down from server/. Containers and the Compose network are removed, while named volumes are preserved. Your local PostgreSQL data survives the next server up.",
           ),
         ],
       },
@@ -186,7 +186,7 @@ export const serverPages: DocPage[] = [
         id: "volumes",
         title: "Delete local volumes",
         blocks: [
-          code("misty-cli server down --volumes"),
+          code("misty server down --volumes"),
           note(
             "Destructive",
             "--volumes passes Docker’s --volumes option. It can erase the development database and other persistent Compose data. There is no automatic backup or undo.",
@@ -212,17 +212,17 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/logs",
-    title: "misty-cli server logs",
+    title: "misty server logs",
     eyebrow: "Server",
     description:
       "Follow combined output from every service in the misty-server Compose project.",
-    command: "misty-cli server logs",
+    command: "misty server logs",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
-          code("misty-cli server logs"),
+          code("misty server logs"),
           p(
             "The command selects compose.dev.yml and runs Docker Compose logs --follow. Existing recent logs are printed and new output continues to stream.",
           ),
@@ -245,7 +245,7 @@ export const serverPages: DocPage[] = [
         title: "Background workflow",
         blocks: [
           code(
-            "misty-cli server up --detach\nmisty-cli server logs\n# Control+C exits logs\nmisty-cli server down",
+            "misty server up --detach\nmisty server logs\n# Control+C exits logs\nmisty server down",
           ),
         ],
       },
@@ -253,18 +253,18 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/image",
-    title: "misty-cli server image build",
+    title: "misty server image build",
     eyebrow: "Server",
     description:
       "Build the canonical misty-server Docker image directly and assign an explicit tag.",
-    command: "misty-cli server image build --tag <TAG>",
+    command: "misty server image build --tag <TAG>",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "misty-cli server image build --tag misty-server:local\nmisty-cli server image build --tag ghcr.io/misty-org/misty-server:0.2.0",
+            "misty server image build --tag misty-server:local\nmisty server image build --tag ghcr.io/misty-org/misty-server:0.2.0",
           ),
           table(
             ["Option", "Required", "Description"],
@@ -284,11 +284,11 @@ export const serverPages: DocPage[] = [
         blocks: [
           code("docker build --tag <TAG> ."),
           p(
-            "The build context is the misty-server checkout and uses its canonical Dockerfile. This command only creates a local image; it does not push to a registry, start containers, run tests, or deploy.",
+            "The build context is the server directory and uses its canonical Dockerfile. This command only creates a local image; it does not push to a registry, start containers, run tests, or deploy.",
           ),
           note(
             "Test first",
-            "Run misty-cli check server before treating an image as a deployment candidate.",
+            "Run misty check server before treating an image as a deployment candidate.",
           ),
         ],
       },
@@ -296,19 +296,19 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/worker",
-    title: "misty-cli server worker generate-secrets",
+    title: "misty server worker generate-secrets",
     eyebrow: "Server",
     description:
       "Generate a verified Journal collaboration signing pair and independent control secrets.",
     command:
-      "misty-cli server worker generate-secrets [--target development|production]",
+      "misty server worker generate-secrets [--target development|production]",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "misty-cli server worker generate-secrets\nmisty-cli server worker generate-secrets --target production",
+            "misty server worker generate-secrets\nmisty server worker generate-secrets --target production",
           ),
           p(
             "The command generates an Ed25519 signing keypair with the operating system random generator, signs and verifies a probe message, and creates three independent 32-byte random secrets.",
@@ -372,7 +372,7 @@ export const serverPages: DocPage[] = [
         title: "Production deployment",
         blocks: [
           code(
-            "misty-cli server worker deploy --target production --dry-run\nmisty-cli server worker deploy --target production",
+            "misty server worker deploy --target production --dry-run\nmisty server worker deploy --target production",
           ),
           p(
             "The command validates the production environment, file permissions, API/Worker keypair, shared secrets, room salt, Worker hostname, public API URL, Cloudflare token, and pinned local Wrangler installation. Every real deployment first performs a Wrangler dry run and then lists deployments to verify the remote result.",
@@ -388,11 +388,11 @@ export const serverPages: DocPage[] = [
   },
   {
     path: "/server/r2",
-    title: "misty-cli server r2 configure-cors",
+    title: "misty server r2 configure-cors",
     eyebrow: "Server",
     description:
       "Preview and apply Misty’s narrow Cloudflare R2 browser-upload CORS policy.",
-    command: "misty-cli server r2 configure-cors [--apply]",
+    command: "misty server r2 configure-cors [--apply]",
     sections: [
       {
         id: "requirements",
@@ -415,7 +415,7 @@ export const serverPages: DocPage[] = [
         id: "dry-run",
         title: "Preview first",
         blocks: [
-          code("misty-cli server r2 configure-cors"),
+          code("misty server r2 configure-cors"),
           p(
             "The default is a dry run. It validates the environment and origins, prints the exact JSON policy, and names the bucket without changing Cloudflare.",
           ),
@@ -425,7 +425,7 @@ export const serverPages: DocPage[] = [
         id: "apply",
         title: "Apply to Cloudflare",
         blocks: [
-          code("misty-cli server r2 configure-cors --apply"),
+          code("misty server r2 configure-cors --apply"),
           p(
             "The command writes the validated policy to a temporary file, invokes the journal-collab Worker’s local Wrangler binary with r2 bucket cors set --force, and then lists the installed policy.",
           ),

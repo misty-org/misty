@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, file_manager, release, server};
+use crate::{checks, config::Settings, desktop, release, server, website};
 
 #[derive(Debug, Parser)]
-#[command(name = "misty-cli", version, about)]
+#[command(name = "misty", version, about)]
 pub struct Cli {
     #[arg(long, global = true)]
     pub workspace: Option<PathBuf>,
@@ -20,8 +20,8 @@ enum Command {
     Doctor,
     Check(Check),
     Desktop(Desktop),
-    /// Open the standalone Misty File Manager.
-    FileManager,
+    /// Run the public website.
+    Website(Website),
     Server(Server),
     Release(Release),
 }
@@ -40,7 +40,7 @@ struct Check {
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum CheckTarget {
-    Misty,
+    App,
     Server,
     All,
 }
@@ -49,6 +49,18 @@ enum CheckTarget {
 struct Desktop {
     #[command(subcommand)]
     command: DesktopCommand,
+}
+
+#[derive(Debug, Args)]
+struct Website {
+    #[command(subcommand)]
+    command: WebsiteCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum WebsiteCommand {
+    /// Start the Vite development server.
+    Dev,
 }
 
 #[derive(Debug, Subcommand)]
@@ -217,10 +229,10 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         }
         Command::Doctor => doctor(&settings),
         Command::Check(command) => match command.target {
-            CheckTarget::Misty => checks::misty(&settings.workspace),
+            CheckTarget::App => checks::app(&settings.workspace),
             CheckTarget::Server => checks::server(&settings.workspace),
             CheckTarget::All => {
-                checks::misty(&settings.workspace)?;
+                checks::app(&settings.workspace)?;
                 checks::server(&settings.workspace)
             }
         },
@@ -246,7 +258,9 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 ),
             },
         },
-        Command::FileManager => file_manager::open(&settings.workspace),
+        Command::Website(command) => match command.command {
+            WebsiteCommand::Dev => website::dev(&settings.workspace),
+        },
         Command::Server(command) => match command.command {
             ServerCommand::Up { detach, no_build } => {
                 server::up(&settings.workspace, detach, !no_build)
@@ -394,23 +408,17 @@ fn report_release_inputs() {
 }
 
 fn report_repository_status(settings: &Settings) -> Result<()> {
-    for (name, path) in [
-        ("misty", &settings.workspace.misty),
-        ("server", &settings.workspace.server),
-        ("cli", &settings.workspace.cli),
-    ] {
-        let status = crate::process::CommandSpec::new("git")
-            .args(["status", "--porcelain"])
-            .capture(path)?;
-        println!(
-            "{name:<18} {}",
-            if status.trim().is_empty() {
-                "clean"
-            } else {
-                "has local changes"
-            }
-        );
-    }
+    let status = crate::process::CommandSpec::new("git")
+        .args(["status", "--porcelain"])
+        .capture(&settings.workspace.root)?;
+    println!(
+        "repository         {}",
+        if status.trim().is_empty() {
+            "clean"
+        } else {
+            "has local changes"
+        }
+    );
     Ok(())
 }
 
@@ -421,20 +429,22 @@ mod tests {
     #[test]
     fn parses_the_stable_command_surface() {
         for arguments in [
-            vec!["misty-cli", "doctor"],
-            vec!["misty-cli", "check", "all"],
-            vec!["misty-cli", "desktop", "dev", "--profile", "owner"],
-            vec!["misty-cli", "desktop", "clean", "--apply"],
-            vec!["misty-cli", "desktop", "icons", "sync"],
-            vec!["misty-cli", "desktop", "windows", "stage-assets"],
-            vec!["misty-cli", "file-manager"],
-            vec!["misty-cli", "server", "up", "--detach", "--no-build"],
-            vec!["misty-cli", "server", "url"],
-            vec!["misty-cli", "server", "down", "--volumes"],
-            vec!["misty-cli", "server", "image", "build", "--tag", "local"],
-            vec!["misty-cli", "server", "worker", "generate-secrets"],
+            vec!["misty", "doctor"],
+            vec!["misty", "check", "all"],
+            vec!["misty", "check", "app"],
+            vec!["misty", "desktop", "dev", "--profile", "owner"],
+            vec!["misty", "desktop", "build"],
+            vec!["misty", "desktop", "clean", "--apply"],
+            vec!["misty", "desktop", "icons", "sync"],
+            vec!["misty", "desktop", "windows", "stage-assets"],
+            vec!["misty", "website", "dev"],
+            vec!["misty", "server", "up", "--detach", "--no-build"],
+            vec!["misty", "server", "url"],
+            vec!["misty", "server", "down", "--volumes"],
+            vec!["misty", "server", "image", "build", "--tag", "local"],
+            vec!["misty", "server", "worker", "generate-secrets"],
             vec![
-                "misty-cli",
+                "misty",
                 "server",
                 "worker",
                 "generate-secrets",
@@ -442,7 +452,7 @@ mod tests {
                 "production",
             ],
             vec![
-                "misty-cli",
+                "misty",
                 "server",
                 "worker",
                 "deploy",
@@ -450,10 +460,10 @@ mod tests {
                 "production",
                 "--dry-run",
             ],
-            vec!["misty-cli", "server", "r2", "configure-cors", "--apply"],
-            vec!["misty-cli", "release", "start", "0.1.0", "--no-windows"],
-            vec!["misty-cli", "release", "start", "0.1.0", "--no-macos"],
-            vec!["misty-cli", "release", "verify", "0.1.0", "--dry-run"],
+            vec!["misty", "server", "r2", "configure-cors", "--apply"],
+            vec!["misty", "release", "start", "0.1.0", "--no-windows"],
+            vec!["misty", "release", "start", "0.1.0", "--no-macos"],
+            vec!["misty", "release", "verify", "0.1.0", "--dry-run"],
         ] {
             Cli::try_parse_from(arguments).unwrap();
         }
@@ -461,7 +471,7 @@ mod tests {
 
     #[test]
     fn destructive_flags_are_never_implicit() {
-        let down = Cli::try_parse_from(["misty-cli", "server", "down"]).unwrap();
+        let down = Cli::try_parse_from(["misty", "server", "down"]).unwrap();
         let Command::Server(server) = down.command else {
             panic!("expected server command");
         };
@@ -470,7 +480,7 @@ mod tests {
             ServerCommand::Down { volumes: false }
         ));
 
-        let cors = Cli::try_parse_from(["misty-cli", "server", "r2", "configure-cors"]).unwrap();
+        let cors = Cli::try_parse_from(["misty", "server", "r2", "configure-cors"]).unwrap();
         let Command::Server(server) = cors.command else {
             panic!("expected server command");
         };
@@ -480,5 +490,10 @@ mod tests {
                 command: R2Command::ConfigureCors { apply: false }
             }
         ));
+    }
+
+    #[test]
+    fn rejects_the_retired_standalone_file_manager_command() {
+        assert!(Cli::try_parse_from(["misty", "file-manager"]).is_err());
     }
 }

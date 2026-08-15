@@ -1,10 +1,10 @@
 # Misty CLI documentation
 
 The documentation site is a standalone Vite and React application generated
-from the `misty-cli` v0.1.0 command contract.
+from the `misty` v0.1.0 command contract.
 
 ```bash
-cd ~/misty-org/misty-cli/docs
+cd ~/misty-org/misty/cli/docs
 npm ci
 npm run dev
 ```

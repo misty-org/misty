@@ -118,17 +118,12 @@ fn bundle_report(dist: &Path, output: &Path) -> Result<()> {
 }
 
 fn web_sbom(workspace: &Workspace, output: &Path) -> Result<()> {
-    let binary = workspace
-        .misty
-        .join("node_modules/.bin")
-        .join(if cfg!(windows) {
-            "cyclonedx-npm.cmd"
-        } else {
-            "cyclonedx-npm"
-        });
     let sbom = output.join("misty-web.cdx.json");
-    CommandSpec::new(binary.as_os_str())
+    CommandSpec::new(crate::process::npm())
         .args([
+            "exec",
+            "cyclonedx-npm",
+            "--",
             "--package-lock-only",
             "--ignore-npm-errors",
             "--omit",
