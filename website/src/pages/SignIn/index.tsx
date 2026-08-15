@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router";
+import { NavLink, useLocation } from "react-router";
 import { useAuth } from "../../AuthContext";
+import { Button } from "@/components/ui/button";
 import { safeInternalPath } from "@/lib/navigation";
 import AuthCard from "../Auth/AuthCard";
 import AuthShell from "../Auth/AuthShell";
@@ -115,7 +116,19 @@ export default function SignIn({ onSignedIn }: SignInProps = {}) {
 
   return (
     <AuthShell title={cardTitle} description={shellDescription}>
-      <AuthCard title="" description="">
+      <AuthCard
+        footer={
+          mode === "signin" ? (
+            <Button
+              asChild
+              variant="link"
+              className="h-auto p-0 text-foreground"
+            >
+              <NavLink to="/register">Don’t have an account? Create one</NavLink>
+            </Button>
+          ) : undefined
+        }
+      >
         <div className="flex flex-col gap-5">
           {mode === "signin" ? (
             <SignInForm

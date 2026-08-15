@@ -1,4 +1,9 @@
-import { configureSpaceSession } from "@/api/spaces/session";
+import { configureApiSession } from "@/api/client/session";
+import {
+  deploymentStorageKey,
+  readDeploymentScope,
+  readDeploymentStorageItem,
+} from "@/api/deployment/api";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
@@ -63,9 +68,15 @@ export async function saveAccountAuthToken(
       ...account,
       lastUsedAt: new Date().toISOString(),
     };
-    const sessions = vault.sessions.filter((item) => item.account.id !== saved.id);
-    sessions.push({ account: saved, token });
-    await persistSecureVault({ version: 1, activeAccountId: saved.id, sessions });
+    const sessions = vault.sessions.filter(
+      (item) => !isCurrentDeploymentSession(item) || item.account.id !== saved.id,
+    );
+    sessions.push({ account: saved, token, deploymentScope: readDeploymentScope() });
+    await persistSecureVault({
+      version: 1,
+      activeAccountId: vaultAccountId(saved.id),
+      sessions,
+    });
   } catch (error) {
     recordTokenDebugEvent({
       level: "error",
@@ -93,8 +104,8 @@ export async function readAccountAuthToken(): Promise<string | null> {
       const vault = await loadSecureVault();
       const active = selectActiveSession(vault);
       cachedToken = active?.token ?? null;
-      if (active && vault.activeAccountId !== active.account.id) {
-        vault.activeAccountId = active.account.id;
+      if (active && vault.activeAccountId !== vaultAccountId(active.account.id)) {
+        vault.activeAccountId = vaultAccountId(active.account.id);
         await persistSecureVault(vault);
       }
     }
@@ -113,9 +124,25 @@ export async function readAccountAuthToken(): Promise<string | null> {
   return cachedToken;
 }
 
+/** Reads a preserved Misty Hosted session specifically for entitlement minting.
+ * It never changes the active deployment or exposes that token to the custom
+ * server request path. */
+export async function readHostedAccountAuthToken(): Promise<string | null> {
+  if (!hasTauriInternals()) return null;
+  if (readDeploymentScope() === "hosted") return readAccountAuthToken();
+  if (isNativeMobileBuild) return null;
+  const vault = await loadSecureVault();
+  return (
+    vault.sessions
+      .filter((session) => sessionDeploymentScope(session) === "hosted")
+      .sort((left, right) => right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0]
+      ?.token ?? null
+  );
+}
+
 export function listSavedAccountSessions(): SavedAccountSession[] {
   try {
-    const raw = localStorage.getItem(accountIndexKey);
+    const raw = readDeploymentStorageItem(accountIndexKey);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(parsed)) return [];
     const activeId = readActiveAccountId();
@@ -140,7 +167,9 @@ export async function updateSavedAccountSession(
 ): Promise<void> {
   if (!hasTauriInternals() || isNativeMobileBuild) return;
   const vault = await loadSecureVault();
-  const session = vault.sessions.find((item) => item.account.id === account.id);
+  const session = vault.sessions.find(
+    (item) => isCurrentDeploymentSession(item) && item.account.id === account.id,
+  );
   if (!session) return;
   session.account = { ...session.account, ...account };
   await persistSecureVault(vault);
@@ -151,20 +180,24 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
     throw new Error("Saved account switching is only available in the Misty desktop app.");
   }
   const vault = await loadSecureVault();
-  const session = vault.sessions.find((item) => item.account.id === accountId);
+  const session = vault.sessions.find(
+    (item) => isCurrentDeploymentSession(item) && item.account.id === accountId,
+  );
   if (!session) {
-    const activeAccountId = vault.sessions.some((item) => item.account.id === vault.activeAccountId)
-      ? vault.activeAccountId
-      : "";
+    const activeAccountId = currentDeploymentSessions(vault).some(
+      (item) => item.account.id === readActiveAccountId(),
+    )
+      ? readActiveAccountId()
+      : activeAccountIdForCurrentDeployment(vault);
     writeAccountIndex(
-      vault.sessions.map((item) => item.account),
+      currentDeploymentSessions(vault).map((item) => item.account),
       activeAccountId,
     );
     throw new Error("That saved Misty session is no longer available.");
   }
 
   session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
-  vault.activeAccountId = accountId;
+  vault.activeAccountId = vaultAccountId(accountId);
   if (cachedToken !== session.token) accountSessionGeneration += 1;
   cachedToken = session.token;
   await persistSecureVault(vault);
@@ -190,13 +223,15 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
 
   try {
     const vault = await loadSecureVault();
-    const activeId = readActiveAccountId() || vault.activeAccountId;
-    vault.sessions = vault.sessions.filter((item) => item.account.id !== activeId);
+    const activeId = readActiveAccountId();
+    vault.sessions = vault.sessions.filter(
+      (item) => !isCurrentDeploymentSession(item) || item.account.id !== activeId,
+    );
     const next =
-      [...vault.sessions].sort((left, right) =>
+      currentDeploymentSessions(vault).sort((left, right) =>
         right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
       )[0] ?? null;
-    vault.activeAccountId = next?.account.id ?? "";
+    vault.activeAccountId = next ? vaultAccountId(next.account.id) : "";
     cachedToken = next?.token ?? null;
     await persistSecureVault(vault);
     await syncManagedAiToken(next?.token ?? "");
@@ -250,10 +285,15 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
   if (!accountId || !hasTauriInternals() || isNativeMobileBuild) return false;
   try {
     const vault = await loadSecureVault();
-    if (vault.activeAccountId === accountId || readActiveAccountId() === accountId) {
+    if (
+      vault.activeAccountId === vaultAccountId(accountId) ||
+      readActiveAccountId() === accountId
+    ) {
       throw new Error("The active Misty session cannot be removed as a background account.");
     }
-    const sessions = vault.sessions.filter((item) => item.account.id !== accountId);
+    const sessions = vault.sessions.filter(
+      (item) => !isCurrentDeploymentSession(item) || item.account.id !== accountId,
+    );
     if (sessions.length === vault.sessions.length) return true;
     vault.sessions = sessions;
     await persistSecureVault(vault);
@@ -305,7 +345,11 @@ function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migr
   if (raw && legacyAccount) {
     const account = { ...legacyAccount, lastUsedAt: new Date().toISOString() };
     return {
-      vault: { version: 1, activeAccountId: account.id, sessions: [{ account, token: raw }] },
+      vault: {
+        version: 1,
+        activeAccountId: `hosted:${account.id}`,
+        sessions: [{ account, token: raw, deploymentScope: "hosted" }],
+      },
       migrated: true,
     };
   }
@@ -334,8 +378,8 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
     lastPersistedPayload = payload;
   }
   writeAccountIndex(
-    vault.sessions.map((item) => item.account),
-    vault.activeAccountId,
+    currentDeploymentSessions(vault).map((item) => item.account),
+    activeAccountIdForCurrentDeployment(vault),
   );
   writeTokenStoredMarker(true);
 }
@@ -356,10 +400,12 @@ async function persistRawToken(token: string): Promise<void> {
 }
 
 function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | null {
-  const preferredId = readActiveAccountId() || vault.activeAccountId;
+  const preferredId = readActiveAccountId() || activeAccountIdForCurrentDeployment(vault);
+  const sessions = currentDeploymentSessions(vault);
+  if (!preferredId && vault.activeAccountId === "") return null;
   return (
-    vault.sessions.find((item) => item.account.id === preferredId) ??
-    [...vault.sessions].sort((left, right) =>
+    sessions.find((item) => item.account.id === preferredId) ??
+    sessions.sort((left, right) =>
       right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
     )[0] ??
     null
@@ -368,10 +414,12 @@ function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | 
 
 function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: string): void {
   try {
-    if (accounts.length > 0) localStorage.setItem(accountIndexKey, JSON.stringify(accounts));
-    else localStorage.removeItem(accountIndexKey);
-    if (activeAccountId) localStorage.setItem(activeAccountKey, activeAccountId);
-    else localStorage.removeItem(activeAccountKey);
+    const indexKey = deploymentStorageKey(accountIndexKey);
+    const activeKey = deploymentStorageKey(activeAccountKey);
+    if (accounts.length > 0) localStorage.setItem(indexKey, JSON.stringify(accounts));
+    else localStorage.removeItem(indexKey);
+    if (activeAccountId) localStorage.setItem(activeKey, activeAccountId);
+    else localStorage.removeItem(activeKey);
   } catch {
     // Account display metadata is best-effort; tokens remain in the OS keystore.
   }
@@ -379,7 +427,7 @@ function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: str
 
 function readActiveAccountId(): string {
   try {
-    return localStorage.getItem(activeAccountKey) ?? "";
+    return readDeploymentStorageItem(activeAccountKey) ?? "";
   } catch {
     return "";
   }
@@ -413,9 +461,38 @@ function isSavedAccountSession(value: unknown): value is SavedAccountSession {
 function isSecureAccountSession(value: unknown): value is SecureAccountSession {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<SecureAccountSession>;
-  return (
-    typeof item.token === "string" && item.token.length > 0 && isSavedAccountSession(item.account)
+  return Boolean(
+    typeof item.token === "string" &&
+    item.token.length > 0 &&
+    isSavedAccountSession(item.account) &&
+    (item.deploymentScope === undefined || typeof item.deploymentScope === "string"),
   );
+}
+
+function sessionDeploymentScope(session: SecureAccountSession): string {
+  return session.deploymentScope || "hosted";
+}
+
+function isCurrentDeploymentSession(session: SecureAccountSession): boolean {
+  return sessionDeploymentScope(session) === readDeploymentScope();
+}
+
+function currentDeploymentSessions(vault: SecureAccountVault): SecureAccountSession[] {
+  return vault.sessions.filter(isCurrentDeploymentSession);
+}
+
+function vaultAccountId(accountId: string): string {
+  return `${readDeploymentScope()}:${accountId}`;
+}
+
+function activeAccountIdForCurrentDeployment(vault: SecureAccountVault): string {
+  const prefix = `${readDeploymentScope()}:`;
+  if (vault.activeAccountId.startsWith(prefix)) return vault.activeAccountId.slice(prefix.length);
+  // Vaults written before deployment namespacing contain a bare Hosted id.
+  if (readDeploymentScope() === "hosted" && !vault.activeAccountId.includes(":")) {
+    return vault.activeAccountId;
+  }
+  return "";
 }
 
 function emptyVault(): SecureAccountVault {
@@ -475,7 +552,7 @@ function tokenDebugEnabled(): boolean {
   return !isNativeMobileBuild && (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1");
 }
 
-configureSpaceSession({
+configureApiSession({
   isTransitioning: isAccountSessionTransitioning,
   readGeneration: readAccountSessionGeneration,
   readToken: readAccountAuthToken,

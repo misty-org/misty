@@ -4,6 +4,8 @@ pub mod agents;
 pub mod autostart;
 pub mod claude;
 pub mod commands;
+#[cfg(desktop)]
+pub mod connected_devices;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -30,10 +32,15 @@ pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
 #[cfg(desktop)]
+pub mod peer_files;
+#[cfg(desktop)]
+pub mod peer_identity;
+#[cfg(desktop)]
 pub mod plugin_commands;
 pub mod power_pack;
 pub mod providers;
 pub mod search;
+pub mod self_host_entitlement;
 pub mod settings;
 mod settings_migration;
 pub mod smart_library;

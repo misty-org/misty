@@ -1,13 +1,13 @@
 import type { LibraryUploadResult, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import {
+  isApiSessionTransitioning,
+  readApiAuthToken,
+  readApiSessionGeneration,
+} from "@/api/client/session";
 import { readDownloadBlob } from "@/api/spaces/signed-download";
 import { assertUploadLimit } from "@/api/spaces/upload-limits";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
-import {
-  isSpaceAccountSessionTransitioning,
-  readSpaceAccountGeneration,
-  readSpaceAccountToken,
-} from "./session";
 
 import {
   assertStableSpaceAccount,
@@ -22,7 +22,7 @@ export async function uploadLibraryPath(
   purpose: "library" | "attachment",
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
-  const accountGeneration = readSpaceAccountGeneration();
+  const accountGeneration = readApiSessionGeneration();
   assertStableSpaceAccount(accountGeneration);
   options?.onStage?.("reading");
   const response = await fetch(safeTauriAssetUrl(path), { signal: options?.signal });
@@ -48,7 +48,7 @@ export async function uploadLibraryBlob(
   purpose: "library" | "attachment" = "library",
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
-  const accountGeneration = readSpaceAccountGeneration();
+  const accountGeneration = readApiSessionGeneration();
   assertStableSpaceAccount(accountGeneration);
   if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
   const file = new File([blob], filename, {
@@ -71,7 +71,7 @@ export async function replaceLibraryItemContent(
   filename: string,
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
-  const accountGeneration = readSpaceAccountGeneration();
+  const accountGeneration = readApiSessionGeneration();
   assertStableSpaceAccount(accountGeneration);
   if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
   const file = new File([blob], filename, {
@@ -168,9 +168,8 @@ export async function transferLibraryObject(
 ): Promise<void> {
   assertStableSpaceAccount(accountGeneration);
   const direct = /^https?:\/\//i.test(transfer.url);
-  const [base, token] = direct
-    ? ["", ""]
-    : await Promise.all([resolveSpacesApiBase(), readSpaceAccountToken()]);
+  const base = direct ? "" : await resolveSpacesApiBase();
+  const token = direct ? "" : await readApiAuthToken();
   assertStableSpaceAccount(accountGeneration);
   const url = direct ? transfer.url : `${base}${transfer.url}`;
   await new Promise<void>((resolve, reject) => {
@@ -184,10 +183,7 @@ export async function transferLibraryObject(
     }
     if (!direct && token) request.setRequestHeader("Authorization", `Bearer ${token}`);
     request.upload.onprogress = (event) => {
-      if (
-        isSpaceAccountSessionTransitioning() ||
-        accountGeneration !== readSpaceAccountGeneration()
-      ) {
+      if (isApiSessionTransitioning() || accountGeneration !== readApiSessionGeneration()) {
         request.abort();
         return;
       }
@@ -259,9 +255,10 @@ export async function downloadProtectedFile(
 }
 
 export async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blob> {
-  const accountGeneration = readSpaceAccountGeneration();
+  const accountGeneration = readApiSessionGeneration();
   assertStableSpaceAccount(accountGeneration);
-  const [base, token] = await Promise.all([resolveSpacesApiBase(), readSpaceAccountToken()]);
+  const base = await resolveSpacesApiBase();
+  const token = await readApiAuthToken();
   assertStableSpaceAccount(accountGeneration);
   const headers = addRequestCorrelation(new Headers(init?.headers));
   if (token) headers.set("Authorization", `Bearer ${token}`);

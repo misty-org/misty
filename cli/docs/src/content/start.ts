@@ -15,7 +15,7 @@ export const startPages: DocPage[] = [
         title: "One command surface",
         blocks: [
           p(
-            "misty-cli coordinates the Misty desktop application, standalone file manager, Go server, and the CLI itself. It does not replace their native tools. It gives recurring workflows one consistent, guarded entry point.",
+            "misty coordinates the Misty desktop application, public website, Go server, checks, and releases from one monorepo. It does not replace their native tools; it gives recurring workflows one consistent, guarded entry point.",
           ),
           table(
             ["Area", "What the CLI owns"],
@@ -28,6 +28,7 @@ export const startPages: DocPage[] = [
                 "Desktop",
                 "Tauri development, native builds, safe cleanup, icon generation, and Windows asset staging.",
               ],
+              ["Website", "Vite development for the public website."],
               [
                 "Server",
                 "The canonical Docker Compose stack, logs, image builds, Worker secrets, and R2 CORS.",
@@ -49,14 +50,14 @@ export const startPages: DocPage[] = [
         title: "Quick start",
         blocks: [
           code(
-            "misty-cli doctor\nmisty-cli server up --detach\nmisty-cli desktop dev",
+            "misty doctor\nmisty server up --detach\nmisty desktop dev\n# Or start the public website:\nmisty website dev",
           ),
           p(
-            "That checks the machine, starts the complete server stack in the background, and opens the Tauri desktop development app. Follow the server with misty-cli server logs and stop it with misty-cli server down.",
+            "That checks the machine, starts the complete server stack in the background, and opens the Tauri desktop development app. Follow the server with misty server logs and stop it with misty server down.",
           ),
           note(
             "Database-safe by default",
-            "misty-cli server down preserves Docker volumes. Database deletion only happens when you explicitly add --volumes.",
+            "misty server down preserves Docker volumes. Database deletion only happens when you explicitly add --volumes.",
             "success",
           ),
         ],
@@ -66,7 +67,7 @@ export const startPages: DocPage[] = [
         title: "Command families",
         blocks: [
           code(
-            "misty-cli configure --workspace ~/misty-org\nmisty-cli doctor\nmisty-cli check <misty|server|all>\nmisty-cli file-manager\nmisty-cli desktop <command>\nmisty-cli server <command>\nmisty-cli release <command>",
+            "misty configure --workspace ~/misty-org/misty\nmisty doctor\nmisty check <app|server|all>\nmisty desktop <command>\nmisty website <command>\nmisty server <command>\nmisty release <command>",
           ),
           list([
             "Use --help or -h at any level to inspect available commands and options.",
@@ -96,21 +97,21 @@ export const startPages: DocPage[] = [
     title: "Getting started",
     eyebrow: "Start",
     description:
-      "Install misty-cli, point it at your workspace, and validate the machine.",
+      "Install misty, point it at your workspace, and validate the machine.",
     sections: [
       {
         id: "requirements",
         title: "Before you begin",
         blocks: [
           p(
-            "The default workspace is ~/misty-org and must contain Git checkouts named misty, misty-server, and misty-cli. The CLI validates these directories when a workflow needs the full workspace.",
+            "The default workspace is ~/misty-org/misty. It is one repository containing app/, website/, server/, and cli/, and misty validates those project markers before running a workflow.",
           ),
           table(
             ["Tool", "Used for"],
             [
               [
                 "Rust 1.88",
-                "Building and installing misty-cli and Misty’s Tauri core.",
+                "Building and installing misty and Misty’s Tauri core.",
               ],
               [
                 "Node.js + npm",
@@ -135,14 +136,14 @@ export const startPages: DocPage[] = [
         title: "Install",
         blocks: [
           code(
-            "rustup target add x86_64-apple-darwin\ncargo install cargo-cyclonedx --version 0.5.9 --locked\ncargo install --path ~/misty-org/misty-cli --locked --force",
+            "rustup target add x86_64-apple-darwin\ncargo install cargo-cyclonedx --version 0.5.9 --locked\ncargo install --path ~/misty-org/misty/cli --locked --force",
           ),
           note(
             "Apple Silicon",
             "The x86_64-apple-darwin target is required because the release build produces one universal application containing both arm64 and x86_64 code. Intel Macs already use x86_64 natively.",
           ),
           p(
-            "The --locked option uses the committed Cargo.lock. --force replaces an older installed misty-cli binary. Re-run the install command after changing CLI source code.",
+            "The --locked option uses the committed Cargo.lock. --force replaces an older installed misty binary. Re-run the install command after changing CLI source code.",
           ),
         ],
       },
@@ -150,9 +151,9 @@ export const startPages: DocPage[] = [
         id: "configure",
         title: "Configure the workspace",
         blocks: [
-          code("misty-cli configure --workspace ~/misty-org"),
+          code("misty configure --workspace ~/misty-org/misty"),
           p(
-            "This stores the workspace path in the operating system’s configuration directory. On macOS, that is under ~/Library/Application Support/misty-cli/config.toml. It does not copy repositories or edit their configuration.",
+            "This stores the workspace path in the operating system’s configuration directory. On macOS, that is under ~/Library/Application Support/misty/cli.toml. It does not copy repositories or edit their configuration.",
           ),
         ],
       },
@@ -160,7 +161,7 @@ export const startPages: DocPage[] = [
         id: "validate",
         title: "Validate the machine",
         blocks: [
-          code("misty-cli doctor"),
+          code("misty doctor"),
           p(
             "Doctor checks tool availability, GitHub authentication, Rust release targets, Tauri tooling, SBOM tooling, release inputs, repository cleanliness, and the resolved workspace. Missing release secrets are reported without printing their values.",
           ),
@@ -171,10 +172,10 @@ export const startPages: DocPage[] = [
         title: "Your first development session",
         blocks: [
           code(
-            "misty-cli server up --detach\nmisty-cli server logs\n# In another terminal:\nmisty-cli desktop dev",
+            "misty server up --detach\nmisty server logs\n# In another terminal:\nmisty desktop dev",
           ),
           p(
-            "Press Control+C to stop following logs; the services continue running because they were started with --detach. End the session with misty-cli server down.",
+            "Press Control+C to stop following logs; the services continue running because they were started with --detach. End the session with misty server down.",
           ),
         ],
       },
@@ -191,11 +192,9 @@ export const startPages: DocPage[] = [
         id: "start",
         title: "Start everything",
         blocks: [
-          code(
-            "misty-cli server up --detach\nmisty-cli desktop dev --route /spaces",
-          ),
+          code("misty server up --detach\nmisty desktop dev --route /spaces"),
           p(
-            "server up wraps the canonical misty-server Docker Compose file and rebuilds images by default. desktop dev starts Vite through Tauri and opens the requested in-app route.",
+            "server up wraps server/compose.dev.yml and rebuilds images by default. desktop dev starts Vite through Tauri and opens the requested in-app route.",
           ),
         ],
       },
@@ -203,7 +202,7 @@ export const startPages: DocPage[] = [
         id: "observe",
         title: "Watch the server",
         blocks: [
-          code("misty-cli server logs"),
+          code("misty server logs"),
           p(
             "The log stream combines services from the Compose project. Control+C only exits the log follower; it does not stop the stack.",
           ),
@@ -217,10 +216,10 @@ export const startPages: DocPage[] = [
             ["Change", "What to run"],
             [
               ["Frontend React/CSS", "Usually nothing; Vite hot reloads."],
-              ["Tauri Rust", "Restart misty-cli desktop dev."],
+              ["Tauri Rust", "Restart misty desktop dev."],
               [
                 "Go server or Dockerfile",
-                "misty-cli server down, then misty-cli server up --detach.",
+                "misty server down, then misty server up --detach.",
               ],
               [
                 "Only environment values",
@@ -228,7 +227,7 @@ export const startPages: DocPage[] = [
               ],
               [
                 "No image-affecting server changes",
-                "misty-cli server up --detach --no-build.",
+                "misty server up --detach --no-build.",
               ],
             ],
           ),
@@ -238,9 +237,9 @@ export const startPages: DocPage[] = [
         id: "check",
         title: "Check before pushing",
         blocks: [
-          code("misty-cli check all"),
+          code("misty check all"),
           p(
-            "This is intentionally thorough. It runs Misty’s npm and Rust checks, followed by Go, PostgreSQL, container-contract, and Cloudflare Worker checks. Use check misty or check server while iterating on only one repository.",
+            "This is intentionally thorough. It runs the app’s npm and Rust checks, followed by Go, PostgreSQL, container-contract, and Cloudflare Worker checks. Use check app or check server while iterating on one part of the monorepo.",
           ),
         ],
       },
@@ -248,7 +247,7 @@ export const startPages: DocPage[] = [
         id: "stop",
         title: "Stop cleanly",
         blocks: [
-          code("misty-cli server down"),
+          code("misty server down"),
           note(
             "Keep your data",
             "Do not add --volumes unless you intentionally want to erase Docker volumes, including the local PostgreSQL data.",
@@ -261,7 +260,7 @@ export const startPages: DocPage[] = [
         title: "Useful command combinations",
         blocks: [
           code(
-            "# Fast server restart without rebuilding images\nmisty-cli server down\nmisty-cli server up --detach --no-build\n\n# Isolated desktop identity and data\nmisty-cli desktop dev --profile owner --route /spaces\n\n# Preview cleanup, then apply it\nmisty-cli desktop clean\nmisty-cli desktop clean --apply",
+            "# Fast server restart without rebuilding images\nmisty server down\nmisty server up --detach --no-build\n\n# Isolated desktop identity and data\nmisty desktop dev --profile owner --route /spaces\n\n# Preview cleanup, then apply it\nmisty desktop clean\nmisty desktop clean --apply",
           ),
         ],
       },
@@ -272,8 +271,8 @@ export const startPages: DocPage[] = [
     title: "Global command-line options",
     eyebrow: "Start",
     description:
-      "Options and shortcuts that apply to the misty-cli command surface.",
-    command: "misty-cli [OPTIONS] <COMMAND>",
+      "Options and shortcuts that apply to the misty command surface.",
+    command: "misty [OPTIONS] <COMMAND>",
     sections: [
       {
         id: "options",
@@ -287,11 +286,11 @@ export const startPages: DocPage[] = [
                 "Use this workspace root for the current invocation. It has the highest path precedence.",
               ],
               ["-h, --help", "Print help for the current command level."],
-              ["-V, --version", "Print the installed misty-cli version."],
+              ["-V, --version", "Print the installed misty version."],
             ],
           ),
           code(
-            "misty-cli --help\nmisty-cli server --help\nmisty-cli desktop dev --help\nmisty-cli --version",
+            "misty --help\nmisty server --help\nmisty desktop dev --help\nmisty --version",
           ),
         ],
       },
@@ -303,7 +302,7 @@ export const startPages: DocPage[] = [
             "--workspace is global, so Clap accepts it with the command surface rather than requiring a permanent configuration change.",
           ),
           code(
-            "misty-cli --workspace /Volumes/work/misty-org check all\nmisty-cli --workspace ../misty-org server up --detach",
+            "misty --workspace /Volumes/work/misty check all\nmisty --workspace ../misty server up --detach",
           ),
           note(
             "Relative paths",

@@ -12,6 +12,7 @@ export {
 import {
   explorerListDirectory,
   explorerPreviewItem,
+  connectedDevicesMediaUrl,
   fileMetadataSnapshot,
 } from "@/features/files/native";
 import type { DirectoryListing, FileEntry, FileMetadataSnapshot } from "@/native/contracts";
@@ -151,6 +152,19 @@ export function useFilePreview(
       };
       if (videoMimeType) return settle(loadDirectMediaPreview(entry, "video", videoMimeType));
       if (audioMimeType) return settle(loadDirectMediaPreview(entry, "audio", audioMimeType));
+      if (
+        entry.location.kind === "peer_device" &&
+        entry.extension.toLowerCase().replace(/^\./, "") === "pdf"
+      ) {
+        return settle(
+          connectedDevicesMediaUrl(entry.path).then((url) => ({
+            kind: "pdf" as const,
+            text: null,
+            url,
+            mimeType: "application/pdf",
+          })),
+        );
+      }
       if (archivePreviewSupported(entry)) return settle(loadArchivePreview(entry));
       if (nativeImageThumbnailSupported(entry)) return settle(loadNativeImagePreview(entry));
 

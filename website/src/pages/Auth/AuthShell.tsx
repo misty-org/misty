@@ -16,7 +16,7 @@ export default function AuthShell({ title, description, children }: AuthShellPro
         <div className="text-center">
           <h1
             id="auth-page-title"
-            className="text-balance text-3xl font-medium tracking-[-0.04em] text-foreground sm:text-4xl"
+            className="text-balance text-3xl font-medium tracking-[-0.04em] text-foreground outline-none sm:text-4xl"
           >
             {title}
           </h1>

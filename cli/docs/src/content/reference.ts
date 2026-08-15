@@ -16,8 +16,8 @@ export const referencePages: DocPage[] = [
           table(
             ["Command or option", "Description"],
             [
-              ["misty-cli --help / -h", "Show top-level help."],
-              ["misty-cli --version / -V", "Show installed version."],
+              ["misty --help / -h", "Show top-level help."],
+              ["misty --version / -V", "Show installed version."],
               [
                 "--workspace <PATH>",
                 "Override workspace discovery for the current command.",
@@ -27,13 +27,12 @@ export const referencePages: DocPage[] = [
                 "Save a default workspace root.",
               ],
               ["doctor", "Validate the development and release environment."],
-              ["check misty", "Run desktop frontend and Rust checks."],
+              ["check app", "Run desktop frontend and Rust checks."],
               [
                 "check server",
                 "Run Go, database, container, and Worker checks.",
               ],
               ["check all", "Run Misty checks followed by server checks."],
-              ["file-manager", "Open the standalone file manager."],
             ],
           ),
         ],
@@ -56,6 +55,11 @@ export const referencePages: DocPage[] = [
             ],
           ),
         ],
+      },
+      {
+        id: "website",
+        title: "Website",
+        blocks: [table(["Command", "Options"], [["website dev", "None"]])],
       },
       {
         id: "server",
@@ -106,10 +110,10 @@ export const referencePages: DocPage[] = [
         title: "Optional shell shortcuts",
         blocks: [
           p(
-            "These are convenience aliases you can add to ~/.zshrc. They are not part of misty-cli and are deliberately easy to remove.",
+            "These are convenience aliases you can add to ~/.zshrc. They are not part of misty and are deliberately easy to remove.",
           ),
           code(
-            "alias mcli='misty-cli'\nalias mdev='misty-cli desktop dev'\nalias msup='misty-cli server up --detach'\nalias mslogs='misty-cli server logs'\nalias msdown='misty-cli server down'\nalias mcheck='misty-cli check all'",
+            "alias mdev='misty desktop dev'\nalias msup='misty server up --detach'\nalias mslogs='misty server logs'\nalias msdown='misty server down'\nalias mcheck='misty check all'",
             "~/.zshrc",
           ),
           note(
@@ -125,7 +129,7 @@ export const referencePages: DocPage[] = [
     path: "/reference/environment",
     title: "Environment variable reference",
     eyebrow: "Reference",
-    description: "Every environment value read directly by misty-cli.",
+    description: "Every environment value read directly by misty.",
     sections: [
       {
         id: "all-variables",
@@ -135,9 +139,9 @@ export const referencePages: DocPage[] = [
             ["Name", "Required for", "Validation or default"],
             [
               [
-                "MISTY_ORG_ROOT",
+                "MISTY_ROOT",
                 "Workspace discovery",
-                "Falls back to saved config, then ~/misty-org.",
+                "Falls back to saved config, then ~/misty-org/misty.",
               ],
               [
                 "MISTY_DESKTOP_DEV_PORT",
@@ -241,8 +245,8 @@ export const referencePages: DocPage[] = [
         title: "Safe .env template",
         blocks: [
           code(
-            "MISTY_ORG_ROOT=/Users/you/misty-org\nTAURI_UPDATER_ENDPOINT=https://mistysys.com/latest.json\nTAURI_CSP_CONNECT_SOURCES=https://mistysys.com wss://mistysys.com\nTAURI_CSP_IMAGE_SOURCES=https://mistysys.com\nR2_BUCKET=misty-server\nMISTY_R2_ALLOWED_ORIGINS=https://mistysys.com,tauri://localhost",
-            "misty-cli/.env",
+            "MISTY_ROOT=/Users/you/misty-org/misty\nTAURI_UPDATER_ENDPOINT=https://mistysys.com/latest.json\nTAURI_CSP_CONNECT_SOURCES=https://mistysys.com wss://mistysys.com\nTAURI_CSP_IMAGE_SOURCES=https://mistysys.com\nR2_BUCKET=misty-server\nMISTY_R2_ALLOWED_ORIGINS=https://mistysys.com,tauri://localhost",
+            "cli/.env",
           ),
           note(
             "Illustrative only",
@@ -308,7 +312,7 @@ export const referencePages: DocPage[] = [
         title: "Secret handling",
         blocks: [
           list([
-            "The ignored misty-cli/.env is loaded without replacing exported shell values.",
+            "The ignored cli/.env is loaded without replacing exported shell values.",
             "Doctor reports only whether release inputs exist.",
             "Worker secret files use restricted permissions on Unix.",
             "The collaboration private key is written to the server secret file and never printed.",
@@ -344,10 +348,10 @@ export const referencePages: DocPage[] = [
     sections: [
       {
         id: "command-not-found",
-        title: "misty-cli is not found",
+        title: "misty is not found",
         blocks: [
           code(
-            "cargo install --path ~/misty-org/misty-cli --locked --force\n~/.cargo/bin/misty-cli --version",
+            "cargo install --path ~/misty-org/misty/cli --locked --force\n~/.cargo/bin/misty --version",
           ),
           p(
             "If the absolute command works, add ~/.cargo/bin to your shell PATH and open a new terminal.",
@@ -358,9 +362,9 @@ export const referencePages: DocPage[] = [
         id: "workspace",
         title: "A checkout was not found",
         blocks: [
-          code("misty-cli configure --workspace ~/misty-org\nmisty-cli doctor"),
+          code("misty configure --workspace ~/misty-org/misty\nmisty doctor"),
           p(
-            "Confirm the workspace directly contains misty, misty-server, and misty-cli Git checkouts. Use --workspace to diagnose another root without changing saved configuration.",
+            "Confirm the workspace directly contains app/, website/, server/, and cli/. Use --workspace to diagnose another root without changing saved configuration.",
           ),
         ],
       },
@@ -371,7 +375,7 @@ export const referencePages: DocPage[] = [
           p(
             "The CLI automatically searches 50 ports beginning at 5173 or MISTY_DESKTOP_DEV_PORT. If all are occupied, choose another range:",
           ),
-          code("MISTY_DESKTOP_DEV_PORT=6100 misty-cli desktop dev"),
+          code("MISTY_DESKTOP_DEV_PORT=6100 misty desktop dev"),
         ],
       },
       {
@@ -379,9 +383,9 @@ export const referencePages: DocPage[] = [
         title: "The API health check returns 503",
         blocks: [
           list([
-            "Run misty-cli server logs and find the first failing dependency, not just repeated /health entries.",
+            "Run misty server logs and find the first failing dependency, not just repeated /health entries.",
             "Confirm Docker Desktop is running and the database container is healthy.",
-            "Check misty-server/.env.dev because Compose, not the Go binary, supplies development server environment values.",
+            "Check server/.env.dev because Compose, not the Go binary, supplies development server environment values.",
             "If the database schema is disposable and irreparably stale, stop with --volumes and recreate it—but only after accepting the data loss.",
           ]),
         ],
@@ -404,7 +408,7 @@ export const referencePages: DocPage[] = [
         title: "Release identity mismatch",
         blocks: [
           p(
-            "Do not work around an identity mismatch by editing a manifest. Check out the exact Misty and misty-cli commits recorded in misty-release-manifest.json, ensure the Misty working tree is clean, reinstall the matching CLI binary if needed, and retry.",
+            "Do not work around an identity mismatch by editing a manifest. Check out the exact monorepo commit recorded in misty-release-manifest.json, ensure the working tree is clean, reinstall the matching CLI binary if needed, and retry.",
           ),
           note(
             "Why it fails closed",
@@ -417,9 +421,9 @@ export const referencePages: DocPage[] = [
         id: "release-inputs",
         title: "Release inputs are missing",
         blocks: [
-          code("misty-cli doctor"),
+          code("misty doctor"),
           p(
-            "Doctor prints missing variable names. Add them to an ignored misty-cli/.env or export them in the shell. It never prints their current values.",
+            "Doctor prints missing variable names. Add them to an ignored cli/.env or export them in the shell. It never prints their current values.",
           ),
         ],
       },
@@ -441,7 +445,7 @@ export const referencePages: DocPage[] = [
         title: "Inspect the installed command surface",
         blocks: [
           code(
-            "misty-cli --help\nmisty-cli desktop --help\nmisty-cli server --help\nmisty-cli release --help\nmisty-cli release publish --help",
+            "misty --help\nmisty desktop --help\nmisty server --help\nmisty release --help\nmisty release publish --help",
           ),
           p(
             "The documentation describes CLI v0.1.0. The installed --help output remains the final authority if the binary has moved ahead of these pages.",

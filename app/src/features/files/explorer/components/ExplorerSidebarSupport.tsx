@@ -74,6 +74,12 @@ export const sidebarStyles = {
   deviceMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
   deviceMeter: "mt-0.5 h-1 overflow-hidden rounded-full bg-charcoal-card",
   deviceMeterFill: "block h-full bg-cream-muted",
+  deviceGroup: "grid gap-1",
+  deviceGroupHeader: "flex h-7 min-w-0 items-center justify-between px-2",
+  deviceGroupLabel:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-cream-muted/75",
+  deviceGroupAction: "size-7 text-cream-muted shadow-none",
+  deviceGroupEmpty: "px-2 py-1 text-xs text-cream-muted/70",
   errorText: "m-0 text-sm text-cream-bright",
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
 } as const;
@@ -166,11 +172,9 @@ export function buildDeviceEntries(
   devices: MountedDevice[],
   customization: DeviceCustomizationState,
 ): SidebarDeviceEntry[] {
-  const hidden = new Set(customization.hiddenPaths);
   const seen = new Set<string>();
   const entries: SidebarDeviceEntry[] = [];
   for (const device of devices) {
-    if (hidden.has(device.mountPath)) continue;
     seen.add(device.mountPath);
     entries.push({
       ...device,
@@ -179,7 +183,7 @@ export function buildDeviceEntries(
     });
   }
   for (const path of customization.customMountPaths) {
-    if (!path || hidden.has(path) || seen.has(path)) continue;
+    if (!path || seen.has(path)) continue;
     entries.push({
       id: `custom:${path}`,
       volumeId: `custom:${path}`,
@@ -286,11 +290,9 @@ export function loadDeviceCustomization(): DeviceCustomizationState {
               ),
             )
           : {},
-      hiddenPaths: Array.isArray(parsed.hiddenPaths)
-        ? uniqueStrings(
-            parsed.hiddenPaths.filter((value): value is string => typeof value === "string"),
-          )
-        : [],
+      // Older builds mislabeled hiding a sidebar row as "Unmount". Never
+      // carry those hidden paths forward: mounted devices must reflect the OS.
+      hiddenPaths: [],
       customMountPaths: Array.isArray(parsed.customMountPaths)
         ? uniqueStrings(
             parsed.customMountPaths

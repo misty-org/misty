@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { spaceDiscordApi } from "@/features/spaces";
+import { spaceDiscordApi } from "@/api/integrations/discord";
 import { spacesApi } from "@/api/spaces/api";
 import type {
   AvailableProviderResource,

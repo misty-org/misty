@@ -29,6 +29,7 @@ struct ClipboardState {
     device_id: String,
     device_name: String,
     next_revision: u64,
+    last_remote_clock: Option<(u64, String)>,
     on_change: Option<ClipboardChangeCallback>,
 }
 
@@ -137,6 +138,19 @@ impl ClipboardService {
 
     pub fn accept_remote_payload(&self, mut payload: ClipboardPayload) {
         payload.origin = ClipboardOrigin::RemoteShared;
+        {
+            let mut state = self.state.lock().expect("clipboard state lock");
+            let clock = (payload.revision, payload.source_device_id.clone());
+            if state
+                .last_remote_clock
+                .as_ref()
+                .is_some_and(|current| current >= &clock)
+            {
+                return;
+            }
+            state.last_remote_clock = Some(clock);
+            state.next_revision = state.next_revision.max(payload.revision.saturating_add(1));
+        }
         self.set_shared_payload(payload);
     }
 
@@ -243,7 +257,8 @@ impl ClipboardService {
             state.last_seen_fingerprint = fingerprint;
         }
         let payload = self.finalize_payload(payload, ClipboardOrigin::LocalSystem);
-        self.set_local_payload(payload);
+        self.set_local_payload(payload.clone());
+        let _ = self.publish_payload_to_shared(&payload);
     }
 
     fn apply_payload_to_system(&self, mut payload: ClipboardPayload) -> bool {
@@ -397,5 +412,28 @@ mod tests {
         assert_eq!(published.images[0].width, 12);
         assert_eq!(published.images[0].height, 8);
         assert_eq!(published.images[0].bytes, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn remote_lamport_clock_rejects_stale_payloads_and_breaks_ties_by_endpoint() {
+        let service = ClipboardService::new(None, None);
+        let remote = |revision, endpoint: &str, text: &str| ClipboardPayload {
+            kind: ClipboardPayloadKind::Text,
+            source_device_id: endpoint.to_owned(),
+            revision,
+            text: text.to_owned(),
+            ..ClipboardPayload::default()
+        };
+        service.accept_remote_payload(remote(7, "endpoint-b", "new"));
+        service.accept_remote_payload(remote(6, "endpoint-z", "stale"));
+        service.accept_remote_payload(remote(7, "endpoint-a", "lower tie"));
+        assert_eq!(service.latest_shared().text, "new");
+
+        service.accept_remote_payload(remote(7, "endpoint-c", "higher tie"));
+        assert_eq!(service.latest_shared().text, "higher tie");
+        assert_eq!(
+            service.latest_shared().origin,
+            ClipboardOrigin::RemoteShared
+        );
     }
 }

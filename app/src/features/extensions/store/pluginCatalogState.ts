@@ -117,13 +117,35 @@ export function buildPluginViews(
 ) {
   const filteredCatalogEntries = filterCatalogEntries(catalogEntries, query);
   const marketplacePlugins = mergeCatalogPlugins(filteredCatalogEntries, localPlugins, platform);
-
-  const installedCatalogEntries = catalogEntries.filter((plugin) =>
-    localPlugins.some((local) => local.id === plugin.id),
+  const catalogById = new Map(catalogEntries.map((plugin) => [plugin.id, plugin]));
+  const installedPlugins = localPlugins.map((local) =>
+    toPluginEntry(catalogById.get(local.id) ?? localCatalogEntry(local), local, platform),
   );
-  const installedPlugins = mergeCatalogPlugins(installedCatalogEntries, localPlugins, platform);
 
   return { marketplacePlugins, installedPlugins };
+}
+
+function localCatalogEntry(local: LocalPluginRecord): PluginCatalogEntry {
+  return {
+    id: local.id,
+    name: local.name,
+    version: local.version,
+    author: local.author,
+    overview: local.overview,
+    logo_path: local.logo_path,
+    status: local.status,
+    capabilities: local.capabilities,
+    where_it_appears: local.where_it_appears,
+    permissions: local.permissions,
+    getting_started: local.getting_started,
+    changelog: local.changelog,
+    included_tools: local.included_tools ?? [],
+    links: local.links,
+    actions: local.actions,
+    verified: local.verified,
+    launcher: local.launcher,
+    install: { root: local.root, artifacts: [] },
+  };
 }
 
 export async function rebuildCatalogState(
@@ -185,9 +207,10 @@ export async function refreshPlugins(
     platform,
   });
 
-  const localPlugins = await scanLocalPlugins();
+  let localPlugins = get().localPlugins;
 
   try {
+    localPlugins = await scanLocalPlugins();
     const catalogIndex = await readCatalogIndex();
     const catalogEntries = await readCatalogEntries(catalogIndex);
     await rebuildCatalogState(set, get, {
@@ -199,16 +222,14 @@ export async function refreshPlugins(
       loading: false,
     });
   } catch (error) {
-    set({
-      loading: false,
+    // The marketplace is remote, but installed extensions are local. Keep
+    // both the last good catalog and every locally installed extension usable
+    // while surfacing the refresh failure.
+    await rebuildCatalogState(set, get, {
       platform,
-      catalogIndex: [],
-      catalogEntries: [],
-      marketplacePlugins: [],
-      installedPlugins: [],
       localPlugins,
-      selectedPluginId: "",
-      error: String(error),
+      loading: false,
     });
+    set({ error: String(error) });
   }
 }

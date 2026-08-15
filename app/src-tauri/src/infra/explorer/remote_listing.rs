@@ -77,6 +77,7 @@ impl ExplorerService {
                         provider_type: Some(remote.provider_type),
                         remote_name: Some(remote.name),
                         remote_path: Some("/".to_string()),
+                        ..Default::default()
                     },
                 )
             })
@@ -90,6 +91,7 @@ impl ExplorerService {
                 provider_type: None,
                 remote_name: None,
                 remote_path: None,
+                ..Default::default()
             },
             total_count: entries.len() + hidden_count,
             hidden_count,
@@ -212,6 +214,7 @@ impl ExplorerService {
                     provider_type: Some(target.provider_type.clone()),
                     remote_name: Some(target.remote_name.clone()),
                     remote_path: Some(remote_path),
+                    ..Default::default()
                 },
             });
         }
@@ -227,6 +230,7 @@ impl ExplorerService {
                 provider_type: Some(target.provider_type),
                 remote_name: Some(target.remote_name),
                 remote_path: Some(target.remote_path),
+                ..Default::default()
             },
             entries,
             total_count,

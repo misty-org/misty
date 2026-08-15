@@ -1,16 +1,10 @@
-import { spaceRequest } from "@/api/spaces/api";
-import YProvider from "y-partyserver/provider";
+import { notesApi } from "@/api/notes/api";
+import type { NoteCollaborationTicket } from "@/api/notes/api";
+import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
+import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
 
-export type NoteCollaborationRole = "creator" | "editor" | "viewer";
-
-export interface NoteCollaborationTicket {
-  ticket: string;
-  room: string;
-  url: string;
-  role: NoteCollaborationRole;
-  expires_at: string;
-}
+export type { NoteCollaborationRole, NoteCollaborationTicket } from "@/api/notes/api";
 
 export interface NoteCollaborationSession {
   key: string;
@@ -38,10 +32,7 @@ export function createNoteCollaborationTicket(
   spaceId: string,
   noteId: string,
 ): Promise<NoteCollaborationTicket> {
-  return spaceRequest<NoteCollaborationTicket>(
-    `/spaces/${encodeURIComponent(spaceId)}/notes/${encodeURIComponent(noteId)}/collaboration-ticket`,
-    { method: "POST" },
-  );
+  return notesApi.collaborationTicket(spaceId, noteId);
 }
 
 export function acquireNoteCollaborationSession(
@@ -103,22 +94,10 @@ async function createSession(
   key: string,
 ): Promise<NoteCollaborationSession> {
   const firstTicket = await createNoteCollaborationTicket(spaceId, noteId);
-  let unusedTicket = firstTicket.ticket;
   const doc = new Y.Doc();
-  const url = new URL(firstTicket.url);
-  const provider = new YProvider(url.host, firstTicket.room, doc, {
-    party: "note-room",
-    disableBc: true,
-    params: async () => {
-      if (unusedTicket) {
-        const ticket = unusedTicket;
-        unusedTicket = "";
-        return { ticket };
-      }
-      const nextTicket = await createNoteCollaborationTicket(spaceId, noteId);
-      return { ticket: nextTicket.ticket };
-    },
-  });
+  const provider = createYjsProvider(firstTicket, doc, "note-room", () =>
+    createNoteCollaborationTicket(spaceId, noteId),
+  );
 
   return {
     key,

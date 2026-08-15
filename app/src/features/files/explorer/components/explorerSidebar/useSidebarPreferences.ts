@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type {
   DeviceCustomizationState,
   SidebarCollapsedState,
-  SidebarDeviceEntry,
 } from "../../model/interfaces/components/ExplorerSidebarSupport";
 import {
   loadDeviceCustomization,
@@ -11,14 +10,13 @@ import {
   saveDeviceCustomization,
   saveHiddenQuickAccessPaths,
   saveSidebarCollapsedState,
-  uniqueStrings,
 } from "../ExplorerSidebarSupport";
 
 /**
  * Everything the sidebar remembers between sessions.
  *
- * Which sections are collapsed, which devices have been renamed or unmounted,
- * and which Quick access rows were hidden. Each is written back on change.
+ * Which sections are collapsed, local device labels, and which Quick access
+ * rows were hidden. Each is written back on change.
  */
 export function useSidebarPreferences() {
   const [collapsedSections, setCollapsedSections] =
@@ -36,26 +34,6 @@ export function useSidebarPreferences() {
   const toggleSection = (section: keyof SidebarCollapsedState) =>
     setCollapsedSections((current) => ({ ...current, [section]: !current[section] }));
 
-  /**
-   * Removes a device from the list.
-   *
-   * A device the user added by hand is forgotten outright; a real mount can
-   * only be hidden, because it will reappear from the OS on the next scan.
-   */
-  const unmountDevice = (device: SidebarDeviceEntry) =>
-    setDeviceCustomization((current) => ({
-      ...current,
-      customMountPaths: device.custom
-        ? current.customMountPaths.filter((path) => path !== device.mountPath)
-        : current.customMountPaths,
-      hiddenPaths: device.custom
-        ? current.hiddenPaths.filter((path) => path !== device.mountPath)
-        : uniqueStrings([...current.hiddenPaths, device.mountPath]),
-      nameOverrides: Object.fromEntries(
-        Object.entries(current.nameOverrides).filter(([path]) => path !== device.mountPath),
-      ),
-    }));
-
   return {
     collapsedSections,
     setCollapsedSections,
@@ -64,6 +42,5 @@ export function useSidebarPreferences() {
     hiddenQuickAccessPaths,
     setHiddenQuickAccessPaths,
     toggleSection,
-    unmountDevice,
   };
 }

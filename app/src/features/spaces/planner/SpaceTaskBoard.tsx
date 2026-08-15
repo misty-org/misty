@@ -64,7 +64,7 @@ export function SpaceTaskBoard({
 
   return (
     <div
-      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden"
+      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-auto"
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (
@@ -342,7 +342,7 @@ function TaskCard({
         </div>
         {canManage ? (
           <TaskInlineSelect
-            className="mt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+            className="mt-2"
             label={`Status for ${task.title}`}
             value={task.status}
             onChange={(value) => onMove(task, value as SpaceTaskStatus)}

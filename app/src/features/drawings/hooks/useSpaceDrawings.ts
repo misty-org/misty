@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { drawingsApi } from "../api/drawingsApi";
+import { drawingsApi } from "@/api/drawings/api";
 import { notifyDrawingListChanged, subscribeToDrawingListChanges } from "../drawingEvents";
 import type { SpaceDrawing } from "../types";
 

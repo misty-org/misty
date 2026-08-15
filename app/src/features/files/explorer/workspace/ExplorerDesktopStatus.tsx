@@ -100,7 +100,7 @@ function compactNotificationMessage(message: string): string {
 }
 
 const renameStatusStyles = {
-  root: "pointer-events-none absolute bottom-[34px] left-1/2 z-[28] flex min-h-[30px] max-w-[min(520px,calc(100%_-_96px))] -translate-x-1/2 items-center justify-center rounded-lg bg-charcoal-card px-3.5 py-1.5 text-cream shadow-md ring-1 ring-cream/10 ",
+  root: "pointer-events-none absolute bottom-[34px] left-1/2 z-[28] flex min-h-[30px] max-w-[min(520px,calc(100%_-_96px))] -translate-x-1/2 items-center justify-center rounded-lg bg-charcoal-card px-3.5 py-1.5 text-cream shadow-md ring-1 ring-cream/10 animate-in fade-in-0 slide-in-from-bottom-2 duration-160 ease-out",
   warning: "text-sage-fg",
   text: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium",
 } as const;
@@ -108,7 +108,7 @@ const renameStatusStyles = {
 const notificationStyles = {
   stack:
     "pointer-events-none absolute left-1/2 top-3 z-30 grid w-[min(360px,calc(100%_-_48px))] -translate-x-1/2 justify-items-center gap-2",
-  item: "pointer-events-auto min-h-8 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md bg-charcoal-card px-[13px] py-[7px] text-cream shadow-md ring-1 ring-cream/10 ",
+  item: "pointer-events-auto min-h-8 max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-md bg-charcoal-card px-[13px] py-[7px] text-cream shadow-md ring-1 ring-cream/10 animate-in fade-in-0 slide-in-from-top-2 duration-160 ease-out",
   success: "text-sage-fg",
   error: "text-cream-bright",
   info: "",

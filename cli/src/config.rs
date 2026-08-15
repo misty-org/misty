@@ -23,7 +23,9 @@ impl Settings {
         let stored = read_stored_settings()?;
         let root = select_workspace(
             command_line_workspace.map(Path::to_path_buf),
-            env::var_os("MISTY_ORG_ROOT").map(PathBuf::from),
+            env::var_os("MISTY_ROOT")
+                .or_else(|| env::var_os("MISTY_ORG_ROOT"))
+                .map(PathBuf::from),
             stored.workspace_root,
             default_workspace(),
         );
@@ -81,25 +83,43 @@ fn copy_legacy_value(old_name: &str, new_name: &str) {
 }
 
 fn read_stored_settings() -> Result<StoredSettings> {
-    let path = settings_path()?;
-    if !path.is_file() {
-        return Ok(StoredSettings::default());
+    for path in settings_paths()? {
+        if !path.is_file() {
+            continue;
+        }
+        let contents = fs::read_to_string(&path)
+            .with_context(|| format!("could not read {}", path.display()))?;
+        return toml::from_str(&contents)
+            .with_context(|| format!("could not parse {}", path.display()));
     }
-    let contents =
-        fs::read_to_string(&path).with_context(|| format!("could not read {}", path.display()))?;
-    toml::from_str(&contents).with_context(|| format!("could not parse {}", path.display()))
+    Ok(StoredSettings::default())
 }
 
 fn settings_path() -> Result<PathBuf> {
     let root =
         dirs::config_dir().context("could not locate the platform configuration directory")?;
-    Ok(root.join("misty-cli").join("config.toml"))
+    Ok(root.join("misty").join("cli.toml"))
+}
+
+fn settings_paths() -> Result<[PathBuf; 3]> {
+    let current = settings_path()?;
+    let root = current
+        .parent()
+        .and_then(Path::parent)
+        .context("could not locate the platform configuration directory")?
+        .to_path_buf();
+    Ok([
+        current,
+        root.join("mcli").join("config.toml"),
+        root.join("misty-cli").join("config.toml"),
+    ])
 }
 
 fn default_workspace() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("misty-org")
+        .join("misty")
 }
 
 fn select_workspace(

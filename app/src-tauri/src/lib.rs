@@ -13,7 +13,10 @@ mod telemetry;
 
 #[cfg(desktop)]
 use app::commands::{
-    agents_device_identity_load, agents_device_identity_store,
+    agents_device_identity_load, agents_device_identity_store, connected_devices_connect,
+    connected_devices_initialize, connected_devices_list_directory, connected_devices_media_url,
+    connected_devices_prepare_clipboard_files, connected_devices_read_file,
+    connected_devices_roots, connected_devices_snapshot, connected_devices_subscribe_directory,
     media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
     media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
     media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
@@ -21,15 +24,16 @@ use app::commands::{
 };
 use app::commands::{
     agents_device_snapshot, agents_open_citation, agents_prepare_document,
-    agents_prepare_scoped_document, agents_register_folder_scope, app_environment_snapshot,
-    app_snapshot, archive_create, archive_extract, archive_list, claude_abort, claude_drain_events,
-    claude_send_message, claude_status, clipboard_apply_shared, clipboard_native_file_refs,
-    clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
-    clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_bytes,
-    clipboard_write_file_refs, compare_apply_text_merge, compare_files, compare_folders,
-    devices_snapshot, duplicates_cancel, duplicates_hash_remote_candidates, duplicates_scan,
-    explorer_calculate_directory_sizes, explorer_cancel_drag_preparation, explorer_create_item,
-    explorer_delete_items, explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
+    agents_prepare_scoped_document, agents_register_folder_scope, app_configure_server,
+    app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
+    claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
+    clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
+    clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
+    clipboard_write_file_bytes, clipboard_write_file_refs, compare_apply_text_merge, compare_files,
+    compare_folders, devices_snapshot, devices_unmount, duplicates_cancel,
+    duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
+    explorer_cancel_drag_preparation, explorer_create_item, explorer_delete_items,
+    explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
     explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_set_tags,
     explorer_library_snapshot, explorer_list_directory, explorer_open_association,
     explorer_open_path, explorer_open_with, explorer_paste_items, explorer_path_exists,
@@ -55,7 +59,8 @@ use app::commands::{
     providers_save_remote, providers_select_remote, providers_snapshot, providers_test_remote,
     providers_verify_result, providers_verify_start, saved_searches_delete, saved_searches_save,
     saved_searches_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
-    search_start_scan, settings_apply_launch_on_login, settings_launch_on_login_snapshot,
+    search_start_scan, self_host_entitlement_load, self_host_entitlement_store,
+    settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
     settings_snapshot, shortcuts_save, shortcuts_snapshot, smart_library_apply_results,
     smart_library_assets_page, smart_library_delete, smart_library_import_files,
@@ -192,6 +197,9 @@ pub fn run() {
             mac_rounded_corners::set_native_wallpaper_video,
             app_snapshot,
             app_environment_snapshot,
+            app_configure_server,
+            self_host_entitlement_store,
+            self_host_entitlement_load,
             agents_device_snapshot,
             agents_register_folder_scope,
             agents_open_citation,
@@ -201,6 +209,24 @@ pub fn run() {
             agents_device_identity_load,
             #[cfg(desktop)]
             agents_device_identity_store,
+            #[cfg(desktop)]
+            connected_devices_initialize,
+            #[cfg(desktop)]
+            connected_devices_snapshot,
+            #[cfg(desktop)]
+            connected_devices_subscribe_directory,
+            #[cfg(desktop)]
+            connected_devices_connect,
+            #[cfg(desktop)]
+            connected_devices_roots,
+            #[cfg(desktop)]
+            connected_devices_list_directory,
+            #[cfg(desktop)]
+            connected_devices_read_file,
+            #[cfg(desktop)]
+            connected_devices_media_url,
+            #[cfg(desktop)]
+            connected_devices_prepare_clipboard_files,
             claude_status,
             claude_send_message,
             claude_drain_events,
@@ -241,6 +267,7 @@ pub fn run() {
             clipboard_write_file_refs,
             notes_store_asset,
             devices_snapshot,
+            devices_unmount,
             explorer_list_directory,
             #[cfg(target_os = "android")]
             android_grant_local_folder,

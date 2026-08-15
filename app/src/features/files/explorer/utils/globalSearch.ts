@@ -16,7 +16,7 @@ import type {
   SearchQueryRequest,
   SearchResult,
 } from "@/native/contracts";
-import { spacesApi } from "@/api/spaces/api";
+import { searchApi } from "@/api/search/api";
 import type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
 import type { MediaSearchHit } from "../model/stores/media/interfaces/useMediaSearchServerStore";
 import type { SemanticSearchHit } from "../model/stores/media/interfaces/useSmartLibraryServerStore";
@@ -95,7 +95,7 @@ export async function querySemanticExplorerSearch(
       mediaSearchSnapshot()
         .then(ensureMediaSearchDeviceReady)
         .then((snapshot) => searchMedia(snapshot.deviceId, trimmed, Math.min(30, limit))),
-      spacesApi.globalSpaceLibrarySearch(trimmed, Math.min(50, limit)),
+      searchApi.spaceLibraries(trimmed, Math.min(50, limit)),
     ]);
     const libraryHits = libraryResponse.status === "fulfilled" ? libraryResponse.value.hits : [];
     const mediaHits = mediaResponse.status === "fulfilled" ? mediaResponse.value.hits : [];
