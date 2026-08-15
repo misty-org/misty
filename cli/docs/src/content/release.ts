@@ -15,7 +15,7 @@ export const releasePages: DocPage[] = [
         title: "The five-stage flow",
         blocks: [
           code(
-            "misty-cli release start 0.2.0\nmisty-cli release build 0.2.0\nmisty-cli release upload 0.2.0\nmisty-cli release verify 0.2.0\nmisty-cli release publish 0.2.0",
+            "misty release start 0.2.0\nmisty release build 0.2.0\nmisty release upload 0.2.0\nmisty release verify 0.2.0\nmisty release publish 0.2.0",
           ),
           table(
             ["Stage", "Where", "Outcome"],
@@ -54,12 +54,12 @@ export const releasePages: DocPage[] = [
         title: "Release identity",
         blocks: [
           p(
-            "release start records the exact Misty commit, misty-cli commit, CLI version, normalized app version, and release configuration hash. Later stages refuse to proceed when their checkout or generated configuration differs.",
+            "release start records the exact monorepo commit, CLI version, normalized app version, and release configuration hash. Later stages refuse to proceed when the checkout or generated configuration differs.",
           ),
           list([
             "The application commit must match on macOS and Windows.",
             "The CLI commit must match on macOS and Windows.",
-            "Both the application and misty-cli working trees must be clean.",
+            "The monorepo working tree must be clean.",
             "package.json, Cargo.toml, and tauri.conf.json must share the release version.",
             "Platform manifests must point to the release tag and approved platform.",
             "Every artifact record contains its filename, SHA-256 digest, and byte length.",
@@ -100,11 +100,10 @@ export const releasePages: DocPage[] = [
         title: "Before starting",
         blocks: [
           list([
-            "Run misty-cli doctor and resolve every release input.",
+            "Run misty doctor and resolve every release input.",
             "Make all three application version files match the intended semantic version.",
             "Merge the release source to misty/main and synchronize it with origin/main.",
-            "Ensure the misty checkout is clean.",
-            "Commit the release tooling and ensure the misty-cli checkout is clean.",
+            "Ensure the monorepo is clean and synchronized with origin/main.",
             "Authenticate GitHub CLI for the private source and misty-org/misty-public release repository.",
             "On macOS, configure Developer ID signing and an Apple Keychain notarytool profile.",
           ]),
@@ -114,19 +113,19 @@ export const releasePages: DocPage[] = [
   },
   {
     path: "/releases/start",
-    title: "misty-cli release start",
+    title: "misty release start",
     eyebrow: "Releases",
     description:
       "Lock release identity, run desktop checks, create the source tag, and open a draft prerelease.",
     command:
-      "misty-cli release start <VERSION> [--dry-run] [--no-macos] [--no-windows]",
+      "misty release start <VERSION> [--dry-run] [--no-macos] [--no-windows]",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "misty-cli release start 0.2.0\nmisty-cli release start 0.2.0 --no-windows\nmisty-cli release start 0.2.0 --no-macos\nmisty-cli release start v0.2.0 --dry-run",
+            "misty release start 0.2.0\nmisty release start 0.2.0 --no-windows\nmisty release start 0.2.0 --no-macos\nmisty release start v0.2.0 --dry-run",
           ),
           table(
             ["Argument", "Description"],
@@ -158,9 +157,9 @@ export const releasePages: DocPage[] = [
           list([
             "The workspace contains all three Git repositories.",
             "misty/package.json has the requested version.",
-            "misty/src-tauri/Cargo.toml has the requested version.",
-            "misty/src-tauri/tauri.conf.json has the requested version.",
-            "The misty checkout is on main and clean.",
+            "app/src-tauri/Cargo.toml has the requested version.",
+            "app/src-tauri/tauri.conf.json has the requested version.",
+            "The monorepo is on main and clean.",
             "For a real start, local main equals the freshly fetched origin/main.",
             "Every required release configuration value is valid.",
           ]),
@@ -171,7 +170,7 @@ export const releasePages: DocPage[] = [
         title: "Checks and local state",
         blocks: [
           p(
-            "A real start runs the full misty-cli check misty workflow. It then writes release state beneath misty/artifacts/release/<VERSION>/.",
+            "A real start runs the full misty check app workflow. It then writes release state beneath misty/artifacts/release/<VERSION>/.",
           ),
           table(
             ["File", "Purpose"],
@@ -209,18 +208,18 @@ export const releasePages: DocPage[] = [
   },
   {
     path: "/releases/build",
-    title: "misty-cli release build",
+    title: "misty release build",
     eyebrow: "Releases",
     description:
       "Build and validate the current platform’s shipping artifacts against the locked release identity.",
-    command: "misty-cli release build <VERSION> [--dry-run]",
+    command: "misty release build <VERSION> [--dry-run]",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "# Run on the Mac release machine\nmisty-cli release build 0.2.0\n\n# Run from the identical revisions on Windows\nmisty-cli release build 0.2.0",
+            "# Run on the Mac release machine\nmisty release build 0.2.0\n\n# Run from the identical revisions on Windows\nmisty release build 0.2.0",
           ),
         ],
       },
@@ -231,14 +230,13 @@ export const releasePages: DocPage[] = [
           list([
             "Loads the local release manifest, downloading it from the draft when necessary for a real build.",
             "Verifies all three Misty version files.",
-            "Requires the current Misty HEAD to match source_commit.",
-            "Requires the current misty-cli HEAD to match cli_commit.",
+            "Requires the current monorepo HEAD to match source_commit.",
             "Requires the Misty checkout to be clean.",
             "Rebuilds the release Tauri configuration and requires its SHA-256 to match config_sha256.",
           ]),
           note(
             "CLI checkout cleanliness",
-            "The CLI commit must match the manifest and the misty-cli working tree must be clean. Commit and reinstall misty-cli before starting the release.",
+            "The recorded CLI commit must match the monorepo and the working tree must be clean. Commit and reinstall misty before starting the release.",
             "warning",
           ),
         ],
@@ -291,7 +289,7 @@ export const releasePages: DocPage[] = [
         id: "dry-run",
         title: "Dry run",
         blocks: [
-          code("misty-cli release build 0.2.0 --dry-run"),
+          code("misty release build 0.2.0 --dry-run"),
           p(
             "The dry run verifies manifest identity and release configuration for the current platform, then exits before npm installation, application builds, signing, notarization, and artifact creation.",
           ),
@@ -318,18 +316,18 @@ export const releasePages: DocPage[] = [
   },
   {
     path: "/releases/upload",
-    title: "misty-cli release upload",
+    title: "misty release upload",
     eyebrow: "Releases",
     description:
       "Validate and attach the current platform’s artifacts to the existing draft release.",
-    command: "misty-cli release upload <VERSION> [--dry-run]",
+    command: "misty release upload <VERSION> [--dry-run]",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
           code(
-            "# After the Mac build\nmisty-cli release upload 0.2.0\n\n# After the Windows build\nmisty-cli release upload 0.2.0",
+            "# After the Mac build\nmisty release upload 0.2.0\n\n# After the Windows build\nmisty release upload 0.2.0",
           ),
         ],
       },
@@ -354,7 +352,7 @@ export const releasePages: DocPage[] = [
           p(
             "A real upload uses gh release upload against misty-org/misty-public with --clobber. Re-running the command replaces draft assets with the same filename.",
           ),
-          code("misty-cli release upload 0.2.0 --dry-run"),
+          code("misty release upload 0.2.0 --dry-run"),
           p(
             "The dry run prints every file that would be uploaded and performs no GitHub mutation.",
           ),
@@ -368,17 +366,17 @@ export const releasePages: DocPage[] = [
   },
   {
     path: "/releases/verify",
-    title: "misty-cli release verify",
+    title: "misty release verify",
     eyebrow: "Releases",
     description:
       "Require every platform selected at release start, validate its artifacts, and generate the static Tauri updater manifest.",
-    command: "misty-cli release verify <VERSION> [--dry-run]",
+    command: "misty release verify <VERSION> [--dry-run]",
     sections: [
       {
         id: "real-verification",
         title: "Remote verification",
         blocks: [
-          code("misty-cli release verify 0.2.0"),
+          code("misty release verify 0.2.0"),
           list([
             "Recreates the local verification directory.",
             "Downloads all assets from the draft release in misty-org/misty-public.",
@@ -422,7 +420,7 @@ export const releasePages: DocPage[] = [
         id: "dry-run",
         title: "Dry-run behavior",
         blocks: [
-          code("misty-cli release verify 0.2.0 --dry-run"),
+          code("misty release verify 0.2.0 --dry-run"),
           note(
             "Not a mock",
             "The verify dry run requires the selected local platform directories and manifests. It validates local identities, files, hashes, byte lengths, and signatures without downloading or uploading GitHub assets.",
@@ -433,17 +431,17 @@ export const releasePages: DocPage[] = [
   },
   {
     path: "/releases/publish",
-    title: "misty-cli release publish",
+    title: "misty release publish",
     eyebrow: "Releases",
     description:
       "Re-run verification and explicitly convert the draft prerelease into a public prerelease.",
-    command: "misty-cli release publish <VERSION> [--yes] [--dry-run]",
+    command: "misty release publish <VERSION> [--yes] [--dry-run]",
     sections: [
       {
         id: "default-flow",
         title: "Confirmed publication",
         blocks: [
-          code("misty-cli release publish 0.2.0"),
+          code("misty release publish 0.2.0"),
           p(
             "The command first performs the complete remote verify workflow. It then asks you to type the exact phrase publish 0.2.0. Any other input cancels publication.",
           ),
@@ -461,7 +459,7 @@ export const releasePages: DocPage[] = [
         id: "yes",
         title: "Non-interactive confirmation",
         blocks: [
-          code("misty-cli release publish 0.2.0 --yes"),
+          code("misty release publish 0.2.0 --yes"),
           note(
             "Use with care",
             "--yes skips the typed confirmation but does not skip verification. Reserve it for an intentional, controlled non-interactive publication.",
@@ -473,7 +471,7 @@ export const releasePages: DocPage[] = [
         id: "dry-run",
         title: "Dry run",
         blocks: [
-          code("misty-cli release publish 0.2.0 --dry-run"),
+          code("misty release publish 0.2.0 --dry-run"),
           p(
             "Dry-run publication runs local verification for the selected platforms through verify --dry-run and then reports that it would publish the tag. It neither downloads assets nor changes the GitHub draft.",
           ),

@@ -5,7 +5,7 @@ use crate::{
     workspace::Workspace,
 };
 
-pub fn misty(workspace: &Workspace) -> Result<()> {
+pub fn app(workspace: &Workspace) -> Result<()> {
     workspace.validate()?;
     CommandSpec::new(npm())
         .args(["run", "check"])

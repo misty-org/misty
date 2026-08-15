@@ -35,14 +35,12 @@ pub fn start(
     let platforms = selected_platforms(no_macos, no_windows)?;
     state::verify_versions(workspace, &version)?;
     state::require_release_checkout(workspace, dry_run)?;
-    state::require_clean_cli_checkout(workspace)?;
     if !dry_run {
-        checks::misty(workspace)?;
+        checks::app(workspace)?;
     }
     let config = config::build()?;
     let config_bytes = serde_json::to_vec_pretty(&config)?;
-    let source_commit = state::git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
-    let cli_commit = state::git(workspace, &workspace.cli, ["rev-parse", "HEAD"])?;
+    let source_commit = state::git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
     let tag = format!("misty-v{version}");
     let root = state::release_root(workspace, &version);
     fs::create_dir_all(&root)?;
@@ -52,7 +50,6 @@ pub fn start(
         version: version.clone(),
         tag: tag.clone(),
         source_commit,
-        cli_commit,
         cli_version: env!("CARGO_PKG_VERSION").to_owned(),
         config_sha256: artifacts::sha256(&config_path)?,
         created_at: Utc::now(),
@@ -92,7 +89,7 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
         return Ok(());
     }
 
-    CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)?;
+    CommandSpec::new(npm()).args(["ci"]).run(&workspace.root)?;
     CommandSpec::new(npm())
         .args(["run", "build:desktop"])
         .run(&workspace.misty)?;
