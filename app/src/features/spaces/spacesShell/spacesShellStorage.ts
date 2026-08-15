@@ -1,3 +1,5 @@
+import { readDeploymentStorageItem } from "@/api/deployment/api";
+
 const PANEL_VISIBLE_KEY = "misty:spaces-panel-visible";
 
 export function readPanelVisible() {
@@ -19,7 +21,7 @@ export function writePanelVisible(visible: boolean) {
 export function readLastActiveSpaceId(userId?: string) {
   if (!userId) return "";
   try {
-    return window.localStorage.getItem(`misty:last-active-space:${userId}`) ?? "";
+    return readDeploymentStorageItem(`misty:last-active-space:${userId}`) ?? "";
   } catch {
     return "";
   }

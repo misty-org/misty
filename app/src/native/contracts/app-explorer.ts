@@ -41,6 +41,9 @@ export interface AppEnvironmentSnapshot {
   workspacesPath: string;
   commandsPath: string;
   serverUrl: string | null;
+  serverMode: "hosted" | "self_hosted";
+  serverDeploymentId?: string | null;
+  serverName?: string | null;
   grpcAddress: string;
   mountPath: string;
   configExists: boolean;
@@ -155,11 +158,53 @@ export interface DeviceSnapshot {
   devices: MountedDevice[];
 }
 
+export interface ConnectedPeerStatus {
+  deviceId: string;
+  state: "online" | "authorization_expired" | "connecting" | "offline";
+  connectionType: "direct" | "relay" | "unknown";
+  authorizationExpiresAt: number;
+}
+
+export interface ConnectedDevicesSnapshot {
+  enabled: boolean;
+  endpointId: string | null;
+  addressing: unknown | null;
+  relayPolicy: "managed" | "public-development" | "disabled";
+  peers: ConnectedPeerStatus[];
+  unavailableReason: string | null;
+}
+
+export interface PeerRoot {
+  id: string;
+  name: string;
+  kind: "system" | "volume";
+  readonly: true;
+}
+
+export interface PeerEntry {
+  name: string;
+  path: string;
+  kind: "file" | "directory" | "symlink";
+  sizeBytes: number | null;
+  modifiedMs: number | null;
+  snapshot: string;
+  readonly: true;
+  hidden: boolean;
+}
+
+export type PeerResponse =
+  | { type: "roots"; data: { roots: PeerRoot[] } }
+  | { type: "directory"; data: { path: string; entries: PeerEntry[]; snapshot: string } }
+  | { type: "stat"; data: { entry: PeerEntry } }
+  | { type: "pong"; data: { nonce: number } };
+
 export interface ExplorerLocation {
   kind: ExplorerLocationKind;
   providerType: string | null;
   remoteName: string | null;
   remotePath: string | null;
+  peerDeviceId?: string | null;
+  peerRootId?: string | null;
 }
 
 export interface AndroidGrantedFolder {

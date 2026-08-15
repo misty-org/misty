@@ -2,6 +2,7 @@ import {
   archiveList,
   explorerGenerateImageThumbnail,
   explorerPrepareOpenItem,
+  connectedDevicesMediaUrl,
 } from "@/features/files/native";
 import type { ArchiveEntry, FileEntry } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
@@ -27,7 +28,7 @@ export function folderPreviewEntries(entries: FileEntry[]): FileEntry[] {
 }
 
 export async function previewPathForEntry(entry: FileEntry): Promise<PreparedPreviewPath> {
-  if (entry.location.kind !== "remote") return { path: entry.path, prepared: null };
+  if (entry.location.kind === "local") return { path: entry.path, prepared: null };
   const prepared = await explorerPrepareOpenItem({
     path: entry.path,
     sizeBytes: entry.sizeBytes,
@@ -103,6 +104,9 @@ export async function loadDirectMediaPreview(
   kind: "image" | "video" | "audio",
   mimeType: string,
 ): Promise<LoadedInspectorPreview> {
+  if (entry.location.kind === "peer_device") {
+    return { kind, text: null, url: await connectedDevicesMediaUrl(entry.path), mimeType };
+  }
   const preparedPath = await previewPathForEntry(entry);
   return { kind, text: null, url: safeTauriAssetUrl(preparedPath.path), mimeType };
 }

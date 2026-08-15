@@ -224,6 +224,8 @@ pub struct ExplorerLocation {
     pub provider_type: Option<String>,
     pub remote_name: Option<String>,
     pub remote_path: Option<String>,
+    pub peer_device_id: Option<String>,
+    pub peer_root_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -233,11 +235,23 @@ pub enum ExplorerLocationKind {
     Local,
     RemoteProvider,
     Remote,
+    PeerDevice,
 }
 
 impl ExplorerLocation {
     pub fn local() -> Self {
         Self::default()
+    }
+
+    pub fn peer_device(device_id: String, root_id: String, relative_path: String) -> Self {
+        Self {
+            kind: ExplorerLocationKind::PeerDevice,
+            provider_type: None,
+            remote_name: None,
+            remote_path: Some(relative_path),
+            peer_device_id: Some(device_id),
+            peer_root_id: Some(root_id),
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+import { deploymentStorageKey } from "@/api/deployment/api";
 import { useEffect } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -14,6 +15,7 @@ import { SpaceLibrary } from "@/features/spaces/library";
 import { SpacePlanner } from "@/features/spaces/planner";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
+import { canOpenMistySpaceSection } from "./mistySpace";
 
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
@@ -60,7 +62,10 @@ export function SpaceDetail() {
   useEffect(() => {
     if (!space || !user?.id) return;
     try {
-      window.localStorage.setItem(`misty:last-active-space:${user.id}`, space.id);
+      window.localStorage.setItem(
+        deploymentStorageKey(`misty:last-active-space:${user.id}`),
+        space.id,
+      );
     } catch {
       /* local route memory can be unavailable in private contexts */
     }
@@ -207,8 +212,7 @@ export function SpaceDetail() {
     );
   }
 
-  const canManageMisty = space.permissions?.["space.invite"] === true;
-  if (space.kind === "misty" && section !== "chat" && !(section === "settings" && canManageMisty)) {
+  if (!canOpenMistySpaceSection(space, section)) {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
   }
 

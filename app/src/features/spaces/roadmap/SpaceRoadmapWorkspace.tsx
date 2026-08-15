@@ -1,3 +1,4 @@
+import { deploymentStorageKey } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
 import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import type {
@@ -87,7 +88,10 @@ export function SpaceRoadmapWorkspace({
   }, [expansionKey]);
   useEffect(() => {
     try {
-      window.localStorage.setItem(expansionKey, JSON.stringify([...expandedGoalIds]));
+      window.localStorage.setItem(
+        deploymentStorageKey(expansionKey),
+        JSON.stringify([...expandedGoalIds]),
+      );
     } catch {
       // Personal expansion state is optional.
     }

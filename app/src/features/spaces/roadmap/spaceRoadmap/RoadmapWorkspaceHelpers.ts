@@ -1,3 +1,4 @@
+import { readDeploymentStorageItem } from "@/api/deployment/api";
 import type {
   SpaceRoadmapEdgeEndpoint,
   SpaceRoadmapMilestone,
@@ -21,7 +22,7 @@ export function normalizeRoadmapSnapshot(snapshot: SpaceRoadmapSnapshot): SpaceR
 
 export function readExpandedGoals(key: string) {
   try {
-    const value = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
+    const value = JSON.parse(readDeploymentStorageItem(key) ?? "[]") as unknown;
     return new Set(
       Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
     );

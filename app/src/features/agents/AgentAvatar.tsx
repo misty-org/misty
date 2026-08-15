@@ -1,6 +1,4 @@
-import { readAccountAuthToken, readAccountSessionGeneration } from "@/features/auth";
-import { httpRequest } from "@/api/http";
-import { resolveSpacesApiBase } from "@/api/spaces/api";
+import { agentsApi } from "@/api/agents/api";
 import { cn } from "@/shared/ui";
 import { Bot, CalendarDays, Code2, PenLine, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -68,18 +66,10 @@ export function AgentAvatar({
     let objectUrl = "";
     setImageUrl(null);
     if (resolved.kind !== "upload" || !agentId) return;
-    const generation = readAccountSessionGeneration();
-    void Promise.all([resolveSpacesApiBase(), readAccountAuthToken()])
-      .then(async ([base, token]) => {
-        const headers = new Headers();
-        if (token) headers.set("Authorization", `Bearer ${token}`);
-        const response = await httpRequest(
-          `${base}/agents/${encodeURIComponent(agentId)}/avatar?version=${resolved.version}`,
-          { credentials: "include", headers },
-        );
-        if (!response.ok || generation !== readAccountSessionGeneration()) return;
-        const blob = await response.blob();
-        if (!current || generation !== readAccountSessionGeneration()) return;
+    void agentsApi
+      .avatar(agentId, resolved.version)
+      .then((blob) => {
+        if (!current) return;
         objectUrl = URL.createObjectURL(blob);
         setImageUrl(objectUrl);
       })

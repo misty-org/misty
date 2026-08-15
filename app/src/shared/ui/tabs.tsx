@@ -58,11 +58,11 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     data-slot="tabs-trigger"
     className={cn(
-      "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-cream/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-cream focus-visible:border-charcoal-active focus-visible:ring-[3px] focus-visible:ring-charcoal-active/50 focus-visible:outline-1 focus-visible:outline-charcoal-active disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 text-cream-muted hover:text-cream group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-      "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:border-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent",
-      "data-active:bg-charcoal-bg data-active:text-cream data-active:border-charcoal-border data-active:bg-charcoal-card data-active:text-cream",
+      "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-cream-muted transition-all duration-150 ease-out group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-cream focus-visible:border-charcoal-active focus-visible:ring-[3px] focus-visible:ring-charcoal-active/50 focus-visible:outline-1 focus-visible:outline-charcoal-active disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent group-data-[variant=line]/tabs-list:data-active:border-transparent",
+      "data-active:bg-charcoal-card data-active:border-charcoal-border data-active:text-cream",
       "after:absolute after:bg-charcoal-active",
-      "after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0",
+      "after:opacity-0 after:transition-opacity after:duration-150 after:ease-out group-data-horizontal/tabs:after:inset-x-0",
       "group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5",
       "group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1",
       "group-data-vertical/tabs:after:w-0.5",

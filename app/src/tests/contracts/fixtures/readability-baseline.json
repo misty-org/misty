@@ -1,5 +1,5 @@
 {
-  "src/app/layouts/DesktopLayout/styles.ts": [
+  "src/application/layouts/DesktopLayout/styles.ts": [
     {
       "length": 161,
       "hash": "b02e0bc0481ad599"
@@ -9,7 +9,7 @@
       "hash": "33323ac7f5c59123"
     }
   ],
-  "src/app/layouts/RootLayout.tsx": [
+  "src/application/layouts/RootLayout.tsx": [
     {
       "length": 308,
       "hash": "5aab0420a6de0452"

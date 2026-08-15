@@ -1,3 +1,4 @@
+import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import {
   formatActivityBadge,
   unreadActivityCountForSpace,
@@ -156,7 +157,6 @@ export function SpaceNavRail() {
         );
       })}
 
-      <span className="my-0.5 h-px w-7 bg-charcoal-border" aria-hidden="true" />
       <Link
         className={cn(
           "misty-navbar-marker-side grid size-[46px] shrink-0 place-items-center rounded-[14px] border border-charcoal-border/55",
@@ -241,7 +241,9 @@ export function reorderSpaceIds(
 
 function readSpaceOrder(): string[] {
   try {
-    const value = JSON.parse(window.localStorage.getItem(spaceOrderStorageKey) ?? "[]") as unknown;
+    const value = JSON.parse(
+      readDeploymentStorageItem(spaceOrderStorageKey) ?? "[]",
+    ) as unknown;
     return Array.isArray(value)
       ? value.filter((item): item is string => typeof item === "string")
       : [];
@@ -252,7 +254,7 @@ function readSpaceOrder(): string[] {
 
 function writeSpaceOrder(order: string[]) {
   try {
-    window.localStorage.setItem(spaceOrderStorageKey, JSON.stringify(order));
+    window.localStorage.setItem(deploymentStorageKey(spaceOrderStorageKey), JSON.stringify(order));
   } catch {
     // Space ordering is a local preference; dragging still works without storage.
   }

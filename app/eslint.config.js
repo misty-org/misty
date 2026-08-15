@@ -103,7 +103,14 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/platform/*", "@/telemetry/*"],
+          [
+            "@/api/*",
+            "@/application/*",
+            "@/features/*",
+            "@/native/*",
+            "@/platform/*",
+            "@/telemetry/*",
+          ],
           "shared/ must not depend on any layer above it.",
         ],
       ]),
@@ -114,7 +121,10 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/app/*", "@/features/*", "@/telemetry/*"], "api/ must not depend on app or features."],
+        [
+          ["@/application/*", "@/features/*", "@/telemetry/*"],
+          "api/ must not depend on application or features.",
+        ],
       ]),
     },
   },
@@ -124,7 +134,7 @@ export default tseslint.config(
       "no-restricted-imports": restrict([
         MODELS_BAN,
         [
-          ["@/api/*", "@/app/*", "@/features/*", "@/telemetry/*"],
+          ["@/api/*", "@/application/*", "@/features/*", "@/telemetry/*"],
           "native/ must not depend on application layers.",
         ],
       ]),
@@ -135,7 +145,10 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/app/*", "@/features/*"], "telemetry/ must not depend on app or features."],
+        [
+          ["@/application/*", "@/features/*"],
+          "telemetry/ must not depend on application or features.",
+        ],
       ]),
     },
   },
@@ -144,13 +157,13 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         MODELS_BAN,
-        [["@/app/*"], "features/ must not import from app/."],
+        [["@/application/*"], "features/ must not import from application/."],
         FEATURE_INTERNALS,
       ]),
     },
   },
   {
-    files: ["src/app/**/*.{ts,tsx}"],
+    files: ["src/application/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
     },

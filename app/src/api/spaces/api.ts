@@ -1,5 +1,10 @@
-import { appSnapshot } from "@/native";
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/baseUrl";
+import {
+  ApiRequestError,
+  HttpRequestError,
+  apiRequest,
+  assertStableApiSession,
+  resolveRequiredApiBase,
+} from "@/api/client";
 import { createSpaceActionSuggestionsApi } from "@/api/spaces/action-suggestions";
 import { createSpaceAgentMembershipsApi } from "@/api/spaces/agent-memberships";
 import {
@@ -16,7 +21,6 @@ import type {
   ProviderConnectionAvailability,
   ProviderSharedResource,
   Space,
-  SpaceInboxItem,
   SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
@@ -28,47 +32,23 @@ import type {
 } from "@/api/spaces/dto/interfaces/types";
 import { createSpaceMembersApi } from "@/api/spaces/members";
 import { createSpacePlannerExpansionApi } from "@/api/spaces/planner";
-import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { createSpaceChatApi } from "./chat";
-import type { GlobalSpaceLibraryHit } from "./dto/interfaces/search";
 import { createSpaceLibraryCollectionsApi } from "./library-collections";
 import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
 import { fetchProtectedBlob } from "./library-upload";
-import {
-  isSpaceAccountSessionTransitioning,
-  readSpaceAccountGeneration,
-  readSpaceAccountToken,
-} from "./session";
 import { createSpaceTasksApi } from "./tasks";
 import type { SpaceRequestInit } from "./types";
 
-export class SpaceRequestError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly code?: string,
-  ) {
-    super(message);
+export class SpaceRequestError extends ApiRequestError {
+  constructor(message: string, status: number, code?: string, responseText = "") {
+    super(message, status, code, responseText);
     this.name = "SpaceRequestError";
   }
 }
 
 export async function resolveSpacesApiBase(): Promise<string> {
-  const publicApiBase = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL);
-  if (publicApiBase) return withDefaultApiPath(publicApiBase);
-  const explicit = normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL);
-  const envBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE);
-  let native: string | null = null;
-  try {
-    native = normalizeApiBaseUrl((await appSnapshot()).environment.serverUrl);
-  } catch {
-    /* desktop service may not be ready */
-  }
-  const base =
-    explicit ?? envBase ?? native ?? (import.meta.env.DEV ? "http://localhost:8080/api" : null);
-  if (!base) throw new Error("Misty server URL is not configured.");
-  return withDefaultApiPath(base);
+  return resolveRequiredApiBase();
 }
 
 export async function spaceRequest<T = void>(path: string, init?: SpaceRequestInit): Promise<T> {
@@ -83,39 +63,21 @@ export async function spaceRequest<T = void>(path: string, init?: SpaceRequestIn
       "offline_reference_only",
     );
   }
-  const accountGeneration = readSpaceAccountGeneration();
-  assertStableSpaceAccount(accountGeneration);
-  const [base, token] = await Promise.all([resolveSpacesApiBase(), readSpaceAccountToken()]);
-  assertStableSpaceAccount(accountGeneration);
   const { allowWhileReferenceOnly: _allowWhileReferenceOnly, ...requestInit } = init ?? {};
-  const headers = addRequestCorrelation(new Headers(requestInit.headers));
-  if (requestInit.body && !headers.has("Content-Type"))
-    headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  let response: Response;
   try {
-    response = await fetch(`${base}${path}`, { credentials: "include", ...requestInit, headers });
+    return await apiRequest<T>(path, requestInit);
   } catch (error) {
-    assertStableSpaceAccount(accountGeneration);
-    setSpaceReferenceOnly(true);
+    if (error instanceof ApiRequestError) {
+      throw new SpaceRequestError(
+        spaceErrorMessage(error.code, error.responseText || error.message),
+        error.status,
+        error.code,
+        error.responseText,
+      );
+    }
+    if (error instanceof HttpRequestError) setSpaceReferenceOnly(true);
     throw error;
   }
-  assertStableSpaceAccount(accountGeneration);
-  if (!response.ok) {
-    const text = await response.text();
-    assertStableSpaceAccount(accountGeneration);
-    let code: string | undefined;
-    try {
-      code = (JSON.parse(text) as { code?: string }).code;
-    } catch {
-      /* plain-text response */
-    }
-    throw new SpaceRequestError(spaceErrorMessage(code, text), response.status, code);
-  }
-  if (response.status === 204) return undefined as T;
-  const result = (await response.json()) as T;
-  assertStableSpaceAccount(accountGeneration);
-  return result;
 }
 
 const pendingSpaceCreationKeys = new Map<string, string>();
@@ -135,8 +97,13 @@ function createSpaceRequest(request: CreateSpaceRequest): Promise<CreateSpaceRes
 }
 
 export function assertStableSpaceAccount(generation: number): void {
-  if (isSpaceAccountSessionTransitioning() || generation !== readSpaceAccountGeneration()) {
-    throw new SpaceRequestError("Wait for the account switch to finish.", 409, "account_changed");
+  try {
+    assertStableApiSession(generation);
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      throw new SpaceRequestError(error.message, error.status, error.code, error.responseText);
+    }
+    throw error;
   }
 }
 
@@ -155,6 +122,8 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
       "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
+    self_host_entitlement_required:
+      "Your self-host entitlement needs verification. Open Connection settings or switch to Misty Hosted.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
     dangerous_file_type: "This file type cannot be stored safely.",
     malware_detected: "This upload was rejected because it matched a malware signature.",
@@ -179,10 +148,6 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
 }
 
 export const spacesApi = {
-  globalSpaceLibrarySearch: (query: string, limit = 50) =>
-    spaceRequest<{ hits: GlobalSpaceLibraryHit[]; semantic: boolean; request_id: string }>(
-      `/search/spaces?q=${encodeURIComponent(query)}&limit=${limit}`,
-    ),
   snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
   ...createSpacePlannerExpansionApi(spaceRequest),
   templates: () =>
@@ -255,11 +220,6 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
       { method: "POST", body: JSON.stringify({ disposition }) },
     ),
-  inbox: (tab: "unreads" | "mentions") =>
-    spaceRequest<{ items: SpaceInboxItem[] }>(`/activity/inbox?tab=${tab}`),
-  seen: () => spaceRequest("/activity/inbox/seen", { method: "POST" }),
-  clearInbox: (tab: "unreads" | "mentions") =>
-    spaceRequest("/activity/inbox/clear", { method: "POST", body: JSON.stringify({ tab }) }),
   studio: (spaceId: string, kind: "agents" | "workflows") =>
     spaceRequest<{ resources: SpaceStudioResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`,

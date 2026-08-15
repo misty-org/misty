@@ -21,6 +21,9 @@ fn expose_public_telemetry_configuration() {
         "POSTHOG_PROJECT_TOKEN",
         "POSTHOG_HOST",
         "MISTY_RELEASE_CHANNEL",
+        "MISTY_CONNECTED_DEVICES_ENABLED",
+        "MISTY_DEVICE_RELAY_URL",
+        "MISTY_DEVICE_TICKET_PUBLIC_KEYS",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)

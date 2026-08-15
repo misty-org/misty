@@ -1,13 +1,19 @@
-import { Bot } from "lucide-react";
+import { AgentEmptyState } from "./components/AgentEmptyState";
 import { AgentEditorPanel } from "./components/AgentEditorPanel";
+import { AgentSpacesRail } from "./components/AgentSpacesRail";
 import { PersonalAgentsSidebar } from "./components/PersonalAgentsSidebar";
 import { useAgentEditor } from "./useAgentEditor";
 
 export default function DesktopAgentsPage() {
   const editor = useAgentEditor();
+  const editing = Boolean(editor.editing);
+
+  const gridClass = editing
+    ? "grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)] overflow-hidden max-[800px]:grid-cols-1"
+    : "grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)_260px] overflow-hidden max-[1100px]:grid-cols-[320px_minmax(0,1fr)] max-[800px]:grid-cols-1";
 
   return (
-    <main className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)] overflow-hidden max-[800px]:grid-cols-1">
+    <main className={gridClass}>
       <aside className="flex min-h-0 flex-col border-r border-charcoal-border bg-charcoal-sidebar p-4">
         <PersonalAgentsSidebar
           selectedAgentId={editor.editingAgentId}
@@ -16,21 +22,15 @@ export default function DesktopAgentsPage() {
           onDelete={(agentId) => void editor.deleteAgent(agentId)}
         />
       </aside>
-      {editor.editing ? (
+      {editing ? (
         <AgentEditorPanel editor={editor} />
       ) : (
-        <section className="grid min-h-0 place-items-center p-8 text-center max-[800px]:hidden">
-          <div className="max-w-md">
-            <span className="mx-auto mb-4 grid size-11 place-items-center rounded-xl bg-charcoal-card text-cream-muted">
-              <Bot size={21} />
-            </span>
-            <h1 className="m-0 text-lg font-semibold">Manage your Agents</h1>
-            <p className="mb-0 mt-2 text-sm leading-6 text-cream-muted">
-              Select an Agent to edit its instructions and capabilities, or create a new one.
-              Conversations with Agents happen inside each Space.
-            </p>
+        <>
+          <AgentEmptyState onCreate={() => editor.open("new")} />
+          <div className="max-[1100px]:hidden">
+            <AgentSpacesRail />
           </div>
-        </section>
+        </>
       )}
     </main>
   );
