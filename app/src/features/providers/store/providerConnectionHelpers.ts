@@ -1,6 +1,6 @@
 import type { AccountMeResponse } from "@/features/auth";
 import { accountFetchMe } from "@/features/auth";
-import { cloudConnectionsSnapshot, cloudConnectionToken } from "@/features/cloud";
+import { cloudConnectionsSnapshot, cloudConnectionToken } from "@/api/cloud/api";
 import type { CurrentLicense } from "@/features/installer";
 import { useSetupStore } from "@/features/installer";
 import { providersImportCloudConnection } from "@/native";

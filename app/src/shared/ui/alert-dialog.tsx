@@ -19,7 +19,7 @@ const AlertDialogOverlay = React.forwardRef<
   <AlertDialogPrimitive.Overlay
     data-slot="alert-dialog-overlay"
     className={cn(
-      "fixed inset-0 z-[2147483200] bg-charcoal-workspace data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[2147483200] bg-charcoal-workspace duration-160 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -41,7 +41,7 @@ const AlertDialogContent = React.forwardRef<
         "fixed left-1/2 top-1/2 z-[2147483300] grid",
         "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
         "-translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-        "text-cream shadow-xl ring-1 ring-cream/10 duration-200",
+        "text-cream shadow-xl ring-1 ring-cream/10 duration-160 ease-out",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

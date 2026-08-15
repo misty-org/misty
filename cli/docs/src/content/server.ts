@@ -128,7 +128,7 @@ export const serverPages: DocPage[] = [
         title: "Environment behavior",
         blocks: [
           p(
-            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. The Go server itself does not load an environment file.",
+            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. On first use it also enables Connected Devices and creates persistent local pairing and ticket secrets. The Go server itself does not load an environment file.",
           ),
           note(
             "Attached mode",

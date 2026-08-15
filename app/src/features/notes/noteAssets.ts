@@ -3,7 +3,7 @@ import {
   MAX_JOURNAL_ASSET_BYTES,
   resolveJournalAssetUrl,
   uploadJournalAsset,
-} from "@/features/journal";
+} from "@/api/journal/assets";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 export const MAX_NOTE_ASSET_BYTES = MAX_JOURNAL_ASSET_BYTES;

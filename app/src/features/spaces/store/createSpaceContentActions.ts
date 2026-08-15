@@ -1,3 +1,4 @@
+import { activityApi } from "@/api/activity/api";
 import { buildMessageSpans, mergeSpaceMessages } from "@/features/spaces/chat";
 import { resolveSpacesApiBase, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
@@ -179,7 +180,7 @@ export function createSpaceContentActions(
     },
 
     markInboxSeen: async () => {
-      await spacesApi.seen();
+      await activityApi.markSeen();
       set((state) => ({
         inbox: {
           unreads: state.inbox.unreads.map((item) => ({
@@ -195,7 +196,7 @@ export function createSpaceContentActions(
     },
 
     clearInbox: async (tab) => {
-      await spacesApi.clearInbox(tab);
+      await activityApi.clearInbox(tab);
       set((state) => ({ inbox: { ...state.inbox, [tab]: [] } }));
     },
   };

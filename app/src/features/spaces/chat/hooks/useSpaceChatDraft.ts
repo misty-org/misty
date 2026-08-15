@@ -1,6 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { MessageAttachment } from "@/api/spaces/dto/interfaces/types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 export const MAX_CHAT_ATTACHMENTS = 5;
 
@@ -26,14 +26,14 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     MAX_CHAT_ATTACHMENTS - pendingAttachments.length - selectedLibraryIds.length,
   );
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setText("");
     setSelectedFileIds([]);
     setSelectedLibraryIds([]);
     setPendingAttachments([]);
     setReplyToMessageId("");
     setSelectedAgentIdsByLabel({});
-  };
+  }, []);
 
   const uploadAttachments = async (paths: string[]) => {
     if (paths.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;

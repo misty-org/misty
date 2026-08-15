@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
+import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "../model/interfaces/types";
-import { managedAiRequest, ManagedAiRequestError } from "./useAiServerStore";
+import { ManagedAiRequestError } from "./useAiServerStore";
 
 const serverDevicePrefix = "misty:agents:server-device:";
 const localDeviceByServerId = new Map<string, string>();
@@ -14,6 +16,7 @@ export const agentDeviceCapabilities = {
   folder_agents: true,
   job_leases: true,
   citations: true,
+  connected_devices: true,
 } as const;
 
 /**
@@ -21,9 +24,23 @@ export const agentDeviceCapabilities = {
  * The opaque public identifier is stable per local device and contains no path
  * or host metadata. Account authentication still protects every device call.
  */
-export async function ensureServerAgentDevice(local: AgentDevice): Promise<ServerTrustedDevice> {
+export async function ensureServerAgentDevice(
+  local: AgentDevice,
+  connected?: { endpointId: string; platform: "macos" | "windows" | "unknown" },
+): Promise<ServerTrustedDevice> {
   let identity = await loadOrCreateDeviceIdentity(local.id);
   let publicKey = identity.publicKey;
+
+  // Registration is an upsert. When Connected Devices starts, repeat it so
+  // the shared trusted-device record receives the separate iroh identity even
+  // if the Agent worker already registered this machine earlier in the session.
+  if (connected) {
+    const registered = await registerServerDevice(local, publicKey, connected);
+    writeStorage(serverDevicePrefix + local.id, registered.id);
+    localDeviceByServerId.set(registered.id, local.id);
+    lastHeartbeatByServerId.set(registered.id, Date.now());
+    return registered;
+  }
   const cachedId = readStorage(serverDevicePrefix + local.id);
   if (cachedId) {
     if (Date.now() - (lastHeartbeatByServerId.get(cachedId) ?? 0) < heartbeatIntervalMs) {
@@ -45,7 +62,7 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
         // cleared, or contains a partial legacy identity. Prove account auth is
         // still valid before rotating anything; otherwise preserve the binding
         // and let the normal sign-in recovery handle the unauthorized session.
-        await managedAiRequest<ServerDeviceList>("/devices");
+        await devicesApi.list<ServerDeviceList>();
       }
       removeStorage(serverDevicePrefix + local.id);
       localDeviceByServerId.delete(cachedId);
@@ -54,7 +71,7 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
     }
   }
 
-  const list = await managedAiRequest<ServerDeviceList>("/devices").catch(() => ({ devices: [] }));
+  const list = await devicesApi.list<ServerDeviceList>().catch(() => ({ devices: [] }));
   const existing = list.devices.find(
     (device) => device.publicKey === publicKey && !device.revokedAt,
   );
@@ -64,19 +81,27 @@ export async function ensureServerAgentDevice(local: AgentDevice): Promise<Serve
     return heartbeatServerAgentDevice(existing.id, local.id);
   }
 
-  const registered = await managedAiRequest<ServerTrustedDevice>("/devices", {
-    method: "POST",
-    body: JSON.stringify({
-      name: local.displayName || "This Misty",
-      publicKey,
-      keyAlgorithm: "ed25519",
-      capabilities: agentDeviceCapabilities,
-    }),
-  });
+  const registered = await registerServerDevice(local, publicKey);
   writeStorage(serverDevicePrefix + local.id, registered.id);
   localDeviceByServerId.set(registered.id, local.id);
   lastHeartbeatByServerId.set(registered.id, Date.now());
   return registered;
+}
+
+async function registerServerDevice(
+  local: AgentDevice,
+  publicKey: string,
+  connected?: { endpointId: string; platform: "macos" | "windows" | "unknown" },
+): Promise<ServerTrustedDevice> {
+  return devicesApi.register<ServerTrustedDevice>({
+    name: local.displayName || "This Misty",
+    publicKey,
+    keyAlgorithm: "ed25519",
+    platform: connected?.platform ?? "unknown",
+    p2pEndpointId: connected?.endpointId ?? "",
+    protocolVersions: connected ? ["misty-device/1"] : [],
+    capabilities: agentDeviceCapabilities,
+  });
 }
 
 export async function heartbeatServerAgentDevice(
@@ -84,13 +109,11 @@ export async function heartbeatServerAgentDevice(
   localDeviceId = localDeviceByServerId.get(deviceId),
 ): Promise<ServerTrustedDevice> {
   if (!localDeviceId) throw new Error("Local device signing identity is unavailable.");
-  const device = await signedAgentDeviceRequest<ServerTrustedDevice>(
+  const device = await devicesApi.heartbeat<ServerTrustedDevice>(
+    signedAgentDeviceRequest,
     localDeviceId,
-    `/devices/${encodeURIComponent(deviceId)}/heartbeat`,
-    {
-      method: "POST",
-      body: JSON.stringify({ capabilities: agentDeviceCapabilities }),
-    },
+    deviceId,
+    { capabilities: agentDeviceCapabilities },
   );
   lastHeartbeatByServerId.set(deviceId, Date.now());
   return device;
@@ -128,7 +151,10 @@ export async function signedAgentDeviceRequest<T>(
   headers.set("X-Misty-Device-Timestamp", timestamp);
   headers.set("X-Misty-Device-Nonce", nonce);
   headers.set("X-Misty-Device-Signature", toBase64(new Uint8Array(signature)));
-  return managedAiRequest<T>(path, { ...init, headers, body });
+  const signedInit: RequestInit = { ...init, headers };
+  if (init.body == null) delete signedInit.body;
+  else signedInit.body = body;
+  return devicesApi.request<T>(path, signedInit);
 }
 
 async function loadOrCreateDeviceIdentity(localDeviceId: string): Promise<StoredDeviceIdentity> {
@@ -197,7 +223,7 @@ function toHex(bytes: Uint8Array): string {
 
 function readStorage(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    return readDeploymentStorageItem(key);
   } catch {
     return null;
   }
@@ -205,7 +231,7 @@ function readStorage(key: string): string | null {
 
 function writeStorage(key: string, value: string): void {
   try {
-    localStorage.setItem(key, value);
+    localStorage.setItem(deploymentStorageKey(key), value);
   } catch {
     /* non-secret registration hint */
   }
@@ -213,7 +239,7 @@ function writeStorage(key: string, value: string): void {
 
 function removeStorage(key: string): void {
   try {
-    localStorage.removeItem(key);
+    localStorage.removeItem(deploymentStorageKey(key));
   } catch {
     /* no-op */
   }
@@ -224,6 +250,9 @@ export interface ServerTrustedDevice {
   name: string;
   publicKey?: string;
   revokedAt?: string | null;
+  platform?: string;
+  p2pEndpointId?: string;
+  protocolVersions?: string[];
 }
 
 export interface ServerDeviceList {

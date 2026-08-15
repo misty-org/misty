@@ -1,4 +1,4 @@
-import { spaceRequest } from "@/api/spaces/api";
+import { assistantApi, safeAssistantTurnInput } from "@/api/assistant/api";
 import type {
   GlobalAiActionProposal,
   GlobalAiCitation,
@@ -9,15 +9,6 @@ import type {
   GlobalSearchDocument,
 } from "./types";
 
-interface GlobalSearchResponse {
-  hits: GlobalSearchDocument[];
-  cursor?: string;
-}
-
-interface ConversationResponse {
-  conversations: GlobalAiConversation[];
-}
-
 interface TurnResponse {
   conversation?: GlobalAiConversation;
   message?: GlobalAiMessage;
@@ -27,23 +18,11 @@ interface TurnResponse {
 }
 
 export const globalMistyApi = {
-  search: (query: string, limit = 40) =>
-    spaceRequest<GlobalSearchResponse>(
-      `/search/global?q=${encodeURIComponent(query)}&limit=${limit}`,
-    ),
-  conversations: (query = "") =>
-    spaceRequest<ConversationResponse>(
-      `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
-    ),
+  search: (query: string, limit = 40) => assistantApi.search<GlobalSearchDocument>(query, limit),
+  conversations: (query = "") => assistantApi.conversations<GlobalAiConversation>(query),
   createConversation: (title: string) =>
-    spaceRequest<GlobalAiConversation>("/misty/conversations", {
-      method: "POST",
-      body: JSON.stringify({ title }),
-    }),
-  deleteConversation: (conversationId: string) =>
-    spaceRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {
-      method: "DELETE",
-    }),
+    assistantApi.createConversation<GlobalAiConversation>(title),
+  deleteConversation: assistantApi.deleteConversation,
   turn: (
     conversationId: string,
     input: {
@@ -52,35 +31,16 @@ export const globalMistyApi = {
       context: GlobalAiContextRef[];
       agentId?: string;
     },
-  ) =>
-    spaceRequest<TurnResponse>(`/misty/conversations/${encodeURIComponent(conversationId)}/turns`, {
-      method: "POST",
-      body: JSON.stringify(aiSafeTurnInput(input)),
-    }),
-  complete: (prompt: string) =>
-    spaceRequest<{ text: string }>("/ai/complete", {
-      method: "POST",
-      body: JSON.stringify({ prompt }),
-    }),
+  ) => assistantApi.turn<TurnResponse, GlobalAiContextRef>(conversationId, input),
+  complete: assistantApi.complete,
   delegate: (proposal: GlobalAiActionProposal) =>
-    spaceRequest<{
+    assistantApi.delegate<{
       status: string;
       trace?: string;
       run?: { id: string; state: string; error_message?: string };
-    }>("/agents/delegate", {
-      method: "POST",
-      headers: { "Idempotency-Key": proposal.id },
-      body: JSON.stringify({
-        prompt: proposal.prompt,
-        space_id: proposal.spaceId ?? "",
-        agent_id: proposal.agentId ?? "",
-      }),
-    }),
+    }>(proposal),
   decideProposal: (proposalId: string, approved: boolean) =>
-    spaceRequest<GlobalAiActionProposal>(
-      `/misty/action-proposals/${encodeURIComponent(proposalId)}/decision`,
-      { method: "POST", body: JSON.stringify({ approved }) },
-    ),
+    assistantApi.decideProposal<GlobalAiActionProposal>(proposalId, approved),
 };
 
 export function aiSafeTurnInput(input: {
@@ -89,10 +49,5 @@ export function aiSafeTurnInput(input: {
   context: GlobalAiContextRef[];
   agentId?: string;
 }) {
-  return {
-    mode: input.mode,
-    prompt: input.prompt,
-    context: input.context.map(({ localPath: _localPath, ...reference }) => reference),
-    ...(input.agentId ? { agent_id: input.agentId } : {}),
-  };
+  return safeAssistantTurnInput(input);
 }

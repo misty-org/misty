@@ -398,6 +398,7 @@ export function selectedDeletePathsForPane(
   return pane.listing.entries
     .filter((entry) => {
       if (!selected.has(entry.id)) return false;
+      if (entry.readonly || entry.location.kind === "peer_device") return false;
       if (inTrash) return permanent && entry.isDeleted;
       return permanent ? !entry.isDeleted : !entry.isDeleted && entry.location.kind === "local";
     })

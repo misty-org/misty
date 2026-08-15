@@ -23,7 +23,7 @@ const protectedRoots = [
 
 const allowedSourceRoots = new Set([
   "api",
-  "app",
+  "application",
   "features",
   "native",
   "shared",
@@ -33,6 +33,13 @@ const allowedSourceRoots = new Set([
 ]);
 
 describe("UI architecture contract", () => {
+  it("keeps behavior tests colocated with their source", () => {
+    const failures = walk("src", extensions)
+      .map(repositoryPath)
+      .filter((path) => path.includes("/__tests__/"));
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
   it("keeps the frontend inside the documented top-level layers", () => {
     const failures = walk("src", extensions)
       .map(repositoryPath)

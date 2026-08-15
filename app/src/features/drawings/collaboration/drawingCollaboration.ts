@@ -1,8 +1,9 @@
 import { accountScopeResetEvent } from "@/features/auth";
+import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import YProvider from "y-partyserver/provider";
+import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
-import { drawingsApi } from "../api/drawingsApi";
+import { drawingsApi } from "@/api/drawings/api";
 import type { DrawingAssetReference, DrawingCollaborationTicket } from "../types";
 
 export interface DrawingCollaborationSession {
@@ -89,22 +90,10 @@ async function createSession(
   key: string,
 ): Promise<DrawingCollaborationSession> {
   const firstTicket = await drawingsApi.collaborationTicket(spaceId, drawingId);
-  let unusedTicket = firstTicket.ticket;
   const doc = new Y.Doc();
-  const url = new URL(firstTicket.url);
-  const provider = new YProvider(url.host, firstTicket.room, doc, {
-    party: "drawing-room",
-    disableBc: true,
-    params: async () => {
-      if (unusedTicket) {
-        const ticket = unusedTicket;
-        unusedTicket = "";
-        return { ticket };
-      }
-      const next = await drawingsApi.collaborationTicket(spaceId, drawingId);
-      return { ticket: next.ticket };
-    },
-  });
+  const provider = createYjsProvider(firstTicket, doc, "drawing-room", () =>
+    drawingsApi.collaborationTicket(spaceId, drawingId),
+  );
   return {
     key,
     spaceId,

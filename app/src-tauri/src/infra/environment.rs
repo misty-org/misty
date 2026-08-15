@@ -7,6 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use url::Url;
 
 use crate::infra::paths;
 
@@ -31,6 +32,9 @@ pub struct AppEnvironment {
     pub workspaces_path: PathBuf,
     pub commands_path: PathBuf,
     pub server_url: Option<String>,
+    pub server_mode: ServerMode,
+    pub server_deployment_id: Option<String>,
+    pub server_name: Option<String>,
     pub grpc_address: String,
     pub mount_path: String,
     pub config_exists: bool,
@@ -53,20 +57,37 @@ pub struct AppEnvironmentSnapshot {
     pub workspaces_path: String,
     pub commands_path: String,
     pub server_url: Option<String>,
+    pub server_mode: ServerMode,
+    pub server_deployment_id: Option<String>,
+    pub server_name: Option<String>,
     pub grpc_address: String,
     pub mount_path: String,
     pub config_exists: bool,
     pub derived_env: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ServerMode {
+    #[default]
+    Hosted,
+    SelfHosted,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct MistyConfig {
     server: Option<MistyServerConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct MistyServerConfig {
+    #[serde(default)]
+    mode: ServerMode,
     url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    deployment_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
 }
 
 impl AppEnvironmentService {
@@ -137,12 +158,77 @@ impl AppEnvironmentService {
         self.inner.workspaces_path.clone()
     }
 
+    pub fn configure_server(
+        &self,
+        mode: ServerMode,
+        raw_url: Option<String>,
+        deployment_id: Option<String>,
+        name: Option<String>,
+    ) -> Result<(), String> {
+        let url = validate_server_url(mode, raw_url)?;
+        let deployment_id = validate_deployment_id(mode, deployment_id)?;
+        let name = validate_server_name(mode, name)?;
+        let document = MistyConfig {
+            server: Some(MistyServerConfig {
+                mode,
+                url,
+                deployment_id,
+                name,
+            }),
+        };
+        let bytes = serde_json::to_vec_pretty(&document)
+            .map_err(|error| format!("Could not encode Misty server configuration: {error}"))?;
+        let path = self.misty_config_path();
+        let parent = path
+            .parent()
+            .ok_or_else(|| "Misty configuration path has no parent directory.".to_owned())?;
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create Misty configuration directory: {error}"))?;
+        let temporary = path.with_extension("json.tmp");
+        fs::write(&temporary, bytes)
+            .map_err(|error| format!("Could not write Misty server configuration: {error}"))?;
+        replace_file(&temporary, &path)
+            .map_err(|error| format!("Could not activate Misty server configuration: {error}"))?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn for_test_home(home_dir: PathBuf) -> Self {
         Self {
             inner: Arc::new(AppEnvironment::for_home(home_dir)),
         }
     }
+}
+
+#[cfg(not(windows))]
+fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::rename(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
+
+    let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
+    let destination: Vec<u16> = destination
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let result = unsafe {
+        MoveFileExW(
+            source.as_ptr(),
+            destination.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if result == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 impl AppEnvironment {
@@ -178,6 +264,19 @@ impl AppEnvironment {
             .and_then(|server| server.url.clone())
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty());
+        let server_mode = parsed_config
+            .as_ref()
+            .and_then(|config| config.server.as_ref())
+            .map(|server| server.mode)
+            .unwrap_or_default();
+        let server_deployment_id = parsed_config
+            .as_ref()
+            .and_then(|config| config.server.as_ref())
+            .and_then(|server| server.deployment_id.clone());
+        let server_name = parsed_config
+            .as_ref()
+            .and_then(|config| config.server.as_ref())
+            .and_then(|server| server.name.clone());
 
         Self {
             home_dir,
@@ -194,6 +293,9 @@ impl AppEnvironment {
             workspaces_path,
             commands_path,
             server_url,
+            server_mode,
+            server_deployment_id,
+            server_name,
             grpc_address,
             mount_path,
             config_exists: misty_config_path.exists(),
@@ -235,6 +337,9 @@ impl AppEnvironment {
             workspaces_path,
             commands_path,
             server_url: None,
+            server_mode: ServerMode::Hosted,
+            server_deployment_id: None,
+            server_name: None,
             grpc_address,
             mount_path,
             config_exists: false,
@@ -264,12 +369,84 @@ impl AppEnvironment {
             workspaces_path: display_path(&self.workspaces_path),
             commands_path: display_path(&self.commands_path),
             server_url: self.server_url.clone(),
+            server_mode: self.server_mode,
+            server_deployment_id: self.server_deployment_id.clone(),
+            server_name: self.server_name.clone(),
             grpc_address: self.grpc_address.clone(),
             mount_path: self.mount_path.clone(),
             config_exists: self.config_exists,
             derived_env,
         }
     }
+}
+
+fn validate_server_url(
+    mode: ServerMode,
+    raw_url: Option<String>,
+) -> Result<Option<String>, String> {
+    if mode == ServerMode::Hosted {
+        return Ok(None);
+    }
+    let raw = raw_url
+        .unwrap_or_default()
+        .trim()
+        .trim_end_matches('/')
+        .to_owned();
+    if raw.is_empty() {
+        return Err("A self-hosted Misty server URL is required.".to_owned());
+    }
+    let parsed =
+        Url::parse(&raw).map_err(|_| "The self-hosted server URL is invalid.".to_owned())?;
+    let hostname = parsed
+        .host_str()
+        .ok_or_else(|| "The self-hosted server URL must include a hostname.".to_owned())?;
+    let loopback = matches!(hostname, "localhost" | "127.0.0.1" | "::1");
+    if parsed.scheme() != "https" && !(loopback && parsed.scheme() == "http") {
+        return Err(
+            "Self-hosted servers must use HTTPS unless they run on this device.".to_owned(),
+        );
+    }
+    if parsed.username() != ""
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(
+            "The self-hosted server URL cannot contain credentials, a query, or a fragment."
+                .to_owned(),
+        );
+    }
+    Ok(Some(raw))
+}
+
+fn validate_deployment_id(
+    mode: ServerMode,
+    deployment_id: Option<String>,
+) -> Result<Option<String>, String> {
+    if mode == ServerMode::Hosted {
+        return Ok(None);
+    }
+    let value = deployment_id.unwrap_or_default().trim().to_owned();
+    if value.len() < 8
+        || value.len() > 200
+        || !value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'))
+    {
+        return Err("The self-hosted deployment identifier is invalid.".to_owned());
+    }
+    Ok(Some(value))
+}
+
+fn validate_server_name(mode: ServerMode, name: Option<String>) -> Result<Option<String>, String> {
+    if mode == ServerMode::Hosted {
+        return Ok(None);
+    }
+    let value = name.unwrap_or_default().trim().to_owned();
+    if value.is_empty() || value.chars().count() > 120 {
+        return Err("The self-hosted server name is invalid.".to_owned());
+    }
+    Ok(Some(value))
 }
 
 fn read_misty_config(path: &Path) -> Option<MistyConfig> {
@@ -360,6 +537,9 @@ mod tests {
                 workspaces_path: root.join(".misty/config/workspaces.json"),
                 commands_path: root.join(".misty/config/commands.msy"),
                 server_url: None,
+                server_mode: ServerMode::Hosted,
+                server_deployment_id: None,
+                server_name: None,
                 grpc_address: "localhost:50051".to_owned(),
                 mount_path: ".misty/mnt".to_owned(),
                 config_exists: false,
@@ -404,5 +584,43 @@ mod tests {
             snapshot.derived_env.get("MISTY_MOUNT_PATH"),
             Some(&"/Volumes/Misty".to_owned()),
         );
+    }
+
+    #[test]
+    fn self_hosted_configuration_is_validated_and_activated_atomically() {
+        let root = unique_test_home("self-hosted");
+        let service = AppEnvironmentService::for_test_home(root.clone());
+
+        service
+            .configure_server(
+                ServerMode::SelfHosted,
+                Some("https://misty.example.com/api/".to_owned()),
+                Some("server_00000000-0000-0000-0000-000000000001".to_owned()),
+                Some("Studio LAN".to_owned()),
+            )
+            .expect("configure self-hosted server");
+
+        let environment = AppEnvironment::load(Some(root.clone()));
+        assert_eq!(environment.server_mode, ServerMode::SelfHosted);
+        assert_eq!(environment.server_name.as_deref(), Some("Studio LAN"));
+        assert_eq!(
+            environment.server_url.as_deref(),
+            Some("https://misty.example.com/api")
+        );
+        assert!(!root.join(".misty/config/misty.json.tmp").exists());
+    }
+
+    #[test]
+    fn self_hosted_configuration_rejects_insecure_non_loopback_urls() {
+        assert!(validate_server_url(
+            ServerMode::SelfHosted,
+            Some("http://misty.lan/api".to_owned())
+        )
+        .is_err());
+        assert!(validate_server_url(
+            ServerMode::SelfHosted,
+            Some("http://127.0.0.1:8080/api".to_owned())
+        )
+        .is_ok());
     }
 }

@@ -19,10 +19,42 @@ export interface PersonalAgentsSidebarProps {
   onDelete: (agentId: string) => void;
 }
 
-/**
- * The Agent list. Selecting one opens it in the tab's right panel, so this
- * sidebar only tracks which Agent is selected — it owns no editor state.
- */
+function shortModel(id: string | undefined): string {
+  if (!id) return "";
+  const lower = id.toLowerCase();
+  const family = lower.includes("opus")
+    ? "Opus"
+    : lower.includes("sonnet")
+      ? "Sonnet"
+      : lower.includes("haiku")
+        ? "Haiku"
+        : null;
+  if (family) {
+    const match = lower.match(/(?:opus|sonnet|haiku)-?(\d+(?:[-.]\d+)?)/);
+    return match ? `${family} ${match[1].replace(/-/g, ".")}` : family;
+  }
+  if (lower.startsWith("gpt-")) {
+    const match = lower.match(/^gpt-(\d+(?:\.\d+)?)/);
+    return match ? `GPT-${match[1]}` : id.toUpperCase();
+  }
+  return id.split(/[-_/]/).slice(-2).join(" ").trim();
+}
+
+function agentInitial(name: string): string {
+  const trimmed = name.trim();
+  return trimmed ? trimmed[0].toLowerCase() : "?";
+}
+
+function agentSubtitle(agent: PersonalAgent): string {
+  const parts: string[] = [];
+  const model = shortModel(agent.model_id);
+  if (model) parts.push(model);
+  const tools = agent.tool_permissions?.integrations?.length ?? 0;
+  if (tools > 0) parts.push(`${tools} tool${tools === 1 ? "" : "s"}`);
+  if (parts.length > 0) return parts.join(" · ");
+  return agent.role?.trim() || "Agent";
+}
+
 export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
   const { agents, loading, load } = usePersonalAgentsStore(
     useShallow((state) => ({
@@ -45,34 +77,43 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
           <span className="sr-only">Create Agent</span>
         </Button>
       </div>
-      <nav className="misty-transient-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto">
-        {agents.map((agent) => (
-          <section key={agent.id} className="grid min-w-0 gap-1">
-            <ContextMenu>
+      <nav className="misty-transient-scrollbar grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto">
+        {agents.map((agent) => {
+          const selected = props.selectedAgentId === agent.id;
+          return (
+            <ContextMenu key={agent.id}>
               <ContextMenuTrigger asChild>
-                <div className="group/agent flex min-h-7 min-w-0 items-center gap-1 px-2">
+                <div className="min-w-0 px-1">
                   <Button
                     type="button"
                     variant="ghost"
-                    aria-current={props.selectedAgentId === agent.id ? "true" : undefined}
+                    aria-current={selected ? "true" : undefined}
                     className={[
-                      "h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-md px-0 py-0",
-                      "text-left text-xs font-semibold shadow-none",
-                      "hover:bg-transparent hover:text-cream-bright",
-                      props.selectedAgentId === agent.id ? "text-cream-bright" : "text-cream-muted",
+                      "flex h-auto min-w-0 w-full items-center gap-2.5 rounded-md px-2 py-1.5",
+                      "text-left shadow-none hover:bg-charcoal-hover",
+                      selected ? "bg-charcoal-card" : "",
                     ].join(" ")}
                     onClick={() => props.onSelect(agent)}
                   >
-                    <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 shrink-0 opacity-0 shadow-none group-hover/agent:opacity-100 focus-visible:opacity-100"
-                    onClick={() => props.onSelect(agent)}
-                  >
-                    <Settings2 size={13} />
-                    <span className="sr-only">Agent preferences for {agent.name}</span>
+                    <span className="relative grid size-[26px] shrink-0 place-items-center rounded-md bg-charcoal-hover text-[11px] font-medium text-cream-bright">
+                      {agentInitial(agent.name)}
+                      {agent.enabled ? (
+                        <span className="absolute -bottom-0.5 -right-0.5 size-2 rounded-full border-2 border-charcoal-sidebar bg-emerald-500" />
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={[
+                          "block truncate text-[13px] font-medium",
+                          selected ? "text-cream-bright" : "text-cream",
+                        ].join(" ")}
+                      >
+                        {agent.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-cream-muted">
+                        {agentSubtitle(agent)}
+                      </span>
+                    </span>
                   </Button>
                 </div>
               </ContextMenuTrigger>
@@ -89,8 +130,8 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
-          </section>
-        ))}
+          );
+        })}
         {!loading && agents.length === 0 ? (
           <p className="px-2.5 py-3 text-xs text-cream-muted">Create an Agent for repeat work.</p>
         ) : null}

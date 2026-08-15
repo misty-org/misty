@@ -4,14 +4,14 @@ Misty is a React product with a native Tauri shell for desktop, iPad, and Androi
 
 ## Repository layout
 
-- `src/app/` — bootstrap, routing, layouts, providers, telemetry lifecycle, and error boundaries.
+- `src/application/` — bootstrap, routing, layouts, providers, telemetry lifecycle, and error boundaries.
 - `src/features/` — product-owned UI, hooks, types, and Zustand state. A feature exposes its intentional public API from `index.ts` and owns its implementation details.
-- `src/api/` — remote Misty HTTP client and resource-specific API modules.
+- `src/api/` — neutral authenticated Misty client and domain-specific endpoint modules. Space-only connectivity policy remains inside `src/api/spaces/`.
 - `src/native/` — small shared Tauri/OS integrations. Desktop-only filesystem IPC lives with the Files feature at `src/features/files/native.ts`.
 - `src/telemetry/` — error reporting and product telemetry.
 - `src/shared/` — generic UI, hooks, utilities, drag infrastructure, and assets with no feature or native-runtime knowledge.
 - `src/styles/` — global styling and design tokens.
-- `src/tests/` — test setup and architecture contracts only; behavior tests are colocated with their source.
+- `src/tests/` — test setup and architecture contracts only; behavior tests are colocated with their source as `*.test.ts` or `*.test.tsx` rather than placed in `__tests__` folders.
 - `src-tauri/` — Rust desktop application and tracked iOS/Android platform projects. Its source is layered as `app/` (Tauri commands/runtime), `domain/` (business models and workflows), `infra/` (storage, network, OS adapters), `platform/` (Tauri and desktop integration), and `telemetry/`.
 - `src-tauri/src/infra/direct_cloud.rs` — native Google Drive, Dropbox, and Microsoft OneDrive client runtime.
 - `src/tests/contracts/` — executable architecture, source-size, readability, and UI contracts.

@@ -1,4 +1,5 @@
-import { spaceRequest } from "@/api/spaces/api";
+import { notesApi } from "@/api/notes/api";
+import type { ServerSpaceNote } from "@/api/notes/api";
 import { nowIso, previewFrom } from "../connectorUtils";
 import { MISTY_CONNECTOR_ID } from "../mockData";
 import type {
@@ -8,20 +9,6 @@ import type {
   UpdateNoteInput,
 } from "../model/interfaces/connectors";
 import type { UnifiedNote } from "../model/types/types";
-
-type ServerSpaceNote = {
-  id: string;
-  space_id: string;
-  creator_user_id: string;
-  title: string;
-  plain_text?: string;
-  lifecycle_state: string;
-  collaboration_revision: number;
-  acl_version: number;
-  role: "creator" | "editor" | "viewer";
-  created_at?: string;
-  updated_at?: string;
-};
 
 /**
  * Native Misty notes are server-backed Space documents. The collaborative Yjs
@@ -69,9 +56,7 @@ export function createMistyNativeNotesConnector(
 
     async getNote(sourceId: string) {
       const scope = noteSpaces.get(sourceId);
-      const note = await spaceRequest<ServerSpaceNote>(
-        `/spaces/${encodeURIComponent(scope?.spaceId ?? spaceId)}/notes/${encodeURIComponent(sourceId)}`,
-      );
+      const note = await notesApi.get(scope?.spaceId ?? spaceId, sourceId);
       const mapped = mapServerNote(note, scope?.spaceName ?? spaceName);
       rememberNotes(noteSpaces, [mapped]);
       return mapped;
@@ -94,13 +79,7 @@ export function createMistyNativeNotesConnector(
       if (!input.spaceId || !input.spaceName) {
         throw new Error("Misty notes must belong to a Space.");
       }
-      const created = await spaceRequest<ServerSpaceNote>(
-        `/spaces/${encodeURIComponent(input.spaceId)}/notes`,
-        {
-          method: "POST",
-          body: JSON.stringify({ title: input.title.trim() || "Untitled note" }),
-        },
-      );
+      const created = await notesApi.create(input.spaceId, input.title.trim() || "Untitled note");
       syncedAt = nowIso();
       const mapped = mapServerNote(created, input.spaceName);
       rememberNotes(noteSpaces, [mapped]);
@@ -111,13 +90,7 @@ export function createMistyNativeNotesConnector(
       const scope = noteSpaces.get(sourceId);
       const targetSpaceId = patch.spaceId ?? scope?.spaceId ?? spaceId;
       if (patch.tags) {
-        const updated = await spaceRequest<ServerSpaceNote>(
-          `/spaces/${encodeURIComponent(targetSpaceId)}/notes/${encodeURIComponent(sourceId)}/metadata`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ shared_tags: patch.tags }),
-          },
-        );
+        const updated = await notesApi.updateMetadata(targetSpaceId, sourceId, patch.tags);
         syncedAt = nowIso();
         const mapped = mapServerNote(updated, patch.spaceName ?? scope?.spaceName ?? spaceName);
         rememberNotes(noteSpaces, [mapped]);
@@ -132,10 +105,7 @@ export function createMistyNativeNotesConnector(
       const scope = noteSpaces.get(sourceId);
       const targetSpaceId = scope?.spaceId ?? spaceId;
       if (!targetSpaceId) throw new Error("Open the note's Space before deleting it.");
-      await spaceRequest(
-        `/spaces/${encodeURIComponent(targetSpaceId)}/notes/${encodeURIComponent(sourceId)}`,
-        { method: "DELETE" },
-      );
+      await notesApi.remove(targetSpaceId, sourceId);
       noteSpaces.delete(sourceId);
       syncedAt = nowIso();
     },
@@ -153,9 +123,7 @@ export async function listMistySpaceNotes(
   spaceId: string,
   spaceName: string,
 ): Promise<UnifiedNote[]> {
-  const result = await spaceRequest<{ notes: ServerSpaceNote[] }>(
-    `/spaces/${encodeURIComponent(spaceId)}/notes`,
-  );
+  const result = await notesApi.list(spaceId);
   return result.notes.map((note) => mapServerNote(note, spaceName));
 }
 

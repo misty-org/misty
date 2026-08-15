@@ -4,7 +4,7 @@ import {
   cloudConnectionToken,
   deleteCloudConnection,
   type CloudProvider,
-} from "@/features/cloud";
+} from "@/api/cloud/api";
 import {
   providersDisconnectRemote,
   providersImportCloudConnection,

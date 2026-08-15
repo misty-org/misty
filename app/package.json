@@ -84,6 +84,7 @@
     "motion": "^12.42.2",
     "pdfjs-dist": "4.8.69",
     "posthog-js": "^1.399.2",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
     "react-avatar-editor": "^15.1.0",
     "react-dom": "^19.2.8",

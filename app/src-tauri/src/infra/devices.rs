@@ -9,7 +9,9 @@ use std::ptr;
 #[cfg(target_os = "macos")]
 use std::thread;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+use crate::error::{ApiError, ApiResult};
 #[cfg(target_os = "macos")]
 use tauri::{Emitter, Wry};
 
@@ -38,6 +40,13 @@ pub struct DeviceSnapshot {
     pub devices: Vec<MountedDeviceSnapshot>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceUnmountRequest {
+    pub volume_id: String,
+    pub mount_path: String,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct DeviceService;
 
@@ -50,6 +59,26 @@ impl DeviceService {
         DeviceSnapshot {
             devices: scan_mounted_devices(),
         }
+    }
+
+    pub fn unmount(&self, request: DeviceUnmountRequest) -> ApiResult<DeviceSnapshot> {
+        let devices = scan_mounted_devices();
+        let device = devices
+            .iter()
+            .find(|device| {
+                device.volume_id == request.volume_id && device.mount_path == request.mount_path
+            })
+            .ok_or_else(|| {
+                ApiError::Message(
+                    "That volume changed or is no longer mounted. Refresh Devices and try again."
+                        .to_owned(),
+                )
+            })?;
+        validate_unmount_target(device)?;
+        perform_unmount(device)?;
+        Ok(DeviceSnapshot {
+            devices: scan_mounted_devices(),
+        })
     }
 }
 
@@ -173,7 +202,7 @@ fn parse_df_kp_output(text: &str) -> Vec<MountedDeviceSnapshot> {
             name,
             mount_path: row.mount_path.clone(),
             fs_type: details.fs_type,
-            is_removable: is_removable_mount(&row.mount_path),
+            is_removable: details.is_removable,
             is_system: row.mount_path == "/",
             is_external: details.is_external,
             is_network: row.fs_name.starts_with("//") || row.fs_name.contains(":"),
@@ -189,6 +218,7 @@ struct DeviceDetails {
     volume_id: String,
     fs_type: String,
     is_external: bool,
+    is_removable: bool,
     writable: bool,
 }
 
@@ -196,7 +226,18 @@ fn device_details(row: &DfRow) -> DeviceDetails {
     let fallback = DeviceDetails {
         volume_id: row.fs_name.clone(),
         fs_type: fs_type_for_row(row),
-        is_external: row.mount_path != "/",
+        // Fail closed on macOS. If Disk Arbitration cannot describe a volume,
+        // keep showing it but do not make a destructive action available.
+        is_external: if cfg!(target_os = "macos") {
+            false
+        } else {
+            row.mount_path != "/"
+        },
+        is_removable: if cfg!(target_os = "macos") {
+            false
+        } else {
+            is_removable_mount(&row.mount_path)
+        },
         writable: fs::metadata(&row.mount_path)
             .map(|metadata| !metadata.permissions().readonly())
             .unwrap_or(false),
@@ -220,16 +261,64 @@ fn device_details(row: &DfRow) -> DeviceDetails {
             .or_else(|| plist_string(&xml, "Type (Bundle)"))
             .unwrap_or_else(|| fallback.fs_type.clone());
         let is_internal = plist_bool(&xml, "Internal").unwrap_or(!fallback.is_external);
+        let is_removable = plist_bool(&xml, "RemovableMedia")
+            .or_else(|| plist_bool(&xml, "Ejectable"))
+            .unwrap_or(fallback.is_removable);
         let writable = plist_bool(&xml, "Writable").unwrap_or(fallback.writable);
         DeviceDetails {
             volume_id,
             fs_type,
             is_external: !is_internal,
+            is_removable,
             writable,
         }
     }
     #[cfg(not(target_os = "macos"))]
     fallback
+}
+
+fn validate_unmount_target(device: &MountedDeviceSnapshot) -> ApiResult<()> {
+    if device.is_system || device.mount_path == "/" {
+        return Err(ApiError::Message(
+            "Misty will never unmount the startup disk.".to_owned(),
+        ));
+    }
+    if !(device.is_removable || device.is_external || device.is_network) {
+        return Err(ApiError::Message(
+            "Misty only unmounts removable, external, or network volumes.".to_owned(),
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    if !device.mount_path.starts_with("/Volumes/") {
+        return Err(ApiError::Message(
+            "Misty only unmounts macOS volumes mounted below /Volumes.".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn perform_unmount(device: &MountedDeviceSnapshot) -> ApiResult<()> {
+    let output = Command::new("/usr/sbin/diskutil")
+        .args(["unmount", &device.mount_path])
+        .output()
+        .map_err(|error| ApiError::Message(format!("Could not start macOS unmount: {error}")))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let message = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    Err(ApiError::Message(if message.is_empty() {
+        "macOS could not unmount that volume. Close files using it and try again.".to_owned()
+    } else {
+        format!("macOS could not unmount that volume: {message}")
+    }))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn perform_unmount(_device: &MountedDeviceSnapshot) -> ApiResult<()> {
+    Err(ApiError::Unavailable(
+        "Safe device unmounting is currently available on macOS.".to_owned(),
+    ))
 }
 
 #[cfg(target_os = "macos")]
@@ -405,6 +494,49 @@ devfs 200 200 0 100% /dev
         assert_eq!(devices[0].mount_path, "/");
         assert_eq!(devices[1].name, "USB Drive");
         assert_eq!(devices[1].free_bytes, 750000 * 1024);
+    }
+
+    #[test]
+    fn unmount_protects_the_system_volume() {
+        let device = test_device("/", true, false, false);
+        let error = validate_unmount_target(&device).unwrap_err();
+        assert!(error.to_string().contains("never unmount the startup disk"));
+    }
+
+    #[test]
+    fn unmount_rejects_internal_non_removable_volumes() {
+        let device = test_device("/internal", false, false, false);
+        let error = validate_unmount_target(&device).unwrap_err();
+        assert!(error.to_string().contains("only unmounts removable"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn unmount_accepts_external_macos_volumes() {
+        let device = test_device("/Volumes/Backup", false, true, true);
+        validate_unmount_target(&device).unwrap();
+    }
+
+    fn test_device(
+        mount_path: &str,
+        is_system: bool,
+        is_external: bool,
+        is_removable: bool,
+    ) -> MountedDeviceSnapshot {
+        MountedDeviceSnapshot {
+            id: "volume".to_owned(),
+            volume_id: "volume".to_owned(),
+            name: "Volume".to_owned(),
+            mount_path: mount_path.to_owned(),
+            fs_type: "test".to_owned(),
+            is_removable,
+            is_system,
+            is_external,
+            is_network: false,
+            writable: true,
+            total_bytes: 1,
+            free_bytes: 1,
+        }
     }
 
     #[cfg(target_os = "linux")]

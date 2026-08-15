@@ -1,4 +1,6 @@
 pub mod clipboard;
+#[cfg(desktop)]
+pub mod connected_devices;
 pub mod explorer;
 pub mod file_master;
 pub mod file_sync;
