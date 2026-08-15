@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 20
     env:
       MISTY_PUBLIC_API_URL: https://mistysys.com/api
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
