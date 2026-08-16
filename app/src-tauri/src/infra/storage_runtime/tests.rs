@@ -59,3 +59,33 @@ fn native_runtime_starts_and_surfaces_only_curated_workflows() {
     drop(runtime);
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn remote_snapshot_exposes_safe_account_provenance_but_never_tokens() {
+    let root =
+        std::env::temp_dir().join(format!("misty-storage-provenance-{}", uuid::Uuid::new_v4()));
+    let environment = AppEnvironmentService::for_test_home(root.clone());
+    let runtime = StorageRuntimeService::start(&environment);
+    runtime
+        .call(
+            "config/create",
+            serde_json::json!({
+                "name": "work",
+                "type": "drive",
+                "parameters": {
+                    "access_token": "provider-secret",
+                    "misty_connection_id": "cloud_123",
+                    "misty_connection_source": "connected_account",
+                    "misty_connected_account_id": "connection_123"
+                }
+            }),
+        )
+        .expect("create direct cloud remote");
+    let remotes = runtime.remotes().expect("list remotes");
+    assert_eq!(remotes[0]["connection_id"], "cloud_123");
+    assert_eq!(remotes[0]["connection_source"], "connected_account");
+    assert_eq!(remotes[0]["connected_account_id"], "connection_123");
+    assert!(!remotes.to_string().contains("provider-secret"));
+    drop(runtime);
+    let _ = std::fs::remove_dir_all(root);
+}

@@ -168,6 +168,31 @@ pub async fn app_configure_server(
 }
 
 #[tauri::command]
+pub async fn mail_cache_read(
+    account_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Option<String>> {
+    crate::infra::mail_cache::read(&state.environment.cache_dir(), &account_id).await
+}
+
+#[tauri::command]
+pub async fn mail_cache_write(
+    account_id: String,
+    value: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    crate::infra::mail_cache::write(&state.environment.cache_dir(), &account_id, &value).await
+}
+
+#[tauri::command]
+pub async fn mail_cache_remove(
+    account_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    crate::infra::mail_cache::remove(&state.environment.cache_dir(), &account_id).await
+}
+
+#[tauri::command]
 pub async fn self_host_entitlement_store(token: String) -> ApiResult<()> {
     crate::infra::self_host_entitlement::store(&token)
 }
@@ -1679,20 +1704,46 @@ pub async fn providers_import_cloud_connection(
     name: String,
     provider_type: String,
     connection_id: String,
-    access_token: String,
+    connection_source: Option<String>,
+    connected_account_id: Option<String>,
+    handoff: String,
+    redeem_url: String,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ProvidersSnapshot> {
     let name = name.trim();
     let provider_type = provider_type.trim();
-    let access_token = access_token.trim();
-    if name.is_empty() || access_token.is_empty() {
+    let connection_id = connection_id.trim();
+    let handoff = handoff.trim();
+    if name.is_empty() || connection_id.is_empty() || handoff.is_empty() {
         return Err(ApiError::Message(
-            "Cloud connection name and access token are required.".to_owned(),
+            "Cloud connection name and credential handoff are required.".to_owned(),
         ));
     }
     if !matches!(provider_type, "drive" | "dropbox" | "onedrive") {
         return Err(ApiError::Message(
             "That cloud provider is not supported.".to_owned(),
+        ));
+    }
+    let connection_source = connection_source.as_deref().unwrap_or("legacy_cloud");
+    if !matches!(connection_source, "connected_account" | "legacy_cloud")
+        || (connection_source == "connected_account"
+            && connected_account_id
+                .as_deref()
+                .is_none_or(|value| value.trim().is_empty()))
+    {
+        return Err(ApiError::Message(
+            "Cloud connection provenance was invalid.".to_owned(),
+        ));
+    }
+    let credential = crate::infra::cloud_handoff::redeem_cloud_credential(handoff, &redeem_url)
+        .await
+        .map_err(ApiError::Message)?;
+    if credential.connection_id != connection_id
+        || credential.provider != provider_type
+        || credential.access_token.trim().is_empty()
+    {
+        return Err(ApiError::Message(
+            "Cloud credential handoff did not match the selected connection.".to_owned(),
         ));
     }
     state
@@ -1703,8 +1754,10 @@ pub async fn providers_import_cloud_connection(
                 "name": name,
                 "type": provider_type,
                 "parameters": {
-                    "access_token": access_token,
-                    "misty_connection_id": connection_id.trim(),
+                    "access_token": credential.access_token,
+                    "misty_connection_id": connection_id,
+                    "misty_connection_source": connection_source,
+                    "misty_connected_account_id": connected_account_id.as_deref().unwrap_or(""),
                 },
                 "opt": { "nonInteractive": true }
             }),

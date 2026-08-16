@@ -43,20 +43,74 @@ struct LspExitEvent {
 }
 
 fn command_for(language: &str) -> Option<Command> {
-    match language {
+    let mut cmd = match language {
         "typescript" | "ts" | "tsx" | "javascript" | "js" | "jsx" => {
             let mut command = Command::new("typescript-language-server");
             command.arg("--stdio");
-            Some(command)
+            command
         }
-        "rust" | "rs" => Some(Command::new("rust-analyzer")),
+        "rust" | "rs" => Command::new("rust-analyzer"),
         "python" | "py" => {
             let mut command = Command::new("pyright-langserver");
             command.arg("--stdio");
-            Some(command)
+            command
         }
-        _ => None,
+        "go" | "golang" => Command::new("gopls"),
+        "c" | "cpp" | "cxx" | "h" | "hpp" => Command::new("clangd"),
+        "yaml" | "yml" => {
+            let mut command = Command::new("yaml-language-server");
+            command.arg("--stdio");
+            command
+        }
+        "json" | "jsonc" => {
+            let mut command = Command::new("vscode-json-language-server");
+            command.arg("--stdio");
+            command
+        }
+        "html" | "htm" => {
+            let mut command = Command::new("vscode-html-language-server");
+            command.arg("--stdio");
+            command
+        }
+        "css" | "scss" | "less" => {
+            let mut command = Command::new("vscode-css-language-server");
+            command.arg("--stdio");
+            command
+        }
+        "sh" | "bash" | "zsh" | "shell" => {
+            let mut command = Command::new("bash-language-server");
+            command.arg("start");
+            command
+        }
+        "lua" => Command::new("lua-language-server"),
+        "zig" => Command::new("zls"),
+        "tailwind" | "tailwindcss" => {
+            let mut command = Command::new("tailwindcss-language-server");
+            command.arg("--stdio");
+            command
+        }
+        _ => return None,
+    };
+
+    if let Ok(current_path) = std::env::var("PATH") {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let extra_dirs = [
+            "/opt/homebrew/bin".to_string(),
+            "/usr/local/bin".to_string(),
+            format!("{home}/.cargo/bin"),
+            format!("{home}/go/bin"),
+            format!("{home}/.local/bin"),
+        ];
+        let mut paths: Vec<String> = current_path.split(':').map(|s| s.to_string()).collect();
+        for dir in extra_dirs {
+            if !dir.is_empty() && !paths.contains(&dir) && std::path::Path::new(&dir).is_dir() {
+                paths.insert(0, dir);
+            }
+        }
+        cmd.env("PATH", paths.join(":"));
     }
+
+    Some(cmd)
 }
 
 #[tauri::command]

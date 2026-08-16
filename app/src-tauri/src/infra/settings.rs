@@ -6,7 +6,9 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use super::settings_migration::{prune_retired_settings, SETTINGS_SCHEMA_VERSION};
+use super::settings_migration::{
+    migrate_code_workspace_settings, prune_retired_settings, SETTINGS_SCHEMA_VERSION,
+};
 
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
@@ -164,12 +166,13 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     }
 
     let root = document.as_object_mut().expect("settings document object");
-    // Monotonic: a document already at 2 is left alone, and a *newer* document
-    // (a user who downgraded) is not mangled by this build's idea of retired.
+    // Monotonic: a document already at the current version is left alone, and
+    // a newer document (a user who downgraded) is not mangled by this build.
     let stored_version = root
         .get("schema_version")
         .and_then(Value::as_i64)
         .unwrap_or(0);
+    changed |= migrate_code_workspace_settings(root, stored_version);
     if stored_version < SETTINGS_SCHEMA_VERSION {
         // Prune before backfilling, or the defaults pass would re-add keys this
         // pass is about to remove. The return value is ignored because bumping
@@ -237,7 +240,9 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         "editor",
         &[
             ("font_family", json!("")),
-            ("font_size", json!(12.5)),
+            ("font_size", json!(14)),
+            ("interface_scale", json!(1.0)),
+            ("theme", json!("gruvbox-dark")),
             ("tab_size", json!(2)),
             ("word_wrap", json!(true)),
             ("line_numbers", json!(true)),
@@ -551,6 +556,10 @@ fn association_key_for_path(file_path: &str) -> String {
         .unwrap_or(file_name);
     key.to_lowercase()
 }
+
+#[cfg(test)]
+#[path = "settings/code_workspace_tests.rs"]
+mod code_workspace_tests;
 
 #[cfg(test)]
 mod tests {

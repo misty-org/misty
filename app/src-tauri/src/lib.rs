@@ -45,12 +45,13 @@ use app::commands::{
     explorer_save_preview_item, explorer_set_open_association, extension_command_run,
     file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
     file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
-    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, notes_store_asset,
-    open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
-    operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
-    operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
-    operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
-    operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
+    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
+    mail_cache_remove, mail_cache_write, notes_store_asset, open_terminal_at_path,
+    operation_queue_cancel, operation_queue_cancel_batch, operation_queue_clear_terminal,
+    operation_queue_pause, operation_queue_pause_all, operation_queue_pause_batch,
+    operation_queue_redo, operation_queue_resolve_conflict, operation_queue_resume,
+    operation_queue_resume_all, operation_queue_resume_batch, operation_queue_retry,
+    operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
     plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
     providers_backend_actions, providers_config_paths, providers_config_security,
@@ -89,6 +90,11 @@ use infra::browser::{
 #[cfg(desktop)]
 use infra::code_git::{code_git_diff, code_git_status};
 #[cfg(desktop)]
+use infra::code_git_remote::{
+    code_git_clone, code_git_commit, code_git_create_branch, code_git_fetch, code_git_push,
+    code_git_workspace_id,
+};
+#[cfg(desktop)]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
 #[cfg(desktop)]
 use infra::code_watcher::{code_stop_watch, code_watch_dir};
@@ -105,6 +111,10 @@ use infra::misty::{
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
+};
+#[cfg(desktop)]
+use infra::ssh_terminal::{
+    terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
 };
 #[cfg(desktop)]
 use infra::terminal::{
@@ -235,6 +245,9 @@ pub fn run() {
             app_snapshot,
             app_environment_snapshot,
             app_configure_server,
+            mail_cache_read,
+            mail_cache_write,
+            mail_cache_remove,
             self_host_entitlement_store,
             self_host_entitlement_load,
             agents_device_snapshot,
@@ -303,6 +316,12 @@ pub fn run() {
             #[cfg(desktop)]
             terminal_kill,
             #[cfg(desktop)]
+            terminal_ssh_environments,
+            #[cfg(desktop)]
+            terminal_ssh_preflight,
+            #[cfg(desktop)]
+            terminal_ssh_trust_host,
+            #[cfg(desktop)]
             code_read_text_file,
             #[cfg(desktop)]
             code_write_text_file,
@@ -322,6 +341,18 @@ pub fn run() {
             code_git_status,
             #[cfg(desktop)]
             code_git_diff,
+            #[cfg(desktop)]
+            code_git_workspace_id,
+            #[cfg(desktop)]
+            code_git_clone,
+            #[cfg(desktop)]
+            code_git_fetch,
+            #[cfg(desktop)]
+            code_git_push,
+            #[cfg(desktop)]
+            code_git_create_branch,
+            #[cfg(desktop)]
+            code_git_commit,
             #[cfg(desktop)]
             code_watch_dir,
             #[cfg(desktop)]

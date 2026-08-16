@@ -7,8 +7,8 @@ use tauri::{AppHandle, Runtime, WebviewWindow};
 #[cfg(target_os = "macos")]
 use cocoa::{
     appkit::{
-        NSColor, NSView, NSViewHeightSizable, NSViewWidthSizable, NSWindow,
-        NSWindowCollectionBehavior, NSWindowStyleMask, NSWindowTitleVisibility,
+        NSColor, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+        NSWindowTitleVisibility,
     },
     base::{id, nil},
     foundation::{NSPoint, NSString},
@@ -135,12 +135,6 @@ pub fn enable_modern_window_style<R: Runtime>(
                     ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
                     ns_window.setMovable_(cocoa::base::YES);
                     ns_window.setHasShadow_(cocoa::base::YES);
-                    // AppKit's default live-resize optimization preserves and
-                    // stretches cached view contents. That makes a WKWebView
-                    // appear frozen until the resize finishes. Force normal
-                    // drawing so WebKit lays out and paints every resize step.
-                    ns_window.setPreservesContentDuringLiveResize_(cocoa::base::NO);
-
                     // The macOS-specific Tauri config creates a normal titled,
                     // resizable overlay window. Do not rewrite its style mask
                     // after creation: AppKit may rebuild the content hierarchy,
@@ -154,14 +148,9 @@ pub fn enable_modern_window_style<R: Runtime>(
                     );
                     ns_window.setCollectionBehavior_(collection_behavior);
 
-                    let content_view = ns_window.contentView();
-                    let webview_view = webview.inner() as id;
-                    let content_bounds = content_view.bounds();
-                    let _: () = msg_send![webview_view, setFrame: content_bounds];
-                    webview_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
-                    let _: () = msg_send![content_view, setNeedsLayout: cocoa::base::YES];
-                    let _: () = msg_send![content_view, layoutSubtreeIfNeeded];
-                    let _: () = msg_send![webview_view, setNeedsDisplay: cocoa::base::YES];
+                    // Wry owns the main WKWebView's parent, frame, and native
+                    // autoresizing mask. Reapplying them here creates a second
+                    // resize owner and can stall its live-resize paint cycle.
 
                     position_traffic_lights(
                         ns_window,

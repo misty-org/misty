@@ -12,6 +12,10 @@ use crate::error::{ApiError, ApiResult};
 
 const PROVIDER_AUTH_CANCEL_RESULT: &str = "cancel";
 
+#[cfg(test)]
+#[path = "providers/step_tests.rs"]
+mod step_tests;
+
 #[derive(Clone)]
 pub struct ProviderService {
     inner: Arc<ProviderInner>,
@@ -54,6 +58,9 @@ pub struct ProviderRemote {
     pub needs_reconnect: bool,
     pub error: Option<String>,
     pub config_source: String,
+    pub connection_id: Option<String>,
+    pub connection_source: Option<String>,
+    pub connected_account_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -330,6 +337,12 @@ struct RawRemote {
     name: String,
     #[serde(default, rename = "type")]
     provider_type: String,
+    #[serde(default)]
+    connection_id: Option<String>,
+    #[serde(default)]
+    connection_source: Option<String>,
+    #[serde(default)]
+    connected_account_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -839,6 +852,9 @@ impl ProviderService {
                     needs_reconnect: status.map(|value| value.needs_reconnect).unwrap_or(false),
                     error: status.and_then(|value| value.error.clone()),
                     config_source: "misty".to_string(),
+                    connection_id: remote.connection_id,
+                    connection_source: remote.connection_source,
+                    connected_account_id: remote.connected_account_id,
                 }
             })
             .collect();
@@ -1273,32 +1289,6 @@ fn json_string(value: &serde_json::Value, keys: &[&str]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn provider_step_accepts_proxy_field_alias() {
-        let step = parse_provider_config_step(
-            r#"{
-                "kind":"post_auth_config",
-                "state":"state-1",
-                "field":{"name":"drive_id","label":"Drive","required":true},
-                "poll_after_ms":0
-            }"#,
-        )
-        .unwrap();
-        assert_eq!(step.kind, "post_auth_config");
-        assert_eq!(step.state, "state-1");
-        assert_eq!(step.option.unwrap().name, "drive_id");
-        assert_eq!(step.poll_after_ms, 1000);
-    }
-
-    #[test]
-    fn provider_step_accepts_first_options_entry() {
-        let step = parse_provider_config_step(
-            r#"{"kind":"post_auth_config","options":[{"name":"scope","defaultValue":"drive"}]}"#,
-        )
-        .unwrap();
-        assert_eq!(step.option.unwrap().name, "scope");
-    }
 
     #[test]
     fn provider_step_accepts_inline_prompt_shape() {
