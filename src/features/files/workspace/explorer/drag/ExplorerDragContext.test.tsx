@@ -98,7 +98,8 @@ describe("ExplorerDragProvider", () => {
     expect(container.textContent).not.toContain("photo.jpg");
     expect(container.querySelector("[data-explorer-drag-interaction-shield]")).toBeNull();
     await act(async () => window.dispatchEvent(pointer("pointermove", 7, 0)));
-    expect(container.textContent).toContain("photo.jpg");
+    expect(document.querySelector(".explorer-drag-chip-name")?.textContent).toBe("photo.jpg");
+    expect(source.dataset.reorderDragging).toBe("true");
     expect(container.querySelector("[data-explorer-drag-interaction-shield]")).not.toBeNull();
     await act(async () => {
       window.dispatchEvent(pointer("pointerup", 7, 0));
@@ -110,6 +111,8 @@ describe("ExplorerDragProvider", () => {
       expect.any(Object),
     );
     expect(container.querySelector("[data-explorer-drag-interaction-shield]")).toBeNull();
+    expect(document.querySelector(".explorer-drag-chip")).toBeNull();
+    expect(source.dataset.reorderDragging).toBeUndefined();
   });
 
   it("cancels an active pointer session on Escape", async () => {
@@ -128,15 +131,15 @@ describe("ExplorerDragProvider", () => {
     expect(document.documentElement.dataset.explorerDragging).toBeUndefined();
   });
 
-  it("always shows the total number of dragged items", async () => {
+  it("counts every dragged item and leaves plain drop areas unlit", async () => {
     const second = { ...item, entryId: "second", name: "second.jpg", path: "/Pictures/second.jpg" };
     await renderHarness(vi.fn(), [item, second]);
     const source = container.querySelector<HTMLElement>("[data-source]")!;
     elementAtPoint = container.querySelector<HTMLElement>("[data-zone]");
     await act(async () => source.dispatchEvent(pointer("pointerdown", 0, 0)));
     await act(async () => window.dispatchEvent(pointer("pointermove", 8, 0)));
-    expect(container.querySelector('[role="status"]')?.textContent).toContain("2 items");
-    expect(elementAtPoint?.getAttribute("data-explorer-drop-active")).toBe("true");
+    expect(document.querySelector(".explorer-drag-count")?.textContent).toBe("2");
+    expect(elementAtPoint?.hasAttribute("data-explorer-drop-active")).toBe(false);
     expect(elementAtPoint?.hasAttribute("data-explorer-drop-valid")).toBe(false);
     await act(async () =>
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })),
@@ -163,12 +166,13 @@ describe("ExplorerDragProvider", () => {
       );
       await act(async () => {
         await Promise.resolve();
-        await vi.advanceTimersByTimeAsync(701);
+        // The folder blinks before it opens.
+        await vi.advanceTimersByTimeAsync(961);
       });
       expect(container.querySelector("[data-source]")).toBeNull();
 
       await act(async () => window.dispatchEvent(pointer("lostpointercapture", 8, 0)));
-      expect(container.textContent).toContain("photo.jpg");
+      expect(document.querySelector(".explorer-drag-chip-name")?.textContent).toBe("photo.jpg");
       await act(async () => {
         window.dispatchEvent(pointer("pointerup", 8, 0));
         await Promise.resolve();

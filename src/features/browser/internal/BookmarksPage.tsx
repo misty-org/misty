@@ -1,6 +1,7 @@
-import { Bookmark, Folder, MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import {
   Button,
+  CollectionFilters,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -36,6 +37,12 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
   const [editing, setEditing] = useState<BookmarkItem | "new" | null>(null);
   const [folderDraft, setFolderDraft] = useState<{ id?: string; name: string } | null>(null);
   const [error, setError] = useState("");
+  const folderLabel = (folder?: (typeof folders)[number]) =>
+    folder?.name === "Bookmarks"
+      ? folder.id === unfiledFolderId
+        ? "Unfiled"
+        : "Bookmarks folder"
+      : (folder?.name ?? "Recovered bookmarks");
   const selected = folders.find((f) => f.id === folderId);
   const needle = text.trim().toLocaleLowerCase();
   const matches = bookmarks.filter(
@@ -46,11 +53,15 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
   return (
     <InternalPageFrame
       title="Bookmarks"
-      icon={Bookmark}
       search={{ value: text, placeholder: "Search bookmarks", onChange: setText }}
       actions={
         <DropdownMenu modal={false}>
-          <MenuTrigger label="Add" icon={<Plus size={16} />} />
+          <MenuTrigger
+            label="Add"
+            variant="primary"
+            className="h-9 px-4"
+            icon={<Plus size={16} />}
+          />
           <DropdownMenuContent align="end">
             <MenuItem label="Add bookmark" onSelect={() => setEditing("new")} />
             <MenuItem
@@ -63,65 +74,51 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       }
+      toolbar={
+        <CollectionFilters
+          options={[
+            { value: "all", label: "All" },
+            ...folders.map((folder) => ({ value: folder.id, label: folderLabel(folder) })),
+          ]}
+          value={selected?.id ?? "all"}
+          onChange={(value) => setFolderId(value === "all" ? null : value)}
+          actions={
+            selected ? (
+              <DropdownMenu modal={false}>
+                <MenuTrigger
+                  iconOnly
+                  label={`Manage folder ${folderLabel(selected)}`}
+                  icon={<MoreHorizontal size={16} />}
+                />
+                <DropdownMenuContent align="end">
+                  <MenuItem
+                    label="Open all in new tabs"
+                    disabled={!matches.length}
+                    onSelect={() => matches.forEach((b) => props.openInNewView(b.url))}
+                  />
+                  <MenuItem
+                    label="Rename folder"
+                    onSelect={() => {
+                      setError("");
+                      setFolderDraft({ id: selected.id, name: selected.name });
+                    }}
+                  />
+                  <DropdownMenuSeparator />
+                  <MenuItem
+                    label="Remove folder, keep bookmarks"
+                    disabled={selected.id === unfiledFolderId}
+                    onSelect={() => {
+                      removeBookmarkFolder(selected.id);
+                      setFolderId(null);
+                    }}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : undefined
+          }
+        />
+      }
     >
-      <div className="mb-5 flex flex-wrap items-center gap-1" aria-label="Bookmark folders">
-        <Button
-          size="sm"
-          variant={selected ? "ghost" : "secondary"}
-          aria-pressed={!selected}
-          onClick={() => setFolderId(null)}
-        >
-          All bookmarks
-        </Button>
-        {folders.map((f) => (
-          <Button
-            key={f.id}
-            size="sm"
-            variant={selected?.id === f.id ? "secondary" : "ghost"}
-            aria-pressed={selected?.id === f.id}
-            className="max-w-48"
-            onClick={() => setFolderId(f.id)}
-          >
-            <Folder size={14} />
-            <span className="truncate">{f.name}</span>
-          </Button>
-        ))}
-      </div>
-      {selected && (
-        <div className="mb-2 flex items-center gap-2">
-          <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{selected.name}</h2>
-          <DropdownMenu modal={false}>
-            <MenuTrigger
-              iconOnly
-              label={`Manage folder ${selected.name}`}
-              icon={<MoreHorizontal size={16} />}
-            />
-            <DropdownMenuContent align="end">
-              <MenuItem
-                label="Open all in new tabs"
-                disabled={!matches.length}
-                onSelect={() => matches.forEach((b) => props.openInNewView(b.url))}
-              />
-              <MenuItem
-                label="Rename folder"
-                onSelect={() => {
-                  setError("");
-                  setFolderDraft({ id: selected.id, name: selected.name });
-                }}
-              />
-              <DropdownMenuSeparator />
-              <MenuItem
-                label="Remove folder, keep bookmarks"
-                disabled={selected.id === unfiledFolderId}
-                onSelect={() => {
-                  removeBookmarkFolder(selected.id);
-                  setFolderId(null);
-                }}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
       {matches.length ? (
         <ul className="grid">
           {matches.map((b) => (
@@ -141,7 +138,7 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
                 </span>
                 {!selected && (
                   <span className="max-w-32 truncate text-xs text-cream-muted">
-                    {folders.find((f) => f.id === b.folderId)?.name ?? "Recovered bookmarks"}
+                    {folderLabel(folders.find((f) => f.id === b.folderId))}
                   </span>
                 )}
               </ListRowButton>
@@ -163,7 +160,13 @@ export function BookmarksPage(props: BrowserInternalPageProps) {
         </ul>
       ) : (
         <InternalPageEmpty
-          title={needle ? "No matching bookmarks" : "No bookmarks yet"}
+          title={
+            needle
+              ? "No matching bookmarks"
+              : selected
+                ? "No bookmarks in this folder"
+                : "No bookmarks yet"
+          }
           detail={
             needle
               ? "Try another name or address."

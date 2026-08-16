@@ -16,6 +16,9 @@ import * as React from "react";
 
 import { cn } from "../utils";
 
+const dropdownViewportClass =
+  "max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] max-w-[var(--radix-dropdown-menu-content-available-width)]";
+
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -65,12 +68,15 @@ const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
 >(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubContent
-    ref={ref}
-    data-slot="dropdown-menu-sub-content"
-    className={cn(menuContentClass, className)}
-    {...props}
-  />
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.SubContent
+      ref={ref}
+      data-slot="dropdown-menu-sub-content"
+      collisionPadding={8}
+      className={cn(menuContentClass, dropdownViewportClass, className)}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
 ));
 DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
 
@@ -87,7 +93,13 @@ const DropdownMenuContent = React.forwardRef<
         side={side ?? placement}
         sideOffset={sideOffset}
         align={align}
-        className={cn(menuContentClass, width && menuWidthClass[width], className)}
+        collisionPadding={8}
+        className={cn(
+          menuContentClass,
+          dropdownViewportClass,
+          width && menuWidthClass[width],
+          className,
+        )}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>

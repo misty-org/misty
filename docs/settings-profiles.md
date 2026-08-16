@@ -1,36 +1,30 @@
-# Settings profiles
+# Account settings
 
-The settings navigation has five groups: App, Browser, Spaces, Files, and Agents. Each page has one subject. The website remains the account administration surface; the app uses its configured website helper for Account settings. Legacy section IDs resolve to canonical pages.
+Misty is a desktop application. Settings belong to the signed-in account on the server. The public/account website is a separate administration surface; the desktop app opens it through the configured website helper.
 
 ## Ownership and resolution
 
-`src/features/settings/profiles/definitions.json` declares stable keys, value types, defaults, validation constraints, ownership, platform availability, and search labels. `registry.ts` supplies value adapters for existing runtime consumers. Dropdown indexes are converted to stable IDs at that boundary. The Go service embeds a matching manifest; a contract test rejects schema drift.
+`src/features/settings/profiles/definitions.json` declares stable keys, value types, defaults, validation constraints, ownership, desktop availability, and search labels. `registry.ts` adapts values for runtime consumers. The Go service embeds the same manifest; a contract test rejects schema drift.
 
-Preferences resolve from built-in defaults, the selected profile, and then that profile's device overrides. Existing installations start in Local only. Profile changes do not restore browser sessions, replace layouts, modify account configuration, or grant access. Shortcut bindings, paths, indexing, telemetry consent, and transfer performance presets remain local. Account AI controls and resource editors continue to call their existing APIs independently.
+Preferences resolve from the account record and pending account mutations, with built-in defaults for absent keys. There are no profile selectors, local-only preferences, or device overrides. Legacy profiles migrate into the account record. Device identities and OS-vault secrets remain distinct from preferences and are never uploaded as ordinary settings.
 
 ## Persistence and synchronization
 
-The native cache is `settings-profiles.sqlite` beside the settings document. It uses SQLite transactions, compare-and-swap revisions, WAL, and full synchronous writes. Web uses IndexedDB with strict durability. Both store account/deployment-specific caches, selection, overrides, and an ordered outbox. Preference changes reach runtime adapters only after a durable local commit.
+The native account/deployment-scoped cache is `settings-profiles.sqlite`. SQLite transactions and compare-and-swap revisions preserve an ordered outbox. Changes reach runtime adapters after a durable local commit. The renderer has no alternate IndexedDB settings backend.
 
-The original native settings file is backed up as `settings.before-profiles.json` before normalization. The backup is created atomically and never overwritten. Each installation also retains a migration baseline. Only allowlisted portable keys can leave the device; unknown local data remains in the backup and local document.
+The original native settings file is backed up before normalization. Legacy data needed for migration remains recoverable. Registered account preferences, including navigation order, synchronize through the authenticated `/settings/preferences` API. Server revisions and mutation receipts make retries safe; the authoritative server order resolves edits to the same key.
 
-The authenticated `/settings/profiles` API lists, creates, reads, patches, and deletes private profiles. Row locks serialize key-level patches, revisions are server controlled, and durable mutation receipts prevent retries from overwriting later edits. The last server commit wins for the same key, including late offline edits. Patches retain unknown newer fields.
+Account event invalidations, reconnect, foreground events, and bounded retries refresh the account record. Offline edits remain in the durable outbox. Account/deployment transitions detach subscriptions and ignore stale replies. Settings synchronization is independent of encrypted browser workspace sharing; native browser data and unlock secrets do not travel through the settings API.
 
-Profile invalidations use the account event stream, independently of encrypted Browser Device Handoff. Reconnect, foreground, online events, and a bounded background retry recover interrupted synchronization. Same-origin windows share state notifications. Account/deployment transitions detach subscriptions and ignore stale replies.
+## Verification and rollout
 
-Cloud creation, duplication, renaming, and deletion require connectivity. Cached selection and preference edits work offline. Deleting the active profile preserves effective values as Local only. Unsent edits to deleted inactive profiles have a recovery action on Sync. Storage failures retain pending work and show Needs attention.
+Ship matching client/server definitions and the native settings persistence commands together. The desktop-only device-platform migration normalizes retired registrations to `unknown` while retaining their identities and grants; applied migration history remains intact.
 
-## Rollout and verification
-
-Deploy the account service with `20270927000000_settings_profiles.sql` before enabling cloud profiles in the new client. The updated native binary is required for SQLite persistence commands. No production migration or deployment is performed by this code change.
-
-Focused frontend tests cover navigation, aliases, search, ownership, migration, default precedence, offline restart, overrides, stale replies, retry IDs, and storage failures. Native tests cover SQLite persistence/CAS, backup, account isolation, and revoked folder reads. PostgreSQL integration tests cover account isolation, simultaneous writes, conflict order, retries, reset, future fields, and deletion. Run them only against a disposable database named `misty_settings_test`:
+Frontend tests cover registered ownership, migration, offline restart, stale replies, retry IDs, native persistence and storage failures. Native tests cover SQLite compare-and-swap and account isolation. Database integration checks must use a disposable settings test database:
 
 ```sh
 cd server
 MISTY_SETTINGS_TEST_DSN=postgres://localhost/misty_settings_test go test ./internal/platform/postgres -run TestSettingsProfilesPostgres
 ```
 
-This iteration targets desktop and web. Mobile shells, bridges, build targets, and platform-specific branches have been removed. The forward migration `20270927010000_desktop_device_platforms.sql` normalizes retired device platforms to `unknown` without deleting registrations or grants.
-
-After the mobile removal, builds and test execution are left to the developer. Review desktop and web navigation, search focus, profile persistence and synchronization, and account/deployment switching before rollout.
+Review desktop navigation, search focus, preference synchronization, and account/deployment switching before rollout. Source changes do not deploy the server or modify live infrastructure.

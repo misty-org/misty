@@ -1,3 +1,5 @@
+import { AppRequestCard } from "../apps/AppRequestCard";
+import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
 import { companionReply } from "../companion/companionReply";
 import type {
   GlobalAiActionProposal,
@@ -21,7 +23,8 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { AgentSteps, type AgentStep } from "./AgentSteps";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 
@@ -54,20 +57,25 @@ export function AgentConversationView(props: {
   return (
     <div className="agent-transcript mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
       <div className="space-y-7">
-        {props.conversation.messages.map((message, index) => {
-          const previousUserPrompt = [...props.conversation!.messages.slice(0, index)]
-            .reverse()
-            .find((item) => item.role === "user")?.content;
+        {conversationTurns(props.conversation.messages).map((turn) => {
+          const handlers = {
+            onRetry: props.onRetry,
+            onConfirm: props.onConfirm,
+            onReject: props.onReject,
+            onCancel: props.onCancel,
+          };
           return (
-            <AgentMessage
-              key={message.id}
-              message={message}
-              retryPrompt={previousUserPrompt}
-              onRetry={props.onRetry}
-              onConfirm={props.onConfirm}
-              onReject={props.onReject}
-              onCancel={props.onCancel}
-            />
+            <Fragment key={turn.key}>
+              {turn.prompt && <AgentMessage message={turn.prompt} {...handlers} />}
+              {turn.answer && (
+                <AgentMessage
+                  message={turn.answer}
+                  steps={turn.steps}
+                  retryPrompt={turn.prompt?.content}
+                  {...handlers}
+                />
+              )}
+            </Fragment>
           );
         })}
         {props.working &&
@@ -93,8 +101,50 @@ export function AgentConversationView(props: {
   );
 }
 
+type Turn = {
+  key: string;
+  prompt?: GlobalAiMessage;
+  replies: GlobalAiMessage[];
+  answer?: GlobalAiMessage;
+  steps: GlobalAiMessage[];
+};
+
+/** A prompt and its replies. The last visible reply is the answer; earlier ones are steps. */
+function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const message of messages) {
+    if (message.role === "user") {
+      turns.push({ key: message.id, prompt: message, replies: [], steps: [] });
+      continue;
+    }
+    const visible =
+      visibleConversationContent(message.content, message.role) ||
+      message.action ||
+      message.state === "pending" ||
+      message.state === "streaming";
+    if (!visible) continue;
+    if (!turns.length) turns.push({ key: message.id, replies: [], steps: [] });
+    turns[turns.length - 1].replies.push(message);
+  }
+  for (const turn of turns) {
+    turn.answer = turn.replies[turn.replies.length - 1];
+    turn.steps = turn.replies.slice(0, -1);
+  }
+  return turns;
+}
+
+function needsAttention(action?: GlobalAiActionProposal) {
+  return Boolean(
+    action &&
+    ((action.state === "proposed" && action.requiresConfirmation) ||
+      action.state === "awaiting_approval" ||
+      action.state === "running"),
+  );
+}
+
 function AgentMessage(props: {
   message: GlobalAiMessage;
+  steps?: GlobalAiMessage[];
   retryPrompt?: string;
   onRetry: (prompt: string) => void;
   onConfirm: (id: string) => void;
@@ -103,7 +153,13 @@ function AgentMessage(props: {
 }) {
   const message = props.message;
   const content = visibleConversationContent(message.content, message.role);
-  if (!content && !message.action && message.state !== "pending" && message.state !== "streaming")
+  if (
+    !content &&
+    !message.action &&
+    !message.appRequest &&
+    message.state !== "pending" &&
+    message.state !== "streaming"
+  )
     return null;
   if (message.role === "user") {
     return (
@@ -130,6 +186,23 @@ function AgentMessage(props: {
     <article className="group/message flex items-start gap-3.5">
       <MistyAvatar />
       <div className="min-w-0 flex-1 pt-0.5">
+        {props.steps?.length ? (
+          <AgentSteps
+            steps={props.steps.map((step): AgentStep => ({
+              id: step.id,
+              content: visibleConversationContent(step.content, step.role),
+              attention: needsAttention(step.action),
+              action: step.action ? (
+                <AgentActionStatus
+                  proposal={step.action}
+                  onConfirm={() => props.onConfirm(step.action!.id)}
+                  onReject={() => props.onReject(step.action!.id)}
+                  onCancel={() => props.onCancel(step.action!.id)}
+                />
+              ) : undefined,
+            }))}
+          />
+        ) : null}
         {content ? (
           <div className="misty-markdown-message text-[14px] leading-6 text-cream">
             <ReactMarkdown>{content}</ReactMarkdown>
@@ -160,6 +233,10 @@ function AgentMessage(props: {
             onReject={() => props.onReject(message.action!.id)}
             onCancel={() => props.onCancel(message.action!.id)}
           />
+        ) : null}
+        {message.appRequest ? <AppRequestCard request={message.appRequest} /> : null}
+        {message.screenRequest ? (
+          <ScreenRequestCard messageId={message.id} request={message.screenRequest} />
         ) : null}
         <MessageFeedback
           message={message}

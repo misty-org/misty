@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Polar and Misty · Layout comparison</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #151515;
+        color: #e8e8e8;
+        font:
+          13px -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 16px 24px;
+        border-bottom: 1px solid #393939;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0;
+        font-weight: 500;
+      }
+      nav {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      button,
+      a {
+        font: inherit;
+        color: inherit;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 7px 12px;
+        background: transparent;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      button[aria-pressed="true"] {
+        background: #eee;
+        color: #222;
+        border-color: #eee;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        gap: 20px;
+      }
+      .toolbar label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: min(460px, 45vw);
+      }
+      input {
+        flex: 1;
+        accent-color: #ddd;
+        min-width: 60px;
+      }
+      .stage {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 1920/1050;
+        overflow: hidden;
+        background: #222;
+      }
+      .stage img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .stage #reference {
+        clip-path: inset(0 50% 0 0);
+      }
+      .line {
+        position: absolute;
+        inset: 0 auto 0 50%;
+        width: 2px;
+        background: #fff;
+        pointer-events: none;
+      }
+      .label {
+        font-size: 12px;
+        color: #aaa;
+      }
+      .notes {
+        padding: 15px 24px;
+        color: #aaa;
+        line-height: 1.7;
+        max-width: 1000px;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
+      }
+      @media (max-width: 750px) {
+        header {
+          gap: 10px;
+        }
+        nav {
+          order: 3;
+          flex-basis: 100%;
+        }
+        .toolbar {
+          padding: 12px;
+          gap: 8px;
+        }
+        .toolbar label {
+          width: 55vw;
+          font-size: 11px;
+        }
+        .label {
+          font-size: 10px;
+        }
+        .notes {
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Polar → Misty · Page layout</h1>
+      <nav aria-label="Comparison pages"></nav>
+      <a id="live" href="/?screen=new">Open interactive mockup ↗</a>
+    </header>
+    <div class="toolbar">
+      <span class="label">Polar · captured from the installed app</span
+      ><label for="split"
+        >Compare<input
+          id="split"
+          aria-label="Reference comparison position"
+          type="range"
+          min="0"
+          max="100"
+          value="50" /></label
+      ><span class="label">Misty · shared components</span>
+    </div>
+    <main class="stage">
+      <img id="candidate" alt="Misty mockup" /><img id="reference" alt="Polar reference" />
+      <div class="line"></div>
+    </main>
+    <p class="notes">
+      Both captures use a 1920 × 1050 viewport. Drag the divider fully left to see Misty or fully
+      right to see Polar. Misty intentionally keeps monochrome controls, optional Space context, its
+      own icons, and floating task execution. The reference is evidence of the page layout;
+      connector and template data in Misty are illustrative.
+    </p>
+    <script>
+      const pages = [
+        ["new", "New task"],
+        ["workflows", "Workflows"],
+        ["templates", "Templates"],
+        ["customize", "Connectors"],
+        ["instructions", "Instructions"],
+        ["skills", "Skills"],
+      ];
+      const nav = document.querySelector("nav");
+      const range = document.querySelector("#split");
+      function select(id) {
+        document.querySelector("#candidate").src = `screenshots/revision-three/misty-${id}.jpg`;
+        document.querySelector("#reference").src = `references/polar-pages/polar-${id}.png`;
+        document.querySelector("#live").href =
+          `/?screen=${["instructions", "skills"].includes(id) ? "customize" : id}`;
+        for (const b of nav.children) b.setAttribute("aria-pressed", b.dataset.id === id);
+      }
+      for (const [id, label] of pages) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.dataset.id = id;
+        b.onclick = () => select(id);
+        nav.append(b);
+      }
+      range.oninput = () => {
+        document.querySelector("#reference").style.clipPath = `inset(0 ${100 - range.value}% 0 0)`;
+        document.querySelector(".line").style.left = range.value + "%";
+      };
+      select("templates");
+    </script>
+  </body>
+</html>

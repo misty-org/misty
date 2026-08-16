@@ -18,9 +18,14 @@ import type {
 } from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
+export type ScreenLocation = "separate" | "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
   memory_enabled: boolean;
+  /** Sends, shares, deletes and payments in connected apps wait for approval. */
+  app_actions_ask: boolean;
+  /** Where agents open a screen when a task needs one. */
+  screen_location?: ScreenLocation;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
@@ -120,6 +125,16 @@ export const aiSurfaceApi = {
         retention_days: retentionDays,
         ...(memoryEnabled === undefined ? {} : { memory_enabled: memoryEnabled }),
       }),
+    }),
+  updateScreenLocation: (location: ScreenLocation) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/screen-location", {
+      method: "PUT",
+      body: JSON.stringify({ location }),
+    }),
+  updateAppActionsAsk: (ask: boolean) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
+      method: "PUT",
+      body: JSON.stringify({ ask }),
     }),
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
@@ -291,6 +306,9 @@ function toServerInvocation(input: AiInvocationRequest) {
     context: input.context.map(toServerContextReference),
     selection: input.selection,
     companion_mode: input.companionMode,
+    method_version_id: input.methodVersionId,
+    method_inputs: input.methodInputs,
+    skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,

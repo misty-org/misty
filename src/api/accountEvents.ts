@@ -240,40 +240,64 @@ function watchNativeFeed(accountId: string, onConnected: () => void): () => void
  * entry covers anything between the previous source closing and this one. */
 async function followNativeFeed(accountId: string, signal: AbortSignal, deliver: Subscriber) {
   const { listen } = await import("@tauri-apps/api/event");
+  if (signal.aborted) return;
   await new Promise<void>((resolve) => {
     const unlisteners: Array<() => void> = [];
     let done = false;
+    let checking = false;
+    let liveness: ReturnType<typeof setInterval> | undefined;
     const finish = () => {
       if (done) return;
       done = true;
+      clearInterval(liveness);
       signal.removeEventListener("abort", finish);
       for (const stop of unlisteners) stop();
       resolve();
     };
+    const checkFeed = async () => {
+      if (done || checking) return;
+      checking = true;
+      try {
+        if (!(await nativeFeedConnected(accountId)) && !done) {
+          // A missed native status event cannot strand readers on a dead feed.
+          deliver({ topic: "reset" });
+          finish();
+        }
+      } finally {
+        checking = false;
+      }
+    };
+    const retainListener = async (pending: Promise<() => void>) => {
+      const stop = await pending;
+      if (done) stop();
+      else unlisteners.push(stop);
+    };
     signal.addEventListener("abort", finish, { once: true });
     void Promise.all([
-      listen<{ accountId?: string; topic?: string; id?: string | null }>(
-        "misty:account-event",
-        ({ payload }) => {
-          if (done || payload?.accountId !== accountId) return;
-          const event = { topic: payload.topic ?? "", ...(payload.id ? { id: payload.id } : {}) };
-          if (validEvent(event)) deliver(event);
-        },
+      retainListener(
+        listen<{ accountId?: string; topic?: string; id?: string | null }>(
+          "misty:account-event",
+          ({ payload }) => {
+            if (done || payload?.accountId !== accountId) return;
+            const event = { topic: payload.topic ?? "", ...(payload.id ? { id: payload.id } : {}) };
+            if (validEvent(event)) deliver(event);
+          },
+        ),
       ),
-      listen("misty:browser-sync-changed", () => {
-        void nativeFeedConnected(accountId).then((connected) => {
-          if (!connected) {
-            // Leaving the feed: the next source starts from a full re-read.
-            deliver({ topic: "reset" });
-            finish();
-          }
-        });
-      }),
+      retainListener(
+        listen("misty:browser-sync-changed", () => {
+          void checkFeed();
+        }),
+      ),
     ])
-      .then((stops) => {
-        unlisteners.push(...stops);
-        if (done) for (const stop of stops) stop();
-        else deliver({ topic: "reset" });
+      .then(() => {
+        if (!done) {
+          // Recheck after listener registration closes the handover race.
+          // This probes local transport metadata only, never server snapshots.
+          liveness = setInterval(() => void checkFeed(), 15_000);
+          void checkFeed();
+          deliver({ topic: "reset" });
+        }
       })
       .catch(finish);
   });

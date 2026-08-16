@@ -1,0 +1,1013 @@
+/* Polar page geometry. Misty controls and monochrome theme stay shared. */
+:root:not([data-mock-theme="light"]) {
+  --misty-theme-workspace: #38393a;
+  --misty-theme-bg: #222;
+  --misty-theme-sidebar: #38393a;
+  --misty-theme-card: #282828;
+  --misty-theme-border: #373737;
+  --misty-theme-hover: #333;
+  --misty-theme-active: #4a4b4c;
+  --misty-theme-text: #e4e4e4;
+  --misty-theme-text-bright: #f1f1f1;
+  --misty-theme-text-muted: #a0a0a0;
+}
+.revision-three .v2-sidebar {
+  width: 240px;
+  padding: 6px 7px;
+  background: var(--misty-theme-sidebar);
+}
+.revision-three .v2-sidebar > header {
+  height: 30px;
+  padding: 0 7px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.revision-three .v2-sidebar > header > svg {
+  width: 18px;
+}
+.revision-three .v2-sidebar.collapsed {
+  width: 61px;
+}
+.revision-three .nav-item {
+  min-height: 32px;
+  height: 32px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 400;
+  gap: 9px !important;
+  padding-inline: 10px;
+}
+.revision-three .v2-sidebar nav {
+  gap: 6px;
+}
+.revision-three .v2-sidebar .selected {
+  background: var(--misty-theme-active) !important;
+}
+.revision-three .sidebar-recents {
+  margin-top: 44px;
+  gap: 2px;
+  padding: 0 9px;
+}
+.revision-three .sidebar-recents > span {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.revision-three .sidebar-recents > button {
+  font-size: 14px;
+  padding-block: 5px;
+  color: var(--misty-theme-text-muted);
+}
+.revision-three .window-tabs {
+  height: 36px;
+  padding-left: 9px;
+  gap: 5px;
+}
+.revision-three .window-tab {
+  align-self: center;
+  height: 30px;
+  min-width: 205px;
+  padding-left: 8px;
+  font-size: 12px;
+}
+.revision-three .window-tab.active {
+  background: transparent;
+  border-radius: 0;
+}
+.revision-three .window-tab:not(.active) {
+  display: none;
+}
+.revision-three .v2-canvas {
+  margin: 0 6px 6px 0;
+  border-radius: 12px;
+  border-color: #454545;
+}
+.revision-three .agent-instance .v2-canvas {
+  border-radius: 0;
+}
+.revision-three .launch-page {
+  width: 672px;
+  max-width: calc(100% - 60px);
+  padding: calc((100dvh - 50px) * 0.25) 0 0;
+}
+.revision-three .launch-center h1 {
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 400 !important;
+  letter-spacing: -0.025em;
+  margin-bottom: 40px;
+}
+.revision-three .start .v2-composer textarea {
+  min-height: 64px !important;
+  padding: 8px 10px !important;
+  font-size: 16px !important;
+}
+.revision-three .start .v2-composer {
+  border-color: #404040 !important;
+  border-radius: 17px !important;
+}
+.revision-three .start .v2-composer > div:last-child {
+  padding: 0 12px 12px;
+  gap: 5px;
+  min-height: 40px;
+}
+.revision-three .v2-composer button {
+  font-size: 13px;
+}
+.revision-three .input-meta {
+  margin: 0 17px;
+  padding: 8px 8px 8px;
+  border: 1px solid var(--misty-theme-border);
+  border-top: 0;
+  border-radius: 0 0 17px 17px;
+  justify-content: flex-start;
+}
+.revision-three .input-meta > span {
+  display: none;
+}
+.revision-three .input-meta > button {
+  font-size: 12px;
+  padding: 0 8px;
+  height: 22px;
+  color: var(--misty-theme-text-muted);
+}
+.revision-three .attached-context {
+  position: relative;
+  margin: 0 0 10px 6px;
+}
+.revision-three .review-strip {
+  height: 40px;
+  font-size: 11px;
+  gap: 5px;
+}
+.revision-three .review-strip nav button {
+  font-size: 11px;
+}
+.revision-three .review-strip > button {
+  font-size: 11px;
+}
+.comparison-capture .review-strip {
+  display: none;
+}
+.comparison-capture .launch-page {
+  padding-top: 250px;
+}
+.revision-three .question-page {
+  width: 672px;
+  max-width: calc(100% - 60px);
+}
+.revision-three .question-card h2 {
+  font-weight: 500;
+}
+.revision-three .question-card {
+  border-color: #878787;
+}
+.revision-three .background-task {
+  bottom: 28px;
+}
+.revision-three .working-address {
+  background: var(--misty-theme-card);
+}
+.polar-pages {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--misty-theme-bg);
+  overflow: hidden;
+}
+.polar-subnav {
+  width: 208px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--misty-theme-border);
+  padding: 15px 8px;
+}
+.polar-subnav h1 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 7px 15px;
+}
+.polar-subnav nav {
+  display: grid;
+  gap: 2px;
+}
+.polar-subnav nav button {
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 400;
+  border-radius: 8px;
+}
+.polar-page-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.polar-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 25px;
+}
+.polar-heading h1 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.polar-heading p {
+  font-size: 14px;
+  color: var(--misty-theme-text-muted);
+  margin-top: 9px;
+}
+.polar-heading > button,
+.polar-heading > div + button {
+  font-size: 13px;
+  height: 36px;
+}
+.polar-workflows {
+  width: 960px;
+  max-width: calc(100% - 64px);
+  margin: 32px auto 70px;
+}
+.workflow-empty {
+  text-align: center;
+  margin: 58px auto 35px;
+  max-width: 560px;
+}
+.workflow-empty > svg {
+  color: var(--misty-theme-text-muted);
+  margin: 0 auto 14px;
+  display: block;
+}
+.workflow-empty h2 {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.workflow-empty p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--misty-theme-text-muted);
+}
+.workflow-empty code {
+  font-family: inherit;
+  font-size: 12px;
+  background: var(--misty-theme-hover);
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: var(--misty-theme-text);
+}
+.workflow-examples > h2,
+.catalog-section h2,
+.connector-section h2 {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  margin: 0;
+}
+.workflow-examples > h2 {
+  margin-bottom: 16px;
+}
+.polar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.polar-template-card {
+  padding: 0 !important;
+  background: var(--misty-theme-card) !important;
+  border: 1px solid var(--misty-theme-border) !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.polar-template-card > button {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  height: 110px;
+  padding: 16px;
+  white-space: normal;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.45;
+  gap: 12px;
+  color: var(--misty-theme-text);
+}
+.polar-template-card > button:hover {
+  background: var(--misty-theme-hover);
+}
+.polar-template-card > button > span {
+  display: block;
+  line-height: 1.45;
+}
+.template-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 19px;
+  color: var(--misty-theme-text-muted);
+}
+.schedule-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 12px;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.workflow-examples > button {
+  display: flex;
+  margin: 24px auto 0;
+  font-size: 14px;
+  height: 38px;
+  background: transparent;
+}
+.polar-catalog {
+  width: 960px;
+  max-width: calc(100% - 64px);
+  margin: 31px auto 60px;
+}
+.polar-search {
+  position: relative;
+  margin: 24px 0 16px;
+}
+.polar-search > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--misty-theme-text-muted);
+  z-index: 1;
+}
+.polar-search > input {
+  padding-left: 36px;
+  height: 38px;
+  font-size: 14px;
+  background: var(--misty-theme-card);
+  border-radius: 8px;
+  border-color: var(--misty-theme-border);
+}
+.category-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  margin-bottom: 11px;
+}
+.category-strip > button {
+  height: 30px;
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 17px;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 28px;
+  font-weight: 400;
+  flex-shrink: 0;
+  color: var(--misty-theme-text-muted);
+  background: transparent;
+}
+.category-strip > button[aria-pressed="true"] {
+  background: var(--misty-theme-text-bright);
+  color: var(--misty-theme-bg);
+  border-color: var(--misty-theme-text-bright);
+}
+.catalog-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 43px;
+}
+.catalog-filters > button {
+  height: 30px;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--misty-theme-text-muted);
+}
+.catalog-filters > button[aria-pressed="true"] {
+  background: var(--misty-theme-hover);
+  color: var(--misty-theme-text);
+}
+.catalog-section {
+  margin: 0 0 37px;
+}
+.catalog-section > header,
+.connector-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  min-height: 20px;
+}
+.catalog-section > header button,
+.connector-section > header button {
+  padding: 0;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.polar-catalog .polar-grid {
+  gap: 16px;
+}
+.polar-catalog .polar-template-card > button {
+  height: 104px;
+}
+.polar-catalog .catalog-section:first-of-type .polar-template-card > button {
+  height: 104px;
+}
+.catalog-empty {
+  padding: 50px;
+  text-align: center;
+  color: var(--misty-theme-text-muted);
+}
+.polar-connectors {
+  width: 1088px;
+  max-width: calc(100% - 64px);
+  margin: 31px auto 60px;
+}
+.connector-browser {
+  margin-top: 34px;
+}
+.connector-browser > h2 {
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+  color: var(--misty-theme-text-muted);
+  margin-bottom: 12px;
+}
+.connector-browser .polar-search {
+  margin: 0 0 12px;
+}
+.connector-browser .polar-search > input {
+  height: 43px;
+}
+.connector-browser .category-strip {
+  margin-bottom: 11px;
+}
+.connector-browser .category-strip > button[aria-pressed="true"] {
+  background: var(--misty-theme-hover);
+  color: var(--misty-theme-text);
+}
+.connector-section {
+  margin-bottom: 28px;
+}
+.connector-section .polar-grid {
+  gap: 12px;
+}
+.connector-section > header {
+  margin-bottom: 11px;
+}
+.connector-card {
+  background: var(--misty-theme-card) !important;
+  border: 1px solid var(--misty-theme-border) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+.connector-card > button {
+  width: 100%;
+  height: 94px;
+  display: flex;
+  gap: 17px;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 18px;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+  border-radius: 0;
+}
+.connector-card > button > span {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.connector-card strong {
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.connector-card small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--misty-theme-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.connector-card > button > svg:last-child {
+  color: var(--misty-theme-text-muted);
+}
+.polar-instructions {
+  width: 768px;
+  max-width: calc(100% - 64px);
+  margin: 62px auto;
+}
+.polar-instructions h2 {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  line-height: 24px !important;
+  color: var(--misty-theme-text) !important;
+}
+.polar-instructions section > div:first-child {
+  margin-bottom: 16px;
+}
+.polar-instructions section > div > p {
+  max-width: none;
+  font-size: 14px;
+  line-height: 20px;
+  margin-top: 8px;
+}
+.polar-instructions textarea {
+  height: 440px;
+  max-height: 65vh;
+  min-height: 200px;
+  background: var(--misty-theme-card);
+  border: 1px solid var(--misty-theme-border);
+  padding: 14px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  resize: vertical;
+}
+.instructions-save {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.instructions-save button {
+  height: 32px;
+  font-size: 13px;
+}
+.polar-skills {
+  height: 100%;
+  display: flex;
+}
+.polar-skills > aside {
+  width: 320px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--misty-theme-border);
+  padding: 15px 16px;
+}
+.polar-skills > aside > header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 17px;
+}
+.polar-skills h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.polar-skills > aside header > button {
+  height: 26px;
+  font-size: 12px;
+  padding-inline: 9px;
+}
+.polar-skills > aside header > button[aria-label] {
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0;
+}
+.polar-skills > aside header > button[aria-label] svg {
+  width: 13px;
+  height: 13px;
+  color: var(--misty-theme-text-muted);
+}
+.skill-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--misty-theme-text-muted);
+  font-size: 12px;
+  margin: 0 4px 7px;
+}
+.skill-label > button {
+  padding: 0;
+  height: 20px;
+  font-size: 11px;
+}
+.polar-skills > aside > button {
+  height: 38px;
+  font-size: 14px;
+  width: 100%;
+  padding-inline: 4px;
+  font-weight: 400;
+}
+.own-skills {
+  margin-top: 29px;
+}
+.skill-none {
+  color: var(--misty-theme-text-muted);
+  font-size: 12px;
+  margin: 10px 4px;
+}
+.skills-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 40px;
+  text-align: center;
+}
+.skills-empty > svg {
+  color: var(--misty-theme-text-muted);
+  margin-bottom: 2px;
+}
+.skills-empty p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--misty-theme-text-muted);
+}
+.skill-editor {
+  padding: 40px;
+  flex: 1;
+  max-width: 850px;
+}
+.skill-editor label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  margin: 20px 0;
+}
+.skill-editor textarea {
+  min-height: 280px;
+}
+.saved-workflows {
+  margin: 45px 0;
+}
+.saved-workflows > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px 5px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--misty-theme-border);
+  text-align: left;
+}
+.saved-workflows span {
+  flex: 1;
+}
+.saved-workflows small {
+  display: block;
+  color: var(--misty-theme-text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.polar-dialog {
+  width: 672px !important;
+  max-width: calc(100vw - 48px) !important;
+  left: 117px !important;
+  max-height: 79vh !important;
+  overflow: auto;
+  border-radius: 13px !important;
+  padding: 24px !important;
+  background: var(--misty-theme-bg) !important;
+  gap: 0 !important;
+}
+.polar-dialog h2 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 8px;
+  letter-spacing: -0.015em;
+}
+.polar-dialog [data-slot="dialog-description"] {
+  font-size: 13px;
+  color: var(--misty-theme-text-muted);
+}
+.polar-dialog > label,
+.workflow-dialog > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 20px;
+  margin-bottom: 6px;
+  color: var(--misty-theme-text-muted);
+}
+.detail-tags {
+  display: flex;
+  gap: 6px;
+  margin: 16px 0 23px;
+  flex-wrap: wrap;
+}
+.detail-tags > span {
+  font-size: 10px;
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 12px;
+  padding: 2px 7px;
+  color: var(--misty-theme-text-muted);
+}
+.template-prompt {
+  background: var(--misty-theme-card);
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 9px;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.template-prompt p + p {
+  margin-top: 24px;
+}
+.detail-apps {
+  display: flex;
+  gap: 7px;
+  margin-top: 7px;
+}
+.detail-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.detail-actions > button {
+  height: 38px;
+  font-size: 13px;
+}
+.related-templates {
+  border-top: 1px solid var(--misty-theme-border);
+  margin-top: 30px;
+  padding-top: 20px;
+  display: grid;
+  gap: 14px;
+}
+.related-templates > span {
+  font-size: 12px;
+  color: var(--misty-theme-text-muted);
+}
+.related-templates > button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--misty-theme-text-muted);
+}
+.workflow-dialog > label {
+  color: var(--misty-theme-text);
+  font-size: 12px;
+  margin-top: 16px;
+}
+.workflow-dialog > label input {
+  margin-top: 6px;
+  height: 38px;
+  font-size: 14px;
+  background: var(--misty-theme-card);
+}
+.workflow-dialog > label textarea {
+  margin-top: 6px;
+  height: 180px;
+  font-size: 14px;
+  background: var(--misty-theme-card);
+  resize: vertical;
+}
+.workflow-dialog .add-schedule {
+  width: max-content;
+  height: 30px;
+  font-size: 12px;
+  margin-top: 0;
+}
+.workflow-dialog footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--misty-theme-border);
+}
+.workflow-dialog footer button {
+  font-size: 12px;
+}
+.schedule-fields {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.schedule-fields > input {
+  width: 140px;
+}
+.connector-dialog p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 20px 0;
+  color: var(--misty-theme-text-muted);
+}
+.connector-dialog > button {
+  width: max-content;
+}
+.page-notice {
+  position: fixed;
+  z-index: 100;
+  bottom: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  background: var(--misty-theme-card);
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 35px #0004;
+  font-size: 12px;
+}
+@media (max-width: 1400px) {
+  .polar-template-card > button {
+    font-size: 13px;
+    padding: 14px;
+  }
+  .polar-catalog .polar-template-card > button {
+    height: 112px;
+  }
+  .connector-card > button {
+    height: 105px;
+    gap: 12px;
+    padding: 14px;
+  }
+  .connector-card strong {
+    font-size: 14px;
+  }
+  .connector-card small {
+    font-size: 11px;
+  }
+  .polar-workflows,
+  .polar-catalog,
+  .polar-connectors {
+    max-width: calc(100% - 48px);
+  }
+  .polar-skills > aside {
+    width: 285px;
+  }
+  .revision-three .review-strip > span small {
+    display: none;
+  }
+}
+@media (max-width: 1050px) {
+  .revision-three .v2-sidebar {
+    width: 190px;
+  }
+  .polar-subnav {
+    width: 170px;
+  }
+  .polar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .polar-dialog {
+    left: 0 !important;
+  }
+  .polar-skills > aside {
+    width: 260px;
+  }
+  .polar-skills > aside header {
+    flex-wrap: wrap;
+  }
+  .skills-empty {
+    padding: 25px;
+  }
+  .polar-instructions {
+    max-width: calc(100% - 40px);
+  }
+}
+@media (max-width: 760px) {
+  .revision-three .v2-sidebar {
+    width: 57px;
+  }
+  .revision-three .v2-sidebar > header {
+    padding: 0;
+  }
+  .revision-three .v2-canvas {
+    margin-right: 4px;
+  }
+  .revision-three .nav-item {
+    font-size: 0;
+  }
+  .revision-three .launch-page,
+  .comparison-capture .launch-page {
+    max-width: calc(100% - 30px);
+    padding-top: 24vh;
+  }
+  .revision-three .launch-center h1 {
+    font-size: 24px;
+    line-height: 30px;
+    margin-bottom: 28px;
+  }
+  .polar-pages {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .polar-subnav {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--misty-theme-border);
+    padding: 10px 12px;
+  }
+  .polar-subnav h1 {
+    margin: 0 0 8px;
+  }
+  .polar-subnav nav {
+    display: flex;
+  }
+  .polar-subnav nav button {
+    width: auto;
+    font-size: 12px;
+    height: 30px;
+    min-height: 30px;
+  }
+  .polar-page-scroll {
+    overflow: visible;
+  }
+  .polar-workflows,
+  .polar-catalog,
+  .polar-connectors {
+    max-width: calc(100% - 28px);
+    margin-top: 25px;
+  }
+  .polar-heading h1 {
+    font-size: 20px;
+  }
+  .polar-heading p {
+    font-size: 12px;
+  }
+  .polar-heading > button {
+    font-size: 10px;
+    padding-inline: 8px;
+  }
+  .workflow-empty {
+    margin-top: 45px;
+  }
+  .workflow-empty p {
+    font-size: 12px;
+  }
+  .polar-grid {
+    grid-template-columns: 1fr;
+  }
+  .polar-template-card > button,
+  .polar-catalog .polar-template-card > button {
+    height: 100px;
+  }
+  .catalog-filters {
+    margin-bottom: 25px;
+  }
+  .polar-dialog {
+    left: 0 !important;
+    max-width: calc(100vw - 28px) !important;
+    padding: 18px !important;
+  }
+  .workflow-dialog footer {
+    flex-wrap: wrap;
+  }
+  .polar-instructions {
+    margin: 25px auto;
+    max-width: calc(100% - 28px);
+  }
+  .polar-instructions textarea {
+    height: 320px;
+  }
+  .polar-skills {
+    display: block;
+  }
+  .polar-skills > aside {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--misty-theme-border);
+  }
+  .skills-empty {
+    padding: 45px 20px;
+  }
+  .skill-editor {
+    padding: 25px;
+  }
+  .revision-three .review-strip {
+    height: auto;
+  }
+  .revision-three .review-strip nav button {
+    font-size: 9px;
+  }
+  .revision-three .window-tab {
+    min-width: 100px;
+  }
+}

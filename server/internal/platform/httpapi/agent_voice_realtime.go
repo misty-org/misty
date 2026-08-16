@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -100,6 +101,19 @@ func (s *AgentsService) AgentVoiceRealtimeConnect() http.HandlerFunc {
 			writeAgentError(w, err)
 			return
 		}
+		conversation, history := "", ""
+		if r.URL.Query().Get("mode") == "conversation" {
+			conversation = r.URL.Query().Get("conversation")
+			if conversation == "" || len(conversation) > 160 {
+				writeJSON(w, 400, map[string]string{"code": "invalid_voice_conversation"})
+				return
+			}
+			history, err = s.voiceConversationContext(r.Context(), user, conversation)
+			if err != nil {
+				writeAgentError(w, err)
+				return
+			}
+		}
 		upgrader := websocket.Upgrader{Subprotocols: []string{"misty-voice-v1"}, CheckOrigin: func(*http.Request) bool { return true }}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -109,36 +123,10 @@ func (s *AgentsService) AgentVoiceRealtimeConnect() http.HandlerFunc {
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 		operation := "realtime-voice:" + uuid.NewString()
-		reservation, err := s.database.BillingService().Reserve(ctx, billingadapter.Request{
-			Version: 1, AccountID: user, Operation: "agent.voice.realtime", OperationID: operation, Key: operation,
-			Usage: billingadapter.Usage{Provider: "openai", Model: agent.AgentRealtimeModel, Units: agent.RealtimeVoiceEstimate(), Estimated: true},
-		})
+		setupStarted := time.Now()
+		provider, err := s.openVoiceTransport(ctx, conn, conversation == "" && r.URL.Query().Get("transport") == "webrtc", user)
 		if err != nil {
-			_ = conn.WriteJSON(map[string]string{"type": "error", "message": "Voice admission failed. Check your usage or retry later."})
-			return
-		}
-		if err = s.database.RecordVoiceUsage(ctx, reservation, "active", map[string]int64{}); err != nil {
-			_ = s.releaseAgentVoice(reservation)
-			_ = conn.WriteJSON(map[string]string{"type": "error", "message": "Voice accounting is unavailable. Please try again."})
-			return
-		}
-		provider, err := s.openVoiceTransport(ctx, conn, r.URL.Query().Get("transport") == "webrtc")
-		if err != nil {
-			// Persist the final decision before enqueueing it. A crash or outbox
-			// failure can then recover the unused reservation with the same key.
-			finish, stop := context.WithTimeout(context.Background(), 20*time.Second)
-			defer stop()
-			if err := s.database.RecordVoiceUsage(finish, reservation, "settlement_pending", map[string]int64{}); err == nil {
-				if err = s.releaseAgentVoice(reservation); err == nil {
-					err = s.database.RecordVoiceUsage(finish, reservation, "closed", map[string]int64{})
-				}
-				if err != nil {
-					log.Printf("voice_usage_pending operation_id=%q", operation)
-				}
-			} else {
-				log.Printf("voice_usage_pending operation_id=%q", operation)
-			}
-			_ = conn.WriteJSON(map[string]string{"type": "error", "message": "The realtime voice provider is unavailable. Please try again."})
+			rejectVoiceSetup(conn, websocket.CloseInternalServerErr, "The realtime voice provider is unavailable. Please try again.")
 			return
 		}
 		defer provider.Close()
@@ -146,7 +134,39 @@ func (s *AgentsService) AgentVoiceRealtimeConnect() http.HandlerFunc {
 		if rtc, ok := provider.(interface{ WebRTC() bool }); ok && rtc.WebRTC() {
 			transport = "webrtc"
 		}
-		log.Printf("voice_transport operation_id=%q transport=%s", operation, transport)
-		s.runVoiceRealtime(ctx, conn, provider, reservation, user, device)
+		log.Printf("voice_transport operation_id=%q transport=%s setup_ms=%d", operation, transport, time.Since(setupStarted).Milliseconds())
+		if conversation != "" {
+			s.runVoiceConversation(ctx, conn, provider, operation, user, device, conversation, history)
+		} else {
+			s.runVoiceRealtime(ctx, conn, provider, operation, user, device)
+		}
+	}
+}
+
+func voiceAdmissionFailure(err error) (int, string) {
+	if errors.Is(err, billingadapter.ErrDenied) {
+		return websocket.ClosePolicyViolation, "Your account's AI allowance could not cover this voice session. Check your plan and usage in Settings."
+	}
+	return websocket.CloseInternalServerErr, "Voice could not check your account's AI allowance. Please try again later."
+}
+
+// Only used before runVoiceSession starts its reader. Finish the close handshake
+// so a setup rejection reaches the client instead of looking like network loss.
+// Drain any in-flight offer/input while waiting, with bounded time and size.
+func rejectVoiceSetup(conn *websocket.Conn, code int, message string) {
+	deadline := time.Now().Add(time.Second)
+	_ = conn.SetWriteDeadline(deadline)
+	if conn.WriteJSON(map[string]string{"type": "error", "message": message}) != nil {
+		return
+	}
+	if conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(code, "Voice setup failed."), deadline) != nil {
+		return
+	}
+	conn.SetReadLimit(100 << 10)
+	_ = conn.SetReadDeadline(deadline)
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
 	}
 }

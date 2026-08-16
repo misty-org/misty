@@ -7,6 +7,14 @@ import { resolve } from "node:path";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadAppEnv(process.cwd());
+  if (
+    !["desktop", "development", "production", "test"].includes(mode) ||
+    (env.VITE_MISTY_TARGET?.trim() && env.VITE_MISTY_TARGET.trim().toLowerCase() !== "desktop")
+  ) {
+    throw new Error(
+      "Misty only supports the desktop app target. Use misty desktop dev or npm run build:desktop.",
+    );
+  }
   const tauriDevHost = env.TAURI_DEV_HOST;
   const desktopDevPort = Number(env.MISTY_DESKTOP_DEV_PORT ?? 5173);
   const accountApiProxyTarget = env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
@@ -19,13 +27,9 @@ export default defineConfig(({ command, mode }) => {
     command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
   const defaultPublicUrl = isDev ? "http://localhost:5174" : "https://mistysys.com";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
-  if (command === "build" && mode === "web" && !publicApiUrl) {
-    throw new Error("Web builds require MISTY_PUBLIC_API_URL to point at the deployed Misty API.");
-  }
   const uploadSourceMaps = Boolean(
     command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",
   );
-  const platformLayoutPath = new URL("../src/app/PlatformLayout.tsx", import.meta.url).pathname;
 
   return {
     root: resolve(process.cwd(), "src/app"),
@@ -54,12 +58,10 @@ export default defineConfig(({ command, mode }) => {
     ],
     define: {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
-        mode === "desktop" &&
-          ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
+        ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
       ),
       "import.meta.env.MISTY_NATIVE_MACOS_CAPTURE": JSON.stringify(
-        mode === "desktop" &&
-          ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
+        ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
       ),
       ...publicAppEnv(env),
       "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
@@ -85,7 +87,6 @@ export default defineConfig(({ command, mode }) => {
     },
     resolve: {
       alias: {
-        "@/app/PlatformLayout": platformLayoutPath,
         "@": new URL("../src", import.meta.url).pathname,
       },
     },

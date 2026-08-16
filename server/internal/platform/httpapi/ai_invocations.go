@@ -58,6 +58,9 @@ type aiInvocationDeviceContext struct {
 }
 
 type aiInvocationInput struct {
+	MethodVersionID       string                      `json:"method_version_id,omitempty"`
+	MethodInputs          map[string]any              `json:"method_inputs,omitempty"`
+	SkillVersionIDs       []string                    `json:"skill_version_ids,omitempty"`
 	CompanionMode         string                      `json:"companion_mode,omitempty"`
 	CompanionModel        string                      `json:"companion_model,omitempty"`
 	DisplayCaptures       []aiDisplayCapture          `json:"display_captures,omitempty"`
@@ -97,7 +100,10 @@ type aiInvocationEvent struct {
 	ToolName   string      `json:"toolName,omitempty"`
 	Citation   *aiCitation `json:"citation,omitempty"`
 	Artifact   *aiArtifact `json:"artifact,omitempty"`
-	Error      string      `json:"error,omitempty"`
+	AppRequest *appRequest `json:"appRequest,omitempty"`
+	// ScreenRequest asks the desktop to open a screen and continue the task.
+	ScreenRequest *screenRequest `json:"screenRequest,omitempty"`
+	Error         string         `json:"error,omitempty"`
 }
 
 type aiArtifact struct {
@@ -159,6 +165,10 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
+		if _, err := resolveInvocationMethod(r.Context(), s.database, userID, &body); err != nil {
+			writeAgentMethodError(w, err)
+			return
+		}
 		if err := validateAIInvocationInput(&body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_invocation", "message": err.Error()})
 			return
@@ -214,11 +224,23 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		body.AgentID = identity.ID
+		if err := pinInvocationSkills(r.Context(), s.database, userID, &body); err != nil {
+			writeAgentMethodError(w, err)
+			return
+		}
 		conversationID := strings.TrimSpace(body.ConversationID)
 		var err error
 		modelFallbackNotice := false
 		modelID := agent.FrontierDefaultModelID()
-		if body.Mode == "companion" && body.CompanionModel != "" {
+		selectedModel, selectedReasoning, accountModel, selectErr := s.accountAgentModel(r.Context(), userID)
+		if selectErr != nil {
+			writeAIProviderError(w, selectErr)
+			return
+		}
+		if accountModel {
+			modelID = selectedModel
+		}
+		if !accountModel && body.Mode == "companion" && body.CompanionModel != "" {
 			if !agent.FrontierModelAvailable(r.Context(), body.CompanionModel) {
 				writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_model", "message": "Choose an available model."})
 				return
@@ -226,6 +248,12 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			modelID = body.CompanionModel
 		}
 		reasoning := agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
+		if accountModel {
+			reasoning = selectedReasoning
+			if body.ThinkingMode == "deep" {
+				reasoning = "xhigh"
+			}
+		}
 		spaceID := "" // AI execution belongs to the authenticated account.
 		if conversationID != "" {
 			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
@@ -237,7 +265,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 				writePersonalAgentError(w, bindErr)
 				return
 			}
-			if body.ThinkingMode == "" && body.ReasoningEffort == "" {
+			if !accountModel && body.ThinkingMode == "" && body.ReasoningEffort == "" {
 				reasoning = agent.ManagedReasoning("", bound.ReasoningEffort)
 			}
 			if bound.ModelID != modelID || bound.ReasoningEffort != reasoning {
@@ -274,7 +302,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			_ = s.database.RenameAgentSession(r.Context(), userID, conversationID, cleanMistyTitle(body.Prompt))
 			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
 		}
-		if !agent.FrontierModelAvailable(r.Context(), modelID) || !agent.FrontierModelReasoningAvailable(r.Context(), modelID, reasoning) {
+		if !accountModel && (!agent.FrontierModelAvailable(r.Context(), modelID) || !agent.FrontierModelReasoningAvailable(r.Context(), modelID, reasoning)) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
 			return
 		}
@@ -315,6 +343,12 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		if err != nil {
 			TestingWriteAIError(w, err)
 			return
+		}
+		if created && s.providerSettings != nil {
+			if _, routeErr := s.database.FreezeAIModelRoutes(r.Context(), userID, stored.ID, defaultAIRoutes(modelID, reasoning), reasoning); routeErr != nil {
+				writeAIProviderError(w, routeErr)
+				return
+			}
 		}
 		record, err := s.invocations.restoreDurable(r.Context(), stored)
 		if err != nil {
@@ -412,16 +446,13 @@ func (s *AIService) CancelInvocation() http.HandlerFunc {
 		} else if !aiInvocationTerminal(stored.State) && stored.RuntimeRunID != "" {
 			_ = s.agentRuntime.Cancel(r.Context(), stored.RuntimeRunID, stored.ID)
 		}
-		if !aiInvocationTerminal(stored.State) {
-			if err := s.invocations.cancel(stored.ID); err != nil {
-				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Misty could not persist the stop request."})
-				return
-			}
+		current, err := s.database.AIInvocationByID(r.Context(), userID, stored.ID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Misty could not load the stop result."})
+			return
 		}
-		state := stored.State
-		if !aiInvocationTerminal(state) {
-			state = "canceled"
-		}
+		_, _ = s.invocations.restoreDurable(r.Context(), *current)
+		state := current.State
 		writeJSON(w, http.StatusAccepted, map[string]any{"state": state, "runtime_cancel_pending": !aiInvocationTerminal(stored.State) && stored.RuntimeRunID != "", "message": "Stop requested. Previously completed or uncertain actions remain in history."})
 	}
 }

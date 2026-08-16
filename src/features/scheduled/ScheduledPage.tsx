@@ -19,6 +19,7 @@ import {
   WorkspaceSidebarHeading,
   WorkspaceSectionLabel,
   Spinner,
+  CollectionSkeleton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -163,7 +164,9 @@ export function ScheduledPage({ embedded = false }: { embedded?: boolean } = {})
         {statusFilter === "paused" ? "Paused" : "Upcoming"}
       </WorkspaceSectionLabel>
       <div className="min-h-0 flex-1 overflow-y-auto misty-transient-scrollbar">
-        {state === "loading" && !tasks.length && <Spinner label="Loading scheduled tasks" />}
+        {state === "loading" && !tasks.length && (
+          <CollectionSkeleton label="Loading scheduled tasks" view="rows" className="h-full" />
+        )}
         {state === "error" && (
           <div role="alert" className="p-2 text-sm text-cream-muted">
             Scheduled tasks couldn’t load.

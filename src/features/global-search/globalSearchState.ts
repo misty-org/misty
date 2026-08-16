@@ -19,15 +19,17 @@ export interface GlobalSearchState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;
   selectedAgentId?: string;
+  /** Where the current task works; set per task, never chosen up front. */
   executionMode?: "user" | "agent" | "team";
-  executionModeByAgent?: Record<string, "user" | "agent" | "team">;
   artifactPaneId?: string;
+  artifactConversationId?: string;
   pendingArtifact?: AiArtifact;
   screenLabel?: string;
   selectedSpaceId?: string;
   targets?: MistyContextTarget[];
   handoff?: MistyHandoff;
   invocationId?: string;
+  invocationConversationId?: string;
   browserRequest?: BrowserAskRequest;
   accountId: string;
   panel: UnifiedMistyPanel;
@@ -59,14 +61,18 @@ export interface GlobalSearchState {
   clear: () => void;
   search: (query: string) => Promise<void>;
   visualSearch: (attachmentId: string, query?: string) => Promise<void>;
-  loadConversations: () => Promise<void>;
-  newConversation: (spaceId?: string) => Promise<string>;
+  loadConversations: (
+    reconnect?: boolean,
+    expected?: { accountId: string; agentId: string; conversationId: string; invocationId: string },
+  ) => Promise<void>;
+  newConversation: (spaceId?: string, agentId?: string) => Promise<string>;
   bindConversationSpace: (conversationId: string, spaceId: string) => Promise<void>;
   selectConversation: (conversationId: string) => void;
   deleteConversation: (conversationId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
   submit: () => Promise<void>;
   cancelResponse?: () => Promise<void>;
+  steerResponse?: (text: string, conversationId?: string) => Promise<void>;
   submitAnswer: (
     prompt: string,
     attachments?: MistyImageAttachment[],
@@ -82,8 +88,16 @@ export interface GlobalSearchState {
       turn?: number;
       interactionMode?: "team" | "auto";
       model?: string;
+      idempotencyKey?: string;
+      methodVersionId?: string;
+      methodInputs?: Record<string, string | number | boolean>;
+      skillVersionIds?: string[];
       displayCaptures?: DisplayCapture[];
       capture?: AiCaptureAttachment;
+      /** Continues the conversation after a screen opened; shows no new user turn. */
+      continuation?: boolean;
+      /** Opens a tab in this window for the task, at this page when given. */
+      openScreen?: { url?: string };
     },
   ) => Promise<void>;
   submitAgentTask: (

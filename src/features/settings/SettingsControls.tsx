@@ -6,6 +6,11 @@ import {
   RadioGroup,
   RadioGroupItem,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Slider,
   Switch,
   Textarea,
@@ -104,6 +109,31 @@ export function SelectControl(props: {
       disabled={props.disabled}
       onValueChange={(value) => props.onChange(Number(value))}
     />
+  );
+}
+
+/** Shared checkmarked dropdown for larger lists of account connections. */
+export function DropdownControl(props: {
+  value: string;
+  label?: string;
+  options: { value: string; label: string; disabled?: boolean }[];
+  disabled?: boolean;
+  onValueChange(value: string): void;
+}) {
+  const label = useSettingsControlLabel("Setting");
+  return (
+    <Select value={props.value} disabled={props.disabled} onValueChange={props.onValueChange}>
+      <SelectTrigger aria-label={props.label ?? label} className="w-full min-w-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {props.options.map((option) => (
+          <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

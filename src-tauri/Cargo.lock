@@ -4411,6 +4411,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "misty-agent-files"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "misty-browser-sync"
 version = "0.1.0"
 dependencies = [
@@ -4485,6 +4495,7 @@ dependencies = [
  "iroh",
  "jsonwebtoken",
  "libc",
+ "misty-agent-files",
  "misty-browser-sync",
  "misty-credential-store",
  "notify",

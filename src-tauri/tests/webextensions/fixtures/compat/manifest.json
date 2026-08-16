@@ -1,0 +1,28 @@
+{
+  "manifest_version": 2,
+  "name": "Misty compat fixture",
+  "version": "1.0",
+  "description": "Exercises Misty's WebExtension compatibility layer.",
+  "browser_specific_settings": { "gecko": { "id": "compat-fixture@misty.test" } },
+  "background": {
+    "scripts": [
+      "__misty_compat__/core.js",
+      "__misty_compat__/shims.js",
+      "__misty_compat__/blocking.js",
+      "__misty_compat__/native.js",
+      "background.js"
+    ]
+  },
+  "permissions": [
+    "storage",
+    "webRequest",
+    "webRequestBlocking",
+    "declarativeNetRequest",
+    "history",
+    "idle",
+    "notifications",
+    "browsingData",
+    "tabs",
+    "http://127.0.0.1/*"
+  ]
+}

@@ -142,6 +142,204 @@
         "key"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "extension"
+        },
+        "extensionId": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "extensionId"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "native"
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "click"
+                },
+                "x": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "y": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "button": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "right"
+                  ]
+                },
+                "clickCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 2
+                }
+              },
+              "required": [
+                "kind",
+                "x",
+                "y"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "drag"
+                },
+                "fromX": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "fromY": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "toX": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "toY": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "kind",
+                "fromX",
+                "fromY",
+                "toX",
+                "toY"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "type"
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 16000
+                }
+              },
+              "required": [
+                "kind",
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "key"
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16
+                },
+                "modifiers": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "Shift",
+                      "Control",
+                      "Alt",
+                      "Meta"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "scroll"
+                },
+                "x": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "y": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "deltaX": {
+                  "type": "integer",
+                  "minimum": -2000,
+                  "maximum": 2000
+                },
+                "deltaY": {
+                  "type": "integer",
+                  "minimum": -2000,
+                  "maximum": 2000
+                }
+              },
+              "required": [
+                "kind",
+                "x",
+                "y",
+                "deltaX",
+                "deltaY"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "input"
+      ],
+      "additionalProperties": false
     }
   ]
 }

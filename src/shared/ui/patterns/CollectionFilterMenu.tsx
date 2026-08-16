@@ -47,7 +47,6 @@ export function CollectionFilterMenu({
       <DropdownMenuTrigger asChild>
         <IconButton
           label={label}
-          shape="round"
           className="relative"
           data-active={active || undefined}
           aria-description={`${filterCount} active filters`}

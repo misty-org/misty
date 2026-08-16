@@ -78,7 +78,7 @@ var (
 	ErrLibraryNotFound         = errors.New("library resource not found")
 	ErrLibraryForbidden        = errors.New("library permission denied")
 	ErrLibraryInvalid          = errors.New("invalid library request")
-	ErrLibraryQuota            = errors.New("space storage quota exceeded")
+	ErrLibraryQuota            = errors.New("account cloud storage quota exceeded")
 	ErrLibraryConflict         = errors.New("library resource version conflict")
 	ErrLibraryReauthentication = errors.New("library reauthentication required")
 	ErrLibraryUploadMismatch   = errors.New("library upload does not match its reservation")

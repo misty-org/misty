@@ -45,6 +45,9 @@ export function ScheduledTaskDetails(props: {
     act(() =>
       store.update(task.id, {
         title: task.title,
+        agent_id: task.agent_id,
+        method_version_id: task.method_version_id,
+        method_inputs: task.method_inputs,
         prompt: task.prompt,
         enabled: !task.enabled,
         cadence: task.cadence,
@@ -68,6 +71,12 @@ export function ScheduledTaskDetails(props: {
         </p>
       </header>
       <p className="text-xs text-cream-muted">Runs with {props.agentName || "Misty"}</p>
+      {task.method_version_id && (
+        <p className="text-xs text-cream-muted">
+          Uses a pinned workflow version and saved inputs. Later workflow edits do not change this
+          schedule.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"

@@ -63,37 +63,41 @@ it("switches sections directly without a redundant filter menu", () => {
   expect(onChange).toHaveBeenCalledWith("drawings");
 });
 
-it("keeps grid metadata and full titles available, with independent item actions", () => {
-  const onOpen = vi.fn();
-  const onAction = vi.fn();
-  const title = "A very long collaborative document title that should fade at the edge";
-  render(
-    <CollectionItems
-      view="grid"
-      items={[
-        {
-          id: "note",
-          title,
-          icon: <span>Note icon</span>,
-          category: "Journal",
-          updated: "Sep 30",
-          creator: "Sam",
-          onOpen,
-          actions: <button onClick={onAction}>More actions</button>,
-        },
-      ]}
-    />,
-  );
-  const card = screen.getByRole("button", { name: title });
-  expect(within(card).getByText("Sep 30")).toBeTruthy();
-  expect(within(card).getByText("Created by Sam")).toBeTruthy();
-  expect(screen.getByTitle(title)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-  expect(onAction).toHaveBeenCalledTimes(1);
-  expect(onOpen).not.toHaveBeenCalled();
-  fireEvent.click(card);
-  expect(onOpen).toHaveBeenCalledTimes(1);
-});
+it.each(["preview", "compact"] as const)(
+  "keeps %s grid metadata and full titles available, with independent item actions",
+  (gridLayout) => {
+    const onOpen = vi.fn();
+    const onAction = vi.fn();
+    const title = "A very long collaborative document title that should fade at the edge";
+    render(
+      <CollectionItems
+        view="grid"
+        gridLayout={gridLayout}
+        items={[
+          {
+            id: "note",
+            title,
+            icon: <span>Note icon</span>,
+            category: "Journal",
+            updated: "Sep 30",
+            creator: "Sam",
+            onOpen,
+            actions: <button onClick={onAction}>More actions</button>,
+          },
+        ]}
+      />,
+    );
+    const card = screen.getByRole("button", { name: title });
+    expect(within(card).getByText("Sep 30")).toBeTruthy();
+    expect(within(card).getByText("Created by Sam")).toBeTruthy();
+    expect(screen.getByTitle(title)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(card);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  },
+);
 
 it("sorts every data column, keeps unknown dates last, and cycles back to source order", () => {
   const onOpen = vi.fn();

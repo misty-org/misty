@@ -149,6 +149,24 @@ func applyLaterMigrations(t *testing.T, conn *sql.DB, dir string) {
 			t.Fatalf("%s: %v", name, err)
 		}
 	}
+	// Minimal native content tables let this isolated sync schema exercise the
+	// same account inventory and write triggers as the complete application.
+	if _, err := conn.Exec(`
+    CREATE TABLE space_storage_contributions(user_id text,logical_bytes bigint,state text);
+    CREATE TABLE space_upload_reservations(user_id text,reserved_bytes bigint,state text);
+    CREATE TABLE space_rendition_reservations(user_id text,reserved_bytes bigint,state text);
+    CREATE TABLE space_messages(sender_user_id text,content jsonb);
+    CREATE TABLE space_notes(creator_user_id text,title_projection text,markdown_projection text,plain_text_projection text,shared_tags jsonb);
+    `); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(dir + "/20271003120000_account_cloud_measurements.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Exec(strings.Split(string(raw), "-- +goose Down")[0]); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestBrowserSyncPostgresMultiwriterRecovery(t *testing.T) {

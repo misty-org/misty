@@ -4,9 +4,11 @@ import {
   type SidebarCollapsedState,
   loadDeviceCustomization,
   loadHiddenQuickAccessPaths,
+  loadQuickAccessOrder,
   loadSidebarCollapsedState,
   saveDeviceCustomization,
   saveHiddenQuickAccessPaths,
+  saveQuickAccessOrder,
   saveSidebarCollapsedState,
 } from "@/features/file-ui";
 
@@ -14,7 +16,7 @@ import {
  * Everything the sidebar remembers between sessions.
  *
  * Which sections are collapsed, local device labels, and which Quick access
- * rows were hidden. Each is written back on change.
+ * rows were hidden and in what order. Each is written back on change.
  */
 export function useSidebarPreferences() {
   const [collapsedSections, setCollapsedSections] =
@@ -24,10 +26,12 @@ export function useSidebarPreferences() {
   const [hiddenQuickAccessPaths, setHiddenQuickAccessPaths] = useState<string[]>(
     loadHiddenQuickAccessPaths,
   );
+  const [quickAccessOrder, setQuickAccessOrder] = useState<string[]>(loadQuickAccessOrder);
 
   useEffect(() => saveDeviceCustomization(deviceCustomization), [deviceCustomization]);
   useEffect(() => saveSidebarCollapsedState(collapsedSections), [collapsedSections]);
   useEffect(() => saveHiddenQuickAccessPaths(hiddenQuickAccessPaths), [hiddenQuickAccessPaths]);
+  useEffect(() => saveQuickAccessOrder(quickAccessOrder), [quickAccessOrder]);
 
   const toggleSection = (section: keyof SidebarCollapsedState) =>
     setCollapsedSections((current) => ({ ...current, [section]: !current[section] }));
@@ -39,6 +43,8 @@ export function useSidebarPreferences() {
     setDeviceCustomization,
     hiddenQuickAccessPaths,
     setHiddenQuickAccessPaths,
+    quickAccessOrder,
+    setQuickAccessOrder,
     toggleSection,
   };
 }

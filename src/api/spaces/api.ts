@@ -109,11 +109,11 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     personal_storage_limit_reached:
       "Your personal storage is full. Free some of your contributions or upgrade your plan. Existing files remain available.",
     space_storage_limit_reached:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     personal_ai_limit_reached:
-      "Your personal weekly hosted AI allowance is used. Wait for it to reset or upgrade your plan.",
+      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
     space_ai_limit_reached:
-      "This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or wait for the allowance to reset.",
+      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
   };
   if (reason && quotaMessages[reason]) return quotaMessages[reason];
   const messages: Record<string, string> = {
@@ -127,13 +127,13 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     space_storage_quota_exceeded:
-      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
     storage_limit_reached:
-      "Storage is full. Free capacity or review your personal and Space limits before trying again.",
+      "Your account’s cloud storage is full. Free some storage or review your account usage.",
     hosted_ai_limit_reached:
-      "Weekly hosted AI is unavailable. Review your personal and Space allowances before trying again.",
+      "AI usage is unavailable. Review your account allowance and command budget before trying again.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",

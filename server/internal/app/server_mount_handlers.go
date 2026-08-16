@@ -63,7 +63,7 @@ func (s *Server) MountHandlers() error {
 	aiService.SetEmbeddingAnalyzer(libraryAnalyzer)
 	aiService.SetAttachmentStore(s.LibraryStore)
 	s.Spaces.SetSearchAnalyzer(libraryAnalyzer)
-	intelligenceEnabled := libraryAnalyzer.APIKey != ""
+	intelligenceEnabled := libraryAnalyzer.APIKey != "" || libraryAnalyzer.ModelResolver != nil
 	s.Library.SetIntelligence(libraryAnalyzer, intelligenceEnabled)
 	smartLibraryService := api.NewSmartLibraryService(s.Database, libraryAnalyzer)
 	mediaSearchService := api.NewMediaSearchService(s.Database, libraryAnalyzer)
@@ -154,6 +154,7 @@ func (s *Server) MountHandlers() error {
 		s.Router.Post(prefix+"/billing/portal-session", api.CreatePortalSession(s.Database))
 		s.Router.Get(prefix+"/billing/usage", api.GetBillingUsage(s.Database))
 		s.Router.Get(prefix+"/billing/ai-usage", api.GetAIUsage(s.Database))
+		s.Router.Post(prefix+"/billing/estimate", api.EstimateAIUsage(s.Database))
 		s.mountAIRoutes(prefix+"/ai", aiService)
 		s.mountMistyRoutes(prefix, aiService)
 		s.mountSmartLibraryRoutes(prefix+"/ai/smart-library", smartLibraryService)
@@ -179,7 +180,9 @@ func (s *Server) MountHandlers() error {
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/activate", s.Spaces.AgentRuntimeActivate())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/start-receipt", s.Spaces.AgentRuntimeStartReceipt())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/budget", s.Spaces.AgentRuntimeExecutionBudget())
+	s.Router.Post("/internal/agent-runtime/runs/{runID}/steering", s.Spaces.AgentRuntimeSteering())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/context", s.Spaces.AgentRuntimeContext())
+	s.Router.Post("/internal/agent-runtime/runs/{runID}/model-provider", s.Spaces.AgentRuntimeModelProvider())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/mcp-token", s.Spaces.AgentRuntimeMCPAccess())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/tools", s.Spaces.AgentRuntimeTool())
 	s.Router.Post("/internal/agent-runtime/runs/{runID}/events", s.Spaces.AgentRuntimeEvent())

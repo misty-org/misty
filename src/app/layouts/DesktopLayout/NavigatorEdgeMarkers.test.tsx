@@ -4,7 +4,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
 import type { DockPosition } from "@/features/app-shell/dockingLayout";
 
-function Fixture({ position = "left" }: { position?: DockPosition }) {
+function Fixture({
+  position = "left",
+  generic = false,
+}: {
+  position?: DockPosition;
+  generic?: boolean;
+}) {
   const ref = useRef<HTMLElement>(null);
   return (
     <nav ref={ref}>
@@ -12,7 +18,12 @@ function Fixture({ position = "left" }: { position?: DockPosition }) {
         <button data-navigation-destination aria-current="page">
           Files
         </button>
-        <button data-spaces-toggle data-active="true" aria-expanded="true">
+        <button
+          data-spaces-toggle={generic ? undefined : true}
+          data-navigator-toggle={generic ? true : undefined}
+          data-active="true"
+          aria-expanded="true"
+        >
           Spaces
         </button>
         <div data-spaces-stack>
@@ -77,15 +88,18 @@ it.each(["left", "right", "top", "bottom"] as const)(
   },
 );
 
-it("moves the active marker to Spaces when its selected child is collapsed", async () => {
-  render(<Fixture />);
-  act(() => {
-    screen.getByRole("button", { name: "Spaces" }).setAttribute("aria-expanded", "false");
-    screen.getByRole("button", { name: "Family" }).parentElement!.setAttribute("inert", "");
-  });
-  await waitFor(() => expect(markers()[1].dataset.state).toBe("active"));
-  expect(markers()[2].dataset.state).toBe("hidden");
-});
+it.each([false, true])(
+  "moves the active marker to a collapsed tray (generic: %s)",
+  async (generic) => {
+    render(<Fixture generic={generic} />);
+    act(() => {
+      screen.getByRole("button", { name: "Spaces" }).setAttribute("aria-expanded", "false");
+      screen.getByRole("button", { name: "Family" }).parentElement!.setAttribute("inert", "");
+    });
+    await waitFor(() => expect(markers()[1].dataset.state).toBe("active"));
+    expect(markers()[2].dataset.state).toBe("hidden");
+  },
+);
 
 it("tracks scroll position and hides markers whose source is clipped", async () => {
   render(<Fixture />);

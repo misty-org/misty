@@ -78,6 +78,7 @@ export const router = createBrowserRouter([
                 path: "spaces/*",
                 element: null,
               },
+              { path: "extensions/*", element: null },
               {
                 path: "signin",
                 element: <SignInPage />,

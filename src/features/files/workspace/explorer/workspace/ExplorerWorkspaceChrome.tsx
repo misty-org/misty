@@ -1,3 +1,4 @@
+import { transfersPath } from "../../../transfers/transferModel";
 import type { MultiPanelTab } from "@/features/workspace";
 import { useMultiPanelStore } from "@/features/workspace";
 import { useMultiPanelStoreContext } from "@/features/workspace/MultiPanelWorkspace";
@@ -9,7 +10,7 @@ export function resolveExplorerBottomBarRenderer(_embedded?: boolean) {
 }
 
 export function renderExplorerBottomBar(tab: MultiPanelTab) {
-  return <ExplorerTabBottomBar tab={tab} />;
+  return tab.path === transfersPath ? null : <ExplorerTabBottomBar tab={tab} />;
 }
 
 function ExplorerTabBottomBar({ tab }: { tab: MultiPanelTab }) {

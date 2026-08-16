@@ -207,6 +207,7 @@ export interface LibrarySharedReference {
 }
 
 export interface StorageQuotaDimension {
+  percentage_used?: number;
   used_bytes: number;
   reserved_bytes: number;
   limit_bytes: number;

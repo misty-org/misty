@@ -1,63 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({
-  invoke: vi.fn(),
-  autopilot: false,
-  account: "owner",
-  sessionGeneration: 0,
-  transitioning: false,
-  startAutopilot: vi.fn(),
-  focus: vi.fn(),
-  request: vi.fn(),
-  cancel: vi.fn(),
-  stream: vi.fn(),
-  state: {
-    working: false,
-    invocationId: undefined as string | undefined,
-    activeConversationId: "conversation",
-    accountId: "owner",
-    selectedSpaceId: "space",
-    submitAnswer: vi.fn(),
-  },
-  deviceSnapshot: vi.fn(),
-  normalContext: vi.fn(),
-}));
-vi.mock("./companion/normalTabs", () => ({ companionBrowserContext: mocks.normalContext }));
-vi.mock("./betaModes", () => ({ visibleAutopilotAvailable: () => mocks.autopilot }));
-vi.mock("./workspaceAutopilot", () => ({ startWorkspaceAutopilot: mocks.startAutopilot }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ label: "main", setFocus: mocks.focus }),
-}));
-vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/auth/core", () => ({
-  useUserStore: { getState: () => ({ me: { id: mocks.account } }) },
-}));
-vi.mock("@/api/client/session", () => ({
-  readApiSessionGeneration: () => mocks.sessionGeneration,
-  isApiSessionTransitioning: () => mocks.transitioning,
-}));
-vi.mock("@/api/client", () => ({
-  apiRequest: mocks.request,
-  resolveRequiredApiBase: async () => "https://api.example.test",
-}));
-vi.mock("./taskArtifacts", () => ({ trackTaskArtifacts: async () => {} }));
-vi.mock("./store/useAgentsStore", () => ({ agentsDeviceSnapshot: mocks.deviceSnapshot }));
-vi.mock("./store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: async () => ({ id: "server-device" }),
-}));
-vi.mock("@/features/misty/useMistyStore", () => ({
-  useMistyStore: {
-    getState: () => mocks.state,
-    setState: (next: object) => Object.assign(mocks.state, next),
-  },
-}));
-vi.mock("@/features/global-search/globalSearchStoreHelpers", () => ({
-  replaceActiveGlobalInvocationStream: mocks.stream,
-}));
-vi.mock("@/features/ai-surface/api", () => ({ aiSurfaceApi: { cancelInvocation: mocks.cancel } }));
+import { mocks } from "./localExecution.testFixtures";
 import {
   startLocalExecution,
   routeLocalFollowup,
+  steerLocalExecution,
   pauseLocalExecution,
   settleLocalExecution,
   finishLocalExecution,
@@ -78,10 +24,20 @@ beforeEach(async () => {
   mocks.cancel.mockResolvedValue(undefined);
   mocks.state.invocationId = undefined;
   mocks.state.accountId = "owner";
+  mocks.state.activeConversationId = "conversation";
   mocks.state.submitAnswer.mockResolvedValue(undefined);
   useCompanionState.setState({ accountId: "", submit: undefined });
 });
 describe("native task authority", () => {
+  it("does not turn a separate worker task into foreground autopilot", async () => {
+    mocks.autopilot = true;
+    const execution = await startLocalExecution("owner", "agent", "", "team");
+    expect(execution.mode).toBe("team");
+    expect(execution.autopilot).toBe(false);
+    expect(mocks.startAutopilot).not.toHaveBeenCalled();
+    expect(mocks.focus).not.toHaveBeenCalled();
+    expect(execution.deviceContexts[0].capabilities).not.toContain("browser.workspace.interact");
+  });
   it("uses an ordinary companion tab without a worker view or closing the user's tab", async () => {
     mocks.autopilot = true;
     mocks.normalContext.mockResolvedValueOnce({
@@ -318,31 +274,16 @@ describe("native task authority", () => {
 });
 
 describe("model-led follow-ups", () => {
-  it("routes a screen follow-up through fresh companion capture after pausing", async () => {
+  it("sends a screen follow-up to the task, which looks at the screen if it needs to", async () => {
     await startLocalExecution("owner", "agent", "", "agent");
-    const submit = vi.fn(async () => {
-      expect(useLocalExecution.getState().execution?.state).toBe("paused");
-    });
+    const submit = vi.fn();
     useCompanionState.setState({ accountId: "owner", submit });
     mocks.request.mockImplementation(async (path: string) =>
       path === "/misty/agent-followup" ? { route: "steer" } : undefined,
     );
     await routeLocalFollowup("Explain this problem on my screen");
-    expect(submit).toHaveBeenCalledWith({
-      prompt: "Explain this problem on my screen",
-      conversationId: "conversation",
-    });
-    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
-  });
-  it("explains missing desktop context in a worker without guessing or continuing", async () => {
-    await startLocalExecution("owner", "agent", "", "agent");
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup" ? { route: "steer" } : undefined,
-    );
-    await expect(routeLocalFollowup("What is on my screen?")).rejects.toThrow(
-      "Fresh desktop context is unavailable",
-    );
-    expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+    expect(mocks.state.submitAnswer).toHaveBeenCalledWith("Explain this problem on my screen");
     expect(useLocalExecution.getState().execution?.state).toBe("paused");
   });
   it("quiesces execution before interpreting a correction", async () => {
@@ -407,7 +348,7 @@ describe("model-led follow-ups", () => {
   });
 });
 
-it("legacy modes share the same visible control behavior", async () => {
+it("foreground control and separate browser execution retain distinct authority", async () => {
   mocks.autopilot = true;
   const execution = await startLocalExecution("owner", "agent", "", "agent");
   expect(execution.autopilot).toBe(true);
@@ -419,8 +360,8 @@ it("legacy modes share the same visible control behavior", async () => {
   expect(execution.deviceContexts[0].metadata?.workspace_control).toBe(true);
   await finishLocalExecution();
   const legacy = await startLocalExecution("owner", "agent", "space", "team");
-  expect(legacy.mode).toBe("agent");
-  expect(legacy.autopilot).toBe(true);
+  expect(legacy.mode).toBe("team");
+  expect(legacy.autopilot).toBe(false);
 });
 
 it("binds desktop control without moving focus or substituting an ordinary browser tab", async () => {
@@ -456,4 +397,35 @@ it("does not cancel a successor invocation while an older pause is awaiting modu
   expect(mocks.state.working).toBe(true);
   expect(mocks.cancel).not.toHaveBeenCalled();
   expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", { taskId: old.taskId });
+});
+
+it("retains workflow pins but blocks automatic resume after takeover", async () => {
+  const inputs = { subject: "research" };
+  const execution = await startLocalExecution("owner", "agent", "", "team", {
+    normalTabs: false,
+    method: {
+      versionId: "immutable-v1",
+      inputs,
+      invocationId: "parent-run",
+      skillVersionIds: ["skill-v2"],
+    },
+  });
+  inputs.subject = "mutated draft";
+  useLocalExecution.setState({
+    execution: { ...execution, conversationId: "original-conversation" },
+  });
+  mocks.state.activeConversationId = "different-conversation";
+  await expect(steerLocalExecution("Continue after inspecting prior effects")).rejects.toThrow(
+    "Automatic workflow resume is not available",
+  );
+  expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
+  expect(useLocalExecution.getState().execution).toMatchObject({
+    state: "paused",
+    conversationId: "original-conversation",
+    method: {
+      versionId: "immutable-v1",
+      inputs: { subject: "research" },
+      invocationId: "parent-run",
+    },
+  });
 });

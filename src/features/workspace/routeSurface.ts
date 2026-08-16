@@ -15,6 +15,12 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   )
     return null;
   const url = new URL(pathname, "https://misty.local");
+  if (path === "/extensions" || path.startsWith("/extensions/")) {
+    return {
+      ...request("extensions", "tool:extensions", "Extensions", pathname, "extensions", "single"),
+      scopeKey: "global",
+    };
+  }
   if (path === "/scheduled") {
     url.searchParams.set("view", "scheduled");
     return {

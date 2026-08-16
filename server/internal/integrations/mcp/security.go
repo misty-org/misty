@@ -99,6 +99,9 @@ func TestingEndpointTransport(endpoint, bearer string, limits Limits, next http.
 
 func TestingIsPublicMCPIP(ip net.IP) bool { return isPublicMCPIP(ip) }
 
+// IsPublicEndpointIP is shared by server-owned outbound AI connections.
+func IsPublicEndpointIP(ip net.IP) bool { return isPublicMCPIP(ip) }
+
 func TestingNormalizedLimits(limits Limits) Limits { return limits.normalized() }
 
 func newHTTPClient(endpoint, bearer string, limits Limits, resolver ipResolver, dial dialContextFunc) (*http.Client, error) {

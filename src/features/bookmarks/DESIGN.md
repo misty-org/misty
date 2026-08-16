@@ -10,9 +10,8 @@ colors:
   text-muted: "var(--misty-theme-text-muted)"
 typography:
   title:
-    fontSize: "16px"
-    fontWeight: 600
-    letterSpacing: "-0.01em"
+    fontSize: "20px"
+    fontWeight: 500
   body:
     fontSize: "14px"
   detail:
@@ -39,19 +38,19 @@ Inherit application typography. Use the title role for the page heading, body te
 
 ## Layout
 
-The page fills its browser content area. A wrapping header holds the title, search, and Add menu; the body scrolls independently. Keep the centered content column bounded (768px), with horizontal page padding (24px). Search occupies a full available row at narrow widths and a compact fixed-width slot from the shared small breakpoint.
+The page fills its browser content area using the same `CollectionPage`, `CollectionHeading`, and `CollectionSearch` components as Spaces. The page scrolls as one surface, with full-width content, shared responsive padding, and wrapping header actions. Do not restore a separate bordered title bar or a centered 768px content column.
 
-Folder filters wrap above one flat bookmark list. The selected folder has its own name and management menu above the list. In All bookmarks, rows add muted folder attribution at the trailing edge. Keep each title and URL together, with its site icon at the left and actions at the right.
+Folder filters use the shared `CollectionFilters` section navigation above one flat bookmark list. The selected folder has its management menu on the section row; do not repeat its name as a second heading. Sections read All, Unfiled, and the person’s named folders. Unfiled is the display label for the default folder while its stored name remains Bookmarks; preserve custom folder names. In All bookmarks, rows add muted folder attribution at the trailing edge. Keep each title and URL together, with its site icon at the left and actions at the right.
 
 Bookmark and folder editors use the shared content-height dialog, with compact preferred width (384px) from the small breakpoint and viewport-bounded scrolling. The bookmark form orders Name, Address, Folder, and conditional Folder name, followed by validation and actions.
 
 ## Elevation & Depth
 
-The library is a flat application page. Use the existing header divider, row hover fills, and shared floating-menu treatment. Bookmark editing uses the shared modal dialog surface and backdrop; its interaction differs from the nonmodal tab-group editor.
+The library is a flat application page. Use the shared collection heading, row hover fills, and floating-menu treatment. Bookmark editing uses the shared modal dialog surface and backdrop; its interaction differs from the nonmodal tab-group editor.
 
 ## Shapes
 
-Retain shared rounded buttons, fields, list rows, menus, and dialogs. Folder filters are ordinary small buttons, with selected state exposed through `aria-pressed`. Do not add a separate card around each bookmark.
+Retain shared rounded buttons, fields, list rows, menus, and dialogs. Folder filters use the Spaces section-button geometry, with selected state exposed through `aria-pressed`. Do not add a separate card around each bookmark.
 
 ## Components
 

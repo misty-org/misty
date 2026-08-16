@@ -24,6 +24,7 @@ export function AgentSwitcher({
   disabled,
   restoreTriggerFocus,
   triggerRef,
+  className = "agent-heading-identity",
   onSelect,
   onCreate,
   onBrowse,
@@ -35,6 +36,7 @@ export function AgentSwitcher({
   disabled: boolean;
   restoreTriggerFocus: boolean;
   triggerRef?: Ref<HTMLButtonElement>;
+  className?: string;
   onSelect(agentId: string, startNew?: boolean, conversationId?: string): void;
   onCreate(): void;
   onBrowse(): void;
@@ -64,7 +66,7 @@ export function AgentSwitcher({
       <MenuTrigger
         ref={triggerRef}
         kind="popover"
-        className="agent-heading-identity"
+        className={className}
         label={`Switch agent: ${selectedAgent?.name || "Agents"}`}
         value={selectedAgent?.name || "Agents"}
         icon={<AgentAvatar agent={selectedAgent} />}

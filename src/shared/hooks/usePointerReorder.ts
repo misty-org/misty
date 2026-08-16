@@ -1,4 +1,6 @@
 import "./pointerReorder.css";
+import { createDragPreview } from "./pointerDragPreview";
+import { reorderLayoutRect, startReorderMotion, settleReorderMotion } from "./pointerReorderMotion";
 import {
   useEffect,
   useMemo,
@@ -8,6 +10,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
 } from "react";
+
+export { createDragPreview } from "./pointerDragPreview";
 
 export type ReorderDrag = {
   id: string;
@@ -72,72 +76,15 @@ export function usePointerDropTarget(
   }, [ref, options.scope]);
 }
 
-let previewSequence = 0;
-
-/** Freeze the painted row before detaching it from ancestor styles and hover state. */
-function createDragPreview(surface: HTMLElement) {
-  const rect = surface.getBoundingClientRect();
-  const copy = surface.cloneNode(true) as HTMLElement;
-  const originals = [surface, ...surface.querySelectorAll<HTMLElement | SVGElement>("*")];
-  const copies = [copy, ...copy.querySelectorAll<HTMLElement | SVGElement>("*")];
-  const prefix = `reorder-preview-${++previewSequence}-`;
-  const ids = new Map(
-    originals.filter((node) => node.id).map((node) => [node.id, prefix + node.id]),
-  );
-  originals.forEach((node, index) => {
-    const clone = copies[index];
-    const style = getComputedStyle(node);
-    for (const property of Array.from(style))
-      clone.style.setProperty(property, style.getPropertyValue(property));
-    clone.style.transition = "none";
-    clone.style.animation = "none";
-    // Keep SVG references local to the copy without duplicating live control IDs.
-    for (const attribute of [...clone.attributes]) {
-      if (attribute.name.startsWith("data-reorder-") || attribute.name === "autofocus") {
-        clone.removeAttribute(attribute.name);
-      } else if (attribute.name === "id") {
-        clone.id = ids.get(attribute.value)!;
-      } else {
-        const value = attribute.value.replace(
-          /url\(["']?#([^)'"\s]+)["']?\)/g,
-          (match, id: string) => (ids.has(id) ? `url(#${ids.get(id)})` : match),
-        );
-        clone.setAttribute(
-          attribute.name,
-          value.startsWith("#") && ids.has(value.slice(1)) ? `#${ids.get(value.slice(1))}` : value,
-        );
-      }
-    }
-  });
-  Object.assign(copy.style, {
-    position: "relative",
-    inset: "auto",
-    margin: "0",
-    transform: "none",
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    minWidth: "0",
-    maxWidth: "none",
-    maxHeight: "none",
-    boxSizing: "border-box",
-  });
-  const preview = document.createElement("div");
-  preview.className = "pointer-reorder-preview";
-  preview.setAttribute("aria-hidden", "true");
-  preview.inert = true;
-  preview.style.width = `${rect.width}px`;
-  preview.style.height = `${rect.height}px`;
-  preview.append(copy);
-  return { preview, rect };
-}
-
 function startGesture(
   event: ReactPointerEvent<HTMLElement>,
   drag: ReorderDrag,
   onLift?: () => () => void,
 ) {
   let restorePresentation: (() => void) | undefined;
+  let motion: ReturnType<typeof startReorderMotion>;
   cancelCurrent?.();
+  settleReorderMotion();
   const source = (event.target as Element).closest<HTMLElement>("[data-reorder-handle]")!;
   const surface =
     source.closest<HTMLElement>("[data-reorder-preview]") ??
@@ -185,7 +132,7 @@ function startGesture(
     restorePresentation?.();
     restorePresentation = undefined;
     shield?.remove();
-    preview?.remove();
+    if (!motion) preview?.remove();
     indicator?.remove();
     delete surface.dataset.reorderDragging;
     if (active) {
@@ -208,6 +155,7 @@ function startGesture(
       announce(commit && current ? `${drag.label} moved.` : "Reordering cancelled.");
     }
     cancelCurrent = undefined;
+    motion?.finish(preview);
     if (commit && active && current && targets.has(current.target))
       current.target.drop(drag, current.hit);
   };
@@ -228,13 +176,18 @@ function startGesture(
   const update = () => {
     if (!source.isConnected) return cancel();
     current = undefined;
+    const placement = motion?.placement(point, offset);
+    const hitPoint = (target: Target) =>
+      target.element === motion?.list && placement
+        ? { x: placement.hitX, y: placement.hitY }
+        : point;
     // The smallest matching region wins, so tab headers beat pane docking zones.
     const candidates = [...targets]
       .filter(
         (t) =>
           t.scope === drag.scope &&
           t.element.isConnected &&
-          contains(visibleRect(t.element), point.x, point.y),
+          contains(visibleRect(t.element), hitPoint(t).x, hitPoint(t).y),
       )
       .sort((a, b) => {
         const ar = a.element.getBoundingClientRect(),
@@ -242,18 +195,23 @@ function startGesture(
         return ar.width * ar.height - br.width * br.height;
       });
     for (const target of candidates) {
-      const hit = target.hit(point.x, point.y, drag);
+      const at = hitPoint(target);
+      const hit = target.hit(at.x, at.y, drag);
       if (hit) {
         current = { target, hit };
         break;
       }
     }
+    motion?.update(
+      current?.target.element === motion.list ? current.hit.id : undefined,
+      current?.hit.after,
+    );
     if (preview) {
-      preview.style.left = `${Math.max(0, Math.min(point.x - offset.x, window.innerWidth - preview.offsetWidth))}px`;
-      preview.style.top = `${Math.max(0, Math.min(point.y - offset.y, window.innerHeight - preview.offsetHeight))}px`;
+      preview.style.left = `${Math.max(0, Math.min(placement?.left ?? point.x - offset.x, window.innerWidth - preview.offsetWidth))}px`;
+      preview.style.top = `${Math.max(0, Math.min(placement?.top ?? point.y - offset.y, window.innerHeight - preview.offsetHeight))}px`;
     }
     if (indicator) {
-      indicator.hidden = !current;
+      indicator.hidden = !current || current.target.element === motion?.list;
       if (current) {
         const { rect, after, axis } = current.hit;
         const r = current.hit.previewRect ?? rect;
@@ -330,6 +288,29 @@ function startGesture(
       } else {
         preview = createDragPreview(surface).preview;
       }
+      const list = surface.closest<HTMLElement>('[data-reorder-animated="true"]');
+      if (list) {
+        motion = startReorderMotion(
+          surface,
+          drag.ids ?? [drag.id],
+          list.dataset.reorderAxis === "y" ? "y" : "x",
+        );
+        preview.classList.add("pointer-reorder-tab-preview");
+        // Inactive tabs belong to a transparent strip at rest, but the lifted
+        // tab must be opaque so its neighbors visibly pass underneath it.
+        // Horizontal workspace tabs lift with their own curved tab shape.
+        const lifted = preview.firstElementChild as HTMLElement | null;
+        const tabShape = lifted?.querySelector<SVGElement>(".misty-workspace-tab-shape");
+        if (tabShape && list.dataset.reorderAxis !== "y") {
+          // Computed styles were frozen per node, so each descendant inherited "hidden".
+          for (const node of [tabShape, ...tabShape.querySelectorAll<SVGElement>("*")])
+            node.style.visibility = "visible";
+          lifted!.style.overflow = "visible";
+          preview.classList.add("pointer-reorder-shaped-preview");
+        } else if (lifted) {
+          lifted.style.backgroundColor = "var(--color-charcoal-bg)";
+        }
+      }
       restorePresentation = onLift?.();
       surface.dataset.reorderDragging = "true";
       window.dispatchEvent(new CustomEvent("misty:pointer-reorder", { detail: true }));
@@ -390,6 +371,7 @@ export function usePointerReorder(options: {
   scope: string;
   axis: "x" | "y";
   hitArea?: "item" | "header";
+  animate?: boolean;
   getDrag(id: string, element: HTMLElement): Omit<ReorderDrag, "scope"> | null;
   onDrop(drag: ReorderDrag, targetId: string, after: boolean): void;
   onKeyboardMove(id: string, direction: -1 | 1): void;
@@ -417,14 +399,14 @@ export function usePointerReorder(options: {
           options.hitArea === "header"
             ? item.querySelector<HTMLElement>("[data-reorder-header], [data-reorder-handle]")
             : null;
-        return (header ?? item).getBoundingClientRect();
+        return header ? header.getBoundingClientRect() : reorderLayoutRect(item);
       };
       const item =
         available.find((item) => {
           const r = hitRect(item);
           return position <= (options.axis === "x" ? r.right : r.bottom);
         }) ?? available[available.length - 1];
-      const rect = item.getBoundingClientRect();
+      const rect = reorderLayoutRect(item);
       const hit = hitRect(item);
       return {
         id: item.dataset.reorderItem!,
@@ -440,6 +422,8 @@ export function usePointerReorder(options: {
   return {
     ref: setElement,
     "data-reorder-list": options.scope,
+    "data-reorder-animated": options.animate ? "true" : undefined,
+    "data-reorder-axis": options.axis,
     onDragStartCapture: (event: React.DragEvent) => {
       if ((event.target as Element).closest("[data-reorder-handle]")) event.preventDefault();
     },

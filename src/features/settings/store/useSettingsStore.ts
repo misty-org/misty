@@ -3,8 +3,6 @@ import {
   validDockingLayout,
   type SavedDockingLayout,
 } from "@/features/app-shell/dockingLayout";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { mutateState, readState } from "../profiles/persistence";
 import {
   definitionForLegacy,
   validPreference,
@@ -43,7 +41,10 @@ import {
   configureBrowserSearchEngine,
   configureBrowserSearchSuggestions,
 } from "@/features/workspace/browserSearchEngine";
-import { configureWorkspaceDefaultView } from "@/features/workspace/workspaceDefaultView";
+import {
+  configureWorkspaceDefaultView,
+  workspaceDefaultViewIndex,
+} from "@/features/workspace/workspaceDefaultView";
 import {
   setBrowserDownloadDirectory,
   setBrowserDownloadPrompt,
@@ -60,13 +61,7 @@ export * from "./preferences";
 let settingsLoad: Promise<void> | null = null;
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
 async function saveLocalDocument(document: Record<string, unknown>): Promise<SettingsSnapshot> {
-  if (hasTauriInternals()) return settingsSave({ document });
-  await mutateState(
-    "device-settings",
-    () => ({}) as Record<string, unknown>,
-    () => document,
-  );
-  return { path: "", document };
+  return settingsSave({ document });
 }
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -86,22 +81,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       set({ working: true, error: null });
       try {
         const [settings, shortcuts, openWithAssociations, launchOnLogin] = await Promise.all([
-          hasTauriInternals()
-            ? settingsSnapshot()
-            : readState<Record<string, unknown>>("device-settings").then((s) => ({
-                path: "",
-                document: s.state ?? {},
-              })),
-          hasTauriInternals() ? shortcutsSnapshot() : Promise.resolve(null),
-          hasTauriInternals() ? settingsOpenWithAssociations() : Promise.resolve([]),
-          hasTauriInternals()
-            ? settingsLaunchOnLoginSnapshot()
-            : Promise.resolve({
-                supported: false,
-                enabled: false,
-                target: "web",
-                detail: "Native app required",
-              }),
+          settingsSnapshot(),
+          shortcutsSnapshot(),
+          settingsOpenWithAssociations(),
+          settingsLaunchOnLoginSnapshot(),
         ]);
         if (
           shortcuts &&
@@ -146,21 +129,19 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           (saved.document.open_with as Record<string, string>) ?? {},
         ).map(([key, applicationPath]) => ({ key, applicationPath })),
       });
-      if (hasTauriInternals()) {
-        const desired = settingsBoolean(saved.document, "general", "launch_on_login", false);
-        const launch = get().launchOnLogin;
-        if (launch?.supported && launch.enabled !== desired) {
-          const applied = await settingsApplyLaunchOnLogin(desired);
-          if (!valid()) return;
-          set({ launchOnLogin: applied });
-        }
-        const overrides = currentShortcutOverrides(saved.document, null);
-        if (JSON.stringify(overrides) !== JSON.stringify(get().shortcuts?.overrides ?? [])) {
-          const shortcuts = await shortcutsReplace(overrides);
-          if (!valid()) return;
-          set({ shortcuts });
-          window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
-        }
+      const desired = settingsBoolean(saved.document, "general", "launch_on_login", false);
+      const launch = get().launchOnLogin;
+      if (launch?.supported && launch.enabled !== desired) {
+        const applied = await settingsApplyLaunchOnLogin(desired);
+        if (!valid()) return;
+        set({ launchOnLogin: applied });
+      }
+      const overrides = currentShortcutOverrides(saved.document, null);
+      if (JSON.stringify(overrides) !== JSON.stringify(get().shortcuts?.overrides ?? [])) {
+        const shortcuts = await shortcutsReplace(overrides);
+        if (!valid()) return;
+        set({ shortcuts });
+        window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
       }
     };
     settingsWriteQueue = settingsWriteQueue.catch(() => {}).then(apply);
@@ -307,7 +288,7 @@ function applySettingsSideEffects(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
   configureWorkspaceDefaultView(
-    settingsNumber(document, "general", "workspace_default_tab_index", 0),
+    settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
   );
   setBrowserStatusBubbleEnabled(
     settingsBoolean(document, "general", "browser_status_bubble", true),

@@ -11,6 +11,7 @@ import (
 
 func (a *SmartLibraryAnalyzer) WithBilling(service *billingadapter.Service, account, operation string) *SmartLibraryAnalyzer {
 	clone := *a
+	clone.account = account
 	clone.billing = &library.Meter{Service: service, Account: account, OperationID: operation}
 	return &clone
 }
@@ -30,40 +31,46 @@ func (a *SmartLibraryAnalyzer) beginLibraryRequest(ctx context.Context, url stri
 		model = headers["ai-model-id"]
 	}
 	operation := "library.model"
-	units := map[string]int64{"input_tokens": max(int64(1), libraryInputBound(body))}
+	textBytes, images := libraryInputFacts(body)
+	units := map[string]int64{"input_bytes": textBytes, "input_images": images}
 	if strings.HasSuffix(url, "/embeddings") || strings.HasSuffix(url, "/embedding-model") {
 		operation = "library.embedding"
+	} else if n, ok := body["max_output_tokens"].(float64); ok {
+		units["output_tokens"] = int64(n)
 	} else if n, ok := body["max_tokens"].(float64); ok {
 		units["output_tokens"] = int64(n)
 	}
 	return a.billing.Begin(ctx, operation, model, units)
 }
 
-// Text bytes provide a conservative token estimate. Image data is bounded as
-// image input, not billed as millions of base64 text characters.
-func libraryInputBound(value any) int64 {
+// Report native text bytes and image counts; billing supplies token estimates.
+func libraryInputFacts(value any) (int64, int64) {
 	switch v := value.(type) {
 	case string:
 		if strings.HasPrefix(v, "data:image/") {
-			return 8192
+			return 0, 1
 		}
-		return int64(len(v))
+		return int64(len(v)), 0
 	case []any:
-		var n int64
+		var bytes, images int64
 		for _, item := range v {
-			n += libraryInputBound(item)
+			b, i := libraryInputFacts(item)
+			bytes += b
+			images += i
 		}
-		return n
+		return bytes, images
 	case map[string]any:
-		var n int64
+		var bytes, images int64
 		for key, item := range v {
 			if key != "model" {
-				n += libraryInputBound(item)
+				b, i := libraryInputFacts(item)
+				bytes += b
+				images += i
 			}
 		}
-		return n
+		return bytes, images
 	}
-	return 0
+	return 0, 0
 }
 
 func libraryResponseUsage(raw []byte) (map[string]int64, bool) {
@@ -77,6 +84,9 @@ func libraryResponseUsage(raw []byte) (map[string]int64, bool) {
 			Details      struct {
 				Cached int64 `json:"cached_tokens"`
 			} `json:"prompt_tokens_details"`
+			InputDetails struct {
+				Cached int64 `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
 		} `json:"usage"`
 	}
 	if json.Unmarshal(raw, &response) != nil {
@@ -97,7 +107,7 @@ func libraryResponseUsage(raw []byte) (map[string]int64, bool) {
 	if input == nil {
 		return nil, true
 	}
-	units := map[string]int64{"input_tokens": *input, "cached_input_tokens": u.Details.Cached}
+	units := map[string]int64{"input_tokens": *input, "cached_input_tokens": max(u.Details.Cached, u.InputDetails.Cached)}
 	if output != nil {
 		units["output_tokens"] = *output
 	}

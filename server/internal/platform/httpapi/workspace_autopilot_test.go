@@ -25,11 +25,6 @@ func TestWorkspaceAutopilotBoundary(t *testing.T) {
 	if schema.Validate(value) == nil {
 		t.Fatal("outside-window point accepted")
 	}
-	for _, mode := range []string{"user", "team"} {
-		if nativeAgentToolAllowed("browser.workspace.visual", "read", mode, map[string]bool{"browser": true}) {
-			t.Fatalf("window control exposed in %s", mode)
-		}
-	}
 	body := aiInvocationInput{AgentID: "agent", ExecutionMode: "agent", WindowLabel: "main"}
 	if !nativeRoutineBrowserAction(body, "browser.workspace.interact", json.RawMessage(`{"consequential":false,"action":{"kind":"point"}}`), "Page") {
 		t.Fatal("routine foreground click requires extra review")

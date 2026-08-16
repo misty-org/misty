@@ -105,6 +105,7 @@ enum Command {
         String,
         oneshot::Sender<Result<(u64, Vec<crate::document::ViewRecord>)>>,
     ),
+    RecordsReady(String, oneshot::Sender<Result<bool>>),
     RecordsWrite(
         String,
         Vec<(String, Option<crate::document::ViewRecord>)>,
@@ -464,6 +465,11 @@ impl WorkerHandle {
     ) -> Result<(u64, Vec<crate::document::ViewRecord>)> {
         self.call(|reply| Command::RecordsList(collection, reply))
             .await
+    }
+
+    /// Whether this native collection has completed its initial pull.
+    pub async fn records_ready(&self, collection: String) -> Result<bool> {
+        self.call(|reply| Command::RecordsReady(collection, reply)).await
     }
 
     /// Native-only: replaces whole records (`None` deletes); queued durably
@@ -893,6 +899,9 @@ where
             }
             Command::RecordsList(collection, reply) => {
                 let _ = reply.send(self.records_list(&collection));
+            }
+            Command::RecordsReady(collection, reply) => {
+                let _ = reply.send(self.store.collection(&self.root, &collection).map(|state| state.loaded));
             }
             Command::RecordsWrite(collection, writes, reply) => {
                 let _ = reply.send(self.records_write(&collection, writes));
@@ -1324,6 +1333,9 @@ fn publication_frame<'a>(
         },
     }
 }
+
+#[cfg(test)]
+mod extensions_tests;
 
 #[cfg(test)]
 mod control_tests {

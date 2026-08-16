@@ -1,9 +1,8 @@
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "@/features/global-search/types";
-import { Button, Card, NavIsland } from "@/shared/ui";
-import { FileOutput, Mic, MousePointer2 } from "lucide-react";
+import { Button, Card } from "@/shared/ui";
+import { FileOutput } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { AgentAvatar } from "./AgentAvatar";
 import { AgentAccess, type AgentAccessState } from "./AgentAccess";
 import { MistyDashboard, type AgentActivityState } from "./MistyDashboard";
 
@@ -33,17 +32,19 @@ export function agentOutputs(conversations: GlobalAiConversation[]) {
     );
 }
 
+/**
+ * Details beside the conversation. The workspace sidebar owns the agent's identity,
+ * history and settings, and the composer owns dictation, so none repeat here.
+ */
 export function AgentOverviewPanel(props: {
   profile: AgentProfile;
   access: AgentAccessState;
   conversations: GlobalAiConversation[];
-  navigation: ReactNode;
+  navigation?: ReactNode;
   working: boolean;
-  voiceBusy: boolean;
   recording: boolean;
-  onTalk(): void;
   onCompanion(): void;
-  onConnections(): void;
+  onConnections(source?: "apps"): void;
   onOpenResult(href: string): void;
 }) {
   const [activityState, setActivityState] = useState<AgentActivityState>("loading");
@@ -68,34 +69,12 @@ export function AgentOverviewPanel(props: {
                   : "Ready";
   return (
     <Card className="gap-5 p-5" aria-label="Agent overview">
-      <header className="flex items-center gap-3">
-        <AgentAvatar agent={props.profile} large />
-        <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold text-cream-bright">
-            {props.profile.name}
-          </h2>
-          <p role="status" className="mt-1 text-sm text-cream-muted">
-            {status}
-          </p>
-        </div>
-      </header>
-      <NavIsland aria-label="Agent actions" className="w-full">
-        <Button
-          variant="toolbar"
-          size="sm"
-          className="flex-1"
-          disabled={!props.profile.enabled || props.working || props.voiceBusy}
-          onClick={props.onTalk}
-          title="Dictate a message to review before sending"
-        >
-          <Mic className="size-4" />
-          {props.recording ? "Stop recording" : "Talk"}
-        </Button>
-        <Button variant="toolbar" size="sm" className="flex-1" onClick={props.onCompanion}>
-          <MousePointer2 className="size-4" />
-          Companion
-        </Button>
-      </NavIsland>
+      <section aria-label="Status" className="grid gap-1">
+        <h3 className="text-xs font-medium text-cream-muted">Status</h3>
+        <p role="status" className="text-sm">
+          {status}
+        </p>
+      </section>
       {props.navigation}
       <AgentAccess
         access={props.access}
@@ -118,7 +97,7 @@ export function AgentOverviewPanel(props: {
             <Button
               variant="ghost"
               justify="start"
-              className="h-auto min-h-9 gap-2 whitespace-normal text-left"
+              className="-mx-2 h-auto min-h-9 gap-3 whitespace-normal px-2 text-left"
               key={output.href}
               onClick={() => props.onOpenResult(output.href)}
             >

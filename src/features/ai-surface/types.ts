@@ -1,4 +1,19 @@
 import type { DisplayCapture } from "@/features/agents";
+import type { AppRequest } from "@/features/agents";
+
+/**
+ * A run that needs a screen asks for one and ends its response. The desktop
+ * opens it where the account setting says, then continues the conversation.
+ */
+export interface ScreenRequest {
+  kind: "open" | "look";
+  url?: string;
+  reason: string;
+  location: "separate" | "window" | "ask";
+  /** Client progress: waiting for a choice, opening, or done. */
+  state?: "pending" | "opening" | "opened" | "declined" | "failed";
+  error?: string;
+}
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
@@ -12,6 +27,7 @@ export type AiSurfaceId =
   | "drawings"
   | "library"
   | "browser"
+  | "extensions"
   | "files"
   | "photo-editor"
   | "scheduled"
@@ -165,6 +181,9 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  methodVersionId?: string;
+  methodInputs?: Record<string, string | number | boolean>;
+  skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
   displayCaptures?: DisplayCapture[];
@@ -230,6 +249,13 @@ export type AiInvocationState =
   | "failed"
   | "canceled";
 export type AiInvocationEvent =
+  | { id: string; type: "user.steering"; text: string }
+  | {
+      id: string;
+      type: "steering.received" | "steering.closed";
+      messages: Array<{ sequence: number; text: string }>;
+      closed: boolean;
+    }
   | {
       id: string;
       type: "invocation.started";
@@ -259,6 +285,16 @@ export type AiInvocationEvent =
       id: string;
       type: "citation";
       citation: AiCitation;
+    }
+  | {
+      id: string;
+      type: "app.request";
+      appRequest: AppRequest;
+    }
+  | {
+      id: string;
+      type: "screen.request";
+      screenRequest: ScreenRequest;
     }
   | {
       id: string;

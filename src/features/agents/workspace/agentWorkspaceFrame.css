@@ -1,0 +1,523 @@
+/* The existing Agents collection is untouched. This shell belongs to one selected agent. */
+.agent-studio {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  container: agent-studio / inline-size;
+}
+.agent-studio-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-right: 1px solid var(--color-charcoal-border);
+  background: var(--color-charcoal-sidebar);
+}
+.agent-studio-sidebar > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  margin-bottom: 12px;
+}
+.agent-studio-identity {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  padding-inline: 6px;
+  font-weight: 600;
+}
+.agent-studio-sidebar .agent-avatar {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.agent-studio-sidebar nav {
+  display: grid;
+  gap: 4px;
+}
+.agent-studio-sidebar nav > button,
+.agent-studio-recent-row > button:first-child {
+  width: 100%;
+  min-height: 34px;
+  gap: 9px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.agent-studio-sidebar button[aria-current="page"] {
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+.agent-studio-sidebar button > svg {
+  flex-shrink: 0;
+}
+.agent-studio-sidebar button > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-studio-recents {
+  margin-top: 36px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* Rows end clear of the overlay scrollbar instead of running under it. */
+  padding-right: 10px;
+  margin-right: -2px;
+}
+.agent-studio-recents h2 {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+  margin: 0 10px 10px;
+}
+.agent-studio-recent-row > button:first-child {
+  color: var(--color-cream-muted);
+}
+.agent-studio-float-action {
+  margin-top: 12px;
+  gap: 8px;
+  font-size: 12px;
+}
+.agent-studio-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-charcoal-bg);
+}
+.agent-studio-task {
+  height: 100%;
+  min-width: 0;
+  display: flex;
+}
+.agent-studio-task[hidden],
+.agent-studio-catalog-host[hidden] {
+  display: none;
+}
+.agent-studio-catalog-host {
+  height: 100%;
+}
+.agent-studio .agent-conversation-heading {
+  flex-shrink: 0;
+}
+.agent-studio .agent-conversation[data-empty="true"] {
+  justify-content: flex-start;
+  padding-top: clamp(40px, 18vh, 210px);
+}
+.agent-studio .agent-conversation[data-empty="true"] .agent-conversation-scroll {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.agent-studio-welcome {
+  text-align: center;
+  margin: 0 auto 32px;
+  padding-inline: 20px;
+}
+.agent-studio-welcome h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  font-weight: 400;
+  margin: 0;
+}
+.agent-studio .agent-conversation[data-empty="true"] .agent-compose-area {
+  width: 672px;
+  max-width: calc(100% - 48px);
+  margin: 0 auto;
+  padding: 0;
+  flex-shrink: 0;
+}
+.agent-studio .agent-conversation[data-empty="true"] .agent-overview-rail {
+  display: none;
+}
+.agent-studio-task[data-floating="true"] {
+  position: absolute;
+  z-index: 20;
+  top: 24px;
+  right: 24px;
+  width: 660px;
+  max-width: calc(100% - 48px);
+  height: min(640px, calc(100% - 48px));
+  flex-direction: column;
+  background: var(--color-charcoal-bg);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 16px 48px #0005;
+  overflow: hidden;
+}
+.agent-studio-floating-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 4px;
+  flex-shrink: 0;
+}
+.agent-studio-floating-bar .agent-avatar {
+  width: 32px;
+  height: 32px;
+}
+.agent-studio-floating-bar > span:not(.agent-avatar) {
+  flex: 1;
+}
+.agent-studio-floating-bar strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.agent-studio-task[data-floating="true"] .agent-conversation-heading,
+.agent-studio-task[data-floating="true"] .agent-overview-rail {
+  display: none;
+}
+.agent-studio-task[data-floating="true"] .agent-conversation {
+  padding: 0;
+  flex-direction: column-reverse;
+}
+.agent-studio-task[data-floating="true"] .agent-compose-area {
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 12px 16px;
+}
+.agent-studio-task[data-floating="true"] .agent-conversation-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.agent-studio-task[data-floating="true"] .agent-studio-welcome {
+  display: none;
+}
+.agent-studio-floating-placeholder {
+  max-width: 420px;
+  margin: 20vh auto 0;
+  text-align: center;
+  padding: 24px;
+}
+.agent-studio-floating-placeholder .agent-avatar {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+}
+.agent-studio-floating-placeholder h1 {
+  font-size: 20px;
+  font-weight: 500;
+}
+.agent-studio-floating-placeholder p {
+  color: var(--color-cream-muted);
+  margin: 12px 0 24px;
+}
+.agent-studio-availability-note {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.agent-studio-instructions-save {
+  align-items: center;
+  gap: 16px;
+}
+.agent-studio-instructions-save .agent-studio-availability-note {
+  flex: 1;
+}
+@container agent-studio (max-width:1100px) {
+  .agent-studio-sidebar {
+    width: 190px;
+  }
+  .agent-studio-subnav {
+    width: 170px;
+  }
+  .agent-studio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .agent-studio-skills > aside {
+    width: 240px;
+  }
+  .agent-studio-skills > aside header {
+    flex-wrap: wrap;
+  }
+  .agent-studio .agent-overview-rail {
+    --agent-rail-width: 260px;
+  }
+}
+@container agent-studio (max-width:760px) {
+  .agent-studio-sidebar {
+    width: 58px;
+    padding: 6px;
+  }
+  .agent-studio-sidebar > header {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .agent-studio-identity > :not(.agent-avatar),
+  .agent-studio-sidebar button > span,
+  .agent-studio-recents h2 {
+    display: none;
+  }
+  .agent-studio-sidebar nav > button,
+  .agent-studio-recent-row > button:first-child {
+    justify-content: center;
+    padding: 8px;
+  }
+  .agent-studio-pages {
+    flex-direction: column;
+  }
+  .agent-studio-subnav {
+    width: auto;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-charcoal-border);
+  }
+  .agent-studio-subnav nav {
+    display: flex;
+  }
+  .agent-studio-subnav nav button {
+    width: auto;
+  }
+  .agent-studio-subnav h1 {
+    margin-bottom: 8px;
+  }
+  .agent-studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .agent-studio-catalog,
+  .agent-studio-connectors,
+  .agent-studio-workflows,
+  .agent-studio-instructions {
+    max-width: calc(100% - 32px);
+    margin-top: 24px;
+  }
+  .agent-studio-skills {
+    flex-direction: column;
+  }
+  .agent-studio-skills > aside {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-charcoal-border);
+  }
+  .agent-studio .agent-overview-rail {
+    display: none;
+  }
+  .agent-studio-welcome h1 {
+    font-size: 26px;
+  }
+  .agent-studio-task[data-floating="true"] {
+    right: 12px;
+    top: 12px;
+    max-width: calc(100% - 24px);
+    height: calc(100% - 24px);
+  }
+}
+.agent-studio-subnav button[aria-current="page"] {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-profile-action {
+  gap: 8px;
+  font-size: 12px;
+}
+.agent-studio
+  .agent-conversation[data-empty="true"]
+  [data-slot="message-composer"]
+  > div:has(textarea) {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  padding: 10px;
+}
+.agent-studio
+  .agent-conversation[data-empty="true"]
+  [data-slot="message-composer"]
+  > div
+  > div:has(> textarea) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+.agent-studio .agent-conversation[data-empty="true"] [data-slot="message-composer"] textarea {
+  min-height: 64px;
+  font-size: 16px;
+}
+.agent-studio
+  .agent-conversation[data-empty="true"]
+  [data-slot="message-composer"]
+  > div
+  > div:first-child {
+  grid-row: 2;
+}
+.agent-studio
+  .agent-conversation[data-empty="true"]
+  [data-slot="message-composer"]
+  > div
+  > div:last-child {
+  grid-column: 3;
+  grid-row: 2;
+}
+/*
+ * Control bar: a tab tucked behind the composer's top edge. Where work runs and folder
+ * work start on the left; usage sits at the end. Receipts and notices span below.
+ */
+.agent-control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  margin-inline: 14px;
+  padding: 3px 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: color-mix(in srgb, var(--color-charcoal-card) 55%, transparent);
+}
+.agent-control-bar button {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.agent-control-bar button:is(:hover, [data-state="open"]) {
+  color: var(--color-cream);
+}
+.agent-control-bar > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+}
+.agent-usage-trigger {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* A 36px meter: enough to read at a glance; exact numbers live in the popover. */
+.agent-usage-meter {
+  position: relative;
+  width: 36px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-cream) 12%, transparent);
+}
+.agent-usage-meter > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-cream) 70%, transparent);
+}
+@container agent-studio (max-width: 760px) {
+  .agent-usage-draft {
+    display: none;
+  }
+}
+
+.agent-studio-recent-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius-md);
+}
+.agent-studio-recent-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+/* One surface per row: the title and its overflow menu highlight together. */
+.agent-studio-recent-row:hover,
+.agent-studio-recent-row:has(> [data-state="open"]) {
+  background: var(--color-charcoal-hover);
+}
+.agent-studio-recent-row:has(> button[aria-current="page"]) {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row > button,
+.agent-studio-recent-row > button:hover,
+.agent-studio-recent-row > button[aria-current="page"],
+.agent-studio-recent-row > button[data-state="open"] {
+  background: transparent;
+}
+.agent-studio-recent-row:has(> button[aria-current="page"]) > button:first-child {
+  color: var(--color-cream-bright);
+}
+.agent-studio-recent-row > :not(:first-child) {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  margin-right: 4px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recent-row > button:not(:first-child):is(:hover, [data-state="open"]) {
+  color: var(--color-cream-bright);
+}
+
+/* The row's own overflow menu appears with intent, not on every recent. */
+.agent-studio-recent-row > :not(:first-child) {
+  opacity: 0;
+}
+.agent-studio-recent-row:is(:hover, :focus-within) > :not(:first-child),
+.agent-studio-recent-row:has(> button[aria-current="page"]) > :not(:first-child),
+.agent-studio-recent-row > [aria-expanded="true"],
+.agent-studio-recent-row > [data-state="open"] {
+  opacity: 1;
+}
+
+/* The workspace header names only the open conversation; the sidebar owns identity. */
+.agent-conversation-heading[data-workspace] {
+  padding: 0 16px 0 24px;
+}
+.agent-heading-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-conversation-heading[data-workspace] .agent-heading-end {
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+/* Folder work joins the bar's controls; its receipt and errors span the row below. */
+.agent-control-bar .misty-folder-work {
+  display: contents;
+}
+.agent-control-bar .misty-folder-work__controls {
+  gap: 2px;
+}
+.agent-control-bar .misty-folder-work__controls > span {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+}
+.agent-control-bar .misty-folder-work__receipt,
+.agent-control-bar .misty-folder-work > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+
+/* Multi-selected recents share the open conversation's monochrome surface. */
+.agent-studio-recent-row[data-selected] {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row[data-selected] > button:first-child {
+  color: var(--color-cream-bright);
+}
+.agent-studio-recents-selection {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 26px;
+  padding-left: 10px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recents-selection > span {
+  flex: 1;
+}

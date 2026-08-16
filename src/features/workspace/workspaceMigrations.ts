@@ -14,6 +14,7 @@ const missingRouteFallback: Partial<Record<string, string>> = {
   files: "/files",
   agents: "/agents",
   scheduled: "/scheduled",
+  extensions: "/extensions",
 };
 /** A saved view restore could not carry forward. Its original stays in the
  * archived copy of the saved workspace. */
@@ -83,17 +84,26 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
     };
   }
   if (tab.surfaceId === "home" && tab.route === "/home") return tab;
+  if (tab.surfaceId === "extensions" && /^\/extensions(?:\/|$)/.test(route.pathname)) return tab;
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
   const retiredTransfers =
     (tab.surfaceId as string) === "transfers" || (tab.groupKey as string) === "tool:transfers";
   if (tab.surfaceId === "files" || tab.groupKey === "app:files" || retiredTransfers) {
     const url = new URL(tab.route, "https://misty.local");
-    if (url.searchParams.get("view") === "transfers") url.searchParams.delete("view");
+    const transfers = retiredTransfers || url.searchParams.get("view") === "transfers";
+    if (transfers) url.searchParams.set("view", "transfers");
     const search = url.search;
     return {
       ...tab,
       surfaceId: "files",
-      title: retiredTransfers || tab.title === "Transfers" ? "Files" : tab.title,
+      title: transfers ? "Transfers" : tab.title,
+      state: transfers
+        ? {
+            ...(tab.state && typeof tab.state === "object" ? tab.state : {}),
+            version: 1,
+            path: "misty-transfers://history",
+          }
+        : tab.state,
       groupKey: "tool:files",
       route: `/files${search}`,
       placeholder: tab.placeholder,

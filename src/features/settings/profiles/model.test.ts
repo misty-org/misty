@@ -26,6 +26,9 @@ const selected = () =>
   reconcileProfile(initialProfileState({}), profile({ "browser.searchEngine": "google" }));
 describe("account settings", () => {
   it("syncs all registered preferences, including formerly device-only choices", () => {
+    expect(
+      settingDefinitions.every((d) => d.platforms.length === 1 && d.platforms[0] === "desktop"),
+    ).toBe(true);
     expect(settingDefinitions.every((d) => d.owner === "account")).toBe(true);
     expect(
       portableValues({

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,12 +15,14 @@ import (
 // ScheduledTask is a prompt Misty runs in the cloud on a schedule, posting each run into
 // its own conversation.
 type ScheduledTask struct {
-	ID             string `json:"id"`
-	UserID         string `json:"-"`
-	ConversationID string `json:"conversation_id,omitempty"`
-	AgentID        string `json:"agent_id,omitempty"`
-	Title          string `json:"title"`
-	Prompt         string `json:"prompt"`
+	MethodVersionID string         `json:"method_version_id,omitempty"`
+	MethodInputs    map[string]any `json:"method_inputs,omitempty"`
+	ID              string         `json:"id"`
+	UserID          string         `json:"-"`
+	ConversationID  string         `json:"conversation_id,omitempty"`
+	AgentID         string         `json:"agent_id,omitempty"`
+	Title           string         `json:"title"`
+	Prompt          string         `json:"prompt"`
 	ScheduledTaskSchedule
 	Enabled          bool       `json:"enabled"`
 	State            string     `json:"state"`
@@ -34,15 +37,20 @@ type ScheduledTask struct {
 
 const scheduledTaskColumns = `id,user_id,COALESCE(conversation_id,''),title,prompt,cadence,local_time,weekday,
 	month_day,COALESCE(to_char(run_on,'YYYY-MM-DD'),''),timezone,enabled,state,next_run_at,
-	COALESCE(last_invocation_id,''),last_run_at,last_error,run_count,created_at,updated_at,COALESCE(agent_id,'')`
+	COALESCE(last_invocation_id,''),last_run_at,last_error,run_count,created_at,updated_at,COALESCE(agent_id,''),COALESCE(method_version_id,''),method_inputs`
 
 func scanScheduledTask(scanner interface{ Scan(...any) error }, item *ScheduledTask) error {
-	return scanner.Scan(
+	var raw []byte
+	err := scanner.Scan(
 		&item.ID, &item.UserID, &item.ConversationID, &item.Title, &item.Prompt, &item.Cadence,
 		&item.LocalTime, &item.Weekday, &item.MonthDay, &item.RunOn, &item.Timezone, &item.Enabled,
 		&item.State, &item.NextRunAt, &item.LastInvocationID, &item.LastRunAt, &item.LastError,
-		&item.RunCount, &item.CreatedAt, &item.UpdatedAt, &item.AgentID,
+		&item.RunCount, &item.CreatedAt, &item.UpdatedAt, &item.AgentID, &item.MethodVersionID, &raw,
 	)
+	if err == nil {
+		err = json.Unmarshal(raw, &item.MethodInputs)
+	}
+	return err
 }
 
 func queryScheduledTasks(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]ScheduledTask, error) {
@@ -106,12 +114,12 @@ func (db *Database) CreateScheduledTask(ctx context.Context, userID, conversatio
 	err = db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		return scanScheduledTask(tx.QueryRowContext(ctx, `
 			INSERT INTO scheduled_tasks(id,user_id,conversation_id,title,prompt,cadence,local_time,weekday,
-				month_day,run_on,timezone,enabled,next_run_at,agent_id)
-			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,NULLIF($10,'')::date,$11,$12,$13,(SELECT agent_id FROM misty_ask_conversations WHERE id=$3 AND user_id=$2))
+				month_day,run_on,timezone,enabled,next_run_at,agent_id,method_version_id,method_inputs)
+			VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,NULLIF($10,'')::date,$11,$12,$13,(SELECT agent_id FROM misty_ask_conversations WHERE id=$3 AND user_id=$2),NULLIF($14,''),$15)
 			RETURNING `+scheduledTaskColumns,
 			"scheduled_task_"+uuid.NewString(), userID, conversationID, strings.TrimSpace(item.Title),
 			strings.TrimSpace(item.Prompt), item.Cadence, item.LocalTime, item.Weekday, item.MonthDay,
-			item.RunOn, item.Timezone, item.Enabled, next), out)
+			item.RunOn, item.Timezone, item.Enabled, next, item.MethodVersionID, methodInputsJSON(item.MethodInputs)), out)
 	})
 	return out, err
 }
@@ -130,11 +138,11 @@ func (db *Database) UpdateScheduledTask(ctx context.Context, userID string, item
 		return scanScheduledTask(tx.QueryRowContext(ctx, `
 			UPDATE scheduled_tasks SET title=$3,prompt=$4,cadence=$5,local_time=$6,weekday=$7,month_day=$8,
 				run_on=NULLIF($9,'')::date,timezone=$10,enabled=$11,next_run_at=$12,
-				state=CASE WHEN state='running' THEN state ELSE 'idle' END,updated_at=NOW()
+				state=CASE WHEN state='running' THEN state ELSE 'idle' END,updated_at=NOW(),method_version_id=NULLIF($13,''),method_inputs=$14
 			WHERE id=$1 AND user_id=$2
 			RETURNING `+scheduledTaskColumns,
 			item.ID, userID, strings.TrimSpace(item.Title), strings.TrimSpace(item.Prompt), item.Cadence,
-			item.LocalTime, item.Weekday, item.MonthDay, item.RunOn, item.Timezone, item.Enabled, next), out)
+			item.LocalTime, item.Weekday, item.MonthDay, item.RunOn, item.Timezone, item.Enabled, next, item.MethodVersionID, methodInputsJSON(item.MethodInputs)), out)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
@@ -249,4 +257,22 @@ func (db *Database) ScheduledTaskByInvocation(ctx context.Context, invocationID 
 		return nil, ErrSpaceNotFound
 	}
 	return out, err
+}
+
+func methodInputsJSON(inputs map[string]any) []byte {
+	if inputs == nil {
+		return []byte(`{}`)
+	}
+	raw, _ := json.Marshal(inputs)
+	return raw
+}
+func (db *Database) ScheduledTaskByID(ctx context.Context, user, id string) (*ScheduledTask, error) {
+	item := &ScheduledTask{}
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(user), func(tx *sql.Tx) error {
+		return scanScheduledTask(tx.QueryRowContext(ctx, `SELECT `+scheduledTaskColumns+` FROM scheduled_tasks WHERE id=$1 AND user_id=$2`, id, user), item)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrSpaceNotFound
+	}
+	return item, err
 }

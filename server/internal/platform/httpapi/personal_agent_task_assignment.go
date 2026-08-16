@@ -36,13 +36,11 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 		}},
 	}
 	requested := []string{toolboxTasksQuery, "tasks.update_assigned", "task.activity.write", "attached_files.read"}
-	for _, descriptor := range globalAgentSpaceDescriptors() {
-		descriptor.Sources = []string{"task_assignment"}
-		descriptor.Triggers = []string{"task_assignment"}
-		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: func(toolCtx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
-			return executeGlobalAgentSpaceTool(toolCtx, s.database, invocation, request)
-		}})
-		requested = append(requested, descriptor.Name)
+	// The assigned task keeps its own tasks.query; other Misty data is reachable
+	// in any Space the owner can access.
+	for _, registration := range routedSpaceRegistrations(s.database, toolboxTasksQuery) {
+		registrations = append(registrations, registration)
+		requested = append(requested, registration.Descriptor.Name)
 	}
 	sdk, err := s.agentSDKRegistrations(ctx, run)
 	if err != nil {
@@ -70,6 +68,10 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 		return s.executeMCPAgentTool(toolCtx, run, tool, false, "task_assignment")
 	}
 	registrations, requested = s.appendPersonalAgentMCPTools(ctx, run.RequestingMemberID, run.AgentID, registrations, requested, mcpHandler)
+	for _, registration := range s.appsToolRegistrations() {
+		registrations = append(registrations, registration)
+		requested = append(requested, registration.Descriptor.Name)
+	}
 	toolbox, err := agenttools.New(registrations...)
 	if err != nil {
 		return nil, agenttools.Invocation{}, serveragent.ToolManifest{}, err

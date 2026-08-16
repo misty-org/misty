@@ -395,7 +395,7 @@ where
         let mut out = BTreeMap::new();
         for collection in COLLECTIONS
             .into_iter()
-            .filter(|c| *c != collections::HISTORY)
+            .filter(|c| *c != collections::HISTORY && *c != collections::EXTENSION_SYNC)
         {
             let state = self.store.collection(&self.root, collection)?;
             if state.loaded || !state.pending.is_empty() {

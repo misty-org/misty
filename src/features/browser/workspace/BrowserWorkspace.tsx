@@ -1,4 +1,6 @@
 import { SystemErrorActivity } from "@/features/activity";
+import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
+import { useExtensionsStore } from "@/features/extensions/store";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
@@ -45,9 +47,9 @@ import {
   setBrowserTabShowsInternalPage,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
-  type BrowserInspection,
   type BrowserMistyPage,
 } from "./browserRuntime";
+import { inspectBrowserPage } from "./browserPageInspection";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
 import { browserThemeFromDocument } from "./browserTheme";
 import { browserToolbarStyles } from "./browserToolbarStyles";
@@ -67,6 +69,7 @@ import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
+  const extensionsReady = useExtensionsStore((state) => state.ready);
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
     const pane = panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ?? panes[0];
@@ -74,6 +77,12 @@ export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
     return candidate?.surfaceId === "browser" ? candidate : undefined;
   });
   const tab = props.tab ?? fallbackTab;
+  if (hasTauriInternals() && !extensionsReady)
+    return (
+      <div className="grid h-full place-items-center text-sm text-cream-muted" role="status">
+        Preparing browser…
+      </div>
+    );
   if (!tab) {
     return (
       <div className="grid h-full place-items-center bg-charcoal-bg text-sm text-cream-muted">
@@ -116,7 +125,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     state.url,
     nativeRuntime,
   );
-  const browserChromeBackground = "#18191c";
+  const browserChromeBackground = "var(--workspace-tab-surface)";
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
   const agentMenuSuspensionReason = `browser-agent-menu:${browserRuntimeId(tab)}`;
@@ -387,47 +396,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       return;
     }
     setMistyPageLoading(true);
-    const grantId = `misty-page-${crypto.randomUUID()}`;
-    const agentId = "misty-contextual-copilot";
-    const scopeId = browserScopeId(tab);
     try {
-      await invoke("browser_agent_grant_register", {
-        request: {
-          id: browserRuntimeId(tab),
-          scopeId,
-          grantId,
-          agentId,
-          capabilities: ["browser.inspect"],
-          expiresAt: new Date(Date.now() + 2 * 60_000).toISOString(),
-        },
-      });
-      const snapshot = await invoke<BrowserInspection>("browser_agent_execute", {
-        request: {
-          scopeId,
-          grantId,
-          agentId,
-          operation: "browser.inspect",
-          input: {},
-        },
-      });
-      const text = String(snapshot.text ?? "").slice(0, 32 * 1024);
-      if (!text.trim()) throw new Error("The page did not expose readable text.");
-      setMistyPage({
-        title: String(snapshot.title || tab.title || "Browser page"),
-        text,
-        truncated: Boolean(snapshot.truncated) || String(snapshot.text ?? "").length > text.length,
-        urlFingerprint: browserContentHash(String(snapshot.url || state.url)),
-        interactive: (snapshot.interactive ?? []).slice(0, 100),
-      });
+      setMistyPage(await inspectBrowserPage(tab, state.url));
     } catch (error) {
       setBrowserError(tab.id, error);
     } finally {
-      await invoke("browser_agent_grant_revoke", {
-        request: {
-          id: browserRuntimeId(tab),
-          grantId,
-        },
-      }).catch(() => undefined);
       setMistyPageLoading(false);
     }
   };
@@ -632,6 +605,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
             mistyPageLoading={mistyPageLoading}
             onAttachPage={() => void attachPageToMisty()}
           />
+          <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
           {
             <BrowserDownloadsButton
               suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}

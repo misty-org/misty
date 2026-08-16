@@ -113,3 +113,34 @@ fn tab_groups_validate_and_route_to_their_collection() {
     assert_eq!(collection_of(Kind::SavedTabGroup), Some(TAB_GROUPS));
     assert_eq!(collection_of(Kind::Bookmark), Some(BOOKMARKS));
 }
+
+#[test]
+fn extension_values_are_encrypted_in_their_own_collection() {
+    let root=VaultRoot::generate(); let scope=scope();
+    let fields=serde_json::from_value(json!({"extension":"fixture@misty.test","generation":"01951d32-40ac-7000-8000-000000000001","key":"setting","change":{"value":"private value"}})).unwrap();
+    assert!(crate::document::entities::validate(Kind::ExtensionSyncKey,&fields).is_ok());
+    assert_eq!(crate::workspace::model::collection_of(Kind::ExtensionSyncKey),Some(EXTENSION_SYNC));
+    let record=ViewRecord {kind:Kind::ExtensionSyncKey,id:"fixture-key".into(),fields};
+    let key=record_key(&root,&scope,EXTENSION_SYNC,&record.id).unwrap();
+    let sealed=seal(&root,&scope,EXTENSION_SYNC,1,&record).unwrap();
+    assert!(!sealed.windows(b"private value".len()).any(|v|v==b"private value"));
+    assert!(open(&root,&scope,EXTENSION_SYNC,&key,1,&sealed).unwrap()==record);
+    assert!(open(&root,&scope,BOOKMARKS,&key,1,&sealed).is_err());
+}
+#[test]
+fn extension_removal_is_separate_from_stale_key_edits_and_new_installs() {
+    let mut collection=Collection::default();
+    let record=|kind,id:&str,generation:&str,change:Option<serde_json::Value>| {
+        let mut fields=std::collections::BTreeMap::from([("extension".into(),json!("fixture@misty.test")),("generation".into(),json!(generation))]);
+        if let Some(change)=change { fields.insert("key".into(),json!("setting")); fields.insert("change".into(),change); }
+        ViewRecord {kind,id:id.into(),fields}
+    };
+    let generation="01951d32-40ac-7000-8000-000000000001";
+    let removed=record(Kind::ExtensionRemoval,"removed",generation,None);
+    assert!(crate::document::entities::validate(removed.kind,&removed.fields).is_ok());
+    collection.pulled("removed".into(),1,Some(removed));
+    collection.write("stale-key".into(),Some(record(Kind::ExtensionSyncKey,"old",generation,Some(json!({"value":"offline edit"})))));
+    collection.write("new-key".into(),Some(record(Kind::ExtensionSyncKey,"new","01951d32-40ac-7000-8000-000000000002",Some(json!({"value":"new install"})))));
+    assert!(collection.view().iter().any(|v|v.kind==Kind::ExtensionRemoval && v.fields["generation"]==generation));
+    assert!(collection.view().iter().any(|v|v.fields["generation"]=="01951d32-40ac-7000-8000-000000000002"));
+}

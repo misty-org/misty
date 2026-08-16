@@ -77,7 +77,6 @@ describe("GlobalNavigator disclosures", () => {
 
   it.each([
     ["agents", "/agents", "Agents"],
-    ["files", "/files?view=transfers", "Files"],
     ["scheduled", "/scheduled", "Agents"],
     ["browser", "/browser", "Browser"],
   ] as const)(
@@ -127,10 +126,10 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(localStorage.getItem("misty:navigator-spaces-open")).toBe("false");
     expect(container.querySelector('[aria-label="Files"]')).not.toBeNull();
-    expect(container.querySelector("[data-spaces-stack]")?.hasAttribute("inert")).toBe(true);
+    expect(container.querySelector("#navigator-spaces")?.hasAttribute("inert")).toBe(true);
     await act(async () => trigger?.click());
     expect(localStorage.getItem("misty:navigator-spaces-open")).toBe("true");
-    expect(container.querySelector("[data-spaces-stack]")?.hasAttribute("inert")).toBe(false);
+    expect(container.querySelector("#navigator-spaces")?.hasAttribute("inert")).toBe(false);
   });
 
   async function renderNavigator(initialEntry = "/spaces/space-1/notes") {

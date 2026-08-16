@@ -110,7 +110,7 @@ export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; 
                 >
                   <span>{kind === "camera" ? "Camera" : "Microphone"}</span>
                   <Select
-                    disabled={busy || !info.persistent}
+                    disabled={busy}
                     value={info.permissions[kind]}
                     onValueChange={(value) =>
                       void update({
@@ -137,7 +137,7 @@ export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; 
               ))}
               {!info.persistent && (
                 <p className="text-sm text-cream-muted">
-                  Temporary session · permissions aren’t saved
+                  Permissions apply only to this temporary session.
                 </p>
               )}
               <Button
@@ -145,11 +145,7 @@ export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; 
                 variant="outline"
                 size="sm"
                 className="mt-3"
-                disabled={
-                  busy ||
-                  !info.persistent ||
-                  Object.values(info.permissions).every((value) => value === "ask")
-                }
+                disabled={busy || Object.values(info.permissions).every((value) => value === "ask")}
                 onClick={() => void update({ camera: "ask", microphone: "ask" })}
               >
                 Reset permissions

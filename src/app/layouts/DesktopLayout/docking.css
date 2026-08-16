@@ -24,6 +24,9 @@
   position: absolute;
   inset: 0 auto 0 0;
   max-width: 100%;
+  /* Browser views make the shell transparent. Paint this otherwise empty
+     corner so the native window backing cannot show beside the traffic lights. */
+  background: var(--misty-theme-workspace);
   pointer-events: auto;
 }
 .misty-docking-nav {
@@ -96,14 +99,14 @@
 .misty-navigator-items > * {
   flex-shrink: 0;
 }
-.misty-global-navigator .misty-navigator-items :is(a, [data-spaces-toggle]) {
+.misty-global-navigator .misty-navigator-items :is(a, [data-navigator-toggle]) {
   display: flex;
   justify-content: center;
   width: var(--misty-navigation-tile-size);
   height: var(--misty-navigation-tile-size);
   padding: 0;
 }
-.misty-navigator-items :is(a, [data-spaces-toggle]) > span {
+.misty-navigator-items :is(a, [data-navigator-toggle]) > span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -113,7 +116,7 @@
 .misty-navigator-items a[aria-current="page"] {
   background: var(--misty-theme-card);
 }
-.misty-navigator-items [data-spaces-toggle]:is([data-active="true"], [aria-expanded="true"]) {
+.misty-navigator-items [data-navigator-toggle]:is([data-active="true"], [aria-expanded="true"]) {
   background: var(--misty-theme-active);
 }
 .misty-global-navigator .misty-navigator-logo {
@@ -137,39 +140,39 @@
   height: 20px;
   margin: auto 3px;
 }
-.misty-global-navigator [data-spaces-tray] {
-  --misty-spaces-tray-inset: 3px;
+.misty-global-navigator [data-navigator-tray] {
+  --misty-navigator-tray-inset: 3px;
   display: flex;
   flex-direction: var(--navigator-direction);
   align-items: center;
-  padding: var(--misty-spaces-tray-inset);
-  border-radius: calc(8px + var(--misty-spaces-tray-inset));
+  padding: var(--misty-navigator-tray-inset);
+  border-radius: calc(8px + var(--misty-navigator-tray-inset));
 }
-.misty-global-navigator [data-spaces-stack] {
+.misty-global-navigator [data-navigator-stack] {
   min-width: 0;
   transition-property: grid-template-rows, grid-template-columns;
   transition-duration: var(--shell-motion-duration, 300ms);
   transition-timing-function: var(--shell-motion-easing, ease-in-out);
 }
-.misty-global-navigator [data-spaces-stack] > [role="group"] {
+.misty-global-navigator [data-navigator-stack] > [role="group"] {
   flex-direction: var(--navigator-direction);
   padding: var(--navigator-stack-padding);
   gap: 5px;
   min-width: 0;
 }
-.misty-global-navigator [data-spaces-stack][data-open="false"] > [role="group"] {
+.misty-global-navigator [data-navigator-stack][data-open="false"] > [role="group"] {
   padding: 0;
 }
 .misty-global-navigator:is([data-dock-position="top"], [data-dock-position="bottom"])
-  [data-spaces-stack] {
+  [data-navigator-stack] {
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: 1fr;
 }
 .misty-global-navigator:is([data-dock-position="top"], [data-dock-position="bottom"])
-  [data-spaces-stack][data-open="false"] {
+  [data-navigator-stack][data-open="false"] {
   grid-template-columns: 0fr;
 }
-.misty-global-navigator .misty-space-rail-control {
+.misty-global-navigator .misty-navigator-tray-item {
   display: grid;
   flex-shrink: 0;
   place-items: center;
@@ -185,8 +188,8 @@
 .misty-global-navigator :is(a, button) {
   position: relative;
 }
-[data-spaces-tray]
-  .misty-space-rail-control:is(
+[data-navigator-tray]
+  .misty-navigator-tray-item:is(
     :hover,
     :focus-visible,
     [aria-current="page"],
@@ -315,7 +318,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .misty-shell-motion,
-  .misty-global-navigator [data-spaces-stack] {
+  .misty-global-navigator [data-navigator-stack] {
     transition: none;
   }
 }
@@ -416,4 +419,192 @@
   height: var(--shell-titlebar, 38px);
   padding-left: max(12px, var(--window-chrome-left, 0px));
   padding-right: max(12px, var(--window-chrome-right, 0px));
+}
+
+/* Connected tabs. The strip shares the navigator's black frame; the active tab
+   (ConnectedTabShape) rises out of the pane below with matching fill. The strip
+   overlaps the pane's seam row by 1px so the tab can cover it, and the pane
+   keeps the standard corners and seams from dockingGeometry. Everything in the
+   strip shares the bar's center line with the traffic lights. Tabs fill the
+   strip below a small --tab-inset gap, and their content is centered in the tab. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
+  /* Corner and shoulder radius; ConnectedTabShape and the drag preview read it. */
+  --tab-shoulder: 14px;
+  --tab-inset: var(--shell-tab-inset, 3px);
+  position: relative;
+  z-index: 1;
+  height: var(--shell-tab-strip-height, 38px);
+  align-items: stretch;
+  border: 0;
+  /* WorkspaceTabStrip sets padding-left from the traffic-light inset. */
+  /* Leave the overlapped seam row unpainted so the pane outline shows. */
+  background: linear-gradient(var(--misty-theme-workspace), var(--misty-theme-workspace)) top / 100%
+    calc(100% - 1px) no-repeat;
+}
+.misty-workspace-tabs[data-tab-position="top"] {
+  margin-bottom: -1px;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] {
+  margin-top: -1px;
+  background-position: bottom;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-list[data-reorder-list] {
+  height: 100%;
+  align-items: flex-end;
+  gap: 0;
+  padding: var(--tab-inset) var(--tab-shoulder) 0;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-list[data-reorder-list] {
+  align-items: flex-start;
+  padding-block: 0 var(--tab-inset);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  min-width: 96px;
+  max-width: 232px;
+  flex: 1 1 232px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--workspace-tab-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab
+  [role="tab"] {
+  justify-content: flex-start;
+  gap: 8px;
+  /* Favicon and close glyph both sit 12px inside the tab's sides. */
+  padding: 0 6px 0 12px;
+  color: inherit;
+  text-align: left;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab[data-active="true"] {
+  z-index: 2;
+  background: transparent;
+  color: var(--workspace-tab-text);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"]):hover {
+  color: var(--workspace-tab-text);
+  background: transparent;
+}
+/* Inactive hover: as tall as the active tab, inset sideways to clear the
+   active shoulders and 1px off the pane seam so the seam stays visible. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"])::before {
+  content: "";
+  position: absolute;
+  inset: 0 4px 1px;
+  z-index: -1;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--workspace-tab-surface) 75%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"], [data-reorder-dragging="true"]):hover::before {
+  opacity: 1;
+}
+.misty-workspace-tab-shape {
+  position: absolute;
+  top: 0;
+  left: calc(-1 * var(--tab-shoulder));
+  z-index: -1;
+  width: calc(100% + 2 * var(--tab-shoulder));
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.misty-workspace-tab:not([data-active="true"]) .misty-workspace-tab-shape {
+  visibility: hidden;
+}
+.misty-workspace-tab-shape-outline {
+  fill: none;
+  stroke: var(--color-charcoal-border);
+  stroke-width: 1px;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-shape {
+  scale: 1 -1;
+}
+.misty-workspace-tabs[data-tab-position="bottom"]
+  .misty-workspace-tab:not([data-active="true"])::before {
+  inset: 1px 4px 0;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab {
+  padding: var(--tab-inset) 0 0;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-list
+  > :is(button, .misty-tab-group-header),
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-actions {
+  align-self: center;
+  margin-block: 0;
+}
+.misty-workspace-tabs[data-tab-position="top"]
+  .misty-workspace-tab-list
+  > :is(button, .misty-tab-group-header) {
+  margin-bottom: var(--tab-inset);
+}
+.misty-workspace-tabs[data-tab-position="bottom"]
+  .misty-workspace-tab-list
+  > :is(button, .misty-tab-group-header) {
+  margin-top: var(--tab-inset);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-actions {
+  color: var(--workspace-tab-muted);
+}
+/* Close and New tab share a 1.33px stroke and sit 12px either side of the
+   tab's trailing edge. Close is the quieter control: a 20px target with a 7px
+   glyph, against New tab's 24px target and 8px glyph. Lucide's x spans 12/24
+   of its box and its plus 14/24. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  :is(.misty-workspace-new-tab, .misty-workspace-tab-close) {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-new-tab {
+  margin-left: 4px;
+  color: var(--workspace-tab-muted);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-new-tab
+  svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-close {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  margin: 0 6px 0 0;
+  color: inherit;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-close
+  svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-tab-group-member:not([data-group-active="true"])::after {
+  bottom: 0;
 }

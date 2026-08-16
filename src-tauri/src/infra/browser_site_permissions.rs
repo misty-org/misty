@@ -1,14 +1,18 @@
 //! Native website permissions. Decisions are local to this app and data-store profile.
 #![allow(unexpected_cfgs)]
 use objc::{msg_send, sel, sel_impl};
-use objc2_foundation::{NSProcessInfo, NSString, NSUserDefaults};
+use objc2_foundation::{NSProcessInfo, NSString};
 use objc2_web_kit::{WKMediaCaptureState, WKSecurityOrigin, WKWebView};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use tauri::{AppHandle, Manager, Webview};
 
 const DELEGATE_CLASS: &str = "MistySitePermissionDelegate";
-const PREFERENCES_KEY: &str = "misty.browser.site-permissions.v1";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PermissionScope {
+    Persistent(String),
+    Temporary(usize),
+}
 
 #[derive(Clone, Copy, Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -42,9 +46,19 @@ pub struct SiteInfo {
     persistent: bool,
     profile: Option<String>,
     permissions: Permissions,
+    #[serde(skip)]
+    scope: PermissionScope,
 }
 
-type PermissionStore = BTreeMap<String, BTreeMap<String, Permissions>>;
+unsafe fn scope(view: &WKWebView) -> PermissionScope {
+    profile(view)
+        .map(PermissionScope::Persistent)
+        .unwrap_or_else(|| {
+            PermissionScope::Temporary(
+                &*view.configuration().websiteDataStore() as *const _ as usize
+            )
+        })
+}
 
 fn canonical_origin(value: &str) -> Result<String, String> {
     let url = url::Url::parse(value).map_err(|_| "Invalid website address.")?;
@@ -52,24 +66,6 @@ fn canonical_origin(value: &str) -> Result<String, String> {
         return Err("Site permissions are available for HTTP and HTTPS websites.".into());
     }
     Ok(url.origin().ascii_serialization())
-}
-
-fn read_store() -> PermissionStore {
-    NSUserDefaults::standardUserDefaults()
-        .stringForKey(&NSString::from_str(PREFERENCES_KEY))
-        .and_then(|raw| serde_json::from_str(&raw.to_string()).ok())
-        .unwrap_or_default()
-}
-
-fn write_store(store: &PermissionStore) -> Result<(), String> {
-    let data = serde_json::to_string(store).map_err(|error| error.to_string())?;
-    unsafe {
-        NSUserDefaults::standardUserDefaults().setObject_forKey(
-            Some(&NSString::from_str(&data)),
-            &NSString::from_str(PREFERENCES_KEY),
-        );
-    }
-    Ok(())
 }
 
 unsafe fn profile(view: &WKWebView) -> Option<String> {
@@ -155,15 +151,17 @@ extern "C" fn media_permission(
         };
         let requester = canonical_origin(&format!("{}://{host}{suffix}", requester.protocol()));
         let top = current_origin(view);
-        let profile_id = profile(view);
-        let store = read_store();
-        let sites = profile_id.as_ref().and_then(|id| store.get(id));
-        let top_permissions = sites
-            .and_then(|sites| top.as_ref().ok().and_then(|origin| sites.get(origin)))
+        let sites = sites_for_scope(&scope(view));
+        let top_permissions = top
+            .as_ref()
+            .ok()
+            .and_then(|origin| sites.get(origin))
             .cloned()
             .unwrap_or_default();
-        let requesting_permissions = sites
-            .and_then(|sites| requester.as_ref().ok().and_then(|origin| sites.get(origin)))
+        let requesting_permissions = requester
+            .as_ref()
+            .ok()
+            .and_then(|origin| sites.get(origin))
             .cloned()
             .unwrap_or_default();
         let permissions = effective_permissions(&top_permissions, &requesting_permissions);
@@ -236,29 +234,12 @@ async fn inspect(
                 return Err("The page changed. Reopen site settings and try again.".into());
             }
             let profile = profile(view);
-            let mut store = read_store();
-            if let Some(update) = update {
-                let profile = profile
-                    .as_ref()
-                    .ok_or("This temporary website session cannot remember permissions.")?;
-                if update == Permissions::default() {
-                    if let Some(sites) = store.get_mut(profile) {
-                        sites.remove(&origin);
-                    }
-                } else {
-                    store
-                        .entry(profile.clone())
-                        .or_default()
-                        .insert(origin.clone(), update);
-                }
-                write_store(&store)?;
-            }
-            let permissions = profile
-                .as_ref()
-                .and_then(|id| store.get(id))
-                .and_then(|sites| sites.get(&origin))
-                .cloned()
-                .unwrap_or_default();
+            let scope = scope(view);
+            let sites = match update {
+                Some(update) => update_scope(&scope, &origin, update)?,
+                None => sites_for_scope(&scope),
+            };
+            let permissions = sites.get(&origin).cloned().unwrap_or_default();
             Ok(SiteInfo {
                 url: view
                     .URL()
@@ -276,6 +257,7 @@ async fn inspect(
                 persistent: profile.is_some(),
                 profile,
                 permissions,
+                scope,
             })
         })();
         let _ = tx.send(result);
@@ -299,7 +281,7 @@ pub async fn browser_site_info(
 // whose current top-level URL does not reveal the origin of an active media stream.
 async fn stop_capture(
     app: &AppHandle,
-    affected_profile: &str,
+    affected_scope: &PermissionScope,
     camera: bool,
     microphone: bool,
 ) -> Result<(), String> {
@@ -313,11 +295,11 @@ async fn stop_capture(
                 continue;
             }
             let (tx, rx) = tokio::sync::oneshot::channel();
-            let affected_profile = affected_profile.to_owned();
+            let affected_scope = affected_scope.clone();
             webview
                 .with_webview(move |native| unsafe {
                     let view: &WKWebView = &*native.inner().cast();
-                    if profile(view).as_deref() != Some(&affected_profile) {
+                    if scope(view) != affected_scope {
                         let _ = tx.send(());
                         return;
                     }
@@ -370,17 +352,14 @@ pub async fn browser_site_permissions_set(
         Some(permissions.clone()),
     )
     .await?;
-    if let Some(profile) = &info.profile {
-        stop_capture(
-            &app,
-            profile,
-            permissions.camera != Decision::Allow
-                && permissions.camera != before.permissions.camera,
-            permissions.microphone != Decision::Allow
-                && permissions.microphone != before.permissions.microphone,
-        )
-        .await?;
-    }
+    stop_capture(
+        &app,
+        &info.scope,
+        permissions.camera != Decision::Allow && permissions.camera != before.permissions.camera,
+        permissions.microphone != Decision::Allow
+            && permissions.microphone != before.permissions.microphone,
+    )
+    .await?;
     Ok(info)
 }
 
@@ -452,85 +431,19 @@ pub async fn browser_site_permissions_reset(
     .map_err(|error| error.to_string())?;
     rx.await
         .map_err(|_| "Could not reset website permissions.".to_owned())??;
-    stop_capture(&app, &affected_profile, true, true).await
+    stop_capture(
+        &app,
+        &PermissionScope::Persistent(affected_profile),
+        true,
+        true,
+    )
+    .await
 }
+
+#[path = "browser_site_permissions_store.rs"]
+mod store;
+use store::{read_store, sites_for_scope, update_scope, write_store};
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn origin_identity_preserves_scheme_host_and_nondefault_port() {
-        assert_eq!(
-            canonical_origin("https://user:pass@EXAMPLE.com:443/path?q=x").unwrap(),
-            "https://example.com"
-        );
-        assert_eq!(
-            canonical_origin("https://example.com:8443/").unwrap(),
-            "https://example.com:8443"
-        );
-        assert_eq!(
-            canonical_origin("http://[::1]:3000/").unwrap(),
-            "http://[::1]:3000"
-        );
-        assert!(canonical_origin("file:///tmp/page.html").is_err());
-        assert!(canonical_origin("javascript:alert(1)").is_err());
-    }
-    #[test]
-    fn prompts_by_default_and_never_inherits_an_allowance_into_another_origin() {
-        assert_eq!(decision(&Permissions::default(), 2, true), 0);
-        let allowed = Permissions {
-            camera: Decision::Allow,
-            microphone: Decision::Allow,
-        };
-        assert_eq!(decision(&allowed, 2, true), 1);
-        assert_eq!(decision(&allowed, 2, false), 0);
-        assert_eq!(decision(&allowed, 99, true), 2);
-    }
-    #[test]
-    fn saved_requester_blocks_apply_inside_frames_and_top_blocks_override_requester_allows() {
-        let blocked = Permissions {
-            camera: Decision::Block,
-            microphone: Decision::Ask,
-        };
-        let allowed = Permissions {
-            camera: Decision::Allow,
-            microphone: Decision::Allow,
-        };
-        assert_eq!(
-            decision(
-                &effective_permissions(&Permissions::default(), &blocked),
-                0,
-                false
-            ),
-            2
-        );
-        assert_eq!(
-            decision(&effective_permissions(&blocked, &allowed), 0, false),
-            2
-        );
-        assert_eq!(
-            decision(
-                &effective_permissions(&Permissions::default(), &allowed),
-                0,
-                false
-            ),
-            0
-        );
-    }
-
-    #[test]
-    fn combined_requests_require_both_grants_and_block_wins() {
-        let partial = Permissions {
-            camera: Decision::Allow,
-            microphone: Decision::Ask,
-        };
-        assert_eq!(decision(&partial, 0, true), 1);
-        assert_eq!(decision(&partial, 2, true), 0);
-        let blocked = Permissions {
-            camera: Decision::Allow,
-            microphone: Decision::Block,
-        };
-        assert_eq!(decision(&blocked, 2, true), 2);
-        assert_eq!(decision(&blocked, 1, false), 2);
-    }
-}
+#[path = "browser_site_permissions_tests.rs"]
+mod tests;

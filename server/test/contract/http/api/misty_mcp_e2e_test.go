@@ -117,35 +117,30 @@ func TestManagedMistyMCPNegotiatesWithOfficialGoSDK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var contextTool, spaceCatalogTool, spaceExecuteTool, remoteTool *mcp.Tool
+	var contextTool, taskCreateTool, remoteTool *mcp.Tool
 	for _, tool := range result.Tools {
-		if tool.Name == "context.get" {
+		switch tool.Name {
+		case "spaces.list":
 			contextTool = tool
-		}
-		if tool.Name == "spaces.tools" {
-			spaceCatalogTool = tool
-		}
-		if tool.Name == "spaces.execute" {
-			spaceExecuteTool = tool
-		}
-		if tool.Name == remoteName {
+		case "tasks.create":
+			taskCreateTool = tool
+		case remoteName:
 			remoteTool = tool
+		case "spaces.tools", "spaces.execute":
+			t.Fatalf("retired Space proxy tool advertised: %s", tool.Name)
 		}
 	}
 	if contextTool == nil {
-		t.Fatalf("context.get missing from %d run-scoped tools", len(result.Tools))
+		t.Fatalf("spaces.list missing from %d run-scoped tools", len(result.Tools))
 	}
 	if contextTool.InputSchema == nil || contextTool.OutputSchema == nil || contextTool.Annotations == nil || !contextTool.Annotations.ReadOnlyHint {
-		t.Fatalf("context.get is missing typed schemas or read-only metadata: %#v", contextTool)
+		t.Fatalf("spaces.list is missing typed schemas or read-only metadata: %#v", contextTool)
 	}
 	if contextTool.Meta["misty/risk"] != "read" || contextTool.Meta["misty/version"] == nil {
-		t.Fatalf("context.get is missing Misty metadata: %#v", contextTool.Meta)
+		t.Fatalf("spaces.list is missing Misty metadata: %#v", contextTool.Meta)
 	}
-	if spaceCatalogTool == nil || spaceExecuteTool == nil {
-		t.Fatalf("Space destination tools are missing from the run-scoped MCP catalog")
-	}
-	if spaceCatalogTool.Meta["misty/risk"] != "read" || spaceExecuteTool.Meta["misty/risk"] != "write" {
-		t.Fatalf("Space destination tools have incorrect risk metadata")
+	if taskCreateTool == nil || taskCreateTool.Meta["misty/risk"] != "write" {
+		t.Fatalf("Space write tools are missing or mislabeled in the run-scoped MCP catalog: %#v", taskCreateTool)
 	}
 	if remoteTool == nil || remoteTool.InputSchema == nil || remoteTool.OutputSchema == nil {
 		t.Fatalf("connected remote MCP tool is not advertised with typed schemas: %#v", remoteTool)

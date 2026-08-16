@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   FileText,
   Hash,
@@ -33,16 +33,6 @@ export function ConversationIcon({ conversation }: { conversation: Conversation 
         ? MessagesSquare
         : Hash;
   return <Icon size={18} aria-hidden="true" />;
-}
-export function useNarrow() {
-  const [narrow, setNarrow] = useState(() => matchMedia("(max-width: 700px)").matches);
-  useEffect(() => {
-    const media = matchMedia("(max-width: 700px)");
-    const update = () => setNarrow(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return narrow;
 }
 const emojis = [
   ["👍", "thumbs up"],

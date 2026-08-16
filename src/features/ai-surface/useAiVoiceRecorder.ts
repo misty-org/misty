@@ -13,7 +13,9 @@ export function useAiVoiceRecorder({
   onTranscript,
   onError,
   onActivityChange,
+  contextKey,
 }: {
+  contextKey?: string;
   onTranscript: (transcript: string) => void;
   onError: (message: string) => void;
   onActivityChange?: (active: boolean) => void;
@@ -63,6 +65,9 @@ export function useAiVoiceRecorder({
 
   useEffect(() => {
     mountedRef.current = true;
+    setRequesting(false);
+    setRecording(false);
+    setTranscribing(false);
     const recordingGeneration = generation;
     return () => {
       mountedRef.current = false;
@@ -74,7 +79,7 @@ export function useAiVoiceRecorder({
       streamRef.current?.getTracks().forEach((track) => track.stop());
       onActivityChangeRef.current?.(false);
     };
-  }, []);
+  }, [contextKey]);
 
   const start = async () => {
     if (requesting || recording || transcribing) return;

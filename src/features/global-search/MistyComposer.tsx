@@ -1,3 +1,4 @@
+import { CommandUsageEstimate } from "./CommandUsageEstimate";
 import {
   cn,
   DropdownMenu,
@@ -19,6 +20,7 @@ import type { GlobalAiMode, MistyImageAttachment } from "./types";
 
 export function MistyComposer(props: {
   value: string;
+  modelId?: string;
   onChange: (value: string) => void;
   mode: GlobalAiMode;
   onModeChange?: (mode: GlobalAiMode) => void;
@@ -38,6 +40,8 @@ export function MistyComposer(props: {
   placeholder?: string;
   compact?: boolean;
   layout?: "default" | "conversation";
+  /** The surface shows usage itself (the Agents control bar), so the footer omits it. */
+  hideUsageEstimate?: boolean;
   className?: string;
   onError?: (message: string) => void;
 }) {
@@ -221,16 +225,21 @@ export function MistyComposer(props: {
         </>
       }
       footer={
-        props.onModeChange ? (
-          <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
-        ) : props.mode === "search" ? (
-          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
-            <Search className="size-3.5" />
-            Search
-          </span>
-        ) : (
-          props.modelControl
-        )
+        <div className="flex min-w-0 flex-col gap-2">
+          {props.onModeChange ? (
+            <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
+          ) : props.mode === "search" ? (
+            <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-[11px] text-cream-muted">
+              <Search className="size-3.5" />
+              Search
+            </span>
+          ) : (
+            props.modelControl
+          )}
+          {props.mode !== "search" && !props.busy && !props.hideUsageEstimate && (
+            <CommandUsageEstimate text={props.value} model={props.modelId} />
+          )}
+        </div>
       }
       actions={
         <>

@@ -82,6 +82,8 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 	if len(spaceIDs) > 0 {
 		spaceID = spaceIDs[0]
 	}
+	embeddingModel := "google/gemini-embedding-2"
+ if len(spaceIDs) > 1 { embeddingModel = spaceIDs[1] }
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return []AIRetrievalHit{}, nil
@@ -97,9 +99,9 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 			rows, err = tx.QueryContext(ctx, `
 				WITH lexical_query AS (SELECT plainto_tsquery('simple',$1) value)
 				SELECT d.id,d.source_kind,d.source_id,COALESCE(d.space_id,''),d.source_revision,d.title,d.href,c.content,
-					(ts_rank_cd(c.lexical,q.value)*0.55 + CASE WHEN c.embedding IS NULL THEN 0 ELSE (1-(c.embedding <=> $2::vector))*0.45 END) score,
+					(ts_rank_cd(c.lexical,q.value)*0.55 + CASE WHEN c.embedding IS NULL OR c.embedding_model<>$6 THEN 0 ELSE (1-(c.embedding <=> $2::vector))*0.45 END) score,
 					ts_rank_cd(c.lexical,q.value) lexical_score,
-					CASE WHEN c.embedding IS NULL THEN 0 ELSE (1-(c.embedding <=> $2::vector)) END semantic_score
+					CASE WHEN c.embedding IS NULL OR c.embedding_model<>$6 THEN 0 ELSE (1-(c.embedding <=> $2::vector)) END semantic_score
 				FROM ai_retrieval_documents d JOIN ai_retrieval_chunks c ON c.document_id=d.id CROSS JOIN lexical_query q
 				WHERE d.lifecycle_state='active' AND ($5='' OR d.space_id=$5)
 				  AND (
@@ -114,9 +116,9 @@ func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string,
 				          SELECT 1 FROM space_calendar_events e JOIN space_calendar_sources s ON s.id=e.source_id
 				          WHERE e.id=d.source_id AND e.removed_at IS NULL AND s.status='active'))))
 				  )
-				  AND (c.lexical @@ q.value OR c.embedding IS NOT NULL)
+				  AND (c.lexical @@ q.value OR (c.embedding IS NOT NULL AND c.embedding_model=$6))
 				ORDER BY score DESC,d.updated_at DESC,d.id,c.ordinal LIMIT $3
-			`, query, aiVectorLiteral(embedding), limit, userID, spaceID)
+			`, query, aiVectorLiteral(embedding), limit, userID, spaceID, embeddingModel)
 		} else {
 			rows, err = tx.QueryContext(ctx, `
 				WITH lexical_query AS (SELECT plainto_tsquery('simple',$1) value)
