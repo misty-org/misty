@@ -1,0 +1,10 @@
+{
+  "schema_version": 1, "id": "storage_report", "name": "Storage Report", "version": "0.3.0", "author": "Misty", "status": "installed",
+  "overview": "Storage Report explains where a local folder's space is going with a recursive, read-only scan that never follows symlinks.",
+  "capabilities": ["Summarize file and folder counts and total bytes", "Sort the largest files and review file-type distribution", "Report unreadable or skipped entries with cancellable progress"],
+  "where_it_appears": ["Files extension popup"], "permissions": ["Read-only access to the selected local folder"],
+  "getting_started": ["Select one local folder in Files.", "Open Storage Report and choose Scan folder.", "Sort the result or refresh it after the folder changes."],
+  "changelog": ["v0.3.0 - Initial production release with symlink-safe scanning, cancellation, largest files, and type distribution."],
+  "included_tools": [], "links": [{"label":"Documentation","url":"https://mistysys.com/docs/extensions/storage-report"}], "actions": [{"label":"Open","kind":"open"}],
+  "launcher": { "views": ["Files"], "show_in_launcher": true, "requires_selected_file": true, "open_mode": "popup" }
+}
