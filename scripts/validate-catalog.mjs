@@ -11,7 +11,7 @@ if (!Array.isArray(index) || index.length === 0) fail("catalog/index.json must c
 for (const entry of index) {
   if (!entry || typeof entry.id !== "string" || ids.has(entry.id)) fail(`Invalid or duplicate catalog id: ${entry?.id}`);
   ids.add(entry.id);
-  const expectedUrl = `https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/${entry.id}.json`;
+  const expectedUrl = `https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/${entry.id}.json`;
   if (entry.url !== expectedUrl) fail(`${entry.id} catalog URL must be ${expectedUrl}`);
 }
 
@@ -34,7 +34,7 @@ for (const id of ids) {
   }
   if (!Array.isArray(catalog.install?.artifacts) || catalog.install.artifacts.length === 0) fail(`${id} must have release artifacts.`);
   for (const artifact of catalog.install.artifacts) {
-    if (!artifact.url?.includes(`/releases/download/v${packageJson.version}/${id}-${artifact.platform}.zip`)) fail(`${id} has an artifact URL for the wrong release or platform bundle.`);
+    if (!artifact.url?.includes(`/releases/download/extensions-v${packageJson.version}/${id}-${artifact.platform}.zip`)) fail(`${id} has an artifact URL for the wrong release or platform bundle.`);
   }
   const tools = manifest.tools ?? [];
   for (const tool of tools) {

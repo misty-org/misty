@@ -56,11 +56,11 @@
   "install": {
     "root": "private",
     "artifacts": [
-      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-aarch64.zip" },
-      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-x86_64.zip" },
-      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-windows-x86_64.zip" },
-      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-linux-x86_64.zip" }
+      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty/releases/download/extensions-v0.3.0/ytdlp-macos-aarch64.zip" },
+      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty/releases/download/extensions-v0.3.0/ytdlp-macos-x86_64.zip" },
+      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty/releases/download/extensions-v0.3.0/ytdlp-windows-x86_64.zip" },
+      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty/releases/download/extensions-v0.3.0/ytdlp-linux-x86_64.zip" }
     ]
   },
-  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/ytdlp/assets/logo.svg"
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty/main/extensions/extensions/ytdlp/assets/logo.svg"
 }
