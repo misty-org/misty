@@ -297,59 +297,6 @@ func TestSpaceAgentInterpretsTaskTimestampInTheSuppliedTimezone(t *testing.T) {
 	}
 }
 
-func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
-	database := openTestDatabase(t)
-	ctx := context.Background()
-	owner, err := database.CreateUser("Note Tool Owner", "note-tool-owner@example.com", "password123")
-	if err != nil {
-		t.Fatal(err)
-	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Notes Space")
-	if err != nil {
-		t.Fatal(err)
-	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Create a launch note", "notes.create", json.RawMessage(`{"title":"Launch plan","markdown":"# Launch\nInitial checklist"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var created SpaceNote
-	if err := json.Unmarshal(createdRaw, &created); err != nil || created.ID == "" {
-		t.Fatalf("created note = %s, %v", createdRaw, err)
-	}
-	updatedRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Update the launch note", "notes.update", json.RawMessage(`{"id":"`+created.ID+`","title":"Launch plan","markdown":"# Launch\nReady for beta"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var updated SpaceNote
-	if json.Unmarshal(updatedRaw, &updated) != nil || updated.ID != created.ID {
-		t.Fatalf("updated note = %s", updatedRaw)
-	}
-	commands, err := database.PendingNoteControlCommands(ctx, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	foundReplace := false
-	for _, command := range commands {
-		if command.NoteID == created.ID && command.Command == "replace_markdown" {
-			foundReplace = true
-		}
-	}
-	if !foundReplace {
-		t.Fatalf("missing durable replace_markdown command: %#v", commands)
-	}
-	applied, err := database.ApplySpaceNoteProjection(ctx, SpaceNoteProjection{
-		NoteID: created.ID, Revision: created.CollaborationRevision + 1, Title: "Launch plan",
-		Markdown: "# Launch\nReady for beta", PlainText: "Launch\nReady for beta",
-	})
-	if err != nil || !applied {
-		t.Fatalf("room projection was not applied: applied=%v err=%v", applied, err)
-	}
-	searchRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Find launch notes", "notes.search", json.RawMessage(`{"query":"Ready for beta"}`))
-	if err != nil || !strings.Contains(string(searchRaw), created.ID) {
-		t.Fatalf("searched notes = %s, %v", searchRaw, err)
-	}
-}
-
 func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()

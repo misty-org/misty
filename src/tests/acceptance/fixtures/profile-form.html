@@ -1,0 +1,11 @@
+<!doctype html>
+<title>Profile</title>
+<body style="font: 16px system-ui; padding: 48px">
+  <label>Full name <input id="name" style="font-size: 18px; padding: 6px" /></label>
+  <button id="save" style="font-size: 18px; margin-left: 12px">Save</button>
+  <p id="status">Not saved</p>
+  <script>
+    const field = (id) => document.getElementById(id);
+    field("save").onclick = () => (field("status").textContent = "Saved: " + field("name").value);
+  </script>
+</body>

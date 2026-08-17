@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Runs the Go server suite against a disposable PostgreSQL container, exactly
 # as production runs it (same pinned image); the dev database is untouched.
+# Arguments replace the default ./... package list, e.g.
+#   .githooks/server-tests.sh ./test/contract/postgres -run NativeNote
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)/server"
 image=pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
@@ -41,7 +43,8 @@ PGHOST=127.0.0.1 PGPORT=$port PGUSER=misty PGPASSWORD=$password PGDATABASE=misty
   ./scripts/docker/postgres-grant-app-role.sh >/dev/null
 log=$(mktemp)
 set +e
-go test -p 1 -timeout 30m ./... -count=1 >"$log" 2>&1
+if [ $# -eq 0 ]; then set -- ./...; fi
+go test -p 1 -timeout 30m -count=1 "$@" >"$log" 2>&1
 status=$?
 set -e
 grep -v -e '^ok ' -e 'no test files' "$log" || true

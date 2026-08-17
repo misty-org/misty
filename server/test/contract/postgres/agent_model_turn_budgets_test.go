@@ -105,6 +105,12 @@ func TestAgentModelTurnBudgetConcurrencyAndRecovery(t *testing.T) {
 			if err := database.ReserveAgentModelTurn(ctx, user, runID, runtime, "model:later"); !errors.Is(err, ErrAgentModelTurnLimit) {
 				t.Fatalf("wait reset budget: %v", err)
 			}
+			// A screen loop's planner calls are metered but never spend agent turns.
+			for call := range 3 {
+				if err := database.ReserveAgentModelTurn(ctx, user, runID, runtime, fmt.Sprintf("model:screen:job:%d", call)); err != nil {
+					t.Fatalf("screen planning spent the turn budget: %v", err)
+				}
+			}
 		})
 	}
 }

@@ -13,7 +13,8 @@ import (
 )
 
 // appsConnect shows a Connect card and waits briefly for the user to sign in.
-// The model calls it again to keep waiting.
+// If the user has not connected by then, the run hands off: the card stays in
+// the chat and Misty continues the conversation once the app is connected.
 func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 	var input struct {
 		App string `json:"app"`
@@ -32,15 +33,7 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	if err != nil {
 		return nil, appsError(err)
 	}
-	connected := func() (bool, error) {
-		accounts, err := client.Accounts(ctx, composio.UserID(invocation.UserID), app)
-		for _, account := range accounts {
-			if account.Active() {
-				return true, nil
-			}
-		}
-		return false, err
-	}
+	connected := func() (bool, error) { return appsAccountActive(ctx, client, invocation.UserID, app) }
 	if ok, err := connected(); err != nil || ok {
 		return appsConnectResult(app, ok, err)
 	}
@@ -83,8 +76,39 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	}
 	return TestingMustAPIRawJSON(map[string]any{
 		"app": app, "status": "waiting_for_user",
-		"message": "A Connect " + name + " card is showing in the chat. Call apps_connect again to keep waiting, or finish and tell the user to connect " + name + ".",
+		"message":      "A Connect " + name + " card is showing in the chat. This run ends here and Misty continues once the user connects " + name + ".",
+		"user_message": "Connect " + name + " with the card above. Misty continues once it's connected.",
 	}), nil
+}
+
+func appsAccountActive(ctx context.Context, client *composio.Client, userID, app string) (bool, error) {
+	accounts, err := client.Accounts(ctx, composio.UserID(userID), app)
+	for _, account := range accounts {
+		if account.Active() {
+			return true, nil
+		}
+	}
+	return false, err
+}
+
+// refreshConnectRequest marks a pending Connect card connected once the app
+// is, so a card left after the run ended can continue the conversation.
+func (s *SpacesService) refreshConnectRequest(ctx context.Context, user string, request *db.AgentAppRequest) *db.AgentAppRequest {
+	if request.Kind != "connect" || request.State != "pending" || !time.Now().Before(request.ExpiresAt) {
+		return request
+	}
+	client, err := composioClient()
+	if err != nil {
+		return request
+	}
+	if ok, err := appsAccountActive(ctx, client, user, request.Subject); err != nil || !ok {
+		return request
+	}
+	if resolved, _ := s.database.ResolveAgentAppRequest(ctx, user, request.ID, "pending", "connected"); resolved {
+		request.State = "connected"
+		s.showAppRequest(ctx, user, request.RunID, request)
+	}
+	return request
 }
 
 func appsConnectResult(app string, ok bool, err error) (json.RawMessage, error) {

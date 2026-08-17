@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Plug, ShieldQuestion } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button } from "@/shared/ui";
 import { appsApi, type AppRequest } from "./api";
@@ -20,8 +20,21 @@ function stateLabel(request: AppRequest, expired: boolean) {
   }
 }
 
-/** In-chat card for something the agent needs: connect an app or approve one action. */
-export function AppRequestCard({ request }: { request: AppRequest }) {
+// How often a Connect card checks for the finished sign-in.
+const connectPollMs = 3_000;
+
+/**
+ * In-chat card for something the agent needs: connect an app or approve one
+ * action. `onResolved` hears every answer, including a sign-in finished in the
+ * browser, so the conversation can continue.
+ */
+export function AppRequestCard({
+  request,
+  onResolved,
+}: {
+  request: AppRequest;
+  onResolved?: (request: AppRequest) => void;
+}) {
   const [current, setCurrent] = useState(request);
   const [busy, setBusy] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -29,6 +42,29 @@ export function AppRequestCard({ request }: { request: AppRequest }) {
   useEffect(() => setCurrent(request), [request]);
   const expired = current.state === "pending" && Date.parse(current.expiresAt) <= Date.now();
   const pending = current.state === "pending" && !expired;
+  const resolved = useRef(onResolved);
+  resolved.current = onResolved;
+  const answered = (next: AppRequest) => {
+    setCurrent(next);
+    if (next.state !== "pending") resolved.current?.(next);
+  };
+  // After sign-in opens, check until the app is connected or the card expires.
+  useEffect(() => {
+    if (!pending || current.kind !== "connect" || !opened) return;
+    let stopped = false;
+    const timer = setInterval(() => {
+      void appsApi
+        .request(current.id)
+        .then(({ request: next }) => {
+          if (!stopped && next.state !== "pending") answered(next);
+        })
+        .catch(() => undefined);
+    }, connectPollMs);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [pending, current.kind, current.id, opened]);
 
   async function act(operation: () => Promise<void>) {
     if (busy) return;
@@ -49,7 +85,7 @@ export function AppRequestCard({ request }: { request: AppRequest }) {
       setOpened(true);
     });
   const decide = (decision: "approve" | "decline") =>
-    act(async () => setCurrent((await appsApi.decide(current.id, decision)).request));
+    act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
   const Icon = current.kind === "connect" ? Plug : ShieldQuestion;
   return (
