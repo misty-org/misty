@@ -1,20 +1,20 @@
 [
-  {"id":"storage_report","name":"Storage Report","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/storage_report.json"},
-  {"id":"image_optimizer","name":"Image Optimizer","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/image_optimizer.json"},
-  {"id":"backups","name":"Backups","url":"https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/backups.json"},
+  {"id":"storage_report","name":"Storage Report","url":"https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/storage_report.json"},
+  {"id":"image_optimizer","name":"Image Optimizer","url":"https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/image_optimizer.json"},
+  {"id":"backups","name":"Backups","url":"https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/backups.json"},
  {
     "id": "quick_convert",
     "name": "Quick Convert",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/quick_convert.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/quick_convert.json"
   },
   {
     "id": "themes",
     "name": "Themes",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/themes.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/themes.json"
   },
   {
     "id": "ytdlp",
     "name": "Ytdlp",
-    "url": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog/ytdlp.json"
+    "url": "https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog/ytdlp.json"
   }
 ]
