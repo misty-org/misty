@@ -1,20 +1,29 @@
 import type { DesktopNavItem } from "@/application/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
-import { ActivityBridge, unreadActivityCountForTool, useActivityStore } from "@/features/activity";
+import { ActivityBridge } from "@/features/activity";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
+import { BrowserRuntimeBridge, setBrowserWebviewsSuspended } from "@/features/browser";
 import { MediaSearchViewer } from "@/features/files/explorer";
 import { GlobalMisty } from "@/features/global-search";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
-import { SpaceNavRail, SpacesRealtimeBridge } from "@/features/spaces";
-import { hideRuntimeAssetOnError, revealRuntimeAssetOnLoad } from "@/shared/platform/runtimeAsset";
-import { Minus, Server, Square, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { SpacesRealtimeBridge } from "@/features/spaces";
+import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
+import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Outlet, useNavigationType } from "react-router-dom";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { NavGroup, ProfileNavButton, SettingsNavButton } from "./NavRail";
 import { ProfilePopover } from "./ProfilePopover";
+import { GlobalNavigator } from "./GlobalNavigator";
+import { WorkspaceCanvas } from "./WorkspaceCanvas";
+import { NavigatorModeMenu } from "./NavigatorModeMenu";
+import {
+  readNavigatorMode,
+  type NavigatorMode,
+  type VisibleNavigatorMode,
+  writeNavigatorMode,
+} from "./navigatorMode";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
 import { TransferCompletionNotifier, WorkStatusPopup } from "./TransferStatus";
@@ -25,10 +34,9 @@ import {
   desktopRouteShellClass,
   desktopTitlebarClass,
   desktopTitlebarDoubleClickLayerClass,
+  desktopTitlebarNavigationButtonClass,
+  desktopTitlebarNavigationClass,
   desktopTitlebarTitleClass,
-  navbarBottomClass,
-  navbarGroupClass,
-  navbarSpacesClass,
   tabletFrameClass,
   tabletNavbarClass,
   tabletRouteShellClass,
@@ -40,6 +48,7 @@ import {
 import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
+import { useDesktopNavigationHistory } from "./useDesktopNavigationHistory";
 export type {
   AppNoticeEntry,
   AppNoticeKind,
@@ -83,22 +92,14 @@ export function DesktopLayout(props: {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
     startTitlebarDrag,
-    handleWindowsTitlebarPointerDown,
-    expandTitlebarWindow,
+    handleDesktopTitlebarPointerDown,
     togglePseudoMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
   const { app: frameApp, mistyLogoSource } = useDesktopFrameStyle();
   const selfHosted = app?.environment.serverMode === "self_hosted";
-  const selfHostedHost = (() => {
-    try {
-      return app?.environment.serverUrl ? new URL(app.environment.serverUrl).host : "Self-hosted";
-    } catch {
-      return "Self-hosted";
-    }
-  })();
-  const selfHostedName = app?.environment.serverName?.trim() || "Misty server";
+  const navigationType = useNavigationType();
 
   const framePacingOverlayEnabled = useSettingsStore((state) =>
     settingsBoolean(
@@ -111,18 +112,23 @@ export function DesktopLayout(props: {
 
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [navigatorMode, setNavigatorModeState] = useState<NavigatorMode>(readNavigatorMode);
+  const lastVisibleNavigatorMode = useRef<VisibleNavigatorMode>(
+    navigatorMode === "hidden" ? "full" : navigatorMode,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
-  const navItems = props.navItems;
-  const activityItems = useActivityStore((state) => state.allItems);
-  const navBadges = useMemo(
-    () => ({
-      files: unreadActivityCountForTool(activityItems, "files"),
-      agents: unreadActivityCountForTool(activityItems, "agents"),
-      extensions: unreadActivityCountForTool(activityItems, "extensions"),
-    }),
-    [activityItems],
-  );
+  const navigationHistory = useDesktopNavigationHistory({ location, navigate, navigationType });
+  const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
+  const setNavigatorMode = useCallback((mode: NavigatorMode) => {
+    if (mode !== "hidden") lastVisibleNavigatorMode.current = mode;
+    setBrowserWebviewsSuspended(true, "navigator-layout");
+    setNavigatorModeState(mode);
+    writeNavigatorMode(mode);
+    window.requestAnimationFrame(() =>
+      window.requestAnimationFrame(() => setBrowserWebviewsSuspended(false, "navigator-layout")),
+    );
+  }, []);
   const refreshUserAfterSettings = useCallback(() => {
     void refreshUser().catch(() => undefined);
   }, [refreshUser]);
@@ -173,27 +179,87 @@ export function DesktopLayout(props: {
     });
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
 
+  useEffect(() => {
+    const surface = workspaceSurfaceFromRoute(location.pathname);
+    if (surface) openWorkspaceSurface(surface);
+  }, [location.pathname, openWorkspaceSurface]);
+
+  useEffect(() => {
+    if (location.pathname === "/") navigate("/home", { replace: true });
+  }, [location.pathname, navigate]);
+
+  useEffect(() => {
+    const handleWorkspaceKeys = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && useWorkspaceStore.getState().layout.maximizedPaneId) {
+        event.preventDefault();
+        useWorkspaceStore.getState().restoreLayout();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === "Enter") {
+        event.preventDefault();
+        useWorkspaceStore.getState().toggleMaximize();
+      }
+    };
+    window.addEventListener("keydown", handleWorkspaceKeys);
+    return () => window.removeEventListener("keydown", handleWorkspaceKeys);
+  }, []);
+
+  useEffect(() => {
+    const toggleNavigator = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) return;
+      if (event.key.toLocaleLowerCase() !== "b") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setNavigatorMode(navigatorMode === "hidden" ? lastVisibleNavigatorMode.current : "hidden");
+    };
+    window.addEventListener("keydown", toggleNavigator, true);
+    return () => window.removeEventListener("keydown", toggleNavigator, true);
+  }, [navigatorMode, setNavigatorMode]);
+
+  useEffect(() => {
+    setBrowserWebviewsSuspended(profileOpen || settingsOpen || remotesOpen, "shell-overlay");
+    return () => setBrowserWebviewsSuspended(false, "shell-overlay");
+  }, [profileOpen, remotesOpen, settingsOpen]);
+
+  useEffect(() => {
+    const handleNavigationKeys = (event: KeyboardEvent) => {
+      const bracketBack = event.metaKey && !event.altKey && event.key === "[";
+      const bracketForward = event.metaKey && !event.altKey && event.key === "]";
+      const arrowBack = event.altKey && !event.metaKey && event.key === "ArrowLeft";
+      const arrowForward = event.altKey && !event.metaKey && event.key === "ArrowRight";
+      if (bracketBack || arrowBack) {
+        if (!navigationHistory.canGoBack) return;
+        event.preventDefault();
+        navigationHistory.goBack();
+      } else if (bracketForward || arrowForward) {
+        if (!navigationHistory.canGoForward) return;
+        event.preventDefault();
+        navigationHistory.goForward();
+      }
+    };
+    window.addEventListener("keydown", handleNavigationKeys);
+    return () => window.removeEventListener("keydown", handleNavigationKeys);
+  }, [navigationHistory]);
+
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const frameClass = usesNativeWindowChrome ? desktopFrameClass : tabletFrameClass;
   const navbarClass = usesNativeWindowChrome ? desktopNavbarClass : tabletNavbarClass;
   const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : tabletRouteShellClass;
-
   return (
-    <main className={frameClass}>
+    <main
+      className={`${frameClass} ${navigatorGridClass(navigatorMode)}`}
+      data-misty-desktop-frame
+      onPointerDown={(event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target?.closest("[data-misty-window-titlebar-region='true']")) return;
+        handleDesktopTitlebarPointerDown(event);
+      }}
+    >
       {usesNativeWindowChrome ? (
-        <header
-          className={desktopTitlebarClass}
-          data-tauri-drag-region={shouldShowWindowsControls ? undefined : ""}
-          onPointerDown={
-            shouldShowWindowsControls ? handleWindowsTitlebarPointerDown : startTitlebarDrag
-          }
-        >
-          {/* Windows/Linux handle drag + double-press-to-maximize via the pointer
-              handler above; macOS keeps the native drag region + pseudo-maximize. */}
-          <div
-            className={desktopTitlebarDoubleClickLayerClass}
-            onDoubleClick={shouldShowWindowsControls ? undefined : expandTitlebarWindow}
-          />
+        <header className={desktopTitlebarClass} onPointerDown={handleDesktopTitlebarPointerDown}>
+          {/* Blank titlebar areas use native drag. A second press invokes native
+              macOS zoom/restore; borderless Windows/Linux use pseudo-maximize. */}
+          <div className={desktopTitlebarDoubleClickLayerClass} />
           <span
             className={
               shouldShowWindowsControls ? windowsTitlebarTitleClass : desktopTitlebarTitleClass
@@ -201,6 +267,35 @@ export function DesktopLayout(props: {
           >
             {selfHosted ? "Misty — Self-hosted" : "Misty"}
           </span>
+          {!shouldShowWindowsControls ? (
+            <div className={desktopTitlebarNavigationClass} data-misty-window-drag-block="true">
+              <NavigatorModeMenu mode={navigatorMode} onModeChange={setNavigatorMode} />
+              <button
+                type="button"
+                className={desktopTitlebarNavigationButtonClass}
+                aria-label="Go back"
+                title="Back (⌘[)"
+                disabled={!navigationHistory.canGoBack}
+                onClick={navigationHistory.goBack}
+              >
+                <ArrowLeft size={17} />
+              </button>
+              <button
+                type="button"
+                className={desktopTitlebarNavigationButtonClass}
+                aria-label="Go forward"
+                title="Forward (⌘])"
+                disabled={!navigationHistory.canGoForward}
+                onClick={navigationHistory.goForward}
+              >
+                <ArrowRight size={17} />
+              </button>
+            </div>
+          ) : (
+            <div className="absolute left-2 top-0 z-[4] flex h-full items-center">
+              <NavigatorModeMenu mode={navigatorMode} onModeChange={setNavigatorMode} />
+            </div>
+          )}
           {shouldShowWindowsControls ? (
             <div className={windowsTitlebarControlsClass}>
               <button
@@ -235,68 +330,32 @@ export function DesktopLayout(props: {
         </header>
       ) : null}
 
-      <nav
-        className={navbarClass}
-        aria-label="Primary"
-        onPointerDown={usesNativeWindowChrome ? startTitlebarDrag : undefined}
-      >
-        <div
-          className="relative flex h-14 w-[54px] shrink-0 items-start justify-center pt-3"
-          title={
-            selfHosted
-              ? `Self-hosted · ${selfHostedName} (${selfHostedHost})`
-              : "Misty Hosted"
-          }
-        >
-          {mistyLogoSource ? (
-            <img
-              className="h-[34px] w-[34px] object-contain"
-              src={mistyLogoSource}
-              onError={hideRuntimeAssetOnError}
-              onLoad={revealRuntimeAssetOnLoad}
-              alt="Misty"
-            />
-          ) : null}
-          {selfHosted ? (
-            <span className="absolute bottom-0 right-0 grid size-5 place-items-center rounded-full border border-charcoal-border bg-charcoal-card text-sage-fg">
-              <Server size={11} strokeWidth={2} aria-label="Self-hosted" />
-            </span>
-          ) : null}
+      {!usesNativeWindowChrome ? (
+        <div className="absolute left-2 top-1 z-[60]" data-misty-window-drag-block="true">
+          <NavigatorModeMenu mode={navigatorMode} onModeChange={setNavigatorMode} />
         </div>
-        <span className="mb-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
-        <div className={navbarGroupClass}>
-          {navItems.length ? (
-            <NavGroup
-              currentPath={location.pathname}
-              items={navItems}
-              badges={navBadges}
-              iconOnly
-            />
-          ) : null}
-        </div>
-        <span className="my-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
-        <div className={navbarSpacesClass}>
-          <SpaceNavRail />
-        </div>
-        <div className={navbarBottomClass}>
-          <span className="mb-0.5 h-px w-7 shrink-0 bg-charcoal-border" aria-hidden="true" />
-          <SettingsNavButton
-            open={settingsOpen || location.pathname.startsWith("/settings")}
-            onClick={openSettingsOverlay}
-          />
-          <ProfileNavButton
-            ref={profileAnchorRef}
-            open={profileOpen}
-            onClick={() => setProfileOpen((open) => !open)}
-          />
-        </div>
-      </nav>
+      ) : null}
 
-      <section className={`${routeShellClass} route-shell`}>
+      {navigatorMode !== "hidden" ? (
+        <div className={navbarClass}>
+          <GlobalNavigator
+            collapsed={navigatorMode === "icons"}
+            mistyLogoSource={mistyLogoSource}
+            profileAnchorRef={profileAnchorRef}
+            profileOpen={profileOpen}
+            settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+            onProfileClick={() => setProfileOpen((open) => !open)}
+            onSettingsClick={openSettingsOverlay}
+            onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
+          />
+        </div>
+      ) : null}
+
+      <section className={`${routeShellClass} route-shell`} data-misty-route-shell>
         <AppNoticePublisher />
         <RouteNotice routeId={routeId} />
 
-        <Outlet />
+        {location.pathname === "/home" ? <Outlet /> : <WorkspaceCanvas outlet={<Outlet />} />}
       </section>
 
       <WorkStatusPopup />
@@ -321,9 +380,16 @@ export function DesktopLayout(props: {
           }
         />
       ) : null}
+      <BrowserRuntimeBridge />
       <MediaSearchViewer />
       <SpacesRealtimeBridge />
       <ActivityBridge />
     </main>
   );
+}
+
+function navigatorGridClass(mode: NavigatorMode): string {
+  if (mode === "hidden") return "grid-cols-[0px_minmax(0,1fr)]";
+  if (mode === "icons") return "grid-cols-[72px_minmax(0,1fr)]";
+  return "grid-cols-[232px_minmax(0,1fr)]";
 }

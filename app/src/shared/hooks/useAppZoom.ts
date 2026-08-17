@@ -10,6 +10,8 @@ let nativeZoomSupported: boolean | null = null;
 let zoomApplySequence = 0;
 let appliedAppZoom = 1;
 
+export const appZoomChangedEvent = "misty:app-zoom-changed";
+
 export function getAppliedAppZoom(): number {
   return appliedAppZoom;
 }
@@ -106,6 +108,7 @@ async function applyAppZoom(zoom: number): Promise<void> {
       nativeZoomSupported = true;
       appliedAppZoom = zoom;
       clearCssZoomFallback();
+      window.dispatchEvent(new Event(appZoomChangedEvent));
       return;
     } catch {
       nativeZoomSupported = false;
@@ -115,6 +118,7 @@ async function applyAppZoom(zoom: number): Promise<void> {
   if (applySequence !== zoomApplySequence) return;
   applyCssZoomFallback(zoom);
   appliedAppZoom = zoom;
+  window.dispatchEvent(new Event(appZoomChangedEvent));
 }
 
 function loadStoredAppZoom(): number {

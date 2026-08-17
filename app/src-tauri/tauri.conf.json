@@ -16,12 +16,16 @@
         "title": "Misty",
         "width": 1280,
         "height": 820,
-        "minWidth": 1040,
-        "minHeight": 720,
+        "minWidth": 640,
+        "minHeight": 420,
         "backgroundThrottling": "disabled",
         "decorations": false,
         "transparent": true,
         "shadow": false,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
         "dragDropEnabled": true
       }
     ],
@@ -53,6 +57,9 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    },
     "fileAssociations": [
       {
         "ext": ["mf"],

@@ -14,6 +14,7 @@ import type { SpaceChatDraft } from "./useSpaceChatDraft";
 export interface SpaceChatMessageActionsOptions {
   spaceId: string;
   conversationId: string;
+  currentUser: { id: string; name: string } | undefined;
   activeConversation: SpaceConversation | undefined;
   members: SpaceMember[];
   agents: SpaceStudioResource[];
@@ -31,6 +32,7 @@ export interface SpaceChatMessageActionsOptions {
     libraryIds: string[],
     replyToMessageId: string,
     agentIdsByLabel: Record<string, string>,
+    optimisticMessage?: SpaceMessage,
   ) => Promise<unknown>;
   storeUpdateMessage: (
     spaceId: string,
@@ -69,20 +71,40 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     if (draft.isEmpty) return;
     const value = draft.text.trim();
     const attachmentIds = draft.pendingAttachments.map((item) => item.id);
+    const content = buildMessageSpans(value, members, agents, draft.selectedAgentIdsByLabel);
+    const clientNonce = createClientNonce();
+    const optimisticMessage: SpaceMessage = {
+      seq: Date.now(),
+      id: `optimistic_${clientNonce}`,
+      client_nonce: clientNonce,
+      local_delivery_state: "sending",
+      space_id: spaceId,
+      conversation_id: conversationId || undefined,
+      sender_user_id: options.currentUser?.id ?? "",
+      sender_name: options.currentUser?.name || "You",
+      sender_kind: "person",
+      content,
+      file_node_ids: [...draft.selectedFileIds],
+      library_item_ids: [...draft.selectedLibraryIds],
+      attachments: [...draft.pendingAttachments],
+      reactions: [],
+      reply_to_message_id: draft.replyToMessageId || undefined,
+      created_at: new Date().toISOString(),
+    };
     // Everything the request needs, captured before the draft is cleared.
     const snapshot = {
-      text: draft.text,
       selectedFileIds: draft.selectedFileIds,
       selectedLibraryIds: draft.selectedLibraryIds,
-      pendingAttachments: draft.pendingAttachments,
       replyToMessageId: draft.replyToMessageId,
       selectedAgentIdsByLabel: draft.selectedAgentIdsByLabel,
     };
 
-    // The composer clears on submit rather than after the round trip — the
-    // network call happening in the background is what "sending" means to
-    // the person typing, not a reason to leave the box looking stuck. On
-    // failure the draft is restored below so nothing is lost.
+    // The composer and message list update together. The server response or
+    // realtime event replaces this row by client_nonce; a failure keeps it in
+    // place with an explicit delivery error.
+    if (conversationId) {
+      setGroupMessages((current) => mergeSpaceMessages(current, [optimisticMessage]));
+    }
     draft.reset();
 
     try {
@@ -90,12 +112,14 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         const response = await spacesApi.sendConversationMessage(
           spaceId,
           conversationId,
-          buildMessageSpans(value, members, agents, snapshot.selectedAgentIdsByLabel),
+          content,
           snapshot.selectedFileIds,
           attachmentIds,
           snapshot.selectedLibraryIds,
           snapshot.replyToMessageId,
+          clientNonce,
         );
+        response.message.client_nonce ||= clientNonce;
         response.message.triggered_runs = (response.triggered_runs ?? []).map((run) => ({
           ...run,
           state: run.state as NonNullable<SpaceMessage["triggered_runs"]>[number]["state"],
@@ -117,15 +141,19 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           snapshot.selectedLibraryIds,
           snapshot.replyToMessageId,
           snapshot.selectedAgentIdsByLabel,
+          optimisticMessage,
         );
       }
     } catch (reason) {
-      draft.setText(snapshot.text);
-      draft.setSelectedFileIds(snapshot.selectedFileIds);
-      draft.setSelectedLibraryIds(snapshot.selectedLibraryIds);
-      draft.setPendingAttachments(snapshot.pendingAttachments);
-      draft.setReplyToMessageId(snapshot.replyToMessageId);
-      draft.setSelectedAgentIdsByLabel(snapshot.selectedAgentIdsByLabel);
+      if (conversationId) {
+        setGroupMessages((current) =>
+          current.map((message) =>
+            message.client_nonce === clientNonce && message.local_delivery_state === "sending"
+              ? { ...message, local_delivery_state: "failed" }
+              : message,
+          ),
+        );
+      }
       reportConversationError(reason, "The group message could not be sent.");
     }
   };
@@ -198,4 +226,14 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
   };
 
   return { submit, saveEdited, remove, toggleReaction };
+}
+
+let fallbackNonce = 0;
+
+function createClientNonce(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `client_${crypto.randomUUID()}`;
+  }
+  fallbackNonce += 1;
+  return `client_${Date.now()}_${fallbackNonce}`;
 }

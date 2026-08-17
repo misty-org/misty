@@ -1,5 +1,6 @@
 import { activityApi } from "@/api/activity/api";
 import { notifyAccountScopeReset } from "@/features/auth";
+import { mergeSpaceMessages } from "@/features/spaces/chat";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
 import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
@@ -164,7 +165,17 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       const { messages } = await spacesApi.messages(spaceId);
       if (generation !== spacesAccountGeneration) return;
       const ordered = [...messages].reverse();
-      set((state) => ({ messagesBySpace: { ...state.messagesBySpace, [spaceId]: ordered } }));
+      set((state) => ({
+        messagesBySpace: {
+          ...state.messagesBySpace,
+          [spaceId]: mergeSpaceMessages(
+            (state.messagesBySpace[spaceId] ?? []).filter(
+              (message) => message.local_delivery_state === "sending",
+            ),
+            ordered,
+          ),
+        },
+      }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
       if (await recoverInaccessibleSpace(error, spaceId, get)) return;

@@ -19,9 +19,10 @@ import {
 } from "./GlobalMistyPanelContent";
 import type { GlobalAiContextRef, GlobalAiMode, GlobalSearchResult } from "./types";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
+import { setBrowserWebviewsSuspended } from "@/features/browser";
 
 const panelClass = [
-  "pointer-events-auto absolute bottom-0 left-1/2 flex",
+  "pointer-events-auto flex",
   "w-[min(780px,calc(100dvw-112px))] flex-col overflow-hidden rounded-2xl will-change-transform",
   "border border-charcoal-border bg-charcoal-card text-cream shadow-[0_28px_90px_rgba(0,0,0,0.62)]",
 ].join(" ");
@@ -140,6 +141,10 @@ export function GlobalMisty(props: {
       window.removeEventListener("keydown", escape, true);
     };
   }, [closePanel, launcherOpen]);
+  useEffect(() => {
+    setBrowserWebviewsSuspended(open || launcherOpen, "global-misty");
+    return () => setBrowserWebviewsSuspended(false, "global-misty");
+  }, [launcherOpen, open]);
 
   const openResult = async (result: GlobalSearchResult) => {
     if (!result.fileResult || result.href !== "/files") {
@@ -197,19 +202,24 @@ export function GlobalMisty(props: {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-[80px] bottom-[max(16px,env(safe-area-inset-bottom))] z-[2147482500]">
+    <div
+      className="pointer-events-none fixed inset-0 z-[2147482500] flex items-start justify-center pt-[18vh]"
+      onClick={(event) => {
+        if (event.target === event.currentTarget && (open || launcherOpen)) closePanel();
+      }}
+    >
       <MotionConfig reducedMotion="user" transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}>
         <AnimatePresence initial={false}>
           {open ? (
             <motion.section
               key="expanded"
-              initial={{ opacity: 0, x: "-50%", y: 6 }}
-              animate={{ opacity: 1, x: "-50%", y: 0 }}
-              exit={{ opacity: 0, x: "-50%", y: 4 }}
+              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.98 }}
               className={`${panelClass} ${
                 mode === "search"
-                  ? "h-[min(320px,calc(100dvh-104px))]"
-                  : "h-[min(560px,calc(100dvh-104px))]"
+                  ? "h-[min(420px,calc(100dvh-32vh))]"
+                  : "h-[min(560px,calc(100dvh-32vh))]"
               }`}
               aria-label="Misty Search, Ask, and Action"
             >

@@ -58,7 +58,7 @@ export async function persistExplorerWorkspace(): Promise<void> {
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   const workspace: NativeWorkspace = {
     id: workspaceId,
-    title: existing?.title || "File layout 1",
+    title: existing?.title || "Profile 1",
     sidebar_width: explorer.sidebarWidth,
     sidebar_visible: activeTab?.sidebarVisible ?? explorer.sidebarVisible,
     inspector_width: explorer.previewWidth,
@@ -83,7 +83,7 @@ export async function persistExplorerWorkspace(): Promise<void> {
     const savedDocument = await H.saveWorkspaceDocument(nextDocument);
     getExplorerStore().setState(H.workspaceMetadata(savedDocument));
   } catch (error) {
-    getExplorerStore().setState({ operationError: `Workspace save failed: ${errorText(error)}` });
+    getExplorerStore().setState({ operationError: `Profile save failed: ${errorText(error)}` });
   }
 }
 
@@ -107,7 +107,7 @@ export async function applyWorkspaceDocument(
       inlineEdit: null,
       dialog: null,
       contextMenu: { open: false, x: 0, y: 0, paneId: "", entryId: null },
-      operationError: "Workspace layout could not be restored, so Misty opened a clean file pane.",
+      operationError: "Profile could not be restored, so Misty opened a clean file pane.",
     });
     await getExplorerStore()
       .getState()
@@ -197,7 +197,7 @@ export function workspaceMetadata(
 ): Pick<ExplorerStore, "workspaceEntries" | "activeWorkspaceId" | "activeWorkspaceTitle"> {
   const workspaceEntries = document.workspaces.map((workspace, index) => ({
     id: workspace.id || `workspace_${index}`,
-    title: workspace.title || `File layout ${index + 1}`,
+    title: explorerProfileTitle(workspace.title, index),
   }));
   const activeWorkspace =
     workspaceEntries.find((workspace) => workspace.id === document.active_workspace_id) ??
@@ -205,7 +205,7 @@ export function workspaceMetadata(
   return {
     workspaceEntries,
     activeWorkspaceId: activeWorkspace?.id ?? document.active_workspace_id,
-    activeWorkspaceTitle: activeWorkspace?.title ?? "File layout 1",
+    activeWorkspaceTitle: activeWorkspace?.title ?? "Profile 1",
   };
 }
 
@@ -220,7 +220,7 @@ export function nextWorkspaceIndex(document: NativeWorkspaceDocument): number {
 }
 
 export function uniqueWorkspaceTitle(title: string, workspaces: Array<{ title: string }>): string {
-  const base = title.trim() || "File layout";
+  const base = title.trim() || "Profile";
   const names = new Set(workspaces.map((workspace) => workspace.title.trim()).filter(Boolean));
   if (!names.has(base)) return base;
   for (let index = 2; index < 1000; index += 1) {
@@ -228,6 +228,13 @@ export function uniqueWorkspaceTitle(title: string, workspaces: Array<{ title: s
     if (!names.has(candidate)) return candidate;
   }
   return `${base} ${Date.now()}`;
+}
+
+function explorerProfileTitle(title: string, index: number): string {
+  const trimmed = title.trim();
+  const legacyDefault = trimmed.match(/^(?:Workspace|File layout)(?: (\d+))?$/i);
+  if (legacyDefault) return `Profile ${legacyDefault[1] ?? index + 1}`;
+  return trimmed || `Profile ${index + 1}`;
 }
 
 export function defaultNativeWorkspace(

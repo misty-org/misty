@@ -293,6 +293,56 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().error).toBeNull();
   });
 
+  it("shows a message immediately and reconciles it after the server confirms", async () => {
+    const request = deferred<{ message: SpaceMessage; triggered_runs: never[] }>();
+    const optimistic = messageFixture({
+      id: "optimistic-client-1",
+      seq: Date.now(),
+      client_nonce: "client-1",
+      local_delivery_state: "sending",
+      content: [{ type: "text", text: "Fast hello" }],
+    });
+    const confirmed = messageFixture({
+      id: "message-confirmed",
+      seq: 2,
+      client_nonce: "client-1",
+      content: optimistic.content,
+    });
+    apiMocks.sendMessage.mockReturnValue(request.promise);
+
+    const send = useSpacesStore
+      .getState()
+      .sendMessage(optimistic.space_id, "Fast hello", [], [], [], "", {}, optimistic);
+
+    expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([optimistic]);
+    request.resolve({ message: confirmed, triggered_runs: [] });
+    await send;
+
+    expect(apiMocks.sendMessage.mock.calls[0]?.[6]).toBe("client-1");
+    expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([confirmed]);
+  });
+
+  it("keeps an optimistic message inline with a failed delivery state", async () => {
+    const optimistic = messageFixture({
+      id: "optimistic-client-failed",
+      seq: Date.now(),
+      client_nonce: "client-failed",
+      local_delivery_state: "sending",
+      content: [{ type: "text", text: "Please send" }],
+    });
+    apiMocks.sendMessage.mockRejectedValue(new Error("network unavailable"));
+
+    await expect(
+      useSpacesStore
+        .getState()
+        .sendMessage(optimistic.space_id, "Please send", [], [], [], "", {}, optimistic),
+    ).rejects.toThrow("network unavailable");
+
+    expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([
+      { ...optimistic, local_delivery_state: "failed" },
+    ]);
+  });
+
   it("treats closed-off chat Agents as optional suggestions", async () => {
     apiMocks.chatAgents.mockRejectedValue(
       new SpaceRequestError("You no longer have access to this Space.", 403, "forbidden"),
@@ -391,4 +441,12 @@ function messageFixture(patch: Partial<SpaceMessage> = {}): SpaceMessage {
     created_at: "2026-07-15T00:00:00Z",
     ...patch,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }

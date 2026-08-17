@@ -43,27 +43,9 @@ impl<R: Runtime> Keystore<R> {
 
         #[cfg(all(target_os = "macos", debug_assertions))]
         if payload.service == TOKEN_SERVICE && payload.user == TOKEN_USER {
-            if let Some(value) = retrieve_development_token(&self.0)? {
-                return Ok(RetrieveResponse { value: Some(value) });
-            }
-            if development_keychain_migration_complete(&self.0)? {
-                return Ok(RetrieveResponse { value: None });
-            }
-
-            // Migrate the existing Keychain value once. Development binaries
-            // are ad-hoc signed, so their code identity changes after a rebuild
-            // and macOS asks the user to authorize the same item repeatedly.
-            match keyring::Entry::new(&payload.service, &user)?.get_password() {
-                Ok(value) => {
-                    store_development_token(&self.0, &value)?;
-                    return Ok(RetrieveResponse { value: Some(value) });
-                }
-                Err(keyring::Error::NoEntry) => {
-                    mark_development_keychain_migration_complete(&self.0)?;
-                    return Ok(RetrieveResponse { value: None });
-                }
-                Err(error) => return Err(error.into()),
-            }
+            return Ok(RetrieveResponse {
+                value: retrieve_development_token(&self.0)?,
+            });
         }
 
         let value = keyring::Entry::new(&payload.service, &user)?.get_password()?;
@@ -128,7 +110,6 @@ fn store_development_token<R: Runtime>(app: &AppHandle<R>, value: &str) -> crate
     temporary.sync_all()?;
     fs::rename(&temporary_path, &path)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-    mark_development_keychain_migration_complete(app)?;
     Ok(())
 }
 
@@ -146,34 +127,10 @@ fn retrieve_development_token<R: Runtime>(app: &AppHandle<R>) -> crate::Result<O
 fn remove_development_token<R: Runtime>(app: &AppHandle<R>) -> crate::Result<()> {
     let path = development_token_path(app)?;
     match fs::remove_file(path) {
-        Ok(()) => mark_development_keychain_migration_complete(app),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            mark_development_keychain_migration_complete(app)
-        }
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
     }
-}
-
-#[cfg(all(target_os = "macos", debug_assertions))]
-fn development_keychain_migration_complete<R: Runtime>(app: &AppHandle<R>) -> crate::Result<bool> {
-    Ok(development_token_path(app)?
-        .with_extension("migrated")
-        .is_file())
-}
-
-#[cfg(all(target_os = "macos", debug_assertions))]
-fn mark_development_keychain_migration_complete<R: Runtime>(
-    app: &AppHandle<R>,
-) -> crate::Result<()> {
-    let marker = development_token_path(app)?.with_extension("migrated");
-    fs::OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .mode(0o600)
-        .open(marker)?
-        .sync_all()?;
-    Ok(())
 }
 
 fn token_user() -> String {

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import type { PersonalAgent, ReasoningEffort } from "./model/interfaces/personal";
+import type {
+  AgentAccessSurface,
+  PersonalAgent,
+  ReasoningEffort,
+} from "./model/interfaces/personal";
 import { initialAgentModelId, modelSupportsReasoning } from "./modelSelection";
 import { personalAgentsApi, usePersonalAgentsStore } from "./store/usePersonalAgentsStore";
 import { usePersonalAgentToolbox } from "./usePersonalAgentToolbox";
@@ -38,6 +42,7 @@ export function useAgentEditor() {
   const [modelId, setModelId] = useState(initialAgentModelId);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("");
   const [contextPermissions, setContextPermissions] = useState(defaultAgentContext);
+  const [disabledSurfaces, setDisabledSurfaces] = useState<AgentAccessSurface[]>([]);
   const [grants, setGrants] = useState<AgentGrantDraft>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -63,6 +68,7 @@ export function useAgentEditor() {
         ? defaultAgentContext
         : { ...defaultAgentContext, ...agent.context_permissions },
     );
+    setDisabledSurfaces(agent === "new" ? [] : (agent.tool_permissions.disabled_surfaces ?? []));
     setGrants({});
     setError("");
     toolbox.load(agent === "new" ? null : agent.id, setError);
@@ -99,14 +105,18 @@ export function useAgentEditor() {
       const selectedToolGrants = toolbox.actions
         .filter((action) => action.granted)
         .map((action) => ({ capability: action.name, risk: action.risk }));
-      const toolPermissions = toolbox.loaded
-        ? {
-            read: selectedToolGrants.some((grant) => grant.risk === "read"),
-            write: selectedToolGrants.some((grant) => grant.risk !== "read"),
-            integrations: current?.tool_permissions.integrations ?? [],
-            grants: selectedToolGrants,
-          }
-        : (current?.tool_permissions ?? { read: true, write: false, integrations: [] });
+      const toolPermissions = {
+        mode: "inherit_invoker" as const,
+        disabled_surfaces: disabledSurfaces,
+        read: true,
+        write: true,
+        integrations: current?.tool_permissions.integrations ?? [],
+        // Keep a catalog snapshot for old servers, but the inherit-invoker mode
+        // intentionally treats every non-disabled surface as available.
+        grants: toolbox.loaded
+          ? toolbox.actions.map((action) => ({ capability: action.name, risk: action.risk }))
+          : selectedToolGrants,
+      };
       const saved = await save(current?.id ?? null, {
         name: name.trim(),
         description: description.trim(),
@@ -156,6 +166,8 @@ export function useAgentEditor() {
     setReasoningEffort,
     contextPermissions,
     setContextPermissions,
+    disabledSurfaces,
+    setDisabledSurfaces,
     grants,
     setGrants,
     saving,

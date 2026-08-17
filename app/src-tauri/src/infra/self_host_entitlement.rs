@@ -1,4 +1,7 @@
-use crate::error::{ApiError, ApiResult};
+use crate::{
+    error::{ApiError, ApiResult},
+    infra::credential_store,
+};
 
 const SERVICE: &str = "misty.self-host.entitlement";
 const ACCOUNT: &str = "current";
@@ -6,21 +9,16 @@ const MAX_TOKEN_BYTES: usize = 8 * 1024;
 
 pub fn store(token: &str) -> ApiResult<()> {
     validate(token)?;
-    keyring::Entry::new(SERVICE, ACCOUNT)
-        .map_err(keyring_error)?
-        .set_password(token)
-        .map_err(keyring_error)
+    credential_store::store(SERVICE, ACCOUNT, token).map_err(credential_error)
 }
 
 pub fn load() -> ApiResult<Option<String>> {
-    let entry = keyring::Entry::new(SERVICE, ACCOUNT).map_err(keyring_error)?;
-    match entry.get_password() {
-        Ok(token) => {
+    match credential_store::load(SERVICE, ACCOUNT).map_err(credential_error)? {
+        Some(token) => {
             validate(&token)?;
             Ok(Some(token))
         }
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(keyring_error(error)),
+        None => Ok(None),
     }
 }
 
@@ -39,7 +37,7 @@ fn validate(token: &str) -> ApiResult<()> {
     Ok(())
 }
 
-fn keyring_error(error: keyring::Error) -> ApiError {
+fn credential_error(error: credential_store::CredentialStoreError) -> ApiError {
     ApiError::Message(format!(
         "Could not access the self-host entitlement credential: {error}"
     ))

@@ -27,7 +27,7 @@ export default function DesktopAgentsPage() {
       ) : (
         <>
           <AgentEmptyState onCreate={() => editor.open("new")} />
-          <div className="max-[1100px]:hidden">
+          <div className="h-full min-h-0 max-[1100px]:hidden">
             <AgentSpacesRail />
           </div>
         </>

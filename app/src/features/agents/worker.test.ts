@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { deviceContentReference, deviceWorkflowErrorCode } from "./worker";
+import {
+  browserAgentExecutionRequest,
+  deviceContentReference,
+  deviceWorkflowErrorCode,
+} from "./worker";
 
 describe("v2 device workflow node worker", () => {
   it("accepts an opaque scope and relative content locator", () => {
@@ -36,5 +40,41 @@ describe("v2 device workflow node worker", () => {
       "unsupported_content",
     );
     expect(deviceWorkflowErrorCode(new Error("device_node_timeout"))).toBe("device_timeout");
+  });
+
+  it("binds browser jobs to their server-selected grant, scope, and agent", () => {
+    expect(
+      browserAgentExecutionRequest({
+        id: "job",
+        runId: "run",
+        nodeId: "node",
+        scopeId: "browser-tab-1",
+        operation: "browser.inspect",
+        deviceGrantId: "grant-1",
+        attempt: 1,
+        input: { scopeId: "browser-tab-1" },
+        config: { agentId: "agent-1" },
+      }),
+    ).toMatchObject({
+      scopeId: "browser-tab-1",
+      grantId: "grant-1",
+      agentId: "agent-1",
+      operation: "browser.inspect",
+    });
+  });
+
+  it("rejects browser jobs missing local grant identity", () => {
+    expect(() =>
+      browserAgentExecutionRequest({
+        id: "job",
+        runId: "run",
+        nodeId: "node",
+        scopeId: "browser-tab-1",
+        operation: "browser.click",
+        attempt: 1,
+        input: {},
+        config: {},
+      }),
+    ).toThrow("invalid_browser_grant");
   });
 });

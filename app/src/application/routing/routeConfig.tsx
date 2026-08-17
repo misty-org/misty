@@ -1,6 +1,7 @@
 import { routes } from "@/features/app-shell";
 import { AgentsPage } from "@/features/agents";
 import { RegisterPage, SignInPage } from "@/features/auth";
+import { BrowserWorkspace } from "@/features/browser";
 import { DeveloperWorkspace } from "@/features/developer-workspace";
 import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
@@ -10,6 +11,7 @@ import { SettingsPage } from "@/features/settings";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/features/spaces";
 import { TransfersPage } from "@/features/transfers";
+import { TerminalWorkspace } from "@/features/terminal";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
@@ -44,6 +46,8 @@ export const router = createBrowserRouter([
             element: <AppPagesLayout />,
             children: [
               { path: "home", element: desktopOnlyRoute("Home dashboard") ?? <HomeDashboard /> },
+              { path: "browser", element: desktopOnlyRoute("Browser") ?? <BrowserWorkspace /> },
+              { path: "terminal", element: desktopOnlyRoute("Terminal") ?? <TerminalWorkspace /> },
               { path: "files", element: desktopOnlyRoute("Files") ?? <FilesPage /> },
               { path: "agents", element: desktopOnlyRoute("Agents") ?? <AgentsPage /> },
               { path: "code", element: desktopOnlyRoute("Code") ?? <DeveloperWorkspace /> },

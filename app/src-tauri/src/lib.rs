@@ -75,6 +75,26 @@ use app::commands::{
     android_open_all_files_access_settings,
 };
 use app::runtime::MistyRuntime;
+#[cfg(desktop)]
+use infra::browser::{
+    browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
+    browser_webview_back, browser_webview_close, browser_webview_create, browser_webview_forward,
+    browser_webview_hide, browser_webview_navigate, browser_webview_reconcile,
+    browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
+    browser_webview_show, browser_webviews_hide_all, browser_webviews_set_overlay_active,
+    BrowserSessionState,
+};
+#[cfg(desktop)]
+use infra::code_git::{code_git_diff, code_git_status};
+#[cfg(desktop)]
+use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
+#[cfg(desktop)]
+use infra::code_watcher::{code_stop_watch, code_watch_dir};
+#[cfg(desktop)]
+use infra::code_workspace::{
+    code_create_file, code_create_folder, code_delete_path, code_find_in_files,
+    code_read_text_file, code_rename_path, code_walk_files, code_write_text_file,
+};
 use infra::misty::{
     check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
     install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
@@ -83,6 +103,10 @@ use infra::misty::{
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
+};
+#[cfg(desktop)]
+use infra::terminal::{
+    terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
 #[cfg(desktop)]
 use infra::tray;
@@ -126,7 +150,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .setup(|app| {
+        .setup(move |app| {
             #[cfg(any(target_os = "ios", target_os = "android"))]
             let runtime = {
                 let data_root = app
@@ -142,6 +166,8 @@ pub fn run() {
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             let runtime = MistyRuntime::new();
             app.manage(runtime);
+            #[cfg(desktop)]
+            app.manage(BrowserSessionState::default());
             #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
@@ -165,7 +191,7 @@ pub fn run() {
 
     builder
         .on_window_event(|window, event| {
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 if window.label() != "main" {
                     return;
@@ -188,6 +214,8 @@ pub fn run() {
                     size: tauri::Size::Physical(*size),
                 });
             }
+            #[cfg(target_os = "macos")]
+            let _ = (window, event);
         })
         .invoke_handler(tauri::generate_handler![
             mac_rounded_corners::enable_rounded_corners,
@@ -255,6 +283,78 @@ pub fn run() {
             uninstall_plugin,
             get_misty_process_status,
             open_external_url,
+            #[cfg(desktop)]
+            terminal_create,
+            #[cfg(desktop)]
+            terminal_write,
+            #[cfg(desktop)]
+            terminal_resize,
+            #[cfg(desktop)]
+            terminal_interrupt,
+            #[cfg(desktop)]
+            terminal_kill,
+            #[cfg(desktop)]
+            code_read_text_file,
+            #[cfg(desktop)]
+            code_write_text_file,
+            #[cfg(desktop)]
+            code_create_file,
+            #[cfg(desktop)]
+            code_create_folder,
+            #[cfg(desktop)]
+            code_rename_path,
+            #[cfg(desktop)]
+            code_delete_path,
+            #[cfg(desktop)]
+            code_walk_files,
+            #[cfg(desktop)]
+            code_find_in_files,
+            #[cfg(desktop)]
+            code_git_status,
+            #[cfg(desktop)]
+            code_git_diff,
+            #[cfg(desktop)]
+            code_watch_dir,
+            #[cfg(desktop)]
+            code_stop_watch,
+            #[cfg(desktop)]
+            code_lsp_start,
+            #[cfg(desktop)]
+            code_lsp_send,
+            #[cfg(desktop)]
+            code_lsp_stop,
+            #[cfg(desktop)]
+            browser_webview_create,
+            #[cfg(desktop)]
+            browser_webview_set_bounds,
+            #[cfg(desktop)]
+            browser_webview_reconcile,
+            #[cfg(desktop)]
+            browser_webview_set_theme,
+            #[cfg(desktop)]
+            browser_webview_navigate,
+            #[cfg(desktop)]
+            browser_webview_back,
+            #[cfg(desktop)]
+            browser_webview_forward,
+            #[cfg(desktop)]
+            browser_webview_reload,
+            #[cfg(desktop)]
+            browser_webview_show,
+            #[cfg(desktop)]
+            browser_webviews_set_overlay_active,
+            #[cfg(desktop)]
+            browser_webview_hide,
+            #[cfg(desktop)]
+            browser_webviews_hide_all,
+            #[cfg(desktop)]
+            browser_webview_close,
+            #[cfg(desktop)]
+            browser_agent_grant_register,
+            #[cfg(desktop)]
+            browser_agent_grant_revoke,
+            #[cfg(desktop)]
+            browser_agent_execute,
             storage_snapshot,
             clipboard_snapshot,
             clipboard_set_local,

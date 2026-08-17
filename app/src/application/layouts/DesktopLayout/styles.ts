@@ -1,19 +1,17 @@
 import type { FramePacingState } from "@/application/layouts/model/types";
 
 export const desktopFrameClass = [
-  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)]",
+  "relative isolate grid h-full min-h-0",
   "grid-rows-[28px_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace text-cream",
 ].join(" ");
 
 export const tabletFrameClass = [
-  "relative isolate grid h-full min-h-0 grid-cols-[80px_minmax(0,1fr)]",
+  "relative isolate grid h-full min-h-0",
   "grid-rows-[minmax(0,1fr)] overflow-hidden bg-charcoal-workspace pb-6 pt-7 text-cream",
 ].join(" ");
 
-export const desktopNavbarClass =
-  "relative z-10 col-start-1 row-start-2 flex min-h-0 flex-col items-center overflow-hidden border-r border-charcoal-border bg-charcoal-workspace pb-2";
-export const tabletNavbarClass =
-  "relative z-10 col-start-1 row-start-1 flex min-h-0 flex-col items-center overflow-hidden border-r border-charcoal-border bg-charcoal-workspace pb-2";
+export const desktopNavbarClass = "relative z-10 col-start-1 row-start-2 min-h-0 overflow-hidden";
+export const tabletNavbarClass = "relative z-10 col-start-1 row-start-1 min-h-0 overflow-hidden";
 
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-charcoal-bg";
@@ -104,6 +102,14 @@ export const windowsTitlebarTitleClass =
   "pointer-events-none absolute inset-y-0 left-3.5 right-[152px] flex min-w-0 items-center justify-start truncate text-[13px] font-medium leading-none text-cream-muted";
 
 export const desktopTitlebarDoubleClickLayerClass = "absolute inset-0 cursor-default";
+export const desktopTitlebarNavigationClass =
+  "absolute left-[76px] top-0 z-[4] flex h-full items-center gap-1";
+export const desktopTitlebarNavigationButtonClass = [
+  "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
+  "disabled:pointer-events-none disabled:text-cream-faint/35",
+].join(" ");
 export const windowsTitlebarControlsClass = "absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
 export const windowsTitlebarControlButtonClass =
@@ -117,7 +123,7 @@ export const frameOverlayBaseClass = [
 ].join(" ");
 
 export const settingsOverlayLayerClass =
-  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace py-8 pl-28 pr-8";
+  "fixed inset-0 z-[2147482600] grid place-items-center bg-charcoal-workspace px-8 py-8";
 
 export const settingsOverlayPanelClass = [
   "h-[min(760px,calc(100dvh-64px))] w-[min(980px,calc(100dvw-144px))]",

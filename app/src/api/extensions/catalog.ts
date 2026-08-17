@@ -1,7 +1,7 @@
 import { httpRequest } from "@/api/client/http";
 
 export const DEFAULT_CATALOG_BASE_URL =
-  "https://raw.githubusercontent.com/misty-org/misty-extensions/main/catalog";
+  "https://raw.githubusercontent.com/misty-org/misty/main/extensions/catalog";
 
 export function normalizeCatalogBaseUrl(value: string | undefined): string {
   const configured = value?.trim();

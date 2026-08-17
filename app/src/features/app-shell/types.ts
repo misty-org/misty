@@ -1,5 +1,7 @@
 export type AppTab =
   | "home"
+  | "browser"
+  | "terminal"
   | "code"
   | "files"
   | "spaces"

@@ -7,7 +7,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
@@ -44,11 +44,19 @@ export function shouldSuppressWindowDrag(target: EventTarget | null) {
   return Boolean(element?.closest(WINDOW_DRAG_SUPPRESS_SELECTOR));
 }
 
+export function windowRectsMatch(actual: WindowRect, expected: WindowRect, tolerance = 4) {
+  return (
+    Math.abs(actual.x - expected.x) <= tolerance &&
+    Math.abs(actual.y - expected.y) <= tolerance &&
+    Math.abs(actual.width - expected.width) <= tolerance &&
+    Math.abs(actual.height - expected.height) <= tolerance
+  );
+}
+
 export function useDesktopWindowChrome() {
   const usesNativeWindowChrome = !isNativeMobileBuild;
   const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>("unknown");
   const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
-  const customZoomedRef = useRef(false);
   const customZoomAnimatingRef = useRef(false);
   const lastTitlebarPressRef = useRef(0);
   const [isWindowMaximized, setIsWindowMaximized] = useState(false);
@@ -68,14 +76,19 @@ export function useDesktopWindowChrome() {
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
-    void getCurrentWebview()
-      .setAutoResize(true)
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (!hasTauriInternals()) return;
-    void enableModernWindowStyle(getCurrentWebviewWindow()).catch(() => undefined);
+    let disposed = false;
+    const configureWindow = async () => {
+      // Normalize the native view to the content bounds first. Tauri computes
+      // auto-resize ratios from the current frame, so this ordering guarantees
+      // a 1:1 main-webview resize instead of capturing a stale launch ratio.
+      await enableModernWindowStyle(getCurrentWebviewWindow());
+      if (disposed) return;
+      await getCurrentWebview().setAutoResize(true);
+    };
+    void configureWindow().catch(() => undefined);
+    return () => {
+      disposed = true;
+    };
   }, []);
 
   const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -117,7 +130,7 @@ export function useDesktopWindowChrome() {
 
       const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
-      return new Promise<void>((resolve) => {
+      return new Promise<void>((resolve, reject) => {
         const start = performance.now();
 
         const step = (now: number) => {
@@ -128,16 +141,26 @@ export function useDesktopWindowChrome() {
           const width = Math.round(from.width + (to.width - from.width) * eased);
           const height = Math.round(from.height + (to.height - from.height) * eased);
 
-          void window.setPosition(new PhysicalPosition(x, y));
-          void window.setSize(new PhysicalSize(width, height));
-
-          if (progress < 1) {
-            requestAnimationFrame(step);
-            return;
-          }
-
-          customZoomAnimatingRef.current = false;
-          resolve();
+          // Keep only one native frame commit in flight. Fire-and-forget IPC
+          // lets older size requests finish after newer ones, which makes the
+          // window and WKWebView visibly jump and can miss the restore target.
+          void Promise.all([
+            window.setPosition(new PhysicalPosition(x, y)),
+            window.setSize(new PhysicalSize(width, height)),
+          ]).then(
+            () => {
+              if (progress < 1) {
+                requestAnimationFrame(step);
+                return;
+              }
+              customZoomAnimatingRef.current = false;
+              resolve();
+            },
+            (error: unknown) => {
+              customZoomAnimatingRef.current = false;
+              reject(error);
+            },
+          );
         };
 
         requestAnimationFrame(step);
@@ -148,6 +171,7 @@ export function useDesktopWindowChrome() {
 
   const togglePseudoMaximize = useCallback(async () => {
     if (!hasTauriInternals()) return;
+    if (customZoomAnimatingRef.current) return;
     const window = getCurrentWindow();
     if (await window.isFullscreen()) {
       return;
@@ -165,28 +189,28 @@ export function useDesktopWindowChrome() {
       width: size.width,
       height: size.height,
     };
+    if (!monitor) return;
+    const workAreaRect = {
+      x: monitor.workArea.position.x,
+      y: monitor.workArea.position.y,
+      width: monitor.workArea.size.width,
+      height: monitor.workArea.size.height,
+    };
+    const isActuallyZoomed = windowRectsMatch(currentRect, workAreaRect);
 
-    if (!customZoomedRef.current) {
-      if (!monitor) {
-        return;
-      }
-
+    if (!isActuallyZoomed) {
+      // A manual resize, move, monitor change, or hot reload can invalidate an
+      // in-memory zoom flag. The actual frame is authoritative: any window
+      // that is not filling the current work area must expand from here.
       customZoomRestoreBoundsRef.current = { position, size };
-      await animateWindowRect(currentRect, {
-        x: monitor.workArea.position.x,
-        y: monitor.workArea.position.y,
-        width: monitor.workArea.size.width,
-        height: monitor.workArea.size.height,
-      });
-      customZoomedRef.current = true;
+      await animateWindowRect(currentRect, workAreaRect);
       setIsWindowMaximized(true);
       return;
     }
 
     const restoreBounds = customZoomRestoreBoundsRef.current;
     if (!restoreBounds) {
-      customZoomedRef.current = false;
-      setIsWindowMaximized(false);
+      setIsWindowMaximized(true);
       return;
     }
 
@@ -196,9 +220,34 @@ export function useDesktopWindowChrome() {
       width: restoreBounds.size.width,
       height: restoreBounds.size.height,
     });
-    customZoomedRef.current = false;
     setIsWindowMaximized(false);
   }, [animateWindowRect]);
+
+  // The native drag loop consumes the DOM dblclick event, so recognize the
+  // second press here. Drive zoom/restore through explicit animation frames:
+  // AppKit's built-in zoom snapshots WKWebView instead of giving WebKit each
+  // intermediate viewport size.
+  const handleMacTitlebarPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0) return;
+      if (shouldSuppressWindowDrag(event.target)) return;
+      event.preventDefault();
+      if (!hasTauriInternals()) return;
+
+      const now = Date.now();
+      const isDoublePress = now - lastTitlebarPressRef.current <= 500;
+      lastTitlebarPressRef.current = isDoublePress ? 0 : now;
+      if (isDoublePress) {
+        void togglePseudoMaximize().catch(() => undefined);
+        return;
+      }
+
+      void getCurrentWindow()
+        .startDragging()
+        .catch(() => undefined);
+    },
+    [togglePseudoMaximize],
+  );
 
   // Windows/Linux titlebar: drag on press, toggle maximize on a double-press.
   // We detect the double-press by timing rather than the DOM `dblclick`, which
@@ -225,13 +274,24 @@ export function useDesktopWindowChrome() {
     [togglePseudoMaximize],
   );
 
-  const expandTitlebarWindow = useCallback(
-    (event: ReactMouseEvent<HTMLElement>) => {
-      event.stopPropagation();
-      event.preventDefault();
-      void togglePseudoMaximize().catch(() => undefined);
+  const handleDesktopTitlebarPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (desktopPlatform === "macos") {
+        handleMacTitlebarPointerDown(event);
+        return;
+      }
+      if (desktopPlatform === "windows" || desktopPlatform === "linux") {
+        handleWindowsTitlebarPointerDown(event);
+        return;
+      }
+      startTitlebarDrag(event);
     },
-    [togglePseudoMaximize],
+    [
+      desktopPlatform,
+      handleMacTitlebarPointerDown,
+      handleWindowsTitlebarPointerDown,
+      startTitlebarDrag,
+    ],
   );
 
   const minimizeTitlebarWindow = useCallback(() => {
@@ -257,8 +317,7 @@ export function useDesktopWindowChrome() {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
     startTitlebarDrag,
-    handleWindowsTitlebarPointerDown,
-    expandTitlebarWindow,
+    handleDesktopTitlebarPointerDown,
     togglePseudoMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,

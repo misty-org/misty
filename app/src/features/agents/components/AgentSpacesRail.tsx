@@ -35,7 +35,7 @@ export function AgentSpacesRail() {
   return (
     <aside
       aria-label="Agents by space"
-      className="flex min-h-0 flex-col gap-5 overflow-y-auto border-l border-charcoal-border bg-charcoal-sidebar px-3 py-4"
+      className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto border-l border-charcoal-border bg-charcoal-sidebar px-3 py-4"
     >
       {SPACES.map((space) => (
         <section key={space.name}>
