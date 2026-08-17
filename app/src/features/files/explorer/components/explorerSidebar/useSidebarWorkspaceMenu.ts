@@ -30,9 +30,9 @@ export function useSidebarWorkspaceMenu(sidebar: ExplorerSidebarProps) {
         ? { kind, workspaceId: active.id, title: active.title }
         : kind === "delete" && active
           ? { kind, workspaceId: active.id, title: active.title }
-          : { kind: "create", workspaceId: "", title: "File layout" },
+          : { kind: "create", workspaceId: "", title: "Profile" },
     );
-    setWorkspaceDraft(kind === "rename" && active ? active.title : "File layout");
+    setWorkspaceDraft(kind === "rename" && active ? active.title : "Profile");
   };
 
   const confirmWorkspaceDialog = () => {

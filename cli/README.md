@@ -1,6 +1,7 @@
 # misty
 
 `misty` is the development and release interface for the Misty monorepo.
+Desktop commands use Tauri's operating-system WebView and do not prepare or bundle a separate browser runtime.
 
 ## Install and start Misty
 

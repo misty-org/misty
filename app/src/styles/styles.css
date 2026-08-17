@@ -89,6 +89,22 @@
     background-color: #131313;
   }
 
+  /* Native browser tabs normally sit above the app renderer. While a Misty
+     menu is open, AppKit places the live browser just underneath it; these
+     surfaces become a precise transparent window onto that same native view. */
+  html[data-browser-overlay-active],
+  html[data-browser-overlay-active] body,
+  html[data-browser-overlay-active] #root,
+  html[data-browser-overlay-active] [data-misty-desktop-frame],
+  html[data-browser-overlay-active] [data-misty-route-shell],
+  html[data-browser-overlay-active] [data-workspace-panes],
+  html[data-browser-overlay-active] [data-workspace-pane]:has([data-browser-page-host]),
+  html[data-browser-overlay-active] [data-workspace-pane]:has([data-browser-page-host]) > div,
+  html[data-browser-overlay-active] [data-browser-workspace-tab],
+  html[data-browser-overlay-active] [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
   button,
   input,
   textarea,

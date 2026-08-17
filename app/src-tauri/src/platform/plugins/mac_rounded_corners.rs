@@ -6,7 +6,10 @@ use tauri::{AppHandle, Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 use cocoa::{
-    appkit::{NSColor, NSView, NSWindow, NSWindowStyleMask, NSWindowTitleVisibility},
+    appkit::{
+        NSColor, NSView, NSViewHeightSizable, NSViewWidthSizable, NSWindow,
+        NSWindowCollectionBehavior, NSWindowStyleMask, NSWindowTitleVisibility,
+    },
     base::{id, nil},
     foundation::{NSPoint, NSString},
 };
@@ -118,40 +121,47 @@ pub fn enable_modern_window_style<R: Runtime>(
     offset_y: Option<f64>,
 ) -> Result<(), String> {
     let radius = corner_radius.unwrap_or(10.0);
-    #[cfg(not(target_os = "macos"))]
-    let _ = radius;
 
     #[cfg(target_os = "macos")]
     {
-        let config = TrafficLightsConfig {
-            offset_x: offset_x.unwrap_or(0.0),
-            offset_y: offset_y.unwrap_or(0.0),
-        };
+        let _ = (radius, offset_x, offset_y);
 
         window
-            .with_webview(move |webview| {
+            .with_webview(|webview| {
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
-
-                    let mut style_mask = ns_window.styleMask();
-
-                    style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
-                    style_mask |= NSWindowStyleMask::NSTitledWindowMask;
-                    style_mask |= NSWindowStyleMask::NSClosableWindowMask;
-                    style_mask |= NSWindowStyleMask::NSMiniaturizableWindowMask;
-                    style_mask |= NSWindowStyleMask::NSResizableWindowMask;
-
-                    ns_window.setStyleMask_(style_mask);
                     ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
                     ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
-                    ns_window.setHasShadow_(cocoa::base::NO);
-                    ns_window.setOpaque_(cocoa::base::NO);
-                    ns_window.setBackgroundColor_(NSColor::clearColor(nil));
+                    ns_window.setMovable_(cocoa::base::YES);
+                    ns_window.setHasShadow_(cocoa::base::YES);
+                    // AppKit's default live-resize optimization preserves and
+                    // stretches cached view contents. That makes a WKWebView
+                    // appear frozen until the resize finishes. Force normal
+                    // drawing so WebKit lays out and paints every resize step.
+                    ns_window.setPreservesContentDuringLiveResize_(cocoa::base::NO);
 
-                    apply_continuous_corner_mask(ns_window, radius);
+                    // The macOS-specific Tauri config creates a normal titled,
+                    // resizable overlay window. Do not rewrite its style mask
+                    // after creation: AppKit may rebuild the content hierarchy,
+                    // severing the webview's native autoresizing relationship.
+                    let mut collection_behavior = ns_window.collectionBehavior();
+                    collection_behavior.remove(
+                        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary,
+                    );
+                    collection_behavior.insert(
+                        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenPrimary,
+                    );
+                    ns_window.setCollectionBehavior_(collection_behavior);
 
-                    position_traffic_lights(ns_window, config.offset_x, config.offset_y);
+                    let content_view = ns_window.contentView();
+                    let webview_view = webview.inner() as id;
+                    let content_bounds = content_view.bounds();
+                    let _: () = msg_send![webview_view, setFrame: content_bounds];
+                    webview_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
+                    let _: () = msg_send![content_view, setNeedsLayout: cocoa::base::YES];
+                    let _: () = msg_send![content_view, layoutSubtreeIfNeeded];
+                    let _: () = msg_send![webview_view, setNeedsDisplay: cocoa::base::YES];
                 }
             })
             .map_err(|e| e.to_string())?;
@@ -161,7 +171,7 @@ pub fn enable_modern_window_style<R: Runtime>(
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (offset_x, offset_y);
+        let _ = (radius, offset_x, offset_y);
         // Windows 11 rounds custom (decorationless) windows only when asked to.
         #[cfg(windows)]
         apply_windows_rounded_corners(&window);

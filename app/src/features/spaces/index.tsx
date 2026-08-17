@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 export { MessageOriginBadge } from "./components/MessageOriginBadge";
 export { SpaceAvatar } from "./components/SpaceAvatar";
+export { spaceDestination } from "./navigation";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";

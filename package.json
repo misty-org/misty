@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "app",
+    "extensions",
     "website"
   ],
   "scripts": {
@@ -11,6 +12,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "build:web": "npm run build:website && npm run build:app",
+    "build:extensions": "npm run build --workspace=@misty/plugins",
+    "validate:extensions": "npm run validate --workspace=@misty/plugins",
     "check:web": "npm run typecheck && npm run lint && npm run test && npm run build:web",
     "dev:app": "npm run dev:web --workspace=@misty/app",
     "build:app": "npm run build:web --workspace=@misty/app",

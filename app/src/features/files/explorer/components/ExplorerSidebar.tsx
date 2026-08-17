@@ -98,7 +98,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
       <section className={sidebarStyles.section}>
         {props.workspaceLocked ? (
-          <div className={sidebarStyles.workspaceSelect} aria-label="File Manager workspace">
+          <div className={sidebarStyles.workspaceSelect} aria-label="File Manager profile">
             <Briefcase size={20} />
             <span className={sidebarStyles.workspaceSelectLabel}>{props.activeWorkspaceTitle}</span>
           </div>
@@ -141,7 +141,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       variant="ghost"
                       size="icon-xs"
                       type="button"
-                      aria-label={`Rename ${workspace.title}`}
+                      aria-label={`Rename profile ${workspace.title}`}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -155,7 +155,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
                       variant="ghost"
                       size="icon-xs"
                       type="button"
-                      aria-label={`Delete ${workspace.title}`}
+                      aria-label={`Delete profile ${workspace.title}`}
                       disabled={props.workspaceEntries.length <= 1}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => {
@@ -172,7 +172,7 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => openWorkspaceDialog("create")}>
                 <Plus size={15} />
-                <span>New</span>
+                <span>New profile</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

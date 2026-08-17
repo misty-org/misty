@@ -37,7 +37,7 @@ export const useExplorerStore = create<ExplorerStore>(
       library: null,
       workspaceEntries: [],
       activeWorkspaceId: "",
-      activeWorkspaceTitle: "Workspace 1",
+      activeWorkspaceTitle: "Profile 1",
       initialized: false,
       sidebarVisible: true,
       previewVisible: true,

@@ -60,8 +60,8 @@ export function useOperationErrorNotification(
     const message = useExplorerStore.getState().consumeOperationError();
     if (!message) return;
     const recoveredWorkspace =
-      message.startsWith("Misty reset a damaged Explorer layout") ||
-      message.startsWith("Workspace layout could not be restored");
+      message.startsWith("Misty reset a damaged Explorer profile") ||
+      message.startsWith("Profile could not be restored");
     pushNotification(message, recoveredWorkspace ? "info" : "error", 4500);
   }, [operationError, pushNotification]);
 }

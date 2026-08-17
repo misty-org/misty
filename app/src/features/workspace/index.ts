@@ -16,3 +16,6 @@ export type {
   MultiPanelStoreHook,
   MultiPanelStoreOptions,
 } from "./useMultiPanelStore";
+export * from "./model";
+export * from "./routeSurface";
+export * from "./useWorkspaceStore";

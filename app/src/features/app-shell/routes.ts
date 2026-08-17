@@ -10,6 +10,7 @@ export const routes = {
   // LegacyAgentRedirect forwards it to `agents`.
   assistant: "/assistant",
   automations: "/automations",
+  browser: "/browser",
   changelog: "/changelog",
   code: "/code",
   diagnostics: "/diagnostics",
@@ -28,4 +29,5 @@ export const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
+  terminal: "/terminal",
 } as const;

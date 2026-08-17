@@ -2,10 +2,21 @@
 pub mod agent_device_identity;
 pub mod agents;
 pub mod autostart;
+#[cfg(desktop)]
+pub mod browser;
 pub mod claude;
+#[cfg(desktop)]
+pub mod code_git;
+#[cfg(desktop)]
+pub mod code_lsp;
+#[cfg(desktop)]
+pub mod code_watcher;
+#[cfg(desktop)]
+pub mod code_workspace;
 pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
+pub mod credential_store;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -49,6 +60,8 @@ pub mod storage;
 pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
+#[cfg(desktop)]
+pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

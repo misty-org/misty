@@ -1,5 +1,5 @@
-import { useAppStore } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
+import { useWorkspaceStore } from "@/features/workspace";
 import { Button, PermissionState } from "@/shared/ui";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
@@ -26,7 +26,6 @@ import { SpacePageFrame } from "./SpacePageLayout";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
-import { SpacesHeader, type SpaceTabDestination } from "./SpacesHeader";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
 import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 
@@ -81,8 +80,6 @@ export default function SpacesShell() {
   const {
     ensureTabSession,
     addWorkspaceTab,
-    closeWorkspaceTab,
-    reorderWorkspaceTabs,
     selectWorkspaceTab,
     updateActiveSpaceRoute,
     pruneTabSessions,
@@ -90,8 +87,6 @@ export default function SpacesShell() {
     useShallow((state) => ({
       ensureTabSession: state.ensureSession,
       addWorkspaceTab: state.addTab,
-      closeWorkspaceTab: state.closeTab,
-      reorderWorkspaceTabs: state.reorderTabs,
       selectWorkspaceTab: state.selectTab,
       updateActiveSpaceRoute: state.updateActiveSpaceRoute,
       pruneTabSessions: state.pruneSessions,
@@ -154,6 +149,19 @@ export default function SpacesShell() {
     setViewingSpace(activeSpace.id);
     return () => setViewingSpace("");
   }, [activeSpace?.id, setViewingSpace, user?.id]);
+
+  // Push the space's name up to the workspace tab that hosts it so the tab
+  // bar (and the collapsed "Spaces" dropdown) shows real names instead of a
+  // stack of generic "Space" entries.
+  useEffect(() => {
+    if (!activeSpace?.id || !activeSpace.name) return;
+    const groupKey = `space:${activeSpace.id}` as const;
+    const state = useWorkspaceStore.getState();
+    const tab = state.layout.panes
+      .flatMap((pane) => pane.tabs)
+      .find((entry) => entry.groupKey === groupKey);
+    if (tab) state.renameTab(tab.id, activeSpace.name);
+  }, [activeSpace?.id, activeSpace?.name]);
   useEffect(() => writePanelVisible(panelVisible), [panelVisible]);
   useEffect(() => {
     if (!accountId || !snapshotReady) return;
@@ -201,43 +209,6 @@ export default function SpacesShell() {
     rememberSpaceSubpageRoute(accountId, panelRoute.activeSpaceId, currentSpacesRoute);
   }, [accountId, activeTab?.kind, currentSpacesRoute, panelRoute.activeSpaceId]);
 
-  const addSpaceTab = (destination: SpaceTabDestination) => {
-    if (!accountId || !activeSpace?.id) return;
-    const route = newSpaceTabRoute(activeSpace.id, destination);
-    const tabId = addWorkspaceTab(accountId, activeSpace.id, "space", route);
-    if (!tabId) {
-      useAppStore.getState().setMessage("This Space already has 16 open tabs.");
-      return;
-    }
-    pendingTabRouteRef.current = route;
-    navigate(route);
-  };
-
-  const selectTopLevelTab = (tabId: string) => {
-    if (!accountId || !activeSpace?.id || tabId === activeTab?.id) return;
-    const selected = tabSession?.tabs.find((tab) => tab.id === tabId);
-    if (!selected) return;
-    selectWorkspaceTab(accountId, activeSpace.id, tabId);
-    if (selected.kind === "space" && selected.route !== currentSpacesRoute) {
-      pendingTabRouteRef.current = selected.route;
-      navigate(selected.route);
-    }
-  };
-
-  const closeTopLevelTab = (tabId: string) => {
-    if (!accountId || !activeSpace?.id) return;
-    const wasActive = activeTab?.id === tabId;
-    closeWorkspaceTab(accountId, activeSpace.id, tabId);
-    if (!wasActive) return;
-    const next = activeSpacesTab(
-      useSpacesTabsStore.getState().sessions[spacesTabsSessionKey(accountId, activeSpace.id)],
-    );
-    if (next?.kind === "space" && next.route !== currentSpacesRoute) {
-      pendingTabRouteRef.current = next.route;
-      navigate(next.route);
-    }
-  };
-
   if (transitioning) return <SpacesAppLoadingPlaceholder />;
 
   if (!user)
@@ -274,7 +245,7 @@ export default function SpacesShell() {
       <div
         className={[
           "grid h-full min-h-0 bg-charcoal-bg",
-          "grid-rows-[46px_minmax(0,1fr)_32px] overflow-hidden",
+          "grid-rows-[minmax(0,1fr)_32px] overflow-hidden",
           "transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         ].join(" ")}
         style={{
@@ -284,19 +255,6 @@ export default function SpacesShell() {
               : "0px minmax(0, 1fr)",
         }}
       >
-        <div className="col-span-full row-start-1 min-w-0">
-          <SpacesHeader
-            session={tabSession}
-            onAddTab={addSpaceTab}
-            onCloseTab={closeTopLevelTab}
-            onReorderTab={(tabId, fromIndex, toIndex) => {
-              if (accountId && activeSpace?.id)
-                reorderWorkspaceTabs(accountId, activeSpace.id, tabId, fromIndex, toIndex);
-            }}
-            onSelectTab={selectTopLevelTab}
-          />
-        </div>
-
         <AnimatePresence initial={false}>
           {panelVisible && spaceSurfaceActive ? (
             <motion.aside
@@ -304,7 +262,7 @@ export default function SpacesShell() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -12 }}
               className={[
-                "col-start-1 row-start-2 flex min-h-0",
+                "col-start-1 row-start-1 flex min-h-0",
                 "min-w-[248px] flex-col overflow-hidden",
                 "border-r border-charcoal-border bg-charcoal-sidebar px-3 pb-2 pt-3 text-sm text-cream-muted",
               ].join(" ")}
@@ -320,7 +278,7 @@ export default function SpacesShell() {
 
         <main
           key={activeInvitation?.id ?? activeTab?.id}
-          className="relative col-start-2 row-start-2 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
+          className="relative col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
         >
           {activeInvitation ? (
             <SpaceInvitationView
@@ -341,7 +299,7 @@ export default function SpacesShell() {
           )}
         </main>
 
-        <footer className="col-span-full row-start-3 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
+        <footer className="col-span-full row-start-2 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
           <SpacesBottomBarToggle
             pressed={panelVisible}
             onClick={() => setPanelVisible((visible) => !visible)}
@@ -361,9 +319,3 @@ export default function SpacesShell() {
   );
 }
 
-function newSpaceTabRoute(spaceId: string, destination: SpaceTabDestination): string {
-  const base = `/spaces/${encodeURIComponent(spaceId)}`;
-  if (destination === "journal") return defaultSpaceRoute(spaceId);
-  if (destination === "planner") return `${base}/planner/tasks/board`;
-  return `${base}/${destination}`;
-}

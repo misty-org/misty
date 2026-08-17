@@ -154,6 +154,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const actions = useSpaceChatMessageActions({
     spaceId,
     conversationId,
+    currentUser: user ? { id: user.id, name: user.name } : undefined,
     activeConversation: scope.activeConversation,
     members: scope.members,
     agents: scope.agents,
@@ -302,7 +303,6 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           suggestions={suggestions}
           input={input}
           isConversation={Boolean(conversationId)}
-          sending={store.sending}
           canUploadAttachments={access.canUploadAttachments}
           canBrowseLibrary={access.canBrowseLibrary}
           mentionNames={mentionNames}

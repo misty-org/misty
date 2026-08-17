@@ -2,6 +2,15 @@ import type { AgentCapabilityGrant } from "@/api/spaces/dto/interfaces/agentArch
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 
 export type ReasoningEffort = "" | "low" | "medium" | "high";
+export type AgentAccessSurface =
+  | "browser"
+  | "files"
+  | "terminal"
+  | "code_editor"
+  | "spaces"
+  | "connections"
+  | "agents"
+  | "extensions";
 
 export interface PersonalAgent {
   id: string;
@@ -19,6 +28,8 @@ export interface PersonalAgent {
   reasoning_effort?: ReasoningEffort;
   context_permissions: Record<string, boolean>;
   tool_permissions: {
+    mode?: "inherit_invoker";
+    disabled_surfaces?: AgentAccessSurface[];
     read: boolean;
     write: boolean;
     integrations: string[];

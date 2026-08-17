@@ -1,4 +1,4 @@
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetSpacesAccountState, useSpacesStore } from "../store/useSpacesStore";
 
@@ -95,6 +95,7 @@ describe("Spaces realtime account lifecycle", () => {
     apiMocks.realtimeTicket.mockReset();
     apiMocks.snapshot.mockReset();
     apiMocks.members.mockReset();
+    apiMocks.messages.mockReset();
     FakeWebSocket.instances = [];
     vi.stubGlobal("WebSocket", FakeWebSocket);
     const values = new Map<string, string>();
@@ -294,6 +295,42 @@ describe("Spaces realtime account lifecycle", () => {
     expect(apiMocks.members).not.toHaveBeenCalled();
     expect(useSpacesStore.getState().error).toBeNull();
   });
+
+  it("applies an included message without refetching the thread", async () => {
+    const loadInbox = vi.fn().mockResolvedValue(undefined);
+    const optimistic = messageFixture({
+      id: "optimistic-client-1",
+      client_nonce: "client-1",
+      local_delivery_state: "sending",
+    });
+    const confirmed = messageFixture({
+      id: "message-confirmed",
+      seq: 2,
+      client_nonce: "client-1",
+    });
+    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "message-ticket", expires_in: 60 });
+    useSpacesStore.setState({
+      spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
+      messagesBySpace: { space: [optimistic] },
+      loadInbox,
+    });
+
+    await useSpacesStore.getState().connectRealtime("active-account");
+    FakeWebSocket.instances[0].open();
+    FakeWebSocket.instances[0].message({
+      type: "event",
+      event: spaceEventFixture({
+        type: "message.created",
+        entity_id: confirmed.id,
+        payload: confirmed,
+      }),
+    });
+    await Promise.resolve();
+
+    expect(apiMocks.messages).not.toHaveBeenCalled();
+    expect(loadInbox).toHaveBeenCalledOnce();
+    expect(useSpacesStore.getState().messagesBySpace.space).toEqual([confirmed]);
+  });
 });
 
 function deferred<T>() {
@@ -327,6 +364,21 @@ function spaceEventFixture(patch: Record<string, unknown> = {}) {
     actor_user_id: "active-account",
     entity_id: "run-1",
     payload: {},
+    created_at: "2026-07-15T00:00:00Z",
+    ...patch,
+  };
+}
+
+function messageFixture(patch: Partial<SpaceMessage> = {}): SpaceMessage {
+  return {
+    seq: 1,
+    id: "message-1",
+    space_id: "space",
+    sender_user_id: "active-account",
+    sender_name: "Active user",
+    sender_kind: "person",
+    content: [{ type: "text", text: "Hello" }],
+    file_node_ids: [],
     created_at: "2026-07-15T00:00:00Z",
     ...patch,
   };

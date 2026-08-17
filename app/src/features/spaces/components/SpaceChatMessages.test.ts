@@ -6,6 +6,7 @@ import {
   buildChatDisplayRows,
   formatChatMessageTime,
   isInFlightRun,
+  mergeSpaceMessages,
   messageReplyPreviewText,
 } from "@/features/spaces/chat";
 import { SpaceChatMessages } from "@/features/spaces/chat/components/ChatMessages";
@@ -26,15 +27,55 @@ function message(id: string, sender: string, createdAt: string): SpaceMessage {
 }
 
 describe("Space chat display rows", () => {
+  it("reconciles an optimistic message with the matching confirmed message", () => {
+    const optimistic = {
+      ...message("1", "alex", "2026-07-21T19:00:00.000Z"),
+      id: "optimistic-client-1",
+      client_nonce: "client-1",
+      local_delivery_state: "sending" as const,
+    };
+    const confirmed = {
+      ...optimistic,
+      id: "message-1",
+      seq: 42,
+      local_delivery_state: undefined,
+    };
+
+    expect(mergeSpaceMessages([optimistic], [confirmed])).toEqual([confirmed]);
+  });
+
+  it("renders local delivery progress and failure feedback inline", () => {
+    const sending = {
+      ...message("1", "alex", "2026-07-21T19:00:00.000Z"),
+      local_delivery_state: "sending" as const,
+    };
+    const failed = {
+      ...message("2", "alex", "2026-07-21T19:01:00.000Z"),
+      local_delivery_state: "failed" as const,
+    };
+    const markup = renderMessages([sending, failed]);
+
+    expect(markup).toContain("Sending…");
+    expect(markup).toContain("Message couldn’t be sent.");
+  });
+
   it("wraps unbroken message text without widening the chat scroller", () => {
     const longMessage = message("1", "alex", "2026-07-21T19:00:00.000Z");
     longMessage.content = [{ type: "text", text: "x".repeat(500) }];
 
-    const markup = renderToStaticMarkup(
+    const markup = renderMessages([longMessage]);
+
+    expect(markup).toContain("overflow-x-hidden");
+    expect(markup).toContain("[overflow-wrap:anywhere]");
+    expect(markup).toContain("whitespace-pre-wrap");
+  });
+
+  function renderMessages(messages: SpaceMessage[]) {
+    return renderToStaticMarkup(
       createElement(SpaceChatMessages, {
         error: "",
         loading: false,
-        messages: [longMessage],
+        messages,
         currentUserId: "sam",
         isOwner: false,
         canWrite: false,
@@ -62,11 +103,7 @@ describe("Space chat display rows", () => {
         onReload: () => {},
       }),
     );
-
-    expect(markup).toContain("overflow-x-hidden");
-    expect(markup).toContain("[overflow-wrap:anywhere]");
-    expect(markup).toContain("whitespace-pre-wrap");
-  });
+  }
 
   it("groups nearby messages from the same sender and starts each date with a divider", () => {
     const rows = buildChatDisplayRows([

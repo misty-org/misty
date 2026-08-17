@@ -34,7 +34,6 @@ export interface SpaceChatComposerProps {
   suggestions: ChatSuggestionsState;
   input: ReturnType<typeof useComposerInput>;
   isConversation: boolean;
-  sending: boolean;
   canUploadAttachments: boolean;
   canBrowseLibrary: boolean;
   replyToSenderName: string;
@@ -247,7 +246,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
               )}
               size="icon-sm"
-              disabled={props.sending || draft.isEmpty}
+              disabled={draft.isEmpty}
               type="submit"
               aria-label="Send message"
             >

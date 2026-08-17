@@ -90,8 +90,8 @@ const explorerCommands: ExplorerCommandPaletteEntry[] = [
   },
   {
     id: "explorer.next_workspace",
-    label: "Next File Layout",
-    hint: "Cycle to the next explorer tab",
+    label: "Next Profile",
+    hint: "Cycle to the next File Explorer profile",
   },
   ...Array.from({ length: 9 }, (_, index): ExplorerCommandPaletteEntry => ({
     id: `explorer.tab_${index + 1}`,
