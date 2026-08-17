@@ -56,3 +56,19 @@ func TestScreenGuidanceOffersOnDemandScreensInsteadOfAModeChoice(t *testing.T) {
 		}
 	}
 }
+
+func TestBrowserActIsTheOnlyWayToActOnAPage(t *testing.T) {
+	var act bool
+	for _, descriptor := range browserToolDescriptors() {
+		if descriptor.Name == screenActTool {
+			act = descriptor.Risk == "write" && strings.Contains(string(descriptor.InputSchema), "allowConsequential")
+		}
+	}
+	if !act {
+		t.Fatal("browser.act must be a write that names its consequential allowance")
+	}
+	guidance := agentCapabilityGuidance([]string{"browser.inspect", "browser.navigate", "browser.act"}, false)
+	if !strings.Contains(guidance, "call browser_act") {
+		t.Fatal(guidance)
+	}
+}

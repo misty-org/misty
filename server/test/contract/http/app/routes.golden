@@ -695,6 +695,7 @@ POST /api/me/deletion
 POST /api/me/export
 POST /api/me/home/apps
 POST /api/me/library-lock
+POST /api/me/screen-model/{jobID}
 POST /api/me/space-templates
 POST /api/misty/agent-execution
 POST /api/misty/agent-followup
@@ -811,6 +812,7 @@ POST /me/deletion
 POST /me/export
 POST /me/home/apps
 POST /me/library-lock
+POST /me/screen-model/{jobID}
 POST /me/space-templates
 POST /misty/agent-execution
 POST /misty/agent-followup
@@ -950,6 +952,7 @@ POST /v1/me/deletion
 POST /v1/me/export
 POST /v1/me/home/apps
 POST /v1/me/library-lock
+POST /v1/me/screen-model/{jobID}
 POST /v1/me/space-templates
 POST /v1/misty/agent-execution
 POST /v1/misty/agent-followup

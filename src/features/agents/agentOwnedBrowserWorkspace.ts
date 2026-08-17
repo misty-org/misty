@@ -40,7 +40,8 @@ export async function createAgentOwnedBrowserWorkspace(
 
   const scopeId = browserScopeId(tab);
   const label = `Misty research: ${query.slice(0, 80)}`;
-  const capabilities = ["browser.inspect", "browser.navigate", "browser.click", "browser.interact"];
+  // The agent acts through browser.act: Midscene on this device, with its own cursor.
+  const capabilities = ["browser.inspect", "browser.visual", "browser.navigate", "browser.act"];
   return {
     context: {
       id: tab.id,

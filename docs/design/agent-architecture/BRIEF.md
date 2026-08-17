@@ -168,13 +168,34 @@ Each phase leaves the product working.
   conversation; `screen_look` continuations through the companion still capture
   every display, so answers can point at the screen.
 
-### Phase 4 — Midscene on the desktop
+### Phase 4 — Midscene on the desktop (implemented October 4, 2026; not yet verified)
 
-- Implement Midscene's `AbstractInterface` over the existing whole-window
-  capture and native input. Set `modelFamily` so grounding works.
-- Reuse the cursor companion overlay as the visible pointer; the adapter's
-  `beforeInvokeAction` moves it before each action.
-- Retire the low-level `browser.*` tools from the model's catalog.
+- `browser_act(goal)` is one device job per goal. The desktop runs Midscene's
+  planner locally in a bounded loop (24 actions, 4 minutes): capture the page,
+  plan one action, act through Misty's native input under a grant scoped to the
+  job, repeat. Leases, Stop and takeover apply to every action. It returns what
+  happened, where the cursor stopped and the final screenshot.
+- Model calls go to `POST /me/screen-model/{jobID}`, a thin pass-through that
+  accepts calls only while that act job runs, uses the run's model and Misty's
+  gateway key, caps output, and meters each call as a model turn of the run.
+  Inference stays at the gateway; neither the server nor the Mac runs a model.
+- The agent cursor is Misty's in-page pointer, separate from the user's.
+  Native input glides it to each target before acting and leaves it in place,
+  so every screenshot shows where the agent points, and each result reports
+  its position. The user's own pointer never moves.
+- Actions stop before sending, publishing, buying, deleting or changing access
+  unless the call sets `allowConsequential`, which the model sets only when the
+  user asked for exactly that.
+- Desktop browser grants no longer include `browser.click`, `browser.type` or
+  `browser.interact`, so Misty-window tasks act only through `browser_act`.
+  The runtime's server-side planner (`misty_browser_act`) remains for paths
+  that still grant native input directly.
+- Midscene's Node-only helpers get browser stubs in the desktop build
+  (`src/shared/platform/nodeShims`); reports and caches are not written.
+- Scope: Misty's own windows. Other Mac apps would need the user's real
+  pointer, so desktop control keeps its existing workspace tools for now.
+- The companion stays the teacher: `screen_look` through it captures every
+  display, so answers can point at things on screen while the user clicks.
 
 ## Acceptance prompts
 

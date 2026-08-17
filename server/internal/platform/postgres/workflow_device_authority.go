@@ -36,7 +36,7 @@ func deviceRunAuthorityTx(ctx context.Context, tx *sql.Tx, userID, runID string,
 	}
 	scope := capability
 	switch capability {
-	case "browser.click", "browser.type", "browser.interact", "browser.upload":
+	case "browser.click", "browser.type", "browser.interact", "browser.upload", "browser.act":
 		scope = "browser.interact"
 	case "browser.downloads.list", "browser.visual":
 		scope = "browser.inspect"

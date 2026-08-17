@@ -80,6 +80,9 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 			guidance.WriteString(", stop and tell the user what to do.")
 		}
 		guidance.WriteString(" Never enter passwords or MFA codes. Include source URLs when saving or sharing research.")
+		if has("browser.act") {
+			guidance.WriteString(" For anything you would do with a mouse or keyboard (clicking, typing into forms, choosing options, dragging, drawing), call browser_act with one concrete goal and the visible result to reach. Misty's agent cursor does it on fresh screenshots and reports where it stopped; check its final screenshot before the next goal. Use browser_navigate to open pages and browser_inspect to read them.")
+		}
 	}
 	switch {
 	case has("screen.open") && !hasPrefix("browser."):

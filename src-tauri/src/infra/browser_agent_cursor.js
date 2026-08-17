@@ -7,7 +7,7 @@
     clearTimeout(timer);
     if (host) host.style.opacity = "0";
   };
-  const move = (target, y) => {
+  const move = (target, y, options) => {
     try {
       let x = target;
       if (typeof target !== "number") {
@@ -45,7 +45,8 @@
       host.style.opacity = "1";
       placed = true;
       clearTimeout(timer);
-      timer = setTimeout(hide, 1600);
+      // An acting agent keeps its cursor visible so every screenshot shows it.
+      if (!options?.hold) timer = setTimeout(hide, 1600);
     } catch { /* Visual feedback must never break the real action. */ }
   };
   window[key] = { move, hide };
