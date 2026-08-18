@@ -3,7 +3,7 @@
 <!-- impeccable:product-schema 1 -->
 
 ## Platform
-
+s
 web
 
 ## Users

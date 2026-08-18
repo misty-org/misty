@@ -2,10 +2,22 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type WorkspaceSurfaceId =
-  "space" | "browser" | "terminal" | "code" | "files" | "agents" | "extensions";
+  | "home"
+  | "space"
+  | "browser"
+  | "terminal"
+  | "code"
+  | "files"
+  | "transfers"
+  | "agents"
+  | "extensions";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";
+export type WorkspaceScopeKey = "global" | `space:${string}`;
+export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
+export type DockSplitDirection = "left" | "right" | "up" | "down";
+export type DockDropZone = "center" | DockSplitDirection;
 
 export interface BrowserTabState {
   version: 1;
@@ -14,8 +26,10 @@ export interface BrowserTabState {
 }
 
 export const blankBrowserUrl = "about:blank";
+/** Where a browser tab starts when nothing else asked for a URL. */
+export const defaultBrowserHomeUrl = "https://www.google.com";
 
-export function createBrowserTabState(url = blankBrowserUrl): BrowserTabState {
+export function createBrowserTabState(url = defaultBrowserHomeUrl): BrowserTabState {
   return {
     version: 1,
     url,
@@ -27,7 +41,9 @@ export function parseBrowserTabState(value: unknown): BrowserTabState {
   if (!value || typeof value !== "object") return createBrowserTabState();
   const candidate = value as Partial<BrowserTabState>;
   const url =
-    typeof candidate.url === "string" && candidate.url.trim() ? candidate.url : blankBrowserUrl;
+    typeof candidate.url === "string" && candidate.url.trim()
+      ? candidate.url
+      : defaultBrowserHomeUrl;
   return {
     version: 1,
     url,
@@ -72,6 +88,17 @@ export interface WorkspaceSurfaceDescriptor<TState = unknown> {
   restore: (snapshot: unknown) => TState;
 }
 
+export interface DockWidgetDescriptor<TState = unknown> {
+  kind: WorkspaceSurfaceId;
+  instancePolicy: "singleton" | "per-space" | "multiple";
+  mountPolicy: DockMountPolicy;
+  minimumSize: { width: number; height: number };
+  create: () => TState;
+  serialize: (state: TState) => unknown;
+  restore: (snapshot: unknown) => TState;
+  dispose?: (state: TState) => void;
+}
+
 export interface WorkspaceTab {
   id: string;
   surfaceId: WorkspaceSurfaceId;
@@ -86,24 +113,30 @@ export interface WorkspaceTab {
 }
 
 export interface WorkspacePane {
+  type: "leaf";
   id: string;
   tabs: WorkspaceTab[];
   activeTabId: string | null;
-  size: number;
 }
 
-export type WorkspaceLayoutPreset = "single" | "columns" | "rows" | "grid";
+export interface WorkspaceSplit {
+  type: "split";
+  id: string;
+  direction: "horizontal" | "vertical";
+  ratio: number;
+  first: WorkspaceDockNode;
+  second: WorkspaceDockNode;
+}
+
+export type WorkspaceDockNode = WorkspacePane | WorkspaceSplit;
 
 export interface WorkspaceLayout {
-  preset: WorkspaceLayoutPreset;
-  panes: WorkspacePane[];
+  root: WorkspaceDockNode;
   focusedPaneId: string;
-  maximizedPaneId: string | null;
-  preservedPreset: WorkspaceLayoutPreset | null;
 }
 
 export interface WorkspaceSnapshot {
-  version: 1;
+  version: 2;
   accountId: string;
   deviceId: string;
   savedAt: number;
@@ -126,4 +159,4 @@ export interface OpenWorkspaceSurfaceRequest {
   paneId?: string;
 }
 
-export const workspaceMaxPanes = 4;
+export const workspaceDefaultMinimumSize = { width: 280, height: 180 } as const;

@@ -20,30 +20,18 @@ export interface EditorGroup {
   activeTabPath: string | null;
 }
 
-export interface TerminalTab {
-  id: string;
-  title: string;
-  sessionKey: number;
-}
-
 interface PersistedState {
   rootPath: string | null;
   filesPaneOpen: boolean;
-  terminalPaneOpen: boolean;
   expandedFolders: string[];
 }
 
 interface WorkspaceState extends PersistedState {
   groups: EditorGroup[];
   activeGroupId: string;
-  terminalTabs: TerminalTab[];
-  activeTerminalId: string | null;
-
   setRootPath: (path: string | null) => void;
   toggleFilesPane: () => void;
-  toggleTerminalPane: () => void;
   setFilesPaneOpen: (open: boolean) => void;
-  setTerminalPaneOpen: (open: boolean) => void;
   toggleFolder: (path: string) => void;
 
   openTab: (tab: OpenTab, groupId?: string) => void;
@@ -55,15 +43,9 @@ interface WorkspaceState extends PersistedState {
 
   splitActiveTab: () => void;
   setActiveGroup: (groupId: string) => void;
-
-  addTerminalTab: () => string;
-  closeTerminalTab: (id: string) => void;
-  setActiveTerminal: (id: string) => void;
-  renameTerminalTab: (id: string, title: string) => void;
 }
 
 const initialGroupId = "group-primary";
-const initialTerminalId = crypto.randomUUID();
 
 function makeGroup(id: string, tabs: OpenTab[] = []): EditorGroup {
   return {
@@ -86,19 +68,13 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
     (set) => ({
       rootPath: null,
       filesPaneOpen: true,
-      terminalPaneOpen: false,
       expandedFolders: [],
 
       groups: [makeGroup(initialGroupId)],
       activeGroupId: initialGroupId,
-      terminalTabs: [{ id: initialTerminalId, title: "shell", sessionKey: 0 }],
-      activeTerminalId: initialTerminalId,
-
       setRootPath: (path) => set({ rootPath: path, expandedFolders: path ? [path] : [] }),
       toggleFilesPane: () => set((state) => ({ filesPaneOpen: !state.filesPaneOpen })),
-      toggleTerminalPane: () => set((state) => ({ terminalPaneOpen: !state.terminalPaneOpen })),
       setFilesPaneOpen: (open) => set({ filesPaneOpen: open }),
-      setTerminalPaneOpen: (open) => set({ terminalPaneOpen: open }),
 
       toggleFolder: (path) =>
         set((state) => {
@@ -198,49 +174,12 @@ export const useCodingWorkspaceStore = create<WorkspaceState>()(
         }),
 
       setActiveGroup: (groupId) => set({ activeGroupId: groupId }),
-
-      addTerminalTab: () => {
-        const id = crypto.randomUUID();
-        set((state) => ({
-          terminalTabs: [
-            ...state.terminalTabs,
-            { id, title: `shell ${state.terminalTabs.length + 1}`, sessionKey: 0 },
-          ],
-          activeTerminalId: id,
-        }));
-        return id;
-      },
-
-      closeTerminalTab: (id) =>
-        set((state) => {
-          const terminalTabs = state.terminalTabs.filter((tab) => tab.id !== id);
-          if (terminalTabs.length === 0) {
-            const fallbackId = crypto.randomUUID();
-            return {
-              terminalTabs: [{ id: fallbackId, title: "shell", sessionKey: 0 }],
-              activeTerminalId: fallbackId,
-            };
-          }
-          const activeTerminalId =
-            state.activeTerminalId === id
-              ? (terminalTabs[terminalTabs.length - 1]?.id ?? null)
-              : state.activeTerminalId;
-          return { terminalTabs, activeTerminalId };
-        }),
-
-      setActiveTerminal: (id) => set({ activeTerminalId: id }),
-
-      renameTerminalTab: (id, title) =>
-        set((state) => ({
-          terminalTabs: state.terminalTabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
-        })),
     }),
     {
       name: "misty:coding-workspace:v2",
       partialize: (state): PersistedState => ({
         rootPath: state.rootPath,
         filesPaneOpen: state.filesPaneOpen,
-        terminalPaneOpen: state.terminalPaneOpen,
         expandedFolders: state.expandedFolders,
       }),
     },

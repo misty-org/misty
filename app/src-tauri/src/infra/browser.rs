@@ -39,6 +39,31 @@ const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   document.addEventListener('DOMContentLoaded', install, { once: true });
 })();
 "#;
+const BROWSER_FAVICON_SCRIPT: &str = r#"
+(() => {
+  const candidates = Array.from(document.querySelectorAll('link[rel][href]'))
+    .map((link) => {
+      const rel = String(link.rel || '').toLowerCase().split(/\s+/);
+      const isIcon = rel.includes('icon') || rel.some((token) => token.includes('apple-touch-icon'));
+      if (!isIcon || !/^https?:$/i.test(link.href ? new URL(link.href).protocol : '')) return null;
+      const sizes = String(link.sizes?.value || link.getAttribute('sizes') || '').toLowerCase();
+      const dimensions = Array.from(sizes.matchAll(/(\d+)x(\d+)/g));
+      const largest = dimensions.reduce((value, match) => {
+        return Math.max(value, Number(match[1]) || 0, Number(match[2]) || 0);
+      }, 0);
+      const vector = String(link.type || '').toLowerCase() === 'image/svg+xml' || /\.svg(?:$|[?#])/i.test(link.href);
+      const scalable = sizes.includes('any');
+      const standardIcon = rel.includes('icon') ? 100 : 0;
+      return {
+        href: link.href,
+        score: vector ? 1_000_000 : scalable ? 900_000 : standardIcon + largest,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score);
+  return candidates[0]?.href || null;
+})()
+"#;
 
 #[derive(Default)]
 pub struct BrowserSessionState {
@@ -157,6 +182,13 @@ struct BrowserPageEvent {
 struct BrowserTitleEvent {
     id: String,
     title: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BrowserFaviconEvent {
+    id: String,
+    url: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -289,12 +321,29 @@ fn configure_macos_webview(_webview: &Webview) -> Result<(), String> {
 }
 
 #[cfg(target_os = "macos")]
+fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
+    let main_webview = app
+        .get_webview("main")
+        .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
+    main_webview
+        .with_webview(|platform_webview| {
+            MAIN_WEBVIEW_VIEW.store(platform_webview.inner() as usize, Ordering::Release);
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn remember_main_macos_webview(_app: &AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String> {
     use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            if reveal {
+            if reveal && view.isHidden() {
                 view.setHidden(false);
             }
             let parent = view.superview().or_else(|| {
@@ -303,7 +352,16 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
             });
             if let Some(parent) = parent {
                 let main_view = MAIN_WEBVIEW_VIEW.load(Ordering::Acquire);
-                if BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire) && main_view != 0 {
+                let below_main = BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire) && main_view != 0;
+                // `addSubview:positioned:relativeTo:` always detaches and
+                // reinserts the view, which resets AppKit's tracking areas and
+                // cursor rects and makes the pointer flicker. Geometry passes
+                // run on every scroll, resize, and page-load event, so only
+                // restack when the current order is actually wrong.
+                if browser_stacking_is_correct(&parent, view, main_view, below_main) {
+                    return;
+                }
+                if below_main {
                     let main_view: &NSView = &*(main_view as *const NSView);
                     parent.addSubview_positioned_relativeTo(
                         view,
@@ -323,6 +381,41 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
             }
         })
         .map_err(|error| error.to_string())
+}
+
+/// Whether `view` already sits on the correct side of the app renderer inside
+/// `parent`. Restacking is only needed when this is false.
+#[cfg(target_os = "macos")]
+unsafe fn browser_stacking_is_correct(
+    parent: &objc2_app_kit::NSView,
+    view: &objc2_app_kit::NSView,
+    main_view: usize,
+    below_main: bool,
+) -> bool {
+    use objc2_app_kit::NSView;
+    let subviews = parent.subviews();
+    let mut view_index = None;
+    let mut main_index = None;
+    for (index, child) in subviews.iter().enumerate() {
+        let child: *const NSView = &*child;
+        if std::ptr::eq(child, view) {
+            view_index = Some(index);
+        }
+        if main_view != 0 && std::ptr::eq(child, main_view as *const NSView) {
+            main_index = Some(index);
+        }
+    }
+    // A detached child always needs reinserting.
+    let Some(view_index) = view_index else {
+        return false;
+    };
+    match main_index {
+        Some(main_index) if below_main => view_index < main_index,
+        Some(main_index) => view_index > main_index,
+        // Without the app renderer as a reference point, "topmost" is the only
+        // ordering the caller can ask for.
+        None => view_index + 1 == subviews.count(),
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -391,6 +484,7 @@ pub fn browser_webview_create(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
+    remember_main_macos_webview(&app)?;
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = app
@@ -439,7 +533,7 @@ pub fn browser_webview_create(
             }
             NewWindowResponse::Deny
         })
-        .on_page_load(move |_webview, payload| {
+        .on_page_load(move |webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                     if let Ok(mut sessions) = state.sessions.lock() {
@@ -461,8 +555,11 @@ pub fn browser_webview_create(
                     phase,
                 },
             );
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                request_browser_favicon(&webview, &page_app, &page_id);
+            }
         })
-        .on_document_title_changed(move |_webview, title| {
+        .on_document_title_changed(move |webview, title| {
             let _ = title_app.emit(
                 "misty://browser-title",
                 BrowserTitleEvent {
@@ -470,6 +567,7 @@ pub fn browser_webview_create(
                     title,
                 },
             );
+            request_browser_favicon(&webview, &title_app, &title_id);
         })
         .on_download(move |_webview, event| {
             handle_download_event(&download_app, &download_id, event)
@@ -484,6 +582,34 @@ pub fn browser_webview_create(
     configure_macos_webview(&webview)?;
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     present_macos_webview(&webview)
+}
+
+fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
+    let favicon_app = app.clone();
+    let favicon_id = id.to_owned();
+    let _ = webview.eval_with_callback(BROWSER_FAVICON_SCRIPT, move |value| {
+        let Ok(Some(candidate)) = serde_json::from_str::<Option<String>>(&value) else {
+            return;
+        };
+        let Some(url) = validated_favicon_url(&candidate) else {
+            return;
+        };
+        let _ = favicon_app.emit(
+            "misty://browser-favicon",
+            BrowserFaviconEvent {
+                id: favicon_id.clone(),
+                url,
+            },
+        );
+    });
+}
+
+fn validated_favicon_url(value: &str) -> Option<String> {
+    if value.len() > 2_048 {
+        return None;
+    }
+    let url = Url::parse(value).ok()?;
+    matches!(url.scheme(), "http" | "https").then(|| url.to_string())
 }
 
 fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>) -> bool {
@@ -809,14 +935,10 @@ pub fn browser_webview_show(
 pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        remember_main_macos_webview(&app)?;
         let main_webview = app
             .get_webview("main")
             .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
-        main_webview
-            .with_webview(|platform_webview| {
-                MAIN_WEBVIEW_VIEW.store(platform_webview.inner() as usize, Ordering::Release);
-            })
-            .map_err(|error| error.to_string())?;
         // Wry applies the macOS `drawsBackground` KVC setting through its
         // supported transparent-webview path. A direct Objective-C selector
         // is not available on recent WKWebView subclasses.
@@ -1307,6 +1429,19 @@ mod tests {
         );
         assert!(validated_user_agent(Some("Mozilla/5.0\r\nX-Test: unsafe")).is_err());
         assert!(validated_user_agent(Some(&"x".repeat(513))).is_err());
+    }
+
+    #[test]
+    fn browser_favicons_accept_only_bounded_web_urls() {
+        assert_eq!(
+            validated_favicon_url("https://example.com/icon-144.png").as_deref(),
+            Some("https://example.com/icon-144.png")
+        );
+        assert!(validated_favicon_url("data:image/svg+xml,<svg></svg>").is_none());
+        assert!(validated_favicon_url("file:///tmp/icon.png").is_none());
+        assert!(
+            validated_favicon_url(&format!("https://example.com/{}", "x".repeat(2_048))).is_none()
+        );
     }
 
     #[test]

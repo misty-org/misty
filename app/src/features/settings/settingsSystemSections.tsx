@@ -1,10 +1,8 @@
-import { inspectSelfHostedServer, saveDeploymentConfiguration } from "@/api/deployment/api";
-import { mintSelfHostEntitlement, renewSelfHostEntitlement } from "@/api/self-host/entitlement";
-import { saveSelfHostEntitlementProof } from "@/api/self-host/proof";
+import { renewSelfHostEntitlement } from "@/api/self-host/entitlement";
 import { readAccountAuthToken, readHostedAccountAuthToken } from "@/features/auth";
+import { applyDeployment } from "@/features/deployment";
 import { useOperationQueueStore } from "@/features/files/explorer";
 import { Button, Input } from "@/shared/ui";
-import { relaunch } from "@tauri-apps/plugin-process";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -357,14 +355,8 @@ function SelfHostedConnectionSettings(props: SettingsContentProps) {
     setWorking(true);
     setNotice("");
     try {
-      const descriptor = mode === "self_hosted" ? await inspectSelfHostedServer(url) : undefined;
-      if (mode === "self_hosted") {
-        const entitlement = await mintSelfHostEntitlement(await readHostedAccountAuthToken());
-        await saveSelfHostEntitlementProof(entitlement.token);
-      }
-      await saveDeploymentConfiguration(mode, url, descriptor);
-      setNotice("Connection saved. Restarting Misty…");
-      await relaunch();
+      setNotice("Verifying the connection. Misty restarts once it is saved…");
+      await applyDeployment({ mode, url });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not change the Misty server.");
     } finally {

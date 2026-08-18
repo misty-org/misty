@@ -13,6 +13,7 @@ import {
   Bot,
   Code2,
   FolderOpen,
+  Download,
   Globe2,
   Plus,
   SquareTerminal,
@@ -42,6 +43,7 @@ export const NEW_TAB_OPTIONS: NewTabOption[] = [
     instancePolicy: "single",
   },
   { surfaceId: "files", label: "Files", route: "/files", icon: FolderOpen },
+  { surfaceId: "transfers", label: "Transfers", route: "/transfers", icon: Download },
   { surfaceId: "terminal", label: "Terminal", route: "/terminal", icon: SquareTerminal },
   {
     surfaceId: "agents",

@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/auth";
-import { useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { Button, PermissionState } from "@/shared/ui";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
@@ -157,7 +157,7 @@ export default function SpacesShell() {
     if (!activeSpace?.id || !activeSpace.name) return;
     const groupKey = `space:${activeSpace.id}` as const;
     const state = useWorkspaceStore.getState();
-    const tab = state.layout.panes
+    const tab = dockLeaves(state.layout.root)
       .flatMap((pane) => pane.tabs)
       .find((entry) => entry.groupKey === groupKey);
     if (tab) state.renameTab(tab.id, activeSpace.name);
@@ -318,4 +318,3 @@ export default function SpacesShell() {
     </MotionConfig>
   );
 }
-

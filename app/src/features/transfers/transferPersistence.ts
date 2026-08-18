@@ -1,4 +1,3 @@
-import type { MultiPanelClosedPane, MultiPanelStore, MultiPanelTab } from "@/features/workspace";
 import type {
   TransferColumnWidths,
   TransferTableColumn,
@@ -10,49 +9,9 @@ import {
   transferTableColumns,
 } from "./transferModel";
 
-const TRANSFERS_MULTIPANEL_STORAGE_KEY = "misty.transfers.multipanel.v1";
 const TRANSFER_COLUMN_WIDTHS_STORAGE_KEY = "misty.transfers.table.columnWidths";
 const TRANSFER_COLUMN_ORDER_STORAGE_KEY = "misty.transfers.table.columnOrder";
 const TRANSFER_PANEL_VISIBILITY_STORAGE_KEY = "misty.transfers.panelVisibility";
-
-export function saveTransfersMultiPanelSnapshot(state: MultiPanelStore): void {
-  if (typeof window === "undefined" || state.tabs.length === 0) return;
-  try {
-    const snapshot: TransfersMultiPanelSnapshot = {
-      tabs: state.tabs,
-      activeTabId: state.activeTabId,
-      activePaneId: state.activePaneId,
-      closedPanes: state.closedPanes,
-      nextPaneIndex: state.nextPaneIndex,
-      nextTabIndex: state.nextTabIndex,
-    };
-    window.localStorage.setItem(TRANSFERS_MULTIPANEL_STORAGE_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Transfers remains usable when persistence is unavailable.
-  }
-}
-
-export function loadTransfersMultiPanelSnapshot(): TransfersMultiPanelSnapshot | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(TRANSFERS_MULTIPANEL_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<TransfersMultiPanelSnapshot>;
-    if (!Array.isArray(parsed.tabs) || parsed.tabs.length === 0) return null;
-    if (typeof parsed.activeTabId !== "string" || typeof parsed.activePaneId !== "string")
-      return null;
-    return {
-      tabs: parsed.tabs,
-      activeTabId: parsed.activeTabId,
-      activePaneId: parsed.activePaneId,
-      closedPanes: Array.isArray(parsed.closedPanes) ? parsed.closedPanes : [],
-      nextPaneIndex: typeof parsed.nextPaneIndex === "number" ? parsed.nextPaneIndex : 1,
-      nextTabIndex: typeof parsed.nextTabIndex === "number" ? parsed.nextTabIndex : 1,
-    };
-  } catch {
-    return null;
-  }
-}
 
 export function loadTransferColumnWidths(): TransferColumnWidths {
   try {
@@ -131,13 +90,4 @@ export function saveTransferPanelVisibility(visibility: {
   } catch {
     // Panel toggles remain available for the current session.
   }
-}
-
-export interface TransfersMultiPanelSnapshot {
-  tabs: MultiPanelTab[];
-  activeTabId: string;
-  activePaneId: string;
-  closedPanes: MultiPanelClosedPane[];
-  nextPaneIndex: number;
-  nextTabIndex: number;
 }

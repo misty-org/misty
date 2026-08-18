@@ -86,6 +86,9 @@ const runtimeTabIds = new Map<string, string>();
 const runtimeQueues = new Map<string, Promise<void>>();
 const browserWebviewSuspensions = new Set<string>();
 let browserOverlayQueue = Promise.resolve();
+let browserPointerGestureActive = false;
+let browserOverlayResumeGeneration = 0;
+let browserOverlayActive = false;
 
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
@@ -135,6 +138,10 @@ export function syncBrowserWebview(input: {
 }): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
   const boundsKey = serializeBounds(input.bounds);
+  const boundsChanged = lastBounds.get(id) !== boundsKey;
+  if (createdRuntimeIds.has(id) && visibleRuntimeIds.has(id) && !boundsChanged) {
+    return Promise.resolve();
+  }
   const pending = runtimeQueues.get(id);
   if (pending && requestedBounds.get(id) === boundsKey) return pending;
   requestedBounds.set(id, boundsKey);
@@ -153,9 +160,9 @@ export function syncBrowserWebview(input: {
       createdRuntimeIds.add(id);
     }
     // Frontend caches can outlive a crashed, detached, or hot-reloaded native
-    // child. Reconcile against native state on every geometry pass. A missing
-    // view is recreated immediately instead of leaving a permanently blank
-    // browser surface.
+    // child. Reconcile after creation, a real bounds change, or an explicit
+    // layout invalidation. Avoid no-op native frame writes: on macOS they
+    // rebuild WKWebView tracking areas and make cursor ownership flicker.
     let exists = await invoke<boolean>("browser_webview_reconcile", {
       request: { id, ...input.bounds },
     });
@@ -185,18 +192,48 @@ export function syncBrowserWebview(input: {
 
 export function setBrowserWebviewsSuspended(suspended: boolean, reason = "default"): void {
   const wasSuspended = browserWebviewSuspensions.size > 0;
+  if (suspended) browserOverlayResumeGeneration += 1;
   if (suspended) browserWebviewSuspensions.add(reason);
   else browserWebviewSuspensions.delete(reason);
   const isSuspended = browserWebviewSuspensions.size > 0;
   if (isSuspended && !wasSuspended) {
     setBrowserOverlayActive(true);
   } else if (!isSuspended && wasSuspended && typeof window !== "undefined") {
-    setBrowserOverlayActive(false);
-    window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+    scheduleBrowserOverlayResume();
   }
 }
 
+export function setBrowserPointerGestureActive(active: boolean): void {
+  const wasActive = browserPointerGestureActive;
+  browserPointerGestureActive = active;
+  if (wasActive && !active && browserOverlayActive && browserWebviewSuspensions.size === 0) {
+    scheduleBrowserOverlayResume();
+  }
+}
+
+function scheduleBrowserOverlayResume(): void {
+  if (typeof window === "undefined" || browserPointerGestureActive || !browserOverlayActive) return;
+  const generation = ++browserOverlayResumeGeneration;
+  // Radix can close a menu during the pointer sequence that activated its
+  // trigger. Keep the native page below the app through that sequence and the
+  // portal's closing frame so mouse-up/click cannot land in the page beneath.
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      if (
+        generation !== browserOverlayResumeGeneration ||
+        browserPointerGestureActive ||
+        browserWebviewSuspensions.size > 0
+      ) {
+        return;
+      }
+      setBrowserOverlayActive(false);
+      window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+    });
+  });
+}
+
 function setBrowserOverlayActive(active: boolean): void {
+  browserOverlayActive = active;
   if (typeof document !== "undefined") {
     document.documentElement.toggleAttribute("data-browser-overlay-active", active);
   }

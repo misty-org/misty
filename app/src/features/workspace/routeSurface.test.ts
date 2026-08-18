@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { workspaceSurfaceFromRoute, workspaceTabMatchesRoute } from "./routeSurface";
+import {
+  shouldReturnWorkspaceHome,
+  workspaceSurfaceFromRoute,
+  workspaceTabMatchesRoute,
+} from "./routeSurface";
 
 describe("workspace deep links", () => {
   it("keeps Home outside the desktop workspace", () => {
@@ -29,9 +33,18 @@ describe("workspace deep links", () => {
     ["/terminal", "terminal"],
     ["/code", "code"],
     ["/files", "files"],
+    ["/transfers", "transfers"],
     ["/agents", "agents"],
     ["/extensions", "extensions"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
     expect(workspaceSurfaceFromRoute(route)?.surfaceId).toBe(surfaceId);
+  });
+});
+
+describe("workspace empty-route transition", () => {
+  it("returns Home only after the final existing tab closes", () => {
+    expect(shouldReturnWorkspaceHome(1, 0, "/browser")).toBe(true);
+    expect(shouldReturnWorkspaceHome(0, 0, "/browser")).toBe(false);
+    expect(shouldReturnWorkspaceHome(1, 0, "/home")).toBe(false);
   });
 });

@@ -1,6 +1,8 @@
 import { routes } from "@/features/app-shell";
 import {
+  browserTabTitle,
   createBrowserTabState,
+  defaultBrowserHomeUrl,
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
   type WorkspaceTab,
@@ -21,7 +23,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   }
   if (pathname.startsWith(routes.browser)) {
     return {
-      ...request("browser", "tool:browser", "New Tab", pathname),
+      ...request("browser", "tool:browser", browserTabTitle(defaultBrowserHomeUrl), pathname),
       state: createBrowserTabState(),
     };
   }
@@ -31,6 +33,8 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     return request("code", "tool:code", "Code", pathname, undefined, "single");
   if (pathname.startsWith(routes.files))
     return request("files", "tool:files", "Files", pathname, undefined, "single");
+  if (pathname.startsWith(routes.transfers))
+    return request("transfers", "tool:transfers", "Transfers", pathname, undefined, "single");
   if (pathname.startsWith(routes.agents))
     return request("agents", "tool:agents", "Agents", pathname, undefined, "single");
   if (pathname.startsWith(routes.extensions))
@@ -47,6 +51,14 @@ export function workspaceTabMatchesRoute(
   return Boolean(
     surface && surface.surfaceId === tab.surfaceId && surface.groupKey === tab.groupKey,
   );
+}
+
+export function shouldReturnWorkspaceHome(
+  previousTabCount: number,
+  tabCount: number,
+  pathname: string,
+): boolean {
+  return previousTabCount > 0 && tabCount === 0 && pathname !== routes.home;
 }
 
 function request(

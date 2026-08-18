@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // Module-scope state that survives React unmount. Each terminal "slot" is one
-// xterm/PTY pair; a workspace tab can contain many slots when the user splits.
+// xterm/PTY pair and each dock tab owns at most one slot.
 
 /** Slot id → live PTY session id in Rust. */
 export const sessionBySlot = new Map<string, string>();
@@ -19,10 +19,7 @@ export const titleBySlot = new Map<string, string>();
 export const slotsByTab = new Map<string, string[]>();
 
 export function registerSlot(tabId: string, slotId: string): void {
-  const existing = slotsByTab.get(tabId) ?? [];
-  if (!existing.includes(slotId)) {
-    slotsByTab.set(tabId, [...existing, slotId]);
-  }
+  slotsByTab.set(tabId, [slotId]);
 }
 
 export function unregisterSlot(tabId: string, slotId: string): void {

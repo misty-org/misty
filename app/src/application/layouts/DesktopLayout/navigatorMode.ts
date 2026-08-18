@@ -1,26 +1,57 @@
-export type NavigatorMode = "full" | "icons" | "hidden";
-export type VisibleNavigatorMode = Exclude<NavigatorMode, "hidden">;
+/** How wide the navigator draws when it is on screen. */
+export type NavigatorWidth = "full" | "icons";
+/** Whether the navigator holds its column or slides away until the edge is hovered. */
+export type NavigatorVisibility = "sticky" | "hidden";
 
+export interface NavigatorLayout {
+  width: NavigatorWidth;
+  visibility: NavigatorVisibility;
+}
+
+export const navigatorLayoutStorageKey = "misty:global-navigator-layout:v3";
 export const navigatorModeStorageKey = "misty:global-navigator-mode:v2";
 export const legacyNavigatorCollapsedStorageKey = "misty:global-navigator-collapsed:v1";
 
-export const navigatorWidths: Record<NavigatorMode, number> = {
+export const navigatorWidths: Record<NavigatorWidth | "hidden", number> = {
   full: 232,
   icons: 72,
   hidden: 0,
 };
 
-export function readNavigatorMode(
-  storage: Pick<Storage, "getItem"> = window.localStorage,
-): NavigatorMode {
-  const saved = storage.getItem(navigatorModeStorageKey);
-  if (saved === "full" || saved === "icons" || saved === "hidden") return saved;
-  return storage.getItem(legacyNavigatorCollapsedStorageKey) === "true" ? "icons" : "full";
+export function nextNavigatorWidth(width: NavigatorWidth): NavigatorWidth {
+  return width === "full" ? "icons" : "full";
 }
 
-export function writeNavigatorMode(
-  mode: NavigatorMode,
+export function readNavigatorLayout(
+  storage: Pick<Storage, "getItem"> = window.localStorage,
+): NavigatorLayout {
+  const saved = storage.getItem(navigatorLayoutStorageKey);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as Partial<NavigatorLayout>;
+      return {
+        width: parsed.width === "icons" ? "icons" : "full",
+        visibility: parsed.visibility === "hidden" ? "hidden" : "sticky",
+      };
+    } catch {
+      // A corrupt entry falls through to the older keys below.
+    }
+  }
+  // Width and visibility used to be one setting, so an older "hidden" only says
+  // the rail was away — it keeps the default width for when it comes back.
+  const mode = storage.getItem(navigatorModeStorageKey);
+  if (mode === "hidden") return { width: "full", visibility: "hidden" };
+  if (mode === "icons") return { width: "icons", visibility: "sticky" };
+  if (mode === "full") return { width: "full", visibility: "sticky" };
+  return {
+    width: storage.getItem(legacyNavigatorCollapsedStorageKey) === "true" ? "icons" : "full",
+    visibility: "sticky",
+  };
+}
+
+export function writeNavigatorLayout(
+  layout: NavigatorLayout,
   storage: Pick<Storage, "setItem"> = window.localStorage,
 ): void {
-  storage.setItem(navigatorModeStorageKey, mode);
+  storage.setItem(navigatorLayoutStorageKey, JSON.stringify(layout));
 }

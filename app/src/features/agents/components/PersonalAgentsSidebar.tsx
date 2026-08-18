@@ -15,6 +15,7 @@ import { usePersonalAgentsStore } from "../store/usePersonalAgentsStore";
 export interface PersonalAgentsSidebarProps {
   selectedAgentId: string;
   onSelect: (agent: PersonalAgent) => void;
+  onEdit: (agent: PersonalAgent) => void;
   onCreate: () => void;
   onDelete: (agentId: string) => void;
 }
@@ -118,7 +119,7 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => props.onSelect(agent)}>
+                <ContextMenuItem onSelect={() => props.onEdit(agent)}>
                   <Settings2 size={14} /> Preferences…
                 </ContextMenuItem>
                 <ContextMenuSeparator />

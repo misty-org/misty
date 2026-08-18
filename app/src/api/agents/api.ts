@@ -33,4 +33,11 @@ export const agentsApi = {
       body: JSON.stringify({ spaces }),
     }),
   models: <T>() => apiRequest<{ catalog_version: string; models: T[] }>("/ai/models"),
+  activity: <T>(id: string, limit = 30) =>
+    apiRequest<T>(`/agents/${encodeURIComponent(id)}/activity?limit=${encodeURIComponent(limit)}`),
+  run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
+  cancelRun: <T>(runId: string) =>
+    apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
+  retryRun: <T>(runId: string) =>
+    apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" }),
 };

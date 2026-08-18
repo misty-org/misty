@@ -11,14 +11,7 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { AlertCircle, RotateCcw } from "lucide-react";
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { TerminalSearchOverlay } from "./TerminalSearchOverlay";
 import { MISTY_TERMINAL_THEME } from "./terminalTheme";
 import {
@@ -27,7 +20,6 @@ import {
   registerSlot,
   sessionBySlot,
   titleBySlot,
-  unregisterSlot,
 } from "./terminalRegistry";
 
 type TerminalOutputEvent = { sessionId: string; data: string };
@@ -61,17 +53,8 @@ interface TerminalPaneProps {
 /** Single xterm.js instance backed by a PTY session in Rust. */
 export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
   function TerminalPane(props, handleRef) {
-    const {
-      slotId,
-      tabId,
-      cwd,
-      visible,
-      focused,
-      onTitleChange,
-      onCwdChange,
-      onExit,
-      onFocus,
-    } = props;
+    const { slotId, tabId, cwd, visible, focused, onTitleChange, onCwdChange, onExit, onFocus } =
+      props;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<Terminal | null>(null);
@@ -145,8 +128,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
             cursorStyle: "block",
             cursorInactiveStyle: "outline",
             drawBoldTextInBrightColors: true,
-            fontFamily:
-              'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace',
+            fontFamily: 'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace',
             fontSize: BASE_FONT_SIZE * fontScaleRef.current,
             lineHeight: 1.3,
             letterSpacing: 0,
@@ -346,13 +328,17 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
             focusDisposable.dispose();
             host.removeEventListener("focusin", domFocusHandler);
             unlistens.forEach((fn) => fn());
-            // Save scrollback for the next mount before disposing xterm.
-            try {
-              const snapshot = serialize.serialize();
-              bufferBySlot.set(slotId, snapshot);
-            } catch {
-              /* serialization can fail on some renderers — best effort */
-            }
+            // Save scrollback only while the PTY still belongs to this slot.
+            // Explicit shell/tab closes remove the session first, so cleanup
+            // cannot resurrect their buffer after disposal.
+            if (sessionBySlot.has(slotId)) {
+              try {
+                const snapshot = serialize.serialize();
+                bufferBySlot.set(slotId, snapshot);
+              } catch {
+                /* serialization can fail on some renderers — best effort */
+              }
+            } else bufferBySlot.delete(slotId);
             sessionIdRef.current = "";
             try {
               webglRef.current?.dispose();
@@ -401,13 +387,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       const id = requestAnimationFrame(fitAndPush);
       return () => cancelAnimationFrame(id);
     }, [fontScale, fitAndPush]);
-
-    useEffect(
-      () => () => {
-        if (tabId) unregisterSlot(tabId, slotId);
-      },
-      [tabId, slotId],
-    );
 
     useImperativeHandle(
       handleRef,
@@ -466,10 +445,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       >
         <div ref={hostRef} className="h-full w-full" />
         {searchOpen && searchRef.current ? (
-          <TerminalSearchOverlay
-            search={searchRef.current}
-            onClose={() => setSearchOpen(false)}
-          />
+          <TerminalSearchOverlay search={searchRef.current} onClose={() => setSearchOpen(false)} />
         ) : null}
         {status === "starting" ? (
           <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#111312]/70 text-xs text-cream-muted">
