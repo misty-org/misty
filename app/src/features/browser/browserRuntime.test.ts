@@ -2,6 +2,7 @@ import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   hideAllBrowserWebviews,
+  setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   syncBrowserWebview,
 } from "./browserRuntime";
@@ -72,7 +73,7 @@ describe("browser native view synchronization", () => {
     expect(invoke.mock.calls.map(([command]) => command)).toEqual(["browser_webview_reconcile"]);
   });
 
-  it("ignores subpixel measurement noise while still reconciling visibility", async () => {
+  it("ignores subpixel measurement noise without touching the native frame", async () => {
     const tab = browserTab("subpixel-noise");
     await syncBrowserWebview({
       tab,
@@ -89,7 +90,7 @@ describe("browser native view synchronization", () => {
       theme: "dark",
     });
 
-    expect(invoke.mock.calls.map(([command]) => command)).toEqual(["browser_webview_reconcile"]);
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("recreates a native child when frontend state is stale", async () => {
@@ -140,5 +141,25 @@ describe("browser native view synchronization", () => {
       expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }),
     );
     expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false);
+  });
+
+  it("does not raise the native page until the closing pointer gesture finishes", async () => {
+    setBrowserPointerGestureActive(true);
+    setBrowserWebviewsSuspended(true, "test-pointer-menu");
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: true }),
+    );
+    invoke.mockClear();
+
+    setBrowserWebviewsSuspended(false, "test-pointer-menu");
+    await new Promise((resolve) => window.setTimeout(resolve, 40));
+    expect(invoke).not.toHaveBeenCalledWith("browser_webviews_set_overlay_active", {
+      active: false,
+    });
+
+    setBrowserPointerGestureActive(false);
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }),
+    );
   });
 });

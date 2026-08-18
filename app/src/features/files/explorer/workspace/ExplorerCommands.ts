@@ -1,6 +1,6 @@
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
 import { useTransfersStore } from "@/features/transfers";
-import { useMultiPanelStore } from "@/features/workspace";
+import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import {
   operationQueueRedo,
   operationQueueUndo,
@@ -173,6 +173,29 @@ export function runExplorerCommand(
   const explorer = useExplorerStore.getState();
   const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
+  const workspace = useWorkspaceStore.getState();
+  const dockPane = dockLeaves(workspace.layout.root).find(
+    (pane) => pane.id === workspace.layout.focusedPaneId,
+  );
+  const dockTab = dockPane?.tabs.find(
+    (tab) => tab.id === dockPane.activeTabId && tab.surfaceId === "files",
+  );
+  const openDockedFiles = (zone?: "right" | "down") => {
+    const path = activeTab?.path ?? explorer.panes[paneId]?.listing?.path ?? "/";
+    const tab = workspace.openSurface({
+      surfaceId: "files",
+      groupKey: "tool:files",
+      title: activeTab?.title || "Files",
+      route: "/files",
+      instancePolicy: "multiple",
+      forceNew: true,
+      paneId: dockPane?.id,
+      state: { version: 1, path },
+    });
+    if (zone && dockPane) workspace.dockTab(tab.id, dockPane.id, zone);
+    workspace.focusTab(tab.id);
+    navigateRoute(tab.route);
+  };
   if (commandId.startsWith("plugin.")) {
     void runPluginCommandById(commandId, paneId, navigateRoute);
     return;
@@ -185,7 +208,7 @@ export function runExplorerCommand(
       focusExplorerSearch(paneId, "command");
       break;
     case "app.toggle_transfers":
-      openTransfersTab();
+      navigateRoute(openTransfersTab().route);
       break;
     case "app.open_settings":
       navigateRoute("/settings");
@@ -200,26 +223,21 @@ export function runExplorerCommand(
       void applySharedClipboardToSystem();
       break;
     case "explorer.new_tab":
-      multi.addTab(
-        activeTab?.path ?? explorer.panes[paneId]?.listing?.path ?? "/",
-        activeTab?.title,
-      );
+      openDockedFiles();
       break;
     case "explorer.restore_tab":
       multi.restoreTab();
       break;
     case "explorer.close_pane":
-      if (activeTab && activeTab.panes.length > 1) multi.closePane(paneId);
-      else if (activeTab) multi.closeTab(activeTab.id);
+      if (dockTab) workspace.closeTab(dockTab.id);
       break;
     case "explorer.restore_pane":
-      multi.restorePane();
       break;
     case "explorer.split_vertical":
-      multi.splitPane(paneId, "vertical");
+      openDockedFiles("right");
       break;
     case "explorer.split_horizontal":
-      multi.splitPane(paneId, "horizontal");
+      openDockedFiles("down");
       break;
     case "explorer.refresh":
       void explorer.refreshPane(paneId);

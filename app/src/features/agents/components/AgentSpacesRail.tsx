@@ -1,66 +1,38 @@
-interface RailAgent {
-  name: string;
-  initial: string;
-  activity?: string;
-  live?: boolean;
-}
+import type { PersonalAgentActivityPage } from "../model/interfaces/personal";
 
-interface RailSpace {
-  name: string;
-  agents: RailAgent[];
-}
-
-const SPACES: RailSpace[] = [
-  {
-    name: "Marketing",
-    agents: [
-      { name: "buzz", initial: "b", live: true, activity: "reading #launch-plan" },
-      { name: "copy editor", initial: "c" },
-    ],
-  },
-  {
-    name: "Product",
-    agents: [
-      { name: "PR reviewer", initial: "p", live: true, activity: "reviewing #1204" },
-      { name: "meeting notes", initial: "m", activity: "idle 18h" },
-    ],
-  },
-  {
-    name: "Research",
-    agents: [{ name: "research", initial: "r" }],
-  },
-];
-
-export function AgentSpacesRail() {
+export function AgentSpacesRail({ activity }: { activity?: PersonalAgentActivityPage | null }) {
+  const spaces = new Map<string, PersonalAgentActivityPage["runs"]>();
+  for (const run of activity?.runs ?? []) {
+    const items = spaces.get(run.space_name) ?? [];
+    items.push(run);
+    spaces.set(run.space_name, items);
+  }
   return (
     <aside
       aria-label="Agents by space"
       className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto border-l border-charcoal-border bg-charcoal-sidebar px-3 py-4"
     >
-      {SPACES.map((space) => (
-        <section key={space.name}>
+      <div className="px-2 text-[10px] font-medium uppercase tracking-wider text-cream-muted">
+        Recent Spaces
+      </div>
+      {spaces.size === 0 ? (
+        <p className="m-0 px-2 text-xs leading-5 text-cream-muted">
+          No assigned-task activity yet.
+        </p>
+      ) : null}
+      {[...spaces.entries()].map(([space, runs]) => (
+        <section key={space}>
           <div className="mb-1.5 px-2 text-[10px] font-medium uppercase tracking-wider text-cream-muted">
-            {space.name}
+            {space}
           </div>
           <ul className="m-0 grid list-none gap-0.5 p-0">
-            {space.agents.map((agent) => (
-              <li
-                key={agent.name}
-                className="flex items-start gap-2.5 rounded-md px-2 py-1.5"
-              >
-                <span className="relative mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-charcoal-hover text-[10px] font-medium text-cream-bright">
-                  {agent.initial}
-                  {agent.live ? (
-                    <span className="absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full border border-charcoal-sidebar bg-emerald-500" />
-                  ) : null}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs text-cream">{agent.name}</div>
-                  {agent.activity ? (
-                    <div className="mt-0.5 truncate text-[10.5px] text-cream-muted">
-                      {agent.activity}
-                    </div>
-                  ) : null}
+            {runs.slice(0, 4).map((run) => (
+              <li key={run.run_id} className="rounded-md px-2 py-1.5">
+                <div className="truncate text-xs text-cream">
+                  {run.task_key} · {run.task_title}
+                </div>
+                <div className="mt-0.5 truncate text-[10.5px] capitalize text-cream-muted">
+                  {run.state.replace(/_/g, " ")}
                 </div>
               </li>
             ))}

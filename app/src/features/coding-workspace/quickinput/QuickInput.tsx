@@ -1,5 +1,13 @@
 import { Command } from "cmdk";
-import { FileCode, PanelBottom, PanelLeft, Search, Settings2, SplitSquareHorizontal, Terminal } from "lucide-react";
+import {
+  FileCode,
+  PanelBottom,
+  PanelLeft,
+  Search,
+  Settings2,
+  SplitSquareHorizontal,
+  Terminal,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cn } from "@/shared/ui";
 import { codeFindInFiles, codeWalkFiles, type SearchMatch, type WalkedFile } from "../native";
@@ -12,9 +20,10 @@ interface QuickInputProps {
   mode: QuickInputMode | null;
   onClose: () => void;
   onOpenSettings: () => void;
+  onOpenTerminal: (forceNew?: boolean) => void;
 }
 
-export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
+export function QuickInput({ mode, onClose, onOpenSettings, onOpenTerminal }: QuickInputProps) {
   const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
   const [query, setQuery] = useState("");
   const [files, setFiles] = useState<WalkedFile[]>([]);
@@ -97,7 +106,7 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
         label: "Toggle terminal panel",
         shortcut: "⌘J",
         icon: <PanelBottom size={14} />,
-        run: () => useCodingWorkspaceStore.getState().toggleTerminalPane(),
+        run: () => onOpenTerminal(false),
       },
       {
         id: "split-editor",
@@ -108,9 +117,9 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
       },
       {
         id: "new-terminal",
-        label: "New terminal tab",
+        label: "New terminal panel",
         icon: <Terminal size={14} />,
-        run: () => useCodingWorkspaceStore.getState().addTerminalTab(),
+        run: () => onOpenTerminal(true),
       },
       {
         id: "ai-settings",
@@ -119,7 +128,7 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
         run: () => onOpenSettings(),
       },
     ],
-    [onOpenSettings],
+    [onOpenSettings, onOpenTerminal],
   );
 
   const runCommand = useCallback(
@@ -165,7 +174,13 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
       >
         <Command shouldFilter={mode !== "search"} loop label={promptLabel(mode)}>
           <div className="flex items-center gap-2 border-b border-charcoal-border px-3 py-2 text-cream-muted">
-            {mode === "search" ? <Search size={14} /> : mode === "files" ? <FileCode size={14} /> : <Command.Loading />}
+            {mode === "search" ? (
+              <Search size={14} />
+            ) : mode === "files" ? (
+              <FileCode size={14} />
+            ) : (
+              <Command.Loading />
+            )}
             <Command.Input
               autoFocus
               value={query}
@@ -186,7 +201,7 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
                 : mode === "search"
                   ? searching
                     ? "Searching…"
-                    : searchNote ?? "Type to search across files."
+                    : (searchNote ?? "Type to search across files.")
                   : "No commands match."}
             </Command.Empty>
 
@@ -212,26 +227,24 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
               : null}
 
             {mode === "files"
-              ? files
-                  .slice(0, 400)
-                  .map((file) => (
-                    <Command.Item
-                      key={file.path}
-                      value={`${file.name} ${file.relative}`}
-                      onSelect={() => handleFileSelect(file.path, file.name)}
-                      className={cn(itemClass)}
-                    >
-                      <span className="grid size-5 place-items-center text-cream-muted">
-                        <FileCode size={13} />
+              ? files.slice(0, 400).map((file) => (
+                  <Command.Item
+                    key={file.path}
+                    value={`${file.name} ${file.relative}`}
+                    onSelect={() => handleFileSelect(file.path, file.name)}
+                    className={cn(itemClass)}
+                  >
+                    <span className="grid size-5 place-items-center text-cream-muted">
+                      <FileCode size={13} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-cream">{file.name}</span>
+                      <span className="block truncate text-[11px] text-cream-muted">
+                        {file.relative}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-cream">{file.name}</span>
-                        <span className="block truncate text-[11px] text-cream-muted">
-                          {file.relative}
-                        </span>
-                      </span>
-                    </Command.Item>
-                  ))
+                    </span>
+                  </Command.Item>
+                ))
               : null}
 
             {mode === "search"
@@ -239,7 +252,9 @@ export function QuickInput({ mode, onClose, onOpenSettings }: QuickInputProps) {
                   <Command.Item
                     key={`${match.path}:${match.lineNumber}:${match.column}`}
                     value={`${match.relative}:${match.lineNumber}:${match.line}`}
-                    onSelect={() => handleSearchSelect(match.path, basename(match.relative), match.lineNumber)}
+                    onSelect={() =>
+                      handleSearchSelect(match.path, basename(match.relative), match.lineNumber)
+                    }
                     className={cn(itemClass, "items-start py-2")}
                   >
                     <span className="grid size-5 place-items-center text-cream-muted">

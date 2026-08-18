@@ -64,7 +64,19 @@ export function BrowserMenu(props: BrowserMenuProps) {
   return (
     <DropdownMenu onOpenChange={(open) => setBrowserWebviewsSuspended(open, suspensionReason)}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={props.iconButtonClass} aria-label="Browser menu">
+        <button
+          type="button"
+          className={`${props.iconButtonClass} select-none`}
+          aria-label="Browser menu"
+          onMouseDown={(event) => {
+            if (event.detail > 1) event.preventDefault();
+          }}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.getSelection()?.removeAllRanges();
+          }}
+        >
           <MoreVertical size={20} strokeWidth={1.8} />
         </button>
       </DropdownMenuTrigger>

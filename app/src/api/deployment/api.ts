@@ -1,5 +1,6 @@
 import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/client/base-url";
 import { appConfigureServer, appSnapshot } from "@/native";
+import { deploymentHostLabel, rememberDeployment } from "./knownDeployments";
 
 export type DeploymentMode = "hosted" | "self_hosted";
 
@@ -147,6 +148,13 @@ export async function saveDeploymentConfiguration(
   } catch {
     // The native configuration remains authoritative; storage namespacing is best-effort.
   }
+  if (url) {
+    rememberDeployment({
+      url,
+      serverId: descriptor?.server_id ?? null,
+      name: descriptor?.name?.trim() || deploymentHostLabel(url),
+    });
+  }
   resetDeploymentTargetCache();
 }
 
@@ -176,6 +184,13 @@ async function loadDeploymentTarget(): Promise<DeploymentTarget> {
       const serverUrl = validateSelfHostedServerUrl(environment.serverUrl ?? "");
       const scope = `self-hosted-${stableScope(environment.serverDeploymentId || serverUrl)}`;
       writeDeploymentScope(scope);
+      // Installations configured before the switcher existed still deserve an
+      // entry, so the server they are already on can be switched back to.
+      rememberDeployment({
+        url: serverUrl,
+        serverId: environment.serverDeploymentId ?? null,
+        name: environment.serverName?.trim() || deploymentHostLabel(serverUrl),
+      });
       return {
         mode: "self_hosted",
         apiBase: withDefaultApiPath(serverUrl),

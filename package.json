@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
+    "agent-runtime",
     "app",
     "extensions",
     "website"
@@ -22,6 +23,9 @@
     "build:desktop": "npm run tauri --workspace=@misty/app -- build",
     "dev:website": "npm run dev --workspace=@misty/website",
     "build:website": "npm run build --workspace=@misty/website",
-    "test:website": "npm run test --workspace=@misty/website"
+    "test:website": "npm run test --workspace=@misty/website",
+    "dev:agent-runtime": "npm run dev --workspace=@misty/agent-runtime",
+    "build:agent-runtime": "npm run build --workspace=@misty/agent-runtime",
+    "test:agent-runtime": "npm run test --workspace=@misty/agent-runtime"
   }
 }

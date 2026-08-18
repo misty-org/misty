@@ -17,6 +17,12 @@ import {
 import { ChevronDown, X, type LucideIcon } from "lucide-react";
 import { useEffect } from "react";
 
+let draggingWorkspaceTabId: string | null = null;
+
+export function currentWorkspaceTabDragId(): string | null {
+  return draggingWorkspaceTabId;
+}
+
 export interface TabGroup {
   key: string;
   surfaceId: WorkspaceSurfaceId;
@@ -67,7 +73,7 @@ export function WorkspaceTabGroupButton({
       : group.surfaceId === "space" && containsActive && displayTab
         ? displayTab.title
         : group.label;
-  const showChevron = group.tabs.length > 1 || group.surfaceId === "space";
+  const showChevron = group.tabs.length > 1;
 
   return (
     <div
@@ -80,16 +86,22 @@ export function WorkspaceTabGroupButton({
       )}
       onDragStart={(event) => {
         if (!displayTab) return;
+        draggingWorkspaceTabId = displayTab.id;
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("application/x-misty-workspace-tab", displayTab.id);
+      }}
+      onDragEnd={() => {
+        draggingWorkspaceTabId = null;
       }}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("application/x-misty-workspace-tab")) {
           event.preventDefault();
+          event.stopPropagation();
         }
       }}
       onDrop={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         const tabId = event.dataTransfer.getData("application/x-misty-workspace-tab");
         if (tabId && displayTab) onMoveTab(tabId, group.tabs.indexOf(displayTab));
       }}
@@ -107,9 +119,12 @@ export function WorkspaceTabGroupButton({
           <span className="relative grid size-4 shrink-0 place-items-center">
             <Icon size={14} className="text-cream-muted" strokeWidth={1.7} />
             <img
+              key={browserState.faviconUrl}
               src={browserState.faviconUrl}
               alt=""
-              className="absolute inset-0 size-4 rounded-sm object-contain"
+              decoding="async"
+              draggable={false}
+              className="absolute inset-0 size-4 select-none rounded-sm object-contain [image-rendering:auto]"
               onError={(event) => {
                 event.currentTarget.style.display = "none";
               }}
@@ -159,9 +174,12 @@ export function WorkspaceTabGroupButton({
                 >
                   {tabBrowserState?.faviconUrl ? (
                     <img
+                      key={tabBrowserState.faviconUrl}
                       src={tabBrowserState.faviconUrl}
                       alt=""
-                      className="size-4 shrink-0 rounded-sm object-contain"
+                      decoding="async"
+                      draggable={false}
+                      className="size-4 shrink-0 select-none rounded-sm object-contain [image-rendering:auto]"
                       onError={(event) => {
                         event.currentTarget.style.display = "none";
                       }}

@@ -13,6 +13,14 @@ export const tabletFrameClass = [
 export const desktopNavbarClass = "relative z-10 col-start-1 row-start-2 min-h-0 overflow-hidden";
 export const tabletNavbarClass = "relative z-10 col-start-1 row-start-1 min-h-0 overflow-hidden";
 
+// An auto-hiding navigator floats over the workspace instead of taking a grid
+// column, so revealing it never reflows the surfaces underneath.
+export const desktopFloatingNavbarClass =
+  "absolute bottom-0 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
+export const tabletFloatingNavbarClass =
+  "absolute bottom-6 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
+export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-2";
+
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-start-2 min-h-0 overflow-hidden bg-charcoal-bg";
 export const tabletRouteShellClass =

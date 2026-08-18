@@ -3,7 +3,9 @@ import { BrowserWorkspace } from "@/features/browser";
 import { DeveloperWorkspace } from "@/features/developer-workspace";
 import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
+import { HomeDashboard } from "@/features/home";
 import { TerminalWorkspace } from "@/features/terminal";
+import { TransfersWorkspacePanel } from "@/features/transfers";
 import type { WorkspaceTab } from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import { Plus } from "lucide-react";
@@ -11,14 +13,18 @@ import { Plus } from "lucide-react";
 /** Static surface for a workspace tab that isn't the currently-routed one. */
 export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
   switch (tab.surfaceId) {
+    case "home":
+      return <HomeDashboard />;
     case "browser":
       return <BrowserWorkspace tab={tab} />;
     case "terminal":
-      return <TerminalWorkspace />;
+      return <TerminalWorkspace tab={tab} />;
     case "code":
       return <DeveloperWorkspace />;
     case "files":
-      return <FilesPage />;
+      return <FilesPage embedded workspaceId={tab.id} workspaceTitle={tab.title} />;
+    case "transfers":
+      return <TransfersWorkspacePanel workspaceId={tab.instanceKey} />;
     case "agents":
       return <AgentsPage />;
     case "extensions":

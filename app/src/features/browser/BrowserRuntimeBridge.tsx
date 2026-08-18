@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
   requestBrowserWebviewLayoutByRuntimeId,
+  setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
@@ -36,6 +37,11 @@ interface BrowserTitleEvent {
   title: string;
 }
 
+interface BrowserFaviconEvent {
+  id: string;
+  url: string;
+}
+
 interface BrowserPopupEvent {
   sourceId: string;
   url: string;
@@ -51,6 +57,22 @@ interface BrowserDownloadEvent {
 
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const beginPointerGesture = () => setBrowserPointerGestureActive(true);
+    const endPointerGesture = () => setBrowserPointerGestureActive(false);
+    window.addEventListener("pointerdown", beginPointerGesture, true);
+    window.addEventListener("pointerup", endPointerGesture, true);
+    window.addEventListener("pointercancel", endPointerGesture, true);
+    window.addEventListener("blur", endPointerGesture);
+    return () => {
+      window.removeEventListener("pointerdown", beginPointerGesture, true);
+      window.removeEventListener("pointerup", endPointerGesture, true);
+      window.removeEventListener("pointercancel", endPointerGesture, true);
+      window.removeEventListener("blur", endPointerGesture);
+      setBrowserPointerGestureActive(false);
+    };
+  }, []);
 
   useEffect(() => {
     const reason = "dom-overlay";
@@ -98,6 +120,13 @@ export function BrowserRuntimeBridge() {
         const tabId = browserTabIdForRuntime(payload.id);
         if (tabId) {
           useWorkspaceStore.getState().updateBrowserTab(tabId, { title: payload.title.trim() });
+        }
+      }),
+      listen<BrowserFaviconEvent>("misty://browser-favicon", ({ payload }) => {
+        if (disposed || !/^https?:\/\//i.test(payload.url)) return;
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (tabId) {
+          useWorkspaceStore.getState().updateBrowserTab(tabId, { faviconUrl: payload.url });
         }
       }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {

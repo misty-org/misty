@@ -5,13 +5,13 @@ import {
   createBrowserTabState,
   parseBrowserTabState,
   type WorkspaceTab,
+  dockLeaves,
   useWorkspaceStore,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Checkbox, cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ArrowLeft, ArrowRight, Maximize2, MessageCirclePlus, RefreshCw, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, MessageCirclePlus, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { grantBrowserAgentAccess, revokeBrowserAgentGrant } from "./browserAgentAccess";
 import {
@@ -59,9 +59,8 @@ export function normalizeBrowserAddress(value: string): string {
 
 export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
   const fallbackTab = useWorkspaceStore((store) => {
-    const pane =
-      store.layout.panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ??
-      store.layout.panes[0];
+    const panes = dockLeaves(store.layout.root);
+    const pane = panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ?? panes[0];
     const candidate = pane?.tabs.find((item) => item.id === pane.activeTabId);
     return candidate?.surfaceId === "browser" ? candidate : undefined;
   });
@@ -202,21 +201,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       setBrowserError(tab.id, error);
     } finally {
       setGrantBusyAgentId(null);
-    }
-  };
-
-  const toggleFullscreen = async () => {
-    try {
-      if (nativeRuntime) {
-        const appWindow = getCurrentWindow();
-        await appWindow.setFullscreen(!(await appWindow.isFullscreen()));
-      } else if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await document.documentElement.requestFullscreen();
-      }
-    } catch (error: unknown) {
-      setBrowserError(tab.id, error);
     }
   };
 
@@ -369,15 +353,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               </div>
             </PopoverContent>
           </Popover>
-          <button
-            type="button"
-            className={iconButtonClass}
-            aria-label="Toggle fullscreen"
-            title="Toggle fullscreen"
-            onClick={() => void toggleFullscreen()}
-          >
-            <Maximize2 size={18} strokeWidth={1.7} />
-          </button>
           <BrowserMenu
             iconButtonClass={iconButtonClass}
             nativeRuntime={nativeRuntime}

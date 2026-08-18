@@ -1,28 +1,45 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  collapseEmptyDockLeaves,
+  createDockId,
+  createDockLeaf,
+  createHomeDockTab,
+  dockLeaves,
+  dockTabs,
+  fillEmptyDockLeaves,
+  findDockLeaf,
+  insertDockSplit,
+  mapDockLeaf,
+  mapDockTabs,
+  normalizeDockNode,
+  updateDockSplitRatio,
+} from "./dockTree";
 import type {
   BrowserTabState,
+  DockDropZone,
+  DockSplitDirection,
   OpenWorkspaceSurfaceRequest,
+  WorkspaceDockNode,
   WorkspaceGroupKey,
   WorkspaceLayout,
-  WorkspaceLayoutPreset,
-  WorkspacePane,
+  WorkspaceScopeKey,
   WorkspaceSnapshot,
   WorkspaceTab,
 } from "./model";
 import {
-  blankBrowserUrl,
+  defaultBrowserHomeUrl,
   browserTabTitle,
   createBrowserTabState,
   parseBrowserTabState,
-  workspaceMaxPanes,
 } from "./model";
 
-type SplitDirection = "right" | "down";
-
 interface WorkspaceStore {
+  activeScopeKey: WorkspaceScopeKey;
+  layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>>;
   layout: WorkspaceLayout;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
+  setScope: (scopeKey: WorkspaceScopeKey) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceTab;
   openBrowserTab: (request?: {
     url?: string;
@@ -31,46 +48,62 @@ interface WorkspaceStore {
   }) => WorkspaceTab;
   updateBrowserTab: (tabId: string, patch: Partial<BrowserTabState> & { title?: string }) => void;
   renameTab: (tabId: string, title: string) => void;
+  updateTabRoute: (tabId: string, route: string) => void;
+  updateTabState: (tabId: string, state: unknown, title?: string) => void;
   focusTab: (tabId: string) => boolean;
   closeTab: (tabId: string) => void;
   moveTab: (tabId: string, paneId: string, index?: number) => boolean;
+  dockTab: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
   reorderTab: (paneId: string, tabId: string, index: number) => void;
-  splitPane: (paneId: string, direction: SplitDirection, tabId?: string) => string | null;
+  splitPane: (paneId: string, direction: DockSplitDirection, tabId?: string) => string | null;
   closePane: (paneId: string) => void;
+  fillEmptyPanes: () => void;
+  updateSplitRatio: (splitId: string, ratio: number) => void;
   toggleSidebar: (tabId: string) => void;
-  toggleMaximize: (paneId?: string) => void;
-  restoreLayout: () => void;
   replaceSnapshot: (snapshot: WorkspaceSnapshot) => void;
   createSnapshot: (accountId: string, deviceId: string) => WorkspaceSnapshot;
   reset: () => void;
 }
 
-const initialPane = (): WorkspacePane => ({
-  id: createId("pane"),
-  tabs: [],
-  activeTabId: null,
-  size: 1,
-});
-const initialLayout = (): WorkspaceLayout => {
-  const pane = initialPane();
+function initialLayout(): WorkspaceLayout {
+  const pane = createDockLeaf();
+  return { root: pane, focusedPaneId: pane.id };
+}
+
+function withLayout(state: WorkspaceStore, layout: WorkspaceLayout) {
+  const normalized = normalizeLayout(layout);
   return {
-    preset: "single",
-    panes: [pane],
-    focusedPaneId: pane.id,
-    maximizedPaneId: null,
-    preservedPreset: null,
+    layout: normalized,
+    layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: normalized },
   };
-};
+}
 
 export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
     (set, get) => ({
+      activeScopeKey: "global",
+      layoutsByScope: {},
       layout: initialLayout(),
       lastUsedTabByGroup: {},
+      setScope: (scopeKey) => {
+        const current = get();
+        if (current.activeScopeKey === scopeKey) return;
+        const layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>> = {
+          ...current.layoutsByScope,
+          [current.activeScopeKey]: current.layout,
+        };
+        const layout = normalizeLayout(layoutsByScope[scopeKey] ?? initialLayout());
+        set({
+          activeScopeKey: scopeKey,
+          layout,
+          layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
+        });
+      },
       openSurface: (request) => {
+        if (request.surfaceId === "space") get().setScope(request.groupKey as WorkspaceScopeKey);
         const now = Date.now();
         const state = get();
-        const panes = state.layout.panes;
+        const panes = dockLeaves(state.layout.root);
         const allTabs = panes.flatMap((pane) => pane.tabs);
         const singleton = request.instancePolicy === "single";
         const existing = singleton
@@ -80,34 +113,27 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             : undefined;
         if (existing) {
           if (request.syncExistingRoute && existing.route !== request.route) {
-            set((current) => ({
-              layout: {
+            set((current) =>
+              withLayout(current, {
                 ...current.layout,
-                panes: current.layout.panes.map((pane) => ({
-                  ...pane,
-                  tabs: pane.tabs.map((tab) =>
-                    tab.id === existing.id ? { ...tab, route: request.route } : tab,
-                  ),
-                })),
-              },
-            }));
+                root: mapDockTabs(current.layout.root, (tab) =>
+                  tab.id === existing.id ? { ...tab, route: request.route } : tab,
+                ),
+              }),
+            );
           }
           get().focusTab(existing.id);
-          return (
-            get()
-              .layout.panes.flatMap((pane) => pane.tabs)
-              .find((tab) => tab.id === existing.id) ?? existing
-          );
+          return dockTabs(get().layout.root).find((tab) => tab.id === existing.id) ?? existing;
         }
         const pane =
           panes.find((candidate) => candidate.id === request.paneId) ??
           panes.find((candidate) => candidate.id === state.layout.focusedPaneId) ??
           panes[0];
         const tab: WorkspaceTab = {
-          id: createId("tab"),
+          id: createDockId("tab"),
           surfaceId: request.surfaceId,
           groupKey: request.groupKey,
-          instanceKey: request.instanceKey ?? createId(request.surfaceId),
+          instanceKey: request.instanceKey ?? createDockId("tab"),
           title: request.title,
           route: request.route,
           sidebarVisible: request.sidebarVisible ?? true,
@@ -116,21 +142,24 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           lastFocusedAt: now,
         };
         set((current) => ({
-          layout: {
+          ...withLayout(current, {
             ...current.layout,
             focusedPaneId: pane.id,
-            panes: current.layout.panes.map((candidate) =>
-              candidate.id === pane.id
-                ? { ...candidate, activeTabId: tab.id, tabs: [...candidate.tabs, tab] }
-                : candidate,
-            ),
-          },
+            root: mapDockLeaf(current.layout.root, pane.id, (candidate) => ({
+              ...candidate,
+              activeTabId: tab.id,
+              tabs:
+                candidate.tabs.length === 1 && candidate.tabs[0]?.surfaceId === "home"
+                  ? [tab]
+                  : [...candidate.tabs, tab],
+            })),
+          }),
           lastUsedTabByGroup: { ...current.lastUsedTabByGroup, [tab.groupKey]: tab.id },
         }));
         return tab;
       },
       openBrowserTab: (request = {}) => {
-        const url = request.url?.trim() || blankBrowserUrl;
+        const url = request.url?.trim() || defaultBrowserHomeUrl;
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
@@ -142,158 +171,155 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           paneId: request.paneId,
         });
         if (request.sourceTabId) {
-          const state = get();
-          const pane = state.layout.panes.find((candidate) =>
+          const pane = dockLeaves(get().layout.root).find((candidate) =>
             candidate.tabs.some((candidateTab) => candidateTab.id === request.sourceTabId),
           );
           const sourceIndex = pane?.tabs.findIndex(
             (candidate) => candidate.id === request.sourceTabId,
           );
-          if (pane && sourceIndex !== undefined && sourceIndex >= 0) {
-            state.moveTab(tab.id, pane.id, sourceIndex + 1);
-          }
+          if (pane && sourceIndex !== undefined && sourceIndex >= 0)
+            get().moveTab(tab.id, pane.id, sourceIndex + 1);
         }
         return tab;
       },
       updateBrowserTab: (tabId, patch) => {
-        set((current) => ({
-          layout: {
+        set((current) =>
+          withLayout(current, {
             ...current.layout,
-            panes: current.layout.panes.map((pane) => ({
-              ...pane,
-              tabs: pane.tabs.map((tab) => {
-                if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
-                const { title, ...statePatch } = patch;
-                const existing = parseBrowserTabState(tab.state);
-                const urlDefaults =
-                  statePatch.url && statePatch.url !== existing.url
-                    ? createBrowserTabState(statePatch.url)
-                    : existing;
-                const state: BrowserTabState = { ...urlDefaults, ...statePatch };
-                return {
-                  ...tab,
-                  title: title?.trim() || tab.title,
-                  state,
-                };
-              }),
-            })),
-          },
-        }));
+            root: mapDockTabs(current.layout.root, (tab) => {
+              if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
+              const { title, ...statePatch } = patch;
+              const existing = parseBrowserTabState(tab.state);
+              const defaults =
+                statePatch.url && statePatch.url !== existing.url
+                  ? createBrowserTabState(statePatch.url)
+                  : existing;
+              return {
+                ...tab,
+                title: title?.trim() || tab.title,
+                state: { ...defaults, ...statePatch } satisfies BrowserTabState,
+              };
+            }),
+          }),
+        );
       },
       renameTab: (tabId, title) => {
         const trimmed = title.trim();
         if (!trimmed) return;
-        const current = get();
-        const currentTab = current.layout.panes
-          .flatMap((pane) => pane.tabs)
-          .find((tab) => tab.id === tabId);
-        if (!currentTab || currentTab.title === trimmed) return;
-        set({
-          layout: {
+        set((current) =>
+          withLayout(current, {
             ...current.layout,
-            panes: current.layout.panes.map((pane) => ({
-              ...pane,
-              tabs: pane.tabs.map((tab) =>
-                tab.id === tabId ? { ...tab, title: trimmed } : tab,
-              ),
-            })),
-          },
-        });
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId && tab.title !== trimmed ? { ...tab, title: trimmed } : tab,
+            ),
+          }),
+        );
+      },
+      updateTabRoute: (tabId, route) => {
+        set((current) =>
+          withLayout(current, {
+            ...current.layout,
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId ? { ...tab, route } : tab,
+            ),
+          }),
+        );
+      },
+      updateTabState: (tabId, state, title) => {
+        set((current) =>
+          withLayout(current, {
+            ...current.layout,
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId ? { ...tab, state, title: title?.trim() || tab.title } : tab,
+            ),
+          }),
+        );
       },
       focusTab: (tabId) => {
         const current = get();
-        const pane = current.layout.panes.find((candidate) =>
+        const pane = dockLeaves(current.layout.root).find((candidate) =>
           candidate.tabs.some((tab) => tab.id === tabId),
         );
         const tab = pane?.tabs.find((candidate) => candidate.id === tabId);
         if (!pane || !tab) return false;
-        // No-op when the tab is already focused. WorkspaceCanvas fires
-        // focusTab from a pane-level `onPointerDown`, which lands on every
-        // click inside the pane — writing to the store on every click would
-        // recreate `layout` and `lastUsedTabByGroup` and re-render every
-        // workspace subscriber (tab bar, breadcrumbs, everything reading
-        // `groups`), flashing the whole surface.
-        const paneAlreadyFocused = current.layout.focusedPaneId === pane.id;
-        const tabAlreadyActive = pane.activeTabId === tabId;
-        if (paneAlreadyFocused && tabAlreadyActive) return true;
+        if (current.layout.focusedPaneId === pane.id && pane.activeTabId === tabId) return true;
         const now = Date.now();
         set({
-          layout: {
+          ...withLayout(current, {
             ...current.layout,
             focusedPaneId: pane.id,
-            panes: current.layout.panes.map((candidate) =>
-              candidate.id === pane.id
-                ? {
-                    ...candidate,
-                    activeTabId: tabId,
-                    tabs: candidate.tabs.map((item) =>
-                      item.id === tabId ? { ...item, lastFocusedAt: now } : item,
-                    ),
-                  }
-                : candidate,
-            ),
-          },
+            root: mapDockLeaf(current.layout.root, pane.id, (candidate) => ({
+              ...candidate,
+              activeTabId: tabId,
+              tabs: candidate.tabs.map((item) =>
+                item.id === tabId ? { ...item, lastFocusedAt: now } : item,
+              ),
+            })),
+          }),
           lastUsedTabByGroup: { ...current.lastUsedTabByGroup, [tab.groupKey]: tabId },
         });
         return true;
       },
       closeTab: (tabId) => {
         set((current) => {
-          let group: WorkspaceGroupKey | undefined;
-          const panes = current.layout.panes.map((pane) => {
-            const index = pane.tabs.findIndex((tab) => tab.id === tabId);
-            if (index < 0) return pane;
-            group = pane.tabs[index]?.groupKey;
-            const tabs = pane.tabs.filter((tab) => tab.id !== tabId);
-            const activeTabId =
-              pane.activeTabId === tabId
-                ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
-                : pane.activeTabId;
-            return { ...pane, tabs, activeTabId };
-          });
-          const nonEmptyPanes = panes.filter((pane) => pane.tabs.length > 0);
-          const nextPanes = nonEmptyPanes.length ? nonEmptyPanes : [initialPane()];
+          const closing = dockTabs(current.layout.root).find((tab) => tab.id === tabId);
+          let root = removeDockTab(current.layout.root, tabId);
+          root = collapseEmptyDockLeaves(root) ?? createDockLeaf();
+          const panes = dockLeaves(root);
+          const focusedPaneId = panes.some((pane) => pane.id === current.layout.focusedPaneId)
+            ? current.layout.focusedPaneId
+            : panes[0].id;
           const lastUsed = { ...current.lastUsedTabByGroup };
-          if (group && lastUsed[group] === tabId) {
-            const replacement = nextPanes
-              .flatMap((pane) => pane.tabs)
-              .filter((tab) => tab.groupKey === group)
+          if (closing && lastUsed[closing.groupKey] === tabId) {
+            const replacement = dockTabs(root)
+              .filter((tab) => tab.groupKey === closing.groupKey)
               .sort((a, b) => b.lastFocusedAt - a.lastFocusedAt)[0];
-            if (replacement) lastUsed[group] = replacement.id;
-            else delete lastUsed[group];
+            if (replacement) lastUsed[closing.groupKey] = replacement.id;
+            else delete lastUsed[closing.groupKey];
           }
           return {
-            layout: normalizeLayout({ ...current.layout, panes: nextPanes }),
+            ...withLayout(current, {
+              ...current.layout,
+              root,
+              focusedPaneId,
+            }),
             lastUsedTabByGroup: lastUsed,
           };
         });
       },
-      moveTab: (tabId, paneId, index) => {
+      moveTab: (tabId, paneId, index) => get().dockTab(tabId, paneId, "center", index),
+      dockTab: (tabId, paneId, zone, index) => {
         const current = get();
-        if (!current.layout.panes.some((pane) => pane.id === paneId)) return false;
-        const sourcePane = current.layout.panes.find((pane) =>
+        const source = dockLeaves(current.layout.root).find((pane) =>
           pane.tabs.some((tab) => tab.id === tabId),
         );
-        const tab = sourcePane?.tabs.find((candidate) => candidate.id === tabId);
-        if (!sourcePane || !tab) return false;
-        set((state) => {
-          const panes = state.layout.panes.map((pane) => {
-            const without = pane.tabs.filter((candidate) => candidate.id !== tabId);
-            if (pane.id !== paneId) {
-              return {
-                ...pane,
-                tabs: without,
-                activeTabId:
-                  pane.activeTabId === tabId
-                    ? (without[without.length - 1]?.id ?? null)
-                    : pane.activeTabId,
-              };
-            }
-            const at = Math.max(0, Math.min(index ?? without.length, without.length));
-            const tabs = [...without.slice(0, at), tab, ...without.slice(at)];
-            return { ...pane, tabs, activeTabId: tabId };
+        const target = findDockLeaf(current.layout.root, paneId);
+        const tab = source?.tabs.find((candidate) => candidate.id === tabId);
+        if (!source || !target || !tab) return false;
+        let root = removeDockTab(current.layout.root, tabId);
+        if (zone === "center") {
+          root = mapDockLeaf(root, paneId, (leaf) => {
+            const at = Math.max(0, Math.min(index ?? leaf.tabs.length, leaf.tabs.length));
+            return {
+              ...leaf,
+              tabs: [...leaf.tabs.slice(0, at), tab, ...leaf.tabs.slice(at)],
+              activeTabId: tab.id,
+            };
           });
-          return { layout: normalizeLayout({ ...state.layout, focusedPaneId: paneId, panes }) };
+        } else {
+          root = insertDockSplit(root, paneId, createDockLeaf([tab]), zone);
+        }
+        root = collapseEmptyDockLeaves(root) ?? createDockLeaf([tab]);
+        const destination = dockLeaves(root).find((leaf) =>
+          leaf.tabs.some((item) => item.id === tabId),
+        );
+        set({
+          ...withLayout(current, {
+            ...current.layout,
+            root,
+            focusedPaneId: destination?.id ?? current.layout.focusedPaneId,
+          }),
+          lastUsedTabByGroup: { ...current.lastUsedTabByGroup, [tab.groupKey]: tab.id },
         });
         return true;
       },
@@ -302,164 +328,163 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       splitPane: (paneId, direction, tabId) => {
         const current = get();
-        if (current.layout.panes.length >= workspaceMaxPanes) return null;
-        const source = current.layout.panes.find((pane) => pane.id === paneId);
-        if (!source) return null;
-        const newPane = initialPane();
-        const movingTabId = tabId ?? null;
-        const movingTab = source.tabs.find((tab) => tab.id === movingTabId);
-        if (movingTab) {
-          newPane.tabs = [movingTab];
-          newPane.activeTabId = movingTab.id;
+        const pane = findDockLeaf(current.layout.root, paneId);
+        if (!pane) return null;
+        if (tabId) {
+          if (!get().dockTab(tabId, paneId, direction)) return null;
+          return (
+            dockLeaves(get().layout.root).find((pane) => pane.tabs.some((tab) => tab.id === tabId))
+              ?.id ?? null
+          );
         }
-        set((state) => {
-          const panes = state.layout.panes.map((pane) => {
-            if (!movingTab || pane.id !== source.id) return pane;
-            const tabs = pane.tabs.filter((tab) => tab.id !== movingTab.id);
-            return { ...pane, tabs, activeTabId: tabs[tabs.length - 1]?.id ?? null };
-          });
-          const sourceIndex = panes.findIndex((pane) => pane.id === source.id);
-          panes.splice(sourceIndex + 1, 0, newPane);
-          return {
-            layout: normalizeLayout({
-              ...state.layout,
-              focusedPaneId: newPane.id,
-              panes,
-              preset: layoutPresetForPaneCount(panes.length, direction),
-            }),
-          };
+        const leaf = createDockLeaf([createHomeDockTab()]);
+        set({
+          ...withLayout(current, {
+            ...current.layout,
+            root: insertDockSplit(current.layout.root, paneId, leaf, direction),
+            focusedPaneId: leaf.id,
+          }),
         });
-        return newPane.id;
+        return leaf.id;
       },
       closePane: (paneId) => {
+        const current = get();
+        const pane = findDockLeaf(current.layout.root, paneId);
+        if (!pane) return;
+        let root = removeDockLeaf(current.layout.root, paneId) ?? createDockLeaf();
+        const target = dockLeaves(root)[0];
+        const movableTabs = pane.tabs.filter((tab) => tab.surfaceId !== "home");
+        if (movableTabs.length)
+          root = mapDockLeaf(root, target.id, (leaf) => ({
+            ...leaf,
+            tabs:
+              leaf.tabs.length === 1 && leaf.tabs[0]?.surfaceId === "home"
+                ? movableTabs
+                : [...leaf.tabs, ...movableTabs],
+            activeTabId: movableTabs.some((tab) => tab.id === pane.activeTabId)
+              ? pane.activeTabId
+              : (movableTabs[0]?.id ?? leaf.activeTabId),
+          }));
+        set({ ...withLayout(current, { ...current.layout, root, focusedPaneId: target.id }) });
+      },
+      fillEmptyPanes: () => {
         set((current) => {
-          if (current.layout.panes.length === 1) return current;
-          const removed = current.layout.panes.find((pane) => pane.id === paneId);
-          const panes = current.layout.panes.filter((pane) => pane.id !== paneId);
-          if (removed?.tabs.length) {
-            const target = panes[0];
-            panes[0] = {
-              ...target,
-              tabs: [...target.tabs, ...removed.tabs],
-              activeTabId: removed.activeTabId ?? target.activeTabId,
-            };
-          }
-          return { layout: normalizeLayout({ ...current.layout, panes }) };
+          const root = fillEmptyDockLeaves(current.layout.root);
+          return root === current.layout.root
+            ? current
+            : withLayout(current, { ...current.layout, root });
+        });
+      },
+      updateSplitRatio: (splitId, ratio) => {
+        set((current) => {
+          const root = updateDockSplitRatio(current.layout.root, splitId, ratio);
+          return root === current.layout.root
+            ? current
+            : withLayout(current, { ...current.layout, root });
         });
       },
       toggleSidebar: (tabId) => {
-        set((current) => ({
-          layout: {
+        set((current) =>
+          withLayout(current, {
             ...current.layout,
-            panes: current.layout.panes.map((pane) => ({
-              ...pane,
-              tabs: pane.tabs.map((tab) =>
-                tab.id === tabId ? { ...tab, sidebarVisible: !tab.sidebarVisible } : tab,
-              ),
-            })),
-          },
-        }));
-      },
-      toggleMaximize: (paneId) => {
-        const current = get();
-        const target = paneId ?? current.layout.focusedPaneId;
-        if (current.layout.maximizedPaneId) return void get().restoreLayout();
-        if (!current.layout.panes.some((pane) => pane.id === target)) return;
-        set({
-          layout: {
-            ...current.layout,
-            maximizedPaneId: target,
-            preservedPreset: current.layout.preset,
-          },
-        });
-      },
-      restoreLayout: () => {
-        set((current) => ({
-          layout: {
-            ...current.layout,
-            preset: current.layout.preservedPreset ?? current.layout.preset,
-            maximizedPaneId: null,
-            preservedPreset: null,
-          },
-        }));
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId ? { ...tab, sidebarVisible: !tab.sidebarVisible } : tab,
+            ),
+          }),
+        );
       },
       replaceSnapshot: (snapshot) => {
+        const current = get();
         set({
-          layout: normalizeLayout(migrateBrowserTabs(snapshot.layout)),
+          ...withLayout(current, normalizeLayout(migrateBrowserTabs(snapshot.layout))),
           lastUsedTabByGroup: snapshot.lastUsedTabByGroup ?? {},
         });
       },
       createSnapshot: (accountId, deviceId) => ({
-        version: 1,
+        version: 2,
         accountId,
         deviceId,
         savedAt: Date.now(),
         layout: get().layout,
         lastUsedTabByGroup: get().lastUsedTabByGroup,
       }),
-      reset: () => set({ layout: initialLayout(), lastUsedTabByGroup: {} }),
+      reset: () => {
+        const layout = initialLayout();
+        set({
+          activeScopeKey: "global",
+          layout,
+          layoutsByScope: { global: layout },
+          lastUsedTabByGroup: {},
+        });
+      },
     }),
     {
-      name: "misty:desktop-workspace:v1",
-      version: 2,
-      migrate: (persisted) => {
-        const state = persisted as Partial<Pick<WorkspaceStore, "layout" | "lastUsedTabByGroup">>;
-        return {
-          layout: normalizeLayout(migrateBrowserTabs(state.layout ?? initialLayout())),
-          lastUsedTabByGroup: state.lastUsedTabByGroup ?? {},
-        };
-      },
+      name: "misty:desktop-dock:v3",
+      version: 1,
       partialize: (state) => ({
+        activeScopeKey: state.activeScopeKey,
         layout: state.layout,
+        layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },
         lastUsedTabByGroup: state.lastUsedTabByGroup,
       }),
     },
   ),
 );
 
-function createId(prefix: string): string {
-  return `${prefix}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function layoutPresetForPaneCount(count: number, direction: SplitDirection): WorkspaceLayoutPreset {
-  if (count <= 1) return "single";
-  if (count === 2) return direction === "down" ? "rows" : "columns";
-  return "grid";
-}
-
 function normalizeLayout(layout: WorkspaceLayout): WorkspaceLayout {
-  const panes = layout.panes.slice(0, workspaceMaxPanes);
-  const fallbackPane = panes[0] ?? initialPane();
+  const root = normalizeDockNode(layout.root);
+  const panes = dockLeaves(root);
+  const focusedPaneId = panes.some((pane) => pane.id === layout.focusedPaneId)
+    ? layout.focusedPaneId
+    : panes[0].id;
   return {
-    ...layout,
-    panes: panes.length ? panes : [fallbackPane],
-    focusedPaneId: panes.some((pane) => pane.id === layout.focusedPaneId)
-      ? layout.focusedPaneId
-      : fallbackPane.id,
-    maximizedPaneId: panes.some((pane) => pane.id === layout.maximizedPaneId)
-      ? layout.maximizedPaneId
-      : null,
-    preset: panes.length <= 1 ? "single" : layout.preset,
+    root,
+    focusedPaneId,
   };
 }
 
 function migrateBrowserTabs(layout: WorkspaceLayout): WorkspaceLayout {
   return {
     ...layout,
-    panes: layout.panes.map((pane) => ({
-      ...pane,
-      tabs: pane.tabs.map((tab) =>
-        tab.surfaceId === "browser"
-          ? {
-              ...tab,
-              title:
-                tab.title && tab.title !== "Browser"
-                  ? tab.title
-                  : browserTabTitle(parseBrowserTabState(tab.state).url),
-              state: parseBrowserTabState(tab.state),
-            }
-          : tab,
-      ),
-    })),
+    root: mapDockTabs(layout.root, (tab) =>
+      tab.surfaceId === "browser"
+        ? {
+            ...tab,
+            title:
+              tab.title && tab.title !== "Browser"
+                ? tab.title
+                : browserTabTitle(parseBrowserTabState(tab.state).url),
+            state: parseBrowserTabState(tab.state),
+          }
+        : tab,
+    ),
   };
+}
+
+function removeDockTab(node: WorkspaceDockNode, tabId: string): WorkspaceDockNode {
+  if (node.type === "leaf") {
+    const index = node.tabs.findIndex((tab) => tab.id === tabId);
+    if (index < 0) return node;
+    const tabs = node.tabs.filter((tab) => tab.id !== tabId);
+    return {
+      ...node,
+      tabs,
+      activeTabId:
+        node.activeTabId === tabId
+          ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
+          : node.activeTabId,
+    };
+  }
+  const first = removeDockTab(node.first, tabId);
+  const second = removeDockTab(node.second, tabId);
+  return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+
+function removeDockLeaf(node: WorkspaceDockNode, paneId: string): WorkspaceDockNode | null {
+  if (node.type === "leaf") return node.id === paneId ? null : node;
+  const first = removeDockLeaf(node.first, paneId);
+  const second = removeDockLeaf(node.second, paneId);
+  if (!first) return second;
+  if (!second) return first;
+  return first === node.first && second === node.second ? node : { ...node, first, second };
 }

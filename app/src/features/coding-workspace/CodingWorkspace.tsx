@@ -1,4 +1,4 @@
-import { PanelLeft, PanelRight } from "lucide-react";
+import { PanelLeft, SquareTerminal } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -8,10 +8,9 @@ import {
   type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { cn } from "@/shared/ui";
-import { useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { CodeExplorer } from "./components/CodeExplorer";
 import { CodeStatusBar } from "./components/CodeStatusBar";
-import { CodeTerminal } from "./components/CodeTerminal";
 import { EditorArea } from "./components/EditorArea";
 import { OpenFolderCard } from "./components/OpenFolderCard";
 import { useGitStore } from "./git/useGitStore";
@@ -37,9 +36,17 @@ interface InlineRequest {
 export function CodingWorkspace() {
   const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
   const filesPaneOpen = useCodingWorkspaceStore((state) => state.filesPaneOpen);
-  const terminalPaneOpen = useCodingWorkspaceStore((state) => state.terminalPaneOpen);
   const setFilesPaneOpen = useCodingWorkspaceStore((state) => state.setFilesPaneOpen);
-  const setTerminalPaneOpen = useCodingWorkspaceStore((state) => state.setTerminalPaneOpen);
+  const dockedTerminalOpen = useWorkspaceStore((state) => {
+    const tabs = dockLeaves(state.layout.root).flatMap((pane) => pane.tabs);
+    const codeTab = tabs.find((tab) => tab.surfaceId === "code");
+    const terminals = tabs.filter((tab) => tab.surfaceId === "terminal");
+    return Boolean(
+      codeTab &&
+      (terminals.some((tab) => isCodeTerminalState(tab.state, codeTab.id)) ||
+        terminals.length === 1),
+    );
+  });
 
   const activeTab = useCodingWorkspaceStore(
     useShallow((state) => {
@@ -60,7 +67,6 @@ export function CodingWorkspace() {
   const [inlineRequest, setInlineRequest] = useState<InlineRequest | null>(null);
 
   const filesRef = useRef<ImperativePanelHandle | null>(null);
-  const terminalRef = useRef<ImperativePanelHandle | null>(null);
 
   useFileWatcher(rootPath);
 
@@ -71,7 +77,7 @@ export function CodingWorkspace() {
     const folder = rootPath ? (rootPath.split("/").filter(Boolean).pop() ?? "Code") : null;
     const title = folder ? `Code · ${folder}` : "Code";
     const state = useWorkspaceStore.getState();
-    const codeTab = state.layout.panes
+    const codeTab = dockLeaves(state.layout.root)
       .flatMap((pane) => pane.tabs)
       .find((tab) => tab.surfaceId === "code");
     if (codeTab) state.renameTab(codeTab.id, title);
@@ -100,15 +106,53 @@ export function CodingWorkspace() {
     if (!filesPaneOpen && !files.isCollapsed()) files.collapse();
   }, [filesPaneOpen]);
 
-  useEffect(() => {
-    const terminal = terminalRef.current;
-    if (!terminal) return;
-    if (terminalPaneOpen && terminal.isCollapsed()) terminal.expand();
-    if (!terminalPaneOpen && !terminal.isCollapsed()) terminal.collapse();
-  }, [terminalPaneOpen]);
+  const openDockedTerminal = useCallback((forceNew = false) => {
+    const workspace = useWorkspaceStore.getState();
+    const leaves = dockLeaves(workspace.layout.root);
+    const codePane =
+      leaves.find((pane) => pane.tabs.some((tab) => tab.surfaceId === "code")) ??
+      leaves.find((pane) => pane.id === workspace.layout.focusedPaneId) ??
+      leaves[0];
+    const codeTab = codePane.tabs.find((tab) => tab.surfaceId === "code");
+    if (!codeTab) return;
+    const terminals = leaves
+      .flatMap((pane) => pane.tabs)
+      .filter((tab) => tab.surfaceId === "terminal");
+    const existing =
+      terminals.find((tab) => isCodeTerminalState(tab.state, codeTab.id)) ??
+      (terminals.length === 1 ? terminals[0] : undefined);
+    if (existing && !forceNew) {
+      workspace.updateTabState(existing.id, createCodeTerminalState(codeTab.id, existing.state));
+      workspace.updateTabRoute(existing.id, codeTab.route);
+      const terminalPane = leaves.find((pane) => pane.tabs.some((tab) => tab.id === existing.id));
+      if (terminalPane?.id === codePane.id) {
+        workspace.dockTab(existing.id, codePane.id, "down");
+      }
+      workspace.focusTab(existing.id);
+      return;
+    }
+    const terminal = workspace.openSurface({
+      surfaceId: "terminal",
+      groupKey: "tool:terminal",
+      title: "Terminal",
+      route: codeTab.route,
+      instancePolicy: "multiple",
+      forceNew: true,
+      paneId: codePane.id,
+      state: createCodeTerminalState(codeTab.id),
+    });
+    workspace.dockTab(terminal.id, codePane.id, "down");
+    workspace.focusTab(terminal.id);
+  }, []);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
+      const workspace = useWorkspaceStore.getState();
+      const focusedPane = dockLeaves(workspace.layout.root).find(
+        (pane) => pane.id === workspace.layout.focusedPaneId,
+      );
+      const focusedTab = focusedPane?.tabs.find((tab) => tab.id === focusedPane.activeTabId);
+      if (focusedTab?.surfaceId !== "code") return;
       const mod = event.metaKey || event.ctrlKey;
       const shift = event.shiftKey;
       if (!mod) return;
@@ -118,7 +162,7 @@ export function CodingWorkspace() {
         useCodingWorkspaceStore.getState().toggleFilesPane();
       } else if (key === "j" && !shift) {
         event.preventDefault();
-        useCodingWorkspaceStore.getState().toggleTerminalPane();
+        openDockedTerminal(false);
       } else if (key === "\\" && !shift) {
         event.preventDefault();
         useCodingWorkspaceStore.getState().splitActiveTab();
@@ -135,7 +179,7 @@ export function CodingWorkspace() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [openDockedTerminal]);
 
   useEffect(() => {
     const handleInline = (event: Event) => {
@@ -151,11 +195,6 @@ export function CodingWorkspace() {
     () => setFilesPaneOpen(!filesPaneOpen),
     [filesPaneOpen, setFilesPaneOpen],
   );
-  const toggleTerminal = useCallback(
-    () => setTerminalPaneOpen(!terminalPaneOpen),
-    [terminalPaneOpen, setTerminalPaneOpen],
-  );
-
   const applyInlineRewrite = useCallback(
     (text: string) => {
       if (!inlineRequest) return;
@@ -205,10 +244,10 @@ export function CodingWorkspace() {
           Files
         </TitleBarToggle>
         <TitleBarToggle
-          label="Toggle terminal (⌘J)"
-          active={terminalPaneOpen}
-          icon={<PanelRight size={12} />}
-          onClick={toggleTerminal}
+          label="Open terminal (⌘J)"
+          active={dockedTerminalOpen}
+          icon={<SquareTerminal size={12} />}
+          onClick={() => openDockedTerminal(false)}
         >
           Terminal
         </TitleBarToggle>
@@ -230,18 +269,6 @@ export function CodingWorkspace() {
         <Panel minSize={30}>
           <EditorArea rootPath={rootPath} />
         </Panel>
-        <PanelResizeHandle className="w-px bg-charcoal-border transition-colors hover:bg-charcoal-active" />
-        <Panel
-          ref={terminalRef}
-          defaultSize={32}
-          minSize={14}
-          collapsible
-          collapsedSize={0}
-          onCollapse={() => setTerminalPaneOpen(false)}
-          onExpand={() => setTerminalPaneOpen(true)}
-        >
-          <CodeTerminal paneOpen={terminalPaneOpen} />
-        </Panel>
       </PanelGroup>
 
       <CodeStatusBar onOpenAiSettings={() => setAiSettingsOpen(true)} />
@@ -250,6 +277,7 @@ export function CodingWorkspace() {
         mode={quickInputMode}
         onClose={() => setQuickInputMode(null)}
         onOpenSettings={() => setAiSettingsOpen(true)}
+        onOpenTerminal={openDockedTerminal}
       />
       {aiSettingsOpen ? (
         <Suspense fallback={null}>
@@ -314,4 +342,15 @@ function formatBreadcrumb(rootPath: string, filePath: string): string {
 function languageOf(name: string): string {
   const extension = name.split(".").pop()?.toLowerCase();
   return extension ?? "";
+}
+
+function createCodeTerminalState(codeTabId: string, previous?: unknown) {
+  const preserved = previous && typeof previous === "object" ? previous : {};
+  return { ...preserved, version: 1, owner: "code", codeTabId } as const;
+}
+
+function isCodeTerminalState(state: unknown, codeTabId: string): boolean {
+  if (!state || typeof state !== "object") return false;
+  const candidate = state as { owner?: unknown; codeTabId?: unknown };
+  return candidate.owner === "code" && candidate.codeTabId === codeTabId;
 }
