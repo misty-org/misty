@@ -14,16 +14,13 @@ import { createSpaceConversationsApi } from "@/api/spaces/conversations";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
-  ProviderAuthorizationStart,
   ProviderConnectionAvailability,
   Space,
   SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
-  SpaceRun,
   SpaceSetup,
   SpacesSnapshot,
-  SpaceStudioResource,
   SpaceTemplate,
 } from "@/api/spaces/dto/interfaces/types";
 import { createSpaceMembersApi } from "@/api/spaces/members";
@@ -199,11 +196,6 @@ export const spacesApi = {
   create: createSpaceRequest,
   setup: (spaceId: string) =>
     spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`),
-  updateSetup: (spaceId: string, provider: string, status: string) =>
-    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`, {
-      method: "PATCH",
-      body: JSON.stringify({ provider, status }),
-    }),
   invitationPreview: (token: string) =>
     spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
   redeemInvitation: (token: string) =>
@@ -230,11 +222,6 @@ export const spacesApi = {
       integrations: SpaceIntegration[];
       providers?: ProviderConnectionAvailability[];
     }>(`/spaces/${encodeURIComponent(spaceId)}/integrations`),
-  beginProviderConnection: (spaceId: string, provider: string, returnTo: string) =>
-    spaceRequest<ProviderAuthorizationStart>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/authorize`,
-      { method: "POST", body: JSON.stringify({ return_to: returnTo }) },
-    ),
   bindAccountConnection: (
     spaceId: string,
     provider: string,
@@ -248,42 +235,12 @@ export const spacesApi = {
         body: JSON.stringify({ connection_id: connectionId, capability }),
       },
     ),
-  deleteProviderIntegration: (integrationId: string) =>
-    spaceRequest<void>(`/integrations/${encodeURIComponent(integrationId)}`, {
-      method: "DELETE",
-    }),
   nodes: (spaceId: string) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
     spaceRequest<{ ticket: string; url: string; expires_in: number }>(
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
       { method: "POST", body: JSON.stringify({ disposition }) },
-    ),
-  studio: (spaceId: string, kind: "workflows") =>
-    spaceRequest<{ resources: SpaceStudioResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`,
-    ),
-  saveStudio: (spaceId: string, kind: "workflows", item: Partial<SpaceStudioResource>) =>
-    spaceRequest<SpaceStudioResource>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`, {
-      method: "POST",
-      body: JSON.stringify(item),
-    }),
-  deleteStudio: (spaceId: string, kind: "workflows", id: string) =>
-    spaceRequest(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-    ),
-  runStudio: (spaceId: string, kind: "workflows", id: string, prompt = "", capabilityId = "") =>
-    spaceRequest<SpaceRun>(
-      `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}/runs`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          prompt,
-          capability_id: capabilityId || undefined,
-          input: { prompt },
-        }),
-      },
     ),
   realtimeTicket: (after: number) =>
     spaceRequest<{ ticket: string; expires_in: number }>("/realtime/tickets", {

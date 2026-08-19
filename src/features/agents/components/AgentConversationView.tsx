@@ -1,28 +1,13 @@
 import { MistyAppRequestCard } from "@/features/misty/MistyAppRequestCard";
 import { ScreenRequestCard } from "@/features/misty/ScreenRequestCard";
 import { companionReply } from "../companion/companionReply";
-import type {
-  GlobalAiActionProposal,
-  GlobalAiConversation,
-  GlobalAiMessage,
-} from "@/features/global-search/types";
-import { AgentsError as SystemErrorActivity } from "@/features/agents/AgentsRuntime";
+import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { Button, cn, Spinner } from "@/shared/ui";
-import {
-  AlertCircle,
-  CalendarClock,
-  Check,
-  CheckCircle2,
-  Clipboard,
-  ExternalLink,
-  Loader2,
-  RotateCcw,
-  X,
-} from "lucide-react";
+import { CalendarClock, Check, Clipboard, RotateCcw } from "lucide-react";
 import { Fragment, useState } from "react";
 import { AgentSteps, type AgentStep } from "./AgentSteps";
 import ReactMarkdown from "react-markdown";
@@ -31,9 +16,6 @@ import { Link } from "react-router-dom";
 export function AgentConversationView(props: {
   conversation?: GlobalAiConversation;
   working: boolean;
-  onConfirm: (id: string) => void;
-  onReject: (id: string) => void;
-  onCancel: (id: string) => void;
   onRetry: (prompt: string) => void;
 }) {
   if (!props.conversation?.messages.length) {
@@ -60,9 +42,6 @@ export function AgentConversationView(props: {
         {conversationTurns(props.conversation.messages).map((turn) => {
           const handlers = {
             onRetry: props.onRetry,
-            onConfirm: props.onConfirm,
-            onReject: props.onReject,
-            onCancel: props.onCancel,
           };
           return (
             <Fragment key={turn.key}>
@@ -119,7 +98,6 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
     }
     const visible =
       visibleConversationContent(message.content, message.role) ||
-      message.action ||
       message.state === "pending" ||
       message.state === "streaming";
     if (!visible) continue;
@@ -133,29 +111,16 @@ function conversationTurns(messages: GlobalAiMessage[]): Turn[] {
   return turns;
 }
 
-function needsAttention(action?: GlobalAiActionProposal) {
-  return Boolean(
-    action &&
-    ((action.state === "proposed" && action.requiresConfirmation) ||
-      action.state === "awaiting_approval" ||
-      action.state === "running"),
-  );
-}
-
 function AgentMessage(props: {
   message: GlobalAiMessage;
   steps?: GlobalAiMessage[];
   retryPrompt?: string;
   onRetry: (prompt: string) => void;
-  onConfirm: (id: string) => void;
-  onReject: (id: string) => void;
-  onCancel: (id: string) => void;
 }) {
   const message = props.message;
   const content = visibleConversationContent(message.content, message.role);
   if (
     !content &&
-    !message.action &&
     !message.appRequest &&
     message.state !== "pending" &&
     message.state !== "streaming"
@@ -191,15 +156,6 @@ function AgentMessage(props: {
             steps={props.steps.map((step): AgentStep => ({
               id: step.id,
               content: visibleConversationContent(step.content, step.role),
-              attention: needsAttention(step.action),
-              action: step.action ? (
-                <AgentActionStatus
-                  proposal={step.action}
-                  onConfirm={() => props.onConfirm(step.action!.id)}
-                  onReject={() => props.onReject(step.action!.id)}
-                  onCancel={() => props.onCancel(step.action!.id)}
-                />
-              ) : undefined,
             }))}
           />
         ) : null}
@@ -225,14 +181,6 @@ function AgentMessage(props: {
               </Link>
             ))}
           </div>
-        ) : null}
-        {message.action ? (
-          <AgentActionStatus
-            proposal={message.action}
-            onConfirm={() => props.onConfirm(message.action!.id)}
-            onReject={() => props.onReject(message.action!.id)}
-            onCancel={() => props.onCancel(message.action!.id)}
-          />
         ) : null}
         {message.appRequest ? (
           <MistyAppRequestCard messageId={message.id} request={message.appRequest} />
@@ -285,93 +233,6 @@ function CollapsibleText({ text }: { text: string }) {
   );
 }
 
-function AgentActionStatus(props: {
-  proposal: GlobalAiActionProposal;
-  onConfirm: () => void;
-  onReject: () => void;
-  onCancel: () => void;
-}) {
-  const proposal = props.proposal;
-  const status = actionStatus(proposal.state);
-  const StatusIcon = status.icon;
-  return (
-    <div
-      className={cn(
-        "mt-4 overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card/70",
-      )}
-    >
-      <div className="flex items-start gap-3 px-3.5 py-3">
-        <span
-          className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-full", status.tone)}
-        >
-          <StatusIcon className={cn("size-3.5", status.spin && "animate-spin")} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <strong className="truncate text-[12px] font-medium text-cream-bright">
-              {proposal.title}
-            </strong>
-            <span className="shrink-0 text-[10px] font-medium text-cream-muted">
-              {status.label}
-            </span>
-          </div>
-          {proposal.summary ? (
-            <p className="mb-0 mt-1 text-[12px] leading-relaxed text-cream">{proposal.summary}</p>
-          ) : null}
-          {proposal.error ? (
-            <SystemErrorActivity
-              error={proposal.error}
-              scope={`misty:proposal:${proposal.id}`}
-              title="Misty action could not be completed"
-            />
-          ) : null}
-          {proposal.agentName ? (
-            <p className="mb-0 mt-1 text-[11px] text-cream-muted">
-              {proposal.agentName}
-              {proposal.spaceName ? ` · ${proposal.spaceName}` : ""}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      {(proposal.state === "proposed" && proposal.requiresConfirmation) ||
-      (proposal.state === "awaiting_approval" && proposal.approvalId) ? (
-        <div className="flex gap-2 border-t border-charcoal-border px-3.5 py-2.5">
-          <Button size="sm" className="h-7 text-[11px]" onClick={props.onConfirm}>
-            <Check className="size-3.5" /> Approve
-          </Button>
-          <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={props.onReject}>
-            Cancel
-          </Button>
-        </div>
-      ) : proposal.resultHref ||
-        proposal.state === "running" ||
-        proposal.state === "awaiting_approval" ? (
-        <div className="flex items-center gap-2 border-t border-charcoal-border px-3.5 py-2.5">
-          {proposal.resultHref ? (
-            <Link
-              to={proposal.resultHref}
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-cream-muted hover:text-cream"
-            >
-              {proposal.resultHref.includes("/drawings/") ? "Open drawing" : "Open work log"}
-              <ExternalLink className="size-3" />
-            </Link>
-          ) : null}
-          {proposal.state === "running" || proposal.state === "awaiting_approval" ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-auto h-7 text-[11px]"
-              onClick={props.onCancel}
-            >
-              <X className="size-3" /> Stop
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function MessageFeedback(props: {
   message: GlobalAiMessage;
   retryPrompt?: string;
@@ -418,43 +279,6 @@ function FeedbackButton(props: { label: string; onClick: () => void; children: R
       {props.children}
     </Button>
   );
-}
-
-function actionStatus(state: GlobalAiActionProposal["state"]) {
-  switch (state) {
-    case "completed":
-      return {
-        label: "Completed",
-        icon: CheckCircle2,
-        tone: "bg-control-active text-cream",
-        spin: false,
-      };
-    case "failed":
-      return {
-        label: "Needs attention",
-        icon: AlertCircle,
-        tone: "bg-control-active text-cream",
-        spin: false,
-      };
-    case "rejected":
-      return { label: "Canceled", icon: X, tone: "bg-white/5 text-cream-muted", spin: false };
-    case "awaiting_approval":
-      return {
-        label: "Approval needed",
-        icon: AlertCircle,
-        tone: "bg-control-active text-cream",
-        spin: false,
-      };
-    case "proposed":
-      return {
-        label: "Ready to review",
-        icon: CheckCircle2,
-        tone: "bg-control-active text-cream",
-        spin: false,
-      };
-    default:
-      return { label: "Working", icon: Loader2, tone: "bg-control-active text-cream", spin: true };
-  }
 }
 
 function visibleConversationContent(value: string, role: GlobalAiMessage["role"]) {

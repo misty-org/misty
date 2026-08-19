@@ -1,14 +1,7 @@
-import { subscribeAccountEvents } from "@/api/accountEvents";
-import {
-  captureAgentActivityReporter,
-  runtimeAgentsApi as agentsApi,
-} from "@/features/agents/AgentsRuntime";
-
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
-import { globalMistyId, normalizeActionState } from "./globalMistyActions";
+import { globalMistyId } from "./globalMistyActions";
 import type { GlobalSearchState } from "./globalSearchState";
 import type {
-  GlobalAiActionProposal,
   GlobalAiCitation,
   GlobalAiContextRef,
   GlobalAiConversation,
@@ -24,12 +17,6 @@ export type GlobalSearchSet = (
 export type GlobalSearchGet = () => GlobalSearchState;
 
 let activeGlobalInvocationStream: (() => void) | undefined;
-const activeGlobalAgentWatches = new Map<string, () => void>();
-
-export function stopGlobalAgentWatches() {
-  for (const stop of activeGlobalAgentWatches.values()) stop();
-  activeGlobalAgentWatches.clear();
-}
 
 export function replaceActiveGlobalInvocationStream(next?: () => void) {
   activeGlobalInvocationStream?.();
@@ -156,28 +143,9 @@ export function applyGlobalInvocationEvent(
     return;
   }
   if (event.type === "assistant.status") {
-    const isApproval = event.phase === "approval" || event.phase === "awaiting_approval";
-    const current = get()
-      .conversations.find((conversation) => conversation.id === conversationId)
-      ?.messages.find((message) => message.id === messageId);
-    let action = current?.action;
-    if (isApproval && event.id) {
-      action = {
-        id: `proposal-${event.id}`,
-        title: "Review this action",
-        summary: event.text || event.summary || "This action requires your confirmation.",
-        prompt: event.text || "",
-        risk: "write",
-        state: "awaiting_approval",
-        requiresConfirmation: true,
-        runId: event.runId,
-        approvalId: event.id,
-      };
-    }
     patchConversationMessage(set, get, conversationId, messageId, {
       activity: event.text || event.phase,
       state: "pending",
-      ...(action ? { action } : {}),
     });
     return;
   }
@@ -223,168 +191,13 @@ function dedupeGlobalCitations(citations: AiCitation[]) {
   );
 }
 
-async function refreshGlobalAgentTask(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  messageId: string,
-  runId: string,
-) {
-  const accountId = get().accountId;
-  const reportActivity = captureAgentActivityReporter();
-  {
-    if (!accountId) return;
-    try {
-      const detail = await agentsApi.run<{
-        summary?: { state?: string; progress?: number; error_message?: string };
-        approvals?: Array<{ id: string; state: string; summary?: string }>;
-      }>(runId);
-      if (get().accountId !== accountId) return;
-      const state = normalizeActionState(detail.summary?.state ?? "running");
-      const message = get()
-        .conversations.find((conversation) => conversation.id === conversationId)
-        ?.messages.find((candidate) => candidate.id === messageId);
-      if (!message?.action || message.action.state === "rejected") return;
-      patchConversationMessage(set, get, conversationId, messageId, {
-        content: isTerminalAgentState(state)
-          ? state === "completed"
-            ? "Misty finished the task. It remains available in Agents history."
-            : detail.summary?.error_message || "The Agent task did not complete."
-          : `Misty is working${detail.summary?.progress ? ` · ${detail.summary.progress}%` : ""}. You can close this window.`,
-        action: {
-          ...message.action,
-          state,
-          approvalId: detail.approvals?.find((approval) => approval.state === "pending")?.id,
-          error: detail.summary?.error_message,
-        },
-        state: isTerminalAgentState(state)
-          ? state === "failed"
-            ? "failed"
-            : "completed"
-          : "pending",
-        retryable: state === "failed",
-      });
-      if (isTerminalAgentState(state)) {
-        activeGlobalAgentWatches.get(runId)?.();
-        activeGlobalAgentWatches.delete(runId);
-        reportActivity?.(
-          {
-            operationId: runId,
-            revision: state === "completed" ? 3 : state === "failed" ? 2 : 4,
-            status:
-              state === "completed" ? "completed" : state === "failed" ? "blocked" : "resolved",
-            title:
-              state === "completed"
-                ? "Misty finished your task"
-                : state === "failed"
-                  ? "Agent task needs attention"
-                  : "Agent task canceled",
-            body: "Open Agents to review the task and its result.",
-            route: `/apps/agents?run=${encodeURIComponent(runId)}`,
-          },
-          accountId,
-        );
-        return;
-      }
-    } catch {
-      // Retain durable state on transport failure; reconnect invalidation retries observation.
-    }
-  }
-}
-
-export function watchGlobalAgentTask(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  messageId: string,
-  runId: string,
-) {
-  if (activeGlobalAgentWatches.has(runId)) return;
-  const accountId = get().accountId;
-  let busy = false,
-    dirty = false,
-    disposed = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const refresh = async () => {
-    if (disposed || get().accountId !== accountId || busy) return;
-    busy = true;
-    dirty = false;
-    try {
-      await refreshGlobalAgentTask(set, get, conversationId, messageId, runId);
-    } finally {
-      busy = false;
-      if (dirty) schedule();
-    }
-  };
-  const schedule = () => {
-    if (disposed) return;
-    dirty = true;
-    if (!busy && !timer)
-      timer = setTimeout(() => {
-        timer = undefined;
-        void refresh();
-      }, 250);
-  };
-  const remove = subscribeAccountEvents(accountId, (event) => {
-    if (
-      event.topic === "reset" ||
-      (event.topic === "runs" && event.id === runId) ||
-      event.topic === "approvals"
-    )
-      schedule();
-  });
-  window.addEventListener("online", schedule);
-  window.addEventListener("focus", schedule);
-  activeGlobalAgentWatches.set(runId, () => {
-    disposed = true;
-    clearTimeout(timer);
-    window.removeEventListener("online", schedule);
-    window.removeEventListener("focus", schedule);
-    remove();
-  });
-  schedule();
-}
-
-export function resumeGlobalAgentWatches(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversations: GlobalAiConversation[],
-) {
-  const retained = new Set(
-    conversations.flatMap((conversation) =>
-      conversation.messages.flatMap((message) =>
-        message.action?.runId && !isTerminalAgentState(message.action.state)
-          ? [message.action.runId]
-          : [],
-      ),
-    ),
-  );
-  for (const [runId, stop] of activeGlobalAgentWatches) {
-    if (!retained.has(runId)) {
-      stop();
-      activeGlobalAgentWatches.delete(runId);
-    }
-  }
-  for (const conversation of conversations) {
-    for (const message of conversation.messages) {
-      const action = message.action;
-      if (!action?.runId || isTerminalAgentState(action.state)) continue;
-      watchGlobalAgentTask(set, get, conversation.id, message.id, action.runId);
-    }
-  }
-}
-
-export function isTerminalAgentState(state: GlobalAiActionProposal["state"]) {
-  return state === "completed" || state === "failed" || state === "rejected";
-}
-
 const lastModeKey = "misty:global-ai:last-mode:v1";
 
 export function readLastMode(accountId: string): GlobalAiMode {
   if (!accountId) return "search";
   try {
     const value = window.localStorage.getItem(`${lastModeKey}:${accountId}`);
-    return value === "ask" || value === "action" ? value : "search";
+    return value === "ask" ? value : "search";
   } catch {
     return "search";
   }
@@ -423,7 +236,6 @@ export function conversationMessage(
   role: GlobalAiMessage["role"],
   mode: GlobalAiMessage["mode"],
   content: string,
-  action?: GlobalAiActionProposal,
 ): GlobalAiMessage {
   return {
     id: `message-${globalMistyId()}`,
@@ -432,7 +244,6 @@ export function conversationMessage(
     content,
     createdAt: new Date().toISOString(),
     state: role === "assistant" && !content ? "pending" : "completed",
-    ...(action ? { action } : {}),
   };
 }
 
@@ -458,29 +269,4 @@ export function searchResultMatchesFilters(
   if (filters.source === "device" && result.source !== "device") return false;
   if (filters.source === "cloud" && result.source === "device") return false;
   return true;
-}
-
-export function findProposal(conversations: GlobalAiConversation[], proposalId: string) {
-  for (const conversation of conversations)
-    for (const message of conversation.messages)
-      if (message.action?.id === proposalId) return message.action;
-  return null;
-}
-
-export function patchProposal(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  proposalId: string,
-  patch: Partial<GlobalAiActionProposal>,
-) {
-  set({
-    conversations: get().conversations.map((conversation) => ({
-      ...conversation,
-      messages: conversation.messages.map((message) =>
-        message.action?.id === proposalId
-          ? { ...message, action: { ...message.action, ...patch } }
-          : message,
-      ),
-    })),
-  });
 }

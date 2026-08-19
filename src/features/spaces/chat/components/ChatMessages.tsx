@@ -43,7 +43,6 @@ export interface SpaceChatMessagesProps {
 }
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
-export { messageReplyPreviewText } from "./messageHelpers";
 import {
   SocialError as SystemErrorActivity,
   socialErrorMessage as systemErrorMessage,

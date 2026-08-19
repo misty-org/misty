@@ -5,9 +5,11 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
+
+
+import ()
 
 func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 	database := openTestDatabase(t)
@@ -21,7 +23,7 @@ func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := database.CreateSpaceWithTemplate(
+	if _, err := database.TestingCreateSpaceWithTemplate(
 		ctx,
 		owner.ID,
 		"Invalid template",
@@ -30,7 +32,7 @@ func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 	); !errors.Is(err, ErrSpaceInvalid) {
 		t.Fatalf("invalid template error = %v, want ErrSpaceInvalid", err)
 	}
-	if _, err := database.CreateSpaceWithTemplate(
+	if _, err := database.TestingCreateSpaceWithTemplate(
 		ctx,
 		owner.ID,
 		"Invalid provider",

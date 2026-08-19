@@ -21,7 +21,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("instance model routing", () => {
+describe("model routing", () => {
   it.each(["low", "max"])(
     "uses account OpenAI credentials and %s reasoning over instance defaults",
     async (reasoning) => {
@@ -44,7 +44,7 @@ describe("instance model routing", () => {
           baseURL: "https://account.example/v1",
           reasoning,
         },
-        { OPENAI_API_KEY: "unused-instance-fixture", AI_GATEWAY_API_KEY: "unused-gateway-fixture" },
+        { AI_GATEWAY_API_KEY: "unused-gateway-fixture" },
         accountFetch,
       );
       await expect(resolved.model.doGenerate(resolved.options)).rejects.toThrow();
@@ -59,15 +59,9 @@ describe("instance model routing", () => {
       expect(resolved.options.providerOptions).not.toHaveProperty("gateway");
     },
   );
+
   it("keeps optional browser arguments optional on the Responses wire", async () => {
-    const fetch = vi.fn(
-      async () =>
-        new Response('{"error":{"message":"fixture rejection"}}', {
-          status: 401,
-          headers: { "content-type": "application/json" },
-        }),
-    );
-    vi.stubGlobal("fetch", fetch);
+    const fetch = rejectingFetch();
     const toolOptions: LanguageModelV4CallOptions = {
       ...options,
       tools: [
@@ -97,11 +91,13 @@ describe("instance model routing", () => {
         },
       ],
     };
-    const resolved = resolveInstanceModel("openai/gpt-6-luna", toolOptions, {
-      MISTY_AGENT_MODEL_PROVIDER: "openai",
-      MISTY_AGENT_MODEL: "openai/gpt-6-luna",
-      OPENAI_API_KEY: "fixture",
-    });
+    const resolved = resolveProviderModel(
+      "openai/gpt-6-luna",
+      toolOptions,
+      account("openai", "openai/gpt-6-luna"),
+      {},
+      fetch,
+    );
     await expect(resolved.model.doGenerate(resolved.options)).rejects.toThrow();
     const [, request] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const body = JSON.parse(request.body as string);
@@ -111,39 +107,7 @@ describe("instance model routing", () => {
     expect(toolOptions.tools?.[0]).not.toHaveProperty("strict");
   });
 
-  it("uses OPENAI_API_KEY with the reasoning-capable Responses endpoint", async () => {
-    const fetch = vi.fn(
-      async () =>
-        new Response('{"error":{"message":"fixture rejection"}}', {
-          status: 401,
-          headers: { "content-type": "application/json" },
-        }),
-    );
-    vi.stubGlobal("fetch", fetch);
-    const resolved = resolveInstanceModel("openai/gpt-6-luna", options, {
-      MISTY_AGENT_MODEL_PROVIDER: "openai",
-      MISTY_AGENT_MODEL: "openai/gpt-6-luna",
-      OPENAI_API_KEY: "openai-fixture",
-      AI_GATEWAY_API_KEY: "unused-gateway-fixture",
-    });
-    await expect(resolved.model.doGenerate(resolved.options)).rejects.toThrow();
-    const [url, request] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://api.openai.com/v1/responses");
-    expect(new Headers(request.headers).get("authorization")).toBe("Bearer openai-fixture");
-    const body = JSON.parse(request.body as string);
-    expect(body.model).toBe("gpt-6-luna");
-    expect(body.reasoning.effort).toBe("high");
-    expect(resolved.options.providerOptions).not.toHaveProperty("gateway");
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("streams tool execution and its readback through direct OpenAI Responses", async () => {
-    vi.stubEnv("MISTY_AGENT_MODEL_PROVIDER", "openai");
-    vi.stubEnv("MISTY_AGENT_MODEL", "openai/gpt-6-luna");
-    vi.stubEnv("MISTY_AGENT_MODEL_API_KEY", "");
-    vi.stubEnv("MISTY_AGENT_MODEL_BASE_URL", "");
-    vi.stubEnv("OPENAI_API_KEY", "openai-fixture");
-    vi.stubEnv("AI_GATEWAY_API_KEY", "unused-gateway-fixture");
+  it("streams tool execution and its readback through account OpenAI Responses", async () => {
     let count = 0;
     const fetch = vi.fn(async () => {
       const first = count++ === 0;
@@ -195,10 +159,15 @@ describe("instance model routing", () => {
         headers: { "content-type": "text/event-stream" },
       });
     });
-    vi.stubGlobal("fetch", fetch);
     const read = vi.fn(async () => ({ text: "hello" }));
     const agent = new WorkflowAgent({
-      model: new InstanceModel("openai/gpt-6-luna"),
+      model: resolveProviderModel(
+        "openai/gpt-6-luna",
+        options,
+        account("openai", "openai/gpt-6-luna"),
+        {},
+        fetch as unknown as typeof globalThis.fetch,
+      ).model,
       reasoning: "low",
       maxRetries: 0,
       stopWhen: isStepCount(2),
@@ -213,8 +182,8 @@ describe("instance model routing", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     for (const call of fetch.mock.calls) {
       const [url, request] = call as unknown as [string, RequestInit];
-      expect(url).toBe("https://api.openai.com/v1/responses");
-      expect(new Headers(request.headers).get("authorization")).toBe("Bearer openai-fixture");
+      expect(url).toBe("https://account.example/v1/responses");
+      expect(new Headers(request.headers).get("authorization")).toBe("Bearer account-fixture");
       const body = JSON.parse(request.body as string);
       expect(body.reasoning.effort).toBe("low");
       expect(body.model).toBe("gpt-6-luna");
@@ -227,7 +196,8 @@ describe("instance model routing", () => {
       output: '{"text":"hello"}',
     });
   });
-  it("preserves the existing gateway path and fallback options by default", () => {
+
+  it("routes instance models through the AI Gateway", () => {
     const result = resolveInstanceModel("openai/example", options, {
       AI_GATEWAY_API_KEY: "fixture",
     });
@@ -236,140 +206,69 @@ describe("instance model routing", () => {
   });
 
   it.each(["openai", "anthropic", "google", "openai-compatible"])(
-    "routes %s directly without gateway fallback",
+    "routes an account %s connection directly without gateway fallback",
     (provider) => {
-      const result = resolveInstanceModel(`${provider}/example`, options, {
-        MISTY_AGENT_MODEL_PROVIDER: provider,
-        MISTY_AGENT_MODEL: `${provider}/example`,
-        MISTY_AGENT_MODEL_API_KEY: "fixture-key",
-        MISTY_AGENT_MODEL_BASE_URL: "https://provider.example/v1",
-      });
+      const result = resolveProviderModel(
+        `${provider}/example`,
+        options,
+        account(provider, `${provider}/example`),
+        {},
+        rejectingFetch(),
+      );
       expect(result.model.modelId).toBe("example");
       expect(result.model.provider).not.toBe("gateway");
       expect(result.options.providerOptions).not.toHaveProperty("gateway");
     },
   );
 
-  it("rejects incomplete configuration, hosted overrides and unconfigured model IDs", () => {
-    for (const env of [
-      { MISTY_AGENT_MODEL_PROVIDER: "unknown" },
-      { MISTY_AGENT_MODEL_PROVIDER: "openai" },
-      {
-        MISTY_AGENT_MODEL_PROVIDER: "openai-compatible",
-        MISTY_AGENT_MODEL: "openai-compatible/local",
-      },
-      {
-        MISTY_AGENT_MODEL_PROVIDER: "openai",
-        MISTY_AGENT_MODEL: "anthropic/example",
-        MISTY_AGENT_MODEL_API_KEY: "secret",
-      },
-      { MISTY_AGENT_MODEL_API_KEY: "secret" },
-      {
-        MISTY_AGENT_MODEL_PROVIDER: "openai-compatible",
-        MISTY_AGENT_MODEL: "openai-compatible/local",
-        MISTY_AGENT_MODEL_BASE_URL: "https://user:secret@example.com/v1",
-      },
-    ])
-      expect(() => instanceModelConfig(env)).toThrow();
+  it("rejects invalid instance models and unconfigured account models", () => {
+    for (const model of ["example", "openai/", "openai/has space"])
+      expect(() => instanceModelConfig({ MISTY_AGENT_MODEL: model })).toThrow();
+    expect(instanceModelConfig({})).toEqual({ provider: "gateway", model: "" });
     expect(() =>
-      resolveInstanceModel("anthropic/wrong", options, {
-        MISTY_AGENT_MODEL_PROVIDER: "anthropic",
-        MISTY_AGENT_MODEL: "anthropic/example",
-        MISTY_AGENT_MODEL_API_KEY: "secret",
-      }),
+      resolveProviderModel(
+        "anthropic/wrong",
+        options,
+        account("anthropic", "anthropic/example"),
+        {},
+        rejectingFetch(),
+      ),
     ).toThrow("not configured");
   });
 
-  it("keeps credentials out of durable state and uses the current key at execution", async () => {
-    vi.stubEnv("MISTY_AGENT_MODEL_PROVIDER", "openai-compatible");
-    vi.stubEnv("MISTY_AGENT_MODEL", "openai-compatible/local/example");
-    vi.stubEnv("MISTY_AGENT_MODEL_API_KEY", "old-secret");
-    vi.stubEnv("MISTY_AGENT_MODEL_BASE_URL", "http://localhost:1234/v1");
-    const serialized = InstanceModel[WORKFLOW_SERIALIZE](
-      new InstanceModel("openai-compatible/local/example"),
-    );
-    expect(serialized).toEqual({
-      modelId: "openai-compatible/local/example",
-      identity: undefined,
-      role: "agent",
-    });
-    vi.stubEnv("MISTY_AGENT_MODEL_API_KEY", "rotated-secret");
-    const fetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            id: "response",
-            created: 1,
-            model: "local/example",
-            choices: [
-              {
-                index: 0,
-                message: { role: "assistant", content: "hello back" },
-                finish_reason: "stop",
-              },
-            ],
-            usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        ),
-    );
-    vi.stubGlobal("fetch", fetch);
-    const model = InstanceModel[WORKFLOW_DESERIALIZE](serialized);
-    const result = await model.doGenerate(options);
-    expect(result.content).toContainEqual({ type: "text", text: "hello back" });
-    const [url, request] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://localhost:1234/v1/chat/completions");
-    expect(new Headers(request.headers).get("authorization")).toBe("Bearer rotated-secret");
-    const body = JSON.parse(request.body as string);
-    expect(body.model).toBe("local/example");
-    expect(body).not.toHaveProperty("reasoning_effort");
-    expect(body).not.toHaveProperty("gateway");
-  });
-
-  it("supports a keyless local OpenAI-compatible endpoint", () => {
-    expect(
-      instanceModelConfig({
-        MISTY_AGENT_MODEL_PROVIDER: "openai-compatible",
-        MISTY_AGENT_MODEL: "openai-compatible/local",
-        MISTY_AGENT_MODEL_BASE_URL: "http://host.docker.internal:11434/v1",
-      }).apiKey,
-    ).toBeUndefined();
+  it("keeps credentials out of durable model state", () => {
+    const serialized = InstanceModel[WORKFLOW_SERIALIZE](new InstanceModel("openai/example"));
+    expect(serialized).toEqual({ modelId: "openai/example", identity: undefined, role: "agent" });
+    expect(InstanceModel[WORKFLOW_DESERIALIZE](serialized).modelId).toBe("openai/example");
   });
 
   it.each([
-    ["openai", "/responses", "authorization", "Bearer fixture-key"],
-    ["anthropic", "/messages", "x-api-key", "fixture-key"],
-    ["google", "/models/example:generateContent", "x-goog-api-key", "fixture-key"],
+    ["openai", "/responses", "authorization", "Bearer account-fixture"],
+    ["anthropic", "/messages", "x-api-key", "account-fixture"],
+    ["google", "/models/example:generateContent", "x-goog-api-key", "account-fixture"],
   ])(
-    "sends %s credentials only to its configured provider endpoint",
+    "sends account %s credentials only to its configured provider endpoint",
     async (provider, path, header, expected) => {
-      const fetch = vi.fn(
-        async () =>
-          new Response('{"error":{"message":"fixture rejection"}}', {
-            status: 401,
-            headers: { "content-type": "application/json" },
-          }),
+      const fetch = rejectingFetch();
+      const globalFetch = vi.fn<typeof globalThis.fetch>();
+      vi.stubGlobal("fetch", globalFetch);
+      const result = resolveProviderModel(
+        `${provider}/example`,
+        options,
+        account(provider, `${provider}/example`),
+        {},
+        fetch,
       );
-      vi.stubGlobal("fetch", fetch);
-      const result = resolveInstanceModel(`${provider}/example`, options, {
-        MISTY_AGENT_MODEL_PROVIDER: provider,
-        MISTY_AGENT_MODEL: `${provider}/example`,
-        MISTY_AGENT_MODEL_API_KEY: "fixture-key",
-        MISTY_AGENT_MODEL_BASE_URL: "https://provider.example/v1",
-      });
       await expect(result.model.doGenerate(result.options)).rejects.toThrow();
       const [url, request] = fetch.mock.calls[0] as unknown as [string, RequestInit];
-      expect(url).toBe(`https://provider.example/v1${path}`);
+      expect(url).toBe(`https://account.example/v1${path}`);
       expect(new Headers(request.headers).get(header!)).toBe(expected);
       expect(fetch).toHaveBeenCalledTimes(1);
+      expect(globalFetch).not.toHaveBeenCalled();
     },
   );
 
   it("streams a tool call and final answer through the real WorkflowAgent adapter", async () => {
-    vi.stubEnv("MISTY_AGENT_MODEL_PROVIDER", "openai-compatible");
-    vi.stubEnv("MISTY_AGENT_MODEL", "openai-compatible/local");
-    vi.stubEnv("MISTY_AGENT_MODEL_BASE_URL", "http://localhost:1234/v1");
-    vi.stubEnv("MISTY_AGENT_MODEL_API_KEY", "");
     let calls = 0;
     const fetch = vi.fn(async () => {
       const delta =
@@ -407,10 +306,19 @@ describe("instance model routing", () => {
         },
       );
     });
-    vi.stubGlobal("fetch", fetch);
     const read = vi.fn(async () => ({ text: "hello" }));
     const agent = new WorkflowAgent({
-      model: new InstanceModel("openai-compatible/local"),
+      model: resolveProviderModel(
+        "openai-compatible/local",
+        options,
+        {
+          provider: "openai-compatible",
+          model: "openai-compatible/local",
+          baseURL: "http://localhost:1234/v1",
+        },
+        {},
+        fetch as unknown as typeof globalThis.fetch,
+      ).model,
       stopWhen: isStepCount(2),
       tools: { read_note: tool({ inputSchema: z.object({}), execute: read }) },
     });
@@ -429,3 +337,17 @@ describe("instance model routing", () => {
     }
   });
 });
+
+function account(provider: string, model: string) {
+  return { provider, model, apiKey: "account-fixture", baseURL: "https://account.example/v1" };
+}
+
+function rejectingFetch() {
+  return vi.fn<typeof globalThis.fetch>(
+    async () =>
+      new Response('{"error":{"message":"fixture rejection"}}', {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+  );
+}

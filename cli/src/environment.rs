@@ -53,7 +53,6 @@ const FILES: &[FileSpec] = &[
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
             "MISTY_PUBLIC_API_URL",
-            "MISTY_SDK_EXECUTION_ENABLED",
             "MISTY_DEVICE_JOBS_ENABLED",
             "MISTY_WEBSITE_URL",
             "PASSWORD_RESET_START_URL",
@@ -62,10 +61,6 @@ const FILES: &[FileSpec] = &[
             "TRUST_PROXY_HEADERS",
             "TRUSTED_PROXY_CIDRS",
             "MISTY_INVITATION_URL_BASE",
-            "MISTY_AGENT_DOCUMENTS_ENABLED",
-            "MISTY_SOCIAL_AUTOMATION_DISABLED",
-            "MISTY_SOCIAL_DISCORD_DISABLED",
-            "MISTY_SOCIAL_SEND_DISABLED",
         ],
     },
     FileSpec {
@@ -120,7 +115,6 @@ const FILES: &[FileSpec] = &[
         path: "integrations/ai.env",
         names: &[
             "AI_GATEWAY_API_KEY",
-            "MISTY_REALTIME_API_KEY",
             "AI_GATEWAY_BASE_URL",
             "AI_GATEWAY_EMBEDDING_BASE_URL",
             "AGENT_TRANSCRIPTION_MODEL",
@@ -133,32 +127,15 @@ const FILES: &[FileSpec] = &[
             "SMART_LIBRARY_EMERGENCY_DISABLE",
             "SMART_LIBRARY_SEARCH_EMERGENCY_DISABLE",
             "SMART_LIBRARY_SEARCH_DAILY_LIMIT",
-            "MISTY_AI_PROVIDER",
-            "MISTY_AI_MODEL",
             "MISTY_AI_LOW_MODEL",
             "MISTY_AI_MED_MODEL",
             "MISTY_AI_HIGH_MODEL",
             "MISTY_AI_MODEL_CATALOG_JSON",
-            "OPENAI_BASE_URL",
-            "GEMINI_AUTH_MODE",
-            "GEMINI_BASE_URL",
-            "GEMINI_OAUTH_SCOPE",
-            "GEMINI_VERTEX_PROJECT",
-            "GEMINI_VERTEX_LOCATION",
-            "GOOGLE_CLOUD_PROJECT",
-            "GOOGLE_CLOUD_LOCATION",
-            "GOOGLE_CLOUD_REGION",
             "VISION_PROCESSOR_URL",
             "VISION_PROCESSOR_TOKEN",
-            "MISTY_AGENT_MODEL_PROVIDER",
             "MISTY_AGENT_MODEL",
-            "MISTY_AGENT_MODEL_API_KEY",
-            "MISTY_AGENT_MODEL_BASE_URL",
-            "GEMINI_API_KEY",
-            "GOOGLE_API_KEY",
             "MISTY_AI_MAX_TOKENS_PER_DAY",
             "MISTY_AI_MAX_TOKENS_PER_HOUR",
-            "OPENAI_API_KEY",
             "VERCEL_OIDC_TOKEN",
         ],
     },
@@ -196,15 +173,6 @@ const FILES: &[FileSpec] = &[
         names: &["MISTY_COMPOSIO_DEPLOYMENT", "MISTY_COMPOSIO_API_KEY"],
     },
     FileSpec {
-        path: "integrations/discord.env",
-        names: &[
-            "DISCORD_BOT_TOKEN",
-            "DISCORD_GATEWAY_URL",
-            "DISCORD_CLIENT_ID",
-            "DISCORD_CLIENT_SECRET",
-        ],
-    },
-    FileSpec {
         path: "integrations/dropbox.env",
         names: &["MISTY_DROPBOX_CLIENT_ID", "MISTY_DROPBOX_CLIENT_SECRET"],
     },
@@ -219,24 +187,6 @@ const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
-        path: "integrations/figma.env",
-        names: &[
-            "FIGMA_CLIENT_ID",
-            "FIGMA_CLIENT_SECRET",
-            "FIGMA_API_BASE_URL",
-        ],
-    },
-    FileSpec {
-        path: "integrations/github.env",
-        names: &[
-            "GITHUB_APP_ID",
-            "GITHUB_API_BASE_URL",
-            "GITHUB_APP_PRIVATE_KEY",
-            "GITHUB_APP_SLUG",
-            "GITHUB_WEBHOOK_SECRET",
-        ],
-    },
-    FileSpec {
         path: "integrations/google.env",
         names: &[
             "GOOGLE_CLIENT_ID",
@@ -244,16 +194,6 @@ const FILES: &[FileSpec] = &[
             "GOOGLE_SIGN_IN_REDIRECT_URL",
             "MISTY_GOOGLE_DRIVE_CLIENT_ID",
             "MISTY_GOOGLE_DRIVE_CLIENT_SECRET",
-        ],
-    },
-    FileSpec {
-        path: "integrations/instagram.env",
-        names: &[
-            "INSTAGRAM_APP_SECRET",
-            "INSTAGRAM_CLIENT_ID",
-            "INSTAGRAM_CLIENT_SECRET",
-            "INSTAGRAM_GRAPH_API_BASE_URL",
-            "INSTAGRAM_WEBHOOK_VERIFY_TOKEN",
         ],
     },
     FileSpec {
@@ -1109,10 +1049,16 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let workspace = fixture_workspace(tmp.path());
         let path = root(&workspace, Target::Dev).join("integrations/ai.env");
-        write_private(&path, b"export OPENAI_API_KEY=old\n").unwrap();
-        set(&workspace, Target::Dev, "OPENAI_API_KEY", "new-$literal").unwrap();
+        write_private(&path, b"export AI_GATEWAY_API_KEY=old\n").unwrap();
+        set(
+            &workspace,
+            Target::Dev,
+            "AI_GATEWAY_API_KEY",
+            "new-$literal",
+        )
+        .unwrap();
         assert_eq!(
-            read(&workspace, Target::Dev).unwrap()["OPENAI_API_KEY"],
+            read(&workspace, Target::Dev).unwrap()["AI_GATEWAY_API_KEY"],
             "new-$literal"
         );
     }
@@ -1157,8 +1103,6 @@ mod tests {
     fn every_name_has_one_owner() {
         let owners = ownership().unwrap();
         assert!(owners.len() > 80);
-        assert_eq!(owners["DISCORD_BOT_TOKEN"], "integrations/discord.env");
-        assert_eq!(owners["INSTAGRAM_APP_SECRET"], "integrations/instagram.env");
         assert_eq!(owners["COMPOSIO_API_KEY"], "composio.env");
         assert_eq!(
             owners["MISTY_COMPOSIO_API_KEY"],
@@ -1244,13 +1188,19 @@ mod tests {
         init(&workspace, Target::Dev).unwrap();
         assert!(!workspace.cli.join(".env").exists());
         assert!(read_cli_files(&workspace).unwrap().is_empty());
-        let integration = root(&workspace, Target::Dev).join("integrations/figma.env");
+        let integration = root(&workspace, Target::Dev).join("integrations/dropbox.env");
         assert!(!integration.exists());
         let before = read(&workspace, Target::Dev).unwrap();
-        assert!(!before.contains_key("FIGMA_CLIENT_ID"));
-        set(&workspace, Target::Dev, "FIGMA_CLIENT_ID", "fixture").unwrap();
+        assert!(!before.contains_key("MISTY_DROPBOX_CLIENT_ID"));
+        set(
+            &workspace,
+            Target::Dev,
+            "MISTY_DROPBOX_CLIENT_ID",
+            "fixture",
+        )
+        .unwrap();
         assert_eq!(
-            read(&workspace, Target::Dev).unwrap()["FIGMA_CLIENT_ID"],
+            read(&workspace, Target::Dev).unwrap()["MISTY_DROPBOX_CLIENT_ID"],
             "fixture"
         );
         fs::remove_file(integration).unwrap();
@@ -1351,19 +1301,25 @@ mod tests {
         set(
             &workspace,
             Target::Dev,
-            "OPENAI_API_KEY",
+            "AI_GATEWAY_API_KEY",
             "test-$literal-secret",
         )
         .unwrap();
         init(&workspace, Target::Dev).unwrap();
         crate::server::initialize_development_secrets(&workspace).unwrap();
         let second = read(&workspace, Target::Dev).unwrap();
-        assert_eq!(second["OPENAI_API_KEY"], "test-$literal-secret");
+        assert_eq!(second["AI_GATEWAY_API_KEY"], "test-$literal-secret");
         for (name, value) in first {
             assert_eq!(second[&name], value, "{name} changed on rerun");
         }
         assert!(set(&workspace, Target::Dev, "UNKNOWN", "x").is_err());
-        assert!(set(&workspace, Target::Dev, "OPENAI_API_KEY", "x\nINJECTED=bad").is_err());
+        assert!(set(
+            &workspace,
+            Target::Dev,
+            "AI_GATEWAY_API_KEY",
+            "x\nINJECTED=bad"
+        )
+        .is_err());
         assert!(validate(&workspace, Target::Dev).is_err());
         for (key, val) in [
             ("CLOUDFLARE_API_TOKEN", "fixture"),

@@ -8,12 +8,6 @@ import type {
   InstalledState,
   ExtensionAction,
 } from "./types";
-
-export interface ExtensionFailure {
-  code: string;
-  message: string;
-  retryable: boolean;
-}
 async function invoke<T = unknown>(command: string, args?: Record<string, unknown>): Promise<T> {
   try {
     return await nativeInvoke<T>(command, args);

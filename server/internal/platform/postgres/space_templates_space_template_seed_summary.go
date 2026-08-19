@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"sort"
 	"strings"
 )
@@ -153,8 +152,4 @@ func TestingNormalizeSetupProviders(providers []string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
-}
-
-func (db *Database) CreateSpaceWithTemplate(ctx context.Context, userID, name, templateID string, providers []string) (*CreateSpaceResult, error) {
-	return db.CreateSpaceWithTemplateIdempotent(ctx, userID, name, templateID, providers, "")
 }

@@ -87,7 +87,7 @@ func (a *SmartLibraryAnalyzer) selectedRealtimeModel() string {
 	if a.realtimeConfig != nil {
 		return a.realtimeConfig.Model
 	}
-	return RealtimeModelID()
+	return AgentRealtimeModel
 }
 
 type accountNamedProvider struct {

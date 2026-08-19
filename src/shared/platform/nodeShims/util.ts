@@ -5,7 +5,8 @@ export const promisify =
     new Promise<T>((resolve, reject) =>
       fn(...args, (error: unknown, value: T) => (error ? reject(error) : resolve(value))),
     );
-export const isDeepStrictEqual = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+export const isDeepStrictEqual = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
 export const inspect = (value: unknown) => {
   try {
     return typeof value === "string" ? value : JSON.stringify(value);

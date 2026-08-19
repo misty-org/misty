@@ -187,28 +187,6 @@ describe("Spaces realtime account lifecycle", () => {
     expect(String(FakeWebSocket.instances[1].url)).toContain("ticket=recovered-ticket");
   });
 
-  it("does not refresh Studio for an own Agent run when Studio visibility is denied", async () => {
-    const loadStudio = vi.fn();
-    apiMocks.realtimeTicket.mockResolvedValue({ ticket: "permission-ticket", expires_in: 60 });
-    useSpacesStore.setState({
-      spaces: [
-        spaceFixture({ id: "space", permissions: { "agents.run": true, "studio.view": false } }),
-      ],
-      loadStudio,
-    });
-
-    await useSpacesStore.getState().connectRealtime("active-account");
-    FakeWebSocket.instances[0].open();
-    FakeWebSocket.instances[0].message({
-      type: "event",
-      event: spaceEventFixture({ type: "agent.run.started" }),
-    });
-    await Promise.resolve();
-
-    expect(loadStudio).not.toHaveBeenCalled();
-    expect(useSpacesStore.getState().error).toBeNull();
-  });
-
   it.each(["library.upload.ready", "library.item.updated"])(
     "announces %s events to the active Library view",
     async (eventType) => {

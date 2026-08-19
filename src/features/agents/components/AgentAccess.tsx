@@ -1,6 +1,5 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { appsApi } from "../apps/api";
-import { mcpConnectionsApi } from "../mcp/api";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { AgentDeviceSnapshot } from "../model/interfaces/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -12,7 +11,6 @@ type AccessConnection = {
   id: string;
   name: string;
   status: string;
-  source?: "apps";
   detail?: string;
 };
 const appStatus = {
@@ -55,8 +53,7 @@ export function useAgentAccess(accountId: string, agentId = "") {
         deviceError: false,
       });
       if (!accountId) return;
-      const [connections, apps, device] = await Promise.allSettled([
-        mcpConnectionsApi.list(),
+      const [apps, device] = await Promise.allSettled([
         appsApi.list(),
         hasTauriInternals() ? agentsDeviceSnapshot() : Promise.resolve(undefined),
       ]);
@@ -64,23 +61,18 @@ export function useAgentAccess(accountId: string, agentId = "") {
       setState({
         accountId,
         agentId,
-        connections: [
-          ...(connections.status === "fulfilled"
-            ? connections.value.connections.filter((c) => c.status !== "revoked")
-            : []),
-          ...(apps.status === "fulfilled"
+        connections:
+          apps.status === "fulfilled"
             ? apps.value.apps.map((app): AccessConnection => ({
                 id: app.id,
                 name: app.alias ? `${app.name} · ${app.alias}` : app.name,
                 status: app.status,
-                source: "apps",
                 detail: appStatus[app.status],
               }))
-            : []),
-        ],
+            : [],
         device: device.status === "fulfilled" ? device.value : undefined,
         loading: false,
-        connectionsError: connections.status === "rejected" || apps.status === "rejected",
+        connectionsError: apps.status === "rejected",
         deviceError: device.status === "rejected",
       });
     };
@@ -114,7 +106,7 @@ export function AgentAccess({
   showComputer = true,
 }: {
   access: AgentAccessState;
-  onConnections(source?: "apps"): void;
+  onConnections(): void;
   onCompanion(): void;
   compact?: boolean;
   showComputer?: boolean;
@@ -157,11 +149,11 @@ export function AgentAccess({
           access.connections.map((connection) => (
             <Button
               type="button"
-              key={`${connection.source ?? "mcp"}:${connection.id}`}
+              key={connection.id}
               variant="ghost"
               justify="start"
               className="h-auto min-h-9 -mx-2 gap-3 whitespace-normal px-2 text-left"
-              onClick={() => onConnections(connection.source)}
+              onClick={onConnections}
             >
               <Cable className="size-4 shrink-0 text-cream-muted" />
               <span className="min-w-0">

@@ -58,13 +58,3 @@ type mistyConversation struct {
 	Messages      []mistyConversationMessage `json:"messages"`
 	Remote        bool                       `json:"remote"`
 }
-
-type mistyContextReference struct {
-	ID        string `json:"id"`
-	Kind      string `json:"kind"`
-	Title     string `json:"title"`
-	Href      string `json:"href,omitempty"`
-	SpaceID   string `json:"spaceId,omitempty"`
-	SpaceName string `json:"spaceName,omitempty"`
-	Attached  bool   `json:"attached,omitempty"`
-}

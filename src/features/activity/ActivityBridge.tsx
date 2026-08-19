@@ -5,10 +5,6 @@ import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { syncNativeBadge } from "./nativeNotifications";
 import {
-  capabilityApprovalActivities,
-  useCapabilityApprovals,
-} from "@/features/capability-approvals/store";
-import {
   agentInterventionActivities,
   useAgentInterventions,
 } from "@/features/agent-interventions/store";
@@ -22,7 +18,6 @@ export function ActivityBridge() {
   const { user, transitioning } = useAuth();
   const accountId = transitioning ? "" : (user?.id ?? "");
   useOperationActivity(accountId);
-  const approvals = useCapabilityApprovals();
   const interventions = useAgentInterventions();
   const { attentionCount, setAccount, syncSources, refresh, setOffline } = useActivityStore(
     useShallow((state) => ({
@@ -36,30 +31,22 @@ export function ActivityBridge() {
 
   useEffect(() => {
     setAccount(accountId);
-    const store = useCapabilityApprovals.getState();
-    store.setAccount(accountId);
     useAgentInterventions.getState().setAccount(accountId);
     // Each source re-reads only on its own topic. An invocation changing state
     // can only remove pending items (new ones publish their own topic), so it
     // re-reads only sources that currently hold items.
-    const removeApprovals = observeAccountChanges(accountId, ["approvals"], () =>
-      refresh(["approvals"]),
-    );
     const removeInterventions = observeAccountChanges(accountId, ["interventions"], () =>
       refresh(["interventions"]),
     );
     const removeInvocations = observeAccountChanges(accountId, ["invocations"], () =>
       refresh([
-        ...(useCapabilityApprovals.getState().items.length ? (["approvals"] as const) : []),
         ...(useAgentInterventions.getState().items.length ? (["interventions"] as const) : []),
       ]),
     );
     return () => {
-      removeApprovals();
       removeInterventions();
       removeInvocations();
       setAccount("");
-      useCapabilityApprovals.getState().setAccount("");
       useAgentInterventions.getState().setAccount("");
     };
   }, [accountId, refresh, setAccount]);
@@ -72,14 +59,8 @@ export function ActivityBridge() {
         ...(interventions.accountId === accountId
           ? agentInterventionActivities(accountId, interventions.items)
           : []),
-        ...(approvals.accountId === accountId
-          ? capabilityApprovalActivities(accountId, approvals.items)
-          : []),
       ],
       [
-        ...(approvals.loaded && !approvals.loading && !approvals.error && !approvals.nextCursor
-          ? ["capabilities" as const]
-          : []),
         ...(interventions.loaded && !interventions.loading && !interventions.error
           ? ["interventions" as const]
           : []),
@@ -90,12 +71,6 @@ export function ActivityBridge() {
     syncSources,
     interventions.accountId,
     interventions.items,
-    approvals.accountId,
-    approvals.items,
-    approvals.loaded,
-    approvals.loading,
-    approvals.error,
-    approvals.nextCursor,
     interventions.loaded,
     interventions.loading,
     interventions.error,

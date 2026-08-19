@@ -21,10 +21,6 @@ func (s *SpacesService) aiProvidersUser(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "not authenticated", http.StatusUnauthorized)
 		return "", false
 	}
-	if db.AppAuthorityFromContext(r.Context()) != nil {
-		http.Error(w, "account settings require the signed-in user", http.StatusForbidden)
-		return "", false
-	}
 	return user, true
 }
 func (s *SpacesService) aiKeyAAD(user, id, provider string) []byte {
@@ -198,10 +194,7 @@ func defaultAIRoutes(model, reasoning string) []aimodels.Route {
 	if reasoning == "" {
 		reasoning = "low"
 	}
-	defaults := map[string]string{"agent": model, "vision": model, "routing": envOr("MISTY_AI_LOW_MODEL", agent.TestingDefaultAgentLowGatewayModel), "realtime": agent.RealtimeModelID(), "library": envOr("SMART_LIBRARY_PRIMARY_MODEL", agent.SmartLibraryPrimaryModel), "library-fallback": envOr("SMART_LIBRARY_FALLBACK_MODEL", agent.SmartLibraryFallbackModel), "embedding": envOr("SMART_LIBRARY_EMBEDDING_MODEL", agent.SmartLibraryEmbeddingModel), "transcription": envOr("AGENT_TRANSCRIPTION_MODEL", "openai/gpt-4o-mini-transcribe"), "transcription-fallback": agent.MediaSearchTranscriptionFallbackModel, "media-transcription": envOr("MEDIA_SEARCH_TRANSCRIPTION_MODEL", agent.MediaSearchTranscriptionModel), "media-transcription-fallback": envOr("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL", agent.MediaSearchTranscriptionFallbackModel), "speech": agent.AgentSpeechModel}
-	if config, err := envconfig.AgentModel(); err == nil && config.Provider == "openai" {
-		defaults["routing"] = config.Model
-	}
+	defaults := map[string]string{"agent": model, "vision": model, "routing": envOr("MISTY_AI_LOW_MODEL", agent.TestingDefaultAgentLowGatewayModel), "realtime": agent.AgentRealtimeModel, "library": envOr("SMART_LIBRARY_PRIMARY_MODEL", agent.SmartLibraryPrimaryModel), "library-fallback": envOr("SMART_LIBRARY_FALLBACK_MODEL", agent.SmartLibraryFallbackModel), "embedding": envOr("SMART_LIBRARY_EMBEDDING_MODEL", agent.SmartLibraryEmbeddingModel), "transcription": envOr("AGENT_TRANSCRIPTION_MODEL", "openai/gpt-4o-mini-transcribe"), "transcription-fallback": agent.MediaSearchTranscriptionFallbackModel, "media-transcription": envOr("MEDIA_SEARCH_TRANSCRIPTION_MODEL", agent.MediaSearchTranscriptionModel), "media-transcription-fallback": envOr("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL", agent.MediaSearchTranscriptionFallbackModel), "speech": agent.AgentSpeechModel}
 	result := make([]aimodels.Route, 0, len(aimodels.Roles))
 	for _, role := range aimodels.Roles {
 		effort := ""

@@ -136,9 +136,3 @@ export function nativeImageThumbnailSupported(entry: FileEntry): boolean {
 export function previewPayloadIsText(mimeType: string): boolean {
   return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
 }
-
-export {
-  archiveEntryName,
-  archiveEntryIsArchive,
-  formatArchiveEntrySize,
-} from "./archivePresentation";

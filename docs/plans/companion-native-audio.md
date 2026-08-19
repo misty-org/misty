@@ -62,7 +62,7 @@ remain in `misty-billing`; no pricing or account credit changes are part of this
 
 On disconnect, the server briefly drains final provider usage. Missing usage
 retains a reservation for reconciliation rather than guessing a charge. Existing
-ownership, device access, capability and approval checks remain enforced.
+ownership, device access and capability checks remain enforced.
 
 ## Verification
 
@@ -92,10 +92,10 @@ No development database migration was applied for this change.
 
 ## Compatibility and scope
 
-The older `companionVoice.ts` and verified-result reader remain for compatibility.
-Their segmented narration and optional direct WebRTC route are not the current
-companion conversation path. No new provider credential is required by the
-Gateway conversation route. Other composer transcription clients are unchanged.
+The older single-turn `companionVoice.ts` client, its segmented narration and
+the direct WebRTC route were removed on October 4, 2026; the realtime
+conversation is the only voice path. No provider credential beyond the AI
+Gateway key is required. Other composer transcription clients are unchanged.
 
 Phases 1–2 only: this does not add Composio, agent-owned browser windows, scheduling,
 workflow persistence, or cross-agent collaboration.

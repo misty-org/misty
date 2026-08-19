@@ -97,11 +97,6 @@ func GetBillingUsage(database *db.Database) http.HandlerFunc {
 	return getBillingUsage(database, true)
 }
 
-// GetAIUsage reads only the account allowance, independent of Space storage.
-func GetAIUsage(database *db.Database) http.HandlerFunc {
-	return getBillingUsage(database, false)
-}
-
 func getBillingUsage(database *db.Database, includeStorage bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")

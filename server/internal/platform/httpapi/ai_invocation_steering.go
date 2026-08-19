@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"net/http"
 	"strings"
 )
@@ -12,10 +11,6 @@ func (s *AIService) SteerInvocation() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)
 		if !ok {
-			return
-		}
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "host only", 403)
 			return
 		}
 		var body struct {

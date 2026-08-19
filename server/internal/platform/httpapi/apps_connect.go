@@ -26,9 +26,6 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	if !composio.ValidToolkit(app) {
 		return nil, serveragent.ErrInvalidRequest("app must be an app slug from apps_search, such as googledrive")
 	}
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return nil, db.ErrSpaceForbidden
-	}
 	client, err := composioClient()
 	if err != nil {
 		return nil, appsError(err)

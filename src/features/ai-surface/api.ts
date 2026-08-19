@@ -12,7 +12,6 @@ import type {
   AiInvocationCreated,
   AiInvocationEvent,
   AiInvocationRequest,
-  AiRunCreated,
   AiCitation,
   AiContextReference,
 } from "./types";
@@ -154,21 +153,6 @@ export const aiSurfaceApi = {
       `/ai/preferences/${encodeURIComponent(surfaceId)}`,
       { method: "PUT", body: JSON.stringify(input) },
     ),
-  recordProactiveEvent: (
-    surfaceId: string,
-    event: "shown" | "snoozed" | "dismissed",
-    snoozeMinutes?: number,
-  ) =>
-    apiRequest<{ preference: AiSurfacePreferenceRecord }>(
-      `/ai/preferences/${encodeURIComponent(surfaceId)}/proactive-events`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          event,
-          ...(snoozeMinutes === undefined ? {} : { snooze_minutes: snoozeMinutes }),
-        }),
-      },
-    ),
   recaps: () => apiRequest<{ recaps: AiRecapRecord[] }>("/ai/recaps"),
   updateRecap: (
     surfaceId: AiRecapRecord["surface_id"],
@@ -181,8 +165,6 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify(input),
     }),
-  markRecapSeen: (surfaceId: AiRecapRecord["surface_id"]) =>
-    apiRequest<void>(`/ai/recaps/${encodeURIComponent(surfaceId)}/seen`, { method: "POST" }),
   feedback: (invocationId: string, rating: -1 | 1, reason = "", comment = "") =>
     apiRequest<void>(`/ai/invocations/${encodeURIComponent(invocationId)}/feedback`, {
       method: "POST",
@@ -193,37 +175,6 @@ export const aiSurfaceApi = {
       method: "POST",
       headers: { "Idempotency-Key": input.idempotencyKey },
       body: JSON.stringify(toServerInvocation(input)),
-    }),
-  createRun: (input: {
-    prompt: string;
-    surfaceId: string;
-    paneId: string;
-    invocationId?: string;
-    conversationId?: string;
-    spaceId?: string;
-    href?: string;
-    title?: string;
-    context: AiContextReference[];
-    idempotencyKey: string;
-  }) =>
-    apiRequest<AiRunCreated>("/ai/runs", {
-      method: "POST",
-      headers: { "Idempotency-Key": input.idempotencyKey },
-      body: JSON.stringify({
-        prompt: input.prompt,
-        space_id: input.spaceId,
-        invocation_id: input.invocationId,
-        conversation_id: input.conversationId,
-        idempotency_key: input.idempotencyKey,
-        origin: {
-          surface_id: input.surfaceId,
-          pane_id: input.paneId,
-          invocation_id: input.invocationId,
-          href: input.href,
-          title: input.title,
-        },
-        context: input.context.map(toServerContextReference),
-      }),
     }),
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {

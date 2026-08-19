@@ -32,9 +32,6 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 		call.Arguments = json.RawMessage(`{}`)
 	}
 	call.Account = strings.TrimSpace(call.Account)
-	if db.AppAuthorityFromContext(ctx) != nil {
-		return nil, db.ErrSpaceForbidden
-	}
 	if strings.TrimSpace(request.ID) == "" {
 		return nil, agenttools.ErrCapabilityDenied
 	}

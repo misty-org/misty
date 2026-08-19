@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
-
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
+
+
+import ()
 
 func TestManagedMistyIsSingleFixedAndSupportsBoundedHiddenWorkers(t *testing.T) {
 	database := openTestDatabase(t)
@@ -15,7 +17,7 @@ func TestManagedMistyIsSingleFixedAndSupportsBoundedHiddenWorkers(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Managed Misty Work")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Managed Misty Work")
 	if err != nil {
 		t.Fatal(err)
 	}

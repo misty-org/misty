@@ -1,70 +1,20 @@
 package agent
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-
-	. "github.com/kannachi323/misty/server/internal/agents"
-
 	"golang.org/x/oauth2"
 )
 
-func TestGeminiProviderADCPrefersTokenOverAPIKey(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("Authorization"); got != "Bearer adc-token" {
-			t.Fatalf("Authorization = %q", got)
-		}
-		if got := r.Header.Get("X-Goog-Api-Key"); got != "" {
-			t.Fatalf("X-Goog-Api-Key = %q", got)
-		}
-		writeJSONResponse(t, w, map[string]any{
-			"output_text": `{"text":"Ready.","tool_requests":[],"file_plan":null}`,
-		})
-	}))
-	defer server.Close()
 
-	provider := NewGeminiProvider(GeminiProviderConfig{
-		APIKey:   "api-key",
-		AuthMode: "adc",
-		BaseURL:  server.URL,
-		Model:    "gemini-test",
-		TokenSource: staticTokenSource{token: &oauth2.Token{
-			AccessToken: "adc-token",
-			TokenType:   "Bearer",
-		}},
-		Client: server.Client(),
-	})
-	if _, err := provider.Next(ModelRequest{
-		SessionID: "s",
-		UserID:    "u",
-		Mode:      ModeAuto,
-		Messages:  []Message{{Role: "user", Content: "Organize this"}},
-	}); err != nil {
-		t.Fatalf("Next() error = %v", err)
-	}
-}
+import (
+	"encoding/json"
+	"net/http"
+	"testing"
 
-func TestNewProviderFromEnvSelectsConfiguredProvider(t *testing.T) {
-	t.Setenv("MISTY_AI_PROVIDER", "gemini")
-	t.Setenv("GEMINI_API_KEY", "key")
-	t.Setenv("MISTY_AI_MODEL", "gemini-test")
-
-	if _, ok := NewProviderFromEnv().(*ADKGeminiProvider); !ok {
-		t.Fatalf("NewProviderFromEnv() did not select ADK Gemini provider")
-	}
-
-	t.Setenv("MISTY_AI_PROVIDER", "openai")
-	t.Setenv("OPENAI_API_KEY", "key")
-	if _, ok := NewProviderFromEnv().(*OpenAIProvider); !ok {
-		t.Fatalf("NewProviderFromEnv() did not select OpenAI provider")
-	}
-}
+	. "github.com/kannachi323/misty/server/internal/agents"
+)
 
 func TestNewAgentProviderFromEnvUsesPerTierRoutes(t *testing.T) {
 	t.Setenv("AI_GATEWAY_API_KEY", "gateway-key")
-	t.Setenv("OPENAI_API_KEY", "openai-key-that-must-not-be-used")
 	t.Setenv("MISTY_AI_LOW_MODEL", "google/gemini-low")
 	t.Setenv("MISTY_AI_MED_MODEL", "anthropic/claude-med")
 	t.Setenv("MISTY_AI_HIGH_MODEL", "openai/gpt-high")
@@ -103,37 +53,13 @@ func TestNewAgentProviderFromEnvUsesGatewayDefaultsAndRequiresGatewayAuth(t *tes
 
 	t.Setenv("AI_GATEWAY_API_KEY", "")
 	t.Setenv("VERCEL_OIDC_TOKEN", "")
-	t.Setenv("OPENAI_API_KEY", "direct-provider-key")
 	router = NewAgentProviderFromEnv().(*AgentProviderRouter)
 	if provider, _ := TestingProviderStatus(router.ProviderForTier(TierHigh)); provider != ProviderMock {
 		t.Fatalf("agent bypassed gateway with provider %q", provider)
 	}
 }
 
-func TestParseFirstProviderJSONResponseUsesConcatenatedCandidate(t *testing.T) {
-	response, err := TestingParseFirstProviderJSONResponse([]string{
-		`{"text":"I will inspect`,
-		`{"text":"I will inspect the folder.","tool_requests":[],"file_plan":null}`,
-	})
-	if err != nil {
-		t.Fatalf("parseFirstProviderJSONResponse() error = %v", err)
-	}
-	if response.Text != "I will inspect the folder." {
-		t.Fatalf("Text = %q", response.Text)
-	}
-}
 
-func TestParseFirstProviderJSONResponseExtractsWrappedJSON(t *testing.T) {
-	response, err := TestingParseFirstProviderJSONResponse([]string{
-		`Here is the plan: {"text":"Plan ready.","tool_requests":[],"file_plan":null}`,
-	})
-	if err != nil {
-		t.Fatalf("parseFirstProviderJSONResponse() error = %v", err)
-	}
-	if response.Text != "Plan ready." {
-		t.Fatalf("Text = %q", response.Text)
-	}
-}
 
 func TestGroundedAgentCitationsRejectInventedFilesAndLocations(t *testing.T) {
 	request := ModelRequest{ToolResults: []ToolResult{{
@@ -155,27 +81,6 @@ func TestGroundedAgentCitationsRejectInventedFilesAndLocations(t *testing.T) {
 	}
 }
 
-func TestNewProviderFromEnvSelectsGeminiRESTFallback(t *testing.T) {
-	t.Setenv("MISTY_AI_PROVIDER", "gemini_rest")
-	t.Setenv("GEMINI_API_KEY", "key")
-	t.Setenv("MISTY_AI_MODEL", "gemini-test")
-
-	if provider, ok := NewProviderFromEnv().(*GeminiProvider); !ok {
-		t.Fatalf("NewProviderFromEnv() = %T, want *GeminiProvider", provider)
-	}
-}
-
-func TestNewProviderFromEnvAcceptsGoogleAPIKeyForADKGemini(t *testing.T) {
-	t.Setenv("MISTY_AI_PROVIDER", "gemini")
-	t.Setenv("GEMINI_AUTH_MODE", "api_key")
-	t.Setenv("GOOGLE_API_KEY", "key")
-	t.Setenv("MISTY_AI_MODEL", "gemini-test")
-
-	if provider, ok := NewProviderFromEnv().(*ADKGeminiProvider); !ok {
-		t.Fatalf("NewProviderFromEnv() = %T, want *ADKGeminiProvider", provider)
-	}
-}
-
 func TestProviderUsageParsing(t *testing.T) {
 	openAI := TestingExtractOpenAIUsage([]byte(`{"usage":{"input_tokens":120,"output_tokens":40,"input_tokens_details":{"cached_tokens":20},"output_tokens_details":{"reasoning_tokens":10}}}`))
 	if openAI.InputTokens != 120 || openAI.CachedInputTokens != 20 || openAI.OutputTokens != 40 || openAI.ReasoningTokens != 10 {
@@ -191,12 +96,11 @@ func TestProviderUsageParsing(t *testing.T) {
 	}
 }
 
-func TestNewProviderFromEnvSelectsGeminiForADC(t *testing.T) {
-	t.Setenv("MISTY_AI_PROVIDER", "gemini")
-	t.Setenv("GEMINI_AUTH_MODE", "adc")
-
-	if _, ok := NewProviderFromEnv().(*ADKGeminiProvider); !ok {
-		t.Fatalf("NewProviderFromEnv() did not select ADK Gemini provider")
+func writeJSONResponse(t *testing.T, w http.ResponseWriter, value any) {
+	t.Helper()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		t.Fatalf("response JSON error = %v", err)
 	}
 }
 
@@ -207,12 +111,4 @@ type staticTokenSource struct {
 
 func (s staticTokenSource) Token() (*oauth2.Token, error) {
 	return s.token, s.err
-}
-
-func writeJSONResponse(t *testing.T, w http.ResponseWriter, value any) {
-	t.Helper()
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-		t.Fatalf("response JSON error = %v", err)
-	}
 }

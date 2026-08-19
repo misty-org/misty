@@ -8,6 +8,4 @@ export const transferRefreshPollMs = 12000;
 export const devicesChangedEvent = "misty://devices-changed";
 export const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 export const explorerCompareWithEvent = "misty:explorer-compare-with";
-
-export const emptyPinnedPaths: string[] = [];
 export const emptyMountedDevices: MountedDevice[] = [];

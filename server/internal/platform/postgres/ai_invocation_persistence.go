@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -38,14 +37,6 @@ type AIInvocationRecord struct {
 // authority. The returned boolean is false when a retry found the existing row.
 func (db *Database) CreateAIInvocationRecord(ctx context.Context, record AIInvocationRecord) (AIInvocationRecord, bool, error) {
 	record.SpaceID = "" // All AI admission is account-scoped; sources carry their own destinations.
-	bound, bindErr := bindAppAuthority(ctx, record.RequestPayload)
-	if bindErr != nil {
-		return AIInvocationRecord{}, false, bindErr
-	}
-	record.RequestPayload = bound
-	if err := db.ValidateAppExecutionAuthority(ctx, AppAuthorityFromContext(ctx), record.UserID, record.SpaceID, "ai.write"); err != nil {
-		return AIInvocationRecord{}, false, err
-	}
 	var stored AIInvocationRecord
 	var created bool
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(record.UserID), func(tx *sql.Tx) error {
@@ -56,8 +47,7 @@ func (db *Database) CreateAIInvocationRecord(ctx context.Context, record AIInvoc
 	return stored, created, err
 }
 
-// Shared by ordinary AI requests and deterministic SDK admissions. The caller
-// can commit its pinned request metadata in this same transaction.
+// The caller can commit its pinned request metadata in this same transaction.
 func createAIInvocationRecordTx(ctx context.Context, tx *sql.Tx, record AIInvocationRecord) (AIInvocationRecord, bool, error) {
 	record.SpaceID = ""
 	stored := AIInvocationRecord{}
@@ -120,11 +110,6 @@ func createAIInvocationRecordTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 			&stored.RuntimeKind, &stored.RuntimeRunID, &stored.AgentRunID, &stored.RuntimeHeartbeatAt, &stored.ExpiresAt, &stored.CreatedAt, &stored.UpdatedAt, &stored.ModelTurnLimit, &inserted,
 		)
 		created = inserted
-		if err == nil && created && record.SurfaceID != "sdk" && record.SurfaceID != "routine" {
-			if pinErr := pinAgentSDKCapabilitiesTx(ctx, tx, stored.ID, stored.UserID, stored.SpaceID, "", stored.RequestPayload); pinErr != nil {
-				return pinErr
-			}
-		}
 		if err == nil && created && record.DispatchRuntime {
 			// Admission and dispatch intent commit together. Service context applies
 			// only to the private delivery row; invocation ownership was checked above.
@@ -152,24 +137,6 @@ func (db *Database) AIInvocationByID(ctx context.Context, userID, invocationID s
 		return nil, ErrSpaceNotFound
 	}
 	return result, err
-}
-
-func (db *Database) LinkAIInvocationAgentRun(ctx context.Context, userID, invocationID, runID string) error {
-	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		result, err := tx.ExecContext(ctx, `UPDATE ai_invocations invocation SET
-			agent_run_id=$1,updated_at=NOW()
-			FROM space_runs run WHERE invocation.id=$2 AND invocation.user_id=$3 AND run.id=$1
-			AND run.owner_user_id=$3
-			AND (invocation.agent_run_id=$1 OR (invocation.state='queued' AND invocation.agent_run_id IS NULL))`, runID, invocationID, userID)
-		if err != nil {
-			return err
-		}
-		changed, err := result.RowsAffected()
-		if err != nil || changed != 1 {
-			return ErrSpaceConflict
-		}
-		return nil
-	})
 }
 
 // ActivateAIInvocationRuntime binds a signed durable runtime identity to an
@@ -244,14 +211,6 @@ func (db *Database) TouchAIInvocationRuntime(ctx context.Context, invocationID, 
 		}
 		return nil
 	})
-}
-
-func (db *Database) AppendAIInvocationEvent(ctx context.Context, userID, invocationID string, sequence int64, eventType string, payload json.RawMessage, state string) error {
-	if sequence < 1 {
-		return ErrSpaceInvalid
-	}
-	_, err := db.CommitAIInvocationEvent(ctx, userID, invocationID, "compat:"+strconv.FormatInt(sequence, 10), eventType, payload, state)
-	return err
 }
 
 type AIInvocationEventRecord struct {

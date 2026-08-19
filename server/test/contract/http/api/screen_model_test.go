@@ -6,20 +6,22 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/platform/security"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/kannachi323/misty/server/internal/aimodels"
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 )
+
+
+import ()
 
 // The desktop's screen loop calls the pass-through once per action while its
 // browser.act job runs. Each call is metered to the run without spending the
@@ -50,7 +52,7 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, user.ID, "Screen")
+	space, err := database.TestingCreateSpace(ctx, user.ID, "Screen")
 	if err != nil {
 		t.Fatal(err)
 	}

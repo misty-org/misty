@@ -89,9 +89,6 @@ func (db *Database) AgentAppRequest(ctx context.Context, user, id string) (*Agen
 // DecideAgentAppRequest records the user's answer. Connect requests can only
 // be dismissed; approvals can be approved or declined.
 func (db *Database) DecideAgentAppRequest(ctx context.Context, user, id, state string) (*AgentAppRequest, error) {
-	if AppAuthorityFromContext(ctx) != nil {
-		return nil, ErrAppRuntimeForbidden
-	}
 	if state != "approved" && state != "declined" {
 		return nil, ErrSpaceInvalid
 	}

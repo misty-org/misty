@@ -13,10 +13,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func openOpenAIRealtime(ctx context.Context, base, key string) (*VoiceRealtime, error) {
- return openOpenAIRealtimeModel(ctx, base, key, RealtimeModelID(), false)
-}
-
 func openOpenAIRealtimeModel(ctx context.Context, base, key, model string, publicEndpoint bool) (*VoiceRealtime, error) {
 	endpoint, err := url.Parse(strings.TrimRight(base, "/") + "/realtime")
 	if err != nil || endpoint.Host == "" || key == "" {

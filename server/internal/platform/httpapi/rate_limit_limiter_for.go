@@ -33,20 +33,14 @@ const overflowRouteKey = "{overflow}"
 // they are charged per account rather than per address. Keyed by the normalized
 // path the limiter already computes.
 var costBearingRoutes = map[string]bool{
-	"/ai/complete":                                              true,
-	"/ai/media-search/chunks":                                   true,
-	"/ai/media-search/search":                                   true,
-	"/spaces/{spaceID}/calendar/sync":                           true,
-	"/spaces/{spaceID}/integrations/discord/link":               true,
-	"/spaces/{spaceID}/integrations/discord/link/{id}/sync":     true,
-	"/spaces/{spaceID}/integrations/discord/link/{id}/publish":  true,
-	"/spaces/{spaceID}/integrations/discord/links":              true,
-	"/spaces/{spaceID}/integrations/discord/links/{id}/sync":    true,
-	"/spaces/{spaceID}/integrations/discord/links/{id}/publish": true,
-	"/spaces/{spaceID}/integrations/notion/sources":             true,
-	"/spaces/{spaceID}/integrations/notion/search":              true,
-	"/spaces/{spaceID}/integrations/notion/pages":               true,
-	"/spaces/{spaceID}/integrations/{provider}/authorize":       true,
+	"/ai/complete":                                        true,
+	"/ai/media-search/chunks":                             true,
+	"/ai/media-search/search":                             true,
+	"/spaces/{spaceID}/calendar/sync":                     true,
+	"/spaces/{spaceID}/integrations/notion/sources":       true,
+	"/spaces/{spaceID}/integrations/notion/search":        true,
+	"/spaces/{spaceID}/integrations/notion/pages":         true,
+	"/spaces/{spaceID}/integrations/{provider}/authorize": true,
 	// Egress and storage operations bill per byte and per request.
 	"/spaces/{spaceID}/library/exports/download":                   true,
 	"/spaces/{spaceID}/library/items/{id}/download":                true,

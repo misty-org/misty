@@ -165,33 +165,6 @@ func (db *Database) SpaceConversations(ctx context.Context, userID, spaceID stri
 	return items, err
 }
 
-// IsSpaceConversationForMember distinguishes a selected-member group
-// conversation from the message correlation ID used by the Space-wide chat.
-// If the ID belongs to a selected group, the caller must still be a member;
-// otherwise returning false here could accidentally redirect a private reply
-// into the Space-wide conversation.
-func (db *Database) IsSpaceConversationForMember(ctx context.Context, userID, spaceID, conversationID string) (bool, error) {
-	if strings.TrimSpace(conversationID) == "" {
-		return false, nil
-	}
-	selectedGroup := false
-	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionMessagesWrite); err != nil {
-			return err
-		}
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
-			SELECT 1 FROM space_conversations WHERE id=$1 AND space_id=$2
-		)`, conversationID, spaceID).Scan(&selectedGroup); err != nil {
-			return err
-		}
-		if !selectedGroup {
-			return nil
-		}
-		return requireSpaceConversationMemberTx(ctx, tx, userID, spaceID, conversationID)
-	})
-	return selectedGroup, err
-}
-
 func (db *Database) CreateSpaceConversation(ctx context.Context, userID, spaceID, title string, participantRefs []SpaceActorRef) (*SpaceConversation, error) {
 	title, err := normalizeConversationTitle(title)
 	if err != nil {

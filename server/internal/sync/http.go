@@ -98,10 +98,6 @@ func (s *BrowserSyncService) user(w http.ResponseWriter, r *http.Request) (strin
 	if !ok {
 		return "", false
 	}
-	if db.AppAuthorityFromContext(r.Context()) != nil {
-		writeSyncError(w, ErrSyncForbidden)
-		return "", false
-	}
 	return user, true
 }
 func (s *BrowserSyncService) Vault() http.HandlerFunc {

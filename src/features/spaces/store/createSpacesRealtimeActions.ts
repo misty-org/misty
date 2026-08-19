@@ -9,7 +9,6 @@ import { readRealtimeCursor, writeRealtimeCursor } from "@/api/spaces/realtime-c
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
 import type { RealtimeEnvelope } from "../model/stores/spaces/types/useSpacesBackendStore";
-export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;

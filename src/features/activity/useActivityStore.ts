@@ -1,4 +1,3 @@
-import { useCapabilityApprovals } from "@/features/capability-approvals/store";
 import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { readDeploymentScope } from "@/api/deployment/api";
 import { create } from "zustand";
@@ -39,7 +38,7 @@ interface ActivityStore extends ActivityData {
   ): void;
   resolveSourceRequest(accountId: string, source: Source, sourceId: string): void;
   load(): Promise<void>;
-  /** Re-reads the named sources, or both when none are named. */
+  /** Re-reads the named sources, or all when none are named. */
   refresh(only?: ActivityRefreshSource[]): Promise<void>;
   ingestLocal(input: LocalActivityInput): string | null;
   markRead(id: string): void;
@@ -55,7 +54,7 @@ interface ActivityStore extends ActivityData {
   clearError(): void;
 }
 
-export type ActivityRefreshSource = "approvals" | "interventions";
+export type ActivityRefreshSource = "interventions";
 
 export const useActivityStore = create<ActivityStore>()(
   persist(
@@ -89,12 +88,8 @@ export const useActivityStore = create<ActivityStore>()(
         set({ loading: true, offline: false, error: null });
         try {
           const accountId = get().accountId;
-          const sources = [useCapabilityApprovals, useAgentInterventions];
-          const selected = only
-            ? sources.filter((_, index) =>
-                only.includes(index === 0 ? "approvals" : "interventions"),
-              )
-            : sources;
+          const sources = [useAgentInterventions];
+          const selected = only ? sources.filter(() => only.includes("interventions")) : sources;
           await Promise.all(
             selected.map((source) => {
               const current = source.getState();

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
+	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
+
+
+import ()
 
 func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
 	database := openTestDatabase(t)
@@ -17,7 +19,7 @@ func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Notes Space")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Notes Space")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +99,7 @@ func TestSpaceAgentReadsAnEmptyNoteAsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, err := database.CreateSpace(ctx, owner.ID, "Empty Notes")
+	space, err := database.TestingCreateSpace(ctx, owner.ID, "Empty Notes")
 	if err != nil {
 		t.Fatal(err)
 	}

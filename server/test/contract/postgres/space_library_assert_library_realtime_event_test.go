@@ -2,13 +2,30 @@ package db
 
 import (
 	"context"
-	"errors"
 	"strings"
-	"testing"
 	"time"
+)
+
+
+import (
+	"errors"
+	"testing"
 
 	. "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
+
+func TestParseLibrarySearchRejectsInvalidStructuredValues(t *testing.T) {
+	if _, err := TestingParseLibrarySearch("type:executable"); !errors.Is(err, ErrLibraryInvalid) {
+		t.Fatalf("type error = %v", err)
+	}
+	if _, err := TestingParseLibrarySearch("after:tomorrow"); !errors.Is(err, ErrLibraryInvalid) {
+		t.Fatalf("date error = %v", err)
+	}
+	parsed, err := TestingParseLibrarySearch(`summer trip album:"Road trip" hidden:false`)
+	if err != nil || parsed.Text != "summer trip" || parsed.Album != "Road trip" || parsed.Hidden == nil || *parsed.Hidden {
+		t.Fatalf("parsed search = %#v, %v", parsed, err)
+	}
+}
 
 func assertLibraryRealtimeEvent(t *testing.T, database *Database, ctx context.Context, userID, eventType, entityID string) {
 	t.Helper()
@@ -105,19 +122,6 @@ func containsString(values []string, expected string) bool {
 	return false
 }
 
-func TestParseLibrarySearchRejectsInvalidStructuredValues(t *testing.T) {
-	if _, err := TestingParseLibrarySearch("type:executable"); !errors.Is(err, ErrLibraryInvalid) {
-		t.Fatalf("type error = %v", err)
-	}
-	if _, err := TestingParseLibrarySearch("after:tomorrow"); !errors.Is(err, ErrLibraryInvalid) {
-		t.Fatalf("date error = %v", err)
-	}
-	parsed, err := TestingParseLibrarySearch(`summer trip album:"Road trip" hidden:false`)
-	if err != nil || parsed.Text != "summer trip" || parsed.Album != "Road trip" || parsed.Hidden == nil || *parsed.Hidden {
-		t.Fatalf("parsed search = %#v, %v", parsed, err)
-	}
-}
-
 func TestMergeLibraryDuplicatesPreservesMetadataAndTrashesRedundantItems(t *testing.T) {
 	database := openTestDatabase(t)
 	useResourceAdapterFixture(t, database)
@@ -165,7 +169,7 @@ func TestLibraryQuotaReservationsDrawOnEachAccountsAllowance(t *testing.T) {
 	owner, _ := database.CreateUser("Quota Owner", "quota-owner@example.com", "password123")
 	member, _ := database.CreateUser("Quota Member", "quota-member@example.com", "password123")
 	spaceID := createTestSpace(t, database, ctx, owner.ID, "Quota").ID
-	invite, err := database.InviteToSpace(ctx, owner.ID, spaceID, member.Email)
+	invite, err := database.TestingInviteToSpace(ctx, owner.ID, spaceID, member.Email)
 	if err != nil {
 		t.Fatal(err)
 	}

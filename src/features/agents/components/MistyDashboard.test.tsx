@@ -6,7 +6,6 @@ const fixture = vi.hoisted(() => ({
   cancelInvocation: vi.fn(async () => {}),
   cancelRun: vi.fn(async () => {}),
   run: vi.fn(),
-  decideApproval: vi.fn(async () => {}),
 }));
 vi.mock("../AgentsRuntime", () => ({
   runtimeAiApi: {
@@ -16,7 +15,6 @@ vi.mock("../AgentsRuntime", () => ({
   runtimeAgentsApi: {
     cancelRun: fixture.cancelRun,
     run: fixture.run,
-    decideApproval: fixture.decideApproval,
   },
   useAgentsAuth: () => ({ user: { id: fixture.user } }),
 }));
@@ -154,34 +152,6 @@ it("loads personal activity without a Space", async () => {
   await waitFor(() => expect(fixture.activity).toHaveBeenCalledWith("", undefined));
   await waitFor(() => expect(screen.queryByText("Loading activity…")).toBeNull());
   expect(screen.queryByText("No activity yet.")).toBeNull();
-});
-
-it("keeps approvals attached to their task run", async () => {
-  fixture.activity.mockResolvedValue({
-    entries: [
-      {
-        id: "run-entry",
-        run_id: "approval-run",
-        kind: "run",
-        title: "Rename files",
-        state: "awaiting_approval",
-        events: [],
-        updated_at: new Date().toISOString(),
-      },
-    ],
-  });
-  fixture.run.mockResolvedValue({
-    instruction: "Rename screenshots",
-    result: {},
-    approvals: [{ id: "approval-1", state: "pending", summary: "Rename 6 files?" }],
-    summary: { run_id: "approval-run" },
-  });
-  render(<MistyDashboard />);
-  fireEvent.click(await screen.findByRole("button", { name: /Rename files/ }));
-  fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
-  await waitFor(() =>
-    expect(fixture.decideApproval).toHaveBeenCalledWith("approval-run", "approval-1", "approve"),
-  );
 });
 
 it.each([
