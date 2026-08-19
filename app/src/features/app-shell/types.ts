@@ -1,5 +1,8 @@
 export type AppTab =
   | "home"
+  | "inbox"
+  | "browser"
+  | "terminal"
   | "code"
   | "files"
   | "spaces"
@@ -8,7 +11,6 @@ export type AppTab =
   | "extensions"
   | "transfers"
   | "providers"
-  | "activity"
   | "settings"
   | "account"
   | "diagnostics";

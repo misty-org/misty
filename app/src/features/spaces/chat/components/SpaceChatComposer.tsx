@@ -14,7 +14,7 @@ import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "reac
 import { splitMentionSegments } from "../hooks/mentionHighlight";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";
-import type { SpaceChatDraft } from "../hooks/useSpaceChatDraft";
+import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { ChatAttachmentChips } from "./ChatAttachmentChips";
 import { ChatReplyBanner } from "./ChatReplyBanner";
 import { ChatSuggestionPopover } from "./ChatSuggestionPopover";
@@ -34,7 +34,6 @@ export interface SpaceChatComposerProps {
   suggestions: ChatSuggestionsState;
   input: ReturnType<typeof useComposerInput>;
   isConversation: boolean;
-  sending: boolean;
   canUploadAttachments: boolean;
   canBrowseLibrary: boolean;
   replyToSenderName: string;
@@ -247,7 +246,7 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
               )}
               size="icon-sm"
-              disabled={props.sending || draft.isEmpty}
+              disabled={draft.isEmpty}
               type="submit"
               aria-label="Send message"
             >

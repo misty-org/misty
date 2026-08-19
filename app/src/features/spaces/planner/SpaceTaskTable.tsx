@@ -16,7 +16,6 @@ import {
   TableRow,
 } from "@/shared/ui";
 import { LoaderCircle } from "lucide-react";
-import { TaskSyncBadge } from "./components/TaskSyncBadge";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -81,7 +80,6 @@ export function SpaceTaskList({
                   >
                     {taskBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                     <span className="truncate">{task.title}</span>
-                    <TaskSyncBadge task={task} />
                   </Button>
                 </TableCell>
                 <TableCell>
@@ -125,7 +123,7 @@ export function SpaceTaskList({
                         (member) => [`person:${member.user_id}`, member.name] as [string, string],
                       ),
                       ...agents
-                        .filter((agent) => agent.enabled)
+                        .filter((agent) => agent.enabled && agent.can_control)
                         .map(
                           (agent) =>
                             [`agent:${agent.agent_id}`, `${agent.name} · Agent`] as [

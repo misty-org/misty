@@ -14,10 +14,7 @@ export function useSpaceAgendaPreferences(accountId: string, spaceId: string) {
     () => `misty:agenda-visibility:${accountId || "anonymous"}:${spaceId}`,
     [accountId, spaceId],
   );
-  const key = useMemo(
-    () => deploymentStorageKey(baseKey),
-    [baseKey],
-  );
+  const key = useMemo(() => deploymentStorageKey(baseKey), [baseKey]);
   const [visibility, setVisibilityState] = useState<SpaceAgendaVisibility>(() => read(baseKey));
 
   useEffect(() => {
@@ -53,7 +50,9 @@ export function useSpaceAgendaPreferences(accountId: string, spaceId: string) {
 
 function read(key: string): SpaceAgendaVisibility {
   try {
-    const value = JSON.parse(readDeploymentStorageItem(key) ?? "null") as Partial<SpaceAgendaVisibility> | null;
+    const value = JSON.parse(
+      readDeploymentStorageItem(key) ?? "null",
+    ) as Partial<SpaceAgendaVisibility> | null;
     return {
       tasks: value?.tasks !== false,
       roadmap: value?.roadmap !== false,

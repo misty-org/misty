@@ -12,6 +12,9 @@ export const desktopNavItems: DesktopNavItem[] = [
 
 const deepLinkPrefixes = [
   routes.home,
+  routes.inbox,
+  routes.browser,
+  routes.terminal,
   routes.invite,
   routes.transfers,
   routes.files,
@@ -33,6 +36,9 @@ const deepLinkPrefixes = [
 
 export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname === routes.home) return "home";
+  if (pathname.startsWith(routes.inbox)) return "inbox";
+  if (pathname.startsWith(routes.browser)) return "browser";
+  if (pathname.startsWith(routes.terminal)) return "terminal";
   if (pathname.startsWith(routes.files)) return "files";
   if (pathname.startsWith(routes.code)) return "code";
   // Assistant remains an accepted legacy deep link that redirects into Agents.

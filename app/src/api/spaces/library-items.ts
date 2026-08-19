@@ -238,6 +238,30 @@ export function createSpaceLibraryItemsApi(spaceRequest: SpaceRequest) {
       purpose: "library" | "attachment",
       options?: LibraryUploadOptions,
     ) => uploadLibraryPath(spaceId, path, purpose, options),
+    setLibraryProviderImport: (
+      spaceId: string,
+      itemId: string,
+      source: {
+        provider: string;
+        remoteName: string;
+        remotePath: string;
+        connectionId?: string;
+        connectionSource?: "connected_account" | "legacy_cloud";
+      },
+    ) =>
+      spaceRequest<SpaceLibraryItem>(
+        `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}/provider-import`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            provider: source.provider,
+            remote_name: source.remoteName,
+            remote_path: source.remotePath,
+            connection_id: source.connectionId ?? "",
+            connection_source: source.connectionSource ?? "device_remote",
+          }),
+        },
+      ),
     uploadLibraryBlob: (
       spaceId: string,
       blob: Blob,

@@ -1,3 +1,4 @@
+import { connectionsApi } from "@/api/connections";
 import { spacesApi } from "@/api/spaces/api";
 import type {
   ProviderConnectionAvailability,
@@ -54,12 +55,32 @@ export function GoogleCalendarConnectionPanel({
     setConnecting(true);
     setError("");
     try {
-      const start = await spacesApi.beginProviderConnection(
-        spaceId,
-        "google",
-        `/spaces/${spaceId}/settings/connections`,
+      const accounts = await connectionsApi.list();
+      const reusable = accounts.connections.find(
+        (connection) =>
+          connection.provider === "google" &&
+          connection.status === "active" &&
+          connection.capabilities?.includes("calendar_write"),
       );
-      await openExternalLink(start.authorization_url);
+      if (reusable) {
+        const bound = await spacesApi.bindAccountConnection(
+          spaceId,
+          "google",
+          reusable.id,
+          "calendar_write",
+        );
+        setConnections((current) => [
+          ...current.filter((connection) => connection.id !== bound.integration.id),
+          bound.integration,
+        ]);
+      } else {
+        const start = await connectionsApi.authorize(
+          "google",
+          ["calendar_write"],
+          `/spaces/${spaceId}/settings/connections`,
+        );
+        await openExternalLink(start.authorization_url);
+      }
     } catch {
       setError("Google Calendar could not start connecting. Try again in a moment.");
     } finally {

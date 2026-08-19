@@ -1,4 +1,5 @@
 import type {
+  SpaceEvent,
   SpaceMember,
   SpaceMessage,
   SpaceStudioResource,
@@ -10,8 +11,35 @@ export function mergeSpaceMessages(
   incoming: SpaceMessage[],
 ): SpaceMessage[] {
   const byId = new Map(current.map((item) => [item.id, item]));
-  for (const item of incoming) byId.set(item.id, item);
+  for (const item of incoming) {
+    if (item.client_nonce) {
+      for (const [id, existing] of byId) {
+        if (id !== item.id && existing.client_nonce === item.client_nonce) byId.delete(id);
+      }
+    }
+    byId.set(item.id, item);
+  }
   return [...byId.values()].sort((left, right) => left.seq - right.seq);
+}
+
+/** Message events carry the full record when it can be applied without a refetch. */
+export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefined {
+  const payload = event.payload;
+  if (
+    !event.type.startsWith("message.") ||
+    typeof payload.id !== "string" ||
+    typeof payload.space_id !== "string" ||
+    typeof payload.seq !== "number" ||
+    !Array.isArray(payload.content) ||
+    !Array.isArray(payload.file_node_ids) ||
+    typeof payload.sender_user_id !== "string" ||
+    typeof payload.sender_name !== "string" ||
+    typeof payload.sender_kind !== "string" ||
+    typeof payload.created_at !== "string"
+  ) {
+    return undefined;
+  }
+  return payload as unknown as SpaceMessage;
 }
 
 export function buildMessageSpans(

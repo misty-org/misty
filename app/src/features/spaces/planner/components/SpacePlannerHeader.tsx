@@ -1,56 +1,32 @@
-import { LoaderCircle, Plus, RefreshCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { SiGooglecalendar } from "react-icons/si";
-
-import type { SpaceCalendarSource } from "@/api/spaces/dto/interfaces/types";
-import {
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/shared/ui";
+import { Badge, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 
 /** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
   query,
   activeFilterCount,
-  sources,
   loading,
   canManage,
-  canManageIntegrations,
-  calendarImportAvailable,
   filters,
   onQuery,
   onSync,
-  onImport,
   onCreate,
 }: {
   query: string;
   activeFilterCount: number;
-  sources: SpaceCalendarSource[];
   loading: boolean;
   canManage: boolean;
-  canManageIntegrations: boolean;
-  calendarImportAvailable: boolean;
   /** Filter controls, shown only when the user opens the popover. */
   filters: ReactNode;
   onQuery: (value: string) => void;
   onSync: () => void;
-  onImport: () => void;
   onCreate: () => void;
 }) {
   // The search field stays collapsed until wanted, but never hides a live query.
   const [searchOpen, setSearchOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const showSearch = searchOpen || Boolean(query);
-  const needsAttention = sources.some((source) => source.status !== "active");
 
   return (
     <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
@@ -120,45 +96,21 @@ export function SpacePlannerHeader({
           </PopoverContent>
         </Popover>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              aria-label="Sync planner"
-              className="relative size-8 text-cream-muted/70 shadow-none hover:text-cream"
-              size="icon"
-              title="Sync planner"
-              variant="ghost"
-              type="button"
-            >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <RefreshCcw className="size-4" aria-hidden />
-              )}
-              {needsAttention ? (
-                <span
-                  className="absolute right-1 top-1 size-1.5 rounded-full bg-sage-bg"
-                  aria-hidden
-                />
-              ) : null}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onSync}>
-              <RefreshCcw />
-              Sync now
-            </DropdownMenuItem>
-            {canManageIntegrations && calendarImportAvailable ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={onImport}>
-                  <SiGooglecalendar />
-                  {sources.length ? "Manage calendars" : "Import from Google Calendar"}
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          aria-label="Refresh tasks"
+          className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
+          size="icon"
+          title="Refresh tasks"
+          variant="ghost"
+          type="button"
+          onClick={onSync}
+        >
+          {loading ? (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <RotateCw className="size-4" aria-hidden />
+          )}
+        </Button>
 
         {canManage ? (
           <Button className="h-8 gap-1.5 text-xs" type="button" onClick={onCreate}>

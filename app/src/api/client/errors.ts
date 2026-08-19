@@ -18,6 +18,8 @@ export function apiErrorMessage(code: string | undefined, fallback: string): str
     account_changed: "Wait for the account switch to finish.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not complete that request. Try again in a moment.",
+    mail_provider_mailbox_unavailable:
+      "This Microsoft account has no Outlook mailbox. Use it in Files for OneDrive, or connect an Outlook.com or Microsoft 365 mailbox.",
   };
   return code && messages[code] ? messages[code] : fallback.trim() || "The Misty request failed.";
 }

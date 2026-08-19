@@ -5,6 +5,7 @@ import { useExplorerStore } from "@/features/files/explorer";
 import { resetSearchAccountState } from "@/features/files/search";
 import type { CurrentLicense } from "@/features/installer";
 import { resetNotesAccountState } from "@/features/notes";
+import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState, useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
@@ -28,6 +29,7 @@ export function resetAccountScopedState(): void {
   resetSpacesAccountState();
   resetAllAgentAccountState();
   resetNotesAccountState();
+  resetConnectionsAccountState();
 }
 export function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();

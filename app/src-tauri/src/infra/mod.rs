@@ -1,11 +1,32 @@
 #[cfg(desktop)]
 pub mod agent_device_identity;
 pub mod agents;
+#[cfg(target_os = "macos")]
+pub mod app_menu;
 pub mod autostart;
+#[cfg(desktop)]
+pub mod browser;
+#[cfg(desktop)]
+mod browser_macos;
+#[cfg(desktop)]
+mod browser_scripts;
 pub mod claude;
+pub(crate) mod cloud_handoff;
+#[cfg(desktop)]
+pub mod code_git;
+#[cfg(desktop)]
+pub mod code_git_remote;
+#[cfg(desktop)]
+pub mod code_lsp;
+#[cfg(desktop)]
+pub mod code_watcher;
+#[cfg(desktop)]
+pub mod code_workspace;
+pub mod command_defaults;
 pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
+pub mod credential_store;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;
@@ -23,6 +44,7 @@ pub mod extension_tools;
 pub mod file_sync;
 pub mod keychain;
 mod macos_privacy;
+pub mod mail_cache;
 #[cfg(desktop)]
 pub mod media_search;
 pub mod metadata;
@@ -45,10 +67,14 @@ pub mod settings;
 mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
+#[cfg(desktop)]
+pub mod ssh_terminal;
 pub mod storage;
 pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
+#[cfg(desktop)]
+pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;

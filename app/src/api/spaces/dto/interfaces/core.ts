@@ -47,7 +47,7 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "google" | "discord" | "notion";
+export type SpaceIntegrationProvider = "google" | "discord" | "slack" | "notion" | "github";
 
 export interface SpaceTemplateSeedSummary {
   task_count: number;
@@ -189,6 +189,10 @@ export interface GoogleCalendarChoice {
 export interface SpaceMessage {
   seq: number;
   id: string;
+  /** Echoed on create responses/events to reconcile a client-side optimistic row. */
+  client_nonce?: string;
+  /** Client-only state; confirmed server messages omit it. */
+  local_delivery_state?: "sending" | "failed";
   space_id: string;
   conversation_id?: string;
   sender_user_id: string;

@@ -35,6 +35,7 @@ export function createSpaceContentActions(
       libraryItemIds = [],
       replyToMessageId = "",
       selectedAgentIdsByLabel = {},
+      optimisticMessage,
     ) => {
       const trimmed = text.trim();
       if (
@@ -44,16 +45,29 @@ export function createSpaceContentActions(
         fileNodeIds.length === 0
       )
         return;
-      set({ sending: true, error: null });
+      set((state) => ({
+        sending: true,
+        error: null,
+        messagesBySpace: optimisticMessage
+          ? {
+              ...state.messagesBySpace,
+              [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [
+                optimisticMessage,
+              ]),
+            }
+          : state.messagesBySpace,
+      }));
       try {
-        const spans = trimmed
-          ? buildMessageSpans(
-              trimmed,
-              get().membersBySpace[spaceId] ?? [],
-              get().agentsBySpace[spaceId] ?? [],
-              selectedAgentIdsByLabel,
-            )
-          : [];
+        const spans =
+          optimisticMessage?.content ??
+          (trimmed
+            ? buildMessageSpans(
+                trimmed,
+                get().membersBySpace[spaceId] ?? [],
+                get().agentsBySpace[spaceId] ?? [],
+                selectedAgentIdsByLabel,
+              )
+            : []);
         const response = await spacesApi.sendMessage(
           spaceId,
           spans,
@@ -61,7 +75,11 @@ export function createSpaceContentActions(
           attachmentIds,
           libraryItemIds,
           replyToMessageId,
+          optimisticMessage?.client_nonce,
         );
+        if (optimisticMessage?.client_nonce) {
+          response.message.client_nonce ||= optimisticMessage.client_nonce;
+        }
         response.message.triggered_runs = response.triggered_runs;
         set((state) => ({
           sending: false,
@@ -72,7 +90,21 @@ export function createSpaceContentActions(
           },
         }));
       } catch (error) {
-        set({ sending: false, error: errorText(error) });
+        set((state) => ({
+          sending: false,
+          error: errorText(error),
+          messagesBySpace: optimisticMessage
+            ? {
+                ...state.messagesBySpace,
+                [spaceId]: (state.messagesBySpace[spaceId] ?? []).map((message) =>
+                  message.client_nonce === optimisticMessage.client_nonce &&
+                  message.local_delivery_state === "sending"
+                    ? { ...message, local_delivery_state: "failed" as const }
+                    : message,
+                ),
+              }
+            : state.messagesBySpace,
+        }));
         throw error;
       }
     },

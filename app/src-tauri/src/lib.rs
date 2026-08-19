@@ -29,7 +29,8 @@ use app::commands::{
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
-    clipboard_write_file_bytes, clipboard_write_file_refs, compare_apply_text_merge, compare_files,
+    clipboard_write_file_bytes, clipboard_write_file_refs, coding_ai_clear_api_key,
+    coding_ai_read_api_key, coding_ai_write_api_key, compare_apply_text_merge, compare_files,
     compare_folders, devices_snapshot, devices_unmount, duplicates_cancel,
     duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
     explorer_cancel_drag_preparation, explorer_create_item, explorer_delete_items,
@@ -44,12 +45,13 @@ use app::commands::{
     explorer_save_preview_item, explorer_set_open_association, extension_command_run,
     file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
     file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
-    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, notes_store_asset,
-    open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
-    operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
-    operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
-    operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
-    operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
+    file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
+    mail_cache_remove, mail_cache_write, notes_store_asset, open_terminal_at_path,
+    operation_queue_cancel, operation_queue_cancel_batch, operation_queue_clear_terminal,
+    operation_queue_pause, operation_queue_pause_all, operation_queue_pause_batch,
+    operation_queue_redo, operation_queue_resolve_conflict, operation_queue_resume,
+    operation_queue_resume_all, operation_queue_resume_batch, operation_queue_retry,
+    operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
     plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
     providers_backend_actions, providers_config_paths, providers_config_security,
@@ -62,12 +64,13 @@ use app::commands::{
     search_start_scan, self_host_entitlement_load, self_host_entitlement_store,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, shortcuts_save, shortcuts_snapshot, smart_library_apply_results,
-    smart_library_assets_page, smart_library_delete, smart_library_import_files,
-    smart_library_preflight_import, smart_library_prepare_previews, smart_library_resolve_assets,
-    smart_library_scan, smart_library_search, smart_library_set_server_folder_id,
-    smart_library_snapshot, storage_snapshot, transfers_delete_all, transfers_delete_selected,
-    transfers_snapshot, workspaces_save, workspaces_snapshot,
+    settings_snapshot, shortcuts_reset, shortcuts_save, shortcuts_snapshot,
+    smart_library_apply_results, smart_library_assets_page, smart_library_delete,
+    smart_library_import_files, smart_library_preflight_import, smart_library_prepare_previews,
+    smart_library_resolve_assets, smart_library_scan, smart_library_search,
+    smart_library_set_server_folder_id, smart_library_snapshot, storage_snapshot,
+    transfers_delete_all, transfers_delete_selected, transfers_snapshot, workspaces_save,
+    workspaces_snapshot,
 };
 #[cfg(target_os = "android")]
 use app::commands::{
@@ -75,6 +78,31 @@ use app::commands::{
     android_open_all_files_access_settings,
 };
 use app::runtime::MistyRuntime;
+#[cfg(desktop)]
+use infra::browser::{
+    browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
+    browser_webview_back, browser_webview_close, browser_webview_create, browser_webview_forward,
+    browser_webview_hide, browser_webview_navigate, browser_webview_reconcile,
+    browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
+    browser_webview_show, browser_webviews_hide_all, browser_webviews_set_overlay_active,
+    BrowserSessionState,
+};
+#[cfg(desktop)]
+use infra::code_git::{code_git_diff, code_git_status};
+#[cfg(desktop)]
+use infra::code_git_remote::{
+    code_git_clone, code_git_commit, code_git_create_branch, code_git_fetch, code_git_push,
+    code_git_workspace_id,
+};
+#[cfg(desktop)]
+use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
+#[cfg(desktop)]
+use infra::code_watcher::{code_stop_watch, code_watch_dir};
+#[cfg(desktop)]
+use infra::code_workspace::{
+    code_create_file, code_create_folder, code_delete_path, code_find_in_files,
+    code_read_text_file, code_rename_path, code_walk_files, code_write_text_file,
+};
 use infra::misty::{
     check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
     install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
@@ -83,6 +111,14 @@ use infra::misty::{
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
+};
+#[cfg(desktop)]
+use infra::ssh_terminal::{
+    terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
+};
+#[cfg(desktop)]
+use infra::terminal::{
+    terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
 #[cfg(desktop)]
 use infra::tray;
@@ -126,7 +162,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .setup(|app| {
+        .setup(move |app| {
             #[cfg(any(target_os = "ios", target_os = "android"))]
             let runtime = {
                 let data_root = app
@@ -143,12 +179,16 @@ pub fn run() {
             let runtime = MistyRuntime::new();
             app.manage(runtime);
             #[cfg(desktop)]
+            app.manage(BrowserSessionState::default());
+            #[cfg(desktop)]
             if let Err(error) = tray::setup(app) {
                 let error = std::io::Error::other(error);
                 telemetry::PostHogTelemetryReporter
                     .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
                 return Err(error.into());
             }
+            #[cfg(target_os = "macos")]
+            infra::app_menu::setup(app)?;
             #[cfg(target_os = "macos")]
             infra::devices::start_device_change_listener(app.handle().clone());
             Ok(())
@@ -160,12 +200,17 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
-        tray::handle_menu_event(app, event.id().as_ref());
+        let id = event.id().as_ref();
+        #[cfg(target_os = "macos")]
+        if infra::app_menu::handle_menu_event(app, id) {
+            return;
+        }
+        tray::handle_menu_event(app, id);
     });
 
     builder
         .on_window_event(|window, event| {
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 if window.label() != "main" {
                     return;
@@ -188,6 +233,8 @@ pub fn run() {
                     size: tauri::Size::Physical(*size),
                 });
             }
+            #[cfg(target_os = "macos")]
+            let _ = (window, event);
         })
         .invoke_handler(tauri::generate_handler![
             mac_rounded_corners::enable_rounded_corners,
@@ -198,6 +245,9 @@ pub fn run() {
             app_snapshot,
             app_environment_snapshot,
             app_configure_server,
+            mail_cache_read,
+            mail_cache_write,
+            mail_cache_remove,
             self_host_entitlement_store,
             self_host_entitlement_load,
             agents_device_snapshot,
@@ -255,6 +305,96 @@ pub fn run() {
             uninstall_plugin,
             get_misty_process_status,
             open_external_url,
+            #[cfg(desktop)]
+            terminal_create,
+            #[cfg(desktop)]
+            terminal_write,
+            #[cfg(desktop)]
+            terminal_resize,
+            #[cfg(desktop)]
+            terminal_interrupt,
+            #[cfg(desktop)]
+            terminal_kill,
+            #[cfg(desktop)]
+            terminal_ssh_environments,
+            #[cfg(desktop)]
+            terminal_ssh_preflight,
+            #[cfg(desktop)]
+            terminal_ssh_trust_host,
+            #[cfg(desktop)]
+            code_read_text_file,
+            #[cfg(desktop)]
+            code_write_text_file,
+            #[cfg(desktop)]
+            code_create_file,
+            #[cfg(desktop)]
+            code_create_folder,
+            #[cfg(desktop)]
+            code_rename_path,
+            #[cfg(desktop)]
+            code_delete_path,
+            #[cfg(desktop)]
+            code_walk_files,
+            #[cfg(desktop)]
+            code_find_in_files,
+            #[cfg(desktop)]
+            code_git_status,
+            #[cfg(desktop)]
+            code_git_diff,
+            #[cfg(desktop)]
+            code_git_workspace_id,
+            #[cfg(desktop)]
+            code_git_clone,
+            #[cfg(desktop)]
+            code_git_fetch,
+            #[cfg(desktop)]
+            code_git_push,
+            #[cfg(desktop)]
+            code_git_create_branch,
+            #[cfg(desktop)]
+            code_git_commit,
+            #[cfg(desktop)]
+            code_watch_dir,
+            #[cfg(desktop)]
+            code_stop_watch,
+            #[cfg(desktop)]
+            code_lsp_start,
+            #[cfg(desktop)]
+            code_lsp_send,
+            #[cfg(desktop)]
+            code_lsp_stop,
+            #[cfg(desktop)]
+            browser_webview_create,
+            #[cfg(desktop)]
+            browser_webview_set_bounds,
+            #[cfg(desktop)]
+            browser_webview_reconcile,
+            #[cfg(desktop)]
+            browser_webview_set_theme,
+            #[cfg(desktop)]
+            browser_webview_navigate,
+            #[cfg(desktop)]
+            browser_webview_back,
+            #[cfg(desktop)]
+            browser_webview_forward,
+            #[cfg(desktop)]
+            browser_webview_reload,
+            #[cfg(desktop)]
+            browser_webview_show,
+            #[cfg(desktop)]
+            browser_webviews_set_overlay_active,
+            #[cfg(desktop)]
+            browser_webview_hide,
+            #[cfg(desktop)]
+            browser_webviews_hide_all,
+            #[cfg(desktop)]
+            browser_webview_close,
+            #[cfg(desktop)]
+            browser_agent_grant_register,
+            #[cfg(desktop)]
+            browser_agent_grant_revoke,
+            #[cfg(desktop)]
+            browser_agent_execute,
             storage_snapshot,
             clipboard_snapshot,
             clipboard_set_local,
@@ -356,8 +496,12 @@ pub fn run() {
             settings_apply_launch_on_login,
             settings_open_with_associations,
             settings_remove_open_with_association,
+            coding_ai_read_api_key,
+            coding_ai_write_api_key,
+            coding_ai_clear_api_key,
             shortcuts_snapshot,
             shortcuts_save,
+            shortcuts_reset,
             #[cfg(desktop)]
             plugin_commands_snapshot,
             #[cfg(desktop)]

@@ -7,12 +7,13 @@ import {
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
+import { invoke } from "@tauri-apps/api/core";
 
 const leaseHeartbeatMs = 20_000;
 const activePollMs = 750;
 const idlePollMs = 4_000;
 const hiddenPollMs = 15_000;
-const nodeExecutionTimeoutMs = 60_000;
+const nodeExecutionTimeoutMs = 5 * 60_000;
 
 export class DesktopAgentJobWorker {
   private stopped = true;
@@ -108,6 +109,12 @@ async function claimNextWorkflowNodeJob(
 async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
 ): Promise<Record<string, unknown>> {
+  if (job.operation.startsWith("browser.")) {
+    await registerRunBoundBrowserContext(job);
+    return invoke<Record<string, unknown>>("browser_agent_execute", {
+      request: browserAgentExecutionRequest(job),
+    });
+  }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);
   }
@@ -143,6 +150,53 @@ async function executeWorkflowNodeOnDevice(
     truncated: document.truncated,
     sourceChanged: false,
   };
+}
+
+export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
+  const contextId = job.contextId;
+  if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
+    throw new Error("invalid_browser_grant");
+  }
+  const agentId =
+    job.config && typeof job.config === "object" && "agentId" in job.config
+      ? String(job.config.agentId)
+      : "";
+  if (!agentId) throw new Error("invalid_browser_grant");
+  return {
+    scopeId: job.scopeId,
+    grantId: contextId,
+    agentId,
+    operation: job.operation,
+    input: job.input && typeof job.input === "object" ? job.input : {},
+  };
+}
+
+async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]): Promise<void> {
+  const contextId = job.contextId;
+  const config =
+    job.config && typeof job.config === "object" ? (job.config as Record<string, unknown>) : {};
+  const agentId = String(config.agentId || "");
+  const capabilities = Array.isArray(config.contextCapabilities)
+    ? config.contextCapabilities.map(String)
+    : [];
+  const expiresAt = String(config.contextExpiresAt || "");
+  if (!contextId || !agentId || !expiresAt || capabilities.length === 0) {
+    throw new Error("invalid_browser_grant");
+  }
+  await invoke("browser_agent_grant_register", {
+    request: {
+      id: browserRuntimeIdForScope(job.scopeId),
+      scopeId: job.scopeId,
+      grantId: contextId,
+      agentId,
+      capabilities,
+      expiresAt,
+    },
+  });
+}
+
+function browserRuntimeIdForScope(scopeId: string): string {
+  return scopeId.startsWith("scope-") ? scopeId.slice("scope-".length) : scopeId;
 }
 
 export function deviceContentReference(
@@ -190,6 +244,12 @@ export function deviceWorkflowErrorCode(error: unknown): string {
   if (message.includes("unsupported_content")) return "unsupported_content";
   if (message.includes("invalid_device_scope")) return "invalid_scope";
   if (message.includes("unsupported_device_operation")) return "unsupported_operation";
+  if (message.includes("invalid_browser_grant") || message.includes("not active"))
+    return "browser_grant_invalid";
+  if (message.includes("not open") || message.includes("not running")) return "browser_tab_closed";
+  if (message.includes("timed out")) return "browser_timeout";
+  if (message.includes("inspect it again") || message.includes("page changed"))
+    return "browser_snapshot_stale";
   if (message.includes("device_node_timeout")) return "device_timeout";
   return "device_execution_failed";
 }
@@ -233,6 +293,7 @@ export interface ClaimedWorkflowNodeJob {
     nodeId: string;
     scopeId: string;
     operation: string;
+    contextId?: string;
     attempt: number;
     input: unknown;
     config: unknown;

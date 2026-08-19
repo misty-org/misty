@@ -18,6 +18,8 @@ Misty is a React product with a native Tauri shell for desktop, iPad, and Androi
 
 ## Setup
 
+Desktop Browser tabs use Tauri child WebViews and the operating system's WebView runtime: WebKit on macOS and Linux, and WebView2 on Windows. Misty does not download or bundle a separate browser engine. Linux development and CI require the WebKitGTK 4.1 development packages for the distribution.
+
 From the monorepo root:
 
 ```sh
@@ -76,6 +78,8 @@ misty desktop dev --profile collaborator
 Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/.profiles/<profile>` for profile-scoped session metadata, while Misty's normal files, assets, remotes, cache, and database stay rooted in `~/.misty`.
 
 The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
+
+Browser agent access is device-local and opt-in per tab. Selecting an Agent creates a visible, revocable eight-hour grant for inspect, navigate, click, and download-status tools; grants never survive an app restart. External pages receive no Tauri API permissions, and downloads are assigned collision-safe names in the operating system Downloads folder by the native WebView handler.
 
 Desktop development, cleanup, icons, Windows staging, and manual releases are owned by `misty`. Tauri's native iOS and Android projects remain available through the standard Tauri CLI.
 

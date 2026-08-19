@@ -1,6 +1,6 @@
 import { Button, cn } from "@/shared/ui";
 import { type LucideIcon, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
@@ -26,39 +26,48 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       >
         <nav className="flex min-h-0 flex-col gap-4" aria-label={props.navigationLabel}>
           <div className="grid gap-1">
-            {props.hideNavigationLabel ? null : (
-              <div className="px-2 pb-1 text-[11px] font-medium text-cream-muted">
-                {overlay ? props.navigationLabel : props.navigationTitle}
-              </div>
-            )}
-            {props.items.map((item) => {
+            {props.items.map((item, index) => {
               const Icon = item.icon;
               const active = props.activeId === item.id;
+              // Group captions use the global navigator's section-header
+              // treatment so the two rails read as the same component.
+              const startsGroup =
+                item.group !== undefined && item.group !== props.items[index - 1]?.group;
               return (
-                <Button
-                  key={item.id}
-                  type="button"
-                  variant="ghost"
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "misty-marker-host h-10 w-full justify-start gap-3 px-3 text-sm font-medium",
-                    "transition-none active:not-aria-[haspopup]:translate-y-0",
-                    active
-                      ? "misty-active-marker-side text-cream-bright"
-                      : "text-cream-muted hover:text-cream",
-                  )}
-                  onClick={() => props.onSelect(item.id)}
-                >
-                  <span
+                <Fragment key={item.id}>
+                  {startsGroup && item.groupLabel ? (
+                    <div
+                      className={cn(
+                        "flex h-8 shrink-0 items-center px-2.5",
+                        index > 0 ? "mb-1 mt-3" : "mb-1",
+                      )}
+                    >
+                      <h2 className="min-w-0 flex-1 text-sm font-semibold tracking-[0.03em] text-cream-faint">
+                        {item.groupLabel}
+                      </h2>
+                    </div>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-current={active ? "page" : undefined}
                     className={cn(
-                      "grid size-4 shrink-0 place-items-center transition-colors",
-                      active ? "text-cream" : "text-cream-muted",
+                      "h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-sm font-medium",
+                      "text-cream-muted transition-colors active:not-aria-[haspopup]:translate-y-0",
+                      "hover:bg-charcoal-card hover:text-cream-bright",
+                      "focus-visible:ring-2 focus-visible:ring-charcoal-active",
+                      active && "bg-charcoal-card text-cream-bright",
                     )}
+                    onClick={() => props.onSelect(item.id)}
                   >
-                    <Icon className="size-4" strokeWidth={1.8} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                </Button>
+                    {/* Icons inherit the row's colour, so hover and selection
+                        move the whole row at once, as in the global navigator. */}
+                    <span className="grid size-4 shrink-0 place-items-center">
+                      <Icon className="size-4" strokeWidth={1.8} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                  </Button>
+                </Fragment>
               );
             })}
           </div>
@@ -76,16 +85,9 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
-                  {props.title}
-                </h1>
-                {props.description ? (
-                  <p className="min-w-0 truncate text-xs text-cream-muted max-[760px]:hidden">
-                    {props.description}
-                  </p>
-                ) : null}
-              </div>
+              <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
+                {props.title}
+              </h1>
             </div>
             {overlay ? (
               <Button
@@ -167,17 +169,18 @@ export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;
   label: string;
   icon: LucideIcon;
+  /** Adjacent entries sharing a group are drawn together. */
+  group?: string;
+  /** Caption shown above the first entry of a group. Omit for an unlabeled break. */
+  groupLabel?: string;
 }
 
 export interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;
   ariaLabel: string;
   children: ReactNode;
-  description?: ReactNode;
-  hideNavigationLabel?: boolean;
   items: readonly DesktopSettingsNavEntry<Id>[];
   navigationLabel: string;
-  navigationTitle: string;
   onClose?: () => void;
   onSelect: (id: Id) => void;
   presentation?: "page" | "overlay";

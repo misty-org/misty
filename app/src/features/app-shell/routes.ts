@@ -4,12 +4,12 @@ export const routes = {
   accountRegister: "/account/register",
   accountSettings: "/account/settings",
   accountSignIn: "/account/signin",
-  activity: "/activity",
   agents: "/agents",
   // Legacy path, kept so saved bookmarks and misty:// deep links still resolve.
   // LegacyAgentRedirect forwards it to `agents`.
   assistant: "/assistant",
   automations: "/automations",
+  browser: "/browser",
   changelog: "/changelog",
   code: "/code",
   diagnostics: "/diagnostics",
@@ -17,6 +17,7 @@ export const routes = {
   extensions: "/extensions",
   files: "/files",
   home: "/home",
+  inbox: "/inbox",
   invite: "/invite",
   library: "/library",
   spaces: "/spaces",
@@ -28,4 +29,5 @@ export const routes = {
   settings: "/settings",
   signIn: "/signin",
   transfers: "/transfers",
+  terminal: "/terminal",
 } as const;

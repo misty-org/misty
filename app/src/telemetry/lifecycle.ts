@@ -21,7 +21,10 @@ export class AnalyticsLifecycleManager {
     private readonly storage: Pick<Storage, "getItem" | "setItem">,
     private readonly metadata: () => Promise<CommonClientProperties>,
     private readonly now: () => number = Date.now,
-    private readonly uuid: () => string = () => crypto.randomUUID(),
+    private readonly uuid: () => string = () =>
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
   ) {
     this.lastActivity = now();
     try {

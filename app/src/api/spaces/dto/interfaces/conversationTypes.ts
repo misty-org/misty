@@ -39,7 +39,7 @@ export interface SpaceConversation {
   direct_user_id?: string;
   direct_agent_id?: string;
   participants: SpaceParticipant[];
-  origin: "misty" | "discord";
+  origin: "misty" | "discord" | "slack";
   integration_id?: string;
   external_resource_id?: string;
   external_display_name?: string;

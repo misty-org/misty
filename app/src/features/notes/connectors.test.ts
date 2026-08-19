@@ -14,6 +14,7 @@ import { createMistyNativeNotesConnector } from "./connectors/mistyNativeNotes";
 import { createNotionConnector } from "./connectors/notion";
 import { createDefaultNotesRegistry, NotesConnectorRegistry } from "./connectors/registry";
 import { createFakeNotionClient, notionPage } from "./fakeNotionClient.fixture";
+import { setNotionScope } from "./store/notionApi";
 
 const spaceInput = { spaceId: "space-product", spaceName: "Product" };
 
@@ -136,11 +137,40 @@ describe("NotionConnector", () => {
 });
 
 describe("NotesConnectorRegistry", () => {
-  it("registers only native Misty notes in the beta default registry", () => {
+  it("registers native Misty notes and the Notion connector by default", () => {
     const registry = createDefaultNotesRegistry("account-1");
     expect(registry.forSource("misty")?.providerId).toBe("misty");
-    expect(registry.forSource("notion")).toBeUndefined();
-    expect(registry.list().map((connector) => connector.providerId)).toEqual(["misty"]);
+    expect(registry.forSource("notion")?.providerId).toBe("notion");
+    expect(registry.list().map((connector) => connector.providerId)).toEqual(["misty", "notion"]);
+  });
+
+  it("uses server-selected Notion resources instead of device-local source scope", async () => {
+    window.localStorage.setItem(
+      "misty.notes.notion.sources.account-1.space-product",
+      JSON.stringify(["local-only-page"]),
+    );
+    setNotionScope("account-1", "space-product");
+    spaceRequestMock.mockImplementation(async (path: string) => {
+      if (path.endsWith("/status")) return { connected: true };
+      if (path.endsWith("/sources")) {
+        return { sources: [{ id: "server-page", kind: "page", title: "Server page" }] };
+      }
+      if (path.includes("/databases/server-page/query")) throw new Error("not a database");
+      if (path.endsWith("/pages/server-page")) return notionPage("server-page", "Server page");
+      if (path.endsWith("/pages/server-page/blocks")) return { blocks: [] };
+      if (path.endsWith("/notes")) return { notes: [] };
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const connector = createDefaultNotesRegistry("account-1", "space-product", "Product").forSource(
+      "notion",
+    )!;
+    const notes = await connector.listNotes();
+
+    expect(notes.map((note) => note.sourceId)).toEqual(["server-page"]);
+    expect(
+      spaceRequestMock.mock.calls.some(([path]) => String(path).includes("local-only-page")),
+    ).toBe(false);
   });
 
   it("merges notes from every connector", async () => {
@@ -149,7 +179,7 @@ describe("NotesConnectorRegistry", () => {
     });
     const notion = createNotionConnector(
       createFakeNotionClient({ pages: { "page-1": notionPage("page-1", "Roadmap") } }).client,
-      { initialStatus: "connected" },
+      { initialStatus: "connected", selectedSourceIds: [] },
     );
     await notion.selectSources!(["page-1"]);
     const registry = new NotesConnectorRegistry([

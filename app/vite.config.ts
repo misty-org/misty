@@ -2,6 +2,14 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
+import { createRequire } from "node:module";
+import { dirname } from "node:path";
+
+// The Vite root is `app/`, but dependencies install at the repo root.
+// Resolving through Node keeps the icon glob working wherever npm hoists it.
+const materialIconThemeDir = dirname(
+  createRequire(import.meta.url).resolve("material-icon-theme/package.json"),
+);
 
 const tauriDevHost = process.env.TAURI_DEV_HOST;
 const desktopDevPort = Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173);
@@ -17,16 +25,10 @@ export default defineConfig(({ command, mode }) => {
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   if (command === "build" && mode === "web" && !publicApiUrl) {
-    throw new Error(
-      "Web builds require MISTY_PUBLIC_API_URL to point at the deployed Misty API.",
-    );
+    throw new Error("Web builds require MISTY_PUBLIC_API_URL to point at the deployed Misty API.");
   }
   const uploadSourceMaps = Boolean(
-    command === "build" &&
-      sourceMapKey &&
-      posthogProjectId &&
-      posthogHost &&
-      mode !== "test",
+    command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",
   );
 
   return {
@@ -43,9 +45,7 @@ export default defineConfig(({ command, mode }) => {
                 enabled: true,
                 releaseName: "misty-desktop",
                 releaseVersion:
-                  process.env.GITHUB_SHA ??
-                  process.env.MISTY_RELEASE_VERSION ??
-                  "0.1.0",
+                  process.env.GITHUB_SHA ?? process.env.MISTY_RELEASE_VERSION ?? "0.1.0",
                 deleteAfterUpload: true,
               },
             }),
@@ -53,9 +53,7 @@ export default defineConfig(({ command, mode }) => {
         : []),
     ],
     define: {
-      "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(
-        posthogToken ?? "",
-      ),
+      "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
       "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
       // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
       // Vite's internal alias keeps non-VITE server secrets out of the bundle.
@@ -65,6 +63,7 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: {
         "@": new URL("./src", import.meta.url).pathname,
+        "#material-icon-theme": materialIconThemeDir,
       },
     },
     build: {

@@ -15,7 +15,10 @@ const UPLOAD_CONCURRENCY = 2;
 export function useLibraryUploads(data: SpaceLibraryData, reload: () => Promise<void>) {
   const { spaceId, canUploadLibrary, setUploadJobs, setLocalError } = data;
 
-  const uploadFiles = async (paths: string[]) => {
+  const uploadFiles = async (
+    paths: string[],
+    importSources: Record<string, LibraryProviderImportSource> = {},
+  ) => {
     if (!canUploadLibrary || paths.length === 0) return;
     setLocalError("");
 
@@ -50,7 +53,13 @@ export function useLibraryUploads(data: SpaceLibraryData, reload: () => Promise<
               updateJob(job.id, { stage, progress: stage === "finalizing" ? 1 : 0 }),
             onProgress: (progress) => updateJob(job.id, { progress }),
           });
-          if (result.item) uploaded.push(result.item);
+          if (result.item) {
+            const source = importSources[job.path];
+            const item = source
+              ? await spacesApi.setLibraryProviderImport(spaceId, result.item.id, source)
+              : result.item;
+            uploaded.push(item);
+          }
           updateJob(job.id, { stage: "ready", progress: 1 });
         } catch (error) {
           updateJob(job.id, {
@@ -73,4 +82,12 @@ export function useLibraryUploads(data: SpaceLibraryData, reload: () => Promise<
   };
 
   return { uploadFiles };
+}
+
+export interface LibraryProviderImportSource {
+  provider: string;
+  remoteName: string;
+  remotePath: string;
+  connectionId?: string;
+  connectionSource?: "connected_account" | "legacy_cloud";
 }

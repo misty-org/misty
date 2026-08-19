@@ -5,6 +5,7 @@ import {
   settingsRemoveOpenWithAssociation,
   settingsSave,
   settingsSnapshot,
+  shortcutsReset,
   shortcutsSave,
   shortcutsSnapshot,
 } from "@/native";
@@ -14,14 +15,20 @@ import type {
   SettingsSnapshot,
   ShortcutsSnapshot,
 } from "@/native/contracts";
+import { configureStartupPreference } from "@/features/app-shell";
+import { configureBrowserHomeUrl, configureBrowserSearchEngine } from "@/features/workspace";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { configureExternalLinkPreference } from "@/shared/platform/openExternalLink";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
-import { selectGeneralPreferences, settingsBoolean, settingsNumber } from "./preferences";
-import { settingsIndexToThemeMode, useAppThemeStore } from "./useAppThemeStore";
-export type { SettingsScaleToken, SettingsSection, SettingValue } from "../types/store";
+import {
+  selectGeneralPreferences,
+  settingsBoolean,
+  settingsNumber,
+  settingsString,
+} from "./preferences";
+export type { SettingsSection, SettingValue } from "../types/store";
 export * from "./preferences";
 
 let settingsSaveSequence = 0;
@@ -29,7 +36,6 @@ let settingsSaveSequence = 0;
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
   settings: null,
-  settingsText: "{}",
   launchOnLogin: null,
   openWithAssociations: [],
   shortcuts: null,
@@ -51,7 +57,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       applySettingsSideEffects(normalizedSettings.document);
       set({
         settings: normalizedSettings,
-        settingsText: JSON.stringify(normalizedSettings.document, null, 2),
         launchOnLogin,
         openWithAssociations,
         shortcuts,
@@ -68,8 +73,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setActiveSection: (activeSection) => set({ activeSection }),
 
-  setSettingsText: (settingsText) => set({ settingsText }),
-
   updateSetting: (section, key, value) => {
     const requestId = ++settingsSaveSequence;
     const current = get().settings;
@@ -84,7 +87,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     set({
       settings: current ? { ...current, document } : { path: "", document },
-      settingsText: JSON.stringify(document, null, 2),
       error: null,
       message: null,
     });
@@ -103,7 +105,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         applySettingsSideEffects(settings.document);
         set({
           settings,
-          settingsText: JSON.stringify(settings.document, null, 2),
           ...(launchOnLogin ? { launchOnLogin } : {}),
         });
       })
@@ -111,33 +112,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         if (requestId !== settingsSaveSequence) return;
         set({
           settings: current,
-          settingsText: JSON.stringify(current?.document ?? {}, null, 2),
           error: errorText(error),
         });
       });
-  },
-
-  saveSettingsDocument: async () => {
-    set({ working: true, error: null, message: null });
-    try {
-      const parsed = JSON.parse(get().settingsText) as unknown;
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-        throw new Error("Settings must be a JSON object.");
-      }
-      await applyLaunchOnLoginFromDocument(parsed as Record<string, unknown>);
-      const settings = await settingsSave({ document: parsed as Record<string, unknown> });
-      applySettingsSideEffects(settings.document);
-      set({
-        settings,
-        settingsText: JSON.stringify(settings.document, null, 2),
-        openWithAssociations: await settingsOpenWithAssociations(),
-        message: "Settings saved.",
-      });
-    } catch (error) {
-      set({ error: errorText(error) });
-    } finally {
-      set({ working: false });
-    }
   },
 
   removeOpenWithAssociation: async (key) => {
@@ -146,7 +123,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const settings = await settingsRemoveOpenWithAssociation(key);
       set({
         settings,
-        settingsText: JSON.stringify(settings.document, null, 2),
         openWithAssociations: await settingsOpenWithAssociations(),
         message: `Removed Open With association for ${key}.`,
       });
@@ -169,6 +145,17 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         },
       };
     });
+  },
+
+  resetShortcuts: async () => {
+    set({ working: true, error: null, message: null });
+    try {
+      set({ shortcuts: await shortcutsReset(), message: "Shortcuts restored to defaults." });
+    } catch (error) {
+      set({ error: errorText(error) });
+    } finally {
+      set({ working: false });
+    }
   },
 
   saveShortcuts: async () => {
@@ -210,25 +197,25 @@ function settingsWithLaunchOnLoginSnapshot(
 }
 
 function applySettingsSideEffects(document: Record<string, unknown>): void {
-  useAppThemeStore
-    .getState()
-    .setThemeMode(
-      settingsIndexToThemeMode(settingsNumber(document, "appearance", "theme_index", 0)),
-    );
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
   );
-}
-
-async function applyLaunchOnLoginFromDocument(document: Record<string, unknown>): Promise<void> {
-  await settingsApplyLaunchOnLogin(settingsBoolean(document, "general", "launch_on_login", false));
+  configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
+  configureBrowserSearchEngine(
+    settingsNumber(document, "general", "browser_search_engine_index", 0),
+  );
+  // Mirrored to localStorage: the index route redirects before this document
+  // has loaded, so it cannot read the preference from here directly.
+  configureStartupPreference({
+    reopenLastSession: settingsBoolean(document, "general", "reopen_last_session", true),
+    startupViewIndex: settingsNumber(document, "general", "startup_view_index", 0),
+  });
 }
 
 export interface SettingsStore {
   activeSection: SettingsSection;
   settings: SettingsSnapshot | null;
-  settingsText: string;
   launchOnLogin: LaunchOnLoginSnapshot | null;
   openWithAssociations: OpenWithAssociation[];
   shortcuts: ShortcutsSnapshot | null;
@@ -238,11 +225,10 @@ export interface SettingsStore {
   message: string | null;
   setActiveSection: (section: SettingsSection) => void;
   load: () => Promise<void>;
-  setSettingsText: (value: string) => void;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
-  saveSettingsDocument: () => Promise<void>;
   removeOpenWithAssociation: (key: string) => Promise<void>;
   setShortcut: (commandId: string, shortcut: string) => void;
+  resetShortcuts: () => Promise<void>;
   saveShortcuts: () => Promise<void>;
 }
 

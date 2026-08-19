@@ -13,6 +13,7 @@ export {
   quickAccessPathHidden,
 } from "./components/ExplorerSidebarSupport";
 export * from "./components/FileBrowser";
+export { FileNameIcon } from "./components/FileBrowserIcons";
 export * from "./components/GlobalPreview";
 export { MediaSearchViewer } from "./components/MediaSearchViewer";
 export * from "./drag/ExplorerDragContext";

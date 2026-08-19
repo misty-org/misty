@@ -1,0 +1,210 @@
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { browserHomeUrl } from "./browserHome";
+export * from "./browserSearchEngine";
+import { blankBrowserUrl } from "./browserUrl";
+
+export { blankBrowserUrl } from "./browserUrl";
+export {
+  browserHomeUrl,
+  configureBrowserHomeUrl,
+  defaultBrowserHomeUrl,
+  normalizeBrowserHomeUrl,
+} from "./browserHome";
+
+export type WorkspaceSurfaceId =
+  | "home"
+  | "inbox"
+  | "space"
+  | "browser"
+  | "terminal"
+  | "code"
+  | "files"
+  | "transfers"
+  | "agents"
+  | "extensions";
+
+export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}`;
+export type WorkspaceInstancePolicy = "multiple" | "single";
+export type WorkspaceScopeKey = "global" | `space:${string}`;
+export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
+export type DockSplitDirection = "left" | "right" | "up" | "down";
+export type DockDropZone = "center" | DockSplitDirection;
+
+export interface BrowserTabState {
+  version: 1;
+  url: string;
+  faviconUrl: string | null;
+}
+
+export interface CodeTabState {
+  version: 1;
+  rootPath: string | null;
+  activeFilePath: string | null;
+  explorerWidth: number;
+}
+
+export function createCodeTabState(
+  initial: Partial<Omit<CodeTabState, "version">> = {},
+): CodeTabState {
+  return {
+    version: 1,
+    rootPath: initial.rootPath ?? null,
+    activeFilePath: initial.activeFilePath ?? null,
+    explorerWidth: clampCodeExplorerWidth(initial.explorerWidth),
+  };
+}
+
+export function parseCodeTabState(value: unknown): CodeTabState {
+  if (!value || typeof value !== "object") return createCodeTabState();
+  const candidate = value as Partial<CodeTabState>;
+  return createCodeTabState({
+    rootPath:
+      typeof candidate.rootPath === "string" && candidate.rootPath.trim()
+        ? candidate.rootPath
+        : null,
+    activeFilePath:
+      typeof candidate.activeFilePath === "string" && candidate.activeFilePath.trim()
+        ? candidate.activeFilePath
+        : null,
+    explorerWidth: candidate.explorerWidth,
+  });
+}
+
+function clampCodeExplorerWidth(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(42, Math.max(14, value))
+    : 22;
+}
+
+export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {
+  return {
+    version: 1,
+    url,
+    faviconUrl: browserFaviconUrl(url),
+  };
+}
+
+export function parseBrowserTabState(value: unknown): BrowserTabState {
+  if (!value || typeof value !== "object") return createBrowserTabState();
+  const candidate = value as Partial<BrowserTabState>;
+  const url =
+    typeof candidate.url === "string" && candidate.url.trim() ? candidate.url : browserHomeUrl();
+  return {
+    version: 1,
+    url,
+    faviconUrl:
+      typeof candidate.faviconUrl === "string" && candidate.faviconUrl
+        ? candidate.faviconUrl
+        : browserFaviconUrl(url),
+  };
+}
+
+export function browserTabTitle(url: string): string {
+  if (url === blankBrowserUrl) return "New Tab";
+  try {
+    const parsed = new URL(url);
+    const query = parsed.searchParams.get("q");
+    if (query) return query;
+    return parsed.hostname.replace(/^www\./, "") || "New Tab";
+  } catch {
+    return "New Tab";
+  }
+}
+
+function browserFaviconUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? `${url.origin}/favicon.ico`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface WorkspaceSurfaceDescriptor<TState = unknown> {
+  id: WorkspaceSurfaceId;
+  title: string;
+  icon: LucideIcon;
+  instancePolicy: WorkspaceInstancePolicy;
+  sidebar?: (state: TState) => ReactNode;
+  content: (state: TState) => ReactNode;
+  serialize: (state: TState) => unknown;
+  restore: (snapshot: unknown) => TState;
+}
+
+export interface DockWidgetDescriptor<TState = unknown> {
+  kind: WorkspaceSurfaceId;
+  instancePolicy: "singleton" | "per-space" | "multiple";
+  mountPolicy: DockMountPolicy;
+  minimumSize: { width: number; height: number };
+  create: () => TState;
+  serialize: (state: TState) => unknown;
+  restore: (snapshot: unknown) => TState;
+  dispose?: (state: TState) => void;
+}
+
+export interface WorkspaceTab {
+  id: string;
+  surfaceId: WorkspaceSurfaceId;
+  groupKey: WorkspaceGroupKey;
+  instanceKey: string;
+  title: string;
+  route: string;
+  sidebarVisible: boolean;
+  state: unknown;
+  createdAt: number;
+  lastFocusedAt: number;
+}
+
+export interface WorkspacePane {
+  type: "leaf";
+  id: string;
+  tabs: WorkspaceTab[];
+  activeTabId: string | null;
+}
+
+export interface WorkspaceSplit {
+  type: "split";
+  id: string;
+  direction: "horizontal" | "vertical";
+  ratio: number;
+  first: WorkspaceDockNode;
+  second: WorkspaceDockNode;
+}
+
+export type WorkspaceDockNode = WorkspacePane | WorkspaceSplit;
+
+export interface WorkspaceLayout {
+  root: WorkspaceDockNode;
+  focusedPaneId: string;
+}
+
+export interface WorkspaceSnapshot {
+  version: 2;
+  accountId: string;
+  deviceId: string;
+  savedAt: number;
+  layout: WorkspaceLayout;
+  lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
+}
+
+export interface OpenWorkspaceSurfaceRequest {
+  surfaceId: WorkspaceSurfaceId;
+  groupKey: WorkspaceGroupKey;
+  /** Layout scope is separate from tab identity for tools hosted by a Space. */
+  scopeKey?: WorkspaceScopeKey;
+  title: string;
+  route: string;
+  instanceKey?: string;
+  state?: unknown;
+  sidebarVisible?: boolean;
+  instancePolicy?: WorkspaceInstancePolicy;
+  forceNew?: boolean;
+  /** Keep an existing tab aligned with navigation driven by the app route. */
+  syncExistingRoute?: boolean;
+  paneId?: string;
+}
+
+export const workspaceDefaultMinimumSize = { width: 280, height: 180 } as const;

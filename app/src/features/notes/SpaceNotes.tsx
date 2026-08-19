@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { NewNoteDialog } from "./components/NewNoteDialog";
+import { JournalIntegrationsSheet } from "./components/JournalIntegrationsSheet";
 import { NoteReadingPane } from "./components/NoteReadingPane";
 import { NotesTopBar } from "./components/NotesTopBar";
 import type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
 import { useNotesStore } from "./store";
+import { NOTION_CONNECTOR_ID } from "./mockData";
 export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
 
 const shellClass =
@@ -30,6 +32,11 @@ export function SpaceNotes(props: SpaceNotesProps) {
       accountId: state.accountId,
       query: state.query,
       registry: state.registry,
+      syncing: state.syncing,
+      integrationsOpen: state.integrationsOpen,
+      connectorRevision: state.connectorRevision,
+      publishingNoteId: state.publishingNoteId,
+      publishError: state.publishError,
     })),
   );
   const actions = useNotesStore(
@@ -43,9 +50,20 @@ export function SpaceNotes(props: SpaceNotesProps) {
       refresh: state.refresh,
       updateNoteBody: state.updateNoteBody,
       updateNoteContent: state.updateNoteContent,
+      syncAll: state.syncAll,
+      setIntegrationsOpen: state.setIntegrationsOpen,
+      publishNote: state.publishNote,
+      openInSource: state.openInSource,
     })),
   );
-  const referenceOnly = useSpacesStore((state) => state.referenceOnly);
+  const { referenceOnly, canManageIntegrations } = useSpacesStore(
+    useShallow((state) => ({
+      referenceOnly: state.referenceOnly,
+      canManageIntegrations:
+        !state.referenceOnly &&
+        state.spaces.find((space) => space.id === props.spaceId)?.role === "owner",
+    })),
+  );
 
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const createQueryConsumedRef = useRef(false);
@@ -88,6 +106,10 @@ export function SpaceNotes(props: SpaceNotesProps) {
   const selectedConnector = selectedNote
     ? store.registry.forSource(selectedNote.source)
     : undefined;
+  const notionConnector = store.registry.get(NOTION_CONNECTOR_ID);
+  const canPublishToNotion =
+    notionConnector?.status() === "connected" &&
+    Boolean(notionConnector.selectedSourceIds?.().length);
 
   return (
     <div className={shellClass}>
@@ -99,6 +121,9 @@ export function SpaceNotes(props: SpaceNotesProps) {
         onNewNote={() => {
           if (!referenceOnly) setNewNoteOpen(true);
         }}
+        onIntegrations={() => actions.setIntegrationsOpen(true)}
+        onSync={() => void actions.syncAll()}
+        syncing={store.syncing}
       />
 
       <div className={bodyClass}>
@@ -131,6 +156,10 @@ export function SpaceNotes(props: SpaceNotesProps) {
           onNewNote={() => {
             if (!referenceOnly) setNewNoteOpen(true);
           }}
+          onOpenInSource={selectedNote?.source === "notion" ? actions.openInSource : undefined}
+          onPublish={canPublishToNotion ? (noteId) => void actions.publishNote(noteId) : undefined}
+          publishing={store.publishingNoteId === selectedNote?.id}
+          publishError={store.publishError || store.connectorErrors[NOTION_CONNECTOR_ID]}
         />
       </div>
 
@@ -140,6 +169,13 @@ export function SpaceNotes(props: SpaceNotesProps) {
         onCreate={async (input) => {
           await actions.createNote(input);
         }}
+      />
+      <JournalIntegrationsSheet
+        spaceId={props.spaceId}
+        canManage={canManageIntegrations}
+        open={store.integrationsOpen}
+        onOpenChange={actions.setIntegrationsOpen}
+        onResourcesChanged={() => void actions.refresh()}
       />
       <JournalAttribution
         technology="BlockNote"

@@ -19,11 +19,6 @@ import type {
   NavigationMode,
 } from "../../types/store/types";
 
-export interface ExplorerWorkspaceEntry {
-  id: string;
-  title: string;
-}
-
 export interface ExplorerNotification {
   id: number;
   message: string;
@@ -116,9 +111,6 @@ export interface ExplorerStore {
   inlineEdit: ExplorerInlineEditState | null;
   dialog: ExplorerDialogState;
   library: ExplorerLibrarySnapshot | null;
-  workspaceEntries: ExplorerWorkspaceEntry[];
-  activeWorkspaceId: string;
-  activeWorkspaceTitle: string;
   initialized: boolean;
   sidebarVisible: boolean;
   previewVisible: boolean;
@@ -128,11 +120,6 @@ export interface ExplorerStore {
   recordLibraryRecent: (entry: FileEntry) => Promise<void>;
   recordLastOpenedPath: (path: string) => Promise<void>;
   initialize: (homePath: string) => Promise<void>;
-  ensureWorkspace: (workspaceId: string, title: string, homePath: string) => Promise<void>;
-  selectWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
-  createWorkspace: (title: string, homePath: string) => Promise<void>;
-  renameWorkspace: (workspaceId: string, title: string) => Promise<void>;
-  deleteWorkspace: (workspaceId: string, homePath: string) => Promise<void>;
   loadPane: (
     paneId: string,
     path: string,

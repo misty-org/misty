@@ -1,63 +1,139 @@
 import { useAppStore } from "@/features/app-shell";
 import { useSettingsStore } from "./store/useSettingsStore";
 import {
-  AppWindow,
   ArrowLeftRight,
   Bell,
   Bot,
+  Blocks,
+  Code,
+  DownloadCloud,
   Eye,
+  FolderOpen,
+  Globe,
   Keyboard,
   Lock,
   Rows3,
   Search,
   Settings2,
+  Sparkles,
+  SquareTerminal,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, type ComponentType } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
-import { NotificationSettings } from "./components/NotificationSettings";
-import {
-  AgentSettings,
-  AppSettings,
-  AppearanceSettings,
-  GeneralSettings,
-} from "./settingsBasicSections";
-import { SearchSettings } from "./settingsSearchSection";
-import {
-  AdvancedSettings,
-  PrivacySettings,
-  ShortcutsSettings,
-  TransfersSettings,
-} from "./settingsSystemSections";
-import type { NavItem, SettingsContentProps, SettingsSection } from "./settingsTypes";
+import { AdvancedSection } from "./sections/AdvancedSection";
+import { AgentsSection } from "./sections/AgentsSection";
+import { AppearanceSection } from "./sections/AppearanceSection";
+import { BrowserSection } from "./sections/BrowserSection";
+import { CodeSection } from "./sections/CodeSection";
+import { ExtensionsSection } from "./sections/ExtensionsSection";
+import { FilesSection } from "./sections/FilesSection";
+import { GeneralSection } from "./sections/GeneralSection";
+import { ModelsSection } from "./sections/ModelsSection";
+import { NotificationsSection } from "./sections/NotificationsSection";
+import { PrivacySection } from "./sections/PrivacySection";
+import { SearchSection } from "./sections/SearchSection";
+import { ShortcutsSection } from "./sections/ShortcutsSection";
+import { TerminalSection } from "./sections/TerminalSection";
+import { TransfersSection } from "./sections/TransfersSection";
+import { UpdatesSection } from "./sections/UpdatesSection";
+import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
+import type { LucideIcon } from "lucide-react";
 
-const appNavItems: NavItem[] = [
-  { id: "general", label: "General", icon: Rows3 },
-  { id: "app", label: "App", icon: AppWindow },
-  { id: "agent", label: "Agents", icon: Bot },
-  { id: "appearance", label: "Appearance", icon: Eye },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "privacy", label: "Privacy", icon: Lock },
-  { id: "transfers", label: "Transfers", icon: ArrowLeftRight },
-  { id: "search", label: "Search & Library", icon: Search },
-  { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
-  { id: "advanced", label: "Advanced", icon: Settings2 },
+/**
+ * The one place a section is declared.
+ *
+ * `group` captions the nav rail. Sixteen entries need the break, and the
+ * caption is what tells you whether a section configures the app itself or one
+ * of its tools.
+ */
+export type SettingsGroup = "app" | "tools" | "system";
+
+/** Rail captions, drawn with the global navigator's section-header treatment. */
+const groupLabels: Record<SettingsGroup, string> = {
+  app: "App",
+  tools: "Tools",
+  system: "System",
+};
+
+export interface SettingsRegistryEntry {
+  id: SettingsSection;
+  label: string;
+  icon: LucideIcon;
+  group: SettingsGroup;
+  Component: ComponentType<SettingsContentProps>;
+}
+
+export const settingsRegistry: readonly SettingsRegistryEntry[] = [
+  { id: "general", label: "General", icon: Rows3, group: "app", Component: GeneralSection },
+  { id: "appearance", label: "Appearance", icon: Eye, group: "app", Component: AppearanceSection },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    group: "app",
+    Component: NotificationsSection,
+  },
+  {
+    id: "shortcuts",
+    label: "Shortcuts",
+    icon: Keyboard,
+    group: "app",
+    Component: ShortcutsSection,
+  },
+
+  { id: "files", label: "Files", icon: FolderOpen, group: "tools", Component: FilesSection },
+  { id: "search", label: "Search", icon: Search, group: "tools", Component: SearchSection },
+  {
+    id: "transfers",
+    label: "Transfers",
+    icon: ArrowLeftRight,
+    group: "tools",
+    Component: TransfersSection,
+  },
+  { id: "browser", label: "Browser", icon: Globe, group: "tools", Component: BrowserSection },
+  {
+    id: "terminal",
+    label: "Terminal",
+    icon: SquareTerminal,
+    group: "tools",
+    Component: TerminalSection,
+  },
+  { id: "code", label: "Code", icon: Code, group: "tools", Component: CodeSection },
+  { id: "models", label: "Models", icon: Sparkles, group: "tools", Component: ModelsSection },
+  { id: "agents", label: "Agents", icon: Bot, group: "tools", Component: AgentsSection },
+  {
+    id: "extensions",
+    label: "Extensions",
+    icon: Blocks,
+    group: "tools",
+    Component: ExtensionsSection,
+  },
+
+  { id: "privacy", label: "Privacy", icon: Lock, group: "system", Component: PrivacySection },
+  {
+    id: "updates",
+    label: "Updates",
+    icon: DownloadCloud,
+    group: "system",
+    Component: UpdatesSection,
+  },
+  {
+    id: "advanced",
+    label: "Advanced",
+    icon: Settings2,
+    group: "system",
+    Component: AdvancedSection,
+  },
 ];
 
-const navItems = appNavItems;
-
-const sectionDescriptions: Record<SettingsSection, string> = {
-  general: "Files startup, default actions, and browsing behavior.",
-  app: "Updates, version details, and local support information.",
-  agent: "Control Agents and the actions they can perform.",
-  appearance: "Density, text size, previews, and motion.",
-  notifications: "Choose when important updates should reach you outside Misty.",
-  privacy: "Choose what diagnostic data Misty may share.",
-  transfers: "Defaults for copies, downloads, and destinations.",
-  search: "Keep filenames and connected libraries searchable.",
-  shortcuts: "Review and customize keyboard commands.",
-  advanced: "Runtime, developer, and recovery preferences.",
-};
+const navItems = settingsRegistry.map(({ id, label, icon, group }) => ({
+  id,
+  label,
+  icon,
+  group,
+  groupLabel: groupLabels[group],
+}));
 
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -76,6 +152,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     removeOpenWithAssociation,
     setShortcut,
     saveShortcuts,
+    resetShortcuts,
   } = useSettingsStore(
     useShallow((state) => ({
       activeSection: state.activeSection,
@@ -90,12 +167,13 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       removeOpenWithAssociation: state.removeOpenWithAssociation,
       setShortcut: state.setShortcut,
       saveShortcuts: state.saveShortcuts,
+      resetShortcuts: state.resetShortcuts,
     })),
   );
   const app = useAppStore((state) => state.app);
   const document = settings?.document ?? {};
-  const title = navItems.find((item) => item.id === activeSection)?.label ?? "General";
-  const controlProps = {
+  const entry = settingsRegistry.find((item) => item.id === activeSection) ?? settingsRegistry[0];
+  const controlProps: SettingsContentProps = {
     document,
     launchOnLogin,
     working,
@@ -103,51 +181,30 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     onLoad: load,
     onShortcutChange: setShortcut,
     onSaveShortcuts: saveShortcuts,
+    onResetShortcuts: resetShortcuts,
     onRemoveOpenWithAssociation: removeOpenWithAssociation,
     shortcuts: shortcuts?.bindings ?? [],
     openWithAssociations,
     app,
   };
 
+  const ActiveComponent = entry.Component;
+
   return (
     <DesktopSettingsFrame
       activeId={activeSection}
       ariaLabel="Settings"
-      description={sectionDescriptions[activeSection]}
       items={navItems}
       navigationLabel="Settings sections"
-      navigationTitle="Misty settings"
       onClose={props.onClose}
       onSelect={setActiveSection}
       presentation={props.presentation}
-      title={title}
+      title={entry.label}
     >
-      <SettingsContent activeSection={activeSection} controlProps={controlProps} />
+      <ActiveComponent {...controlProps} />
     </DesktopSettingsFrame>
   );
 });
-
-function SettingsContent(props: {
-  activeSection: SettingsSection;
-  controlProps: SettingsContentProps;
-}) {
-  return (
-    <>
-      {props.activeSection === "general" ? <GeneralSettings {...props.controlProps} /> : null}
-      {props.activeSection === "app" ? <AppSettings {...props.controlProps} /> : null}
-      {props.activeSection === "agent" ? <AgentSettings {...props.controlProps} /> : null}
-      {props.activeSection === "appearance" ? <AppearanceSettings {...props.controlProps} /> : null}
-      {props.activeSection === "notifications" ? (
-        <NotificationSettings {...props.controlProps} />
-      ) : null}
-      {props.activeSection === "privacy" ? <PrivacySettings {...props.controlProps} /> : null}
-      {props.activeSection === "transfers" ? <TransfersSettings {...props.controlProps} /> : null}
-      {props.activeSection === "search" ? <SearchSettings {...props.controlProps} /> : null}
-      {props.activeSection === "shortcuts" ? <ShortcutsSettings {...props.controlProps} /> : null}
-      {props.activeSection === "advanced" ? <AdvancedSettings {...props.controlProps} /> : null}
-    </>
-  );
-}
 
 export default SettingsWorkspace;
 export type { SettingValue, SettingsSection } from "./settingsTypes";

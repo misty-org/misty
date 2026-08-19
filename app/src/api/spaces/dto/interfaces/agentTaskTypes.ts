@@ -1,5 +1,4 @@
 import type { SpaceRole } from "../types/types";
-import type { AgentCapabilityGrant } from "./agentArchitectureTypes";
 
 export type AgentAvatar =
   | { kind: "preset"; preset_id: string; accent: string }
@@ -20,26 +19,16 @@ export interface SpaceAgentMembership {
   space_id: string;
   agent_id: string;
   owner_user_id: string;
+  can_control: boolean;
   name: string;
-  role?: string;
-  space_role?: string;
   description: string;
   icon: string;
   avatar?: AgentAvatar;
   model_id?: string;
   reasoning_effort?: "" | "low" | "medium" | "high";
+  default_run_mode: "ask" | "auto" | "full";
   enabled: boolean;
-  role_id?: string;
-  capability_grants?: AgentCapabilityGrant[];
-  approved_version_id: string;
-  approved_version: number;
-  latest_version_id: string;
-  latest_version: number;
-  update_available: boolean;
-  space_instructions?: string;
-  permissions: Record<string, boolean>;
-  managed_by_user_id?: string;
-  membership_version: number;
+  version: number;
   created_at: string;
   updated_at: string;
   work_state?:
@@ -47,6 +36,7 @@ export interface SpaceAgentMembership {
     | "queued"
     | "working"
     | "awaiting_approval"
+    | "awaiting_device"
     | "needs_approval"
     | "retrying"
     | "completed"
