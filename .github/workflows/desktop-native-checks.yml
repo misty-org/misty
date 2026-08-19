@@ -1,0 +1,63 @@
+name: Native desktop checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-desktop:
+    name: ${{ matrix.os }} native WebView
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    env:
+      MISTY_PUBLIC_API_URL: https://mistysys.com/api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Linux WebKitGTK prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential curl file libappindicator3-dev librsvg2-dev \
+            libssl-dev libwebkit2gtk-4.1-dev patchelf
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@1.91.0
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Check browser frontend
+        run: npm run typecheck --workspace @misty/app
+
+      - name: Test browser frontend
+        run: npm test --workspace @misty/app -- src/features/browser/BrowserWorkspace.test.ts src/features/agents/worker.test.ts
+
+      - name: Compile native desktop
+        run: cargo check --manifest-path app/src-tauri/Cargo.toml --lib
+
+      - name: Test native desktop
+        run: cargo test --manifest-path app/src-tauri/Cargo.toml --lib

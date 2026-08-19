@@ -211,6 +211,9 @@ export interface ProviderRemote {
   needsReconnect: boolean;
   error: string | null;
   configSource: string;
+  connectionId?: string | null;
+  connectionSource?: "connected_account" | "legacy_cloud" | null;
+  connectedAccountId?: string | null;
 }
 
 export interface ProviderWorkflowOption {

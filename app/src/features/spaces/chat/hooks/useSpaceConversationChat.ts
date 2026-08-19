@@ -1,6 +1,11 @@
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceConversation, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type {
+  SpaceConversation,
+  SpaceEvent,
+  SpaceMessage,
+} from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState } from "react";
+import { mergeSpaceMessages, messageFromSpaceEvent } from "../store/useSpaceMessageSpansStore";
 
 export function useSpaceConversationChat(
   spaceId: string,
@@ -50,8 +55,19 @@ export function useSpaceConversationChat(
         if (active) setLoading(false);
       });
     const reload = (event: Event) => {
-      const detail = (event as CustomEvent<{ spaceId?: string; conversationId?: string }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          spaceId?: string;
+          conversationId?: string;
+          event?: SpaceEvent;
+        }>
+      ).detail;
       if (detail?.spaceId !== spaceId || detail.conversationId !== conversationId) return;
+      const includedMessage = detail.event ? messageFromSpaceEvent(detail.event) : undefined;
+      if (includedMessage) {
+        setMessages((current) => mergeSpaceMessages(current, [includedMessage]));
+        return;
+      }
       void spacesApi.conversationMessages(spaceId, conversationId).then(({ messages: next }) => {
         if (active) setMessages([...next].reverse());
       });

@@ -1,6 +1,5 @@
 import { unreadActivityCountForTool, useActivityStore } from "@/features/activity";
 import { useTransfersStore } from "@/features/transfers";
-import { useMultiPanelStore } from "@/features/workspace";
 import { openTerminalAtPath } from "@/features/files/native";
 import type { PluginCommandEntry, PluginPanelEntry, TransferRecord } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
@@ -9,9 +8,9 @@ import { ArrowRightLeft, PanelsTopLeft, Terminal } from "lucide-react";
 import { useCallback } from "react";
 import { useExplorerStore } from "../../store";
 import { explorerTrayStyles } from "../ExplorerDesktopPluginStyles";
-import { cx } from "../ExplorerDesktopShared";
 import { ExplorerPluginTabMenu } from "./ExplorerPluginTabMenu";
-import { isTransfersTabPath } from "./tabPaths";
+import { useNavigate } from "react-router-dom";
+import { openTransfersTab } from "./tabPaths";
 
 const transferBadgeStatuses = new Set<TransferRecord["status"]>([
   "queued",
@@ -30,7 +29,6 @@ export function ExplorerTray(props: {
   panels: PluginPanelEntry[];
   selectedPath: string;
   onToggleFileManagerMode: () => void;
-  onOpenTransfers: () => void;
 }) {
   const openTerminal = useCallback(() => {
     if (!props.terminalEnabled) return;
@@ -58,7 +56,7 @@ export function ExplorerTray(props: {
         panels={props.panels}
         selectedPath={props.selectedPath}
       />
-      <ExplorerTransfersTabButton onClick={props.onOpenTransfers} />
+      <ExplorerTransfersTabButton />
       <Button
         className={explorerTrayStyles.trigger}
         type="button"
@@ -73,13 +71,15 @@ export function ExplorerTray(props: {
   );
 }
 
-export function ExplorerTransfersTabButton(props: { onClick: () => void }) {
+/**
+ * The transfer badge, kept in the file manager toolbar because that is where
+ * transfers get started. Transfers itself is a workspace tool now, so this
+ * opens that tab rather than a panel inside this one.
+ */
+export function ExplorerTransfersTabButton() {
+  const navigate = useNavigate();
   const rows = useTransfersStore((state) => state.transfers?.rows ?? emptyTransferRows);
   const activityItems = useActivityStore((state) => state.allItems);
-  const active = useMultiPanelStore((state) => {
-    const tab = state.tabs.find((candidate) => candidate.id === state.activeTabId);
-    return Boolean(tab && isTransfersTabPath(tab.path));
-  });
   const activeTransferCount = rows.filter((row) => transferBadgeStatuses.has(row.status)).length;
   const newTransferCount = unreadActivityCountForTool(activityItems, "transfers");
   const badgeCount = newTransferCount || activeTransferCount;
@@ -94,12 +94,12 @@ export function ExplorerTransfersTabButton(props: { onClick: () => void }) {
         activity.markRead(item.id);
       }
     }
-    props.onClick();
+    navigate(openTransfersTab().route);
   };
   return (
     <span className={explorerTrayStyles.triggerWrap}>
       <Button
-        className={cx(explorerTrayStyles.trigger, active && explorerTrayStyles.triggerActive)}
+        className={explorerTrayStyles.trigger}
         type="button"
         title="Transfers"
         aria-label={newTransferCount ? `Transfers, ${newTransferCount} new` : "Transfers"}

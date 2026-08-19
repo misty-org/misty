@@ -41,6 +41,21 @@ describe("SpaceManagementNavigation", () => {
     expect(container.querySelector('[aria-label="More Space actions"]')).toBeNull();
   });
 
+  it("can sit inside the Spaces navbar header without extra header spacing", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceManagementNavigation space={spaceFixture()} section="chat" placement="navbar" />
+        </MemoryRouter>,
+      );
+    });
+
+    const management = container.querySelector('nav[aria-label="Space management"]');
+    expect(management?.parentElement?.className).toContain("ml-0");
+    expect(management?.parentElement?.className).not.toContain("pl-3");
+    expect(container.querySelector(".bg-status-green")).toBeNull();
+  });
+
   it("hides global management from ordinary Misty members", async () => {
     await act(async () => {
       root.render(

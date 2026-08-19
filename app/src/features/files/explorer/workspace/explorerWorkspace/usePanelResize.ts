@@ -1,25 +1,19 @@
-import { useMultiPanelStore } from "@/features/workspace";
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from "react";
 import type { ResizeTarget } from "../../model/types/workspace";
-import {
-  explorerWorkspaceNeedsSave,
-  scheduleExplorerWorkspaceSave,
-  useExplorerStore,
-} from "../../store";
+import { useExplorerStore } from "../../store";
 import {
   maxPreviewWidth,
   maxSidebarWidth,
   minPreviewWidth,
   minSidebarWidth,
 } from "../ExplorerWorkspaceConstants";
-import { clamp, multiPanelWorkspaceNeedsSave } from "../ExplorerWorkspaceUtils";
+import { clamp } from "../ExplorerWorkspaceUtils";
 
 /**
  * Drag-to-resize for the sidebar and preview panes.
  *
  * Pointer moves are coalesced into one animation frame so a fast drag does not
- * queue a store write per event. Layout saves are held back until the drag
- * ends — otherwise every frame would persist a new width.
+ * queue a store write per event.
  */
 export function usePanelResize(options: {
   workspaceRef: RefObject<HTMLElement | null>;
@@ -27,33 +21,8 @@ export function usePanelResize(options: {
 }) {
   const { workspaceRef, mainRef } = options;
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
-  const resizeTargetRef = useRef<ResizeTarget>(null);
-  const pendingResizeSaveRef = useRef(false);
   const pendingResizeXRef = useRef(0);
   const resizeFrameRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const unsubscribeExplorer = useExplorerStore.subscribe((state, previous) => {
-      if (!explorerWorkspaceNeedsSave(state, previous)) return;
-      if (resizeTargetRef.current) pendingResizeSaveRef.current = true;
-      else scheduleExplorerWorkspaceSave();
-    });
-    const unsubscribeMulti = useMultiPanelStore.subscribe((state, previous) => {
-      if (multiPanelWorkspaceNeedsSave(state, previous)) scheduleExplorerWorkspaceSave();
-    });
-    return () => {
-      unsubscribeExplorer();
-      unsubscribeMulti();
-    };
-  }, []);
-
-  useEffect(() => {
-    resizeTargetRef.current = resizeTarget;
-    if (!resizeTarget && pendingResizeSaveRef.current) {
-      pendingResizeSaveRef.current = false;
-      scheduleExplorerWorkspaceSave();
-    }
-  }, [resizeTarget]);
 
   useEffect(() => {
     if (!resizeTarget) return;

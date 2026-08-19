@@ -71,13 +71,17 @@ describe("SpacePlanner", () => {
     expect(container.textContent).toContain("Tasks");
     expect(container.textContent).not.toContain("board view");
     expect(container.textContent).not.toContain("Calendar");
-    expect(container.querySelector('button[aria-label="Sync planner"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Refresh tasks"]')).not.toBeNull();
     expect(container.textContent).toContain("To do");
     expect(container.textContent).toContain("In progress");
     expect(container.textContent).toContain("Done");
+    // The board scrolls sideways only; each column scrolls its own tasks, so a
+    // long column no longer drags the whole board past the viewport.
     const board = container.querySelector('[aria-label="Task board"]');
-    expect(board?.className).toContain("overflow-y-auto");
-    expect(board?.className).not.toContain("overflow-y-hidden");
+    expect(board?.className).toContain("overflow-x-auto");
+    expect(board?.className).toContain("overflow-y-hidden");
+    const columnScrollers = board?.querySelectorAll("section > div.overflow-y-auto") ?? [];
+    expect(columnScrollers.length).toBeGreaterThan(0);
   });
 
   it("opens the existing task drawer from a task creation query", async () => {
@@ -135,7 +139,7 @@ describe("SpacePlanner", () => {
     expect(status?.className).not.toContain("opacity-0");
   });
 
-  it("keeps core tasks available when optional calendar endpoints fail", async () => {
+  it("loads core tasks without requesting external calendar endpoints", async () => {
     loadTasks.mockResolvedValue({
       tasks: [
         {
@@ -152,9 +156,6 @@ describe("SpacePlanner", () => {
         },
       ],
     });
-    loadCalendarSources.mockRejectedValue(new Error("Calendar endpoint unavailable"));
-    loadIntegrations.mockRejectedValue(new Error("Provider endpoint unavailable"));
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/list"]}>
@@ -166,11 +167,11 @@ describe("SpacePlanner", () => {
     });
 
     expect(container.textContent).toContain("Ship beta");
-    expect(container.textContent).toContain("Tasks are available");
+    expect(loadCalendarSources).not.toHaveBeenCalled();
+    expect(loadIntegrations).not.toHaveBeenCalled();
   });
 
-  it("shows core tasks without waiting for slow optional provider discovery", async () => {
-    let releaseIntegrations!: (value: { integrations: never[] }) => void;
+  it("shows core tasks immediately with integrations disabled", async () => {
     loadTasks.mockResolvedValue({
       tasks: [
         {
@@ -187,10 +188,6 @@ describe("SpacePlanner", () => {
         },
       ],
     });
-    loadIntegrations.mockImplementation(
-      () => new Promise((resolve) => (releaseIntegrations = resolve)),
-    );
-
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/list"]}>
@@ -202,11 +199,7 @@ describe("SpacePlanner", () => {
     });
 
     expect(container.textContent).toContain("Available immediately");
-
-    await act(async () => {
-      releaseIntegrations({ integrations: [] });
-      await Promise.resolve();
-    });
+    expect(loadIntegrations).not.toHaveBeenCalled();
   });
 
   it("does not send blank optional date and assignee fields when quick-adding a task", async () => {

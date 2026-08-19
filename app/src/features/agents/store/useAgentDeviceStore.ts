@@ -10,6 +10,10 @@ const identityCache = new Map<string, StoredDeviceIdentity>();
 const identityLoadAttempts = new Map<string, Promise<StoredDeviceIdentity>>();
 const lastHeartbeatByServerId = new Map<string, number>();
 const heartbeatIntervalMs = 30_000;
+export const browserDeviceSessionId =
+  typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `browser-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export const agentDeviceCapabilities = {
   document_intelligence: true,
@@ -17,6 +21,8 @@ export const agentDeviceCapabilities = {
   job_leases: true,
   citations: true,
   connected_devices: true,
+  browser_tools: true,
+  browser_session_id: browserDeviceSessionId,
 } as const;
 
 /**

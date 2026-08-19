@@ -1,25 +1,17 @@
 import { create } from "zustand";
 
-export function settingsIndexToThemeMode(_index: number): AppThemeMode {
-  return "dark";
-}
-
-export function themeModeToSettingsIndex(_mode: AppThemeMode): number {
-  return 0;
-}
-
-export const useAppThemeStore = create<AppThemeStore>()((set) => ({
+/**
+ * Misty ships one theme. This store exists because canvas surfaces (drawings,
+ * roadmap, note editor) need to read a resolved theme at render time rather
+ * than from CSS. It is deliberately not a preference: there is no light
+ * palette to switch to, so no settings control writes here.
+ */
+export const useAppThemeStore = create<AppThemeStore>()(() => ({
   resolvedTheme: "dark",
-  themeMode: "dark",
-  setThemeMode: () => set({ themeMode: "dark", resolvedTheme: "dark" }),
 }));
-
-export type AppThemeMode = "dark";
 
 export type ResolvedAppTheme = "dark";
 
 export type AppThemeStore = {
   resolvedTheme: ResolvedAppTheme;
-  themeMode: AppThemeMode;
-  setThemeMode: (mode: AppThemeMode) => void;
 };

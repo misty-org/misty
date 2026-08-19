@@ -8,9 +8,11 @@ import { SpaceUsagePopover } from "./SpaceUsagePopover";
 export function SpaceManagementNavigation({
   space,
   section,
+  placement = "header",
 }: {
   space: Space | undefined;
   section: string;
+  placement?: "header" | "navbar";
 }) {
   const location = useLocation();
   if (!space) return null;
@@ -20,7 +22,12 @@ export function SpaceManagementNavigation({
   const settingsPath = `/spaces/${encodedSpaceId}/settings/general`;
 
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-1 pl-3">
+    <div
+      className={cn(
+        "flex shrink-0 items-center gap-1",
+        placement === "header" ? "ml-auto pl-3" : "ml-0 pl-0",
+      )}
+    >
       <TooltipProvider delayDuration={400}>
         <nav className="flex items-center gap-1" aria-label="Space management">
           <SpaceUsagePopover space={space} />

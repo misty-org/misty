@@ -1,10 +1,7 @@
-import type { NativeWorkspaceDocument } from "@/native/contracts";
 import type { StoreApi } from "zustand";
 import type { ExplorerStore } from "../model/interfaces/store/types";
 
 export const explorerRuntime: ExplorerRuntime = {
-  workspaceDocumentCache: null,
-  workspaceSaveTimer: null,
   initializationInFlight: false,
   transferRefreshObserverReady: false,
   transferRefreshWatermarkMs: 0,
@@ -13,7 +10,6 @@ export const explorerRuntime: ExplorerRuntime = {
   directorySizeSchedulerTimer: null,
   pendingPaneRefreshes: new Map(),
   paneLoadRequestsInFlight: new Map(),
-  explorerWorkspaceResetKey: "misty.explorer.resetWorkspaceOnNextLoad.v1",
   directorySizeRefreshIntervalMs: 30 * 60 * 1000,
   store: null,
 };
@@ -28,8 +24,6 @@ export function getExplorerStore(): StoreApi<ExplorerStore> {
 }
 
 export interface ExplorerRuntime {
-  workspaceDocumentCache: NativeWorkspaceDocument | null;
-  workspaceSaveTimer: number | null;
   initializationInFlight: boolean;
   transferRefreshObserverReady: boolean;
   transferRefreshWatermarkMs: number;
@@ -38,7 +32,6 @@ export interface ExplorerRuntime {
   directorySizeSchedulerTimer: number | null;
   pendingPaneRefreshes: Map<string, { firstTimer: number | null; followupTimer: number | null }>;
   paneLoadRequestsInFlight: Map<string, Promise<void>>;
-  explorerWorkspaceResetKey: string;
   directorySizeRefreshIntervalMs: number;
   store: StoreApi<ExplorerStore> | null;
 }

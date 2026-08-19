@@ -6,12 +6,11 @@ import type { SpaceAgentMembership, SpaceMember } from "@/api/spaces/dto/interfa
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SpaceAgenda } from "./SpaceAgenda";
-import { CalendarSourceDrawer, SpaceTaskDrawer } from "./SpacePlannerViews";
+import { SpaceTaskDrawer } from "./SpacePlannerViews";
 import { SpacePlannerHeader } from "./components/SpacePlannerHeader";
 import { SpacePlannerBody } from "./spaceTasks/SpacePlannerBody";
 import { TaskFilters } from "./spaceTasks/TaskFilters";
 import { normalizeView } from "./spaceTasks/taskFiltering";
-import { useCalendarPublishing } from "./spaceTasks/useCalendarPublishing";
 import { useCreateTaskShortcut } from "./spaceTasks/useCreateTaskShortcut";
 import { useSpaceTaskActions } from "./spaceTasks/useSpaceTaskActions";
 import { useSpaceTasksData } from "./spaceTasks/useSpaceTasksData";
@@ -23,7 +22,6 @@ const emptyAgents: SpaceAgentMembership[] = [];
 export function SpacePlanner({
   spaceId,
   canManage,
-  canManageIntegrations,
 }: {
   spaceId: string;
   canManage: boolean;
@@ -31,14 +29,7 @@ export function SpacePlanner({
 }) {
   const route = useSpacePanelRoute();
   if (route.plannerSection === "agenda") {
-    return (
-      <SpaceAgenda
-        spaceId={spaceId}
-        view={route.agendaView}
-        canManage={canManage}
-        canManageIntegrations={canManageIntegrations}
-      />
-    );
+    return <SpaceAgenda spaceId={spaceId} view={route.agendaView} canManage={canManage} />;
   }
   if (route.plannerSection === "roadmaps") {
     return (
@@ -54,24 +45,10 @@ export function SpacePlanner({
       />
     );
   }
-  return (
-    <SpaceTasksPlanner
-      spaceId={spaceId}
-      canManage={canManage}
-      canManageIntegrations={canManageIntegrations}
-    />
-  );
+  return <SpaceTasksPlanner spaceId={spaceId} canManage={canManage} />;
 }
 
-function SpaceTasksPlanner({
-  spaceId,
-  canManage,
-  canManageIntegrations,
-}: {
-  spaceId: string;
-  canManage: boolean;
-  canManageIntegrations: boolean;
-}) {
+function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -83,7 +60,6 @@ function SpaceTasksPlanner({
   const filters = useTaskFilterParams({ view, currentUserId: user?.id });
   const data = useSpaceTasksData({ spaceId, view, filters });
   const actions = useSpaceTaskActions({ spaceId, canManage, data });
-  const calendar = useCalendarPublishing({ spaceId, data, actions });
   const createQueryConsumedRef = useRef(false);
 
   const openCreate = actions.openCreate;
@@ -125,17 +101,10 @@ function SpaceTasksPlanner({
       <SpacePlannerHeader
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}
-        sources={data.sources}
         loading={data.loading}
         canManage={canManage}
-        canManageIntegrations={canManageIntegrations}
-        calendarImportAvailable={
-          data.sources.length > 0 ||
-          data.integrations.some((integration) => integration.status === "active")
-        }
         onQuery={(value: string) => filters.updateParam("q", value)}
         onSync={() => void data.load(false)}
-        onImport={() => calendar.setSourceOpen(true)}
         onCreate={openCreate}
         filters={
           <TaskFilters
@@ -177,31 +146,6 @@ function SpaceTasksPlanner({
           onClose={() => actions.setEditing(undefined)}
           onSave={actions.save}
           onArchive={actions.editing ? () => void actions.archive(actions.editing!) : undefined}
-          onPublishCalendar={
-            actions.editing?.calendar
-              ? () => void calendar.publishTask(actions.editing!)
-              : undefined
-          }
-          onDiscardCalendar={
-            actions.editing?.calendar
-              ? () => void calendar.discardTaskChanges(actions.editing!)
-              : undefined
-          }
-        />
-      ) : null}
-
-      {calendar.sourceOpen ? (
-        <CalendarSourceDrawer
-          integrations={data.integrations}
-          selectedIntegration={calendar.selectedIntegration}
-          choices={calendar.calendarChoices}
-          sources={data.sources}
-          connectionsUnavailable={data.connectionsUnavailable}
-          busy={actions.busy}
-          onSelect={(id) => void calendar.loadCalendars(id)}
-          onPublish={(choice) => void calendar.publishCalendar(choice)}
-          onDisable={calendar.disableSource}
-          onClose={() => calendar.setSourceOpen(false)}
         />
       ) : null}
     </div>

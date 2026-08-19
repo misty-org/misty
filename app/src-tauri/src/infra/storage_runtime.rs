@@ -38,7 +38,6 @@ const MAX_ACTIVE_JOBS: usize = 4;
 const MAX_ACTIVE_JOBS_PER_REMOTE: usize = 2;
 const MAX_JOB_HISTORY: usize = 256;
 const SUPPORTED_PROVIDERS: [&str; 3] = ["drive", "onedrive", "dropbox"];
-
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageRuntimeSnapshot {
@@ -253,8 +252,9 @@ impl StorageRuntimeService {
             .into_iter()
             .filter_map(|(name, config)| {
                 let provider_type = config.get("type").and_then(Value::as_str)?.to_owned();
-                supported_provider(&provider_type)
-                    .then(|| serde_json::json!({"name":name,"type":provider_type}))
+                supported_provider(&provider_type).then(|| {
+                    crate::infra::direct_cloud::configured_remote(name, provider_type, &config)
+                })
             })
             .collect::<Vec<_>>();
         Ok(Value::Array(entries))

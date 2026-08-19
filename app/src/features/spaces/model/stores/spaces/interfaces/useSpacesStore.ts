@@ -60,6 +60,7 @@ export interface SpacesStore {
     libraryItemIds?: string[],
     replyToMessageId?: string,
     selectedAgentIdsByLabel?: Record<string, string>,
+    optimisticMessage?: SpaceMessage,
   ) => Promise<void>;
   updateMessage: (
     spaceId: string,

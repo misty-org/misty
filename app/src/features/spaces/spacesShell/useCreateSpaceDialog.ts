@@ -1,19 +1,14 @@
 import { spaceNotesEnabled } from "@/features/notes";
 import { spacesApi } from "@/api/spaces/api";
-import type {
-  ProviderConnectionAvailability,
-  SpaceIntegrationProvider,
-  SpaceTemplate,
-} from "@/api/spaces/dto/interfaces/types";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { restoreDocumentInteractivityAfterModalClose } from "./spacesShellStorage";
 
-export const CREATE_STEP_COUNT = 3;
+export const CREATE_STEP_COUNT = 2;
 
 /**
- * The three-step "Create a Space" flow: name, template, connections.
+ * The focused two-step "Create a Space" flow: name, then template.
  *
  * Templates load lazily the first time the dialog opens, and a failure there is
  * non-fatal — a Blank Space is always offered as a fallback.
@@ -32,10 +27,6 @@ export function useCreateSpaceDialog(options: {
   const [step, setStep] = useState(0);
   const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
   const [templateId, setTemplateId] = useState("blank");
-  const [providers, setProviders] = useState<SpaceIntegrationProvider[]>([]);
-  const [providerAvailability, setProviderAvailability] = useState<
-    ProviderConnectionAvailability[]
-  >([]);
   const [templateError, setTemplateError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -44,10 +35,9 @@ export function useCreateSpaceDialog(options: {
     let active = true;
     spacesApi
       .templates()
-      .then(({ templates: loaded, providers: available }) => {
+      .then(({ templates: loaded }) => {
         if (!active) return;
         setTemplates(loaded);
-        setProviderAvailability(available ?? []);
       })
       .catch(() => {
         if (active)
@@ -62,7 +52,6 @@ export function useCreateSpaceDialog(options: {
     setName("");
     setStep(0);
     setTemplateId("blank");
-    setProviders([]);
   };
 
   const close = () => {
@@ -71,7 +60,6 @@ export function useCreateSpaceDialog(options: {
     setOpen(false);
     restoreDocumentInteractivityAfterModalClose();
     resetDraft();
-    setProviderAvailability([]);
     setTemplateError("");
   };
 
@@ -86,11 +74,10 @@ export function useCreateSpaceDialog(options: {
     if (!trimmed || creating || step < CREATE_STEP_COUNT - 1) return;
     setCreating(true);
     try {
-      const firstProvider = providers[0];
       const created = await options.createSpace({
         name: trimmed,
         template_id: templateId,
-        integration_providers: providers,
+        integration_providers: [],
       });
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();
@@ -98,7 +85,6 @@ export function useCreateSpaceDialog(options: {
       navigate(
         `/spaces/${encodeURIComponent(created.space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
       );
-      if (firstProvider) beginProviderConnection(created.space.id, firstProvider);
     } catch {
       /* the dialog renders the store error */
     } finally {
@@ -116,22 +102,10 @@ export function useCreateSpaceDialog(options: {
     templates,
     templateId,
     setTemplateId,
-    providers,
-    setProviders,
-    providerAvailability,
     templateError,
     creating,
     close,
     start,
     submit,
   };
-}
-
-function beginProviderConnection(spaceId: string, provider: SpaceIntegrationProvider) {
-  void spacesApi
-    .beginProviderConnection(spaceId, provider, `/spaces/${spaceId}/settings/connections`)
-    .then((start) => openExternalLink(start.authorization_url))
-    .catch(() => {
-      // The resumable setup card remains available in Chat and Settings.
-    });
 }

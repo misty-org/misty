@@ -100,6 +100,12 @@ export const ProfileNavButton = memo(
     {
       open: boolean;
       onClick: () => void;
+      /** Overrides the rail dock geometry so the navigator can align it to its rows. */
+      className?: string;
+      avatarClassName?: string;
+      label?: string | null;
+      /** Labels the button with the signed-in account's display name. */
+      showAccountName?: boolean;
     }
   >(function ProfileNavButton(props, ref) {
     const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -123,7 +129,7 @@ export const ProfileNavButton = memo(
     return (
       <Button
         ref={ref}
-        className={profileDockClass}
+        className={cn("group/profile", props.className ?? profileDockClass)}
         variant="ghost"
         type="button"
         aria-label="Profile"
@@ -138,6 +144,7 @@ export const ProfileNavButton = memo(
               props.open
                 ? "ring-2 ring-cream/70"
                 : "ring-1 ring-charcoal-border/55 group-hover/profile:ring-charcoal-border",
+              props.avatarClassName,
             )}
           >
             {avatarUrl ? (
@@ -156,10 +163,16 @@ export const ProfileNavButton = memo(
           </Avatar>
         ) : (
           <UserCircle
-            className="size-6 text-cream-muted transition-colors group-hover/profile:text-cream"
+            className={cn(
+              "size-6 shrink-0 text-cream-muted transition-colors group-hover/profile:text-cream",
+              props.avatarClassName,
+            )}
             strokeWidth={1.75}
           />
         )}
+        {(props.label ?? (props.showAccountName ? displayName : null)) ? (
+          <span className="min-w-0 flex-1 truncate text-left">{props.label ?? displayName}</span>
+        ) : null}
       </Button>
     );
   }),

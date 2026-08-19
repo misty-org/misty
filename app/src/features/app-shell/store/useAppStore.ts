@@ -16,8 +16,8 @@ export const useAppStore = create<AppStore>((set) => ({
   loadApp: async () => {
     try {
       set({ app: await appSnapshot(), error: null });
-    } catch (error) {
-      set({ error: errorText(error) });
+    } catch {
+      set({ app: null });
     }
   },
 }));

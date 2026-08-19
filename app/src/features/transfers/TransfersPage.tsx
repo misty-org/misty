@@ -1,35 +1,14 @@
-import { createMultiPanelStore, MultiPanelWorkspace } from "@/features/workspace";
-import { memo, useEffect } from "react";
-import {
-  loadTransfersMultiPanelSnapshot,
-  saveTransfersMultiPanelSnapshot,
-} from "./transferPersistence";
+import { memo } from "react";
 import { transferStyles } from "./transferStyles";
 import { TransferWorkspacePane } from "./TransferWorkspacePane";
 
-const useTransfersMultiPanelStore = createMultiPanelStore({
-  idPrefix: "transfers",
-  defaultTitle: "Transfers",
-});
-
+/** Transfers is now a single dock widget. Additional transfer views are
+ * created as workspace tabs/panels instead of using a private pane grid. */
 export const TransfersWorkspace = memo(function TransfersWorkspace() {
-  useEffect(() => {
-    const state = useTransfersMultiPanelStore.getState();
-    if (state.tabs.length === 0) {
-      const snapshot = loadTransfersMultiPanelSnapshot();
-      if (!snapshot || !state.hydrate(snapshot))
-        state.initialize("transfers://history", "Transfers");
-    }
-    saveTransfersMultiPanelSnapshot(useTransfersMultiPanelStore.getState());
-    return useTransfersMultiPanelStore.subscribe(saveTransfersMultiPanelSnapshot);
-  }, []);
-
   return (
-    <MultiPanelWorkspace
-      className={transferStyles.workspace}
-      store={useTransfersMultiPanelStore}
-      renderPane={(paneId) => <TransferWorkspacePane workspaceId={paneId} />}
-    />
+    <section className={transferStyles.workspace}>
+      <TransferWorkspacePane workspaceId="transfers" />
+    </section>
   );
 });
 

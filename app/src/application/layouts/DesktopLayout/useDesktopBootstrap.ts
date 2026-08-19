@@ -8,9 +8,8 @@ import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features
 import { useTransfersStore } from "@/features/transfers";
 import { useMultiPanelStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
 import { settingsFallbackRoute } from "./helpers";
 
 export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => AppTab }) {
@@ -22,8 +21,9 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const transferLoad = useTransfersStore((state) => state.load);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
-  const searchMaintenancePreferences = useSettingsStore(
-    useShallow((state) => selectSearchMaintenancePreferences(state.settings?.document)),
+  const searchMaintenancePreferences = useMemo(
+    () => selectSearchMaintenancePreferences(settings?.document),
+    [settings?.document],
   );
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const activePanePath = useExplorerStore(

@@ -20,11 +20,9 @@ export interface PendingAgentRun {
  * The Agent turns this conversation is still waiting on.
  *
  * This deliberately does not live on the messages. `triggered_runs` is only
- * populated on the send response — every subsequent read of the message list
- * omits it — so any refetch (and one fires on the member's own message.created)
- * wiped the in-flight state milliseconds after it appeared, and the typing
- * indicator never survived long enough to be seen. Keeping the pending turns in
- * their own state means only the run's own lifecycle events clear them.
+ * populated on the send response but omitted from ordinary message snapshots.
+ * Keeping pending turns in their own state means a later snapshot or realtime
+ * merge cannot erase the typing indicator; only run lifecycle events clear it.
  *
  * Becoming in-flight and becoming *visible* are separate: a short delay sits
  * between them so the typing bubble reads as a beat of attention rather than

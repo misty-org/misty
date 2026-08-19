@@ -38,6 +38,7 @@ import {
   uniqueStrings,
 } from "./globalSearch/searchPaths";
 import { mergeLibrarySearchResults } from "./librarySearch";
+import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 
 export const semanticQueryMinimumCharacters = 3;
 export const semanticSearchDebounceMs = 650;
@@ -58,7 +59,10 @@ export async function queryIndexedExplorerSearch(
     scope: options.scope,
     includeFiles: options.includeFiles ?? true,
     includeDirectories: options.includeDirectories ?? true,
-    includeHidden: options.includeHidden ?? false,
+    includeHidden:
+      options.includeHidden ??
+      selectSearchMaintenancePreferences(useSettingsStore.getState().settings?.document)
+        .includeHidden,
     limit: options.limit ?? 100,
     rules: options.rules,
     matchMode: options.matchMode,

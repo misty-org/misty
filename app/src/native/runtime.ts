@@ -18,7 +18,7 @@ export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<voi
 }
 
 export function enableModernWindowStyle(window: unknown): Promise<void> {
-  return invoke("enable_modern_window_style", { window, offsetX: -6, offsetY: 0 });
+  return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 5 });
 }
 
 export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
@@ -31,6 +31,18 @@ export function appSnapshot(): Promise<AppSnapshot> {
 
 export function appEnvironmentSnapshot(): Promise<AppEnvironmentSnapshot> {
   return invoke("app_environment_snapshot");
+}
+
+export function mailCacheRead(accountId: string): Promise<string | null> {
+  return invoke("mail_cache_read", { accountId });
+}
+
+export function mailCacheWrite(accountId: string, value: string): Promise<void> {
+  return invoke("mail_cache_write", { accountId, value });
+}
+
+export function mailCacheRemove(accountId: string): Promise<void> {
+  return invoke("mail_cache_remove", { accountId });
 }
 
 export function appConfigureServer(

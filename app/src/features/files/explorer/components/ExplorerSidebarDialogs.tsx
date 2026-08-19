@@ -26,10 +26,7 @@ import {
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import type { SmartFolderDraft } from "../model/interfaces/components/ExplorerSidebarSupport";
-import type {
-  SmartFolderDialogState,
-  WorkspaceDialogState,
-} from "../model/types/components/ExplorerSidebarSupport";
+import type { SmartFolderDialogState } from "../model/types/components/ExplorerSidebarSupport";
 import { smartFolderQueryFromRules } from "./ExplorerSidebarQuery";
 
 const smartFolderFields = [
@@ -57,88 +54,6 @@ const smartFolderOperators = [
 
 const fieldClass = "grid gap-1.5";
 const fieldLabelClass = "text-xs font-medium text-cream-muted";
-
-export function WorkspaceDialog(props: {
-  state: NonNullable<WorkspaceDialogState>;
-  value: string;
-  onChange: (value: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  if (props.state.kind === "delete") {
-    return (
-      <AlertDialog
-        open
-        onOpenChange={(open) => {
-          if (!open) props.onCancel();
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete file layout</AlertDialogTitle>
-            <AlertDialogDescription>
-              Delete <strong className="font-medium text-cream">{props.state.title}</strong>? This
-              removes the saved layout, not any files.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-charcoal-active text-cream-bright"
-              onClick={props.onConfirm}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    );
-  }
-
-  const title = props.state.kind === "create" ? "New file layout" : "Rename file layout";
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) props.onCancel();
-      }}
-    >
-      <DialogContent className="sm:max-w-sm">
-        <form
-          className="contents"
-          onSubmit={(event) => {
-            event.preventDefault();
-            props.onConfirm();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>Give this Files pane arrangement a clear name.</DialogDescription>
-          </DialogHeader>
-          <div className={fieldClass}>
-            <Label className={fieldLabelClass} htmlFor="workspace-name">
-              Name
-            </Label>
-            <Input
-              id="workspace-name"
-              autoFocus
-              value={props.value}
-              onChange={(event) => props.onChange(event.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={props.onCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!props.value.trim()}>
-              Save
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export function SmartFolderDialog(props: {
   state: NonNullable<SmartFolderDialogState>;
