@@ -1,7 +1,5 @@
 export const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
 export const transferBehaviorOptions = ["Ask Every Time", "Use Default Location"];
-export const scaleOptions = ["Small", "Default", "Large"];
-export const keymapOptions = ["System", "VS Code", "Finder"];
 export const terminalOptions = [
   "System Default",
   "Terminal",
@@ -10,6 +8,13 @@ export const terminalOptions = [
   "Ghostty",
   "Alacritty",
 ];
+export const terminalCursorStyleOptions = ["Block", "Bar", "Underline"];
+export const fileViewModeOptions = ["List", "Grid"];
+export const navigatorWidthOptions = ["Full", "Icons only"];
+export const editorTabSizeOptions = ["2 spaces", "4 spaces", "8 spaces"];
+export const editorTabSizeValues = [2, 4, 8];
+export const autosaveDelayOptions = ["Off", "After 500ms", "After 1s", "After 3s"];
+export const autosaveDelayValues = [0, 500, 1000, 3000];
 // The store already consumes and clamps this to 5-240; these are the values the
 // UI offers.
 export const discoveryIntervalOptions = [5, 15, 30, 60, 240];

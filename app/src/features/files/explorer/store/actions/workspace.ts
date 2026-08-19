@@ -42,81 +42,108 @@ export function createWorkspaceActions(set: ExplorerSet, get: ExplorerGet): Part
 
     initialize: async (homePath) => {
       const multi = useMultiPanelStore.getState();
-      const shouldResetWorkspace = H.consumeExplorerWorkspaceResetFlag();
       if (explorerRuntime.initializationInFlight) return;
-      if (!shouldResetWorkspace && (multi.tabs.length > 0 || get().initialized)) return;
+      // Consumed only once this run is committed. Reading it before the
+      // in-flight guard let a concurrent call clear a pending reset request
+      // and then return without acting on it.
+      const shouldResetWorkspace = H.consumeExplorerWorkspaceResetFlag();
+      // Only `initialized` proves the profile was restored. Tabs can exist
+      // before that — a chrome tab opened by a command, or a remount after a
+      // reset — and treating them as "already set up" returned here forever,
+      // leaving the workspace on its loading shell.
+      if (!shouldResetWorkspace && get().initialized) return;
       explorerRuntime.initializationInFlight = true;
       H.ensureDirectorySizeScheduler();
       void get().loadLibrary();
+      // A rejected restore must never strand the flag: every later call would
+      // return at the guard above and the shell would never resolve.
       try {
-        const [workspaceDocument, processClipboard] = await Promise.all([
-          workspacesSnapshot(),
-          clipboardSnapshot(),
-        ]);
-        const restoredClipboard = H.explorerClipboardFromPayload(processClipboard.local);
-        if (shouldResetWorkspace) {
-          const resetDocument = H.defaultWorkspaceDocument();
-          const workspace = H.defaultNativeWorkspace("workspace_0", "Profile 1", homePath, get());
-          explorerRuntime.workspaceDocumentCache = await H.saveWorkspaceDocument({
-            ...resetDocument,
-            active_workspace_id: workspace.id,
-            next_workspace_idx: 1,
-            workspaces: [workspace],
-          });
-          set({
-            ...H.workspaceMetadata(explorerRuntime.workspaceDocumentCache),
-            clipboard: restoredClipboard,
-            operationError: "Misty reset a damaged Explorer profile and opened a clean file pane.",
-          });
-        } else {
-          explorerRuntime.workspaceDocumentCache = workspaceDocument;
-        }
-        const restored = H.restoreNativeWorkspace(explorerRuntime.workspaceDocumentCache, homePath);
-        if (restored) {
-          if (multi.hydrate(restored.multiPanel)) {
-            const hydratedMulti = useMultiPanelStore.getState();
+        try {
+          const [workspaceDocument, processClipboard] = await Promise.all([
+            workspacesSnapshot(),
+            clipboardSnapshot(),
+          ]);
+          const restoredClipboard = H.explorerClipboardFromPayload(processClipboard.local);
+          if (shouldResetWorkspace) {
+            const resetDocument = H.defaultWorkspaceDocument();
+            const workspace = H.defaultNativeWorkspace("workspace_0", "Profile 1", homePath, get());
+            explorerRuntime.workspaceDocumentCache = await H.saveWorkspaceDocument({
+              ...resetDocument,
+              active_workspace_id: workspace.id,
+              next_workspace_idx: 1,
+              workspaces: [workspace],
+            });
             set({
               ...H.workspaceMetadata(explorerRuntime.workspaceDocumentCache),
-              panes: restored.panes,
-              sidebarVisible: restored.workspace.sidebar_visible,
-              previewVisible: restored.workspace.inspector_visible,
-              sidebarWidth: H.clamp(restored.workspace.sidebar_width, 212, 380),
-              previewWidth: H.clamp(restored.workspace.inspector_width, 240, 420),
-              showHidden: restored.showHidden,
-              paneShowHidden: restored.paneShowHidden,
-              viewMode: restored.viewMode,
-              paneViewModes: restored.paneViewModes,
-              sort: restored.sort,
-              paneSorts: restored.paneSorts,
               clipboard: restoredClipboard,
-              initialized: true,
+              operationError:
+                "Misty reset a damaged Explorer profile and opened a clean file pane.",
             });
-            const activeTab =
-              hydratedMulti.tabs.find((tab) => tab.id === hydratedMulti.activeTabId) ??
-              hydratedMulti.tabs[0];
-            await Promise.all(
-              (activeTab?.panes ?? []).map((pane) => {
-                const restoredPane = restored.panes[pane.id];
-                return restoredPane?.listing &&
-                  !H.isExplorerInternalTabPath(restoredPane.listing.path)
-                  ? get().loadPane(pane.id, restoredPane.listing.path, "replace")
-                  : Promise.resolve();
-              }),
-            );
-            explorerRuntime.initializationInFlight = false;
-            return;
+          } else {
+            explorerRuntime.workspaceDocumentCache = workspaceDocument;
           }
+          const restored = H.restoreNativeWorkspace(
+            explorerRuntime.workspaceDocumentCache,
+            homePath,
+          );
+          if (restored) {
+            if (multi.hydrate(restored.multiPanel)) {
+              const hydratedMulti = useMultiPanelStore.getState();
+              set({
+                ...H.workspaceMetadata(explorerRuntime.workspaceDocumentCache),
+                panes: restored.panes,
+                sidebarVisible: restored.workspace.sidebar_visible,
+                previewVisible: restored.workspace.inspector_visible,
+                sidebarWidth: H.clamp(restored.workspace.sidebar_width, 212, 380),
+                previewWidth: H.clamp(restored.workspace.inspector_width, 240, 420),
+                showHidden: restored.showHidden,
+                paneShowHidden: restored.paneShowHidden,
+                viewMode: restored.viewMode,
+                paneViewModes: restored.paneViewModes,
+                sort: restored.sort,
+                paneSorts: restored.paneSorts,
+                clipboard: restoredClipboard,
+                initialized: true,
+              });
+              const activeTab =
+                hydratedMulti.tabs.find((tab) => tab.id === hydratedMulti.activeTabId) ??
+                hydratedMulti.tabs[0];
+              // A pane that cannot be listed must not fall through to the
+              // fallback below, which would discard the profile just restored.
+              try {
+                await Promise.all(
+                  (activeTab?.panes ?? []).map((pane) => {
+                    const restoredPane = restored.panes[pane.id];
+                    return restoredPane?.listing &&
+                      !H.isExplorerInternalTabPath(restoredPane.listing.path)
+                      ? get().loadPane(pane.id, restoredPane.listing.path, "replace")
+                      : Promise.resolve();
+                  }),
+                );
+              } catch (error) {
+                set({ operationError: `Some panes could not be opened: ${errorText(error)}` });
+              }
+              return;
+            }
+          }
+          set(H.workspaceMetadata(explorerRuntime.workspaceDocumentCache));
+        } catch (error) {
+          set({ operationError: `Profile restore failed: ${errorText(error)}` });
         }
-        set(H.workspaceMetadata(explorerRuntime.workspaceDocumentCache));
-      } catch (error) {
-        set({ operationError: `Profile restore failed: ${errorText(error)}` });
+        multi.initialize(homePath, H.titleFromPath(homePath));
+        const fallbackDocument =
+          explorerRuntime.workspaceDocumentCache ?? H.defaultWorkspaceDocument();
+        set({ ...H.workspaceMetadata(fallbackDocument), initialized: true });
+        // The pane listing is best-effort. An unreadable home directory should
+        // show an empty pane, not hold the whole workspace on its shell.
+        try {
+          await get().loadPane(multi.activePaneId || "explorer-pane-0", homePath, "replace");
+        } catch (error) {
+          set({ operationError: `Could not open ${homePath}: ${errorText(error)}` });
+        }
+      } finally {
+        explorerRuntime.initializationInFlight = false;
       }
-      multi.initialize(homePath, H.titleFromPath(homePath));
-      const fallbackDocument =
-        explorerRuntime.workspaceDocumentCache ?? H.defaultWorkspaceDocument();
-      set({ ...H.workspaceMetadata(fallbackDocument), initialized: true });
-      await get().loadPane(multi.activePaneId || "explorer-pane-0", homePath, "replace");
-      explorerRuntime.initializationInFlight = false;
     },
 
     ensureWorkspace: async (workspaceId, title, homePath) => {

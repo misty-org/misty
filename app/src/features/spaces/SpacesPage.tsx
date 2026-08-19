@@ -10,9 +10,9 @@ import { useSpacesStore } from "./store/useSpacesStore";
 
 import { SpaceDrawings } from "@/features/drawings";
 import { SpaceNotes, spaceNotesEnabled } from "@/features/notes";
-import { SpaceChat } from "@/features/spaces/chat";
 import { SpaceLibrary } from "@/features/spaces/library";
 import { SpacePlanner } from "@/features/spaces/planner";
+import { SpaceChat } from "./chat/SpaceChatEntry";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 import { canOpenMistySpaceSection } from "./mistySpace";

@@ -61,7 +61,7 @@ export function TaskDrawerProperties({
             ["", "Unassigned"],
             ...members.map((member): [string, string] => [`person:${member.user_id}`, member.name]),
             ...agents
-              .filter((agent) => agent.enabled)
+              .filter((agent) => agent.enabled && agent.can_control)
               .map((agent): [string, string] => [
                 `agent:${agent.agent_id}`,
                 `${agent.name} · Agent`,

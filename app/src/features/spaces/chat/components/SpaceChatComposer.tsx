@@ -14,7 +14,7 @@ import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "reac
 import { splitMentionSegments } from "../hooks/mentionHighlight";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { useComposerInput } from "../hooks/useComposerInput";
-import type { SpaceChatDraft } from "../hooks/useSpaceChatDraft";
+import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { ChatAttachmentChips } from "./ChatAttachmentChips";
 import { ChatReplyBanner } from "./ChatReplyBanner";
 import { ChatSuggestionPopover } from "./ChatSuggestionPopover";

@@ -23,7 +23,7 @@ export function CreateEditConversationDialog({
   open,
   onOpenChange,
   members,
-  agents,
+  agents: _agents,
   currentUserId,
   conversation,
   onSaved,
@@ -51,11 +51,9 @@ export function CreateEditConversationDialog({
       conversation?.participants
         .filter((participant) => participant.user_id !== currentUserId)
         .flatMap((participant): SpaceActorRef[] =>
-          participant.kind === "agent" && participant.agent_id
-            ? [{ kind: "agent", agent_id: participant.agent_id }]
-            : participant.user_id
-              ? [{ kind: "person", user_id: participant.user_id }]
-              : [],
+          participant.kind === "person" && participant.user_id
+            ? [{ kind: "person", user_id: participant.user_id }]
+            : [],
         ) ?? [],
     );
   }, [open, conversation, currentUserId]);
@@ -85,9 +83,9 @@ export function CreateEditConversationDialog({
     try {
       const selectedNames = selectedActors
         .map((actor) =>
-          actor.kind === "agent"
-            ? agents.find((agent) => agent.agent_id === actor.agent_id)?.name
-            : otherMembers.find((member) => member.user_id === actor.user_id)?.name,
+          actor.kind === "person"
+            ? otherMembers.find((member) => member.user_id === actor.user_id)?.name
+            : undefined,
         )
         .filter((name): name is string => Boolean(name));
       const resolvedTitle = (title.trim() || selectedNames.join(", ") || "Conversation").slice(
@@ -118,7 +116,7 @@ export function CreateEditConversationDialog({
           <DialogHeader>
             <DialogTitle>{conversation ? "Edit conversation" : "New conversation"}</DialogTitle>
             <DialogDescription>
-              Choose people and Agents. You can change participants later.
+              Choose the people in this conversation. Agents join through explicit mentions.
             </DialogDescription>
           </DialogHeader>
           <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
@@ -151,29 +149,6 @@ export function CreateEditConversationDialog({
                 </span>
               </label>
             ))}
-            {agents
-              .filter((agent) => agent.enabled)
-              .map((agent) => (
-                <label
-                  className="flex min-h-10 items-center gap-3 rounded-md px-3 text-xs hover:bg-charcoal-hover"
-                  key={`agent:${agent.agent_id}`}
-                >
-                  <Checkbox
-                    checked={selectedActors.some(
-                      (actor) => actor.kind === "agent" && actor.agent_id === agent.agent_id,
-                    )}
-                    onCheckedChange={(checked) =>
-                      toggleActor({ kind: "agent", agent_id: agent.agent_id }, Boolean(checked))
-                    }
-                  />
-                  <span className="min-w-0">
-                    <span className="block truncate text-cream">{agent.name}</span>
-                    <span className="block truncate text-[9px] text-cream-muted">
-                      Agent · {agent.space_role || agent.role || "Teammate"}
-                    </span>
-                  </span>
-                </label>
-              ))}
           </fieldset>
           {error ? (
             <p

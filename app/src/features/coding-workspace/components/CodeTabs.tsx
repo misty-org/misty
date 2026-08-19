@@ -26,9 +26,7 @@ export function CodeTabs({ group, isFocused, canSplit }: CodeTabsProps) {
               className={cn(
                 "group relative flex max-w-[240px] shrink-0 items-center gap-2 border-r border-charcoal-border pl-3 pr-2",
                 "font-mono text-[12px]",
-                isActive
-                  ? "bg-charcoal-bg text-cream-bright"
-                  : "text-cream-muted hover:text-cream",
+                isActive ? "bg-charcoal-bg text-cream-bright" : "text-cream-muted hover:text-cream",
               )}
             >
               {isActive && isFocused ? (

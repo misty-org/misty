@@ -66,8 +66,7 @@ export interface AnalyticsEventProperties {
     context_kind: "surface" | "selection" | "task";
   };
   agent_creation_completed: {
-    placed_space_count: number;
-    enabled_action_count: number;
+    default_run_mode: "ask" | "auto" | "full";
     avatar_kind: "preset" | "upload";
   };
   agent_work_outcome_observed: {

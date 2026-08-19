@@ -49,9 +49,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
   onRequestDelete,
 }: CodeExplorerRowProps) {
   const isDirectory = entry.kind === "folder";
-  const expanded = useCodingWorkspaceStore((state) =>
-    state.expandedFolders.includes(entry.path),
-  );
+  const expanded = useCodingWorkspaceStore((state) => state.expandedFolders.includes(entry.path));
   const toggleFolder = useCodingWorkspaceStore((state) => state.toggleFolder);
 
   const [children, setChildren] = useState<FileEntry[] | null>(null);
@@ -67,9 +65,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
         setChildren(sortEntries(listing.entries));
       })
       .catch((nextError: unknown) => {
-        setError(
-          nextError instanceof Error ? nextError.message : "Could not open this folder.",
-        );
+        setError(nextError instanceof Error ? nextError.message : "Could not open this folder.");
       })
       .finally(() => setLoading(false));
   }, [entry.path, expanded, isDirectory, children, loading]);
@@ -82,7 +78,10 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
   const handleContextMenu = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();
-      const action = window.prompt(`Rename or delete "${entry.name}"?\nType "delete" to delete, or the new name to rename.`, entry.name);
+      const action = window.prompt(
+        `Rename or delete "${entry.name}"?\nType "delete" to delete, or the new name to rename.`,
+        entry.name,
+      );
       if (action == null) return;
       if (action.trim() === "delete") {
         if (window.confirm(`Really delete ${entry.name}?`)) {
@@ -127,11 +126,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
         ) : (
           <span className="inline-block w-3 shrink-0" />
         )}
-        {isDirectory ? (
-          <FolderIcon open={expanded} />
-        ) : (
-          <FileIcon name={entry.name} />
-        )}
+        {isDirectory ? <FolderIcon open={expanded} /> : <FileIcon name={entry.name} />}
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
         {status ? (
           <span

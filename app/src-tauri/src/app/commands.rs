@@ -1413,6 +1413,21 @@ pub fn settings_apply_launch_on_login(enabled: bool) -> ApiResult<LaunchOnLoginS
 }
 
 #[tauri::command]
+pub fn coding_ai_read_api_key(provider_id: String) -> ApiResult<Option<String>> {
+    crate::infra::keychain::read_coding_ai_key(&provider_id)
+}
+
+#[tauri::command]
+pub fn coding_ai_write_api_key(provider_id: String, key: String) -> ApiResult<()> {
+    crate::infra::keychain::write_coding_ai_key(&provider_id, &key)
+}
+
+#[tauri::command]
+pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
+    crate::infra::keychain::clear_coding_ai_key(&provider_id)
+}
+
+#[tauri::command]
 pub async fn shortcuts_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<ShortcutsSnapshot> {
     state.commands.snapshot().await
 }
@@ -1423,6 +1438,11 @@ pub async fn shortcuts_save(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<ShortcutsSnapshot> {
     state.commands.save(request).await
+}
+
+#[tauri::command]
+pub async fn shortcuts_reset(state: State<'_, MistyRuntime>) -> ApiResult<ShortcutsSnapshot> {
+    state.commands.reset().await
 }
 
 #[cfg(desktop)]

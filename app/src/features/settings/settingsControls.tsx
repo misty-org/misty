@@ -7,7 +7,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Slider,
   Switch,
+  Textarea,
 } from "@/shared/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Copy } from "lucide-react";
@@ -137,6 +139,150 @@ export function TextControl(props: {
         }
       }}
     />
+  );
+}
+
+/** A continuous value with its current reading, e.g. panel opacity or zoom. */
+export function SliderControl(props: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  disabled: boolean;
+  format?: (value: number) => string;
+  onCommit: (value: number) => void;
+}) {
+  const format = props.format ?? ((value: number) => String(value));
+  return (
+    <div className="flex w-[220px] max-w-full items-center gap-3">
+      <Slider
+        className="flex-1"
+        value={[props.value]}
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        disabled={props.disabled}
+        onValueChange={(next) => {
+          const value = next[0];
+          if (typeof value === "number") props.onCommit(value);
+        }}
+      />
+      <span className="w-12 shrink-0 text-right text-sm tabular-nums text-cream-muted">
+        {format(props.value)}
+      </span>
+    </div>
+  );
+}
+
+export function NumberControl(props: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  disabled: boolean;
+  onCommit: (value: number) => void;
+}) {
+  const commit = (raw: string) => {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return;
+    const clamped = Math.min(props.max, Math.max(props.min, parsed));
+    if (clamped !== props.value) props.onCommit(clamped);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        key={props.value}
+        type="number"
+        className="w-[110px]"
+        defaultValue={props.value}
+        min={props.min}
+        max={props.max}
+        step={props.step ?? 1}
+        disabled={props.disabled}
+        onBlur={(event) => commit(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+      />
+      {props.suffix ? <span className="text-sm text-cream-muted">{props.suffix}</span> : null}
+    </div>
+  );
+}
+
+/** Multi-line free text, committed on blur like {@link TextControl}. */
+export function TextAreaControl(props: {
+  value: string;
+  placeholder?: string;
+  rows?: number;
+  disabled: boolean;
+  onCommit: (value: string) => void;
+}) {
+  return (
+    <Textarea
+      key={props.value}
+      className="w-full max-w-[520px] font-mono text-xs"
+      defaultValue={props.value}
+      placeholder={props.placeholder}
+      rows={props.rows ?? 4}
+      disabled={props.disabled}
+      onBlur={(event) => {
+        if (event.currentTarget.value !== props.value) props.onCommit(event.currentTarget.value);
+      }}
+    />
+  );
+}
+
+/** Picks a single file — the wallpaper row. Mirrors {@link WorkspaceRootControl}. */
+export function FilePathControl(props: {
+  value: string;
+  title: string;
+  filters?: { name: string; extensions: string[] }[];
+  emptyLabel?: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const pickerAvailable = hasTauriInternals();
+  const chooseFile = async () => {
+    if (!pickerAvailable) return;
+    const selection = await open({ title: props.title, multiple: false, filters: props.filters });
+    const path = Array.isArray(selection) ? selection[0] : selection;
+    if (path) props.onChange(path);
+  };
+
+  return (
+    <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
+      <span
+        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-cream" : "text-cream-muted"}`}
+        title={props.value || props.emptyLabel || "None"}
+      >
+        {props.value || props.emptyLabel || "None"}
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          className={settingsControlButtonCompactClass}
+          disabled={props.disabled || !pickerAvailable}
+          title={pickerAvailable ? props.title : "File picker unavailable on this platform"}
+          onClick={() => void chooseFile()}
+        >
+          Choose
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          className={settingsControlButtonCompactClass}
+          disabled={props.disabled || !props.value}
+          onClick={() => props.onChange("")}
+        >
+          Clear
+        </Button>
+      </div>
+    </div>
   );
 }
 

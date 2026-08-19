@@ -1,10 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import {
-  FilePlus,
-  FolderInput,
-  FolderPlus,
-  RotateCcw,
-} from "lucide-react";
+import { FilePlus, FolderInput, FolderPlus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FileEntry } from "@/native/contracts/app-explorer";
 import {
@@ -17,10 +12,7 @@ import {
 } from "../native";
 import { useGitStore } from "../git/useGitStore";
 import { openFileInWorkspace } from "../openFile";
-import {
-  useCodingWorkspaceStore,
-  useDirtyPaths,
-} from "../store/useCodingWorkspaceStore";
+import { useCodingWorkspaceStore, useDirtyPaths } from "../store/useCodingWorkspaceStore";
 import { CodeExplorerRow } from "./CodeExplorerRow";
 
 export function CodeExplorer() {
@@ -62,9 +54,7 @@ export function CodeExplorer() {
       })
       .catch((nextError: unknown) => {
         if (cancelled) return;
-        setError(
-          nextError instanceof Error ? nextError.message : "Could not open that folder.",
-        );
+        setError(nextError instanceof Error ? nextError.message : "Could not open that folder.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -199,9 +189,7 @@ export function CodeExplorer() {
         {loading && rootEntries === null ? (
           <p className="px-3 py-2 text-[11px] italic text-cream-muted/60">Loading…</p>
         ) : null}
-        {error ? (
-          <p className="px-3 py-2 text-[11px] italic text-[#d68b80]">{error}</p>
-        ) : null}
+        {error ? <p className="px-3 py-2 text-[11px] italic text-[#d68b80]">{error}</p> : null}
         {rootEntries?.map((entry) => (
           <CodeExplorerRow
             key={entry.id}

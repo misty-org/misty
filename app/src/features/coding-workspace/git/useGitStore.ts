@@ -59,7 +59,11 @@ export const useGitStore = create<GitState>((set, get) => ({
   clear: () => set({ snapshot: null, diffs: {}, error: null }),
 }));
 
-function parseUnifiedDiff(text: string): { additions: Set<number>; modifications: Set<number>; deletions: Set<number> } {
+function parseUnifiedDiff(text: string): {
+  additions: Set<number>;
+  modifications: Set<number>;
+  deletions: Set<number>;
+} {
   const additions = new Set<number>();
   const modifications = new Set<number>();
   const deletions = new Set<number>();

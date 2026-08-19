@@ -18,6 +18,7 @@ import type { SearchResult, SearchStatus } from "@/native/contracts";
 import type { SearchQueryScope } from "@/native/contracts/primitives";
 import { userFacingErrorText } from "@/shared/lib/format";
 import { create } from "zustand";
+import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 
 const searchDebounceMs = 180;
 const activeStatusPollMs = 500;
@@ -89,11 +90,15 @@ export const useSearchStore = create<SearchStore>((set, get) => ({
   startScan: async (currentPath) => {
     const generation = accountStateGeneration;
     try {
+      const searchPreferences = selectSearchMaintenancePreferences(
+        useSettingsStore.getState().settings?.document,
+      );
       const status = await searchStartScan({
         includeLocal: true,
         includeRemotes: true,
         roots: [],
-        maxDepth: null,
+        maxDepth: searchPreferences.maxDepth,
+        ignoredPaths: searchPreferences.ignoredPaths,
         incremental: true,
       });
       if (generation !== accountStateGeneration) return;

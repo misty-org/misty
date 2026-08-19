@@ -27,10 +27,7 @@ export function languageFor(filename: string): string | null {
   }
 }
 
-export async function getLspClient(
-  language: string,
-  cwd: string,
-): Promise<LspClient | null> {
+export async function getLspClient(language: string, cwd: string): Promise<LspClient | null> {
   const key = keyFor(language, cwd);
   if (startupFailures.has(key)) return null;
   const existing = clients.get(key);

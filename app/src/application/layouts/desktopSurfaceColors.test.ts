@@ -15,8 +15,8 @@ import { describe, expect, it } from "vitest";
 
 describe("desktop warm charcoal surfaces", () => {
   it("uses opaque workspace and sidebar surfaces", () => {
-    expect(desktopTitlebarClass).toContain("bg-charcoal-workspace");
-    expect(desktopTitlebarClass).toContain("border-charcoal-border");
+    expect(desktopTitlebarClass).not.toContain("bg-charcoal-workspace");
+    expect(desktopTitlebarClass).not.toContain("border-charcoal-border");
     expect(desktopTitlebarClass).not.toContain("var(");
     expect(desktopWallpaperLayerClass).toBe("hidden");
     expect(sidebarStyles.root).toContain("bg-charcoal-sidebar");

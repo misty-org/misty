@@ -6,10 +6,6 @@ const transfersTabPath = "misty-transfers://history";
 const remotesTabPath = "misty-remotes://manage";
 const pluginTabProtocol = "misty-plugin:";
 
-export function isTransfersTabPath(path: string): boolean {
-  return path === transfersTabPath;
-}
-
 export function isRemotesTabPath(path: string): boolean {
   return path === remotesTabPath;
 }
@@ -56,6 +52,30 @@ export function openTransfersTab(): WorkspaceTab {
   });
 }
 
+/**
+ * Leaves a chrome tab for an ordinary browse tab.
+ *
+ * The embedded file manager hides its own tab strip because the dock supplies
+ * one, so a chrome tab like Remotes has no visible way back. Falls back to
+ * opening a browse tab when every remaining tab is chrome.
+ */
+export function returnToBrowseTab(
+  fallbackPath: string,
+  store: MultiPanelStoreHook = useMultiPanelStore,
+): void {
+  const browseTab = store.getState().tabs.find((tab) => !isChromeTabPath(tab.path));
+  if (browseTab) {
+    store.getState().selectTab(browseTab.id);
+    return;
+  }
+  store.getState().addTab(fallbackPath, titleForBrowsePath(fallbackPath));
+}
+
+function titleForBrowsePath(path: string): string {
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  return segments[segments.length - 1] || "Home";
+}
+
 export function toggleActiveTabPanelVisibility(panel: "sidebar" | "preview"): void {
   const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
@@ -86,4 +106,7 @@ export function parsePluginTabPath(path: string): PluginTabState | null {
   } catch {
     return null;
   }
+}
+export function isTransfersTabPath(path: string): boolean {
+  return path === transfersTabPath;
 }

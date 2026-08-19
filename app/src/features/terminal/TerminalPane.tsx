@@ -21,11 +21,15 @@ import {
   sessionBySlot,
   titleBySlot,
 } from "./terminalRegistry";
+import { selectTerminalPreferences, useSettingsStore } from "@/features/settings";
+import { useShallow } from "zustand/react/shallow";
 
 type TerminalOutputEvent = { sessionId: string; data: string };
 type TerminalExitEvent = { sessionId: string; exitCode?: number };
 
-const BASE_FONT_SIZE = 13;
+const MISTY_MONOSPACE_STACK =
+  'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace';
+const CURSOR_STYLES = ["block", "bar", "underline"] as const;
 const MIN_FONT_SCALE = 0.6;
 const MAX_FONT_SCALE = 2.0;
 
@@ -65,6 +69,13 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     const sessionIdRef = useRef("");
     const fontScaleRef = useRef(1);
     const [fontScale, setFontScale] = useState(1);
+    const terminalPreferences = useSettingsStore(
+      useShallow((state) => selectTerminalPreferences(state.settings?.document)),
+    );
+    // xterm is built once inside a rAF callback, so the constructor reads
+    // through a ref rather than the render-time value.
+    const preferencesRef = useRef(terminalPreferences);
+    preferencesRef.current = terminalPreferences;
     const [status, setStatus] = useState<"starting" | "running" | "exited" | "unavailable">(
       "starting",
     );
@@ -124,15 +135,15 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           const term = new Terminal({
             allowProposedApi: true,
             allowTransparency: false,
-            cursorBlink: true,
-            cursorStyle: "block",
+            cursorBlink: preferencesRef.current.cursorBlink,
+            cursorStyle: CURSOR_STYLES[preferencesRef.current.cursorStyleIndex] ?? "block",
             cursorInactiveStyle: "outline",
             drawBoldTextInBrightColors: true,
-            fontFamily: 'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace',
-            fontSize: BASE_FONT_SIZE * fontScaleRef.current,
+            fontFamily: preferencesRef.current.fontFamily || MISTY_MONOSPACE_STACK,
+            fontSize: preferencesRef.current.fontSize * fontScaleRef.current,
             lineHeight: 1.3,
             letterSpacing: 0,
-            scrollback: 50_000,
+            scrollback: preferencesRef.current.scrollback,
             smoothScrollDuration: 80,
             macOptionIsMeta: true,
             rightClickSelectsWord: true,
@@ -378,15 +389,29 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       if (focused) terminalRef.current?.focus();
     }, [focused]);
 
-    // Apply font-size changes without rebuilding the terminal.
+    // Apply font and cursor changes without rebuilding the terminal. Both the
+    // Cmd +/- scale and the Terminal settings feed the same font size, so they
+    // are applied together rather than fighting over `term.options`.
     useEffect(() => {
       const term = terminalRef.current;
       if (!term) return;
-      term.options.fontSize = BASE_FONT_SIZE * fontScale;
+      term.options.fontSize = terminalPreferences.fontSize * fontScale;
+      term.options.fontFamily = terminalPreferences.fontFamily || MISTY_MONOSPACE_STACK;
+      term.options.cursorBlink = terminalPreferences.cursorBlink;
+      term.options.cursorStyle = CURSOR_STYLES[terminalPreferences.cursorStyleIndex] ?? "block";
+      term.options.scrollback = terminalPreferences.scrollback;
       fontScaleRef.current = fontScale;
       const id = requestAnimationFrame(fitAndPush);
       return () => cancelAnimationFrame(id);
-    }, [fontScale, fitAndPush]);
+    }, [
+      fitAndPush,
+      fontScale,
+      terminalPreferences.cursorBlink,
+      terminalPreferences.cursorStyleIndex,
+      terminalPreferences.fontFamily,
+      terminalPreferences.fontSize,
+      terminalPreferences.scrollback,
+    ]);
 
     useImperativeHandle(
       handleRef,

@@ -17,9 +17,7 @@ export function OpenFolderCard() {
         setRootPath(selection);
       }
     } catch (nextError) {
-      setError(
-        nextError instanceof Error ? nextError.message : "Could not open that folder.",
-      );
+      setError(nextError instanceof Error ? nextError.message : "Could not open that folder.");
     } finally {
       setBusy(false);
     }
@@ -35,8 +33,8 @@ export function OpenFolderCard() {
         <p className="mt-2 text-sm leading-6 text-cream-muted">
           Point Misty at a project directory to browse files, edit them, and run{" "}
           <span className="font-mono text-[12px] text-cream">claude</span>,{" "}
-          <span className="font-mono text-[12px] text-cream">codex</span>, or any other CLI
-          from the built-in terminal.
+          <span className="font-mono text-[12px] text-cream">codex</span>, or any other CLI from the
+          built-in terminal.
         </p>
         <button
           type="button"

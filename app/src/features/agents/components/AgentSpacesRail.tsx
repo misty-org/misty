@@ -29,10 +29,17 @@ export function AgentSpacesRail({ activity }: { activity?: PersonalAgentActivity
             {runs.slice(0, 4).map((run) => (
               <li key={run.run_id} className="rounded-md px-2 py-1.5">
                 <div className="truncate text-xs text-cream">
-                  {run.task_key} · {run.task_title}
+                  {run.task_id
+                    ? `${run.task_key} · ${run.task_title}`
+                    : run.trigger_kind === "delegated"
+                      ? "Delegated work"
+                      : "Direct instruction"}
                 </div>
                 <div className="mt-0.5 truncate text-[10.5px] capitalize text-cream-muted">
-                  {run.state.replace(/_/g, " ")}
+                  {(run.state === "completed" && run.has_failed_steps
+                    ? "completed_with_errors"
+                    : run.state
+                  ).replace(/_/g, " ")}
                 </div>
               </li>
             ))}

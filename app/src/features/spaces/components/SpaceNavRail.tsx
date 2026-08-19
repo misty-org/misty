@@ -231,9 +231,7 @@ export function reorderSpaceIds(
 
 function readSpaceOrder(): string[] {
   try {
-    const value = JSON.parse(
-      readDeploymentStorageItem(spaceOrderStorageKey) ?? "[]",
-    ) as unknown;
+    const value = JSON.parse(readDeploymentStorageItem(spaceOrderStorageKey) ?? "[]") as unknown;
     return Array.isArray(value)
       ? value.filter((item): item is string => typeof item === "string")
       : [];

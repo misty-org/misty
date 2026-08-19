@@ -3,7 +3,6 @@ import { useAuth } from "@/features/auth";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
 import { useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/api/spaces/api";
 import type { Space, SpaceAgentMembership, SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
@@ -17,7 +16,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { Settings2, UserPlus, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
@@ -28,7 +27,7 @@ const emptyAgents: SpaceAgentMembership[] = [];
 type PresenceStatus = "online" | "idle" | "offline";
 type PresentMember = SpaceMember & { presenceStatus: PresenceStatus };
 
-export function SpaceMembersPopover({ space }: { space: Space }) {
+export function SpaceMembersPopover({ space, trigger }: { space: Space; trigger?: ReactElement }) {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,28 +74,24 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          className={cn(
-            "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
-            "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
-            open && "text-cream-bright",
-          )}
-          variant="ghost"
-          size="icon"
-          type="button"
-          title="Team"
-          aria-label="Space team"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-        >
-          <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
-          {onlineCount > 0 ? (
-            <span
-              className="absolute bottom-1 right-1 size-2.5 rounded-full border-2 border-charcoal-sidebar bg-status-green"
-              aria-hidden="true"
-            />
-          ) : null}
-        </Button>
+        {trigger ?? (
+          <Button
+            className={cn(
+              "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
+              "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
+              open && "text-cream-bright",
+            )}
+            variant="ghost"
+            size="icon"
+            type="button"
+            title="Team"
+            aria-label="Space team"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+          >
+            <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent sideOffset={8} className="w-72 overflow-hidden border-charcoal-border/70 p-0">
@@ -121,13 +116,9 @@ export function SpaceMembersPopover({ space }: { space: Space }) {
               agents={agents}
               onOpenAgent={(agentId) => {
                 setOpen(false);
-                void spacesApi
-                  .directAgentConversation(space.id, agentId)
-                  .then((conversation) =>
-                    navigate(
-                      `/spaces/${encodeURIComponent(space.id)}/chat?conversation=${encodeURIComponent(conversation.id)}`,
-                    ),
-                  );
+                navigate(
+                  `/agents?agent=${encodeURIComponent(agentId)}&space=${encodeURIComponent(space.id)}`,
+                );
               }}
             />
           )}
@@ -232,6 +223,7 @@ function agentWorkStateLabel(agent: SpaceAgentMembership): string {
       queued: "Queued",
       working: "Working",
       awaiting_approval: "Awaiting approval",
+      awaiting_device: "Waiting for device",
       needs_approval: "Needs approval",
       retrying: "Retrying",
       completed: "Ready",

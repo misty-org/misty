@@ -15,18 +15,18 @@ import { pluginCommandsEqual, pluginPanelsEqual } from "../ExplorerWorkspaceUtil
  */
 export function usePluginRegistry(options: {
   extensionsEnabled: boolean;
-  shortcutPreferences: { customShortcutsEnabled: boolean; keymapIndex: number };
+  shortcutPreferences: { customShortcutsEnabled: boolean };
 }) {
   const { extensionsEnabled, shortcutPreferences } = options;
   const [pluginCommands, setPluginCommands] = useState<PluginCommandEntry[]>(emptyPluginCommands);
   const [pluginPanels, setPluginPanels] = useState<PluginPanelEntry[]>(emptyPluginPanels);
-  const shortcutMapRef = useRef(defaultExplorerShortcutMap(shortcutPreferences.keymapIndex));
+  const shortcutMapRef = useRef(defaultExplorerShortcutMap());
   const executableCommandIdsRef = useRef<readonly string[]>(executableShortcutCommands);
   const pluginCommandsRef = useRef<PluginCommandEntry[]>(emptyPluginCommands);
 
   useEffect(() => {
     if (!extensionsEnabled) {
-      shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
+      shortcutMapRef.current = defaultExplorerShortcutMap();
       executableCommandIdsRef.current = executableShortcutCommands;
       pluginCommandsRef.current = emptyPluginCommands;
       setPluginCommands(emptyPluginCommands);
@@ -41,7 +41,7 @@ export function usePluginRegistry(options: {
           pluginCommandsSnapshot(),
         ]);
         if (!disposed) {
-          const fallbackShortcuts = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
+          const fallbackShortcuts = defaultExplorerShortcutMap();
           const shortcutMap = shortcutPreferences.customShortcutsEnabled
             ? shortcutMapFromBindings(shortcutSnapshot.bindings, fallbackShortcuts)
             : fallbackShortcuts;
@@ -67,7 +67,7 @@ export function usePluginRegistry(options: {
         }
       } catch {
         if (!disposed) {
-          shortcutMapRef.current = defaultExplorerShortcutMap(shortcutPreferences.keymapIndex);
+          shortcutMapRef.current = defaultExplorerShortcutMap();
           executableCommandIdsRef.current = executableShortcutCommands;
           pluginCommandsRef.current = emptyPluginCommands;
           setPluginCommands((current) => (current.length === 0 ? current : emptyPluginCommands));
@@ -81,11 +81,7 @@ export function usePluginRegistry(options: {
       disposed = true;
       window.removeEventListener("focus", loadCommandMetadata);
     };
-  }, [
-    extensionsEnabled,
-    shortcutPreferences.customShortcutsEnabled,
-    shortcutPreferences.keymapIndex,
-  ]);
+  }, [extensionsEnabled, shortcutPreferences.customShortcutsEnabled]);
 
   return {
     pluginCommands,
