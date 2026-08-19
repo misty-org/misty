@@ -56,6 +56,26 @@ export function transferProfileOptions(profile: TransferProfileRecord): Transfer
   };
 }
 
+/**
+ * Back to the on-disk shape.
+ *
+ * `transferProfileRecords` reads snake_case JSON into camelCase records, so an
+ * edited profile has to be converted back or the next read silently falls back
+ * to defaults for every renamed field.
+ */
+export function transferProfileDocument(profile: TransferProfileRecord): Record<string, unknown> {
+  return {
+    id: profile.id,
+    name: profile.name,
+    transfers: profile.transfers,
+    checkers: profile.checkers,
+    bandwidth_limit: profile.bandwidthLimit,
+    retries: profile.retries,
+    low_level_retries: profile.lowLevelRetries,
+    checksum: profile.checksum,
+  };
+}
+
 function numberField(record: Record<string, unknown>, key: string, fallback: number): number {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;

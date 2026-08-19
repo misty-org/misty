@@ -8,14 +8,20 @@ import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =
   | "general"
-  | "app"
-  | "agent"
   | "appearance"
   | "notifications"
-  | "privacy"
-  | "transfers"
-  | "search"
   | "shortcuts"
+  | "files"
+  | "search"
+  | "transfers"
+  | "browser"
+  | "terminal"
+  | "code"
+  | "models"
+  | "agents"
+  | "extensions"
+  | "privacy"
+  | "updates"
   | "advanced";
 
 export type SettingValue =
@@ -25,6 +31,8 @@ export interface NavItem {
   id: SettingsSection;
   label: string;
   icon: LucideIcon;
+  group?: string;
+  groupLabel?: string;
 }
 
 export interface SettingsContentProps {
@@ -35,6 +43,7 @@ export interface SettingsContentProps {
   onLoad: () => Promise<void>;
   onShortcutChange: (commandId: string, shortcut: string) => void;
   onSaveShortcuts: () => Promise<void>;
+  onResetShortcuts: () => Promise<void>;
   onRemoveOpenWithAssociation: (key: string) => Promise<void>;
   shortcuts: ShortcutBinding[];
   openWithAssociations: OpenWithAssociation[];

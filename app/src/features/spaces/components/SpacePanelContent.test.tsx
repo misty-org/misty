@@ -49,8 +49,9 @@ describe("SpacePanelContent", () => {
     expect(container.querySelector("header")?.textContent).toBe("Design team");
     expect(container.querySelector('[aria-label^="Space menu"]')).toBeNull();
     expect(container.querySelector("header > div")?.className).not.toContain("bg-charcoal-active");
-    expect(container.querySelector("nav[aria-label='Space sections']")).not.toBeNull();
-    expect(container.querySelector("nav[aria-label='Space management']")).not.toBeNull();
+    expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
+    expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
+    expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();
   });
 
   it("shows only Chat in the canonical Misty Space", async () => {
@@ -75,7 +76,10 @@ describe("SpacePanelContent", () => {
       );
     });
 
-    expect(container.querySelector('a[aria-current="page"]')?.textContent).toContain("Chat");
+    expect(container.querySelector('[aria-label="Space conversations"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Journal");
+    expect(container.textContent).not.toContain("Planner");
+    expect(container.textContent).not.toContain("Library");
     expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
   });
 
@@ -157,10 +161,10 @@ describe("SpacePanelContent", () => {
       vi.advanceTimersByTime(700);
     });
 
-    // Once spin timer finishes, the vertical Space menu and its contextual branch
-    // replace the skeleton together in the sidebar.
+    // Once spin timer finishes, only the selected tool's contextual branch
+    // replaces the skeleton in the sidebar. Top-level Space tools live globally.
     expect(container.querySelector('[role="status"]')).toBeNull();
-    expect(container.querySelector("nav[aria-label='Space sections']")).not.toBeNull();
+    expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
     expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();
     vi.useRealTimers();
   });

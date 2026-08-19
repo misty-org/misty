@@ -127,7 +127,7 @@ pub fn enable_modern_window_style<R: Runtime>(
         let _ = (radius, offset_x, offset_y);
 
         window
-            .with_webview(|webview| {
+            .with_webview(move |webview| {
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
@@ -162,6 +162,12 @@ pub fn enable_modern_window_style<R: Runtime>(
                     let _: () = msg_send![content_view, setNeedsLayout: cocoa::base::YES];
                     let _: () = msg_send![content_view, layoutSubtreeIfNeeded];
                     let _: () = msg_send![webview_view, setNeedsDisplay: cocoa::base::YES];
+
+                    position_traffic_lights(
+                        ns_window,
+                        offset_x.unwrap_or(0.0),
+                        offset_y.unwrap_or(0.0),
+                    );
                 }
             })
             .map_err(|e| e.to_string())?;

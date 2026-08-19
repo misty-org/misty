@@ -64,7 +64,10 @@ export function SpaceTaskBoard({
 
   return (
     <div
-      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-auto"
+      // The board scrolls sideways only. Scrolling it vertically let the
+      // columns grow past the viewport, so the tallest one dragged the whole
+      // board instead of each column scrolling its own tasks.
+      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden"
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (

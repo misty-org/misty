@@ -8,12 +8,36 @@ const appZoomStep = 0.1;
 
 let nativeZoomSupported: boolean | null = null;
 let zoomApplySequence = 0;
-let appliedAppZoom = 1;
+let appliedAppZoom = loadStoredAppZoom();
 
 export const appZoomChangedEvent = "misty:app-zoom-changed";
 
 export function getAppliedAppZoom(): number {
   return appliedAppZoom;
+}
+
+/**
+ * Sets the zoom from outside the keyboard shortcuts — currently the Appearance
+ * settings row. Both paths write the same storage key and announce the result
+ * on `appZoomChangedEvent`, so whichever one moved last, the other resyncs.
+ */
+export function setAppZoom(zoom: number): void {
+  const clamped = clampAppZoom(zoom);
+  if (clamped === appliedAppZoom) return;
+  saveStoredAppZoom(clamped);
+  void applyAppZoom(clamped);
+}
+
+/** Read-only view of the live zoom, for UI that displays but does not own it. */
+export function useAppZoomValue(): number {
+  const [zoom, setZoom] = useState(getAppliedAppZoom);
+  useEffect(() => {
+    const sync = () => setZoom(getAppliedAppZoom());
+    sync();
+    window.addEventListener(appZoomChangedEvent, sync);
+    return () => window.removeEventListener(appZoomChangedEvent, sync);
+  }, []);
+  return zoom;
 }
 
 export function useAppZoom() {
@@ -64,6 +88,12 @@ export function useAppZoom() {
     },
     [],
   );
+
+  useEffect(() => {
+    const sync = () => setClampedZoom(getAppliedAppZoom());
+    window.addEventListener(appZoomChangedEvent, sync);
+    return () => window.removeEventListener(appZoomChangedEvent, sync);
+  }, [setClampedZoom]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

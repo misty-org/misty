@@ -30,11 +30,8 @@ const mistyTheme = EditorView.theme(
       color: palette.fg,
       backgroundColor: palette.bg,
       height: "100%",
-      fontSize: "12.5px",
     },
     ".cm-scroller": {
-      fontFamily:
-        'ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace',
       lineHeight: "1.65",
       overflow: "auto",
     },
@@ -112,7 +109,17 @@ const mistyHighlight = HighlightStyle.define([
   { tag: t.invalid, color: "#efab9f" },
 ]);
 
-export const mistyCodeMirrorTheme: Extension = [
-  mistyTheme,
-  syntaxHighlighting(mistyHighlight),
-];
+export function createEditorTypographyTheme(fontSize = 12.5, fontFamily = ""): Extension {
+  return EditorView.theme({
+    "&": {
+      fontSize: `${fontSize}px`,
+    },
+    ".cm-scroller": {
+      fontFamily: fontFamily.trim()
+        ? `${fontFamily}, ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace`
+        : 'ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace',
+    },
+  });
+}
+
+export const mistyCodeMirrorTheme: Extension = [mistyTheme, syntaxHighlighting(mistyHighlight)];

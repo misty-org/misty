@@ -1,7 +1,10 @@
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import type { SettingsScaleToken } from "../types/store";
+import { booleanSetting, numberSetting, sectionRecord, stringSetting } from "../settingsControls";
 
-const defaultAdvancedServerAddress = isNativeMobileBuild ? "" : "localhost:50051";
+export const settingsBoolean = booleanSetting;
+export const settingsNumber = numberSetting;
+export const settingsString = stringSetting;
+
 const deviceNotificationsKey = "device_notifications_enabled";
 const legacyDesktopNotificationsKey = ["desktop", "notifications", "enabled"].join("_");
 export const notificationsDeviceKey = isNativeMobileBuild
@@ -13,16 +16,68 @@ export function selectAppearancePreferences(
 ): AppearancePreferences {
   const source = document ?? {};
   return {
+    appZoom: clampSettingsNumber(settingsNumber(source, "appearance", "app_zoom", 1), 0.5, 2),
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
-    fontSize: settingsScaleToken(settingsNumber(source, "appearance", "font_size_index", 1)),
-    reducedMotionEnabled: settingsBoolean(source, "appearance", "reduced_motion_enabled", false),
+    navigatorAutoHide: settingsBoolean(source, "appearance", "navigator_auto_hide", false),
+    navigatorWidthIndex: settingsNumber(source, "appearance", "navigator_width_index", 0),
+    panelOpacity: clampSettingsNumber(
+      settingsNumber(source, "appearance", "panel_opacity", 0.82),
+      0.4,
+      1,
+    ),
     thumbnailPreviewsEnabled: settingsBoolean(
       source,
       "appearance",
       "thumbnail_previews_enabled",
       true,
     ),
-    uiScale: settingsScaleToken(settingsNumber(source, "appearance", "ui_scale_index", 1)),
+    wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
+  };
+}
+
+export function selectFilePreferences(
+  document: Record<string, unknown> | null | undefined,
+): FilePreferences {
+  const source = document ?? {};
+  return {
+    defaultViewModeIndex: settingsNumber(source, "files", "default_view_mode_index", 0),
+    showHiddenFiles: settingsBoolean(source, "files", "show_hidden_files", false),
+  };
+}
+
+export function selectTerminalPreferences(
+  document: Record<string, unknown> | null | undefined,
+): TerminalPreferences {
+  const source = document ?? {};
+  return {
+    cursorBlink: settingsBoolean(source, "terminal", "cursor_blink", true),
+    cursorStyleIndex: settingsNumber(source, "terminal", "cursor_style_index", 0),
+    fontFamily: settingsString(source, "terminal", "font_family", ""),
+    fontSize: clampSettingsNumber(settingsNumber(source, "terminal", "font_size", 13), 8, 32),
+    scrollback: clampSettingsNumber(
+      settingsNumber(source, "terminal", "scrollback", 50_000),
+      1_000,
+      500_000,
+    ),
+  };
+}
+
+export function selectEditorPreferences(
+  document: Record<string, unknown> | null | undefined,
+): EditorPreferences {
+  const source = document ?? {};
+  return {
+    autosaveDelayMs: clampSettingsNumber(
+      settingsNumber(source, "editor", "autosave_delay_ms", 1000),
+      0,
+      30_000,
+    ),
+    fontFamily: settingsString(source, "editor", "font_family", ""),
+    fontSize: clampSettingsNumber(settingsNumber(source, "editor", "font_size", 12.5), 8, 32),
+    formatOnSave: settingsBoolean(source, "editor", "format_on_save", false),
+    lineNumbers: settingsBoolean(source, "editor", "line_numbers", true),
+    tabSize: clampSettingsNumber(settingsNumber(source, "editor", "tab_size", 2), 1, 8),
+    wordWrap: settingsBoolean(source, "editor", "word_wrap", true),
   };
 }
 
@@ -81,6 +136,9 @@ export function selectGeneralPreferences(
     ),
     openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
+    reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
+    searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),
+    startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
   };
 }
 
@@ -93,9 +151,8 @@ export function selectAgentPreferences(
   // "agent", so the stored document for every existing user still uses the old
   // key until they next save. Read the current key first and fall back, or the
   // rename silently disables Agents for everyone who already had them on.
-  const current = settingsSectionRecord(source, "agent");
-  const agent =
-    Object.keys(current).length > 0 ? current : settingsSectionRecord(source, "assistant");
+  const current = sectionRecord(source, "agent");
+  const agent = Object.keys(current).length > 0 ? current : sectionRecord(source, "assistant");
   const scopesValue = agent.scopes;
   const scopes =
     scopesValue && typeof scopesValue === "object" && !Array.isArray(scopesValue)
@@ -117,7 +174,6 @@ export function selectShortcutPreferences(
   const source = document ?? {};
   return {
     customShortcutsEnabled: settingsBoolean(source, "shortcuts", "custom_shortcuts_enabled", false),
-    keymapIndex: settingsNumber(source, "shortcuts", "keymap_index", 0),
     shortcutHintsEnabled: settingsBoolean(source, "shortcuts", "shortcut_hints_enabled", true),
   };
 }
@@ -129,12 +185,6 @@ export function selectAdvancedPreferences(
   return {
     extensionToolsPath: settingsString(source, "advanced", "extension_tools_path", ""),
     mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
-    serverAddress: settingsString(
-      source,
-      "advanced",
-      "server_address",
-      defaultAdvancedServerAddress,
-    ),
   };
 }
 
@@ -154,65 +204,55 @@ export function selectSearchMaintenancePreferences(
       5,
       240,
     ),
+    ignoredPaths: parsePathList(settingsString(source, "search", "ignored_paths", "")),
+    includeHidden: settingsBoolean(source, "search", "include_hidden", false),
+    maxDepth: clampSettingsNumber(settingsNumber(source, "search", "max_depth", 18), 1, 64),
   };
 }
 
-export function settingsNumber(
-  document: Record<string, unknown>,
-  section: string,
-  key: string,
-  fallback: number,
-): number {
-  const value = settingsSectionRecord(document, section)[key];
-  return typeof value === "number" ? value : fallback;
-}
-
-export function settingsBoolean(
-  document: Record<string, unknown>,
-  section: string,
-  key: string,
-  fallback: boolean,
-): boolean {
-  const value = settingsSectionRecord(document, section)[key];
-  return typeof value === "boolean" ? value : fallback;
-}
-
-export function settingsString(
-  document: Record<string, unknown>,
-  section: string,
-  key: string,
-  fallback: string,
-): string {
-  const value = settingsSectionRecord(document, section)[key];
-  return typeof value === "string" ? value : fallback;
-}
-
-function settingsScaleToken(index: number): SettingsScaleToken {
-  if (index === 0) return "small";
-  if (index === 2) return "large";
-  return "default";
+/** Newline- or comma-separated in the settings field, a list everywhere else. */
+export function parsePathList(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }
 
 function clampSettingsNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function settingsSectionRecord(
-  document: Record<string, unknown>,
-  section: string,
-): Record<string, unknown> {
-  const value = document[section];
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+export interface AppearancePreferences {
+  appZoom: number;
+  compactModeEnabled: boolean;
+  navigatorAutoHide: boolean;
+  navigatorWidthIndex: number;
+  panelOpacity: number;
+  thumbnailPreviewsEnabled: boolean;
+  wallpaperPath: string;
 }
 
-export interface AppearancePreferences {
-  compactModeEnabled: boolean;
-  fontSize: SettingsScaleToken;
-  reducedMotionEnabled: boolean;
-  thumbnailPreviewsEnabled: boolean;
-  uiScale: SettingsScaleToken;
+export interface FilePreferences {
+  defaultViewModeIndex: number;
+  showHiddenFiles: boolean;
+}
+
+export interface TerminalPreferences {
+  cursorBlink: boolean;
+  cursorStyleIndex: number;
+  fontFamily: string;
+  fontSize: number;
+  scrollback: number;
+}
+
+export interface EditorPreferences {
+  autosaveDelayMs: number;
+  fontFamily: string;
+  fontSize: number;
+  formatOnSave: boolean;
+  lineNumbers: boolean;
+  tabSize: number;
+  wordWrap: boolean;
 }
 
 export interface NotificationPreferences {
@@ -230,6 +270,9 @@ export interface GeneralPreferences {
   defaultTransferBehaviorIndex: number;
   openLinksExternally: boolean;
   preferredWorkspaceRoot: string;
+  reopenLastSession: boolean;
+  searchEngineIndex: number;
+  startupViewIndex: number;
 }
 
 export interface AgentPreferences {
@@ -243,17 +286,18 @@ export interface AgentPreferences {
 
 export interface ShortcutPreferences {
   customShortcutsEnabled: boolean;
-  keymapIndex: number;
   shortcutHintsEnabled: boolean;
 }
 
 export interface AdvancedPreferences {
   extensionToolsPath: string;
   mountPath: string;
-  serverAddress: string;
 }
 
 export interface SearchMaintenancePreferences {
   automaticFileDiscoveryEnabled: boolean;
   discoveryIntervalMinutes: number;
+  ignoredPaths: string[];
+  includeHidden: boolean;
+  maxDepth: number;
 }

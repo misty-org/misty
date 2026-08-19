@@ -7,7 +7,13 @@ import {
   findDockLeaf,
   insertDockSplit,
 } from "./dockTree";
-import { blankBrowserUrl, defaultBrowserHomeUrl, parseBrowserTabState } from "./model";
+import {
+  blankBrowserUrl,
+  defaultBrowserHomeUrl,
+  parseBrowserTabState,
+  type WorkspaceTab,
+} from "./model";
+import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 const browserRequest = {
@@ -22,6 +28,171 @@ describe("desktop dock store", () => {
   beforeEach(() => {
     useWorkspaceStore.persist.clearStorage();
     useWorkspaceStore.getState().reset();
+  });
+
+  it("keeps a Home tab instead of ever emptying the workspace", () => {
+    const store = useWorkspaceStore.getState();
+    store.openSurface({
+      surfaceId: "terminal",
+      groupKey: "tool:terminal",
+      title: "Terminal",
+      route: "/terminal",
+      instancePolicy: "single",
+    });
+    for (const tab of dockTabs(useWorkspaceStore.getState().layout.root)) {
+      useWorkspaceStore.getState().closeTab(tab.id);
+    }
+
+    // Closing everything leaves Home behind, so no part of the app has to
+    // handle a zero-tab workspace.
+    const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toMatchObject({ surfaceId: "home", route: "/home" });
+  });
+
+  it("stacks Home tabs on request but never from a route", () => {
+    const home = {
+      surfaceId: "home" as const,
+      groupKey: "tool:home" as const,
+      title: "Home",
+      route: "/home",
+    };
+    // Reset already leaves one Home tab behind.
+    const store = useWorkspaceStore.getState();
+    store.openSurface({ ...home, forceNew: true });
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).filter((tab) => tab.surfaceId === "home"),
+    ).toHaveLength(2);
+
+    // Navigating to /home lands on a Home tab you already have. The fallback
+    // Home is created outside openSurface, so this must not depend on
+    // lastUsedTabByGroup being populated.
+    useWorkspaceStore.getState().openSurface(home);
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).filter((tab) => tab.surfaceId === "home"),
+    ).toHaveLength(2);
+  });
+
+  it("lets a real tab take the filler Home's place", () => {
+    // The counterpart to stacking: a pane showing only the fallback Home is
+    // showing a placeholder, so the first real tab replaces it.
+    useWorkspaceStore.getState().openSurface({
+      surfaceId: "terminal",
+      groupKey: "tool:terminal",
+      title: "Terminal",
+      route: "/terminal",
+      instancePolicy: "single",
+    });
+    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId)).toEqual([
+      "terminal",
+    ]);
+  });
+
+  it("gives each Space its own tabs and restores them on the way back", () => {
+    const store = useWorkspaceStore.getState();
+    store.setScope("space:family");
+    store.openSurface({
+      surfaceId: "terminal",
+      groupKey: "tool:terminal",
+      title: "Terminal",
+      route: "/terminal",
+      instancePolicy: "single",
+    });
+
+    useWorkspaceStore.getState().setScope("space:work");
+    expect(dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId)).toEqual([
+      "home",
+    ]);
+
+    useWorkspaceStore.getState().setScope("space:family");
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
+    ).toContain("terminal");
+  });
+
+  it("adopts the default Space once, then leaves the user's choice alone", () => {
+    const store = useWorkspaceStore.getState();
+    store.openSurface({
+      surfaceId: "terminal",
+      groupKey: "tool:terminal",
+      title: "Terminal",
+      route: "/terminal",
+      instancePolicy: "single",
+    });
+
+    // The bootstrap scope's tabs come along rather than being stranded.
+    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:misty");
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
+    ).toContain("terminal");
+
+    useWorkspaceStore.getState().setScope("space:family");
+    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
+  });
+
+  it("restores a saved transfers tab as its own tool", () => {
+    const legacyTab = {
+      id: "tab:legacy",
+      surfaceId: "transfers",
+      groupKey: "tool:transfers",
+      instanceKey: "transfers:one",
+      title: "Transfers",
+      route: "/transfers",
+      sidebarVisible: true,
+      state: {},
+      createdAt: 1,
+      lastFocusedAt: 1,
+    } as unknown as WorkspaceTab;
+    const leaf = createDockLeaf([legacyTab]);
+
+    useWorkspaceStore.getState().replaceSnapshot({
+      version: 2,
+      accountId: "account",
+      deviceId: "device",
+      savedAt: 1,
+      layout: { root: leaf, focusedPaneId: leaf.id },
+      lastUsedTabByGroup: {},
+    });
+
+    const restored = dockTabs(useWorkspaceStore.getState().layout.root);
+    expect(restored).toHaveLength(1);
+    expect(restored[0].surfaceId).toBe("transfers");
+    expect(restored[0].groupKey).toBe("tool:transfers");
+    expect(restored[0].route).toBe("/transfers");
+  });
+
+  it("restores a legacy Space tab as its concrete tool tab", () => {
+    const legacyTab: WorkspaceTab = {
+      id: "tab:legacy-space",
+      surfaceId: "space",
+      groupKey: "space:one",
+      instanceKey: "one",
+      title: "One",
+      route: "/spaces/one/chat",
+      sidebarVisible: true,
+      state: {},
+      createdAt: 1,
+      lastFocusedAt: 1,
+    };
+    const pane = createDockLeaf([legacyTab]);
+
+    useWorkspaceStore.getState().replaceSnapshot({
+      version: 2,
+      accountId: "account-1",
+      deviceId: "device-1",
+      savedAt: 1,
+      layout: { root: pane, focusedPaneId: pane.id },
+      lastUsedTabByGroup: { "space:one": legacyTab.id },
+    });
+
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]).toMatchObject({
+      id: legacyTab.id,
+      groupKey: "space:one:chat",
+      instanceKey: "one:chat",
+      title: "Chat",
+    });
   });
 
   it("opens a browser tab on the default homepage when no URL is requested", () => {
@@ -94,6 +265,26 @@ describe("desktop dock store", () => {
         (tab) => tab.id === first.id,
       ),
     ).toBe(true);
+  });
+
+  it("opens Journal and Planner as separate reusable tabs in one Space", () => {
+    const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
+    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/planner/tasks/board");
+    expect(journalRequest).not.toBeNull();
+    expect(plannerRequest).not.toBeNull();
+
+    const journal = useWorkspaceStore.getState().openSurface(journalRequest!);
+    const planner = useWorkspaceStore.getState().openSurface(plannerRequest!);
+
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:one");
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { id: journal.id, groupKey: "space:one:journal", title: "Journal" },
+      { id: planner.id, groupKey: "space:one:planner", title: "Planner" },
+    ]);
+    expect(
+      useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/spaces/one/notes/2")!)
+        .id,
+    ).toBe(journal.id);
   });
 
   it("builds arbitrary nested splits and persists their ratios", () => {

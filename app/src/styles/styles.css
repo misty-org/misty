@@ -55,6 +55,18 @@
     box-sizing: border-box;
   }
 
+  /* Tailwind v4 resolves an uncolored `border-*` utility to currentColor, which
+     paints bright text-coloured rules across this dark theme. Anchor the
+     default to the theme border so only a deliberate `border-<color>` stands
+     out. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-charcoal-border);
+  }
+
   html,
   body,
   #root {
@@ -87,6 +99,19 @@
   #root {
     overflow: hidden;
     background-color: #131313;
+  }
+
+  /* Panel opacity only means something when there is something behind the app
+     to see. The wallpaper plays on a native layer beneath the transparent
+     webview, so the base surfaces thin out to let it through; with no
+     wallpaper set these rules are inert and the app stays fully opaque. */
+  html[data-wallpaper-active="true"] body,
+  html[data-wallpaper-active="true"] #root {
+    background-color: rgb(19 19 19 / var(--misty-panel-opacity, 1));
+  }
+
+  html[data-wallpaper-active="true"] [data-misty-desktop-frame] {
+    background-color: transparent;
   }
 
   /* Native browser tabs normally sit above the app renderer. While a Misty

@@ -26,12 +26,12 @@ describe("browser address normalization", () => {
 
 describe("native browser bounds", () => {
   it("converts zoomed CSS pixels into window coordinates", () => {
-    expect(
-      browserBoundsAtAppZoom(
-        { x: 72, y: 110, width: 900, height: 600 },
-        1.25,
-      ),
-    ).toEqual({ x: 90, y: 137.5, width: 1125, height: 750 });
+    expect(browserBoundsAtAppZoom({ x: 72, y: 110, width: 900, height: 600 }, 1.25)).toEqual({
+      x: 90,
+      y: 137.5,
+      width: 1125,
+      height: 750,
+    });
   });
 
   it("falls back safely when the app zoom is invalid", () => {

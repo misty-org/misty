@@ -2,8 +2,9 @@ import { agentsApi } from "@/api/agents/api";
 import type { AgentToolboxResponse } from "@/api/spaces/dto/interfaces/agentArchitectureTypes";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
-import type { GatewayModel, PersonalAgent, PersonalAgentGrant } from "../model/interfaces/personal";
+import type { GatewayModel, PersonalAgent } from "../model/interfaces/personal";
 import { initialAgentModelId } from "../modelSelection";
+import { clearAllAgentCaches } from "../agentCacheLifecycle";
 
 type AgentInput = Pick<
   PersonalAgent,
@@ -16,8 +17,8 @@ type AgentInput = Pick<
   | "model_mode"
   | "model_id"
   | "reasoning_effort"
-  | "context_permissions"
-  | "tool_permissions"
+  | "default_run_mode"
+  | "voice_id"
   | "enabled"
 > & { version?: number };
 
@@ -26,14 +27,9 @@ export const personalAgentsApi = {
   create: (input: AgentInput) => agentsApi.create<PersonalAgent>(input),
   update: (id: string, input: AgentInput) => agentsApi.update<PersonalAgent>(id, input),
   remove: agentsApi.remove,
-  grants: (id: string) => agentsApi.grants<PersonalAgentGrant>(id),
   toolboxCatalog: () => agentsApi.toolboxCatalog<AgentToolboxResponse>(),
   toolbox: (id: string) => agentsApi.toolbox<AgentToolboxResponse>(id),
   uploadAvatar: (id: string, file: File) => agentsApi.uploadAvatar<PersonalAgent>(id, file),
-  replaceGrants: (
-    id: string,
-    spaces: Array<{ space_id: string; all_members: boolean; member_user_ids: string[] }>,
-  ) => agentsApi.replaceGrants<PersonalAgentGrant>(id, spaces),
   models: () => agentsApi.models<GatewayModel>(),
 };
 
@@ -51,12 +47,15 @@ interface PersonalAgentsStore {
   loading: boolean;
   loaded: boolean;
   error: string | null;
-  load: () => Promise<void>;
+  load: (options?: { force?: boolean }) => Promise<void>;
   save: (id: string | null, input: AgentInput) => Promise<PersonalAgent>;
   remove: (id: string) => Promise<void>;
 }
 
 let personalAgentsAccountGeneration = 0;
+let personalAgentsLoadPromise: Promise<void> | null = null;
+let personalAgentsLoadedAt = 0;
+const personalAgentsFreshnessMs = 5 * 60_000;
 
 export const usePersonalAgentsStore = create<PersonalAgentsStore>((set, get) => ({
   agents: [],
@@ -64,22 +63,38 @@ export const usePersonalAgentsStore = create<PersonalAgentsStore>((set, get) => 
   loading: false,
   loaded: false,
   error: null,
-  load: async () => {
+  load: async (options) => {
+    if (personalAgentsLoadPromise) return personalAgentsLoadPromise;
+    if (
+      !options?.force &&
+      get().loaded &&
+      Date.now() - personalAgentsLoadedAt < personalAgentsFreshnessMs
+    )
+      return;
     const generation = personalAgentsAccountGeneration;
-    set({ loading: true, error: null });
-    const [agents, models] = await Promise.allSettled([
-      personalAgentsApi.list(),
-      personalAgentsApi.models(),
-    ]);
-    if (generation !== personalAgentsAccountGeneration) return;
-    set({
-      agents:
-        agents.status === "fulfilled" ? agents.value.agents.map(withConcreteModelSelection) : [],
-      models: models.status === "fulfilled" ? models.value.models.filter(isMajorProviderModel) : [],
-      loading: false,
-      loaded: true,
-      error: agents.status === "rejected" ? errorText(agents.reason) : null,
-    });
+    const request = (async () => {
+      set({ loading: true, error: null });
+      const [agents, models] = await Promise.allSettled([
+        personalAgentsApi.list(),
+        personalAgentsApi.models(),
+      ]);
+      if (generation !== personalAgentsAccountGeneration) return;
+      personalAgentsLoadedAt = Date.now();
+      set({
+        agents:
+          agents.status === "fulfilled" ? agents.value.agents.map(withConcreteModelSelection) : [],
+        models: models.status === "fulfilled" ? models.value.models.filter(isMajorProviderModel) : [],
+        loading: false,
+        loaded: true,
+        error: agents.status === "rejected" ? errorText(agents.reason) : null,
+      });
+    })();
+    personalAgentsLoadPromise = request;
+    try {
+      await request;
+    } finally {
+      if (personalAgentsLoadPromise === request) personalAgentsLoadPromise = null;
+    }
   },
   save: async (id, input) => {
     const generation = personalAgentsAccountGeneration;
@@ -109,6 +124,9 @@ export const usePersonalAgentsStore = create<PersonalAgentsStore>((set, get) => 
 
 export function resetPersonalAgentsAccountState(): void {
   personalAgentsAccountGeneration += 1;
+  personalAgentsLoadPromise = null;
+  personalAgentsLoadedAt = 0;
+  clearAllAgentCaches();
   usePersonalAgentsStore.setState({
     agents: [],
     models: [],

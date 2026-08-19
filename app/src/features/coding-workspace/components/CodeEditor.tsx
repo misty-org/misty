@@ -1,12 +1,6 @@
 import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import {
-  bracketMatching,
-  foldGutter,
-  foldKeymap,
-  indentOnInput,
-  indentUnit,
-} from "@codemirror/language";
+import { bracketMatching, foldGutter, foldKeymap, indentOnInput } from "@codemirror/language";
 import {
   forceLinting,
   forEachDiagnostic,
@@ -23,7 +17,6 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
   keymap,
-  lineNumbers,
 } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
 import { gitGutter, pushGitDiff } from "../git/gitGutter";
@@ -36,6 +29,18 @@ import { codeWriteTextFile } from "../native";
 import { loadCodeMirrorLanguage } from "./codeMirrorLanguages";
 import { mistyCodeMirrorTheme } from "./codeMirrorTheme";
 import { lintersFor } from "./linters";
+import {
+  selectEditorPreferences,
+  type EditorPreferences,
+  useSettingsStore,
+} from "@/features/settings";
+import { useShallow } from "zustand/react/shallow";
+import {
+  createEditorCompartments,
+  buildConfigurableExtensions,
+  reconfigureEditorPreferences,
+  type EditorCompartments,
+} from "./editorCompartments";
 
 const CONTENT_DEBOUNCE_MS = 400;
 const CURSOR_THROTTLE_MS = 100;
@@ -48,6 +53,13 @@ interface CodeEditorProps {
 export function CodeEditor({ tab, groupId }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const compartmentsRef = useRef<EditorCompartments | null>(null);
+
+  const editorPrefs = useSettingsStore(
+    useShallow((state) => selectEditorPreferences(state.settings?.document)),
+  );
+  const editorPrefsRef = useRef(editorPrefs);
+  editorPrefsRef.current = editorPrefs;
 
   const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
   const gitDiff = useGitStore((state) => state.diffs[tab.path]);
@@ -60,14 +72,25 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
   }, [tab.path, rootPath]);
 
   useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !compartmentsRef.current) return;
+    reconfigureEditorPreferences(view, compartmentsRef.current, editorPrefs);
+  }, [editorPrefs]);
+
+  useEffect(() => {
     const host = hostRef.current;
     if (!host || tab.loading || tab.error) return;
 
+    const compartments = createEditorCompartments();
+    compartmentsRef.current = compartments;
     const languageCompartment = new Compartment();
     const state = EditorState.create({
       doc: tab.contents,
       extensions: buildExtensions({
         languageCompartment,
+        compartments,
+        editorPrefs,
+        editorPrefsRef,
         linters: lintExtensions,
         lspExtensions,
         basicAutocomplete: lspExtensions.length === 0,
@@ -185,6 +208,9 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
 
 interface BuildOpts {
   languageCompartment: Compartment;
+  compartments: EditorCompartments;
+  editorPrefs: EditorPreferences;
+  editorPrefsRef: React.MutableRefObject<EditorPreferences>;
   linters: Extension[];
   lspExtensions: Extension[];
   basicAutocomplete: boolean;
@@ -195,6 +221,9 @@ interface BuildOpts {
 
 function buildExtensions({
   languageCompartment,
+  compartments,
+  editorPrefs,
+  editorPrefsRef,
   linters,
   lspExtensions,
   basicAutocomplete,
@@ -203,6 +232,7 @@ function buildExtensions({
   readonly,
 }: BuildOpts): Extension[] {
   let pendingContentTimer: number | null = null;
+  let pendingAutosaveTimer: number | null = null;
   let lastCursorAt = 0;
   let cursorScheduled: number | null = null;
 
@@ -229,6 +259,16 @@ function buildExtensions({
     }, CONTENT_DEBOUNCE_MS);
   };
 
+  const scheduleAutosave = (view: EditorView) => {
+    if (pendingAutosaveTimer !== null) window.clearTimeout(pendingAutosaveTimer);
+    const delay = editorPrefsRef.current.autosaveDelayMs;
+    if (delay <= 0) return;
+    pendingAutosaveTimer = window.setTimeout(() => {
+      pendingAutosaveTimer = null;
+      void saveTab(path, view.state.doc.toString());
+    }, delay);
+  };
+
   const scheduleCursor = (view: EditorView) => {
     const now = performance.now();
     const elapsed = now - lastCursorAt;
@@ -246,12 +286,11 @@ function buildExtensions({
   };
 
   const extensions: Extension[] = [
-    lineNumbers(),
+    ...buildConfigurableExtensions(compartments, editorPrefs),
     foldGutter(),
     gitGutter(),
     history(),
     indentOnInput(),
-    indentUnit.of("  "),
     bracketMatching(),
     closeBrackets(),
     highlightActiveLine(),
@@ -298,11 +337,13 @@ function buildExtensions({
         },
       },
     ]),
-    EditorView.lineWrapping,
     EditorState.readOnly.of(readonly),
     mistyCodeMirrorTheme,
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) scheduleContent(update.view);
+      if (update.docChanged) {
+        scheduleContent(update.view);
+        scheduleAutosave(update.view);
+      }
       if (update.selectionSet || update.docChanged) scheduleCursor(update.view);
       const diagnosticsChanged = update.transactions.some((transaction) =>
         transaction.effects.some((effect) => effect.is(setDiagnosticsEffect)),
@@ -312,6 +353,7 @@ function buildExtensions({
     ViewPlugin.define(() => ({
       destroy() {
         if (pendingContentTimer !== null) window.clearTimeout(pendingContentTimer);
+        if (pendingAutosaveTimer !== null) window.clearTimeout(pendingAutosaveTimer);
         if (cursorScheduled !== null) window.clearTimeout(cursorScheduled);
       },
     })),

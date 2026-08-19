@@ -19,7 +19,7 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   terminal: descriptor("terminal", "multiple", "keep-alive", 320, 180),
   code: descriptor("code", "per-space", "keep-alive", 480, 280),
   files: descriptor("files", "multiple", "suspend", 360, 240),
-  transfers: descriptor("transfers", "multiple", "suspend", 360, 240),
+  transfers: descriptor("transfers", "singleton", "suspend", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
   extensions: descriptor("extensions", "singleton", "suspend", 360, 240),
 };

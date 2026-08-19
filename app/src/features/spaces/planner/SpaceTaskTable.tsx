@@ -125,7 +125,7 @@ export function SpaceTaskList({
                         (member) => [`person:${member.user_id}`, member.name] as [string, string],
                       ),
                       ...agents
-                        .filter((agent) => agent.enabled)
+                        .filter((agent) => agent.enabled && agent.can_control)
                         .map(
                           (agent) =>
                             [`agent:${agent.agent_id}`, `${agent.name} · Agent`] as [

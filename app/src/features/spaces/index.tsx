@@ -1,10 +1,13 @@
 import { lazy, Suspense } from "react";
 
 export { MessageOriginBadge } from "./components/MessageOriginBadge";
+export { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 export { SpaceAvatar } from "./components/SpaceAvatar";
-export { CreateSpaceDialog } from "./spacesShell/CreateSpaceDialog";
-export { useCreateSpaceDialog } from "./spacesShell/useCreateSpaceDialog";
+export { SpaceManagementNavigation } from "./components/SpaceManagementNavigation";
+export { SpaceRowActions } from "./components/SpaceRowActions";
 export { spaceDestination } from "./navigation";
+export { canOpenMistySpaceSection, preferredMistySpace } from "./mistySpace";
+export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";

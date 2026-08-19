@@ -11,7 +11,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { Gauge } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { formatStorageBytes } from "./spacePanel/storageFormat";
 import { useAgentUsage } from "./spacePanel/useAgentUsage";
 import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
@@ -24,7 +24,7 @@ import { useSpaceLibraryUsage } from "./spacePanel/useSpaceLibraryUsage";
  * Quotas are something you check, not something you watch, so they load only
  * once this opens.
  */
-export function SpaceUsagePopover({ space }: { space: Space }) {
+export function SpaceUsagePopover({ space, trigger }: { space: Space; trigger?: ReactElement }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const storage = useSpaceLibraryUsage({
@@ -39,22 +39,24 @@ export function SpaceUsagePopover({ space }: { space: Space }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          className={cn(
-            "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
-            "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
-            open && "text-cream-bright",
-          )}
-          variant="ghost"
-          size="icon"
-          type="button"
-          title="Usage"
-          aria-label="Usage"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-        >
-          <Gauge size={16} strokeWidth={1.75} aria-hidden="true" />
-        </Button>
+        {trigger ?? (
+          <Button
+            className={cn(
+              "relative grid size-8 place-items-center rounded-md p-0 text-cream-muted shadow-none",
+              "hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-charcoal-active",
+              open && "text-cream-bright",
+            )}
+            variant="ghost"
+            size="icon"
+            type="button"
+            title="Usage"
+            aria-label="Usage"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+          >
+            <Gauge size={16} strokeWidth={1.75} aria-hidden="true" />
+          </Button>
+        )}
       </PopoverTrigger>
 
       <PopoverContent sideOffset={8} className="w-72 overflow-hidden border-charcoal-border/70 p-0">

@@ -1,30 +1,75 @@
+import {
+  codingAiClearApiKey,
+  codingAiReadApiKey,
+  codingAiWriteApiKey,
+} from "@/native/settings-plugins";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+
 const PREFIX = "misty:coding-ai-key:";
 
-// MVP: store the API key in localStorage. The Misty desktop app already scopes
-// window.localStorage to the app's private data directory, so the key is not
-// world-readable, but this is not equivalent to the OS keychain. A future pass
-// should move these to the `keyring` crate exposed via a Tauri command; the API
-// surface here would not change.
 export async function readApiKey(providerId: string): Promise<string | null> {
+  // If running in a test or non-Tauri environment, fallback gracefully to localStorage.
+  if (!hasTauriInternals()) {
+    try {
+      return window.localStorage.getItem(`${PREFIX}${providerId}`);
+    } catch {
+      return null;
+    }
+  }
+
+  // Check for existing plaintext key in localStorage and migrate it to keyring.
   try {
-    return window.localStorage.getItem(`${PREFIX}${providerId}`);
+    const legacyKey = window.localStorage.getItem(`${PREFIX}${providerId}`);
+    if (legacyKey) {
+      await codingAiWriteApiKey(providerId, legacyKey);
+      window.localStorage.removeItem(`${PREFIX}${providerId}`);
+      return legacyKey;
+    }
+  } catch {
+    /* localStorage migration best-effort */
+  }
+
+  try {
+    return await codingAiReadApiKey(providerId);
   } catch {
     return null;
   }
 }
 
 export async function writeApiKey(providerId: string, key: string): Promise<void> {
+  // Remove any stale plaintext entry.
   try {
-    window.localStorage.setItem(`${PREFIX}${providerId}`, key);
+    window.localStorage.removeItem(`${PREFIX}${providerId}`);
   } catch {
-    /* localStorage may be disabled in some contexts */
+    /* ignore */
   }
+
+  if (!hasTauriInternals()) {
+    try {
+      window.localStorage.setItem(`${PREFIX}${providerId}`, key);
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
+  await codingAiWriteApiKey(providerId, key);
 }
 
 export async function clearApiKey(providerId: string): Promise<void> {
   try {
     window.localStorage.removeItem(`${PREFIX}${providerId}`);
   } catch {
-    /* nothing to remove */
+    /* ignore */
+  }
+
+  if (!hasTauriInternals()) {
+    return;
+  }
+
+  try {
+    await codingAiClearApiKey(providerId);
+  } catch {
+    /* ignore */
   }
 }

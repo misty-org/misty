@@ -1,4 +1,5 @@
 import { useWorkspaceStore } from "@/features/workspace";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -101,6 +102,7 @@ export function BrowserRuntimeBridge() {
   }, []);
 
   useEffect(() => {
+    if (!hasTauriInternals()) return;
     let disposed = false;
     const listeners = Promise.all([
       listen<BrowserPageEvent>("misty://browser-page", ({ payload }) => {

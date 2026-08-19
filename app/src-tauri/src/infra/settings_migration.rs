@@ -8,7 +8,7 @@ use serde_json::{json, Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 2;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 3;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read;
 /// `transfer_profiles` keeps its presets but no longer stores a user-edited
@@ -17,8 +17,6 @@ const RETIRED_SECTIONS: &[&str] = &["account", "ai"];
 
 /// Individual keys retired from sections that still exist.
 const RETIRED_KEYS: &[(&str, &str)] = &[
-    ("general", "startup_view_index"),
-    ("general", "reopen_last_session"),
     ("general", "release_channel_index"),
     ("general", "update_available"),
     ("general", "available_version_label"),
@@ -26,6 +24,17 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("appearance", "custom_fonts"),
     ("privacy", "data_stays_local"),
     ("search", "automatic_image_discovery_enabled"),
+    // Schema 3. Each of these persisted happily and was read by nothing:
+    // `ui_scale_index`/`font_size_index`/`reduced_motion_enabled` reached the
+    // DOM as data attributes with no CSS or JS consumer, `theme_index` was
+    // ignored by a dark-only theme store, `keymap_index` was never applied to
+    // any keymap, and `server_address` had no reader at all.
+    ("appearance", "theme_index"),
+    ("appearance", "ui_scale_index"),
+    ("appearance", "font_size_index"),
+    ("appearance", "reduced_motion_enabled"),
+    ("shortcuts", "keymap_index"),
+    ("advanced", "server_address"),
 ];
 
 /// Removes retired keys from an existing settings file.
@@ -70,8 +79,10 @@ mod tests {
     #[test]
     fn removes_retired_sections_and_keys() {
         let mut root = object(json!({
-            "general": { "startup_view_index": 2, "reopen_last_session": false },
-            "appearance": { "custom_fonts": ["Inter"], "theme_index": 1 },
+            "general": { "release_channel_index": 1, "open_links_externally": false },
+            "appearance": { "custom_fonts": ["Inter"], "theme_index": 1, "compact_mode_enabled": true },
+            "shortcuts": { "keymap_index": 2 },
+            "advanced": { "server_address": "localhost:50051" },
             "privacy": { "data_stays_local": true, "anonymous_usage_analytics_enabled": true },
             "search": { "automatic_image_discovery_enabled": false },
             "account": { "email": "someone@example.com" },
@@ -85,15 +96,20 @@ mod tests {
         assert!(!root.contains_key("account"));
         assert!(!root.contains_key("ai"));
         let general = root.get("general").and_then(Value::as_object);
-        assert!(general.is_none_or(|general| !general.contains_key("startup_view_index")));
-        assert!(general.is_none_or(|general| !general.contains_key("reopen_last_session")));
+        assert!(general.is_none_or(|general| !general.contains_key("release_channel_index")));
+        // Schema 3: controls that persisted with no reader. `shortcuts` and
+        // `advanced` had nothing else in them here, so the whole section goes.
+        let appearance = root.get("appearance").and_then(Value::as_object);
+        assert!(appearance.is_none_or(|appearance| !appearance.contains_key("theme_index")));
+        assert!(!root.contains_key("shortcuts"));
+        assert!(!root.contains_key("advanced"));
         // A section that still has live keys keeps them.
         assert_eq!(
             root.get("appearance")
                 .and_then(Value::as_object)
-                .and_then(|appearance| appearance.get("theme_index"))
-                .and_then(Value::as_i64),
-            Some(1)
+                .and_then(|appearance| appearance.get("compact_mode_enabled"))
+                .and_then(Value::as_bool),
+            Some(true)
         );
         assert_eq!(
             root.get("privacy")

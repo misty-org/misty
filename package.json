@@ -8,6 +8,24 @@
     "extensions",
     "website"
   ],
+  "overrides": {
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.18"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "5.1.16"
+    },
+    "@workflow/core": {
+      "nanoid": "5.1.16"
+    },
+    "@workflow/world-local": {
+      "undici": "7.29.0"
+    },
+    "@workflow/world-vercel": {
+      "undici": "7.29.0"
+    },
+    "lodash-es": "4.18.1"
+  },
   "scripts": {
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

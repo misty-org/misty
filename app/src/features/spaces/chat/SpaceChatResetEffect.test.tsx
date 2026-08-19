@@ -2,7 +2,7 @@ import { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useMessageEditing } from "../chat/hooks/useMessageEditing";
-import { useSpaceChatDraft } from "../chat/hooks/useSpaceChatDraft";
+import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 
 describe("SpaceChat reset effect", () => {
   let container: HTMLDivElement;

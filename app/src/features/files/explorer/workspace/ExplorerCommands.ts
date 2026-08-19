@@ -22,7 +22,6 @@ import {
   transferTypeLabel,
 } from "./explorerCommands/transferLabels";
 
-const explorerSearchFocusEvent = "misty:explorer-search-focus";
 const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 
 export const executableShortcutCommands = [
@@ -32,7 +31,6 @@ export const executableShortcutCommands = [
   "clipboard.publish_shared",
   "clipboard.apply_shared",
   "search.toggle",
-  "explorer.open_palette",
   "explorer.copy",
   "explorer.cut",
   "explorer.paste",
@@ -69,7 +67,6 @@ const defaultMacExplorerShortcuts: ShortcutMap = {
   "clipboard.publish_shared": "Cmd+Alt+C",
   "clipboard.apply_shared": "Cmd+Alt+V",
   "search.toggle": "Cmd+K",
-  "explorer.open_palette": "Cmd+P",
   "explorer.copy": "Cmd+C",
   "explorer.cut": "Cmd+X",
   "explorer.paste": "Cmd+V",
@@ -102,7 +99,6 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
   "clipboard.publish_shared": "Ctrl+Alt+C",
   "clipboard.apply_shared": "Ctrl+Alt+V",
   "search.toggle": "Ctrl+K",
-  "explorer.open_palette": "Ctrl+P",
   "explorer.copy": "Ctrl+C",
   "explorer.cut": "Ctrl+X",
   "explorer.paste": "Ctrl+V",
@@ -130,12 +126,10 @@ const defaultNonMacExplorerShortcuts: ShortcutMap = {
 };
 
 const vscodeExplorerShortcutOverrides: ShortcutMap = {
-  "explorer.open_palette": "Primary+Shift+P",
   "search.toggle": "Primary+P",
 };
 
 const finderExplorerShortcutOverrides: ShortcutMap = {
-  "explorer.open_palette": "Primary+Shift+P",
   "search.toggle": "Primary+F",
   "explorer.delete": "Primary+Backspace",
   "explorer.rename": "Enter",
@@ -204,10 +198,9 @@ export function runExplorerCommand(
     case "search.toggle":
       openDeepSearch(paneId);
       break;
-    case "explorer.open_palette":
-      focusExplorerSearch(paneId, "command");
-      break;
     case "app.toggle_transfers":
+      // Transfers is its own tool now, so this opens a dock tab rather than a
+      // panel inside the file manager.
       navigateRoute(openTransfersTab().route);
       break;
     case "app.open_settings":
@@ -359,12 +352,6 @@ async function runPluginCommandById(
       operationError: `Extension command "${commandId}" failed: ${errorText(error)}`,
     });
   }
-}
-
-function focusExplorerSearch(paneId: string, mode: "search" | "command"): void {
-  useExplorerStore.getState().setCommandQueryMode(paneId, "search");
-  useExplorerStore.getState().setCommandQuery(paneId, mode === "command" ? ">" : "");
-  window.dispatchEvent(new CustomEvent(explorerSearchFocusEvent, { detail: { paneId, mode } }));
 }
 
 function openDeepSearch(paneId: string): void {

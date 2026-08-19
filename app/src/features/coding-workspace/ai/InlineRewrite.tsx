@@ -77,7 +77,15 @@ export function InlineRewrite({
     } finally {
       if (!controller.signal.aborted) setStreaming(false);
     }
-  }, [filename, instruction, language, selection, settings.baseUrl, settings.model, settings.providerId]);
+  }, [
+    filename,
+    instruction,
+    language,
+    selection,
+    settings.baseUrl,
+    settings.model,
+    settings.providerId,
+  ]);
 
   const submit = useCallback(
     (event: React.FormEvent) => {
@@ -144,11 +152,7 @@ export function InlineRewrite({
             <span>
               {settings.providerId === "anthropic" ? "Anthropic" : "OpenAI-compat"} ·{" "}
               <span className="font-mono">{settings.model}</span> ·{" "}
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="underline hover:text-cream"
-              >
+              <button type="button" onClick={onOpenSettings} className="underline hover:text-cream">
                 configure
               </button>
             </span>

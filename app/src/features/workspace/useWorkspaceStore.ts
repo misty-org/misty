@@ -28,11 +28,12 @@ import type {
   WorkspaceTab,
 } from "./model";
 import {
-  defaultBrowserHomeUrl,
+  browserHomeUrl,
   browserTabTitle,
   createBrowserTabState,
   parseBrowserTabState,
 } from "./model";
+import { workspaceSurfaceFromRoute } from "./routeSurface";
 
 interface WorkspaceStore {
   activeScopeKey: WorkspaceScopeKey;
@@ -40,6 +41,7 @@ interface WorkspaceStore {
   layout: WorkspaceLayout;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   setScope: (scopeKey: WorkspaceScopeKey) => void;
+  adoptDefaultScope: (scopeKey: WorkspaceScopeKey) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceTab;
   openBrowserTab: (request?: {
     url?: string;
@@ -66,7 +68,7 @@ interface WorkspaceStore {
 }
 
 function initialLayout(): WorkspaceLayout {
-  const pane = createDockLeaf();
+  const pane = createDockLeaf([createHomeDockTab()]);
   return { root: pane, focusedPaneId: pane.id };
 }
 
@@ -99,18 +101,82 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
         });
       },
+      adoptDefaultScope: (scopeKey) => {
+        const current = get();
+        // Only the pre-Spaces bootstrap scope is adopted. Once the user is in a
+        // real Space, their choice stands.
+        if (current.activeScopeKey !== "global") return;
+        const layoutsByScope = { ...current.layoutsByScope };
+        // Carry the bootstrap layout across rather than stranding whatever the
+        // user opened before Spaces finished loading.
+        const layout = normalizeLayout(layoutsByScope[scopeKey] ?? current.layout);
+        delete layoutsByScope.global;
+        set({
+          activeScopeKey: scopeKey,
+          layout,
+          layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
+        });
+      },
       openSurface: (request) => {
-        if (request.surfaceId === "space") get().setScope(request.groupKey as WorkspaceScopeKey);
+        if (request.surfaceId === "space")
+          get().setScope(request.scopeKey ?? (request.groupKey as WorkspaceScopeKey));
         const now = Date.now();
         const state = get();
         const panes = dockLeaves(state.layout.root);
         const allTabs = panes.flatMap((pane) => pane.tabs);
         const singleton = request.instancePolicy === "single";
-        const existing = singleton
+        let existing = singleton
           ? allTabs.find((tab) => tab.surfaceId === request.surfaceId)
           : !request.forceNew
             ? allTabs.find((tab) => tab.id === state.lastUsedTabByGroup[request.groupKey])
             : undefined;
+        if (
+          !existing &&
+          !request.forceNew &&
+          (request.surfaceId === "space" || request.surfaceId === "home")
+        ) {
+          // Home is stackable, so it cannot be a singleton — but navigating to
+          // /home must still land on the Home tab you already have rather than
+          // pile up a new one. Only an explicit `forceNew` (the + menu) stacks.
+          // Home tabs also appear as the empty-pane fallback, which bypasses
+          // this method entirely and so is not in `lastUsedTabByGroup`.
+          existing = allTabs.find((tab) => tab.groupKey === request.groupKey);
+        }
+        // A bare or legacy Space tab is provisional. Reuse it for the first
+        // concrete Space tool instead of leaving an extra generic tab behind
+        // after the /spaces/:id redirect resolves.
+        if (!existing && request.surfaceId === "space" && request.scopeKey) {
+          existing = allTabs.find(
+            (tab) =>
+              tab.surfaceId === "space" &&
+              (tab.groupKey === request.scopeKey ||
+                (tab.groupKey === `${request.scopeKey}:space` &&
+                  workspaceSurfaceFromRoute(tab.route)?.groupKey === request.scopeKey)),
+          );
+          if (existing) {
+            const replacement = {
+              ...existing,
+              groupKey: request.groupKey,
+              instanceKey: request.instanceKey ?? existing.instanceKey,
+              title: request.title,
+              route: request.route,
+            };
+            set((current) => ({
+              ...withLayout(current, {
+                ...current.layout,
+                root: mapDockTabs(current.layout.root, (tab) =>
+                  tab.id === existing?.id ? replacement : tab,
+                ),
+              }),
+              lastUsedTabByGroup: {
+                ...current.lastUsedTabByGroup,
+                [request.groupKey]: replacement.id,
+              },
+            }));
+            get().focusTab(replacement.id);
+            return replacement;
+          }
+        }
         if (existing) {
           if (request.syncExistingRoute && existing.route !== request.route) {
             set((current) =>
@@ -148,8 +214,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             root: mapDockLeaf(current.layout.root, pane.id, (candidate) => ({
               ...candidate,
               activeTabId: tab.id,
+              // A pane showing nothing but Home is showing the empty-pane
+              // filler, so the first real tab takes its place instead of
+              // leaving it behind. Opening Home itself is never a replacement,
+              // or Home could never be stacked.
               tabs:
-                candidate.tabs.length === 1 && candidate.tabs[0]?.surfaceId === "home"
+                request.surfaceId !== "home" &&
+                candidate.tabs.length === 1 &&
+                candidate.tabs[0]?.surfaceId === "home"
                   ? [tab]
                   : [...candidate.tabs, tab],
             })),
@@ -159,7 +231,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         return tab;
       },
       openBrowserTab: (request = {}) => {
-        const url = request.url?.trim() || defaultBrowserHomeUrl;
+        const url = request.url?.trim() || browserHomeUrl();
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
@@ -396,7 +468,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       replaceSnapshot: (snapshot) => {
         const current = get();
         set({
-          ...withLayout(current, normalizeLayout(migrateBrowserTabs(snapshot.layout))),
+          ...withLayout(
+            current,
+            normalizeLayout(migrateSpaceToolTabs(migrateBrowserTabs(snapshot.layout))),
+          ),
           lastUsedTabByGroup: snapshot.lastUsedTabByGroup ?? {},
         });
       },
@@ -420,7 +495,22 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     }),
     {
       name: "misty:desktop-dock:v3",
-      version: 1,
+      version: 3,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<WorkspaceStore> | undefined;
+        if (!state || version >= 3) return state as WorkspaceStore;
+        const layoutsByScope = Object.fromEntries(
+          Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
+            scope,
+            layout ? migrateSpaceToolTabs(layout) : layout,
+          ]),
+        ) as WorkspaceStore["layoutsByScope"];
+        return {
+          ...state,
+          layout: state.layout ? migrateSpaceToolTabs(state.layout) : state.layout,
+          layoutsByScope,
+        } as WorkspaceStore;
+      },
       partialize: (state) => ({
         activeScopeKey: state.activeScopeKey,
         layout: state.layout,
@@ -431,8 +521,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
   ),
 );
 
+/**
+ * A layout always has at least one tab.
+ *
+ * Closing the last tab leaves a Home tab behind rather than an empty pane, so
+ * there is no "zero tabs" state for the rest of the app to react to. Applied
+ * here rather than at each call site because every mutation, scope switch, and
+ * rehydration funnels through this.
+ */
 function normalizeLayout(layout: WorkspaceLayout): WorkspaceLayout {
-  const root = normalizeDockNode(layout.root);
+  const root = normalizeDockNode(fillEmptyDockLeaves(layout.root));
   const panes = dockLeaves(root);
   const focusedPaneId = panes.some((pane) => pane.id === layout.focusedPaneId)
     ? layout.focusedPaneId
@@ -458,6 +556,23 @@ function migrateBrowserTabs(layout: WorkspaceLayout): WorkspaceLayout {
           }
         : tab,
     ),
+  };
+}
+
+function migrateSpaceToolTabs(layout: WorkspaceLayout): WorkspaceLayout {
+  return {
+    ...layout,
+    root: mapDockTabs(layout.root, (tab) => {
+      if (tab.surfaceId !== "space") return tab;
+      const request = workspaceSurfaceFromRoute(tab.route);
+      if (!request || request.surfaceId !== "space") return tab;
+      return {
+        ...tab,
+        groupKey: request.groupKey,
+        instanceKey: request.instanceKey ?? tab.instanceKey,
+        title: request.title,
+      };
+    }),
   };
 }
 

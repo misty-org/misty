@@ -1,6 +1,8 @@
 #[cfg(desktop)]
 pub mod agent_device_identity;
 pub mod agents;
+#[cfg(target_os = "macos")]
+pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
@@ -13,6 +15,7 @@ pub mod code_lsp;
 pub mod code_watcher;
 #[cfg(desktop)]
 pub mod code_workspace;
+pub mod command_defaults;
 pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;

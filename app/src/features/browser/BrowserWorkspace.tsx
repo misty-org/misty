@@ -1,6 +1,6 @@
-import { usePersonalAgentsStore } from "@/features/agents";
 import {
   blankBrowserUrl,
+  browserSearchUrl,
   browserTabTitle,
   createBrowserTabState,
   parseBrowserTabState,
@@ -9,15 +9,13 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Checkbox, cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, MessageCirclePlus, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { grantBrowserAgentAccess, revokeBrowserAgentGrant } from "./browserAgentAccess";
 import {
   browserRuntimeCreated,
   browserRuntimeId,
-  browserScopeId,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
@@ -54,7 +52,7 @@ export function normalizeBrowserAddress(value: string): string {
   if (!trimmed) return blankBrowserUrl;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.includes(".") && !trimmed.includes(" ")) return `https://${trimmed}`;
-  return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
+  return browserSearchUrl(trimmed);
 }
 
 export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
@@ -82,10 +80,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const [draftAddress, setDraftAddress] = useState(() => displayBrowserAddress(state.url));
   const [addressFocused, setAddressFocused] = useState(false);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
-  const [grantBusyAgentId, setGrantBusyAgentId] = useState<string | null>(null);
-  const agents = usePersonalAgentsStore((agentState) => agentState.agents);
-  const agentsLoaded = usePersonalAgentsStore((agentState) => agentState.loaded);
-  const loadAgents = usePersonalAgentsStore((agentState) => agentState.load);
   const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
   const storedHistory = useBrowserRuntimeStore((runtime) => runtime.histories[tab.id]);
   const grants = storedGrants ?? [];
@@ -171,36 +165,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       void invoke(direction < 0 ? "browser_webview_back" : "browser_webview_forward", {
         request: { id: browserRuntimeId(tab) },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
-    }
-  };
-
-  const toggleAgentGrant = async (agentId: string) => {
-    if (grantBusyAgentId) return;
-    const runtimeId = browserRuntimeId(tab);
-    const existing = grants.filter((grant) => grant.agentId === agentId);
-    setGrantBusyAgentId(agentId);
-    useBrowserRuntimeStore.getState().setError(tab.id, null);
-    try {
-      if (existing.length) {
-        await Promise.all(existing.map((grant) => revokeBrowserAgentGrant(runtimeId, grant)));
-        useBrowserRuntimeStore.getState().setGrants(
-          tab.id,
-          grants.filter((grant) => grant.agentId !== agentId),
-        );
-      } else {
-        const created = await grantBrowserAgentAccess({
-          runtimeId,
-          scopeId: browserScopeId(tab),
-          agentId,
-          title: tab.title,
-          url: state.url,
-        });
-        useBrowserRuntimeStore.getState().setGrants(tab.id, [...grants, ...created]);
-      }
-    } catch (error: unknown) {
-      setBrowserError(tab.id, error);
-    } finally {
-      setGrantBusyAgentId(null);
     }
   };
 
@@ -299,7 +263,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               if (nativeRuntime) {
                 setBrowserWebviewsSuspended(open, agentMenuSuspensionReason);
               }
-              if (open && !agentsLoaded) void loadAgents();
             }}
           >
             <PopoverTrigger asChild>
@@ -318,39 +281,16 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" sideOffset={8} className="w-72 p-3">
-              <p className="m-0 text-sm font-medium">Agent access</p>
+              <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
               <p className="mb-3 mt-1 text-xs text-cream-muted">
-                Selected Agents can inspect and interact with this tab for up to eight hours.
+                Attach this tab when you ask an Agent to work. Access belongs only to that run,
+                stays inside its Space, and expires automatically.
               </p>
-              <div className="grid max-h-64 gap-1 overflow-auto">
-                {!agentsLoaded ? (
-                  <p className="m-0 text-xs text-cream-muted">Loading Agents…</p>
-                ) : agents.filter((agent) => agent.enabled).length === 0 ? (
-                  <p className="m-0 text-xs text-cream-muted">No enabled Agents are available.</p>
-                ) : (
-                  agents
-                    .filter((agent) => agent.enabled)
-                    .map((agent) => {
-                      const checked = grants.some((grant) => grant.agentId === agent.id);
-                      return (
-                        <label
-                          key={agent.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-white/5"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={grantBusyAgentId !== null}
-                            onCheckedChange={() => void toggleAgentGrant(agent.id)}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm">{agent.name}</span>
-                          {grantBusyAgentId === agent.id ? (
-                            <span className="text-[10px] text-cream-muted">Saving…</span>
-                          ) : null}
-                        </label>
-                      );
-                    })
-                )}
-              </div>
+              <p className="m-0 text-xs text-cream-muted">
+                {agentAccess
+                  ? "This tab is attached to active Agent work."
+                  : "No active Agent run is attached to this tab."}
+              </p>
             </PopoverContent>
           </Popover>
           <BrowserMenu

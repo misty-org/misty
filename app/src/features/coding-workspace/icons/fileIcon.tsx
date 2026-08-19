@@ -46,8 +46,8 @@ const FILENAME_TO_ICON: Record<string, { icon: typeof FileCode; color: string }>
   "Cargo.toml": { icon: FileJson, color: "#e8a887" },
   "Cargo.lock": { icon: FileJson, color: "#8c8c8c" },
   "README.md": { icon: FileText, color: "#a9c7e2" },
-  "Dockerfile": { icon: FileCode, color: "#87a9c7" },
-  "Makefile": { icon: FileCode, color: "#a8c090" },
+  Dockerfile: { icon: FileCode, color: "#87a9c7" },
+  Makefile: { icon: FileCode, color: "#a8c090" },
 };
 
 export function FileIcon({ name, size = 13 }: { name: string; size?: number }) {

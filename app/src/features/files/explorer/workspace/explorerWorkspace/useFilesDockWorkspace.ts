@@ -14,14 +14,14 @@ interface FilesDockWorkspaceOptions {
 
 export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
   const navigate = options.navigate;
-  const dockTabState = useWorkspaceStore((state) => {
+  const dockTabPath = useWorkspaceStore((state) => {
     if (!options.workspaceId) return null;
     const tab = dockLeaves(state.layout.root)
       .flatMap((pane) => pane.tabs)
       .find((entry) => entry.id === options.workspaceId);
     if (!tab?.state || typeof tab.state !== "object") return null;
     const path = (tab.state as { path?: unknown }).path;
-    return typeof path === "string" && path ? { path } : null;
+    return typeof path === "string" && path ? path : null;
   });
   const restoredTabRef = useRef("");
 
@@ -44,7 +44,7 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
   useEffect(() => {
     if (!options.workspaceId || !options.activePaneId || !options.initialized) return;
     restoredTabRef.current = "";
-    const desiredPath = dockTabState?.path;
+    const desiredPath = dockTabPath;
     if (!desiredPath || desiredPath === options.activePath) {
       restoredTabRef.current = options.workspaceId;
       return;
@@ -64,7 +64,7 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     options.activePath,
     options.initialized,
     options.workspaceId,
-    dockTabState?.path,
+    dockTabPath,
   ]);
 
   useEffect(() => {

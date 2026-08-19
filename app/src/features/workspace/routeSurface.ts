@@ -2,28 +2,39 @@ import { routes } from "@/features/app-shell";
 import {
   browserTabTitle,
   createBrowserTabState,
-  defaultBrowserHomeUrl,
+  browserHomeUrl,
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
   type WorkspaceTab,
 } from "./model";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
-  if (
-    pathname === routes.home ||
-    pathname === routes.activity ||
-    pathname.startsWith(routes.settings)
-  )
-    return null;
+  if (pathname.startsWith(routes.settings)) return null;
+  // Home is an ordinary, stackable tab. It is also what a pane falls back to
+  // when its last tab closes, so it must resolve to a surface like any other.
+  if (pathname === routes.home) return request("home", "tool:home", "Home", pathname);
   if (pathname.startsWith(routes.spaces)) {
-    const rawId = pathname.split("/").filter(Boolean)[1];
+    const parts = pathname.split("/").filter(Boolean);
+    const rawId = parts[1];
     if (!rawId) return null;
     const spaceId = safeDecode(rawId);
-    return request("space", `space:${spaceId}`, "Space", pathname, spaceId, "multiple");
+    const tool = spaceToolFromSection(parts[2]);
+    const scopeKey = `space:${spaceId}` as const;
+    return {
+      ...request(
+        "space",
+        tool === "space" ? scopeKey : `space:${spaceId}:${tool}`,
+        spaceToolTitle(tool),
+        pathname,
+        tool === "space" ? spaceId : `${spaceId}:${tool}`,
+        "multiple",
+      ),
+      scopeKey,
+    };
   }
   if (pathname.startsWith(routes.browser)) {
     return {
-      ...request("browser", "tool:browser", browserTabTitle(defaultBrowserHomeUrl), pathname),
+      ...request("browser", "tool:browser", browserTabTitle(browserHomeUrl()), pathname),
       state: createBrowserTabState(),
     };
   }
@@ -42,6 +53,12 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   return null;
 }
 
+export type SpaceWorkspaceTool = "journal" | "planner" | "chat" | "library" | "space";
+
+export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
+  return spaceToolFromSection(pathname.split("/").filter(Boolean)[2]);
+}
+
 /** Whether a tab owns the route even when a nested route or redirect changed its exact URL. */
 export function workspaceTabMatchesRoute(
   tab: Pick<WorkspaceTab, "surfaceId" | "groupKey">,
@@ -51,14 +68,6 @@ export function workspaceTabMatchesRoute(
   return Boolean(
     surface && surface.surfaceId === tab.surfaceId && surface.groupKey === tab.groupKey,
   );
-}
-
-export function shouldReturnWorkspaceHome(
-  previousTabCount: number,
-  tabCount: number,
-  pathname: string,
-): boolean {
-  return previousTabCount > 0 && tabCount === 0 && pathname !== routes.home;
 }
 
 function request(
@@ -86,4 +95,18 @@ function safeDecode(value: string): string {
   } catch {
     return value;
   }
+}
+
+function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
+  if (section === "notes" || section === "drawings") return "journal";
+  if (section === "planner" || section === "chat" || section === "library") return section;
+  return "space";
+}
+
+function spaceToolTitle(tool: SpaceWorkspaceTool): string {
+  if (tool === "journal") return "Journal";
+  if (tool === "planner") return "Planner";
+  if (tool === "chat") return "Chat";
+  if (tool === "library") return "Library";
+  return "Space";
 }

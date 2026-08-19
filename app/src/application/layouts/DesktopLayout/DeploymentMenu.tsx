@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import { Check, Cloud, Loader2, Plus, Server, X } from "lucide-react";
+import { Check, ChevronDown, Cloud, Loader2, Plus, Server, X } from "lucide-react";
 import { useState } from "react";
 
 export function DeploymentMenu(props: {
@@ -60,7 +60,7 @@ export function DeploymentMenu(props: {
         <button
           type="button"
           className={cn(
-            "flex min-w-0 items-center rounded-md border-0 bg-transparent text-left transition-colors",
+            "flex min-w-0 shrink-0 items-center rounded-md border-0 bg-transparent text-left transition-colors",
             "hover:bg-charcoal-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
             props.collapsed ? "mx-auto justify-center p-1" : "gap-2.5 px-2.5 py-1",
           )}
@@ -69,6 +69,9 @@ export function DeploymentMenu(props: {
           data-misty-window-drag-block="true"
         >
           {brand}
+          {props.collapsed ? null : (
+            <ChevronDown size={14} className="shrink-0 text-cream-faint" strokeWidth={2} />
+          )}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={6} className="min-w-[264px]">
@@ -172,7 +175,7 @@ function Brand(props: { collapsed: boolean; mistyLogoSource: string | null }) {
         />
       ) : null}
       {props.collapsed ? null : (
-        <span className="min-w-0 flex-1 truncate text-[19px] font-semibold tracking-[-0.02em] text-cream-bright">
+        <span className="min-w-0 truncate text-[18px] font-semibold tracking-[-0.02em] text-cream-bright">
           Misty
         </span>
       )}

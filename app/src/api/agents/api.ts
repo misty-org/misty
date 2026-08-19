@@ -10,8 +10,6 @@ export const agentsApi = {
       body: JSON.stringify(input),
     }),
   remove: (id: string) => apiRequest(`/agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  grants: <T>(id: string) =>
-    apiRequest<{ grants: T[] }>(`/agents/${encodeURIComponent(id)}/space-grants`),
   toolboxCatalog: <T>() => apiRequest<T>("/agents/toolbox"),
   toolbox: <T>(id: string) => apiRequest<T>(`/agents/${encodeURIComponent(id)}/toolbox`),
   uploadAvatar: <T>(id: string, file: File) =>
@@ -24,14 +22,6 @@ export const agentsApi = {
     apiBlobRequest(
       `/agents/${encodeURIComponent(id)}/avatar?version=${encodeURIComponent(version)}`,
     ),
-  replaceGrants: <T>(
-    id: string,
-    spaces: Array<{ space_id: string; all_members: boolean; member_user_ids: string[] }>,
-  ) =>
-    apiRequest<{ grants: T[] }>(`/agents/${encodeURIComponent(id)}/space-grants`, {
-      method: "PUT",
-      body: JSON.stringify({ spaces }),
-    }),
   models: <T>() => apiRequest<{ catalog_version: string; models: T[] }>("/ai/models"),
   activity: <T>(id: string, limit = 30) =>
     apiRequest<T>(`/agents/${encodeURIComponent(id)}/activity?limit=${encodeURIComponent(limit)}`),
@@ -40,4 +30,23 @@ export const agentsApi = {
     apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
   retryRun: <T>(runId: string) =>
     apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" }),
+  decideApproval: <T>(runId: string, approvalId: string, decision: "approve" | "deny") =>
+    apiRequest<T>(
+      `/agent-runs/${encodeURIComponent(runId)}/approvals/${encodeURIComponent(approvalId)}`,
+      { method: "POST", body: JSON.stringify({ decision }) },
+    ),
+  transcribeVoice: (audio: Blob, durationMs: number) => {
+    const form = new FormData();
+    form.append("audio", audio, "agent-turn.webm");
+    form.append("duration_ms", String(durationMs));
+    return apiRequest<{ transcript: string; detected_language: string; duration_ms: number }>(
+      "/agent-voice/transcriptions",
+      { method: "POST", body: form },
+    );
+  },
+  speech: (agentId: string, responseText: string) =>
+    apiBlobRequest("/agent-voice/speech", {
+      method: "POST",
+      body: JSON.stringify({ agent_id: agentId, response_text: responseText }),
+    }),
 };

@@ -6,6 +6,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use super::command_defaults::{default_command_entries, DefaultCommandEntry};
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
 
@@ -42,12 +43,6 @@ pub struct SaveShortcutsRequest {
     pub bindings: Vec<ShortcutBinding>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct DefaultCommandEntry {
-    id: &'static str,
-    shortcut: &'static str,
-}
-
 impl CommandService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
@@ -65,6 +60,13 @@ impl CommandService {
     pub async fn save(&self, request: SaveShortcutsRequest) -> ApiResult<ShortcutsSnapshot> {
         let path = self.path.clone();
         tokio::task::spawn_blocking(move || save_shortcuts(path, request.bindings))
+            .await
+            .map_err(|err| ApiError::Message(format!("Command worker failed: {err}")))?
+    }
+
+    pub async fn reset(&self) -> ApiResult<ShortcutsSnapshot> {
+        let path = self.path.clone();
+        tokio::task::spawn_blocking(move || reset_shortcuts(path))
             .await
             .map_err(|err| ApiError::Message(format!("Command worker failed: {err}")))?
     }
@@ -124,6 +126,31 @@ fn save_shortcuts(path: PathBuf, bindings: Vec<ShortcutBinding>) -> ApiResult<Sh
             continue;
         }
         write_command_block(&mut output, command_id, shortcut);
+    }
+
+    fs::write(&path, output).map_err(|err| {
+        ApiError::Message(format!(
+            "Failed to write ~/.misty/config/commands.msy: {err}"
+        ))
+    })?;
+    load_shortcuts(path)
+}
+
+/// Restores every binding to its built-in default.
+///
+/// The old "Reset" button reloaded the file from disk, which restored nothing —
+/// it only discarded unsaved edits. This rewrites the file from
+/// `default_command_entries`, which is what the label always implied.
+fn reset_shortcuts(path: PathBuf) -> ApiResult<ShortcutsSnapshot> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| {
+            ApiError::Message(format!("Failed to create shortcut config directory: {err}"))
+        })?;
+    }
+
+    let mut output = command_file_header();
+    for entry in default_command_entries() {
+        write_command_block(&mut output, entry.id, entry.shortcut);
     }
 
     fs::write(&path, output).map_err(|err| {
@@ -338,317 +365,5 @@ fn unquote(value: &str) -> &str {
         &value[1..value.len() - 1]
     } else {
         value
-    }
-}
-
-fn default_command_entries() -> &'static [DefaultCommandEntry] {
-    #[cfg(target_os = "macos")]
-    {
-        const ENTRIES: &[DefaultCommandEntry] = &[
-            DefaultCommandEntry {
-                id: "search.toggle",
-                shortcut: "Cmd+K",
-            },
-            DefaultCommandEntry {
-                id: "search.cancel",
-                shortcut: "Escape",
-            },
-            DefaultCommandEntry {
-                id: "search.confirm",
-                shortcut: "Enter",
-            },
-            DefaultCommandEntry {
-                id: "search.prev",
-                shortcut: "Up",
-            },
-            DefaultCommandEntry {
-                id: "search.next",
-                shortcut: "Down",
-            },
-            DefaultCommandEntry {
-                id: "explorer.open_palette",
-                shortcut: "Cmd+P",
-            },
-            DefaultCommandEntry {
-                id: "explorer.copy",
-                shortcut: "Cmd+C",
-            },
-            DefaultCommandEntry {
-                id: "explorer.cut",
-                shortcut: "Cmd+X",
-            },
-            DefaultCommandEntry {
-                id: "explorer.paste",
-                shortcut: "Cmd+V",
-            },
-            DefaultCommandEntry {
-                id: "explorer.undo",
-                shortcut: "Cmd+Z",
-            },
-            DefaultCommandEntry {
-                id: "explorer.redo",
-                shortcut: "Cmd+Shift+Z",
-            },
-            DefaultCommandEntry {
-                id: "explorer.delete",
-                shortcut: "Delete",
-            },
-            DefaultCommandEntry {
-                id: "explorer.rename",
-                shortcut: "F2",
-            },
-            DefaultCommandEntry {
-                id: "explorer.refresh",
-                shortcut: "Cmd+R",
-            },
-            DefaultCommandEntry {
-                id: "explorer.next_workspace",
-                shortcut: "Cmd+Shift+Grave",
-            },
-            DefaultCommandEntry {
-                id: "explorer.new_tab",
-                shortcut: "Cmd+T",
-            },
-            DefaultCommandEntry {
-                id: "explorer.restore_tab",
-                shortcut: "Cmd+Shift+T",
-            },
-            DefaultCommandEntry {
-                id: "explorer.close_pane",
-                shortcut: "Cmd+W",
-            },
-            DefaultCommandEntry {
-                id: "explorer.restore_pane",
-                shortcut: "Cmd+Ctrl+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.split_vertical",
-                shortcut: "Cmd+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.split_horizontal",
-                shortcut: "Cmd+Shift+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_1",
-                shortcut: "Cmd+1",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_2",
-                shortcut: "Cmd+2",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_3",
-                shortcut: "Cmd+3",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_4",
-                shortcut: "Cmd+4",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_5",
-                shortcut: "Cmd+5",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_6",
-                shortcut: "Cmd+6",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_7",
-                shortcut: "Cmd+7",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_8",
-                shortcut: "Cmd+8",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_9",
-                shortcut: "Cmd+9",
-            },
-            DefaultCommandEntry {
-                id: "app.open_settings",
-                shortcut: "Cmd+Comma",
-            },
-            DefaultCommandEntry {
-                id: "app.toggle_plugin_launcher",
-                shortcut: "Cmd+Shift+P",
-            },
-            DefaultCommandEntry {
-                id: "app.toggle_transfers",
-                shortcut: "Cmd+Shift+Y",
-            },
-            DefaultCommandEntry {
-                id: "clipboard.publish_shared",
-                shortcut: "Cmd+Alt+C",
-            },
-            DefaultCommandEntry {
-                id: "clipboard.apply_shared",
-                shortcut: "Cmd+Alt+V",
-            },
-            DefaultCommandEntry {
-                id: "modal.confirm",
-                shortcut: "Enter",
-            },
-            DefaultCommandEntry {
-                id: "modal.cancel",
-                shortcut: "Escape",
-            },
-        ];
-        ENTRIES
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        const ENTRIES: &[DefaultCommandEntry] = &[
-            DefaultCommandEntry {
-                id: "search.toggle",
-                shortcut: "Ctrl+K",
-            },
-            DefaultCommandEntry {
-                id: "search.cancel",
-                shortcut: "Escape",
-            },
-            DefaultCommandEntry {
-                id: "search.confirm",
-                shortcut: "Enter",
-            },
-            DefaultCommandEntry {
-                id: "search.prev",
-                shortcut: "Up",
-            },
-            DefaultCommandEntry {
-                id: "search.next",
-                shortcut: "Down",
-            },
-            DefaultCommandEntry {
-                id: "explorer.open_palette",
-                shortcut: "Ctrl+P",
-            },
-            DefaultCommandEntry {
-                id: "explorer.copy",
-                shortcut: "Ctrl+C",
-            },
-            DefaultCommandEntry {
-                id: "explorer.cut",
-                shortcut: "Ctrl+X",
-            },
-            DefaultCommandEntry {
-                id: "explorer.paste",
-                shortcut: "Ctrl+V",
-            },
-            DefaultCommandEntry {
-                id: "explorer.undo",
-                shortcut: "Ctrl+Z",
-            },
-            DefaultCommandEntry {
-                id: "explorer.redo",
-                shortcut: "Ctrl+Shift+Z",
-            },
-            DefaultCommandEntry {
-                id: "explorer.delete",
-                shortcut: "Delete",
-            },
-            DefaultCommandEntry {
-                id: "explorer.rename",
-                shortcut: "F2",
-            },
-            DefaultCommandEntry {
-                id: "explorer.refresh",
-                shortcut: "Ctrl+R",
-            },
-            DefaultCommandEntry {
-                id: "explorer.next_workspace",
-                shortcut: "Ctrl+Shift+Grave",
-            },
-            DefaultCommandEntry {
-                id: "explorer.new_tab",
-                shortcut: "Ctrl+T",
-            },
-            DefaultCommandEntry {
-                id: "explorer.restore_tab",
-                shortcut: "Ctrl+Shift+T",
-            },
-            DefaultCommandEntry {
-                id: "explorer.close_pane",
-                shortcut: "Ctrl+W",
-            },
-            DefaultCommandEntry {
-                id: "explorer.restore_pane",
-                shortcut: "Ctrl+Ctrl+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.split_vertical",
-                shortcut: "Ctrl+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.split_horizontal",
-                shortcut: "Ctrl+Shift+Backslash",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_1",
-                shortcut: "Ctrl+1",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_2",
-                shortcut: "Ctrl+2",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_3",
-                shortcut: "Ctrl+3",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_4",
-                shortcut: "Ctrl+4",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_5",
-                shortcut: "Ctrl+5",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_6",
-                shortcut: "Ctrl+6",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_7",
-                shortcut: "Ctrl+7",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_8",
-                shortcut: "Ctrl+8",
-            },
-            DefaultCommandEntry {
-                id: "explorer.tab_9",
-                shortcut: "Ctrl+9",
-            },
-            DefaultCommandEntry {
-                id: "app.open_settings",
-                shortcut: "Ctrl+Comma",
-            },
-            DefaultCommandEntry {
-                id: "app.toggle_plugin_launcher",
-                shortcut: "Ctrl+Shift+P",
-            },
-            DefaultCommandEntry {
-                id: "app.toggle_transfers",
-                shortcut: "Ctrl+Shift+Y",
-            },
-            DefaultCommandEntry {
-                id: "clipboard.publish_shared",
-                shortcut: "Ctrl+Alt+C",
-            },
-            DefaultCommandEntry {
-                id: "clipboard.apply_shared",
-                shortcut: "Ctrl+Alt+V",
-            },
-            DefaultCommandEntry {
-                id: "modal.confirm",
-                shortcut: "Enter",
-            },
-            DefaultCommandEntry {
-                id: "modal.cancel",
-                shortcut: "Escape",
-            },
-        ];
-        ENTRIES
     }
 }

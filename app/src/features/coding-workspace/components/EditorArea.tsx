@@ -15,14 +15,7 @@ export function EditorArea({ rootPath }: EditorAreaProps) {
   if (groups.length === 1) {
     const [group] = groups;
     if (!group) return null;
-    return (
-      <EditorGroupPane
-        group={group}
-        isFocused
-        canSplit={canSplit}
-        rootPath={rootPath}
-      />
-    );
+    return <EditorGroupPane group={group} isFocused canSplit={canSplit} rootPath={rootPath} />;
   }
 
   return (

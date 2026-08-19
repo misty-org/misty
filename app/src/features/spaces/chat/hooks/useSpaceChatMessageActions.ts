@@ -9,7 +9,7 @@ import type {
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
 import type { MessageEditingState } from "./useMessageEditing";
-import type { SpaceChatDraft } from "./useSpaceChatDraft";
+import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 
 export interface SpaceChatMessageActionsOptions {
   spaceId: string;

@@ -10,7 +10,6 @@ export type AppTab =
   | "extensions"
   | "transfers"
   | "providers"
-  | "activity"
   | "settings"
   | "account"
   | "diagnostics";

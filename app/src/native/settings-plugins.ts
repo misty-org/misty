@@ -54,6 +54,10 @@ export function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
   return invoke("shortcuts_snapshot");
 }
 
+export function shortcutsReset(): Promise<ShortcutsSnapshot> {
+  return invoke("shortcuts_reset");
+}
+
 export function shortcutsSave(request: SaveShortcutsRequest): Promise<ShortcutsSnapshot> {
   return invoke("shortcuts_save", { request });
 }
@@ -143,4 +147,16 @@ export function providersVerifyResult(jobId: string): Promise<VerifyResult> {
 
 export function providersDisconnectRemote(name: string): Promise<ProvidersSnapshot> {
   return invoke("providers_disconnect_remote", { name });
+}
+
+export function codingAiReadApiKey(providerId: string): Promise<string | null> {
+  return invoke("coding_ai_read_api_key", { providerId });
+}
+
+export function codingAiWriteApiKey(providerId: string, key: string): Promise<void> {
+  return invoke("coding_ai_write_api_key", { providerId, key });
+}
+
+export function codingAiClearApiKey(providerId: string): Promise<void> {
+  return invoke("coding_ai_clear_api_key", { providerId });
 }

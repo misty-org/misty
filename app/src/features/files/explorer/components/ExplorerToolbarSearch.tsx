@@ -16,7 +16,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/ui";
-import { Command as CommandIcon, Folder } from "lucide-react";
+import { ArrowLeftRight, Folder } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExplorerLocationResult } from "../model/interfaces/components/ExplorerToolbarModel";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
@@ -30,7 +30,6 @@ import {
   semanticSearchDebounceMs,
 } from "../utils/globalSearch";
 import { searchResultNavigationTarget } from "../utils/searchNavigation";
-import { explorerCommandPaletteEntries } from "./ExplorerToolbarModel";
 import {
   fuzzyIncludes,
   searchResultContext,
@@ -38,42 +37,18 @@ import {
   toolbarStyles,
 } from "./ExplorerToolbarSupport";
 import { SearchResultThumbnail } from "./SearchResultThumbnail";
+import { useNavigate } from "react-router-dom";
 
 export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
+  const navigate = useNavigate();
   const [searchFocused, setSearchFocused] = useState(false);
   const [indexedResults, setIndexedResults] = useState<SearchResult[]>([]);
   const [indexedSearching, setIndexedSearching] = useState(false);
   const [indexedError, setIndexedError] = useState<string | null>(null);
   const indexedNativeResultsRef = useRef<SearchResult[]>([]);
   const indexedSemanticResultsRef = useRef<SearchResult[]>([]);
-  const commandMode = props.commandQuery.trimStart().startsWith(">");
-  const commandFilter = commandMode
-    ? props.commandQuery.trimStart().slice(1).trim().toLowerCase()
-    : "";
   const searchMode = props.commandQueryMode === "search";
-  const locationFilter = commandMode || !searchMode ? "" : props.commandQuery.trim().toLowerCase();
-  const paletteCommands = useMemo(
-    () => explorerCommandPaletteEntries(props.pluginCommands),
-    [props.pluginCommands],
-  );
-  const filteredCommands = useMemo(
-    () =>
-      paletteCommands.filter((command) => {
-        if (!commandFilter) return true;
-        const haystack = [
-          command.id,
-          command.label,
-          command.hint,
-          command.pluginName,
-          command.group ?? "Explorer",
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(commandFilter);
-      }),
-    [commandFilter, paletteCommands],
-  );
+  const locationFilter = searchMode ? props.commandQuery.trim().toLowerCase() : "";
   const filteredLocations = useMemo(() => {
     if (!locationFilter) return [];
     return props.locationResults
@@ -87,13 +62,12 @@ export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
   }, [locationFilter, props.locationResults]);
   const locationMode =
     searchFocused &&
-    !commandMode &&
     Boolean(locationFilter) &&
     (filteredLocations.length > 0 ||
       indexedResults.length > 0 ||
       indexedSearching ||
       Boolean(indexedError));
-  const paletteOpen = commandMode || locationMode;
+  const paletteOpen = locationMode;
 
   useEffect(() => {
     let canceled = false;
@@ -190,15 +164,7 @@ export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
     return () => window.removeEventListener("misty:explorer-search-focus", onSearchFocus);
   }, [props.paneId, props.path]);
 
-  const closePalette = () => {
-    setSearchFocused(false);
-    if (commandMode) props.onCommandQuery("");
-  };
-  const runCommand = (commandId: string) => {
-    props.onRunCommand(commandId);
-    props.onCommandQuery("");
-    setSearchFocused(false);
-  };
+  const closePalette = () => setSearchFocused(false);
   const runLocation = (path: string) => {
     props.onNavigateLocation(path);
     props.onCommandQuery("");
@@ -225,68 +191,39 @@ export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label="Explorer commands"
-                title="Explorer commands"
-                onClick={() => {
-                  setSearchFocused(true);
-                  props.onCommandQuery(">");
-                }}
+                aria-label="Transfers"
+                title="Transfers"
+                onClick={() => navigate("/transfers")}
               >
-                <CommandIcon size={18} />
+                <ArrowLeftRight size={18} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Explorer commands</TooltipContent>
+          <TooltipContent>Transfers</TooltipContent>
         </Tooltip>
       </TooltipProvider>
       <PopoverContent
         align="end"
         sideOffset={6}
         className={toolbarStyles.palette}
-        aria-label={commandMode ? "Explorer commands" : "Explorer locations"}
+        aria-label="Explorer locations"
       >
         <Command shouldFilter={false} loop>
           <CommandInput
             autoFocus
-            value={commandMode ? props.commandQuery.trimStart().slice(1) : props.commandQuery}
-            placeholder={commandMode ? "Type a command…" : "Search locations…"}
-            onValueChange={(value) => props.onCommandQuery(commandMode ? `>${value}` : value)}
+            value={props.commandQuery}
+            placeholder="Search locations…"
+            onValueChange={(value) => props.onCommandQuery(value)}
           />
           <CommandList className="max-h-[min(420px,calc(100vh-120px))]">
-            {commandMode ? (
-              <>
-                <CommandEmpty>No explorer commands found.</CommandEmpty>
-                <CommandGroup heading="Commands">
-                  {filteredCommands.map((command) => (
-                    <CommandItem
-                      key={command.id}
-                      value={command.id}
-                      className={toolbarStyles.paletteButton}
-                      onSelect={() => runCommand(command.id)}
-                    >
-                      <CommandIcon />
-                      <span className={toolbarStyles.paletteText}>
-                        <span className={toolbarStyles.paletteTitle}>{command.label}</span>
-                        <span className={toolbarStyles.paletteSubtitle}>
-                          {command.group === "Extension" && command.pluginName
-                            ? `${command.pluginName} · ${command.hint}`
-                            : command.hint}
-                        </span>
-                      </span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </>
-            ) : (
-              <LocationResults
-                locations={filteredLocations}
-                indexedResults={indexedResults}
-                searching={indexedSearching}
-                error={indexedError}
-                onLocation={runLocation}
-                onResult={runIndexedResult}
-              />
-            )}
+            <LocationResults
+              locations={filteredLocations}
+              indexedResults={indexedResults}
+              searching={indexedSearching}
+              error={indexedError}
+              onLocation={runLocation}
+              onResult={runIndexedResult}
+            />
           </CommandList>
         </Command>
       </PopoverContent>

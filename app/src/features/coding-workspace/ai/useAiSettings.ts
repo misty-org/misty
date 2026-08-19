@@ -24,8 +24,7 @@ export const useAiSettings = create<AiSettingsState>()(
       setProvider: (providerId) =>
         set(() => ({
           providerId,
-          baseUrl:
-            providerId === "anthropic" ? DEFAULT_ANTHROPIC_URL : DEFAULT_OPENAI_COMPAT_URL,
+          baseUrl: providerId === "anthropic" ? DEFAULT_ANTHROPIC_URL : DEFAULT_OPENAI_COMPAT_URL,
         })),
       setBaseUrl: (baseUrl) => set({ baseUrl }),
       setModel: (model) => set({ model }),

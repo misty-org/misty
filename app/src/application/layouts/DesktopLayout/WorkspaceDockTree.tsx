@@ -22,6 +22,7 @@ import {
   cn,
 } from "@/shared/ui";
 import {
+  ArrowLeftRight,
   ArrowDownToLine,
   ArrowLeftToLine,
   ArrowRightToLine,
@@ -35,6 +36,10 @@ import {
   MoreHorizontal,
   PanelRightOpen,
   PanelTopOpen,
+  BookOpenText,
+  CheckSquare2,
+  MessagesSquare,
+  Notebook,
   SquareTerminal,
   X,
   type LucideIcon,
@@ -43,6 +48,7 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "rea
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import { WorkspaceNewTabMenu, type NewTabOption } from "./WorkspaceNewTabMenu";
+import { dockHeaderPadding } from "./styles";
 import {
   currentWorkspaceTabDragId,
   WorkspaceTabGroupButton,
@@ -56,7 +62,7 @@ const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
   terminal: SquareTerminal,
   code: Code2,
   files: FolderOpen,
-  transfers: ArrowDownToLine,
+  transfers: ArrowLeftRight,
   agents: Bot,
   extensions: Blocks,
 };
@@ -71,22 +77,21 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   agents: "Agents",
   extensions: "Extensions",
 };
-const spacesGroupKey = "collapsed:spaces";
 const tabDragType = "application/x-misty-workspace-tab";
 
-function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
+export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
   const map = new Map<string, TabGroup>();
   for (const tab of tabs) {
-    const key = tab.surfaceId === "space" ? spacesGroupKey : tab.groupKey;
+    const key = tab.groupKey;
     const existing = map.get(key);
     if (existing) existing.tabs.push(tab);
     else
       map.set(key, {
         key,
         surfaceId: tab.surfaceId,
-        label: tab.surfaceId === "space" ? "Spaces" : surfaceLabels[tab.surfaceId],
+        label: tab.surfaceId === "space" ? tab.title : surfaceLabels[tab.surfaceId],
         tabs: [tab],
-        storeGroupKey: tab.surfaceId === "space" ? null : tab.groupKey,
+        storeGroupKey: tab.groupKey,
       });
   }
   return [...map.values()];
@@ -94,6 +99,8 @@ function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
 
 export interface WorkspaceDockTreeProps {
   node: WorkspaceDockNode;
+  dockEdge?: { top: boolean; left: boolean; right: boolean };
+  titlebarInsets?: { left: number; right: number };
   focusedPaneId: string;
   locationPath: string;
   locationSearch: string;
@@ -121,6 +128,15 @@ export function WorkspaceDockTree(props: WorkspaceDockTreeProps) {
 function DockSplitView(
   props: WorkspaceDockTreeProps & { node: Extract<WorkspaceDockNode, { type: "split" }> },
 ) {
+  const edge = props.dockEdge ?? { top: true, left: true, right: true };
+  const firstEdge =
+    props.node.direction === "horizontal"
+      ? { top: edge.top, left: edge.left, right: false }
+      : { top: edge.top, left: edge.left, right: edge.right };
+  const secondEdge =
+    props.node.direction === "horizontal"
+      ? { top: edge.top, left: false, right: edge.right }
+      : { top: false, left: edge.left, right: edge.right };
   const persistTimerRef = useRef<number | null>(null);
   const pendingRatioRef = useRef(props.node.ratio);
   useEffect(
@@ -143,7 +159,7 @@ function DockSplitView(
       }}
     >
       <Panel defaultSize={props.node.ratio * 100} minSize={10} className="min-h-0 min-w-0">
-        <WorkspaceDockTree {...props} node={props.node.first} />
+        <WorkspaceDockTree {...props} node={props.node.first} dockEdge={firstEdge} />
       </Panel>
       <PanelResizeHandle
         className={cn(
@@ -154,7 +170,7 @@ function DockSplitView(
         )}
       />
       <Panel defaultSize={(1 - props.node.ratio) * 100} minSize={10} className="min-h-0 min-w-0">
-        <WorkspaceDockTree {...props} node={props.node.second} />
+        <WorkspaceDockTree {...props} node={props.node.second} dockEdge={secondEdge} />
       </Panel>
     </PanelGroup>
   );
@@ -176,6 +192,18 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const homeMinimum = dockWidgetRegistry.get("home").minimumSize;
   const canSplitSideways = canFitDockSplit(paneSize, "right", minimum, homeMinimum);
   const canSplitVertically = canFitDockSplit(paneSize, "down", minimum, homeMinimum);
+  const dockEdge = props.dockEdge ?? { top: true, left: true, right: true };
+  const titlebarHeader = Boolean(props.titlebarInsets && dockEdge.top);
+  const titlebarPadding = titlebarHeader
+    ? {
+        paddingLeft: dockEdge.left
+          ? dockHeaderPadding + (props.titlebarInsets?.left ?? 0)
+          : dockHeaderPadding,
+        paddingRight: dockEdge.right
+          ? dockHeaderPadding + (props.titlebarInsets?.right ?? 0)
+          : dockHeaderPadding,
+      }
+    : undefined;
 
   useEffect(() => {
     const element = sectionRef.current;
@@ -247,17 +275,16 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       }}
     >
       <header
-        className={cn(
-          "flex min-w-0 items-end border-b border-charcoal-border bg-charcoal-workspace px-1.5 pt-1",
-          focused && "shadow-[inset_0_-1px_0_rgba(201,225,166,0.24)]",
-        )}
+        className="flex h-[38px] min-w-0 items-center border-b border-charcoal-border bg-charcoal-workspace px-2"
+        style={titlebarPadding}
+        data-misty-window-titlebar-region={titlebarHeader ? "true" : undefined}
       >
-        <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {groups.map((group) => (
             <WorkspaceTabGroupButton
               key={group.key}
               group={group}
-              icon={surfaceIcons[group.surfaceId]}
+              icon={spaceToolIcon(group.tabs[0]) ?? surfaceIcons[group.surfaceId]}
               activeTabId={activeTab?.id ?? null}
               lastUsedTabByGroup={props.lastUsedTabByGroup}
               onOpen={props.onOpen}
@@ -265,9 +292,11 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
               onMoveTab={(tabId, index) => props.onMoveTab(tabId, pane.id, index)}
             />
           ))}
+          <div className="sticky right-0 z-10 flex shrink-0 items-center bg-charcoal-workspace/90 px-0.5 backdrop-blur-sm">
+            <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
+          </div>
         </div>
-        <div className="ml-1 flex h-8 shrink-0 items-center gap-0.5">
-          <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
+        <div className="ml-1.5 flex h-7 shrink-0 items-center gap-0.5 border-l border-charcoal-border pl-1.5">
           <button
             type="button"
             disabled={!canSplitSideways}
@@ -339,6 +368,16 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       {dropZone ? <DockDropPreview zone={dropZone} /> : null}
     </section>
   );
+}
+
+function spaceToolIcon(tab: WorkspaceTab | undefined): LucideIcon | null {
+  if (tab?.surfaceId !== "space") return null;
+  const section = tab.route.split("/").filter(Boolean)[2];
+  if (section === "notes" || section === "drawings") return Notebook;
+  if (section === "planner") return CheckSquare2;
+  if (section === "chat") return MessagesSquare;
+  if (section === "library") return BookOpenText;
+  return Blocks;
 }
 
 function MoveTabMenu(props: {

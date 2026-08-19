@@ -1,25 +1,30 @@
+import { useAuth } from "@/features/auth";
 import { setBrowserWebviewsSuspended } from "@/features/browser";
-import type { WorkspaceSurfaceId } from "@/features/workspace";
+import { rememberedJournalRoute, rememberedPlannerRoute, useSpacesStore } from "@/features/spaces";
+import { useWorkspaceStore, type WorkspaceSurfaceId } from "@/features/workspace";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/ui";
 import {
+  ArrowLeftRight,
   Blocks,
+  BookOpenText,
   Bot,
+  CheckSquare2,
   Code2,
   FolderOpen,
-  Download,
   Globe2,
+  House,
+  MessagesSquare,
+  Notebook,
   Plus,
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export interface NewTabOption {
   surfaceId: WorkspaceSurfaceId;
@@ -29,12 +34,9 @@ export interface NewTabOption {
   instancePolicy?: "single" | "multiple";
 }
 
-// The "+" menu always opens a fresh instance for surfaces that can meaningfully
-// have more than one tab. Agents / Extensions stay singleton because they only
-// make sense as one surface per app. Nav-rail clicks and URL restoration still
-// reuse the last-used tab via routeSurface.ts.
-export const NEW_TAB_OPTIONS: NewTabOption[] = [
-  { surfaceId: "browser", label: "Browser tab", route: "/browser", icon: Globe2 },
+export const GENERAL_TAB_OPTIONS: NewTabOption[] = [
+  { surfaceId: "home", label: "Home", route: "/home", icon: House },
+  { surfaceId: "browser", label: "Browser", route: "/browser", icon: Globe2 },
   {
     surfaceId: "code",
     label: "Code",
@@ -43,7 +45,13 @@ export const NEW_TAB_OPTIONS: NewTabOption[] = [
     instancePolicy: "single",
   },
   { surfaceId: "files", label: "Files", route: "/files", icon: FolderOpen },
-  { surfaceId: "transfers", label: "Transfers", route: "/transfers", icon: Download },
+  {
+    surfaceId: "transfers",
+    label: "Transfers",
+    route: "/transfers",
+    icon: ArrowLeftRight,
+    instancePolicy: "single",
+  },
   { surfaceId: "terminal", label: "Terminal", route: "/terminal", icon: SquareTerminal },
   {
     surfaceId: "agents",
@@ -61,6 +69,8 @@ export const NEW_TAB_OPTIONS: NewTabOption[] = [
   },
 ];
 
+export const NEW_TAB_OPTIONS: NewTabOption[] = GENERAL_TAB_OPTIONS;
+
 interface Props {
   paneId: string;
   onOpenNewTab: (option: NewTabOption, paneId: string) => void;
@@ -68,10 +78,59 @@ interface Props {
 
 export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   const popupSuspensionReason = `workspace-new-tab-menu:${paneId}`;
+  const { user } = useAuth();
+  const spaces = useSpacesStore((state) => state.spaces);
+  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+
   useEffect(
     () => () => setBrowserWebviewsSuspended(false, popupSuspensionReason),
     [popupSuspensionReason],
   );
+
+  const activeSpace = useMemo(() => {
+    const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
+    return spaces.find((s) => s.id === activeSpaceId) ?? spaces[0];
+  }, [activeScopeKey, spaces]);
+
+  const spaceTabOptions = useMemo<NewTabOption[]>(() => {
+    const accountId = user?.id ?? "";
+    if (!activeSpace) {
+      return [
+        { surfaceId: "space", label: "Journal", route: "/spaces", icon: Notebook },
+        { surfaceId: "space", label: "Planner", route: "/spaces", icon: CheckSquare2 },
+        { surfaceId: "space", label: "Chat", route: "/spaces", icon: MessagesSquare },
+        { surfaceId: "space", label: "Library", route: "/spaces", icon: BookOpenText },
+      ];
+    }
+    const encodedId = encodeURIComponent(activeSpace.id);
+    return [
+      {
+        surfaceId: "space",
+        label: "Journal",
+        route: rememberedJournalRoute(accountId, activeSpace.id),
+        icon: Notebook,
+      },
+      {
+        surfaceId: "space",
+        label: "Planner",
+        route: rememberedPlannerRoute(accountId, activeSpace.id),
+        icon: CheckSquare2,
+      },
+      {
+        surfaceId: "space",
+        label: "Chat",
+        route: `/spaces/${encodedId}/chat`,
+        icon: MessagesSquare,
+      },
+      {
+        surfaceId: "space",
+        label: "Library",
+        route: `/spaces/${encodedId}/library`,
+        icon: BookOpenText,
+      },
+    ];
+  }, [activeSpace, user?.id]);
+
   return (
     <DropdownMenu onOpenChange={(open) => setBrowserWebviewsSuspended(open, popupSuspensionReason)}>
       <DropdownMenuTrigger asChild>
@@ -85,13 +144,11 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[200px]">
-        <DropdownMenuLabel>Open new…</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {NEW_TAB_OPTIONS.map((option) => {
+        {[...GENERAL_TAB_OPTIONS, ...spaceTabOptions].map((option) => {
           const Icon = option.icon;
           return (
             <DropdownMenuItem
-              key={option.surfaceId}
+              key={`${option.surfaceId}:${option.label}`}
               onSelect={() => onOpenNewTab(option, paneId)}
               className="flex items-center gap-2"
             >

@@ -75,9 +75,13 @@ describe("SpacePlanner", () => {
     expect(container.textContent).toContain("To do");
     expect(container.textContent).toContain("In progress");
     expect(container.textContent).toContain("Done");
+    // The board scrolls sideways only; each column scrolls its own tasks, so a
+    // long column no longer drags the whole board past the viewport.
     const board = container.querySelector('[aria-label="Task board"]');
-    expect(board?.className).toContain("overflow-y-auto");
-    expect(board?.className).not.toContain("overflow-y-hidden");
+    expect(board?.className).toContain("overflow-x-auto");
+    expect(board?.className).toContain("overflow-y-hidden");
+    const columnScrollers = board?.querySelectorAll("section > div.overflow-y-auto") ?? [];
+    expect(columnScrollers.length).toBeGreaterThan(0);
   });
 
   it("opens the existing task drawer from a task creation query", async () => {

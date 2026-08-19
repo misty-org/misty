@@ -7,39 +7,27 @@ export function createSpaceAgentMembershipsApi(request: SpaceRequest) {
   return {
     spaceAgents: (spaceId: string) =>
       request<{ agents: SpaceAgentMembership[] }>(`/spaces/${encodeURIComponent(spaceId)}/agents`),
-    addSpaceAgent: (spaceId: string, agentId: string, spaceRole = "") =>
-      request<SpaceAgentMembership>(`/spaces/${encodeURIComponent(spaceId)}/agents`, {
-        method: "POST",
-        body: JSON.stringify({ agent_id: agentId, space_role: spaceRole }),
-      }),
-    updateSpaceAgent: (
+    startAgentRun: <T>(
       spaceId: string,
-      membership: SpaceAgentMembership,
-      patch: Pick<
-        SpaceAgentMembership,
-        | "enabled"
-        | "role_id"
-        | "space_role"
-        | "space_instructions"
-        | "permissions"
-        | "capability_grants"
-      >,
+      agentId: string,
+      input: {
+        instruction: string;
+        mode?: "ask" | "auto" | "full";
+        timezone?: string;
+        conversation_target?: string;
+        context_references?: Array<{
+          device_id: string;
+          kind: "browser_tab" | "project_root";
+          opaque_ref: string;
+          display_name?: string;
+          capabilities: string[];
+          metadata?: Record<string, unknown>;
+        }>;
+      },
     ) =>
-      request<SpaceAgentMembership>(
-        `/spaces/${encodeURIComponent(spaceId)}/agents/${encodeURIComponent(membership.agent_id)}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ ...patch, membership_version: membership.membership_version }),
-        },
-      ),
-    removeSpaceAgent: (spaceId: string, agentId: string) =>
-      request(`/spaces/${encodeURIComponent(spaceId)}/agents/${encodeURIComponent(agentId)}`, {
-        method: "DELETE",
-      }),
-    approveSpaceAgentVersion: (spaceId: string, agentId: string) =>
-      request<SpaceAgentMembership>(
-        `/spaces/${encodeURIComponent(spaceId)}/agents/${encodeURIComponent(agentId)}/approve-version`,
-        { method: "POST" },
+      request<T>(
+        `/spaces/${encodeURIComponent(spaceId)}/agents/${encodeURIComponent(agentId)}/runs`,
+        { method: "POST", body: JSON.stringify(input) },
       ),
     spaceAgentToolbox: (spaceId: string, agentId: string) =>
       request<AgentToolboxResponse>(

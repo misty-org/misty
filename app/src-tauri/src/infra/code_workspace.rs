@@ -176,8 +176,13 @@ pub struct WalkedFile {
     pub name: String,
 }
 
+/// Directories a workspace walk should not descend into.
+///
+/// Only the explicit list is skipped. Skipping every dot-directory as well was
+/// redundant — the costly ones (`.git`, `.next`, `.venv`, …) are already named
+/// — and it also hid the ones people edit, like `.github` and `.vscode`.
 fn should_skip_dir(name: &str) -> bool {
-    HARD_SKIP_DIRS.contains(&name) || name.starts_with('.')
+    HARD_SKIP_DIRS.contains(&name)
 }
 
 #[tauri::command]
@@ -437,5 +442,25 @@ fn run_native_search(root: &Path, query: &str, case_sensitive: bool) -> SearchOu
         matches,
         truncated,
         used_ripgrep: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_skip_dir;
+
+    #[test]
+    fn skips_only_the_named_directories() {
+        assert!(should_skip_dir(".git"));
+        assert!(should_skip_dir("node_modules"));
+        assert!(should_skip_dir("target"));
+    }
+
+    #[test]
+    fn walks_configuration_directories_that_start_with_a_dot() {
+        assert!(!should_skip_dir(".github"));
+        assert!(!should_skip_dir(".vscode"));
+        assert!(!should_skip_dir(".cargo"));
+        assert!(!should_skip_dir("src"));
     }
 }

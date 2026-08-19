@@ -1,12 +1,14 @@
 {
-  "src/application/layouts/DesktopLayout/styles.ts": [
+  "src/application/layouts/DesktopLayout/ActivityMenu.tsx": [
     {
-      "length": 161,
-      "hash": "b02e0bc0481ad599"
-    },
+      "length": 218,
+      "hash": "4cdf78067b35b51e"
+    }
+  ],
+  "src/application/layouts/DesktopLayout/GlobalNavigator.tsx": [
     {
-      "length": 169,
-      "hash": "33323ac7f5c59123"
+      "length": 300,
+      "hash": "f0628661caf953cc"
     }
   ],
   "src/application/layouts/RootLayout.tsx": [
@@ -271,12 +273,12 @@
   ],
   "src/features/files/explorer/workspace/ExplorerDesktopStatus.tsx": [
     {
-      "length": 254,
-      "hash": "8e82f1e129bb7caf"
+      "length": 319,
+      "hash": "bc4f388a3f093c42"
     },
     {
-      "length": 187,
-      "hash": "57115d7e374e89ba"
+      "length": 249,
+      "hash": "ce8b49a0e0b4191d"
     }
   ],
   "src/features/files/explorer/workspace/ExplorerDuplicateFinderDialog.tsx": [
@@ -369,24 +371,16 @@
       "hash": "e976147355e1cb29"
     },
     {
+      "length": 175,
+      "hash": "e976147355e1cb29"
+    },
+    {
       "length": 173,
       "hash": "a31d88740c6ecdc9"
     },
     {
       "length": 184,
       "hash": "de5f715a25619ef0"
-    }
-  ],
-  "src/features/settings/settingsSearchSection.tsx": [
-    {
-      "length": 162,
-      "hash": "216a79dbb34e0bd0"
-    }
-  ],
-  "src/features/settings/settingsSystemSections.tsx": [
-    {
-      "length": 198,
-      "hash": "4cd5c39f34abc3e0"
     }
   ],
   "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
@@ -405,6 +399,18 @@
     {
       "length": 210,
       "hash": "37ca8065247c9015"
+    }
+  ],
+  "src/features/spaces/components/SpaceManagementNavigation.tsx": [
+    {
+      "length": 165,
+      "hash": "c4977d3628e797c7"
+    }
+  ],
+  "src/features/spaces/components/SpacesLoadingPlaceholder.tsx": [
+    {
+      "length": 167,
+      "hash": "bab522c30f72415c"
     }
   ],
   "src/features/spaces/library/SpaceLibraryPlayback.tsx": [
@@ -487,18 +493,6 @@
       "hash": "bd6f2b6a85059e8b"
     }
   ],
-  "src/features/spaces/components/SpaceManagementNavigation.tsx": [
-    {
-      "length": 165,
-      "hash": "c4977d3628e797c7"
-    }
-  ],
-  "src/features/spaces/components/SpacesLoadingPlaceholder.tsx": [
-    {
-      "length": 167,
-      "hash": "bab522c30f72415c"
-    }
-  ],
   "src/features/transfers/transferStyles.ts": [
     {
       "length": 172,
@@ -529,8 +523,8 @@
   ],
   "src/shared/ui/alert-dialog.tsx": [
     {
-      "length": 179,
-      "hash": "57a90c121cb67190"
+      "length": 182,
+      "hash": "f50fd3b389aaa1a9"
     }
   ],
   "src/shared/ui/alert.tsx": [
@@ -583,12 +577,6 @@
       "hash": "0fd31895d3e806d9"
     }
   ],
-  "src/shared/ui/checkbox.tsx": [
-    {
-      "length": 426,
-      "hash": "168a9cc7daf92dbf"
-    }
-  ],
   "src/shared/ui/command.tsx": [
     {
       "length": 388,
@@ -631,8 +619,8 @@
   ],
   "src/shared/ui/dialog.tsx": [
     {
-      "length": 179,
-      "hash": "601db1ecebb28de6"
+      "length": 182,
+      "hash": "0d1d81cf83893556"
     },
     {
       "length": 264,
@@ -651,12 +639,12 @@
       "hash": "938ac8a13a38bba6"
     },
     {
-      "length": 957,
-      "hash": "261fe29865ac1709"
+      "length": 1000,
+      "hash": "3e5b0bf7b021fd8b"
     },
     {
-      "length": 1053,
-      "hash": "3ac7e03a740acfeb"
+      "length": 1096,
+      "hash": "37257dff57a54c91"
     },
     {
       "length": 641,
@@ -701,12 +689,12 @@
   ],
   "src/shared/ui/sheet.tsx": [
     {
-      "length": 179,
-      "hash": "601db1ecebb28de6"
+      "length": 182,
+      "hash": "11cce1cfe96c32df"
     },
     {
-      "length": 221,
-      "hash": "6982afcd534a0947"
+      "length": 218,
+      "hash": "14597395a4a92e5d"
     },
     {
       "length": 266,
@@ -719,12 +707,12 @@
       "hash": "b27539ee55cd7744"
     },
     {
-      "length": 811,
-      "hash": "6c785a2f63c803d2"
+      "length": 802,
+      "hash": "196850d7f2ebf13c"
     },
     {
-      "length": 252,
-      "hash": "2cd65f256ce42f1d"
+      "length": 189,
+      "hash": "4eb744700a98828a"
     }
   ],
   "src/shared/ui/toggle-group.tsx": [

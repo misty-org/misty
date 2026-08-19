@@ -26,10 +26,7 @@ export const useEditorEphemeralStore = create<EphemeralState>((set) => ({
   setCursor: (groupId, cursor) =>
     set((state) => {
       const existing = state.cursors[groupId];
-      if (
-        existing?.line === cursor?.line &&
-        existing?.column === cursor?.column
-      ) {
+      if (existing?.line === cursor?.line && existing?.column === cursor?.column) {
         return state;
       }
       return { cursors: { ...state.cursors, [groupId]: cursor } };

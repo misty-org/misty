@@ -104,6 +104,8 @@ export const ProfileNavButton = memo(
       className?: string;
       avatarClassName?: string;
       label?: string | null;
+      /** Labels the button with the signed-in account's display name. */
+      showAccountName?: boolean;
     }
   >(function ProfileNavButton(props, ref) {
     const currentUser = useSetupStore((state) => state.status?.current_user ?? null);
@@ -168,8 +170,8 @@ export const ProfileNavButton = memo(
             strokeWidth={1.75}
           />
         )}
-        {props.label ? (
-          <span className="min-w-0 flex-1 truncate text-left">{props.label}</span>
+        {(props.label ?? (props.showAccountName ? displayName : null)) ? (
+          <span className="min-w-0 flex-1 truncate text-left">{props.label ?? displayName}</span>
         ) : null}
       </Button>
     );

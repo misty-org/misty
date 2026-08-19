@@ -29,7 +29,8 @@ use app::commands::{
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
     clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
     clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
-    clipboard_write_file_bytes, clipboard_write_file_refs, compare_apply_text_merge, compare_files,
+    clipboard_write_file_bytes, clipboard_write_file_refs, coding_ai_clear_api_key,
+    coding_ai_read_api_key, coding_ai_write_api_key, compare_apply_text_merge, compare_files,
     compare_folders, devices_snapshot, devices_unmount, duplicates_cancel,
     duplicates_hash_remote_candidates, duplicates_scan, explorer_calculate_directory_sizes,
     explorer_cancel_drag_preparation, explorer_create_item, explorer_delete_items,
@@ -62,12 +63,13 @@ use app::commands::{
     search_start_scan, self_host_entitlement_load, self_host_entitlement_store,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, shortcuts_save, shortcuts_snapshot, smart_library_apply_results,
-    smart_library_assets_page, smart_library_delete, smart_library_import_files,
-    smart_library_preflight_import, smart_library_prepare_previews, smart_library_resolve_assets,
-    smart_library_scan, smart_library_search, smart_library_set_server_folder_id,
-    smart_library_snapshot, storage_snapshot, transfers_delete_all, transfers_delete_selected,
-    transfers_snapshot, workspaces_save, workspaces_snapshot,
+    settings_snapshot, shortcuts_reset, shortcuts_save, shortcuts_snapshot,
+    smart_library_apply_results, smart_library_assets_page, smart_library_delete,
+    smart_library_import_files, smart_library_preflight_import, smart_library_prepare_previews,
+    smart_library_resolve_assets, smart_library_scan, smart_library_search,
+    smart_library_set_server_folder_id, smart_library_snapshot, storage_snapshot,
+    transfers_delete_all, transfers_delete_selected, transfers_snapshot, workspaces_save,
+    workspaces_snapshot,
 };
 #[cfg(target_os = "android")]
 use app::commands::{
@@ -176,6 +178,8 @@ pub fn run() {
                 return Err(error.into());
             }
             #[cfg(target_os = "macos")]
+            infra::app_menu::setup(app)?;
+            #[cfg(target_os = "macos")]
             infra::devices::start_device_change_listener(app.handle().clone());
             Ok(())
         });
@@ -186,7 +190,12 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
-        tray::handle_menu_event(app, event.id().as_ref());
+        let id = event.id().as_ref();
+        #[cfg(target_os = "macos")]
+        if infra::app_menu::handle_menu_event(app, id) {
+            return;
+        }
+        tray::handle_menu_event(app, id);
     });
 
     builder
@@ -456,8 +465,12 @@ pub fn run() {
             settings_apply_launch_on_login,
             settings_open_with_associations,
             settings_remove_open_with_association,
+            coding_ai_read_api_key,
+            coding_ai_write_api_key,
+            coding_ai_clear_api_key,
             shortcuts_snapshot,
             shortcuts_save,
+            shortcuts_reset,
             #[cfg(desktop)]
             plugin_commands_snapshot,
             #[cfg(desktop)]

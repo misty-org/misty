@@ -1,12 +1,10 @@
 export type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
 
-import { AgentCreatorDialog, agentTeammatesV1Enabled } from "@/features/agents";
+import { agentTeammatesV1Enabled } from "@/features/agents";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { Button } from "@/shared/ui";
-import { Plus, UserPlus } from "lucide-react";
-import { useState } from "react";
-import { AgentMembershipList } from "./AgentMembershipList";
+import { UserPlus } from "lucide-react";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { MemberActionDialog } from "./MemberActionDialog";
 import { MemberList } from "./MemberList";
@@ -28,7 +26,6 @@ export function SpaceMembers({
   const { space, members, agents, error, clearError } = state;
   const bannerError = error && !dialogs.inviteOpen && !dialogs.memberAction ? error : "";
   const teammatesEnabled = agentTeammatesV1Enabled();
-  const [creatorOpen, setCreatorOpen] = useState(false);
 
   return (
     <div
@@ -52,11 +49,6 @@ export function SpaceMembers({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {state.canManageAgents ? (
-              <Button type="button" variant="outline" onClick={() => setCreatorOpen(true)}>
-                <Plus className="size-4" /> Create Agent
-              </Button>
-            ) : null}
             {state.canInvite ? (
               <Button type="button" onClick={dialogs.openInvite}>
                 <UserPlus className="size-4" /> Invite member
@@ -83,7 +75,7 @@ export function SpaceMembers({
             agents={agents}
             loading={state.membersLoading}
             owner={state.canManageMembers}
-            canManageAgents={state.canManageAgents}
+            canManageAgents={false}
             currentUserId={user?.id}
             onMemberAction={dialogs.setMemberAction}
             onReload={() => useSpacesStore.getState().loadMembers(spaceId)}
@@ -97,13 +89,6 @@ export function SpaceMembers({
               owner={state.canManageMembers}
               currentUserId={user?.id}
               onAction={dialogs.setMemberAction}
-            />
-            <AgentMembershipList
-              spaceId={spaceId}
-              agents={agents}
-              canManage={state.canManageAgents}
-              onReload={() => useSpacesStore.getState().loadMembers(spaceId)}
-              onError={(message) => useSpacesStore.setState({ error: message || null })}
             />
           </>
         )}
@@ -124,12 +109,6 @@ export function SpaceMembers({
         error={error ?? ""}
       />
       <MemberActionDialog dialogs={dialogs} error={error ?? ""} />
-      <AgentCreatorDialog
-        open={creatorOpen}
-        onOpenChange={setCreatorOpen}
-        defaultSpaceId={spaceId}
-        onCreated={() => void useSpacesStore.getState().loadMembers(spaceId)}
-      />
     </div>
   );
 }

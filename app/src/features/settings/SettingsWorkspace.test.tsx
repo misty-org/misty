@@ -16,18 +16,10 @@ import type * as SettingsStoreModule from "./store/useSettingsStore";
  * empty a tab.
  */
 
-const SECTIONS: SettingsSection[] = [
-  "general",
-  "app",
-  "agent",
-  "appearance",
-  "notifications",
-  "privacy",
-  "transfers",
-  "search",
-  "shortcuts",
-  "advanced",
-];
+// Import the registry so the test always mirrors the real nav list.
+import { settingsRegistry } from "./SettingsPage";
+
+const SECTIONS: SettingsSection[] = settingsRegistry.map((entry) => entry.id);
 
 const mocks = vi.hoisted(() => {
   const settingsState = {
@@ -45,6 +37,7 @@ const mocks = vi.hoisted(() => {
     removeOpenWithAssociation: () => {},
     setShortcut: () => {},
     saveShortcuts: () => {},
+    resetShortcuts: () => {},
   };
   const searchState = {
     status: null,
@@ -145,16 +138,33 @@ describe("SettingsWorkspace", () => {
     expect(heading?.textContent).toBe("Appearance");
   });
 
-  it("marks the selected settings section with the active edge marker", async () => {
+  it("marks the selected settings section the way the global navigator does", async () => {
     await renderWorkspace("general");
 
     const nav = container.querySelector('nav[aria-label="Settings sections"]');
     const activeItem = nav?.querySelector('button[aria-current="page"]');
     const inactiveItem = nav?.querySelector('button:not([aria-current="page"])');
 
-    expect(activeItem?.className).toContain("misty-active-marker-side");
-    expect(activeItem?.className).toContain("text-cream-bright");
-    expect(inactiveItem?.className).toContain("misty-marker-host");
-    expect(inactiveItem?.className).not.toContain("misty-active-marker-side");
+    // Compared as class tokens, not substrings: every row also carries
+    // `hover:bg-charcoal-card`, which a substring check would match on both.
+    const classesOf = (node: Element | null | undefined) => (node?.className ?? "").split(/\s+/);
+
+    // Selection is a filled row, not an edge marker: `bg-charcoal-card` plus
+    // the brightened text is exactly `navigatorRowClass`'s active treatment.
+    expect(classesOf(activeItem)).toContain("bg-charcoal-card");
+    expect(classesOf(activeItem)).toContain("text-cream-bright");
+    expect(classesOf(inactiveItem)).toContain("text-cream-muted");
+    expect(classesOf(inactiveItem)).not.toContain("bg-charcoal-card");
+    // The old edge marker must not come back alongside the fill.
+    expect(classesOf(activeItem)).not.toContain("misty-active-marker-side");
+    expect(classesOf(inactiveItem)).not.toContain("misty-marker-host");
+  });
+
+  it("captions each nav group", async () => {
+    await renderWorkspace("general");
+
+    const nav = container.querySelector('nav[aria-label="Settings sections"]');
+    const captions = [...(nav?.querySelectorAll("h2") ?? [])].map((node) => node.textContent);
+    expect(captions).toEqual(["App", "Tools", "System"]);
   });
 });

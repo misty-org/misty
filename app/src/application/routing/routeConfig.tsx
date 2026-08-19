@@ -1,4 +1,4 @@
-import { routes } from "@/features/app-shell";
+import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { AgentsPage } from "@/features/agents";
 import { RegisterPage, SignInPage } from "@/features/auth";
 import { BrowserWorkspace } from "@/features/browser";
@@ -10,8 +10,8 @@ import { spaceNotesEnabled } from "@/features/notes";
 import { SettingsPage } from "@/features/settings";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import SpacesShell, { SpaceDetail, SpacesIndexRedirect } from "@/features/spaces";
-import { TransfersPage } from "@/features/transfers";
 import { TerminalWorkspace } from "@/features/terminal";
+import { TransfersPage } from "@/features/transfers";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
@@ -19,6 +19,18 @@ import { RootLayout } from "../layouts/RootLayout";
 import { WebUnavailablePage } from "../layouts/WebUnavailablePage";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
 import { isWebBuild } from "@/shared/platform/buildTarget";
+
+/**
+ * Honours the startup preference on the index route.
+ *
+ * Reads the last remembered route from the store rather than the URL, so
+ * "Reopen last session" lands where the user actually left off.
+ */
+function StartupRedirect() {
+  const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
+  const fallback = isWebBuild ? routes.spaces : routes.home;
+  return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
+}
 
 const desktopOnlyRoute = (feature: string) =>
   isWebBuild ? <WebUnavailablePage feature={feature} /> : null;
@@ -36,10 +48,7 @@ export const router = createBrowserRouter([
       {
         element: <AppFrameLayout />,
         children: [
-          {
-            index: true,
-            element: <Navigate to={isWebBuild ? routes.spaces : routes.home} replace />,
-          },
+          { index: true, element: <StartupRedirect /> },
           { path: "library", element: <Navigate to={routes.files} replace /> },
           { path: "providers", element: null },
           {
@@ -52,7 +61,10 @@ export const router = createBrowserRouter([
               { path: "agents", element: desktopOnlyRoute("Agents") ?? <AgentsPage /> },
               { path: "code", element: desktopOnlyRoute("Code") ?? <DeveloperWorkspace /> },
               { path: "extensions", element: desktopOnlyRoute("Extensions") ?? <ExtensionsPage /> },
-              { path: "transfers", element: desktopOnlyRoute("Transfers") ?? <TransfersPage /> },
+              {
+                path: "transfers",
+                element: desktopOnlyRoute("Transfers") ?? <TransfersPage />,
+              },
               { path: "automations", element: <Navigate to={routes.spaces} replace /> },
               { path: "assistant", element: <Navigate to={routes.agents} replace /> },
               {
@@ -90,7 +102,6 @@ export const router = createBrowserRouter([
           },
           { path: "settings", element: null },
           { path: "diagnostics", element: <Navigate to={routes.spaces} replace /> },
-          { path: "activity", element: <Navigate to={routes.spaces} replace /> },
           { path: "*", element: <Navigate to={routes.home} replace /> },
         ],
       },

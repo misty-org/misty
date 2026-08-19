@@ -194,7 +194,7 @@ export const startPages: DocPage[] = [
         blocks: [
           code("misty server up --detach\nmisty desktop dev --route /spaces"),
           p(
-            "server up wraps server/compose.dev.yml and rebuilds images by default. desktop dev starts Vite through Tauri and opens the requested in-app route.",
+            "server up wraps server/compose.dev.yml, rebuilds images by default, and starts the Space Agent workflow runtime automatically. desktop dev starts Vite through Tauri and opens the requested in-app route.",
           ),
         ],
       },
