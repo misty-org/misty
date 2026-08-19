@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 /** How wide the navigator draws when it is on screen. */
-export type NavigatorWidth = "full" | "icons";
+export type NavigatorWidth = "full";
 /** Whether the navigator holds its column or slides away until the edge is hovered. */
 export type NavigatorVisibility = "sticky" | "hidden";
 
@@ -16,13 +16,8 @@ export const legacyNavigatorCollapsedStorageKey = "misty:global-navigator-collap
 
 export const navigatorWidths: Record<NavigatorWidth | "hidden", number> = {
   full: 264,
-  icons: 72,
   hidden: 0,
 };
-
-export function nextNavigatorWidth(width: NavigatorWidth): NavigatorWidth {
-  return width === "full" ? "icons" : "full";
-}
 
 export function readNavigatorLayout(
   storage: Pick<Storage, "getItem"> = window.localStorage,
@@ -32,7 +27,7 @@ export function readNavigatorLayout(
     try {
       const parsed = JSON.parse(saved) as Partial<NavigatorLayout>;
       return {
-        width: parsed.width === "icons" ? "icons" : "full",
+        width: "full",
         visibility: parsed.visibility === "hidden" ? "hidden" : "sticky",
       };
     } catch {
@@ -40,10 +35,7 @@ export function readNavigatorLayout(
     }
   }
   const mode = storage.getItem(navigatorModeStorageKey);
-  if (mode === "icons") return { width: "icons", visibility: "sticky" };
   if (mode === "hidden") return { width: "full", visibility: "hidden" };
-  const legacy = storage.getItem(legacyNavigatorCollapsedStorageKey);
-  if (legacy === "true") return { width: "icons", visibility: "sticky" };
   return { width: "full", visibility: "sticky" };
 }
 

@@ -13,7 +13,7 @@ import type { ChromeTabStripProps } from "./model/interfaces";
 export type { ChromeTabStripProps, ChromeTabStripTab } from "./model/interfaces";
 
 const chromeTabShellClass = [
-  "flex h-[46px] min-w-0 overflow-hidden border-b border-charcoal-border bg-charcoal-sidebar",
+  "chrome-tab-strip flex h-[46px] min-w-0 overflow-hidden border-b border-charcoal-border bg-charcoal-sidebar",
 ].join(" ");
 
 const tabCloseButtonClass = [
@@ -73,17 +73,29 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
     event.preventDefault();
   }, []);
 
-  const handleDragStart = useCallback((event: DragEvent<HTMLDivElement>, tabId: string) => {
-    draggedTabIdRef.current = tabId;
-    suppressSelectionRef.current = true;
-    setDraggedTabId(tabId);
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-misty-workspace-tab", tabId);
-    event.dataTransfer.setData("text/plain", tabId);
-  }, []);
+  const handleDragStart = useCallback(
+    (event: DragEvent<HTMLDivElement>, tabId: string) => {
+      const tab = props.tabs.find((candidate) => candidate.id === tabId);
+      if (!tab) return;
+      draggedTabIdRef.current = tabId;
+      suppressSelectionRef.current = true;
+      setDraggedTabId(tabId);
+      event.dataTransfer.effectAllowed = "move";
+      activeChromeTabDrag = {
+        id: tab.id,
+        paneId: tab.paneId,
+        scope: props.dragScope ?? "workspace",
+      };
+      event.dataTransfer.setData(chromeTabMime, JSON.stringify(activeChromeTabDrag));
+      event.dataTransfer.setData("application/x-misty-workspace-tab", tabId);
+      event.dataTransfer.setData("text/plain", tabId);
+    },
+    [props.dragScope, props.tabs],
+  );
 
   const finishTabDrag = useCallback(() => {
     draggedTabIdRef.current = null;
+    activeChromeTabDrag = null;
     setDraggedTabId("");
     setDropIndicator(undefined);
     window.setTimeout(() => {
@@ -93,8 +105,12 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
 
   const handleDragOver = useCallback(
     (event: DragEvent<HTMLDivElement>, destinationTabId: string) => {
-      const sourceTabId = draggedTabIdRef.current;
-      if (!props.onReorderTab || !sourceTabId || sourceTabId === destinationTabId) return;
+      const payload = readChromeTabDrag(event.dataTransfer, draggedTabIdRef.current, props);
+      if (!payload || payload.id === destinationTabId) return;
+      const destinationPaneId = props.paneId ?? props.tabs[0]?.paneId;
+      if (!destinationPaneId) return;
+      const samePane = payload.paneId === destinationPaneId;
+      if ((samePane && !props.onReorderTab) || (!samePane && !props.onMoveTab)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
       const bounds = event.currentTarget.getBoundingClientRect();
@@ -103,41 +119,88 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         position: event.clientX >= bounds.left + bounds.width / 2 ? "after" : "before",
       });
     },
-    [props.onReorderTab],
+    [props],
   );
 
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, destinationTabId: string) => {
-      const sourceTabId =
-        draggedTabIdRef.current ||
-        event.dataTransfer.getData("application/x-misty-workspace-tab").trim();
-      if (!sourceTabId || sourceTabId === destinationTabId || !props.onReorderTab)
+      const payload = readChromeTabDrag(event.dataTransfer, draggedTabIdRef.current, props);
+      const destinationPaneId = props.paneId ?? props.tabs[0]?.paneId;
+      if (!payload || !destinationPaneId || payload.id === destinationTabId)
         return void finishTabDrag();
       event.preventDefault();
       event.stopPropagation();
-      const fromIndex = props.tabs.findIndex((tab) => tab.id === sourceTabId);
       const bounds = event.currentTarget.getBoundingClientRect();
-      const toIndex = workspaceTabDropIndex(
-        props.tabs.map((tab) => tab.id),
-        sourceTabId,
-        destinationTabId,
-        event.clientX >= bounds.left + bounds.width / 2,
-      );
-      if (fromIndex < 0 || toIndex < 0) return void finishTabDrag();
-      props.onReorderTab(sourceTabId, fromIndex, toIndex);
+      const insertAfter = event.clientX >= bounds.left + bounds.width / 2;
+      if (payload.paneId === destinationPaneId) {
+        if (!props.onReorderTab) return void finishTabDrag();
+        const fromIndex = props.tabs.findIndex((tab) => tab.id === payload.id);
+        const toIndex = workspaceTabDropIndex(
+          props.tabs.map((tab) => tab.id),
+          payload.id,
+          destinationTabId,
+          insertAfter,
+        );
+        if (fromIndex < 0 || toIndex < 0) return void finishTabDrag();
+        props.onReorderTab(payload.id, fromIndex, toIndex);
+      } else {
+        if (!props.onMoveTab) return void finishTabDrag();
+        const targetIndex = props.tabs.findIndex((tab) => tab.id === destinationTabId);
+        if (targetIndex < 0) return void finishTabDrag();
+        props.onMoveTab(
+          payload.id,
+          payload.paneId,
+          destinationPaneId,
+          targetIndex + (insertAfter ? 1 : 0),
+        );
+      }
+      finishTabDrag();
+    },
+    [finishTabDrag, props],
+  );
+
+  const handleStripDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if ((event.target as Element).closest(".chrome-tab")) return;
+      const payload = readChromeTabDrag(event.dataTransfer, draggedTabIdRef.current, props);
+      const destinationPaneId = props.paneId ?? props.tabs[0]?.paneId;
+      if (
+        !payload ||
+        !destinationPaneId ||
+        payload.paneId === destinationPaneId ||
+        !props.onMoveTab
+      )
+        return;
+      event.preventDefault();
+      props.onMoveTab(payload.id, payload.paneId, destinationPaneId, props.tabs.length);
       finishTabDrag();
     },
     [finishTabDrag, props],
   );
 
   return (
-    <div ref={shellRef} className={chromeTabShellClass}>
+    <div ref={shellRef} className={`${chromeTabShellClass} ${props.className ?? ""}`}>
       <div
         ref={tabsRef}
         className="flex h-[46px] min-w-0 flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label={props.ariaLabel ?? "Open locations"}
         onWheel={handleWheel}
+        onDragOver={(event) => {
+          if ((event.target as Element).closest(".chrome-tab")) return;
+          const payload = readChromeTabDrag(event.dataTransfer, draggedTabIdRef.current, props);
+          const destinationPaneId = props.paneId ?? props.tabs[0]?.paneId;
+          if (
+            payload &&
+            destinationPaneId &&
+            payload.paneId !== destinationPaneId &&
+            props.onMoveTab
+          ) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+          }
+        }}
+        onDrop={handleStripDrop}
       >
         {props.tabs.map((tab) => {
           const active = tab.id === props.activeTabId;
@@ -148,7 +211,8 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
             <div
               key={tab.id}
               className={[
-                "chrome-tab relative flex h-9 min-w-[92px] max-w-60 flex-[1_1_180px] items-center overflow-hidden rounded-t-lg border border-charcoal-border",
+                "chrome-tab group relative flex h-9 min-w-[92px] max-w-60 flex-[1_1_180px]",
+                "items-center overflow-hidden rounded-t-lg border border-charcoal-border",
                 "text-cream-muted transition-colors",
                 // The selected tab takes the colour of the pane it opens onto,
                 // the way a browser tab joins its page, instead of a fill that
@@ -164,10 +228,12 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               data-drop-position={
                 dropIndicator?.tabId === tab.id ? dropIndicator.position : undefined
               }
-              data-misty-window-drag-block={props.onReorderTab ? "true" : undefined}
-              data-reorder-drag-source={props.onReorderTab ? "true" : undefined}
+              data-misty-window-drag-block={
+                props.onReorderTab || props.onMoveTab ? "true" : undefined
+              }
+              data-reorder-drag-source={props.onReorderTab || props.onMoveTab ? "true" : undefined}
               // Dragging a tab mid-rename would tear the caret out of the field.
-              draggable={Boolean(props.onReorderTab) && !renaming}
+              draggable={Boolean(props.onReorderTab || props.onMoveTab) && !renaming}
               onDragEnd={finishTabDrag}
               onDragOver={(event) => handleDragOver(event, tab.id)}
               onDragLeave={(event) => {
@@ -195,7 +261,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               ) : (
                 <button
                   type="button"
-                  className="flex h-full min-w-0 flex-1 items-center overflow-hidden border-0 bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit"
+                  className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden border-0 bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit"
                   role="tab"
                   aria-selected={active}
                   title={tab.path}
@@ -206,6 +272,11 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                     if (canRename) setRenamingTabId(tab.id);
                   }}
                 >
+                  {tab.leading ? (
+                    <span className="grid shrink-0 place-items-center" aria-hidden="true">
+                      {tab.leading}
+                    </span>
+                  ) : null}
                   <span className="min-w-0 truncate text-[13px] font-medium">{tab.title}</span>
                 </button>
               )}
@@ -220,7 +291,19 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                     props.onCloseTab(tab);
                   }}
                 >
-                  <X size={13} strokeWidth={2} />
+                  {tab.dirty ? (
+                    <>
+                      <span
+                        className="text-[15px] leading-none text-current group-hover:hidden"
+                        aria-hidden="true"
+                      >
+                        •
+                      </span>
+                      <X className="hidden group-hover:block" size={13} strokeWidth={2} />
+                    </>
+                  ) : (
+                    <X size={13} strokeWidth={2} />
+                  )}
                 </button>
               ) : null}
             </div>
@@ -228,23 +311,66 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
         })}
         {/* Sits on the tab row's own baseline; the old bottom padding lifted
             it above the tab titles it belongs beside. */}
-        <div className="flex h-9 flex-none items-center pl-1">
-          {props.addTabControl ?? (
-            <Button
-              type="button"
-              className="grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
-              title="New tab"
-              onClick={props.onAddTab}
-            >
-              <Plus size={17} strokeWidth={2.4} />
-            </Button>
-          )}
-        </div>
+        {props.showAddTabControl === false ? null : (
+          <div className="flex h-9 flex-none items-center pl-1">
+            {props.addTabControl ?? (
+              <Button
+                type="button"
+                className="grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
+                title="New tab"
+                onClick={props.onAddTab}
+              >
+                <Plus size={17} strokeWidth={2.4} />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {props.actions ? <div className={chromeTabTrayClass}>{props.actions}</div> : null}
     </div>
   );
 });
+
+const chromeTabMime = "application/x-misty-chrome-tab";
+
+interface ChromeTabDragPayload {
+  id: string;
+  paneId: string;
+  scope: string;
+}
+
+let activeChromeTabDrag: ChromeTabDragPayload | null = null;
+
+function readChromeTabDrag(
+  dataTransfer: DataTransfer,
+  localTabId: string | null,
+  props: ChromeTabStripProps,
+): ChromeTabDragPayload | null {
+  const raw = dataTransfer.getData(chromeTabMime);
+  if (raw) {
+    try {
+      const payload = JSON.parse(raw) as Partial<ChromeTabDragPayload>;
+      if (
+        typeof payload.id === "string" &&
+        typeof payload.paneId === "string" &&
+        typeof payload.scope === "string" &&
+        payload.scope === (props.dragScope ?? "workspace")
+      ) {
+        return payload as ChromeTabDragPayload;
+      }
+    } catch {
+      return null;
+    }
+  }
+  if (activeChromeTabDrag?.scope === (props.dragScope ?? "workspace")) {
+    return activeChromeTabDrag;
+  }
+  if (!localTabId) return null;
+  const local = props.tabs.find((tab) => tab.id === localTabId);
+  return local
+    ? { id: local.id, paneId: local.paneId, scope: props.dragScope ?? "workspace" }
+    : null;
+}
 
 /**
  * Inline tab rename. Blur commits rather than cancels, matching how the rest of

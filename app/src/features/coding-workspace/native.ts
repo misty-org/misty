@@ -109,6 +109,38 @@ export function codeGitDiff(root: string, path: string): Promise<string> {
   return invoke("code_git_diff", { root, path });
 }
 
+export function codeGitWorkspaceId(root: string): Promise<string> {
+  return invoke("code_git_workspace_id", { root });
+}
+
+export function codeGitClone(
+  destination: string,
+  redeemUrl: string,
+  handoff: string,
+): Promise<string> {
+  return invoke("code_git_clone", { request: { destination, redeemUrl, handoff } });
+}
+
+export function codeGitFetch(root: string, redeemUrl: string, handoff: string): Promise<string> {
+  return invoke("code_git_fetch", { request: { root, redeemUrl, handoff } });
+}
+
+export function codeGitPush(root: string, redeemUrl: string, handoff: string): Promise<string> {
+  return invoke("code_git_push", { request: { root, redeemUrl, handoff } });
+}
+
+export function codeGitCreateBranch(
+  root: string,
+  name: string,
+  startPoint?: string,
+): Promise<string> {
+  return invoke("code_git_create_branch", { request: { root, name, startPoint } });
+}
+
+export function codeGitCommit(root: string, message: string, stageAll: boolean): Promise<string> {
+  return invoke("code_git_commit", { request: { root, message, stageAll } });
+}
+
 export function codeWatchDir(root: string): Promise<string> {
   return invoke("code_watch_dir", { root });
 }

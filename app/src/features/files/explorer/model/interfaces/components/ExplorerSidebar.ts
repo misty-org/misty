@@ -5,8 +5,6 @@ import type {
   MountedDevice,
   ProviderRemote,
 } from "@/native/contracts";
-import type { ExplorerWorkspaceEntry } from "../../../store";
-
 export interface ExplorerSidebarProps {
   homePath: string;
   activePath: string;
@@ -17,16 +15,8 @@ export interface ExplorerSidebarProps {
   devices: MountedDevice[];
   devicesLoading: boolean;
   pinnedPaths: string[];
-  workspaceEntries: ExplorerWorkspaceEntry[];
-  activeWorkspaceId: string;
-  activeWorkspaceTitle: string;
-  workspaceLocked?: boolean;
   onNavigate: (path: string) => void;
   onRefreshDevices: () => void;
-  onSelectWorkspace: (workspaceId: string) => void;
-  onCreateWorkspace: (title: string) => void;
-  onRenameWorkspace: (workspaceId: string, title: string) => void;
-  onDeleteWorkspace: (workspaceId: string) => void;
   onOpenInNewTab: (path: string, title?: string) => void;
   onManageRemotes: () => void;
   onAddRemote: () => void;

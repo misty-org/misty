@@ -1,16 +1,7 @@
-import { LoaderCircle, Plug, UserPlus, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import { SiDiscord, SiGooglecalendar, SiNotion } from "react-icons/si";
+import { UserPlus, X } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { spacesApi } from "@/api/spaces/api";
-import type {
-  ProviderConnectionAvailability,
-  SpaceIntegration,
-  SpaceIntegrationProvider,
-  SpaceSetup,
-} from "@/api/spaces/dto/interfaces/types";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, Card } from "@/shared/ui";
 
 export function SpaceSetupCards({
@@ -24,49 +15,8 @@ export function SpaceSetupCards({
   showInvitation?: boolean;
   dismissible?: boolean;
 }) {
-  const [setup, setSetup] = useState<SpaceSetup | null>(null);
-  const [availability, setAvailability] = useState<ProviderConnectionAvailability[]>([]);
-  const [integrations, setIntegrations] = useState<SpaceIntegration[]>([]);
   const [dismissed, setDismissed] = useState(false);
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    void Promise.all([spacesApi.setup(spaceId), spacesApi.integrations(spaceId)])
-      .then(([nextSetup, integrations]) => {
-        if (!active) return;
-        setSetup(nextSetup);
-        setAvailability(integrations.providers ?? []);
-        setIntegrations(integrations.integrations);
-      })
-      .catch(() => {
-        if (active) setSetup(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [spaceId]);
-
-  if (dismissed || (!showInvitation && !setup?.pending_providers.length)) return null;
-
-  const connect = async (provider: SpaceIntegrationProvider) => {
-    if (!isOwner || busy) return;
-    setBusy(provider);
-    setError("");
-    try {
-      const start = await spacesApi.beginProviderConnection(
-        spaceId,
-        provider,
-        `/spaces/${spaceId}/settings/connections`,
-      );
-      await openExternalLink(start.authorization_url);
-    } catch {
-      setError(`${providerName(provider)} could not start connecting. You can try again later.`);
-    } finally {
-      setBusy("");
-    }
-  };
+  if (dismissed || !showInvitation || !isOwner) return null;
 
   return (
     <Card className="mx-4 mt-3 grid gap-3 border-charcoal-active/20 bg-charcoal-active p-3 shadow-none">
@@ -74,7 +24,7 @@ export function SpaceSetupCards({
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">Your Space is ready</p>
           <p className="mb-0 mt-1 text-xs text-cream-muted">
-            Start chatting now. Invitations and connections can be finished whenever you want.
+            Invite someone to start collaborating in Chat, Tasks, Journal, and the Library.
           </p>
         </div>
         {dismissible ? (
@@ -91,86 +41,12 @@ export function SpaceSetupCards({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        {showInvitation && isOwner ? (
-          <Button asChild size="sm" variant="outline">
-            <Link to={`/spaces/${encodeURIComponent(spaceId)}/settings/members?invite=1`}>
-              <UserPlus size={14} /> Invite people
-            </Link>
-          </Button>
-        ) : null}
-        {setup?.pending_providers.map((provider) => {
-          const configured = availability.find((item) => item.provider === provider)?.configured;
-          const connected = integrations.some(
-            (integration) => integration.provider === provider && integration.status === "active",
-          );
-          const Icon = providerIcon(provider);
-          if (connected)
-            return (
-              <Button asChild key={provider} size="sm" variant="outline">
-                <Link to={providerManagementPath(spaceId, provider)}>
-                  <Icon className="size-3.5" />
-                  {providerManagementLabel(provider)}
-                </Link>
-              </Button>
-            );
-          return (
-            <Button
-              key={provider}
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={!isOwner || configured === false || Boolean(busy)}
-              onClick={() => void connect(provider)}
-              title={
-                configured === false
-                  ? `${providerName(provider)} is unavailable on this Misty server.`
-                  : undefined
-              }
-            >
-              {busy === provider ? (
-                <LoaderCircle className="size-3.5 animate-spin" />
-              ) : (
-                <Icon className="size-3.5" />
-              )}
-              {configured === false
-                ? `${providerName(provider)} unavailable`
-                : `Connect ${providerName(provider)}`}
-            </Button>
-          );
-        })}
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/spaces/${encodeURIComponent(spaceId)}/settings/members?invite=1`}>
+            <UserPlus size={14} /> Invite people
+          </Link>
+        </Button>
       </div>
-      {error ? <p className="m-0 text-xs text-cream-bright">{error}</p> : null}
-      {!isOwner && setup?.pending_providers.length ? (
-        <p className="m-0 text-xs text-cream-muted">
-          The Space owner can finish these connections. They never limit your access.
-        </p>
-      ) : null}
     </Card>
   );
-}
-
-function providerName(provider: SpaceIntegrationProvider) {
-  if (provider === "google") return "Google Calendar";
-  if (provider === "discord") return "Discord";
-  return "Notion";
-}
-
-function providerIcon(provider: SpaceIntegrationProvider) {
-  if (provider === "google") return SiGooglecalendar;
-  if (provider === "discord") return SiDiscord;
-  if (provider === "notion") return SiNotion;
-  return Plug;
-}
-
-function providerManagementPath(spaceId: string, provider: SpaceIntegrationProvider) {
-  const encoded = encodeURIComponent(spaceId);
-  if (provider === "google") return `/spaces/${encoded}/planner`;
-  if (provider === "notion") return `/spaces/${encoded}/settings/connections`;
-  return `/spaces/${encoded}/settings/connections`;
-}
-
-function providerManagementLabel(provider: SpaceIntegrationProvider) {
-  if (provider === "google") return "Choose calendars";
-  if (provider === "notion") return "Choose Notion sources";
-  return "Choose Discord channels";
 }

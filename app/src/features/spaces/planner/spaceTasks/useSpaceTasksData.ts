@@ -1,9 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
-import type {
-  SpaceCalendarSource,
-  SpaceIntegration,
-  SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,12 +9,8 @@ import type { TaskFilterParams } from "./useTaskFilterParams";
 const TASK_PAGE_SIZE = 200;
 
 /**
- * Tasks and their optional calendar publishing connections.
- *
- * Tasks are awaited first and rendered immediately; connection data is optional
- * and settled separately, so a Google outage degrades to a notice instead of
- * blocking the board. A generation counter drops responses from superseded
- * loads, since filter changes can overlap in flight.
+ * Space tasks. A generation counter drops responses from superseded loads,
+ * since filter changes can overlap in flight.
  */
 export function useSpaceTasksData(options: {
   spaceId: string;
@@ -27,14 +19,10 @@ export function useSpaceTasksData(options: {
 }) {
   const { spaceId, filters } = options;
   const [tasks, setTasks] = useState<SpaceTask[]>([]);
-  const [sources, setSources] = useState<SpaceCalendarSource[]>([]);
-  const [integrations, setIntegrations] = useState<SpaceIntegration[]>([]);
   const [statusTotals, setStatusTotals] = useState<Record<string, number>>({});
   const [nextCursor, setNextCursor] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [calendarNotice, setCalendarNotice] = useState("");
-  const [connectionsUnavailable, setConnectionsUnavailable] = useState(false);
   const loadGenerationRef = useRef(0);
   const nextCursorRef = useRef("");
 
@@ -45,7 +33,7 @@ export function useSpaceTasksData(options: {
       const generation = ++loadGenerationRef.current;
       setLoading(true);
       try {
-        const taskRequest = spacesApi.tasks(spaceId, {
+        const taskResult = await spacesApi.tasks(spaceId, {
           status: status === "all" ? undefined : status,
           assigneeUserId: effectiveAssignee
             ? effectiveAssignee.startsWith("person:")
@@ -65,12 +53,6 @@ export function useSpaceTasksData(options: {
           cursor: append ? nextCursorRef.current : undefined,
           limit: TASK_PAGE_SIZE,
         });
-        const optionalRequest = Promise.allSettled([
-          spacesApi.calendarSources(spaceId),
-          spacesApi.integrations(spaceId),
-        ]);
-
-        const taskResult = await taskRequest;
         if (generation !== loadGenerationRef.current) return;
         setTasks((current) => (append ? mergeTasks(current, taskResult.tasks) : taskResult.tasks));
         nextCursorRef.current = taskResult.next_cursor ?? "";
@@ -78,25 +60,6 @@ export function useSpaceTasksData(options: {
         setStatusTotals(taskResult.status_totals ?? {});
         setError("");
         setLoading(false);
-
-        const [sourceResult, integrationResult] = await optionalRequest;
-        if (generation !== loadGenerationRef.current) return;
-        setSources(sourceResult.status === "fulfilled" ? sourceResult.value.sources : []);
-        setIntegrations(
-          integrationResult.status === "fulfilled"
-            ? integrationResult.value.integrations.filter((item) => item.provider === "google")
-            : [],
-        );
-        setConnectionsUnavailable(integrationResult.status === "rejected");
-        const unavailable = [
-          sourceResult.status === "rejected" ? "calendar sync status" : "",
-          integrationResult.status === "rejected" ? "Google Calendar connections" : "",
-        ].filter(Boolean);
-        setCalendarNotice(
-          unavailable.length
-            ? `Tasks are available, but ${unavailable.join(" and ")} could not be checked.`
-            : "",
-        );
       } catch (reason) {
         if (generation !== loadGenerationRef.current) return;
         setError(errorText(reason));
@@ -123,15 +86,11 @@ export function useSpaceTasksData(options: {
   return {
     tasks,
     setTasks,
-    sources,
-    integrations,
     statusTotals,
     nextCursor,
     loading,
     error,
     setError,
-    calendarNotice,
-    connectionsUnavailable,
     load,
   };
 }

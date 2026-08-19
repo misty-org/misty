@@ -6,25 +6,30 @@ import {
 } from "@codemirror/autocomplete";
 import { setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import { StateEffect, StateField, type Extension, type Text } from "@codemirror/state";
-import { EditorView, ViewPlugin, hoverTooltip } from "@codemirror/view";
+import { EditorView, ViewPlugin, hoverTooltip, keymap } from "@codemirror/view";
 import { getLspClient, languageFor } from "./useLsp";
-import { pathToUri } from "./client";
+import { pathToUri, uriToPath } from "./client";
 
-interface Position {
+export interface Position {
   line: number;
   character: number;
 }
 
-interface LspRange {
+export interface LspRange {
   start: Position;
   end: Position;
 }
 
-interface LspDiagnostic {
+export interface LspDiagnostic {
   range: LspRange;
   severity?: number;
   message: string;
   source?: string;
+}
+
+export interface TextEdit {
+  range: LspRange;
+  newText: string;
 }
 
 interface LspContext {
@@ -46,13 +51,13 @@ const lspContextField = StateField.define<LspContext | null>({
   },
 });
 
-function offsetToPosition(doc: Text, offset: number): Position {
+export function offsetToPosition(doc: Text, offset: number): Position {
   const clamped = Math.min(Math.max(0, offset), doc.length);
   const line = doc.lineAt(clamped);
   return { line: line.number - 1, character: clamped - line.from };
 }
 
-function positionToOffset(doc: Text, position: Position): number {
+export function positionToOffset(doc: Text, position: Position): number {
   const lineNumber = Math.min(Math.max(1, position.line + 1), doc.lines);
   const line = doc.line(lineNumber);
   return Math.min(line.to, line.from + Math.max(0, position.character));
@@ -85,11 +90,112 @@ function applyDiagnostics(view: EditorView, path: string, diagnostics: LspDiagno
     };
   });
   view.dispatch(setDiagnostics(state, cmDiagnostics));
-  // suppress unused-var warning
   void path;
 }
 
-export function lspExtension(path: string, cwd: string): Extension[] {
+export async function goToDefinition(
+  view: EditorView,
+  path: string,
+  cwd: string,
+  viewId?: string,
+): Promise<boolean> {
+  const language = languageFor(path);
+  if (!language) return false;
+  const client = await getLspClient(language, cwd);
+  if (!client) return false;
+  const head = view.state.selection.main.head;
+  const position = offsetToPosition(view.state.doc, head);
+  try {
+    const result = await client.request<
+      | { uri: string; range: LspRange }
+      | Array<{
+          uri?: string;
+          range?: LspRange;
+          targetUri?: string;
+          targetRange?: LspRange;
+          targetSelectionRange?: LspRange;
+        }>
+      | null
+    >("textDocument/definition", {
+      textDocument: { uri: pathToUri(path) },
+      position,
+    });
+    if (!result) return false;
+    const target = Array.isArray(result) ? result[0] : result;
+    if (!target) return false;
+    const targetUri =
+      "targetUri" in target && target.targetUri
+        ? target.targetUri
+        : "uri" in target
+          ? target.uri
+          : undefined;
+    const targetRange =
+      "targetSelectionRange" in target && target.targetSelectionRange
+        ? target.targetSelectionRange
+        : "targetRange" in target && target.targetRange
+          ? target.targetRange
+          : "range" in target
+            ? target.range
+            : undefined;
+    if (!targetUri || !targetRange) return false;
+    const targetPath = uriToPath(targetUri);
+    const targetLine = targetRange.start.line + 1;
+    if (targetPath === path) {
+      const doc = view.state.doc;
+      const targetOffset = positionToOffset(doc, targetRange.start);
+      view.dispatch({
+        selection: { anchor: targetOffset, head: targetOffset },
+        scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }
+    const fileName = targetPath.split("/").pop() ?? "file";
+    if (!viewId) return false;
+    window.dispatchEvent(
+      new CustomEvent("misty:code-open-file", {
+        detail: { path: targetPath, name: fileName, line: targetLine, viewId },
+      }),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function formatDocument(
+  view: EditorView,
+  path: string,
+  cwd: string,
+  tabSize = 2,
+): Promise<boolean> {
+  const language = languageFor(path);
+  if (!language) return false;
+  const client = await getLspClient(language, cwd);
+  if (!client) return false;
+  try {
+    const edits = await client.request<TextEdit[] | null>("textDocument/formatting", {
+      textDocument: { uri: pathToUri(path) },
+      options: {
+        tabSize,
+        insertSpaces: true,
+      },
+    });
+    if (!edits || edits.length === 0) return false;
+    const doc = view.state.doc;
+    const changes = edits.map((edit) => ({
+      from: positionToOffset(doc, edit.range.start),
+      to: positionToOffset(doc, edit.range.end),
+      insert: edit.newText,
+    }));
+    view.dispatch({ changes });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function lspExtension(path: string, cwd: string, viewId: string): Extension[] {
   const language = languageFor(path);
   if (!language) return [];
 
@@ -183,12 +289,14 @@ export function lspExtension(path: string, cwd: string): Extension[] {
         create: () => {
           const dom = document.createElement("div");
           dom.className = "cm-lsp-hover";
-          dom.style.padding = "6px 10px";
-          dom.style.maxWidth = "480px";
+          dom.style.padding = "8px 12px";
+          dom.style.maxWidth = "520px";
           dom.style.whiteSpace = "pre-wrap";
           dom.style.fontFamily = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace';
-          dom.style.fontSize = "11.5px";
-          dom.style.color = "#e0e0e0";
+          dom.style.fontSize = "12px";
+          dom.style.lineHeight = "1.5";
+          dom.style.borderRadius = "6px";
+          dom.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
           dom.textContent = rendered;
           return { dom };
         },
@@ -242,6 +350,30 @@ export function lspExtension(path: string, cwd: string): Extension[] {
     ],
   });
 
+  const lspKeymap = keymap.of([
+    {
+      key: "F12",
+      run: (view) => {
+        void goToDefinition(view, path, cwd, viewId);
+        return true;
+      },
+    },
+    {
+      key: "Mod-Shift-i",
+      run: (view) => {
+        void formatDocument(view, path, cwd);
+        return true;
+      },
+    },
+    {
+      key: "Alt-Shift-f",
+      run: (view) => {
+        void formatDocument(view, path, cwd);
+        return true;
+      },
+    },
+  ]);
+
   return [
     lspContextField.init(() => initialContext),
     updateListener,
@@ -249,6 +381,7 @@ export function lspExtension(path: string, cwd: string): Extension[] {
     lifecycle,
     hover,
     completion,
+    lspKeymap,
   ];
 }
 

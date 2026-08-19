@@ -4,7 +4,9 @@ import { DeveloperWorkspace } from "@/features/developer-workspace";
 import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
 import { HomeDashboard } from "@/features/home";
+import { InboxWorkspace } from "@/features/inbox";
 import { TerminalWorkspace } from "@/features/terminal";
+import { SpaceSectionView } from "@/features/spaces";
 import { TransfersPage } from "@/features/transfers";
 import type { WorkspaceTab } from "@/features/workspace";
 import { cn } from "@/shared/ui";
@@ -15,12 +17,14 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
   switch (tab.surfaceId) {
     case "home":
       return <HomeDashboard />;
+    case "inbox":
+      return <InboxWorkspace />;
     case "browser":
       return <BrowserWorkspace tab={tab} />;
     case "terminal":
       return <TerminalWorkspace tab={tab} />;
     case "code":
-      return <DeveloperWorkspace />;
+      return <DeveloperWorkspace tab={tab} />;
     case "files":
       return <FilesPage embedded workspaceId={tab.id} workspaceTitle={tab.title} />;
     case "transfers":
@@ -30,9 +34,48 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
     case "extensions":
       return <ExtensionsPage />;
     case "space":
-      // Rendered by the router outlet once the pane is focused. Inert here
-      // so we don't race route redirects.
-      return <div className="h-full bg-charcoal-bg" />;
+      return <SpacePane tab={tab} />;
+  }
+}
+
+/**
+ * A Space section in any pane.
+ *
+ * Space content used to come from the router outlet, which meant only the one
+ * focused pane could show it — every other pane went blank. The section reads
+ * its Space and section from the tab's own route instead, so the same Space
+ * can be open in as many panes as you like.
+ */
+function SpacePane({ tab }: { tab: WorkspaceTab }) {
+  const route = parseSpaceTabRoute(tab.route);
+  if (!route) return <div className="h-full bg-charcoal-bg" />;
+  return (
+    <SpaceSectionView
+      spaceId={route.spaceId}
+      section={route.section}
+      studioKind={route.studioKind}
+    />
+  );
+}
+
+/** `/spaces/:spaceId/:section/:studioKind` — the shape `SpaceDetail` normalises to. */
+export function parseSpaceTabRoute(
+  route: string,
+): { spaceId: string; section: string; studioKind: string } | null {
+  const parts = route.split("?")[0].split("#")[0].split("/").filter(Boolean);
+  if (parts[0] !== "spaces" || !parts[1]) return null;
+  return {
+    spaceId: safeDecode(parts[1]),
+    section: parts[2] ?? "",
+    studioKind: parts[3] ?? "",
+  };
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
 }
 

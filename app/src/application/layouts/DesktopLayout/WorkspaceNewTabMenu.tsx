@@ -1,5 +1,4 @@
 import { useAuth } from "@/features/auth";
-import { setBrowserWebviewsSuspended } from "@/features/browser";
 import { rememberedJournalRoute, rememberedPlannerRoute, useSpacesStore } from "@/features/spaces";
 import { useWorkspaceStore, type WorkspaceSurfaceId } from "@/features/workspace";
 import {
@@ -18,13 +17,14 @@ import {
   FolderOpen,
   Globe2,
   House,
+  Inbox,
   MessagesSquare,
   Notebook,
   Plus,
   SquareTerminal,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 export interface NewTabOption {
   surfaceId: WorkspaceSurfaceId;
@@ -36,13 +36,20 @@ export interface NewTabOption {
 
 export const GENERAL_TAB_OPTIONS: NewTabOption[] = [
   { surfaceId: "home", label: "Home", route: "/home", icon: House },
+  {
+    surfaceId: "inbox",
+    label: "Inbox",
+    route: "/inbox",
+    icon: Inbox,
+    instancePolicy: "single",
+  },
   { surfaceId: "browser", label: "Browser", route: "/browser", icon: Globe2 },
   {
     surfaceId: "code",
     label: "Code",
     route: "/code",
     icon: Code2,
-    instancePolicy: "single",
+    instancePolicy: "multiple",
   },
   { surfaceId: "files", label: "Files", route: "/files", icon: FolderOpen },
   {
@@ -77,15 +84,9 @@ interface Props {
 }
 
 export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
-  const popupSuspensionReason = `workspace-new-tab-menu:${paneId}`;
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-
-  useEffect(
-    () => () => setBrowserWebviewsSuspended(false, popupSuspensionReason),
-    [popupSuspensionReason],
-  );
 
   const activeSpace = useMemo(() => {
     const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
@@ -132,11 +133,11 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   }, [activeSpace, user?.id]);
 
   return (
-    <DropdownMenu onOpenChange={(open) => setBrowserWebviewsSuspended(open, popupSuspensionReason)}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="grid size-7 place-items-center rounded text-cream-muted hover:bg-charcoal-card hover:text-cream"
+          className="grid size-7 place-items-center rounded text-cream-muted outline-none hover:bg-charcoal-card hover:text-cream focus:outline-none"
           aria-label="New tab"
           title="New tab"
         >

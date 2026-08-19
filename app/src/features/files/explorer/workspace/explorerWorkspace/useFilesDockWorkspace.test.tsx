@@ -58,6 +58,34 @@ describe("useFilesDockWorkspace", () => {
 
     expect(renderCount).toBe(1);
   });
+
+  it("synchronizes the active path back to the workspace tab state when user navigates", async () => {
+    const navigate = vi.fn() as unknown as NavigateFunction;
+
+    function Harness(props: { activePath: string }) {
+      useFilesDockWorkspace({
+        workspaceId: filesTab.id,
+        activePaneId: "explorer-pane",
+        activePath: props.activePath,
+        initialized: true,
+        embedded: true,
+        navigate,
+      });
+      return null;
+    }
+
+    await act(async () => root.render(<Harness activePath="/Users/misty/Documents" />));
+
+    // Now simulate the user navigating to /Users/misty/Downloads
+    await act(async () => root.render(<Harness activePath="/Users/misty/Downloads" />));
+
+    const rootNode = useWorkspaceStore.getState().layout.root;
+    const updatedTab =
+      rootNode.type === "leaf" ? rootNode.tabs.find((t) => t.id === filesTab.id) : null;
+
+    expect(updatedTab?.state).toEqual({ version: 1, path: "/Users/misty/Downloads" });
+    expect(updatedTab?.title).toBe("Downloads");
+  });
 });
 
 const filesTab: WorkspaceTab = {

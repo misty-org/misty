@@ -39,17 +39,31 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
   const showMessage =
     notificationPreferences.inAppNotificationsEnabled && !notificationPreferences.quietHoursEnabled;
 
+  const dismissNotice = () => {
+    useAppStore.getState().clearNotice();
+    useProvidersStore.setState({ error: null, message: null });
+    useTransfersStore.setState({ error: null, message: null });
+    useSettingsStore.setState({ error: null, message: null });
+  };
+
+  useEffect(() => {
+    if (!notice.error && !notice.message) return;
+    const timeoutMs = notice.error ? 5500 : 3500;
+    const timer = window.setTimeout(dismissNotice, timeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [notice.error, notice.message]);
+
   if (!notice.error && !(showMessage && notice.message)) return null;
 
   return (
     <div className={globalNoticeLayerClass}>
       {notice.error ? (
-        <Banner variant="danger" className={globalBannerClass}>
+        <Banner variant="danger" onDismiss={dismissNotice} className={globalBannerClass}>
           {notice.error}
         </Banner>
       ) : null}
       {showMessage && notice.message ? (
-        <Banner variant="success" className={globalBannerClass}>
+        <Banner variant="success" onDismiss={dismissNotice} className={globalBannerClass}>
           {notice.message}
         </Banner>
       ) : null}

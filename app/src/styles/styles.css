@@ -114,20 +114,46 @@
     background-color: transparent;
   }
 
-  /* Native browser tabs normally sit above the app renderer. While a Misty
-     menu is open, AppKit places the live browser just underneath it; these
-     surfaces become a precise transparent window onto that same native view. */
-  html[data-browser-overlay-active],
-  html[data-browser-overlay-active] body,
-  html[data-browser-overlay-active] #root,
-  html[data-browser-overlay-active] [data-misty-desktop-frame],
-  html[data-browser-overlay-active] [data-misty-route-shell],
-  html[data-browser-overlay-active] [data-workspace-panes],
-  html[data-browser-overlay-active] [data-workspace-pane]:has([data-browser-page-host]),
-  html[data-browser-overlay-active] [data-workspace-pane]:has([data-browser-page-host]) > div,
-  html[data-browser-overlay-active] [data-browser-workspace-tab],
-  html[data-browser-overlay-active] [data-browser-page-host] {
+  /* Keep the native Browser's transparent path stable for the lifetime of a
+     mounted Browser surface. Toggling these full-window ancestors for every
+     popup forced WebKit to clear and repaint its backing store, which appeared
+     as a dark flash. Opaque tool surfaces and Browser chrome still paint their
+     own backgrounds normally. */
+  html:has([data-browser-page-host]),
+  html:has([data-browser-page-host]) body,
+  html:has([data-browser-page-host]) #root,
+  html:has([data-browser-page-host]) [data-misty-desktop-frame],
+  html:has([data-browser-page-host]) [data-misty-route-shell],
+  html:has([data-browser-page-host]) [data-workspace-panes],
+  html:has([data-browser-page-host]) [data-workspace-pane]:has([data-browser-page-host]),
+  html:has([data-browser-page-host]) [data-workspace-pane]:has([data-browser-page-host]) > div,
+  html:has([data-browser-page-host]) [data-browser-workspace-tab],
+  html:has([data-browser-page-host]) [data-browser-page-stage],
+  html:has([data-browser-page-host]) [data-browser-page-host] {
     background-color: transparent !important;
+  }
+
+  /* Browser chrome is application UI, not selectable page content. Prevent a
+     stray drag or focus transfer elsewhere in Misty from painting selection
+     or tap-highlight layers behind the native child view. */
+  [data-browser-workspace-tab],
+  [data-browser-page-stage],
+  [data-browser-page-host] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  [data-browser-workspace-tab] input,
+  [data-browser-workspace-tab] textarea,
+  [data-browser-workspace-tab] [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  [data-browser-page-stage]::selection,
+  [data-browser-page-host]::selection {
+    background: transparent;
   }
 
   button,
@@ -339,5 +365,463 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  /* The editor and every piece of Code chrome consume the same semantic
+     palette, avoiding a themed editor floating inside Misty-coloured UI. */
+  .coding-workspace,
+  .code-theme-overlay {
+    --code-workspace-bg: #282828;
+    --code-editor-bg: #282828;
+    --code-sidebar-bg: #202020;
+    --code-surface-bg: #32302f;
+    --code-raised-bg: #504945;
+    --code-border: #3c3836;
+    --code-fg: #ebdbb2;
+    --code-fg-bright: #fbf1c7;
+    --code-fg-muted: #a89984;
+    --code-hover: #504945;
+    --code-selection: #504945;
+    --code-accent: #fabd2f;
+    --code-danger: #fb4934;
+    --code-warning: #fabd2f;
+    --code-success: #b8bb26;
+    --code-info: #83a598;
+    --code-interface-font-size: 13px;
+    --code-small-font-size: 11.5px;
+    --code-icon-size: 17px;
+    --code-toolbar-height: 42px;
+    --code-control-height: 32px;
+    --code-explorer-row-height: 30px;
+    --code-status-height: 29px;
+    --code-tab-strip-height: 46px;
+    --code-tab-height: 36px;
+    --code-tab-close-size: 13px;
+  }
+
+  .coding-workspace[data-editor-theme="gruvbox-light"],
+  html[data-code-overlay-theme="gruvbox-light"] .code-theme-overlay {
+    --code-workspace-bg: #fbf1c7;
+    --code-editor-bg: #fbf1c7;
+    --code-sidebar-bg: #f2e5bc;
+    --code-surface-bg: #f2e5bc;
+    --code-raised-bg: #ebdbb2;
+    --code-border: #d5c4a1;
+    --code-fg: #3c3836;
+    --code-fg-bright: #282828;
+    --code-fg-muted: #7c6f64;
+    --code-hover: #ebdbb2;
+    --code-selection: #ebdbb2;
+    --code-accent: #b57614;
+    --code-danger: #9d0006;
+    --code-warning: #b57614;
+    --code-success: #79740e;
+    --code-info: #076678;
+  }
+
+  .coding-workspace[data-editor-theme="misty-dark"],
+  html[data-code-overlay-theme="misty-dark"] .code-theme-overlay {
+    --code-workspace-bg: #131313;
+    --code-editor-bg: #131313;
+    --code-sidebar-bg: #161616;
+    --code-surface-bg: #191919;
+    --code-raised-bg: #2b2b2b;
+    --code-border: #262626;
+    --code-fg: #e0e0e0;
+    --code-fg-bright: #f5f5f5;
+    --code-fg-muted: #8c8c8c;
+    --code-hover: #2b2b2b;
+    --code-selection: #2b2b2b;
+    --code-accent: #e8d9c0;
+    --code-danger: #d89c8a;
+    --code-warning: #e2c08d;
+    --code-success: #b8bb87;
+    --code-info: #92b6b1;
+  }
+
+  .coding-workspace[data-interface-scale="0.8"],
+  html[data-code-overlay-scale="0.8"] .code-theme-overlay {
+    --code-interface-font-size: 10.4px;
+    --code-small-font-size: 9.2px;
+    --code-icon-size: 13.6px;
+    --code-toolbar-height: 33.6px;
+    --code-control-height: 25.6px;
+    --code-explorer-row-height: 24px;
+    --code-status-height: 23.2px;
+    --code-tab-strip-height: 36.8px;
+    --code-tab-height: 28.8px;
+    --code-tab-close-size: 10.4px;
+  }
+
+  .coding-workspace[data-interface-scale="0.9"],
+  html[data-code-overlay-scale="0.9"] .code-theme-overlay {
+    --code-interface-font-size: 11.7px;
+    --code-small-font-size: 10.4px;
+    --code-icon-size: 15.3px;
+    --code-toolbar-height: 37.8px;
+    --code-control-height: 28.8px;
+    --code-explorer-row-height: 27px;
+    --code-status-height: 26.1px;
+    --code-tab-strip-height: 41.4px;
+    --code-tab-height: 32.4px;
+    --code-tab-close-size: 11.7px;
+  }
+
+  .coding-workspace[data-interface-scale="1.1"],
+  html[data-code-overlay-scale="1.1"] .code-theme-overlay {
+    --code-interface-font-size: 14.3px;
+    --code-small-font-size: 12.7px;
+    --code-icon-size: 18.7px;
+    --code-toolbar-height: 46.2px;
+    --code-control-height: 35.2px;
+    --code-explorer-row-height: 33px;
+    --code-status-height: 31.9px;
+    --code-tab-strip-height: 50.6px;
+    --code-tab-height: 39.6px;
+    --code-tab-close-size: 14.3px;
+  }
+
+  .coding-workspace[data-interface-scale="1.2"],
+  html[data-code-overlay-scale="1.2"] .code-theme-overlay {
+    --code-interface-font-size: 15.6px;
+    --code-small-font-size: 13.8px;
+    --code-icon-size: 20.4px;
+    --code-toolbar-height: 50.4px;
+    --code-control-height: 38.4px;
+    --code-explorer-row-height: 36px;
+    --code-status-height: 34.8px;
+    --code-tab-strip-height: 55.2px;
+    --code-tab-height: 43.2px;
+    --code-tab-close-size: 15.6px;
+  }
+
+  .coding-workspace[data-interface-scale="1.3"],
+  html[data-code-overlay-scale="1.3"] .code-theme-overlay {
+    --code-interface-font-size: 16.9px;
+    --code-small-font-size: 15px;
+    --code-icon-size: 22.1px;
+    --code-toolbar-height: 54.6px;
+    --code-control-height: 41.6px;
+    --code-explorer-row-height: 39px;
+    --code-status-height: 37.7px;
+    --code-tab-strip-height: 59.8px;
+    --code-tab-height: 46.8px;
+    --code-tab-close-size: 16.9px;
+  }
+
+  .coding-workspace[data-interface-scale="1.4"],
+  html[data-code-overlay-scale="1.4"] .code-theme-overlay {
+    --code-interface-font-size: 18.2px;
+    --code-small-font-size: 16.1px;
+    --code-icon-size: 23.8px;
+    --code-toolbar-height: 58.8px;
+    --code-control-height: 44.8px;
+    --code-explorer-row-height: 42px;
+    --code-status-height: 40.6px;
+    --code-tab-strip-height: 64.4px;
+    --code-tab-height: 50.4px;
+    --code-tab-close-size: 18.2px;
+  }
+
+  .coding-workspace[data-interface-scale="1.5"],
+  html[data-code-overlay-scale="1.5"] .code-theme-overlay {
+    --code-interface-font-size: 19.5px;
+    --code-small-font-size: 17.3px;
+    --code-icon-size: 25.5px;
+    --code-toolbar-height: 63px;
+    --code-control-height: 48px;
+    --code-explorer-row-height: 45px;
+    --code-status-height: 43.5px;
+    --code-tab-strip-height: 69px;
+    --code-tab-height: 54px;
+    --code-tab-close-size: 19.5px;
+  }
+
+  .coding-workspace {
+    grid-template-rows: calc(var(--code-control-height) + 2px) minmax(0, 1fr) var(
+        --code-status-height
+      );
+    background: var(--code-workspace-bg);
+    color: var(--code-fg);
+    font-size: var(--code-interface-font-size);
+    color-scheme: dark;
+  }
+
+  .coding-workspace.code-empty-workspace {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .coding-workspace .code-command-center {
+    height: calc(var(--code-control-height) + 2px);
+    color: var(--code-fg-muted);
+  }
+
+  .coding-workspace .code-command-results {
+    color: var(--code-fg);
+  }
+
+  .coding-workspace[data-editor-theme="gruvbox-light"] {
+    color-scheme: light;
+  }
+
+  .coding-workspace .code-toolbar {
+    height: var(--code-toolbar-height);
+  }
+
+  .coding-workspace .code-toolbar-button {
+    height: var(--code-control-height);
+    border-color: var(--code-border);
+    background: transparent;
+    color: var(--code-fg-muted);
+    font-size: var(--code-interface-font-size);
+  }
+
+  .coding-workspace .code-toolbar-button:hover,
+  .coding-workspace .code-toolbar-button[aria-pressed="true"] {
+    background: var(--code-hover);
+    color: var(--code-fg-bright);
+  }
+
+  .coding-workspace .code-interface-icon,
+  .coding-workspace .code-interface-icon > svg {
+    width: var(--code-icon-size);
+    height: var(--code-icon-size);
+  }
+
+  .coding-workspace .code-explorer-header {
+    min-height: calc(var(--code-control-height) + 2px);
+    font-size: var(--code-interface-font-size);
+    color: var(--code-fg);
+  }
+
+  .coding-workspace .code-interface-icon-button {
+    width: var(--code-control-height);
+    height: var(--code-control-height);
+    color: var(--code-fg-muted);
+  }
+
+  .coding-workspace .code-interface-icon-button > svg,
+  .coding-workspace .code-explorer-row img {
+    width: var(--code-icon-size) !important;
+    height: var(--code-icon-size) !important;
+  }
+
+  .coding-workspace .code-explorer-row {
+    min-height: var(--code-explorer-row-height);
+    font-size: var(--code-interface-font-size);
+  }
+
+  .coding-workspace .code-explorer-chevron {
+    width: var(--code-icon-size);
+    height: var(--code-icon-size);
+  }
+
+  .coding-workspace .code-theme-sidebar,
+  .coding-workspace .code-theme-tabs,
+  .coding-workspace .code-theme-statusbar,
+  .coding-workspace .code-toolbar {
+    background: var(--code-sidebar-bg) !important;
+    border-color: var(--code-border) !important;
+    color: var(--code-fg-muted);
+  }
+
+  .coding-workspace .code-theme-statusbar {
+    height: var(--code-status-height) !important;
+    font-size: var(--code-small-font-size) !important;
+  }
+
+  .coding-workspace .code-theme-statusbar button > svg {
+    width: var(--code-small-font-size);
+    height: var(--code-small-font-size);
+  }
+
+  .coding-workspace .code-status-icon {
+    width: var(--code-small-font-size);
+    height: var(--code-small-font-size);
+  }
+
+  .coding-workspace .code-theme-editor,
+  .coding-workspace .code-theme-active-tab {
+    background: var(--code-editor-bg) !important;
+    color: var(--code-fg-bright) !important;
+  }
+
+  .coding-workspace .code-theme-accent {
+    background: var(--code-accent) !important;
+    color: var(--code-accent) !important;
+  }
+
+  .coding-workspace .chrome-tab-strip,
+  .coding-workspace .chrome-tab-strip [role="tablist"] {
+    height: var(--code-tab-strip-height) !important;
+    background: var(--code-sidebar-bg) !important;
+    border-color: var(--code-border) !important;
+  }
+
+  .coding-workspace .chrome-tab {
+    height: var(--code-tab-height) !important;
+    border-color: var(--code-border) !important;
+    background: var(--code-surface-bg) !important;
+    color: var(--code-fg-muted) !important;
+  }
+
+  .coding-workspace .chrome-tab[data-active="true"] {
+    border-bottom-color: var(--code-editor-bg) !important;
+    background: var(--code-editor-bg) !important;
+    color: var(--code-fg-bright) !important;
+  }
+
+  .coding-workspace .chrome-tab [role="tab"] > span:last-child {
+    font-size: var(--code-interface-font-size) !important;
+  }
+
+  .coding-workspace .chrome-tab [role="tab"] img {
+    width: var(--code-icon-size) !important;
+    height: var(--code-icon-size) !important;
+  }
+
+  .coding-workspace .chrome-tab > button:last-child svg {
+    width: var(--code-tab-close-size) !important;
+    height: var(--code-tab-close-size) !important;
+  }
+
+  .coding-workspace [class~="border-charcoal-border"],
+  .code-theme-overlay [class~="border-charcoal-border"] {
+    border-color: var(--code-border) !important;
+  }
+
+  .coding-workspace [class~="bg-charcoal-sidebar"] {
+    background-color: var(--code-sidebar-bg) !important;
+  }
+
+  .coding-workspace [class~="bg-charcoal-border"],
+  .code-theme-overlay [class~="bg-charcoal-border"] {
+    background-color: var(--code-border) !important;
+  }
+
+  .coding-workspace [class~="bg-charcoal-active"],
+  .code-theme-overlay [class~="bg-charcoal-active"],
+  .coding-workspace [data-slot="button"][data-variant="default"],
+  .code-theme-overlay [data-slot="button"][data-variant="default"] {
+    background-color: var(--code-raised-bg) !important;
+    color: var(--code-fg-bright) !important;
+  }
+
+  .coding-workspace [class*="hover:bg-charcoal-active"]:hover,
+  .code-theme-overlay [class*="hover:bg-charcoal-active"]:hover {
+    background-color: var(--code-accent) !important;
+  }
+
+  .coding-workspace [data-slot="button"][data-variant="default"]:hover,
+  .code-theme-overlay [data-slot="button"][data-variant="default"]:hover {
+    filter: brightness(1.12);
+  }
+
+  .coding-workspace [class~="bg-charcoal-card"],
+  .code-theme-overlay[class~="bg-charcoal-card"],
+  .code-theme-overlay [class~="bg-charcoal-card"] {
+    background-color: var(--code-surface-bg) !important;
+  }
+
+  .coding-workspace [class~="bg-charcoal-bg"],
+  .code-theme-overlay[class~="bg-charcoal-bg"],
+  .code-theme-overlay [class~="bg-charcoal-bg"] {
+    background-color: var(--code-editor-bg) !important;
+  }
+
+  .coding-workspace [class~="bg-cream-bright"],
+  .code-theme-overlay [class~="bg-cream-bright"] {
+    background-color: var(--code-accent) !important;
+  }
+
+  .coding-workspace [class~="text-charcoal-workspace"],
+  .code-theme-overlay [class~="text-charcoal-workspace"] {
+    color: var(--code-workspace-bg) !important;
+  }
+
+  .coding-workspace [class~="bg-charcoal-hover"],
+  .coding-workspace [class*="hover:bg-charcoal-hover"]:hover,
+  .code-theme-overlay [class~="bg-charcoal-hover"],
+  .code-theme-overlay [class*="hover:bg-charcoal-hover"]:hover {
+    background-color: var(--code-hover) !important;
+  }
+
+  .coding-workspace [class~="text-cream-muted"],
+  .code-theme-overlay [class~="text-cream-muted"] {
+    color: var(--code-fg-muted) !important;
+  }
+
+  .coding-workspace [class~="text-cream"],
+  .code-theme-overlay,
+  .code-theme-overlay [class~="text-cream"] {
+    color: var(--code-fg) !important;
+  }
+
+  .coding-workspace [class~="text-cream-bright"],
+  .coding-workspace [class*="hover:text-cream"]:hover,
+  .code-theme-overlay [class~="text-cream-bright"],
+  .code-theme-overlay [class*="hover:text-cream"]:hover {
+    color: var(--code-fg-bright) !important;
+  }
+
+  .coding-workspace :focus-visible,
+  .code-theme-overlay :focus-visible {
+    outline-color: var(--code-accent);
+  }
+
+  .code-theme-overlay {
+    border-color: var(--code-border) !important;
+    color-scheme: inherit;
+  }
+
+  html[data-code-overlay-theme="gruvbox-light"] .code-theme-overlay {
+    color-scheme: light;
+  }
+
+  html[data-code-overlay-theme="gruvbox-dark"] .code-theme-overlay,
+  html[data-code-overlay-theme="misty-dark"] .code-theme-overlay {
+    color-scheme: dark;
+  }
+
+  .coding-workspace .code-danger,
+  .code-theme-overlay .code-danger {
+    color: var(--code-danger) !important;
+  }
+
+  .coding-workspace .code-warning,
+  .code-theme-overlay .code-warning {
+    color: var(--code-warning) !important;
+  }
+
+  .coding-workspace .code-success,
+  .code-theme-overlay .code-success {
+    color: var(--code-success) !important;
+  }
+
+  .coding-workspace .code-info,
+  .code-theme-overlay .code-info {
+    color: var(--code-info) !important;
+  }
+
+  .coding-workspace .code-muted,
+  .code-theme-overlay .code-muted {
+    color: var(--code-fg-muted) !important;
+  }
+
+  .coding-workspace .code-accent,
+  .code-theme-overlay .code-accent {
+    color: var(--code-accent) !important;
+  }
+
+  .code-theme-overlay .code-themed-control {
+    border-color: var(--code-border) !important;
+    background: var(--code-editor-bg) !important;
+    color: var(--code-fg-bright) !important;
+  }
+
+  .code-theme-overlay .code-destructive {
+    border-color: var(--code-danger) !important;
+    background: var(--code-danger) !important;
+    color: var(--code-workspace-bg) !important;
   }
 }

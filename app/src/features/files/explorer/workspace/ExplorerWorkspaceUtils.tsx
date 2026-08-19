@@ -99,7 +99,7 @@ export function buildExplorerLocationResults(
     add(path.split("/").filter(Boolean).pop() || path, path, "Pinned");
   }
   for (const path of workspacePaths) {
-    add(titleFromPath(path), path, "Profile");
+    add(titleFromPath(path), path, "Tab");
   }
   for (const item of library?.starredFiles ?? []) {
     add(item.name || titleFromPath(item.path), item.path, "Starred");

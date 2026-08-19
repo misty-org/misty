@@ -13,9 +13,16 @@ import type { AgentRunMode, ReasoningEffort } from "../model/interfaces/personal
 import type { AgentEditorState } from "../useAgentEditor";
 import { AgentEditorField as Field } from "./AgentEditorField";
 import { AgentModelPicker } from "./AgentModelPicker";
+import { McpAgentToolsPanel } from "../mcp/McpAgentToolsPanel";
 
 /** The Agent form, filling the right half of the Agents tab. */
-export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
+export function AgentEditorPanel({
+  editor,
+  onManageConnections,
+}: {
+  editor: AgentEditorState;
+  onManageConnections?: () => void;
+}) {
   const isNew = editor.editing === "new";
 
   return (
@@ -151,6 +158,12 @@ export function AgentEditorPanel({ editor }: { editor: AgentEditorState }) {
               </Field>
             </div>
           </details>
+          {!isNew && editor.editingAgentId ? (
+            <McpAgentToolsPanel
+              agentId={editor.editingAgentId}
+              onManageConnections={onManageConnections}
+            />
+          ) : null}
           {editor.error ? <p className="m-0 text-sm text-cream-bright">{editor.error}</p> : null}
         </div>
       </div>

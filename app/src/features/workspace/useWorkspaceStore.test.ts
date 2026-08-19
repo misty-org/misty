@@ -88,6 +88,17 @@ describe("desktop dock store", () => {
     ]);
   });
 
+  it("keeps Inbox singleton even when opened repeatedly", () => {
+    const inbox = workspaceSurfaceFromRoute("/inbox");
+    expect(inbox).not.toBeNull();
+    useWorkspaceStore.getState().openSurface(inbox!);
+    useWorkspaceStore.getState().openSurface(inbox!);
+
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).filter((tab) => tab.surfaceId === "inbox"),
+    ).toHaveLength(1);
+  });
+
   it("gives each Space its own tabs and restores them on the way back", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
@@ -377,6 +388,33 @@ describe("desktop dock store", () => {
     const remaining = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].tabs.map((tab) => tab.id)).toEqual([first.id]);
+  });
+
+  it("returns to the previously visited tab when the active tab closes", () => {
+    const first = useWorkspaceStore.getState().openBrowserTab({ url: "https://one.example" });
+    const closing = useWorkspaceStore.getState().openBrowserTab({ url: "https://two.example" });
+    const lastInList = useWorkspaceStore.getState().openBrowserTab({
+      url: "https://three.example",
+    });
+
+    useWorkspaceStore.getState().focusTab(first.id);
+    useWorkspaceStore.getState().focusTab(closing.id);
+    useWorkspaceStore.getState().closeTab(closing.id);
+
+    const pane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    expect(pane.activeTabId).toBe(first.id);
+    expect(pane.activeTabId).not.toBe(lastInList.id);
+  });
+
+  it("does not change the active tab when an inactive tab closes", () => {
+    const inactive = useWorkspaceStore.getState().openBrowserTab({
+      url: "https://inactive.example",
+    });
+    const active = useWorkspaceStore.getState().openBrowserTab({ url: "https://active.example" });
+
+    useWorkspaceStore.getState().closeTab(inactive.id);
+
+    expect(dockLeaves(useWorkspaceStore.getState().layout.root)[0].activeTabId).toBe(active.id);
   });
 
   it("moves tabs between panel tab strips using a center drop", () => {

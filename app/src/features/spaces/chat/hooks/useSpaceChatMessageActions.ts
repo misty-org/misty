@@ -22,8 +22,6 @@ export interface SpaceChatMessageActionsOptions {
   editing: MessageEditingState;
   setGroupMessages: Dispatch<SetStateAction<SpaceMessage[]>>;
   setGroupChatError: (message: string) => void;
-  onPublishToDiscord: (message: SpaceMessage) => void;
-  canPublishToDiscord: (message: SpaceMessage) => boolean;
   storeSendMessage: (
     spaceId: string,
     text: string,
@@ -126,12 +124,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         }));
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
         options.onAgentRunsQueued(response.message.triggered_runs);
-        if (
-          options.activeConversation?.origin === "discord" &&
-          options.canPublishToDiscord(response.message)
-        ) {
-          options.onPublishToDiscord(response.message);
-        }
       } else {
         await options.storeSendMessage(
           spaceId,

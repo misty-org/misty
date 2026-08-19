@@ -30,6 +30,7 @@ describe("workspace deep links", () => {
 
   it.each([
     ["/browser", "browser"],
+    ["/inbox", "inbox"],
     ["/terminal", "terminal"],
     ["/code", "code"],
     ["/files", "files"],
@@ -37,6 +38,22 @@ describe("workspace deep links", () => {
     ["/extensions", "extensions"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
     expect(workspaceSurfaceFromRoute(route)?.surfaceId).toBe(surfaceId);
+  });
+
+  it("opens Inbox as one account-level tool surface", () => {
+    expect(workspaceSurfaceFromRoute("/inbox")).toMatchObject({
+      surfaceId: "inbox",
+      groupKey: "tool:inbox",
+      instancePolicy: "single",
+    });
+  });
+
+  it("keeps Code route navigation reusable while allowing explicit global Code tabs", () => {
+    expect(workspaceSurfaceFromRoute("/code")).toMatchObject({
+      surfaceId: "code",
+      groupKey: "tool:code",
+      instancePolicy: "multiple",
+    });
   });
 });
 

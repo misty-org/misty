@@ -20,7 +20,7 @@ export const desktopFloatingNavbarClass =
   "absolute bottom-0 left-0 top-0 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
 export const tabletFloatingNavbarClass =
   "absolute bottom-6 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
-export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-2";
+export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-3 cursor-pointer";
 
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-span-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
@@ -112,16 +112,17 @@ export const dockHeaderPadding = 8;
 // tabs is a comfortable drag target. It stays click-through so the tabs
 // underneath keep working; the rail strip and the dock header do the dragging.
 export const desktopTitlebarClass =
-  "group/titlebar pointer-events-none absolute inset-x-0 top-0 z-30 h-[38px] select-none";
+  "group/titlebar pointer-events-none absolute inset-x-0 top-0 z-50 h-[38px] select-none";
 
 // Empty band at the top of the rail: it lines the traffic lights up with the
 // dock header and gives the whole left side back to window dragging.
-export const navigatorTitlebarStripClass = "h-[38px] w-full shrink-0 select-none";
+export const navigatorTitlebarStripClass =
+  "pointer-events-auto h-[38px] w-full shrink-0 select-none";
 
 export const desktopWallpaperLayerClass = "hidden";
 
 export const desktopTitlebarNavigationClass =
-  "pointer-events-auto absolute top-0 z-[4] flex h-[38px] items-center pt-[3px] gap-3";
+  "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center pt-[3px] gap-1";
 export const desktopTitlebarNavigationButtonClass = [
   "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",

@@ -35,7 +35,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import { TaskCalendarNotice } from "../components/TaskCalendarNotice";
 import { TaskDrawerProperties } from "./TaskDrawerProperties";
 
 export interface SpaceTaskDrawerProps {
@@ -50,10 +49,6 @@ export interface SpaceTaskDrawerProps {
   onClose: () => void;
   onSave: (event: FormEvent) => void;
   onArchive?: () => void;
-  /** Sends this task's schedule edits to Google. Omitted for Misty-only tasks. */
-  onPublishCalendar?: () => void;
-  /** Drops local schedule edits in favour of what Google holds. */
-  onDiscardCalendar?: () => void;
 }
 
 export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
@@ -169,15 +164,6 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
 
           <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_240px] overflow-auto max-sm:grid-cols-1">
             <div className="grid content-start gap-5 p-5 sm:p-6">
-              {editing && props.onPublishCalendar && props.onDiscardCalendar ? (
-                <TaskCalendarNotice
-                  task={editing}
-                  busy={busy}
-                  canManage={canManage}
-                  onPublish={props.onPublishCalendar}
-                  onDiscard={props.onDiscardCalendar}
-                />
-              ) : null}
               <div className="grid gap-2">
                 <Label htmlFor="space-task-title">Title</Label>
                 <Input

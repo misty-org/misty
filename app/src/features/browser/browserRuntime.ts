@@ -14,12 +14,14 @@ interface BrowserHistory {
 interface BrowserRuntimeUiState {
   grants: Record<string, ActiveBrowserAgentGrant[]>;
   histories: Record<string, BrowserHistory>;
+  cursors: Record<string, string>;
   errors: Record<string, string | null>;
   notices: Record<string, string | null>;
   setGrants: (tabId: string, grants: ActiveBrowserAgentGrant[]) => void;
   ensureHistory: (tabId: string, url: string) => void;
   pushHistory: (tabId: string, url: string) => void;
   moveHistory: (tabId: string, direction: -1 | 1) => string | null;
+  setCursor: (tabId: string, cursor: string) => void;
   setError: (tabId: string, error: string | null) => void;
   setNotice: (tabId: string, notice: string | null) => void;
   removeTab: (tabId: string) => void;
@@ -28,6 +30,7 @@ interface BrowserRuntimeUiState {
 export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) => ({
   grants: {},
   histories: {},
+  cursors: {},
   errors: {},
   notices: {},
   setGrants: (tabId, grants) => set((state) => ({ grants: { ...state.grants, [tabId]: grants } })),
@@ -61,6 +64,10 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     }));
     return current.entries[index] ?? null;
   },
+  setCursor: (tabId, cursor) =>
+    set((state) =>
+      state.cursors[tabId] === cursor ? state : { cursors: { ...state.cursors, [tabId]: cursor } },
+    ),
   setError: (tabId, error) => set((state) => ({ errors: { ...state.errors, [tabId]: error } })),
   setNotice: (tabId, notice) =>
     set((state) => ({ notices: { ...state.notices, [tabId]: notice } })),
@@ -68,22 +75,25 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     set((state) => {
       const grants = { ...state.grants };
       const histories = { ...state.histories };
+      const cursors = { ...state.cursors };
       const errors = { ...state.errors };
       const notices = { ...state.notices };
       delete grants[tabId];
       delete histories[tabId];
+      delete cursors[tabId];
       delete errors[tabId];
       delete notices[tabId];
-      return { grants, histories, errors, notices };
+      return { grants, histories, cursors, errors, notices };
     }),
 }));
 
 const createdRuntimeIds = new Set<string>();
 const visibleRuntimeIds = new Set<string>();
+const desiredVisibleRuntimeIds = new Set<string>();
 const lastBounds = new Map<string, string>();
-const requestedBounds = new Map<string, string>();
 const runtimeTabIds = new Map<string, string>();
 const runtimeQueues = new Map<string, Promise<void>>();
+const browserSyncStates = new Map<string, BrowserSyncState>();
 const browserWebviewSuspensions = new Set<string>();
 let browserOverlayQueue = Promise.resolve();
 let browserPointerGestureActive = false;
@@ -93,6 +103,18 @@ let browserOverlayActive = false;
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
 type BrowserRuntimeTab = Pick<WorkspaceTab, "id" | "instanceKey">;
+type BrowserSyncInput = {
+  tab: WorkspaceTab;
+  url: string;
+  bounds: BrowserBounds;
+  theme: BrowserTheme;
+};
+
+interface BrowserSyncState {
+  latest: BrowserSyncInput | null;
+  running: boolean;
+  waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }>;
+}
 
 export function browserRuntimeId(tab: BrowserRuntimeTab): string {
   return `tab-${tab.instanceKey.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80)}`;
@@ -130,64 +152,101 @@ export function requestBrowserWebviewLayoutByRuntimeId(runtimeId: string): void 
   }
 }
 
-export function syncBrowserWebview(input: {
-  tab: WorkspaceTab;
-  url: string;
-  bounds: BrowserBounds;
-  theme: BrowserTheme;
-}): Promise<void> {
+export function syncBrowserWebview(input: BrowserSyncInput): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
+  desiredVisibleRuntimeIds.add(id);
   const boundsKey = serializeBounds(input.bounds);
-  const boundsChanged = lastBounds.get(id) !== boundsKey;
-  if (createdRuntimeIds.has(id) && visibleRuntimeIds.has(id) && !boundsChanged) {
+  const existingState = browserSyncStates.get(id);
+  if (
+    !existingState &&
+    createdRuntimeIds.has(id) &&
+    visibleRuntimeIds.has(id) &&
+    lastBounds.get(id) === boundsKey
+  ) {
     return Promise.resolve();
   }
-  const pending = runtimeQueues.get(id);
-  if (pending && requestedBounds.get(id) === boundsKey) return pending;
-  requestedBounds.set(id, boundsKey);
-  return enqueue(id, async () => {
-    if (!createdRuntimeIds.has(id)) {
-      await invoke("browser_webview_create", {
-        request: {
-          id,
-          url: input.url,
-          scopeId: browserScopeId(input.tab),
-          theme: input.theme,
-          userAgent: browserUserAgent(),
-          ...input.bounds,
-        },
-      });
-      createdRuntimeIds.add(id);
+  const state = existingState ?? { latest: null, running: false, waiters: [] };
+  state.latest = input;
+  browserSyncStates.set(id, state);
+  const result = new Promise<void>((resolve, reject) => {
+    state.waiters.push({ resolve, reject });
+  });
+  if (!state.running) void flushBrowserSync(id, state);
+  return result;
+}
+
+async function flushBrowserSync(id: string, state: BrowserSyncState): Promise<void> {
+  state.running = true;
+  try {
+    // Live window resizing can produce geometry faster than native IPC can
+    // apply it. Keep only the newest measurement while one update is in
+    // flight, otherwise stale frames queue up and the webview trails the app.
+    while (state.latest) {
+      const input = state.latest;
+      state.latest = null;
+      await enqueue(id, () => applyBrowserSync(id, input));
     }
-    // Frontend caches can outlive a crashed, detached, or hot-reloaded native
-    // child. Reconcile after creation, a real bounds change, or an explicit
-    // layout invalidation. Avoid no-op native frame writes: on macOS they
-    // rebuild WKWebView tracking areas and make cursor ownership flicker.
-    let exists = await invoke<boolean>("browser_webview_reconcile", {
+    state.waiters.splice(0).forEach(({ resolve }) => resolve());
+  } catch (error) {
+    state.latest = null;
+    state.waiters.splice(0).forEach(({ reject }) => reject(error));
+  } finally {
+    state.running = false;
+    if (browserSyncStates.get(id) === state) browserSyncStates.delete(id);
+  }
+}
+
+async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<void> {
+  const boundsKey = serializeBounds(input.bounds);
+  if (!createdRuntimeIds.has(id)) {
+    await invoke("browser_webview_create", {
+      request: {
+        id,
+        url: input.url,
+        scopeId: browserScopeId(input.tab),
+        theme: input.theme,
+        userAgent: browserUserAgent(),
+        ...input.bounds,
+      },
+    });
+    createdRuntimeIds.add(id);
+  }
+  // Frontend caches can outlive a crashed, detached, or hot-reloaded native
+  // child. Reconcile after creation, a real bounds change, or an explicit
+  // layout invalidation. Avoid no-op native frame writes: on macOS they
+  // rebuild WKWebView tracking areas and make cursor ownership flicker.
+  let exists = await invoke<boolean>("browser_webview_reconcile", {
+    request: { id, ...input.bounds },
+  });
+  if (!exists) {
+    createdRuntimeIds.delete(id);
+    visibleRuntimeIds.delete(id);
+    await invoke("browser_webview_create", {
+      request: {
+        id,
+        url: input.url,
+        scopeId: browserScopeId(input.tab),
+        theme: input.theme,
+        userAgent: browserUserAgent(),
+        ...input.bounds,
+      },
+    });
+    createdRuntimeIds.add(id);
+    exists = await invoke<boolean>("browser_webview_reconcile", {
       request: { id, ...input.bounds },
     });
-    if (!exists) {
-      createdRuntimeIds.delete(id);
-      visibleRuntimeIds.delete(id);
-      await invoke("browser_webview_create", {
-        request: {
-          id,
-          url: input.url,
-          scopeId: browserScopeId(input.tab),
-          theme: input.theme,
-          userAgent: browserUserAgent(),
-          ...input.bounds,
-        },
-      });
-      createdRuntimeIds.add(id);
-      exists = await invoke<boolean>("browser_webview_reconcile", {
-        request: { id, ...input.bounds },
-      });
-      if (!exists) throw new Error("Browser webview could not be attached.");
-    }
-    lastBounds.set(id, boundsKey);
-    visibleRuntimeIds.add(id);
-  });
+    if (!exists) throw new Error("Browser webview could not be attached.");
+  }
+  lastBounds.set(id, boundsKey);
+  // The Browser surface can unmount while native creation or reconciliation
+  // is still in flight. Honor the latest desired visibility before exposing
+  // the child, otherwise that late completion can cover Home or another tool.
+  if (!desiredVisibleRuntimeIds.has(id)) {
+    visibleRuntimeIds.delete(id);
+    await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
+    return;
+  }
+  visibleRuntimeIds.add(id);
 }
 
 export function setBrowserWebviewsSuspended(suspended: boolean, reason = "default"): void {
@@ -244,10 +303,17 @@ function setBrowserOverlayActive(active: boolean): void {
     );
 }
 
+export async function browserOverlayReady(): Promise<void> {
+  await browserOverlayQueue;
+}
+
 export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
   const id = registerBrowserRuntime(tab);
-  if (!createdRuntimeIds.has(id) || !visibleRuntimeIds.has(id)) return Promise.resolve();
+  desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
+  // Always enqueue the hide. A create/reconcile operation may still be in
+  // flight even when the frontend has not marked this runtime visible yet.
+  // The native command safely no-ops when no child exists.
   return enqueue(id, async () => {
     await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
   });
@@ -255,6 +321,7 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
 
 export async function closeBrowserRuntime(tab: WorkspaceTab): Promise<void> {
   const id = registerBrowserRuntime(tab);
+  desiredVisibleRuntimeIds.delete(id);
   const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
   await Promise.allSettled(grants.map((grant) => revokeBrowserAgentGrant(id, grant)));
   await enqueue(id, async () => {
@@ -264,13 +331,14 @@ export async function closeBrowserRuntime(tab: WorkspaceTab): Promise<void> {
     createdRuntimeIds.delete(id);
     visibleRuntimeIds.delete(id);
     lastBounds.delete(id);
-    requestedBounds.delete(id);
+    browserSyncStates.delete(id);
     runtimeTabIds.delete(id);
     useBrowserRuntimeStore.getState().removeTab(tab.id);
   });
 }
 
 export function hideAllBrowserWebviews(): Promise<void[]> {
+  desiredVisibleRuntimeIds.clear();
   const trackedHides = Promise.all(
     [...visibleRuntimeIds].map((id) => {
       visibleRuntimeIds.delete(id);

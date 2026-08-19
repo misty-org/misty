@@ -4,6 +4,7 @@ import { nowIso } from "../connectorUtils";
 import { NOTION_CONNECTOR_ID } from "../mockData";
 import type { CreateNoteInput } from "../model/interfaces/connectors";
 import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "../model/types/types";
+import { setNotionScope } from "./notionApi";
 
 let registry = createDefaultNotesRegistry();
 let notesLoadGeneration = 0;
@@ -32,6 +33,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (sameScope && state.phase === "ready") return;
 
     const generation = ++notesLoadGeneration;
+    setNotionScope(accountId, spaceId);
     registry = createDefaultNotesRegistry(accountId, spaceId, spaceName);
     const activeRegistry = registry;
     set((current) => ({
@@ -326,6 +328,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 export function resetNotesAccountState(): void {
   closeOpenNoteCollaborationSessions();
   notesLoadGeneration += 1;
+  setNotionScope("", "");
   registry = createDefaultNotesRegistry();
   useNotesStore.setState({
     registry,

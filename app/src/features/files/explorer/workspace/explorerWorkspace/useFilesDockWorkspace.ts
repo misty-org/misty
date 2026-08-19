@@ -41,31 +41,17 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     useMultiPanelStore.getState().collapseDuplicateBrowsePanes();
   }, [options.embedded, options.initialized]);
 
+  // Initial seed from dock tab state on mount or when switching tabs
   useEffect(() => {
-    if (!options.workspaceId || !options.activePaneId || !options.initialized) return;
-    restoredTabRef.current = "";
+    if (!options.workspaceId || !options.initialized || !options.activePaneId) return;
+    if (restoredTabRef.current === options.workspaceId) return;
+    restoredTabRef.current = options.workspaceId;
+
     const desiredPath = dockTabPath;
-    if (!desiredPath || desiredPath === options.activePath) {
-      restoredTabRef.current = options.workspaceId;
-      return;
+    if (desiredPath && desiredPath !== options.activePath) {
+      void useExplorerStore.getState().navigatePane(options.activePaneId, desiredPath);
     }
-    let cancelled = false;
-    void useExplorerStore
-      .getState()
-      .navigatePane(options.activePaneId, desiredPath)
-      .finally(() => {
-        if (!cancelled) restoredTabRef.current = options.workspaceId ?? "";
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    options.activePaneId,
-    options.activePath,
-    options.initialized,
-    options.workspaceId,
-    dockTabPath,
-  ]);
+  }, [options.workspaceId, options.initialized, options.activePaneId, dockTabPath]);
 
   useEffect(() => {
     if (

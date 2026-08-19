@@ -27,7 +27,6 @@ export type {
   QuickAccessMenuItem,
   SmartFolderDialogState,
   SmartFolderMatchMode,
-  WorkspaceDialogState,
 } from "../model/types/components/ExplorerSidebarSupport";
 
 const DEVICE_CUSTOMIZATION_STORAGE_KEY = "misty.explorer.sidebar.devices";
@@ -84,7 +83,7 @@ export const sidebarStyles = {
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
 } as const;
 
-export { DeviceDialog, SmartFolderDialog, WorkspaceDialog } from "./ExplorerSidebarDialogs";
+export { DeviceDialog, SmartFolderDialog } from "./ExplorerSidebarDialogs";
 export { smartFolderQueryFromRules } from "./ExplorerSidebarQuery";
 
 export function SidebarSectionHeader(props: {

@@ -1,16 +1,12 @@
 import {
+  bindCloudConnection,
   beginCloudAuthorization,
   cloudConnectionsSnapshot,
-  cloudConnectionToken,
   deleteCloudConnection,
   type CloudProvider,
 } from "@/api/cloud/api";
-import {
-  providersDisconnectRemote,
-  providersImportCloudConnection,
-  providersRefresh,
-  providersSelectRemote,
-} from "@/native";
+import { connectionsApi } from "@/api/connections";
+import { providersDisconnectRemote, providersRefresh, providersSelectRemote } from "@/native";
 import type { ProviderConfigStep } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
@@ -47,6 +43,11 @@ import {
   pruneRemoteFromWorkspaces,
   removeRemoteDraftCache,
 } from "./providerWorkspaceState";
+import {
+  accountProviderForCloud,
+  completedProviderStep,
+  importCloudConnection,
+} from "./cloudConnectionImport";
 
 export function createProviderConnectionActions(
   set: ProvidersSet,
@@ -212,30 +213,68 @@ export function createProviderConnectionActions(
         const remoteName = session.remoteName.trim();
         let step: ProviderConfigStep;
         if (!polling) {
-          const authorization = await beginCloudAuthorization({
-            provider: session.providerType as CloudProvider,
-            name: remoteName,
-            clientId: normalizedParameters.client_id,
-            clientSecret: normalizedParameters.client_secret,
-          });
-          step = {
-            kind: "browser_auth",
-            name: remoteName,
-            state: authorization.state_expires_at,
-            result: "pending",
-            done: false,
-            error: "",
-            authorizeUrl: authorization.authorization_url,
-            instructions: "Complete sign-in in the browser.",
-            pollAfterMs: 1_000,
-            option: null,
-          };
+          const customOAuth = Boolean(
+            normalizedParameters.client_id || normalizedParameters.client_secret,
+          );
+          const accountProvider = accountProviderForCloud(session.providerType);
+          const accounts = customOAuth ? null : await connectionsApi.list();
+          const reusable = accounts?.connections.find(
+            (candidate) =>
+              candidate.provider === accountProvider &&
+              candidate.status === "active" &&
+              candidate.capabilities?.includes("files"),
+          );
+          if (reusable) {
+            const connected = await bindCloudConnection({
+              connectionId: reusable.id,
+              name: remoteName,
+            });
+            await importCloudConnection(connected);
+            step = completedProviderStep(remoteName);
+          } else {
+            const authorization = customOAuth
+              ? await beginCloudAuthorization({
+                  provider: session.providerType as CloudProvider,
+                  name: remoteName,
+                  clientId: normalizedParameters.client_id,
+                  clientSecret: normalizedParameters.client_secret,
+                })
+              : await connectionsApi.authorize(accountProvider, ["files"], "/files");
+            step = {
+              kind: "browser_auth",
+              name: remoteName,
+              state: authorization.state_expires_at ?? "",
+              result: "pending",
+              done: false,
+              error: "",
+              authorizeUrl: authorization.authorization_url,
+              instructions: "Complete sign-in in the browser.",
+              pollAfterMs: 1_000,
+              option: null,
+            };
+          }
         } else {
           const cloud = await cloudConnectionsSnapshot();
-          const connected = cloud.connections.find(
+          let connected = cloud.connections.find(
             (candidate) =>
               candidate.provider === session.providerType && candidate.name === remoteName,
           );
+          if (!connected) {
+            const accountProvider = accountProviderForCloud(session.providerType);
+            const accounts = await connectionsApi.list();
+            const reusable = accounts.connections.find(
+              (candidate) =>
+                candidate.provider === accountProvider &&
+                candidate.status === "active" &&
+                candidate.capabilities?.includes("files"),
+            );
+            if (reusable) {
+              connected = await bindCloudConnection({
+                connectionId: reusable.id,
+                name: remoteName,
+              });
+            }
+          }
           if (!connected) {
             step = {
               kind: "browser_auth",
@@ -250,25 +289,8 @@ export function createProviderConnectionActions(
               option: null,
             };
           } else {
-            const lease = await cloudConnectionToken(connected.id);
-            await providersImportCloudConnection({
-              name: remoteName,
-              providerType: connected.provider,
-              connectionId: connected.id,
-              accessToken: lease.access_token,
-            });
-            step = {
-              kind: "done",
-              name: remoteName,
-              state: "",
-              result: "done",
-              done: true,
-              error: "",
-              authorizeUrl: "",
-              instructions: "",
-              pollAfterMs: 0,
-              option: null,
-            };
+            await importCloudConnection(connected);
+            step = completedProviderStep(remoteName);
           }
         }
         if (generation !== currentConnectionGeneration() || !get().connection) return;

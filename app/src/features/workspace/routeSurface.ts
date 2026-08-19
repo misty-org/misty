@@ -13,6 +13,8 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   // Home is an ordinary, stackable tab. It is also what a pane falls back to
   // when its last tab closes, so it must resolve to a surface like any other.
   if (pathname === routes.home) return request("home", "tool:home", "Home", pathname);
+  if (pathname.startsWith(routes.inbox))
+    return request("inbox", "tool:inbox", "Inbox", pathname, undefined, "single");
   if (pathname.startsWith(routes.spaces)) {
     const parts = pathname.split("/").filter(Boolean);
     const rawId = parts[1];
@@ -41,7 +43,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   if (pathname.startsWith(routes.terminal))
     return request("terminal", "tool:terminal", "Terminal", pathname, undefined, "single");
   if (pathname.startsWith(routes.code))
-    return request("code", "tool:code", "Code", pathname, undefined, "single");
+    return request("code", "tool:code", "Code", pathname, undefined, "multiple");
   if (pathname.startsWith(routes.files))
     return request("files", "tool:files", "Files", pathname, undefined, "single");
   if (pathname.startsWith(routes.transfers))

@@ -24,7 +24,7 @@ export type DiscordLinkErrorCode =
   | "unknown";
 
 /** Where a mirrored Space message came from, and where it was published to. */
-export type MessageOriginSystem = "misty" | "discord";
+export type MessageOriginSystem = "misty" | "discord" | "slack";
 
 /**
  * Outcome of publishing one Misty message outward. `skipped` covers messages
