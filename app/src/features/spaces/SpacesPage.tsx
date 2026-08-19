@@ -1,21 +1,13 @@
 import { deploymentStorageKey } from "@/api/deployment/api";
 import { useEffect } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
 import { useAuth } from "@/features/auth";
-import { isWebBuild } from "@/shared/platform/buildTarget";
-import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { useSpacesStore } from "./store/useSpacesStore";
 
-import { SpaceDrawings } from "@/features/drawings";
-import { SpaceNotes, spaceNotesEnabled } from "@/features/notes";
-import { SpaceLibrary } from "@/features/spaces/library";
-import { SpacePlanner } from "@/features/spaces/planner";
-import { SpaceChat } from "./chat/SpaceChatEntry";
-import { SpaceSettings } from "./components/SpaceSettings";
-import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
-import { canOpenMistySpaceSection } from "./mistySpace";
+import { spaceNotesEnabled } from "@/features/notes";
+import { SpaceSectionView } from "./SpaceSectionView";
 
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
@@ -40,19 +32,10 @@ export function SpaceDetail() {
     section = spaceNotesEnabled ? "notes" : "drawings",
     studioKind = "",
   } = useParams();
-  const { user, accounts, transitioning } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { spaces, snapshotReady, referenceOnly, loading, error, load, loadSpace } = useSpacesStore(
-    useShallow((state) => ({
-      spaces: state.spaces,
-      snapshotReady: state.snapshotReady,
-      referenceOnly: state.referenceOnly,
-      loading: state.loading,
-      error: state.error,
-      load: state.load,
-      loadSpace: state.loadSpace,
-    })),
+  const { spaces, loadSpace } = useSpacesStore(
+    useShallow((state) => ({ spaces: state.spaces, loadSpace: state.loadSpace })),
   );
   const space = spaces.find((item) => item.id === spaceId);
 
@@ -150,138 +133,16 @@ export function SpaceDetail() {
   if (section === "members") {
     return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/settings/members`} replace />;
   }
-
-  const returnPath = `${location.pathname}${location.search}${location.hash}`;
-  if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
-
-  if (!user && accounts.length > 0) {
-    return <Navigate to="/signin" state={{ from: returnPath }} replace />;
+  if (section === "assistant") {
+    return <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />;
   }
 
-  if (!user) {
-    return (
-      <PermissionState
-        className="h-full"
-        title="Log in to view this Space"
-        description="Sign in to your Misty account to open Spaces and see their content."
-        action={
-          <Button
-            type="button"
-            onClick={() =>
-              navigate("/signin", {
-                state: { from: returnPath },
-              })
-            }
-          >
-            Log in
-          </Button>
-        }
-      />
-    );
-  }
-
-  if (!snapshotReady && error) {
-    return (
-      <SpacePageLoadingPlaceholder
-        label="Loading Space"
-        onRetry={() => {
-          void load({ force: true }).then(() => {
-            if (useSpacesStore.getState().snapshotReady) void loadSpace(spaceId);
-          });
-        }}
-      />
-    );
-  }
-
-  if (!snapshotReady || (!space && loading)) {
-    return <SpacePageLoadingPlaceholder />;
-  }
-
-  if (!space && spaces.length > 0) {
-    const fallback = spaces[0];
-    return <Navigate to={defaultJournalPath(fallback.id)} replace />;
-  }
-
-  if (!space) {
-    return (
-      <EmptyState
-        className="h-full"
-        title="This Space isn’t available"
-        description="This Space may have been removed, or you may no longer have access."
-      />
-    );
-  }
-
-  if (!canOpenMistySpaceSection(space, section)) {
-    return <Navigate to={`/spaces/${encodeURIComponent(spaceId)}/chat`} replace />;
-  }
-
-  return (
-    <div className="relative h-full min-h-0 overflow-hidden">
-      {section === "library" ? (
-        isWebBuild ? (
-          <PermissionState
-            className="h-full"
-            title="Space Library is available in the Misty desktop app"
-            description={
-              "This Library currently depends on local-device file indexing and transfers. " +
-              "Cloud-backed Space chat, planning, notes, and drawings are available on the web."
-            }
-          />
-        ) : space.permissions?.["library.view"] === false ? (
-          <SpacePermissionDenied
-            title="Library access required"
-            detail="You do not have permission to view this Space's Library."
-          />
-        ) : (
-          <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} />
-        )
-      ) : section === "planner" ? (
-        space.permissions?.["tasks.view"] === false ? (
-          <SpacePermissionDenied
-            title="Planner access required"
-            detail="Ask a Space owner to grant Planner access."
-          />
-        ) : (
-          <SpacePlanner
-            key={`planner:${spaceId}`}
-            spaceId={spaceId}
-            canManage={!referenceOnly && space.permissions?.["tasks.manage"] !== false}
-            canManageIntegrations={!referenceOnly && space.role === "owner"}
-          />
-        )
-      ) : section === "notes" ? (
-        <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
-      ) : section === "drawings" ? (
-        <SpaceDrawings
-          key={`drawings:${spaceId}:${studioKind}`}
-          spaceId={spaceId}
-          drawingId={studioKind}
-        />
-      ) : section === "assistant" ? (
-        <Navigate to={`/agents?spaceId=${encodeURIComponent(spaceId)}`} replace />
-      ) : section === "settings" ? (
-        <SpaceSettings
-          key={`settings:${spaceId}:${studioKind}`}
-          spaceId={spaceId}
-          section={studioKind}
-        />
-      ) : space.permissions?.["messages.read"] === false ? (
-        <SpacePermissionDenied
-          title="Chat access required"
-          detail="You do not have permission to read this Space's messages."
-        />
-      ) : (
-        <SpaceChat key={`chat:${spaceId}`} spaceId={spaceId} />
-      )}
-    </div>
-  );
+  // Route normalisation is this component's whole job now. The section itself
+  // renders from props so the dock can show it in more than one pane, which a
+  // single router outlet cannot do.
+  return <SpaceSectionView spaceId={spaceId} section={section} studioKind={studioKind} />;
 }
 
 function defaultJournalPath(spaceId: string) {
   return `/spaces/${encodeURIComponent(spaceId)}/${spaceNotesEnabled ? "notes" : "drawings"}`;
-}
-
-function SpacePermissionDenied({ title, detail }: { title: string; detail: string }) {
-  return <PermissionState className="h-full" title={title} description={detail} />;
 }

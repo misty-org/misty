@@ -1,11 +1,10 @@
 import { lazy, Suspense } from "react";
 
-export { MessageOriginBadge } from "./components/MessageOriginBadge";
 export { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 export { SpaceAvatar } from "./components/SpaceAvatar";
 export { SpaceManagementNavigation } from "./components/SpaceManagementNavigation";
 export { SpaceRowActions } from "./components/SpaceRowActions";
-export { spaceDestination } from "./navigation";
+export { spaceDestination, spaceLandingRoute } from "./navigation";
 export { canOpenMistySpaceSection, preferredMistySpace } from "./mistySpace";
 export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
@@ -24,6 +23,12 @@ export * from "./store/useSpacesTabsStore";
 
 const LazySpacesPage = lazy(() => import("./SpacesPage"));
 const LazySpaceDetail = lazy(async () => ({ default: (await import("./SpacesPage")).SpaceDetail }));
+// Lazy like the other Space surfaces: it reaches drawings and chat, which pull
+// in collaboration modules that must not load just because this barrel is
+// imported for something small.
+const LazySpaceSectionView = lazy(async () => ({
+  default: (await import("./SpaceSectionView")).SpaceSectionView,
+}));
 const LazySpacesIndexRedirect = lazy(async () => ({
   default: (await import("./SpacesPage")).SpacesIndexRedirect,
 }));
@@ -38,6 +43,14 @@ export function SpacesPage() {
   return (
     <Suspense fallback={null}>
       <LazySpacesPage />
+    </Suspense>
+  );
+}
+
+export function SpaceSectionView(props: { spaceId: string; section: string; studioKind?: string }) {
+  return (
+    <Suspense fallback={null}>
+      <LazySpaceSectionView {...props} />
     </Suspense>
   );
 }

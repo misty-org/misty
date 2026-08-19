@@ -1,19 +1,20 @@
 export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
 import { Button } from "@/shared/ui";
-import { Lightbulb, LightbulbOff } from "lucide-react";
+import { Lightbulb, LightbulbOff, PlugZap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth";
 import { useSetupStore } from "@/features/installer";
 import type { MistyPickerSource } from "@/features/picker";
-import { useDiscordPublish } from "@/features/spaces/integrations";
 import { SpaceSetupCards } from "@/features/spaces";
+import { useDiscordPublish, useSlackPublish } from "@/features/spaces/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { ChatPresencePill } from "./components/ChatPresencePill";
+import { ChatIntegrationsSheet } from "./components/ChatIntegrationsSheet";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./components/SpaceChatComposer";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
@@ -29,7 +30,6 @@ import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
-import { mergeSpaceMessages } from "./store/useSpaceMessageSpansStore";
 
 export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [searchParams] = useSearchParams();
@@ -99,6 +99,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const [messageToDelete, setMessageToDelete] = useState<SpaceMessage | null>(null);
   const [suggestionVeto, setSuggestionVeto] = useState(false);
+  const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const resetDraft = draft.reset;
   const resetEditing = editing.reset;
   const closeSuggestions = suggestions.setOpen;
@@ -148,9 +149,6 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     [scope.members, scope.agents],
   );
 
-  const discord = useDiscordPublish(spaceId, conversationId, (published) =>
-    conversationChat.setMessages((current) => mergeSpaceMessages(current, [published])),
-  );
   const actions = useSpaceChatMessageActions({
     spaceId,
     conversationId,
@@ -162,13 +160,21 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     editing,
     setGroupMessages: conversationChat.setMessages,
     setGroupChatError: conversationChat.setError,
-    onPublishToDiscord: (message) => void discord.publish(message),
-    canPublishToDiscord: discord.canPublish,
     storeSendMessage: store.sendMessage,
     storeUpdateMessage: store.updateMessage,
     storeDeleteMessage: store.deleteMessage,
     storeToggleReaction: store.toggleMessageReaction,
     onAgentRunsQueued: agentTurns.track,
+  });
+  const discordPublish = useDiscordPublish(spaceId, conversationId, (published) => {
+    conversationChat.setMessages((current) =>
+      current.map((message) => (message.id === published.id ? published : message)),
+    );
+  });
+  const slackPublish = useSlackPublish(spaceId, conversationId, user?.id, (published) => {
+    conversationChat.setMessages((current) =>
+      current.map((message) => (message.id === published.id ? published : message)),
+    );
   });
 
   const [messagesLoading] = useMinimumSpin(
@@ -238,6 +244,17 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         </h1>
 
         <div className="ml-auto flex items-center gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-cream-muted"
+            aria-label="Manage chat integrations"
+            title="Chat integrations"
+            onClick={() => setIntegrationsOpen(true)}
+          >
+            <PlugZap className="size-4" />
+          </Button>
           {conversationId && !scope.activeConversation?.direct_agent_id ? (
             <Button
               type="button"
@@ -280,9 +297,8 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         editing={editing}
         actions={actions}
         suggestions={suggestions}
-        discord={discord}
         currentUserId={user?.id}
-        error={conversationChat.error}
+        error={conversationChat.error || discordPublish.error || slackPublish.error}
         setError={conversationChat.setError}
         loading={messagesLoading}
         endRef={endRef}
@@ -295,6 +311,19 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         pendingAgentRuns={agentTurns.pending}
         actionSuggestions={actionSuggestions.items}
         onActionSuggestionsChanged={() => void actionSuggestions.refresh()}
+        onPublishToDiscord={(message) => void discordPublish.publish(message)}
+        canPublishToDiscord={discordPublish.canPublish}
+        publishingMessageId={discordPublish.publishingMessageId}
+        onPublishToSlack={(message) => {
+          const parent = scope.messages.find((item) => item.id === message.reply_to_message_id);
+          const threadTs =
+            parent?.origin?.system === "slack"
+              ? parent.origin.external_thread_id || parent.origin.external_id || ""
+              : "";
+          void slackPublish.publish(message, threadTs);
+        }}
+        canPublishToSlack={slackPublish.canPublish}
+        publishingSlackMessageId={slackPublish.publishingMessageId}
       />
 
       {access.canWriteMessages ? (
@@ -342,6 +371,12 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             if (removed) setMessageToDelete(null);
           });
         }}
+      />
+      <ChatIntegrationsSheet
+        spaceId={spaceId}
+        canManage={!store.referenceOnly && access.isOwner}
+        open={integrationsOpen}
+        onOpenChange={setIntegrationsOpen}
       />
     </div>
   );

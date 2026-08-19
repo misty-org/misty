@@ -21,11 +21,9 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas";
 import { NavigatorControls } from "./NavigatorControls";
 import {
   navigatorWidths,
-  nextNavigatorWidth,
   readNavigatorLayout,
   writeNavigatorLayout,
   type NavigatorLayout,
-  type NavigatorWidth,
 } from "./navigatorMode";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { RemotesOverlay, SettingsOverlay } from "./SettingsOverlays";
@@ -132,14 +130,8 @@ export function DesktopLayout(props: {
     setBrowserWebviewsSuspended(true, "navigator-layout");
     setNavigatorLayout(next);
     writeNavigatorLayout(next);
-    window.requestAnimationFrame(() =>
-      window.requestAnimationFrame(() => setBrowserWebviewsSuspended(false, "navigator-layout")),
-    );
+    window.setTimeout(() => setBrowserWebviewsSuspended(false, "navigator-layout"), 320);
   }, []);
-  const cycleNavigatorWidth = useCallback(() => {
-    const current = navigatorLayoutRef.current;
-    applyNavigatorLayout({ ...current, width: nextNavigatorWidth(current.width) });
-  }, [applyNavigatorLayout]);
   const toggleNavigatorVisibility = useCallback(() => {
     const current = navigatorLayoutRef.current;
     setNavigatorRevealed(false);
@@ -270,7 +262,7 @@ export function DesktopLayout(props: {
   const routeShellClass = usesNativeWindowChrome ? desktopRouteShellClass : tabletRouteShellClass;
   return (
     <main
-      className={`${frameClass} ${navigatorGridClass(navigatorHidden ? "hidden" : navigatorLayout.width)}`}
+      className={`${frameClass} ${navigatorGridClass(navigatorHidden ? "hidden" : "full")}`}
       data-misty-desktop-frame
       onPointerDown={(event) => {
         const target = event.target instanceof Element ? event.target : null;
@@ -282,17 +274,10 @@ export function DesktopLayout(props: {
         <header className={desktopTitlebarClass} onPointerDown={handleDesktopTitlebarPointerDown}>
           {!shouldShowWindowsControls ? (
             <div
-              className={cn(
-                desktopTitlebarNavigationClass,
-                navigatorLayout.width === "full" && !navigatorHidden
-                  ? "left-0 w-[264px] justify-end pr-3"
-                  : "left-[74px] justify-start",
-              )}
-              data-misty-window-drag-block="true"
+              className={cn(desktopTitlebarNavigationClass, "left-[74px] justify-start gap-1.5")}
             >
               <NavigatorControls
-                layout={navigatorLayout}
-                onCycleWidth={cycleNavigatorWidth}
+                visibility={navigatorLayout.visibility}
                 onToggleVisibility={toggleNavigatorVisibility}
               />
               <div className="flex items-center gap-1">
@@ -319,10 +304,9 @@ export function DesktopLayout(props: {
               </div>
             </div>
           ) : (
-            <div className="absolute left-2 top-0 z-[4] flex h-full items-center">
+            <div className="absolute left-2 top-0 z-[55] flex h-full items-center gap-1.5">
               <NavigatorControls
-                layout={navigatorLayout}
-                onCycleWidth={cycleNavigatorWidth}
+                visibility={navigatorLayout.visibility}
                 onToggleVisibility={toggleNavigatorVisibility}
               />
             </div>
@@ -364,40 +348,43 @@ export function DesktopLayout(props: {
       {!usesNativeWindowChrome ? (
         <div className="absolute left-2 top-1 z-[60]" data-misty-window-drag-block="true">
           <NavigatorControls
-            layout={navigatorLayout}
-            onCycleWidth={cycleNavigatorWidth}
+            visibility={navigatorLayout.visibility}
             onToggleVisibility={toggleNavigatorVisibility}
           />
         </div>
       ) : null}
 
-      {!navigatorHidden || navigatorRevealed ? (
-        <div
-          className={
-            navigatorHidden
-              ? `${navbarClass} ${usesNativeWindowChrome ? desktopFloatingNavbarClass : tabletFloatingNavbarClass}`
-              : navbarClass
+      <div
+        className={cn(
+          navbarClass,
+          "w-[264px] transition-all duration-300 ease-in-out",
+          navigatorHidden
+            ? cn(
+                usesNativeWindowChrome ? desktopFloatingNavbarClass : tabletFloatingNavbarClass,
+                navigatorRevealed
+                  ? "translate-x-0 opacity-100 shadow-[0_18px_44px_rgba(0,0,0,0.6)] pointer-events-auto"
+                  : "-translate-x-full opacity-0 pointer-events-none shadow-none",
+              )
+            : "translate-x-0 opacity-100 pointer-events-auto",
+        )}
+        onPointerLeave={navigatorHidden ? () => setNavigatorRevealed(false) : undefined}
+      >
+        <GlobalNavigator
+          collapsed={false}
+          mistyLogoSource={mistyLogoSource}
+          profileAnchorRef={profileAnchorRef}
+          profileOpen={profileOpen}
+          settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+          onProfileClick={() => setProfileOpen((open) => !open)}
+          onSettingsClick={openSettingsOverlay}
+          onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
+          onTitlebarPointerDown={
+            usesNativeWindowChrome ? handleDesktopTitlebarPointerDown : undefined
           }
-          style={navigatorHidden ? { width: navigatorWidths[navigatorLayout.width] } : undefined}
-          onPointerLeave={navigatorHidden ? () => setNavigatorRevealed(false) : undefined}
-        >
-          <GlobalNavigator
-            collapsed={navigatorLayout.width === "icons"}
-            mistyLogoSource={mistyLogoSource}
-            profileAnchorRef={profileAnchorRef}
-            profileOpen={profileOpen}
-            settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-            onProfileClick={() => setProfileOpen((open) => !open)}
-            onSettingsClick={openSettingsOverlay}
-            onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
-            onTitlebarPointerDown={
-              usesNativeWindowChrome ? handleDesktopTitlebarPointerDown : undefined
-            }
-          />
-        </div>
-      ) : null}
+        />
+      </div>
 
-      {navigatorHidden && !navigatorRevealed ? (
+      {navigatorHidden ? (
         <div
           className={navigatorRevealStripClass}
           aria-hidden="true"
@@ -462,8 +449,7 @@ export function DesktopLayout(props: {
   );
 }
 
-function navigatorGridClass(width: NavigatorWidth | "hidden"): string {
+function navigatorGridClass(width: "full" | "hidden"): string {
   if (width === "hidden") return "grid-cols-[0px_minmax(0,1fr)]";
-  if (width === "icons") return "grid-cols-[72px_minmax(0,1fr)]";
   return "grid-cols-[264px_minmax(0,1fr)]";
 }

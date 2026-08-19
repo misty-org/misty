@@ -13,12 +13,7 @@ import type {
 import type { NotionBlock, NotionClient, NotionPage } from "../model/interfaces/notion";
 import type { NoteConnectorCapabilities } from "../model/types/capabilities";
 import type { NoteProviderStatus, UnifiedNote } from "../model/types/types";
-import {
-  activeNotionAccountId,
-  activeNotionSpaceId,
-  createNotionApiClient,
-  toNoteWriteError,
-} from "../store/notionApi";
+import { createNotionApiClient, toNoteWriteError } from "../store/notionApi";
 import {
   buildCreatePagePayload,
   buildPropertyPatch,
@@ -55,11 +50,15 @@ export function createNotionConnector(
   options: {
     initialStatus?: NoteProviderStatus;
     selectedSourceIds?: string[];
+    /** Tests and injected clients may manage a transient selection themselves. */
+    useServerSelectedSources?: boolean;
   } = {},
 ): NotesConnector {
   let status: NoteProviderStatus = options.initialStatus ?? "disconnected";
   let syncedAt: string | undefined;
-  let selected = [...(options.selectedSourceIds ?? readSelectedSources())];
+  let selected = [...(options.selectedSourceIds ?? [])];
+  const useServerSelectedSources =
+    options.useServerSelectedSources ?? !("selectedSourceIds" in options);
   let cache: UnifiedNote[] = [];
   /** Databases the notes came from, so property writes can read their schema. */
   const databaseOfPage = new Map<string, string>();
@@ -127,6 +126,11 @@ export function createNotionConnector(
     return cache;
   }
 
+  async function refreshServerSelection() {
+    if (!useServerSelectedSources || status === "disconnected") return;
+    selected = (await client.listSources()).map((source) => source.id);
+  }
+
   /** Resolves the page a write targets, defaulting to the first selection. */
   function resolveTarget(input: PublishNoteInput) {
     const targetId = input.targetId ?? selected[0];
@@ -161,7 +165,6 @@ export function createNotionConnector(
       status = "disconnected";
       syncedAt = undefined;
       selected = [];
-      writeSelectedSources([]);
       cache = [];
     },
 
@@ -171,8 +174,8 @@ export function createNotionConnector(
         // making someone press Connect again after every reload would be wrong.
         status = (await client.isConnected()) ? "connected" : "disconnected";
         if (status === "disconnected") return [];
-        selected = readSelectedSources();
       }
+      await guard(refreshServerSelection);
       return (await refresh()).map((note) => ({ ...note, providerStatus: status }));
     },
 
@@ -200,7 +203,6 @@ export function createNotionConnector(
 
     async selectSources(sourceIds: string[]) {
       selected = [...new Set(sourceIds)];
-      writeSelectedSources(selected);
       await refresh();
       syncedAt = nowIso();
     },
@@ -301,6 +303,7 @@ export function createNotionConnector(
       }
       status = "syncing";
       try {
+        await refreshServerSelection();
         const notes = await refresh();
         status = "connected";
         syncedAt = nowIso();
@@ -393,42 +396,5 @@ async function titleProperty(client: NotionClient, databaseId: string): Promise<
     return entry?.[0] ?? "Name";
   } catch {
     return "Name";
-  }
-}
-
-/**
- * Selected sources are remembered locally so a reload does not silently empty
- * the Notes pane. They are a per-device view preference, not shared Space
- * state, which is why they are not written back to the server.
- */
-function selectionKey(): string {
-  const accountId = activeNotionAccountId();
-  const spaceId = activeNotionSpaceId();
-  return accountId && spaceId
-    ? `misty.notes.notion.sources.${encodeURIComponent(accountId)}.${encodeURIComponent(spaceId)}`
-    : "";
-}
-
-function readSelectedSources(): string[] {
-  const key = selectionKey();
-  if (!key) return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === "string")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeSelectedSources(sourceIds: string[]): void {
-  const key = selectionKey();
-  if (!key) return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(sourceIds));
-  } catch {
-    // A storage quota or privacy-mode failure must not break note reading.
   }
 }

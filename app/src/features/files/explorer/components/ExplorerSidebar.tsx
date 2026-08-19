@@ -7,22 +7,14 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "@/shared/ui";
 import {
-  Briefcase,
-  Check,
   ChevronDown,
   HardDrive,
   Pencil,
   Plus,
   Search,
   SlidersHorizontal,
-  Trash2,
   Unplug,
 } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -33,8 +25,7 @@ import { ConnectedDevicesSidebarSection } from "./explorerSidebar/ConnectedDevic
 import { useSidebarPreferences } from "./explorerSidebar/useSidebarPreferences";
 import { useSidebarQuickAccess } from "./explorerSidebar/useSidebarQuickAccess";
 import { useSidebarSmartFolders } from "./explorerSidebar/useSidebarSmartFolders";
-import { useSidebarWorkspaceMenu } from "./explorerSidebar/useSidebarWorkspaceMenu";
-import { SmartFolderDialog, WorkspaceDialog } from "./ExplorerSidebarDialogs";
+import { SmartFolderDialog } from "./ExplorerSidebarDialogs";
 import {
   buildDeviceEntries,
   deviceCapacityLabel,
@@ -74,16 +65,6 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
     deleteSmartFolder,
     runSmartFolder,
   } = useSidebarSmartFolders(props);
-  const {
-    workspaceMenuOpen,
-    setWorkspaceMenuOpen,
-    workspaceDialog,
-    setWorkspaceDialog,
-    workspaceDraft,
-    setWorkspaceDraft,
-    openWorkspaceDialog,
-    confirmWorkspaceDialog,
-  } = useSidebarWorkspaceMenu(props);
   const quickAccessModel = useSidebarQuickAccess({
     sidebar: props,
     hiddenQuickAccessPaths,
@@ -96,89 +77,6 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
 
   return (
     <aside className={sidebarStyles.root} data-explorer-scroll-container>
-      <section className={sidebarStyles.section}>
-        {props.workspaceLocked ? (
-          <div className={sidebarStyles.workspaceSelect} aria-label="File Manager profile">
-            <Briefcase size={20} />
-            <span className={sidebarStyles.workspaceSelectLabel}>{props.activeWorkspaceTitle}</span>
-          </div>
-        ) : (
-          <DropdownMenu open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" className={sidebarStyles.workspaceSelect}>
-                <Briefcase size={20} />
-                <span className={sidebarStyles.workspaceSelectLabel}>
-                  {props.activeWorkspaceTitle}
-                </span>
-                <ChevronDown size={15} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-60">
-              {(props.workspaceEntries.length > 0
-                ? props.workspaceEntries
-                : [
-                    {
-                      id: props.activeWorkspaceId || "workspace_0",
-                      title: props.activeWorkspaceTitle,
-                    },
-                  ]
-              ).map((workspace) => (
-                <DropdownMenuItem
-                  key={workspace.id}
-                  className="group/workspace gap-2 pr-1"
-                  role="menuitemradio"
-                  aria-checked={workspace.id === props.activeWorkspaceId}
-                  onSelect={() => props.onSelectWorkspace(workspace.id)}
-                >
-                  <span className="w-[17px] flex-none">
-                    {workspace.id === props.activeWorkspaceId ? <Check size={15} /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                    {workspace.title}
-                  </span>
-                  <span className="flex flex-none items-center gap-px opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      type="button"
-                      aria-label={`Rename profile ${workspace.title}`}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        event.preventDefault();
-                        openWorkspaceDialog("rename", workspace);
-                      }}
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      type="button"
-                      aria-label={`Delete profile ${workspace.title}`}
-                      disabled={props.workspaceEntries.length <= 1}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        event.preventDefault();
-                        openWorkspaceDialog("delete", workspace);
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </span>
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => openWorkspaceDialog("create")}>
-                <Plus size={15} />
-                <span>New profile</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </section>
-
       <SidebarQuickAccessSection
         sidebar={props}
         collapsed={collapsedSections.quickAccess}
@@ -427,18 +325,6 @@ export const ExplorerSidebar = memo(function ExplorerSidebar(props: ExplorerSide
           />
         </div>
       </section>
-      {workspaceDialog ? (
-        <WorkspaceDialog
-          state={workspaceDialog}
-          value={workspaceDraft}
-          onChange={setWorkspaceDraft}
-          onConfirm={confirmWorkspaceDialog}
-          onCancel={() => {
-            setWorkspaceDialog(null);
-            setWorkspaceDraft("");
-          }}
-        />
-      ) : null}
       {smartFolderDialog ? (
         <SmartFolderDialog
           state={smartFolderDialog}

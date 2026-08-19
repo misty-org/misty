@@ -28,7 +28,7 @@ export interface DiscordLinkState {
 }
 
 /**
- * Owns the Space ↔ Discord link lifecycle for the settings panel.
+ * Owns the Space ↔ Discord link lifecycle for Chat's integration panel.
  *
  * Channel discovery is deliberately lazy: listing a guild's channels is a real
  * Discord call, so it only happens once an integration exists and the panel is
@@ -126,9 +126,16 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       const start = await spacesApi.beginProviderConnection(
         spaceId,
         "discord",
-        `/spaces/${spaceId}/settings/connections`,
+        `/spaces/${spaceId}/chat`,
       );
       await openExternalLink(start.authorization_url);
+    });
+
+  const disconnect = () =>
+    run("disconnect", async () => {
+      if (!state.integration) return;
+      await spacesApi.deleteProviderIntegration(state.integration.id);
+      await load();
     });
 
   const linkChannel = (channelId: string) =>
@@ -172,7 +179,16 @@ export function useDiscordLink(spaceId: string, canManage: boolean) {
       patch({ links: state.links.filter((link) => link.id !== linkId) });
     });
 
-  return { ...state, reload: load, connect, linkChannel, setDirection, sync, unlink };
+  return {
+    ...state,
+    reload: load,
+    connect,
+    disconnect,
+    linkChannel,
+    setDirection,
+    sync,
+    unlink,
+  };
 }
 
 /**
@@ -227,7 +243,7 @@ export interface SpaceConversation {
   direct_user_id?: string;
   direct_agent_id?: string;
   participants: SpaceParticipant[];
-  origin: "misty" | "discord";
+  origin: "misty" | "discord" | "slack";
   integration_id?: string;
   external_resource_id?: string;
   external_display_name?: string;

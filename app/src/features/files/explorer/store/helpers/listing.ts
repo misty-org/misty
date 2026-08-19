@@ -193,16 +193,6 @@ export function normalizePinnedPaths(paths: string[]): string[] {
   return normalized;
 }
 
-export function scheduleExplorerWorkspaceSave(): void {
-  if (!getExplorerStore().getState().initialized) return;
-  if (explorerRuntime.workspaceSaveTimer !== null)
-    window.clearTimeout(explorerRuntime.workspaceSaveTimer);
-  explorerRuntime.workspaceSaveTimer = window.setTimeout(() => {
-    explorerRuntime.workspaceSaveTimer = null;
-    void H.persistExplorerWorkspace();
-  }, 500);
-}
-
 export function queuePaneRefresh(
   paneId: string,
   path: string,

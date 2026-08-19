@@ -3,6 +3,7 @@
  * never needs to know which provider module a helper lives in.
  */
 export { DiscordConnectionPanel } from "./DiscordConnectionPanel";
+export { SlackConnectionPanel } from "./SlackConnectionPanel";
 export {
   discordMessageToMirroredMessage,
   isSnowflakeAfter,
@@ -17,3 +18,4 @@ export * from "./googleCalendarMapping";
 export { NotionConnectionPanel } from "./NotionConnectionPanel";
 export { useDiscordLink } from "./useDiscordLink";
 export { useDiscordPublish } from "./useDiscordPublish";
+export { useSlackPublish } from "./useSlackPublish";

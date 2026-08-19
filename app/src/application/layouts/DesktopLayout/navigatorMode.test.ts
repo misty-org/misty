@@ -4,7 +4,6 @@ import {
   navigatorLayoutStorageKey,
   navigatorModeStorageKey,
   navigatorWidths,
-  nextNavigatorWidth,
   readNavigatorLayout,
   writeNavigatorLayout,
 } from "./navigatorMode";
@@ -25,7 +24,7 @@ describe("navigator layout", () => {
 
   it("migrates the legacy collapsed preference", () => {
     expect(readNavigatorLayout(storage({ [legacyNavigatorCollapsedStorageKey]: "true" }))).toEqual({
-      width: "icons",
+      width: "full",
       visibility: "sticky",
     });
     expect(readNavigatorLayout(storage({ [legacyNavigatorCollapsedStorageKey]: "false" }))).toEqual(
@@ -36,40 +35,35 @@ describe("navigator layout", () => {
     );
   });
 
-  it("migrates the older single three-state mode", () => {
+  it("migrates the older single mode keys", () => {
     expect(readNavigatorLayout(storage({ [navigatorModeStorageKey]: "hidden" }))).toEqual({
       width: "full",
       visibility: "hidden",
     });
     expect(readNavigatorLayout(storage({ [navigatorModeStorageKey]: "icons" }))).toEqual({
-      width: "icons",
+      width: "full",
       visibility: "sticky",
     });
   });
 
   it("prefers and persists the versioned layout", () => {
     const target = storage({ [navigatorModeStorageKey]: "hidden" });
-    writeNavigatorLayout({ width: "icons", visibility: "hidden" }, target);
+    writeNavigatorLayout({ width: "full", visibility: "hidden" }, target);
     expect(target.values.get(navigatorLayoutStorageKey)).toBe(
-      JSON.stringify({ width: "icons", visibility: "hidden" }),
+      JSON.stringify({ width: "full", visibility: "hidden" }),
     );
-    expect(readNavigatorLayout(target)).toEqual({ width: "icons", visibility: "hidden" });
+    expect(readNavigatorLayout(target)).toEqual({ width: "full", visibility: "hidden" });
   });
 
   it("falls back to the older keys when the stored layout is corrupt", () => {
     expect(
       readNavigatorLayout(
-        storage({ [navigatorLayoutStorageKey]: "{{", [navigatorModeStorageKey]: "icons" }),
+        storage({ [navigatorLayoutStorageKey]: "{{", [navigatorModeStorageKey]: "hidden" }),
       ),
-    ).toEqual({ width: "icons", visibility: "sticky" });
-  });
-
-  it("cycles the width between full and icons", () => {
-    expect(nextNavigatorWidth("full")).toBe("icons");
-    expect(nextNavigatorWidth("icons")).toBe("full");
+    ).toEqual({ width: "full", visibility: "hidden" });
   });
 
   it("resolves the expected shell widths", () => {
-    expect(navigatorWidths).toEqual({ full: 264, icons: 72, hidden: 0 });
+    expect(navigatorWidths).toEqual({ full: 264, hidden: 0 });
   });
 });

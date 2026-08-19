@@ -1,6 +1,6 @@
 import { cn } from "@/shared/ui";
-import { PanelLeft, PanelLeftClose, Pin, PinOff } from "lucide-react";
-import type { NavigatorLayout } from "./navigatorMode";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
 
 const controlButtonClass = [
   "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
@@ -9,40 +9,27 @@ const controlButtonClass = [
 ].join(" ");
 
 /**
- * Two independent navigator switches: one cycles the width, the other decides
- * whether the rail holds its column or slides away until the edge is hovered.
+ * Navigator visibility toggle: decides whether the sidebar holds its column (sticky)
+ * or slides away (hidden) until the edge is hovered.
  */
 export function NavigatorControls(props: {
-  layout: NavigatorLayout;
-  onCycleWidth: () => void;
+  layout?: NavigatorLayout;
+  visibility?: NavigatorVisibility;
   onToggleVisibility: () => void;
   className?: string;
 }) {
-  const full = props.layout.width === "full";
-  const sticky = props.layout.visibility === "sticky";
+  const sticky = (props.visibility ?? props.layout?.visibility ?? "sticky") === "sticky";
   return (
-    <div
-      className={cn("flex items-center gap-1", props.className)}
-      data-misty-window-drag-block="true"
-    >
-      <button
-        type="button"
-        className={controlButtonClass}
-        aria-label={`Navigation width: ${full ? "Full" : "Icons"}`}
-        title={full ? "Switch to icons" : "Switch to full width"}
-        onClick={props.onCycleWidth}
-      >
-        {full ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
-      </button>
+    <div className={cn("flex items-center", props.className)} data-misty-window-drag-block="true">
       <button
         type="button"
         className={controlButtonClass}
         aria-pressed={sticky}
-        aria-label={`Navigation is ${sticky ? "sticky" : "hidden"}`}
-        title={sticky ? "Auto-hide navigation (⌘⇧B)" : "Keep navigation open (⌘⇧B)"}
+        aria-label={sticky ? "Hide sidebar" : "Show sidebar"}
+        title={sticky ? "Hide sidebar (⌘⇧B)" : "Show sidebar (⌘⇧B)"}
         onClick={props.onToggleVisibility}
       >
-        {sticky ? <Pin size={16} /> : <PinOff size={16} />}
+        {sticky ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
       </button>
     </div>
   );

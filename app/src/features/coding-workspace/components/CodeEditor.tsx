@@ -21,13 +21,12 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { gitGutter, pushGitDiff } from "../git/gitGutter";
 import { useGitStore } from "../git/useGitStore";
-import { lspExtension } from "../lsp/codeMirrorLsp";
+import { formatDocument, lspExtension } from "../lsp/codeMirrorLsp";
 import type { OpenTab } from "../store/useCodingWorkspaceStore";
 import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
 import { useEditorEphemeralStore } from "../store/useEditorEphemeralStore";
 import { codeWriteTextFile } from "../native";
 import { loadCodeMirrorLanguage } from "./codeMirrorLanguages";
-import { mistyCodeMirrorTheme } from "./codeMirrorTheme";
 import { lintersFor } from "./linters";
 import {
   selectEditorPreferences,
@@ -48,9 +47,10 @@ const CURSOR_THROTTLE_MS = 100;
 interface CodeEditorProps {
   tab: OpenTab;
   groupId: string;
+  rootPath: string;
 }
 
-export function CodeEditor({ tab, groupId }: CodeEditorProps) {
+export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const compartmentsRef = useRef<EditorCompartments | null>(null);
@@ -61,15 +61,14 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
   const editorPrefsRef = useRef(editorPrefs);
   editorPrefsRef.current = editorPrefs;
 
-  const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
   const gitDiff = useGitStore((state) => state.diffs[tab.path]);
   const refreshDiff = useGitStore((state) => state.refreshDiff);
 
   const lintExtensions = useMemo(() => lintersFor(tab.name), [tab.name]);
   const lspExtensions = useMemo(() => {
     if (!rootPath) return [];
-    return lspExtension(tab.path, rootPath);
-  }, [tab.path, rootPath]);
+    return lspExtension(tab.path, rootPath, groupId);
+  }, [groupId, tab.path, rootPath]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -97,6 +96,7 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
         path: tab.path,
         groupId,
         readonly: tab.readonly,
+        rootPath,
       }),
     });
     const view = new EditorView({ state, parent: host });
@@ -143,11 +143,9 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
       // view so the store's copy of `contents` reflects the final doc.
       const current = view.state.doc.toString();
       const store = useCodingWorkspaceStore.getState();
-      const tabInStore = store.groups
-        .find((group) => group.id === groupId)
-        ?.tabs.find((entry) => entry.path === tab.path);
+      const tabInStore = store.projectBuffers[rootPath]?.[tab.path];
       if (tabInStore && tabInStore.contents !== current) {
-        store.updateTabContents(groupId, tab.path, current);
+        store.updateBufferContents(rootPath, tab.path, current);
       }
       view.destroy();
       viewRef.current = null;
@@ -197,13 +195,7 @@ export function CodeEditor({ tab, groupId }: CodeEditorProps) {
       </div>
     );
   }
-  return (
-    <div
-      ref={hostRef}
-      onClick={() => useCodingWorkspaceStore.getState().setActiveGroup(groupId)}
-      className="h-full min-h-0 w-full bg-charcoal-bg"
-    />
-  );
+  return <div ref={hostRef} className="code-theme-editor h-full min-h-0 w-full bg-charcoal-bg" />;
 }
 
 interface BuildOpts {
@@ -217,6 +209,7 @@ interface BuildOpts {
   path: string;
   groupId: string;
   readonly: boolean;
+  rootPath: string;
 }
 
 function buildExtensions({
@@ -230,6 +223,7 @@ function buildExtensions({
   path,
   groupId,
   readonly,
+  rootPath,
 }: BuildOpts): Extension[] {
   let pendingContentTimer: number | null = null;
   let pendingAutosaveTimer: number | null = null;
@@ -242,13 +236,11 @@ function buildExtensions({
       pendingContentTimer = null;
     }
     const store = useCodingWorkspaceStore.getState();
-    const tab = store.groups
-      .find((group) => group.id === groupId)
-      ?.tabs.find((entry) => entry.path === path);
+    const tab = store.projectBuffers[rootPath]?.[path];
     if (!tab) return;
     const current = view.state.doc.toString();
     if (current === tab.contents) return;
-    store.updateTabContents(groupId, path, current);
+    store.updateBufferContents(rootPath, path, current);
   };
 
   const scheduleContent = (view: EditorView) => {
@@ -265,7 +257,7 @@ function buildExtensions({
     if (delay <= 0) return;
     pendingAutosaveTimer = window.setTimeout(() => {
       pendingAutosaveTimer = null;
-      void saveTab(path, view.state.doc.toString());
+      void saveTab(path, view, editorPrefsRef.current, rootPath);
     }, delay);
   };
 
@@ -312,7 +304,7 @@ function buildExtensions({
         key: "Mod-s",
         preventDefault: true,
         run: (view) => {
-          void saveTab(path, view.state.doc.toString());
+          void saveTab(path, view, editorPrefsRef.current, rootPath);
           return true;
         },
       },
@@ -326,7 +318,7 @@ function buildExtensions({
             new CustomEvent("misty:code-inline-ai", {
               detail: {
                 path,
-                groupId,
+                viewId: groupId,
                 selection,
                 from,
                 to,
@@ -338,7 +330,6 @@ function buildExtensions({
       },
     ]),
     EditorState.readOnly.of(readonly),
-    mistyCodeMirrorTheme,
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         scheduleContent(update.view);
@@ -358,9 +349,7 @@ function buildExtensions({
       },
     })),
     EditorView.focusChangeEffect.of((state, focused) => {
-      if (focused) {
-        useCodingWorkspaceStore.getState().setActiveGroup(groupId);
-      } else {
+      if (!focused) {
         // Flush pending doc changes so the store's view of `contents`
         // catches up before another surface reads it.
         const view = viewByGroup.get(groupId);
@@ -396,23 +385,30 @@ function reportDiagnostics(view: EditorView, groupId: string) {
   useEditorEphemeralStore.getState().setDiagnostics(groupId, { errors, warnings });
 }
 
-async function saveTab(path: string, contents: string) {
+async function saveTab(path: string, view: EditorView, prefs: EditorPreferences, rootPath: string) {
   const state = useCodingWorkspaceStore.getState();
-  const tab = state.groups.flatMap((group) => group.tabs).find((entry) => entry.path === path);
+  const tab = state.projectBuffers[rootPath]?.[path];
   if (!tab || tab.readonly) return;
+  if (prefs.formatOnSave && rootPath) {
+    try {
+      await formatDocument(view, path, rootPath, prefs.tabSize);
+    } catch {
+      /* formatting errors should not block saving */
+    }
+  }
+  const contents = view.state.doc.toString();
   try {
     await codeWriteTextFile(path, contents, tab.lineEnding);
     // Ensure the store's `contents` matches what we just saved so the dirty
     // flag settles (the debounced writer may not have flushed yet).
-    if (tab.contents !== contents) state.updateTabContents(state.activeGroupId, path, contents);
-    state.markTabSaved(path);
-    const rootPath = state.rootPath;
+    if (tab.contents !== contents) state.updateBufferContents(rootPath, path, contents);
+    state.markBufferSaved(rootPath, path);
     if (rootPath) {
       void useGitStore.getState().refresh(rootPath);
       void useGitStore.getState().refreshDiff(rootPath, path);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save file.";
-    state.patchTab(path, { error: message });
+    state.patchBuffer(rootPath, path, { error: message });
   }
 }

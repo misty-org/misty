@@ -3,12 +3,10 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { navigatorWidthOptions } from "../settingsConstants";
 import {
   booleanSetting,
   FilePathControl,
   numberSetting,
-  SelectControl,
   SliderControl,
   stringSetting,
   SwitchControl,
@@ -80,19 +78,6 @@ export function AppearanceSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Sidebar width" description="How wide the navigation rail draws.">
-          <SelectControl
-            value={navigatorLayout.width === "icons" ? 1 : 0}
-            options={navigatorWidthOptions}
-            disabled={props.working}
-            onChange={(value) =>
-              publishNavigatorLayout({
-                ...navigatorLayout,
-                width: value === 1 ? "icons" : "full",
-              })
-            }
-          />
-        </SettingsRow>
         <SettingsRow
           label="Hide sidebar"
           description="Slide the rail away until you hover the edge of the window."
@@ -103,7 +88,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             disabled={props.working}
             onChange={(value) =>
               publishNavigatorLayout({
-                width: navigatorLayout.width,
+                width: "full",
                 visibility: value ? "hidden" : "sticky",
               })
             }

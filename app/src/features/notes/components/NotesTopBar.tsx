@@ -1,5 +1,5 @@
 import { Button, IconButton, Input } from "@/shared/ui";
-import { Plus, Search, X } from "lucide-react";
+import { PlugZap, Plus, RefreshCw, Search, X } from "lucide-react";
 import { useState } from "react";
 
 const topBarClass =
@@ -16,6 +16,33 @@ export function NotesTopBar(props: NotesTopBarProps) {
       </h1>
 
       <div className="ml-auto flex items-center gap-3">
+        {props.onSync ? (
+          <Button
+            className="size-8"
+            size="icon"
+            variant="ghost"
+            type="button"
+            disabled={props.syncing}
+            onClick={props.onSync}
+            aria-label="Sync Journal sources"
+            title="Sync Journal sources"
+          >
+            <RefreshCw className={`size-4 ${props.syncing ? "animate-spin" : ""}`} />
+          </Button>
+        ) : null}
+        {props.onIntegrations ? (
+          <Button
+            className="size-8"
+            size="icon"
+            variant="ghost"
+            type="button"
+            onClick={props.onIntegrations}
+            aria-label="Manage Journal integrations"
+            title="Journal integrations"
+          >
+            <PlugZap className="size-4" />
+          </Button>
+        ) : null}
         {showSearch ? (
           <div className="relative w-44">
             <Search
@@ -79,4 +106,7 @@ export interface NotesTopBarProps {
   readOnly?: boolean;
   onQueryChange: (query: string) => void;
   onNewNote: () => void;
+  onIntegrations?: () => void;
+  onSync?: () => void;
+  syncing?: boolean;
 }

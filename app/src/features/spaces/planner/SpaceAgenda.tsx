@@ -2,12 +2,7 @@ import { useAuth } from "@/features/auth";
 import { useSpaceAgendaPreferences } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type {
-  GoogleCalendarChoice,
-  SpaceCalendarEvent,
-  SpaceCalendarSource,
-  SpaceIntegration,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceCalendarEvent } from "@/api/spaces/dto/interfaces/types";
 import { errorText } from "@/shared/lib/format";
 import {
   Button,
@@ -24,18 +19,17 @@ import {
 import {
   CalendarCheck2,
   CalendarDays,
-  CalendarPlus,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   LoaderCircle,
   Minus,
   Plus,
-  RefreshCcw,
+  RotateCw,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CalendarSourceDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
+import { SpaceTaskEventDrawer } from "./SpacePlannerViews";
 import {
   AgendaMonthView,
   AgendaTimelineView,
@@ -54,12 +48,10 @@ export function SpaceAgenda({
   spaceId,
   view,
   canManage,
-  canManageIntegrations,
 }: {
   spaceId: string;
   view: AgendaView;
   canManage: boolean;
-  canManageIntegrations: boolean;
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -69,33 +61,24 @@ export function SpaceAgenda({
     return value ? new Date(`${value}T12:00:00`) : new Date();
   });
   const [entries, setEntries] = useState<SpaceAgendaEntry[]>([]);
-  const [sources, setSources] = useState<SpaceCalendarSource[]>([]);
-  const [integrations, setIntegrations] = useState<SpaceIntegration[]>([]);
-  const [choices, setChoices] = useState<GoogleCalendarChoice[]>([]);
-  const [selectedIntegration, setSelectedIntegration] = useState("");
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [eventOpen, setEventOpen] = useState<SpaceCalendarEvent>();
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [zoomMinutes, setZoomMinutes] = useState<AgendaZoomMinutes>(30);
-  const { visibility, setVisibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
+  const { visibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
   const range = useMemo(() => agendaRange(anchor, view), [anchor, view]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [agenda, calendarSources, calendarIntegrations] = await Promise.all([
-        spacesApi.agenda(spaceId, range.from.toISOString(), range.to.toISOString()),
-        spacesApi.calendarSources(spaceId),
-        spacesApi.integrations(spaceId),
-      ]);
-      setEntries(agenda.entries);
-      setSources(calendarSources.sources);
-      setIntegrations(
-        calendarIntegrations.integrations.filter((item) => item.provider === "google"),
+      const agenda = await spacesApi.agenda(
+        spaceId,
+        range.from.toISOString(),
+        range.to.toISOString(),
       );
+      setEntries(agenda.entries);
       setError("");
     } catch (reason) {
       setError(errorText(reason));
@@ -292,15 +275,6 @@ export function SpaceAgenda({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant="ghost"
-            className="h-8 gap-1.5 px-2.5 text-xs font-medium"
-            onClick={() => setDrawerOpen(true)}
-          >
-            <CalendarPlus className="size-3.5" />
-            Calendars
-          </Button>
-
           {view !== "month" ? (
             <div
               className="flex h-8 items-center overflow-hidden rounded-md border border-charcoal-border/70"
@@ -337,17 +311,12 @@ export function SpaceAgenda({
             size="icon"
             className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
             aria-label="Refresh calendar"
-            onClick={() =>
-              void run("sync", async () => {
-                await spacesApi.syncCalendarTasks(spaceId);
-                await load();
-              })
-            }
+            onClick={() => void load()}
           >
             {loading ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
-              <RefreshCcw className="size-4" />
+              <RotateCw className="size-4" />
             )}
           </Button>
           {canManage ? (
@@ -386,46 +355,8 @@ export function SpaceAgenda({
           />
         )}
       </main>
-      {drawerOpen ? (
-        <CalendarSourceDrawer
-          integrations={integrations}
-          selectedIntegration={selectedIntegration}
-          choices={choices}
-          sources={sources}
-          visibility={visibility}
-          onVisibilityChange={setVisibility}
-          canManage={canManageIntegrations}
-          connectionsUnavailable={false}
-          busy={busy}
-          onSelect={(id) => {
-            setSelectedIntegration(id);
-            setChoices([]);
-            if (id)
-              void run("calendars", async () =>
-                setChoices((await spacesApi.googleCalendars(spaceId, id)).calendars),
-              );
-          }}
-          onPublish={(choice) =>
-            void run(choice.id, async () => {
-              await spacesApi.publishGoogleCalendar(spaceId, selectedIntegration, choice);
-              await load();
-            })
-          }
-          onDisable={(source) =>
-            void run(source.id, async () => {
-              await spacesApi.disableCalendarSource(spaceId, source.id);
-              await load();
-            })
-          }
-          onClose={() => setDrawerOpen(false)}
-        />
-      ) : null}
       {eventOpen ? (
-        <SpaceTaskEventDrawer
-          event={eventOpen}
-          source={sources.find((source) => source.id === eventOpen.source_id)}
-          onClose={() => setEventOpen(undefined)}
-        />
+        <SpaceTaskEventDrawer event={eventOpen} onClose={() => setEventOpen(undefined)} />
       ) : null}
       <NewCalendarEventDialog
         open={createEventOpen}

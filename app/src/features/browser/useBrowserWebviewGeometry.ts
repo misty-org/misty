@@ -1,6 +1,6 @@
 import { appZoomChangedEvent, getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
 import type { RefObject } from "react";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import {
   browserRuntimeResumeEvent,
   hideBrowserWebview,
@@ -14,6 +14,7 @@ import type { WorkspaceTab } from "@/features/workspace";
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
   nativeRuntime: boolean;
+  nativeLiveResize: boolean;
   tab: WorkspaceTab;
   url: string;
   theme: BrowserTheme;
@@ -25,10 +26,13 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
   const tabId = input.tab.id;
   const tabInstanceKey = input.tab.instanceKey;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!input.nativeRuntime) return;
     let disposed = false;
     let frame = 0;
+    let settleTimer = 0;
+    let windowSize = currentWindowSize();
+    let windowResizeActive = false;
     const recoveryTimers: number[] = [];
     let hiddenForInvalidBounds = false;
     let geometryError: string | null = null;
@@ -73,13 +77,49 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (disposed || frame) return;
       frame = window.requestAnimationFrame(synchronize);
     };
-    const observer = new ResizeObserver(schedule);
+    const scheduleResizeSettle = () => {
+      windowResizeActive = true;
+      if (settleTimer) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        windowResizeActive = false;
+        // Responsive mode has the same fixed top/left and flexible size as the
+        // AppKit child, so its native autoresizing mask is already exact during
+        // live resize. Fixed device previews still need one final measurement
+        // because they remain centered and width-capped.
+        if (!latest.current.nativeLiveResize) {
+          requestBrowserWebviewLayout(effectTab);
+        }
+      }, 120);
+    };
+    const observeHostResize = () => {
+      const nextWindowSize = currentWindowSize();
+      if (nextWindowSize !== windowSize) {
+        // AppKit owns live window resizing for the child WKWebView. Sending a
+        // reconcile IPC here fights its autoresizing mask on the main thread
+        // and stalls both Misty's renderer and the embedded page.
+        windowSize = nextWindowSize;
+        scheduleResizeSettle();
+        return;
+      }
+      if (windowResizeActive) {
+        scheduleResizeSettle();
+        return;
+      }
+      // Pane splits, sidebars, viewport presets, and notices can move the host
+      // without resizing the native window, so those still reconcile now.
+      schedule();
+    };
+    const observeWindowResize = () => {
+      windowSize = currentWindowSize();
+      scheduleResizeSettle();
+    };
+    const observer = new ResizeObserver(observeHostResize);
     if (host) observer.observe(host);
-    window.addEventListener("resize", schedule);
+    window.addEventListener("resize", observeWindowResize);
     window.addEventListener("scroll", schedule, true);
     window.addEventListener(browserRuntimeResumeEvent, schedule);
     window.addEventListener(appZoomChangedEvent, schedule);
-    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", observeWindowResize);
     window.visualViewport?.addEventListener("scroll", schedule);
     document.addEventListener("visibilitychange", schedule);
     schedule();
@@ -93,18 +133,23 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     return () => {
       disposed = true;
       if (frame) window.cancelAnimationFrame(frame);
+      if (settleTimer) window.clearTimeout(settleTimer);
       recoveryTimers.forEach((timer) => window.clearTimeout(timer));
       observer.disconnect();
-      window.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", observeWindowResize);
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener(browserRuntimeResumeEvent, schedule);
       window.removeEventListener(appZoomChangedEvent, schedule);
-      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("resize", observeWindowResize);
       window.visualViewport?.removeEventListener("scroll", schedule);
       document.removeEventListener("visibilitychange", schedule);
       void hideBrowserWebview(effectTab);
     };
   }, [input.hostRef, input.nativeRuntime, tabId, tabInstanceKey]);
+}
+
+function currentWindowSize(): string {
+  return `${window.innerWidth}:${window.innerHeight}`;
 }
 
 function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {

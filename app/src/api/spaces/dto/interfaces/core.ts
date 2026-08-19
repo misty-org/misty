@@ -47,7 +47,7 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "google" | "discord" | "notion";
+export type SpaceIntegrationProvider = "google" | "discord" | "slack" | "notion" | "github";
 
 export interface SpaceTemplateSeedSummary {
   task_count: number;

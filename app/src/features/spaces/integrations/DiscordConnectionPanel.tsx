@@ -28,14 +28,16 @@ import { useDiscordLink } from "./useDiscordLink";
 export function DiscordConnectionPanel({
   spaceId,
   canManage,
+  expandedByDefault = false,
 }: {
   spaceId: string;
   canManage: boolean;
+  expandedByDefault?: boolean;
 }) {
   const discord = useDiscordLink(spaceId, canManage);
   const [channelId, setChannelId] = useState("");
   const [deletingConversationId, setDeletingConversationId] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(expandedByDefault);
   const availableChannels = discord.channels.filter(
     (channel) =>
       !discord.links.some(
@@ -85,6 +87,19 @@ export function DiscordConnectionPanel({
           ) : (
             <Badge variant="outline">Not connected</Badge>
           )
+        ) : discord.integration.status !== "active" && canManage ? (
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            disabled={discord.busy === "connect"}
+            onClick={discord.connect}
+          >
+            {discord.busy === "connect" ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            Reconnect
+          </Button>
         ) : (
           <div className="flex shrink-0 items-center gap-1.5">
             <Badge className="hidden lg:inline-flex" variant="secondary">
@@ -180,6 +195,27 @@ export function DiscordConnectionPanel({
             }}
             onRetry={() => void discord.reload()}
           />
+          {canManage ? (
+            <div className="flex items-center justify-between gap-3 border-t border-charcoal-border/60 pt-4">
+              <p className="m-0 text-xs text-cream-muted">
+                Disconnecting preserves imported messages in Misty.
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                disabled={Boolean(discord.busy)}
+                onClick={discord.disconnect}
+              >
+                {discord.busy === "disconnect" ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Unlink className="size-4" aria-hidden />
+                )}
+                Disconnect
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       ) : null}
     </Card>

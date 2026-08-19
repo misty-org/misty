@@ -6,7 +6,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/shared/ui";
-import { Plus, Settings2, Trash2 } from "lucide-react";
+import { Cable, Plus, Settings2, Trash2 } from "lucide-react";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import type { PersonalAgent } from "../model/interfaces/personal";
@@ -19,6 +19,7 @@ export interface PersonalAgentsSidebarProps {
   onEdit: (agent: PersonalAgent) => void;
   onCreate: () => void;
   onDelete: (agentId: string) => void;
+  onConnections?: () => void;
 }
 
 export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
@@ -38,10 +39,18 @@ export function PersonalAgentsSidebar(props: PersonalAgentsSidebarProps) {
     <section className="flex min-h-0 flex-1 flex-col" aria-label="Agents">
       <div className="flex shrink-0 items-center justify-between gap-2 px-2 pb-3">
         <h2 className="m-0 truncate text-sm font-semibold text-cream-muted">Agents</h2>
-        <Button size="icon" variant="ghost" className="size-8" onClick={props.onCreate}>
-          <Plus size={14} />
-          <span className="sr-only">Create Agent</span>
-        </Button>
+        <div className="flex items-center gap-1">
+          {props.onConnections ? (
+            <Button size="icon" variant="ghost" className="size-8" onClick={props.onConnections}>
+              <Cable size={14} />
+              <span className="sr-only">Tool connections</span>
+            </Button>
+          ) : null}
+          <Button size="icon" variant="ghost" className="size-8" onClick={props.onCreate}>
+            <Plus size={14} />
+            <span className="sr-only">Create Agent</span>
+          </Button>
+        </div>
       </div>
       <nav className="misty-transient-scrollbar grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto">
         {agents.map((agent) => {

@@ -1,22 +1,46 @@
-import { PanelLeft, SquareTerminal } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Panel,
   PanelGroup,
   PanelResizeHandle,
   type ImperativePanelHandle,
 } from "react-resizable-panels";
-import { cn } from "@/shared/ui";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { useShallow } from "zustand/react/shallow";
+import {
+  createCodeTabState,
+  dockLeaves,
+  parseCodeTabState,
+  useWorkspaceStore,
+  type CodeTabState,
+  type WorkspaceTab,
+} from "@/features/workspace";
+import { killTerminalTab } from "@/features/terminal";
+import {
+  selectEditorPreferences,
+  selectShortcutPreferences,
+  useSettingsStore,
+} from "@/features/settings";
+import { shortcutMapFromBindings } from "@/shared/lib/shortcuts";
+import { CodeCommandCenter, type CommandCenterMode } from "./components/CodeCommandCenter";
+import { CodeEditor } from "./components/CodeEditor";
 import { CodeExplorer } from "./components/CodeExplorer";
 import { CodeStatusBar } from "./components/CodeStatusBar";
-import { EditorArea } from "./components/EditorArea";
 import { OpenFolderCard } from "./components/OpenFolderCard";
 import { useGitStore } from "./git/useGitStore";
-import { QuickInput, type QuickInputMode } from "./quickinput/QuickInput";
-import { useCodingWorkspaceStore } from "./store/useCodingWorkspaceStore";
+import { GitHubCodeSheet } from "./github/GitHubCodeSheet";
+import { openFileInWorkspace } from "./openFile";
+import { projectState, useCodingWorkspaceStore } from "./store/useCodingWorkspaceStore";
 import { useFileWatcher } from "./watcher/useFileWatcher";
+import {
+  basename,
+  codeCommandForEvent,
+  defaultCodeShortcuts,
+  displayFileTitle,
+  EmptyEditor,
+  isOwnedTerminal,
+  languageOf,
+  useCodeCommands,
+} from "./codeWorkspaceSupport";
 
 const InlineRewrite = lazy(() =>
   import("./ai/InlineRewrite").then((module) => ({ default: module.InlineRewrite })),
@@ -24,113 +48,252 @@ const InlineRewrite = lazy(() =>
 
 interface InlineRequest {
   path: string;
-  groupId: string;
+  viewId: string;
   selection: string;
   from: number;
   to: number;
 }
 
-export function CodingWorkspace() {
-  const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
-  const filesPaneOpen = useCodingWorkspaceStore((state) => state.filesPaneOpen);
-  const setFilesPaneOpen = useCodingWorkspaceStore((state) => state.setFilesPaneOpen);
-  const dockedTerminalOpen = useWorkspaceStore((state) => {
-    const tabs = dockLeaves(state.layout.root).flatMap((pane) => pane.tabs);
-    const codeTab = tabs.find((tab) => tab.surfaceId === "code");
-    const terminals = tabs.filter((tab) => tab.surfaceId === "terminal");
-    return Boolean(
-      codeTab &&
-      (terminals.some((tab) => isCodeTerminalState(tab.state, codeTab.id)) ||
-        terminals.length === 1),
-    );
-  });
-
-  const activeTab = useCodingWorkspaceStore(
+export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
+  const fallbackTab = useWorkspaceStore((state) =>
+    dockLeaves(state.layout.root)
+      .flatMap((pane) => pane.tabs)
+      .find((entry) => entry.surfaceId === "code"),
+  );
+  const codeTab = tab ?? fallbackTab;
+  const codeState = parseCodeTabState(codeTab?.state);
+  const rootPath = codeState.rootPath;
+  const codeTitleKey = useWorkspaceStore((state) =>
+    dockLeaves(state.layout.root)
+      .flatMap((pane) => pane.tabs)
+      .filter((entry) => entry.surfaceId === "code")
+      .map((entry) => `${entry.id}:${parseCodeTabState(entry.state).activeFilePath ?? ""}`)
+      .sort()
+      .join("\0"),
+  );
+  const filesOpen = codeTab?.sidebarVisible ?? true;
+  const legacyRoot = useCodingWorkspaceStore((state) => state.rootPath);
+  const legacyExpandedFolders = useCodingWorkspaceStore((state) => state.expandedFolders);
+  const ensureView = useCodingWorkspaceStore((state) => state.ensureView);
+  const clearView = useCodingWorkspaceStore((state) => state.clearView);
+  const activeBuffer = useCodingWorkspaceStore(
     useShallow((state) => {
-      const group =
-        state.groups.find((entry) => entry.id === state.activeGroupId) ?? state.groups[0];
-      const tab = group?.activeTabPath
-        ? group.tabs.find((entry) => entry.path === group.activeTabPath)
-        : null;
-      return tab ? { path: tab.path, name: tab.name } : null;
+      if (!codeTab || !rootPath) return null;
+      const path = state.views[codeTab.id]?.activeFilePath;
+      return path ? (state.projectBuffers[rootPath]?.[path] ?? null) : null;
     }),
   );
-
-  const refreshGit = useGitStore((state) => state.refresh);
-  const clearGit = useGitStore((state) => state.clear);
-
-  const [quickInputMode, setQuickInputMode] = useState<QuickInputMode | null>(null);
+  const project = useCodingWorkspaceStore((state) =>
+    rootPath ? projectState(state.projects[rootPath]) : null,
+  );
+  const editorAppearance = useSettingsStore(
+    useShallow((state) => {
+      const preferences = selectEditorPreferences(state.settings?.document);
+      return { theme: preferences.theme, interfaceScale: preferences.interfaceScale };
+    }),
+  );
+  const shortcutSnapshot = useSettingsStore((state) => state.shortcuts);
+  const customShortcutsEnabled = useSettingsStore(
+    (state) => selectShortcutPreferences(state.settings?.document).customShortcutsEnabled,
+  );
+  const shortcuts = useMemo(() => {
+    const fallback = defaultCodeShortcuts();
+    return customShortcutsEnabled && shortcutSnapshot
+      ? shortcutMapFromBindings(shortcutSnapshot.bindings, fallback)
+      : fallback;
+  }, [customShortcutsEnabled, shortcutSnapshot]);
+  const [commandMode, setCommandMode] = useState<CommandCenterMode | null>(() =>
+    rootPath && !codeState.activeFilePath ? "files" : null,
+  );
+  const [githubOpen, setGithubOpen] = useState(false);
   const [inlineRequest, setInlineRequest] = useState<InlineRequest | null>(null);
-
-  const openModelsSettings = useCallback(() => {
-    window.dispatchEvent(new CustomEvent("misty:open-settings", { detail: { section: "models" } }));
-  }, []);
-
   const filesRef = useRef<ImperativePanelHandle | null>(null);
+  const resizeTimerRef = useRef<number | null>(null);
+
+  const patchCodeState = useCallback(
+    (patch: Partial<CodeTabState>, title?: string) => {
+      if (!codeTab) return;
+      const workspace = useWorkspaceStore.getState();
+      const current = dockLeaves(workspace.layout.root)
+        .flatMap((pane) => pane.tabs)
+        .find((entry) => entry.id === codeTab.id);
+      workspace.updateTabState(
+        codeTab.id,
+        { ...parseCodeTabState(current?.state), ...patch, version: 1 },
+        title,
+      );
+    },
+    [codeTab],
+  );
+
+  useEffect(() => {
+    if (!codeTab) return;
+    ensureView(codeTab.id, rootPath);
+  }, [codeTab, ensureView, rootPath]);
+
+  useEffect(() => {
+    if (!codeTab || rootPath || !legacyRoot) return;
+    const store = useCodingWorkspaceStore.getState();
+    if (!store.projects[legacyRoot] && legacyExpandedFolders.length) {
+      useCodingWorkspaceStore.setState({
+        projects: {
+          ...store.projects,
+          [legacyRoot]: { expandedFolders: legacyExpandedFolders, marks: [], recents: [] },
+        },
+      });
+    }
+    patchCodeState({ rootPath: legacyRoot, activeFilePath: null });
+  }, [codeTab, legacyExpandedFolders, legacyRoot, patchCodeState, rootPath]);
+
+  useEffect(() => {
+    if (!codeTab || !rootPath || !codeState.activeFilePath) return;
+    const view = useCodingWorkspaceStore.getState().views[codeTab.id];
+    if (view?.rootPath === rootPath && view.activeFilePath === codeState.activeFilePath) return;
+    openFileInWorkspace(
+      codeState.activeFilePath,
+      basename(codeState.activeFilePath),
+      undefined,
+      codeTab.id,
+      rootPath,
+    );
+  }, [codeState.activeFilePath, codeTab, rootPath]);
+
+  useEffect(() => {
+    if (!codeTab || !rootPath || !codeState.activeFilePath) return;
+    const title = displayFileTitle(codeState.activeFilePath, rootPath, codeTab.id);
+    if (codeTab.title !== title) useWorkspaceStore.getState().renameTab(codeTab.id, title);
+  }, [codeState.activeFilePath, codeTab, codeTitleKey, rootPath]);
 
   useFileWatcher(rootPath);
 
-  // Push a contextual title to the workspace tab that hosts this surface, so
-  // the tab bar and the "Code" group dropdown show "Code · <folder>" instead
-  // of a generic "Code" label. Runs whenever the workspace root changes.
+  const refreshGit = useGitStore((state) => state.refresh);
   useEffect(() => {
-    const folder = rootPath ? (rootPath.split("/").filter(Boolean).pop() ?? "Code") : null;
-    const title = folder ? `Code · ${folder}` : "Code";
-    const state = useWorkspaceStore.getState();
-    const codeTab = dockLeaves(state.layout.root)
-      .flatMap((pane) => pane.tabs)
-      .find((tab) => tab.surfaceId === "code");
-    if (codeTab) state.renameTab(codeTab.id, title);
-  }, [rootPath]);
-
-  useEffect(() => {
-    if (!rootPath) {
-      clearGit();
-      return;
-    }
-    // Defer both the initial git refresh and the interval setup until after
-    // the first paint so navigation into the Code tab feels instant. The
-    // native `git` subprocess is cheap but the IPC round-trip still adds up.
-    const startupHandle = window.setTimeout(() => void refreshGit(rootPath), 900);
+    if (!rootPath) return;
+    const startup = window.setTimeout(() => void refreshGit(rootPath), 500);
     const interval = window.setInterval(() => void refreshGit(rootPath), 30_000);
     return () => {
-      window.clearTimeout(startupHandle);
+      window.clearTimeout(startup);
       window.clearInterval(interval);
     };
-  }, [rootPath, refreshGit, clearGit]);
+  }, [refreshGit, rootPath]);
 
   useEffect(() => {
-    const files = filesRef.current;
-    if (!files) return;
-    if (filesPaneOpen && files.isCollapsed()) files.expand();
-    if (!filesPaneOpen && !files.isCollapsed()) files.collapse();
-  }, [filesPaneOpen]);
+    document.documentElement.dataset.codeOverlayTheme = editorAppearance.theme;
+    document.documentElement.dataset.codeOverlayScale = String(editorAppearance.interfaceScale);
+    return () => {
+      delete document.documentElement.dataset.codeOverlayTheme;
+      delete document.documentElement.dataset.codeOverlayScale;
+    };
+  }, [editorAppearance.interfaceScale, editorAppearance.theme]);
 
-  const openDockedTerminal = useCallback((forceNew = false) => {
+  useEffect(() => {
+    const panel = filesRef.current;
+    if (!panel) return;
+    if (filesOpen && panel.isCollapsed()) panel.expand();
+    if (!filesOpen && !panel.isCollapsed()) panel.collapse();
+  }, [filesOpen]);
+
+  const setRoot = useCallback(
+    (path: string) => {
+      if (!codeTab) return;
+      clearView(codeTab.id);
+      patchCodeState({ rootPath: path, activeFilePath: null }, `Code · ${basename(path)}`);
+      setCommandMode("files");
+    },
+    [clearView, codeTab, patchCodeState],
+  );
+
+  const focusExistingFileView = useCallback(
+    (path: string) => {
+      const workspace = useWorkspaceStore.getState();
+      const existing = dockLeaves(workspace.layout.root)
+        .flatMap((pane) => pane.tabs)
+        .find((entry) => {
+          if (entry.id === codeTab?.id || entry.surfaceId !== "code") return false;
+          const state = parseCodeTabState(entry.state);
+          return state.rootPath === rootPath && state.activeFilePath === path;
+        });
+      if (!existing) return false;
+      workspace.focusTab(existing.id);
+      return true;
+    },
+    [codeTab?.id, rootPath],
+  );
+
+  const openFile = useCallback(
+    (path: string, name: string, line?: number) => {
+      if (!codeTab || !rootPath) return;
+      if (focusExistingFileView(path)) return;
+      openFileInWorkspace(path, name, line, codeTab.id, rootPath);
+      patchCodeState({ activeFilePath: path }, displayFileTitle(path, rootPath, codeTab.id));
+    },
+    [codeTab, focusExistingFileView, patchCodeState, rootPath],
+  );
+
+  const openFileInNewTab = useCallback(
+    (path: string, name: string, line?: number) => {
+      if (!codeTab || !rootPath || focusExistingFileView(path)) return;
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find((entry) =>
+        entry.tabs.some((candidate) => candidate.id === codeTab.id),
+      );
+      const created = workspace.openSurface({
+        surfaceId: "code",
+        groupKey: "tool:code",
+        title: displayFileTitle(path, rootPath),
+        route: codeTab.route,
+        instancePolicy: "multiple",
+        forceNew: true,
+        paneId: pane?.id,
+        state: createCodeTabState({
+          rootPath,
+          activeFilePath: path,
+          explorerWidth: codeState.explorerWidth,
+        }),
+        sidebarVisible: filesOpen,
+      });
+      workspace.focusTab(created.id);
+      if (line)
+        window.setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent("misty:code-goto-line", { detail: { path, line } }),
+            ),
+          50,
+        );
+    },
+    [codeState.explorerWidth, codeTab, filesOpen, focusExistingFileView, rootPath],
+  );
+
+  const previousFile = useCallback(() => {
+    if (!project || !activeBuffer) return;
+    const currentIndex = project.recents.indexOf(activeBuffer.path);
+    const target = project.recents[currentIndex < 0 ? 0 : currentIndex + 1] ?? project.recents[0];
+    if (target && target !== activeBuffer.path) openFile(target, basename(target));
+  }, [activeBuffer, openFile, project]);
+
+  const terminalOpen = useWorkspaceStore((state) =>
+    codeTab
+      ? dockLeaves(state.layout.root)
+          .flatMap((pane) => pane.tabs)
+          .some((entry) => isOwnedTerminal(entry, codeTab.id))
+      : false,
+  );
+  const toggleTerminal = useCallback(() => {
+    if (!codeTab) return;
     const workspace = useWorkspaceStore.getState();
     const leaves = dockLeaves(workspace.layout.root);
-    const codePane =
-      leaves.find((pane) => pane.tabs.some((tab) => tab.surfaceId === "code")) ??
-      leaves.find((pane) => pane.id === workspace.layout.focusedPaneId) ??
-      leaves[0];
-    const codeTab = codePane.tabs.find((tab) => tab.surfaceId === "code");
-    if (!codeTab) return;
-    const terminals = leaves
+    const existing = leaves
       .flatMap((pane) => pane.tabs)
-      .filter((tab) => tab.surfaceId === "terminal");
-    const existing =
-      terminals.find((tab) => isCodeTerminalState(tab.state, codeTab.id)) ??
-      (terminals.length === 1 ? terminals[0] : undefined);
-    if (existing && !forceNew) {
-      workspace.updateTabState(existing.id, createCodeTerminalState(codeTab.id, existing.state));
-      workspace.updateTabRoute(existing.id, codeTab.route);
-      const terminalPane = leaves.find((pane) => pane.tabs.some((tab) => tab.id === existing.id));
-      if (terminalPane?.id === codePane.id) {
-        workspace.dockTab(existing.id, codePane.id, "down");
-      }
-      workspace.focusTab(existing.id);
+      .find((entry) => isOwnedTerminal(entry, codeTab.id));
+    if (existing) {
+      killTerminalTab(existing.id);
+      workspace.closeTab(existing.id);
+      workspace.focusTab(codeTab.id);
       return;
     }
+    const codePane = leaves.find((pane) => pane.tabs.some((entry) => entry.id === codeTab.id));
+    if (!codePane) return;
     const terminal = workspace.openSurface({
       surfaceId: "terminal",
       groupKey: "tool:terminal",
@@ -139,153 +302,187 @@ export function CodingWorkspace() {
       instancePolicy: "multiple",
       forceNew: true,
       paneId: codePane.id,
-      state: createCodeTerminalState(codeTab.id),
+      state: { version: 1, owner: "code", codeTabId: codeTab.id },
     });
     workspace.dockTab(terminal.id, codePane.id, "down");
     workspace.focusTab(terminal.id);
-  }, []);
+  }, [codeTab]);
+
+  const { commands, openExtensions, openModelsSettings } = useCodeCommands(
+    codeTab,
+    setCommandMode,
+    toggleTerminal,
+  );
 
   useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!codeTab) return;
       const workspace = useWorkspaceStore.getState();
-      const focusedPane = dockLeaves(workspace.layout.root).find(
+      const focused = dockLeaves(workspace.layout.root).find(
         (pane) => pane.id === workspace.layout.focusedPaneId,
       );
-      const focusedTab = focusedPane?.tabs.find((tab) => tab.id === focusedPane.activeTabId);
-      if (focusedTab?.surfaceId !== "code") return;
-      const mod = event.metaKey || event.ctrlKey;
-      const shift = event.shiftKey;
-      if (!mod) return;
-      const key = event.key.toLowerCase();
-      if (key === "b" && !shift) {
-        event.preventDefault();
-        useCodingWorkspaceStore.getState().toggleFilesPane();
-      } else if (key === "j" && !shift) {
-        event.preventDefault();
-        openDockedTerminal(false);
-      } else if (key === "\\" && !shift) {
-        event.preventDefault();
-        useCodingWorkspaceStore.getState().splitActiveTab();
-      } else if (key === "p" && !shift) {
-        event.preventDefault();
-        setQuickInputMode("files");
-      } else if (key === "p" && shift) {
-        event.preventDefault();
-        setQuickInputMode("commands");
-      } else if (key === "f" && shift) {
-        event.preventDefault();
-        setQuickInputMode("search");
+      if (focused?.activeTabId !== codeTab.id) return;
+      const commandId = codeCommandForEvent(event, shortcuts);
+      if (!commandId) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (commandId === "code.quick_open") setCommandMode("files");
+      else if (commandId === "code.command_palette") setCommandMode("commands");
+      else if (commandId === "code.search_project") setCommandMode("search");
+      else if (commandId === "code.harpoon") setCommandMode("harpoon");
+      else if (commandId === "code.previous_file") previousFile();
+      else if (commandId === "code.toggle_explorer") workspace.toggleSidebar(codeTab.id);
+      else if (commandId === "code.toggle_terminal") toggleTerminal();
+      else if (commandId.startsWith("code.mark_") && rootPath && project) {
+        const target = project.marks[Number(commandId.slice(-1)) - 1];
+        if (target) openFile(target, basename(target));
       }
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [openDockedTerminal]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [codeTab, openFile, previousFile, project, rootPath, shortcuts, toggleTerminal]);
 
   useEffect(() => {
     const handleInline = (event: Event) => {
       const detail = (event as CustomEvent<InlineRequest>).detail;
-      if (!detail) return;
-      setInlineRequest(detail);
+      if (detail?.viewId === codeTab?.id) setInlineRequest(detail);
     };
     window.addEventListener("misty:code-inline-ai", handleInline);
     return () => window.removeEventListener("misty:code-inline-ai", handleInline);
-  }, []);
+  }, [codeTab?.id]);
 
-  const toggleFiles = useCallback(
-    () => setFilesPaneOpen(!filesPaneOpen),
-    [filesPaneOpen, setFilesPaneOpen],
-  );
+  useEffect(() => {
+    const handleOpenFile = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ path?: string; name?: string; line?: number; viewId?: string }>
+      ).detail;
+      if (detail?.viewId !== codeTab?.id || !detail.path) return;
+      openFile(detail.path, detail.name ?? basename(detail.path), detail.line);
+    };
+    window.addEventListener("misty:code-open-file", handleOpenFile);
+    return () => window.removeEventListener("misty:code-open-file", handleOpenFile);
+  }, [codeTab?.id, openFile]);
+
   const applyInlineRewrite = useCallback(
     (text: string) => {
-      if (!inlineRequest) return;
-      const { path, groupId, from, to } = inlineRequest;
+      if (!inlineRequest || !rootPath) return;
+      const { path, viewId, from, to } = inlineRequest;
       window.dispatchEvent(
-        new CustomEvent("misty:code-inline-apply", {
-          detail: { path, groupId, from, to, text },
-        }),
+        new CustomEvent("misty:code-inline-apply", { detail: { path, viewId, from, to, text } }),
       );
-      // Fall back: directly update store contents if no listener splices the range
       const store = useCodingWorkspaceStore.getState();
-      const tab = store.groups
-        .find((group) => group.id === groupId)
-        ?.tabs.find((entry) => entry.path === path);
-      if (!tab) return;
-      const nextContents = tab.contents.slice(0, from) + text + tab.contents.slice(to);
-      store.updateTabContents(groupId, path, nextContents);
+      const buffer = store.projectBuffers[rootPath]?.[path];
+      if (buffer)
+        store.updateBufferContents(
+          rootPath,
+          path,
+          buffer.contents.slice(0, from) + text + buffer.contents.slice(to),
+        );
     },
-    [inlineRequest],
+    [inlineRequest, rootPath],
   );
 
-  if (!rootPath) return <OpenFolderCard />;
-
-  const language = activeTab ? languageOf(activeTab.name) : "";
+  if (!codeTab) return null;
+  if (!rootPath)
+    return (
+      <section
+        data-editor-theme={editorAppearance.theme}
+        data-interface-scale={editorAppearance.interfaceScale}
+        className="coding-workspace code-empty-workspace h-full min-h-0"
+      >
+        <OpenFolderCard onOpenRoot={setRoot} onOpenGitHub={() => setGithubOpen(true)} />
+        <GitHubCodeSheet
+          open={githubOpen}
+          onOpenChange={setGithubOpen}
+          rootPath={null}
+          onOpenRoot={setRoot}
+        />
+      </section>
+    );
 
   return (
-    <section className="relative grid h-full min-h-0 grid-rows-[32px_minmax(0,1fr)_24px] bg-charcoal-workspace">
-      <header className="flex h-8 items-center gap-2 border-b border-charcoal-border bg-charcoal-sidebar px-2.5">
-        <span className="min-w-0 flex-1 truncate pl-1 font-mono text-[11px] text-cream-muted">
-          {activeTab ? (
-            <>
-              <span className="text-cream-muted/70">
-                {formatBreadcrumb(rootPath, activeTab.path)}
-              </span>
-              <span className="text-cream-bright">{activeTab.name}</span>
-            </>
-          ) : (
-            <span className="text-cream-muted/70">{rootPath}</span>
-          )}
-        </span>
-        <TitleBarToggle
-          label="Toggle files (⌘B)"
-          active={filesPaneOpen}
-          icon={<PanelLeft size={12} />}
-          onClick={toggleFiles}
-        >
-          Files
-        </TitleBarToggle>
-        <TitleBarToggle
-          label="Open terminal (⌘J)"
-          active={dockedTerminalOpen}
-          icon={<SquareTerminal size={12} />}
-          onClick={() => openDockedTerminal(false)}
-        >
-          Terminal
-        </TitleBarToggle>
-      </header>
-
+    <section
+      data-editor-theme={editorAppearance.theme}
+      data-interface-scale={editorAppearance.interfaceScale}
+      className="coding-workspace relative grid h-full min-h-0 bg-charcoal-workspace"
+    >
+      <CodeCommandCenter
+        viewId={codeTab.id}
+        rootPath={rootPath}
+        activePath={activeBuffer?.path ?? null}
+        mode={commandMode}
+        onModeChange={setCommandMode}
+        onOpenFile={openFile}
+        onOpenFileInNewTab={openFileInNewTab}
+        onPreviousFile={previousFile}
+        commands={commands}
+      />
       <PanelGroup direction="horizontal" className="min-h-0">
         <Panel
           ref={filesRef}
-          defaultSize={20}
-          minSize={12}
+          defaultSize={codeState.explorerWidth}
+          minSize={14}
+          maxSize={42}
           collapsible
           collapsedSize={0}
-          onCollapse={() => setFilesPaneOpen(false)}
-          onExpand={() => setFilesPaneOpen(true)}
+          onCollapse={() => filesOpen && useWorkspaceStore.getState().toggleSidebar(codeTab.id)}
+          onExpand={() => !filesOpen && useWorkspaceStore.getState().toggleSidebar(codeTab.id)}
+          onResize={(size) => {
+            if (size < 14) return;
+            if (resizeTimerRef.current !== null) window.clearTimeout(resizeTimerRef.current);
+            resizeTimerRef.current = window.setTimeout(
+              () => patchCodeState({ explorerWidth: size }),
+              160,
+            );
+          }}
         >
-          <CodeExplorer />
+          <CodeExplorer
+            rootPath={rootPath}
+            viewId={codeTab.id}
+            onOpenFile={openFile}
+            onOpenFileInNewTab={openFileInNewTab}
+            onOpenRoot={setRoot}
+          />
         </Panel>
         <PanelResizeHandle className="w-px bg-charcoal-border transition-colors hover:bg-charcoal-active" />
         <Panel minSize={30}>
-          <EditorArea rootPath={rootPath} />
+          <div className="code-theme-editor h-full min-h-0 bg-charcoal-bg text-cream">
+            {activeBuffer ? (
+              <CodeEditor tab={activeBuffer} groupId={codeTab.id} rootPath={rootPath} />
+            ) : (
+              <EmptyEditor rootPath={rootPath} onOpen={() => setCommandMode("files")} />
+            )}
+          </div>
         </Panel>
       </PanelGroup>
-
-      <CodeStatusBar onOpenAiSettings={openModelsSettings} />
-
-      <QuickInput
-        mode={quickInputMode}
-        onClose={() => setQuickInputMode(null)}
-        onOpenSettings={openModelsSettings}
-        onOpenTerminal={openDockedTerminal}
+      <CodeStatusBar
+        viewId={codeTab.id}
+        rootPath={rootPath}
+        activeTab={activeBuffer}
+        filesOpen={filesOpen}
+        terminalOpen={terminalOpen}
+        onToggleFiles={() => useWorkspaceStore.getState().toggleSidebar(codeTab.id)}
+        onOpenHarpoon={() => setCommandMode("harpoon")}
+        onOpenSearch={() => setCommandMode("search")}
+        onToggleTerminal={toggleTerminal}
+        onOpenFile={openFile}
+        onOpenGitHub={() => setGithubOpen(true)}
+        onOpenAi={openModelsSettings}
+        onOpenExtensions={openExtensions}
+      />
+      <GitHubCodeSheet
+        open={githubOpen}
+        onOpenChange={setGithubOpen}
+        rootPath={rootPath}
+        onOpenRoot={setRoot}
       />
       {inlineRequest ? (
         <Suspense fallback={null}>
           <InlineRewrite
             open
             selection={inlineRequest.selection}
-            language={language}
-            filename={activeTab?.name ?? ""}
+            language={languageOf(activeBuffer?.name)}
+            filename={activeBuffer?.name ?? ""}
             onClose={() => setInlineRequest(null)}
             onApply={applyInlineRewrite}
             onOpenSettings={() => {
@@ -297,55 +494,4 @@ export function CodingWorkspace() {
       ) : null}
     </section>
   );
-}
-
-interface TitleBarToggleProps {
-  label: string;
-  active: boolean;
-  icon: React.ReactNode;
-  onClick: () => void;
-  children: React.ReactNode;
-}
-
-function TitleBarToggle({ label, active, icon, onClick, children }: TitleBarToggleProps) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border border-charcoal-border px-2 py-0.5 font-mono text-[10.5px]",
-        active ? "bg-charcoal-hover text-cream-bright" : "text-cream-muted hover:text-cream",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-function formatBreadcrumb(rootPath: string, filePath: string): string {
-  if (!filePath.startsWith(rootPath)) return "";
-  const relative = filePath.slice(rootPath.length).replace(/^\//, "");
-  const parts = relative.split("/");
-  if (parts.length <= 1) return "";
-  return `${parts.slice(0, -1).join(" / ")} / `;
-}
-
-function languageOf(name: string): string {
-  const extension = name.split(".").pop()?.toLowerCase();
-  return extension ?? "";
-}
-
-function createCodeTerminalState(codeTabId: string, previous?: unknown) {
-  const preserved = previous && typeof previous === "object" ? previous : {};
-  return { ...preserved, version: 1, owner: "code", codeTabId } as const;
-}
-
-function isCodeTerminalState(state: unknown, codeTabId: string): boolean {
-  if (!state || typeof state !== "object") return false;
-  const candidate = state as { owner?: unknown; codeTabId?: unknown };
-  return candidate.owner === "code" && candidate.codeTabId === codeTabId;
 }

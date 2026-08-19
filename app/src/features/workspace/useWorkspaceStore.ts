@@ -120,8 +120,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       openSurface: (request) => {
         if (request.surfaceId === "space")
           get().setScope(request.scopeKey ?? (request.groupKey as WorkspaceScopeKey));
-        const now = Date.now();
         const state = get();
+        const now = nextTabFocusTimestamp(state.layout.root);
         const panes = dockLeaves(state.layout.root);
         const allTabs = panes.flatMap((pane) => pane.tabs);
         const singleton = request.instancePolicy === "single";
@@ -315,7 +315,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const tab = pane?.tabs.find((candidate) => candidate.id === tabId);
         if (!pane || !tab) return false;
         if (current.layout.focusedPaneId === pane.id && pane.activeTabId === tabId) return true;
-        const now = Date.now();
+        const now = nextTabFocusTimestamp(current.layout.root);
         set({
           ...withLayout(current, {
             ...current.layout,
@@ -335,7 +335,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       closeTab: (tabId) => {
         set((current) => {
           const closing = dockTabs(current.layout.root).find((tab) => tab.id === tabId);
-          let root = removeDockTab(current.layout.root, tabId);
+          const closingPane = dockLeaves(current.layout.root).find((pane) =>
+            pane.tabs.some((tab) => tab.id === tabId),
+          );
+          const previouslyVisitedTabId =
+            closingPane?.activeTabId === tabId
+              ? [...closingPane.tabs].filter((tab) => tab.id !== tabId).sort(compareTabRecency)[0]
+                  ?.id
+              : undefined;
+          let root = removeDockTab(current.layout.root, tabId, previouslyVisitedTabId);
           root = collapseEmptyDockLeaves(root) ?? createDockLeaf();
           const panes = dockLeaves(root);
           const focusedPaneId = panes.some((pane) => pane.id === current.layout.focusedPaneId)
@@ -576,7 +584,11 @@ function migrateSpaceToolTabs(layout: WorkspaceLayout): WorkspaceLayout {
   };
 }
 
-function removeDockTab(node: WorkspaceDockNode, tabId: string): WorkspaceDockNode {
+function removeDockTab(
+  node: WorkspaceDockNode,
+  tabId: string,
+  preferredTabId?: string,
+): WorkspaceDockNode {
   if (node.type === "leaf") {
     const index = node.tabs.findIndex((tab) => tab.id === tabId);
     if (index < 0) return node;
@@ -586,13 +598,24 @@ function removeDockTab(node: WorkspaceDockNode, tabId: string): WorkspaceDockNod
       tabs,
       activeTabId:
         node.activeTabId === tabId
-          ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null)
+          ? (tabs.find((tab) => tab.id === preferredTabId)?.id ??
+            tabs[Math.min(index, tabs.length - 1)]?.id ??
+            null)
           : node.activeTabId,
     };
   }
-  const first = removeDockTab(node.first, tabId);
-  const second = removeDockTab(node.second, tabId);
+  const first = removeDockTab(node.first, tabId, preferredTabId);
+  const second = removeDockTab(node.second, tabId, preferredTabId);
   return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+
+function compareTabRecency(a: WorkspaceTab, b: WorkspaceTab): number {
+  return b.lastFocusedAt - a.lastFocusedAt || b.createdAt - a.createdAt;
+}
+
+function nextTabFocusTimestamp(root: WorkspaceDockNode): number {
+  const latest = dockTabs(root).reduce((maximum, tab) => Math.max(maximum, tab.lastFocusedAt), 0);
+  return Math.max(Date.now(), latest + 1);
 }
 
 function removeDockLeaf(node: WorkspaceDockNode, paneId: string): WorkspaceDockNode | null {

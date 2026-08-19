@@ -13,7 +13,8 @@ import {
   Input,
   cn,
 } from "@/shared/ui";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Puzzle, Trash2 } from "lucide-react";
+import { FaFigma } from "react-icons/fa6";
 import { useEffect, useRef, useState } from "react";
 import type { DrawingConnectionState, SpaceDrawing } from "../types";
 
@@ -22,6 +23,7 @@ export function DrawingHeader(props: {
   connection: DrawingConnectionState;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  onOpenFigma?: () => void;
 }) {
   const [title, setTitle] = useState(props.drawing.title);
   const [saving, setSaving] = useState(false);
@@ -102,6 +104,14 @@ export function DrawingHeader(props: {
       </div>
 
       <ConnectionBadge state={props.connection} />
+
+      {props.onOpenFigma ? (
+        <Button type="button" size="sm" variant="ghost" onClick={props.onOpenFigma}>
+          <FaFigma className="size-4" aria-hidden />
+          Figma
+          <Puzzle className="size-3.5 text-cream-muted" aria-hidden />
+        </Button>
+      ) : null}
 
       {props.drawing.can_delete ? (
         <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

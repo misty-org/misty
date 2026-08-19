@@ -1,4 +1,4 @@
-import { FileText, LoaderCircle, RefreshCcw } from "lucide-react";
+import { FileText, LoaderCircle, RefreshCcw, Unlink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SiNotion } from "react-icons/si";
 
@@ -15,9 +15,13 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Checkbox } fro
 export function NotionConnectionPanel({
   spaceId,
   canManage,
+  expandedByDefault = false,
+  onResourcesChanged,
 }: {
   spaceId: string;
   canManage: boolean;
+  expandedByDefault?: boolean;
+  onResourcesChanged?: () => void;
 }) {
   const [integrations, setIntegrations] = useState<SpaceIntegration[]>([]);
   const [availability, setAvailability] = useState<ProviderConnectionAvailability>();
@@ -27,7 +31,7 @@ export function NotionConnectionPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(expandedByDefault);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +42,7 @@ export function NotionConnectionPanel({
         spacesApi.sharedProviderResources(spaceId),
       ]);
       const notionIntegrations = integrationResult.integrations.filter(
-        (item) => item.provider === "notion" && item.status === "active",
+        (item) => item.provider === "notion" && item.status !== "revoked",
       );
       const notionResources = resourceResult.resources.filter(
         (item) => item.provider === "notion" && item.status !== "disabled",
@@ -77,7 +81,7 @@ export function NotionConnectionPanel({
       const start = await spacesApi.beginProviderConnection(
         spaceId,
         "notion",
-        `/spaces/${spaceId}/settings/connections`,
+        `/spaces/${spaceId}/notes`,
       );
       await openExternalLink(start.authorization_url);
     } catch {
@@ -122,8 +126,26 @@ export function NotionConnectionPanel({
         ...current.filter((resource) => resource.integration_id !== integrationId),
         ...result.resources,
       ]);
+      onResourcesChanged?.();
     } catch {
       setError("Those Notion sources could not be saved. Your previous selection is unchanged.");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const disconnect = async () => {
+    if (!canManage || busy || !integrations.length) return;
+    setBusy("disconnect");
+    setError("");
+    try {
+      await Promise.all(
+        integrations.map((integration) => spacesApi.deleteProviderIntegration(integration.id)),
+      );
+      await load();
+      onResourcesChanged?.();
+    } catch {
+      setError("Notion could not be disconnected. Your selected sources are unchanged.");
     } finally {
       setBusy("");
     }
@@ -165,6 +187,10 @@ export function NotionConnectionPanel({
           ) : (
             <Badge variant="outline">Not connected</Badge>
           )
+        ) : integrations.every((integration) => integration.status !== "active") && canManage ? (
+          <Button size="sm" variant="outline" type="button" onClick={() => void connect()}>
+            Reconnect
+          </Button>
         ) : (
           <div className="flex shrink-0 items-center gap-1.5">
             <Badge className="hidden lg:inline-flex" variant="secondary">
@@ -215,16 +241,31 @@ export function NotionConnectionPanel({
               ))
             : shared.map((resource) => <ResourceRow key={resource.id} resource={resource} />)}
           {canManage ? (
-            <Button
-              className="justify-self-start"
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={Boolean(busy)}
-              onClick={() => void connect()}
-            >
-              Add account
-            </Button>
+            <div className="flex items-center justify-between gap-3 border-t border-charcoal-border/60 pt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => void connect()}
+              >
+                Add account
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => void disconnect()}
+              >
+                {busy === "disconnect" ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Unlink className="size-4" aria-hidden />
+                )}
+                Disconnect
+              </Button>
+            </div>
           ) : null}
         </CardContent>
       ) : null}

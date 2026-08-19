@@ -1,6 +1,6 @@
 import { useActivityStore } from "@/features/activity";
 import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { dockTabs, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -29,6 +29,8 @@ describe("GlobalNavigator Space tools", () => {
       spaces: [spaceFixture],
       invitations: [],
       limits: null,
+      snapshotReady: true,
+      loading: false,
       presenceBySpace: {
         "space-1": [{ user_id: "account-1", active: true }],
       },
@@ -52,7 +54,13 @@ describe("GlobalNavigator Space tools", () => {
     await act(async () => root.unmount());
     container.remove();
     document.body.innerHTML = "";
-    useSpacesStore.setState({ spaces: [], invitations: [], presenceBySpace: {} });
+    useSpacesStore.setState({
+      spaces: [],
+      invitations: [],
+      presenceBySpace: {},
+      snapshotReady: false,
+      loading: false,
+    });
     useActivityStore.setState({ allItems: [] });
     useWorkspaceStore.getState().reset();
   });
@@ -60,25 +68,64 @@ describe("GlobalNavigator Space tools", () => {
   it("places contextual Space surfaces beside the other tools", async () => {
     await renderNavigator();
 
-    const tools = container.querySelector('section[aria-label="Tools"]');
+    const tools = container.querySelector('section[aria-label="Navigation"]');
     expect(
       [...tools!.querySelectorAll("a")].map((link) => link.getAttribute("aria-label")),
     ).toEqual([
       "Journal",
       "Planner",
       "Chat",
+      "Inbox",
       "Library",
       "Browser",
-      "Terminal",
-      "Code",
       "Files",
       "Transfers",
+      "Terminal",
+      "Code",
       "Agents",
-      "Extensions",
     ]);
+    expect(tools?.querySelector('a[aria-label="Extensions"]')).toBeNull();
+    expect(container.querySelector('a[aria-label="Extensions"]')).not.toBeNull();
+    expect(
+      [...tools!.querySelectorAll("[data-navigator-tool-group]")].map((group) =>
+        group.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Work", "Explore", "Build"]);
     expect(tools?.querySelector('a[aria-label="Journal"]')?.getAttribute("aria-current")).toBe(
       "page",
     );
+  });
+
+  it("keeps Space tools visible while Spaces are loading", async () => {
+    useSpacesStore.setState({
+      spaces: [],
+      invitations: [],
+      limits: null,
+      snapshotReady: false,
+      loading: true,
+      presenceBySpace: {},
+    });
+    useWorkspaceStore.setState({
+      activeScopeKey: "global",
+      layout: {
+        focusedPaneId: "pane-1",
+        root: {
+          type: "leaf",
+          id: "pane-1",
+          activeTabId: null,
+          tabs: [],
+        },
+      },
+    });
+    await renderNavigator("/home");
+
+    const tools = container.querySelector('section[aria-label="Navigation"]');
+    expect(tools?.querySelector('[aria-label="Journal"]')?.getAttribute("aria-disabled")).toBe(
+      "true",
+    );
+    expect(tools?.querySelector('a[aria-label="Inbox"]')).not.toBeNull();
+    expect(tools?.querySelector('a[aria-label="Browser"]')).not.toBeNull();
+    expect(tools?.querySelector('a[aria-label="Terminal"]')).not.toBeNull();
   });
 
   it("keeps Space names visible and exposes one hover action menu per row", async () => {
@@ -126,7 +173,7 @@ describe("GlobalNavigator Space tools", () => {
     await renderNavigator();
 
     const spaces = container.querySelector('[data-navigator-section-scroll="spaces"]');
-    const tools = container.querySelector('[data-navigator-section-scroll="tools"]');
+    const tools = container.querySelector('[data-navigator-section-scroll="navigation"]');
     for (const section of [spaces, tools]) {
       expect(section?.className).toContain("overflow-y-auto");
       expect(section?.className).toContain("[scrollbar-width:none]");
@@ -149,7 +196,7 @@ describe("GlobalNavigator Space tools", () => {
     await renderNavigator("/browser");
 
     const spaces = container.querySelector('section[aria-label="Spaces"]');
-    const tools = container.querySelector('section[aria-label="Tools"]');
+    const tools = container.querySelector('section[aria-label="Navigation"]');
     expect(spaces?.querySelector('a[aria-label="Family"]')?.getAttribute("aria-current")).toBe(
       "page",
     );
@@ -157,6 +204,58 @@ describe("GlobalNavigator Space tools", () => {
       "page",
     );
     expect(tools?.querySelector('a[aria-label="Journal"]')).not.toBeNull();
+  });
+
+  it("switches workspace scope when clicking on a different space", async () => {
+    const space2Fixture = {
+      ...spaceFixture,
+      id: "space-2",
+      name: "Work",
+    };
+    useSpacesStore.setState({
+      spaces: [spaceFixture, space2Fixture],
+    });
+
+    await renderNavigator("/spaces/space-1/notes");
+
+    const spaces = container.querySelector('section[aria-label="Spaces"]');
+    const workLink = spaces?.querySelector<HTMLAnchorElement>('a[aria-label="Work"]');
+    expect(workLink).not.toBeNull();
+
+    await act(async () => {
+      workLink?.click();
+    });
+
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:space-2");
+  });
+
+  it("opens a browser tab when clicking Browser in the nav bar even if no browser tab exists", async () => {
+    // Start with only space tab, no browser tab
+    useWorkspaceStore.setState({
+      activeScopeKey: "space:space-1",
+      layout: {
+        focusedPaneId: "pane-1",
+        root: {
+          type: "leaf",
+          id: "pane-1",
+          activeTabId: "tab-1",
+          tabs: [spaceTab],
+        },
+      },
+    });
+
+    await renderNavigator("/spaces/space-1/notes");
+
+    const tools = container.querySelector('section[aria-label="Navigation"]');
+    const browserLink = tools?.querySelector<HTMLAnchorElement>('a[aria-label="Browser"]');
+    expect(browserLink).not.toBeNull();
+
+    await act(async () => {
+      browserLink?.click();
+    });
+
+    const currentTabs = dockTabs(useWorkspaceStore.getState().layout.root);
+    expect(currentTabs.some((t) => t.surfaceId === "browser")).toBe(true);
   });
 
   async function renderNavigator(initialEntry = "/spaces/space-1/notes") {

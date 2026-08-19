@@ -1,9 +1,4 @@
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings";
-import {
-  DiscordConnectionPanel,
-  GoogleCalendarConnectionPanel,
-  NotionConnectionPanel,
-} from "@/features/spaces/integrations";
 import { SpaceMembers } from "@/features/spaces/members";
 import { spacesApi } from "@/api/spaces/api";
 import {
@@ -26,19 +21,18 @@ import {
   Switch,
 } from "@/shared/ui";
 import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
-import { Cable, Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
+import { Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { canManageSpaceLifecycle } from "../mistySpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 
-type SpaceSettingsSection = "general" | "members" | "connections" | "suggestions";
+type SpaceSettingsSection = "general" | "members" | "suggestions";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
-  { id: "connections", label: "Connections", icon: Cable },
   { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
@@ -269,14 +263,6 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
           ) : null}
 
           {activeSection === "members" ? <SpaceMembers embedded spaceId={spaceId} /> : null}
-
-          {activeSection === "connections" ? (
-            <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <GoogleCalendarConnectionPanel spaceId={spaceId} canManage={isOwner} />
-              <NotionConnectionPanel spaceId={spaceId} canManage={isOwner} />
-              <DiscordConnectionPanel spaceId={spaceId} canManage={isOwner} />
-            </div>
-          ) : null}
 
           {activeSection === "suggestions" ? (
             <SuggestionSettingsPanel spaceId={spaceId} isOwner={isOwner} />

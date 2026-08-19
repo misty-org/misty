@@ -84,7 +84,12 @@ describe("SpaceNotes beta simplification", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     window.localStorage.clear();
     spaceRequestMock.mockReset();
-    spaceRequestMock.mockResolvedValue({ notes: [] });
+    spaceRequestMock.mockImplementation(async (path: string) => {
+      if (path.endsWith("/status")) return { connected: false };
+      if (path.endsWith("/integrations")) return { integrations: [], providers: [] };
+      if (path.endsWith("/provider-resources")) return { resources: [] };
+      return { notes: [] };
+    });
     resetNotesAccountState();
     container = document.createElement("div");
     document.body.append(container);
@@ -105,7 +110,7 @@ describe("SpaceNotes beta simplification", () => {
     </MemoryRouter>
   );
 
-  it("does not render Notion or source-management UI in the beta notes surface", async () => {
+  it("mounts Notion management inside Journal without replacing native notes", async () => {
     await act(async () => {
       root.render(notesSurface());
     });
@@ -120,6 +125,17 @@ describe("SpaceNotes beta simplification", () => {
     expect(document.body.textContent).not.toContain(
       "Misty notes are saved privately on this desktop and belong to this Space.",
     );
+    expect(
+      document.body.querySelector('button[aria-label="Manage Journal integrations"]'),
+    ).not.toBeNull();
+    await act(async () => {
+      document.body
+        .querySelector<HTMLButtonElement>('button[aria-label="Manage Journal integrations"]')
+        ?.click();
+    });
+    await wait();
+    expect(document.body.textContent).toContain("Journal integrations");
+    expect(document.body.textContent).toContain("Notion");
   });
 
   it("opens the existing note dialog from a note creation query", async () => {
@@ -156,7 +172,7 @@ describe("SpaceNotes beta simplification", () => {
   });
 
   it("creates a title-only collaborative Space note and selects it", async () => {
-    spaceRequestMock.mockResolvedValueOnce({ notes: [] }).mockResolvedValueOnce({
+    const createdResponse = {
       id: "note_beta",
       space_id: "space-product",
       creator_user_id: "account-beta",
@@ -168,6 +184,11 @@ describe("SpaceNotes beta simplification", () => {
       role: "creator",
       created_at: "2026-07-20T12:00:00.000Z",
       updated_at: "2026-07-20T12:00:00.000Z",
+    };
+    spaceRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("/status")) return { connected: false };
+      if (path === "/spaces/space-product/notes" && init?.method === "POST") return createdResponse;
+      return { notes: [] };
     });
     await act(async () => {
       root.render(notesSurface());
@@ -218,25 +239,29 @@ describe("SpaceNotes beta simplification", () => {
   });
 
   it("deletes a creator-owned native note and clears it from the Journal", async () => {
-    spaceRequestMock
-      .mockResolvedValueOnce({
-        notes: [
-          {
-            id: "note_delete",
-            space_id: "space-product",
-            creator_user_id: "account-beta",
-            title: "Delete me",
-            plain_text: "",
-            lifecycle_state: "active",
-            collaboration_revision: 0,
-            acl_version: 1,
-            role: "creator",
-            created_at: "2026-07-20T12:00:00.000Z",
-            updated_at: "2026-07-20T12:00:00.000Z",
-          },
-        ],
-      })
-      .mockResolvedValueOnce(undefined);
+    let deleted = false;
+    const noteToDelete = {
+      id: "note_delete",
+      space_id: "space-product",
+      creator_user_id: "account-beta",
+      title: "Delete me",
+      plain_text: "",
+      lifecycle_state: "active",
+      collaboration_revision: 0,
+      acl_version: 1,
+      role: "creator",
+      created_at: "2026-07-20T12:00:00.000Z",
+      updated_at: "2026-07-20T12:00:00.000Z",
+    };
+    spaceRequestMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("/status")) return { connected: false };
+      if (path.endsWith("/notes/note_delete") && init?.method === "DELETE") {
+        deleted = true;
+        return undefined;
+      }
+      if (path.endsWith("/notes")) return { notes: deleted ? [] : [noteToDelete] };
+      return undefined;
+    });
 
     await act(async () => {
       root.render(notesSurface());
@@ -260,54 +285,41 @@ describe("SpaceNotes beta simplification", () => {
   });
 
   it("refreshes the mounted Space notes when realtime announces a note change", async () => {
-    spaceRequestMock
-      .mockResolvedValueOnce({
-        notes: [
-          {
-            id: "note_first",
-            space_id: "space-product",
-            creator_user_id: "account-beta",
-            title: "First note",
-            plain_text: "",
-            lifecycle_state: "active",
-            collaboration_revision: 0,
-            acl_version: 1,
-            role: "creator",
-            created_at: "2026-07-20T12:00:00.000Z",
-            updated_at: "2026-07-20T12:00:00.000Z",
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        notes: [
-          {
-            id: "note_second",
-            space_id: "space-product",
-            creator_user_id: "other-user",
-            title: "Second note",
-            plain_text: "",
-            lifecycle_state: "active",
-            collaboration_revision: 0,
-            acl_version: 1,
-            role: "editor",
-            created_at: "2026-07-20T12:02:00.000Z",
-            updated_at: "2026-07-20T12:02:00.000Z",
-          },
-          {
-            id: "note_first",
-            space_id: "space-product",
-            creator_user_id: "account-beta",
-            title: "First note",
-            plain_text: "",
-            lifecycle_state: "active",
-            collaboration_revision: 0,
-            acl_version: 1,
-            role: "creator",
-            created_at: "2026-07-20T12:00:00.000Z",
-            updated_at: "2026-07-20T12:00:00.000Z",
-          },
-        ],
-      });
+    const first = {
+      id: "note_first",
+      space_id: "space-product",
+      creator_user_id: "account-beta",
+      title: "First note",
+      plain_text: "",
+      lifecycle_state: "active",
+      collaboration_revision: 0,
+      acl_version: 1,
+      role: "creator",
+      created_at: "2026-07-20T12:00:00.000Z",
+      updated_at: "2026-07-20T12:00:00.000Z",
+    };
+    const second = {
+      id: "note_second",
+      space_id: "space-product",
+      creator_user_id: "other-user",
+      title: "Second note",
+      plain_text: "",
+      lifecycle_state: "active",
+      collaboration_revision: 0,
+      acl_version: 1,
+      role: "editor",
+      created_at: "2026-07-20T12:02:00.000Z",
+      updated_at: "2026-07-20T12:02:00.000Z",
+    };
+    let noteListReads = 0;
+    spaceRequestMock.mockImplementation(async (path: string) => {
+      if (path.endsWith("/status")) return { connected: false };
+      if (path.endsWith("/notes")) {
+        noteListReads += 1;
+        return { notes: noteListReads === 1 ? [first] : [second, first] };
+      }
+      return undefined;
+    });
 
     await act(async () => {
       root.render(notesSurface());
@@ -329,6 +341,6 @@ describe("SpaceNotes beta simplification", () => {
       "Second note",
       "First note",
     ]);
-    expect(spaceRequestMock).toHaveBeenCalledTimes(2);
+    expect(noteListReads).toBe(2);
   });
 });

@@ -17,6 +17,7 @@ export const routes = {
   extensions: "/extensions",
   files: "/files",
   home: "/home",
+  inbox: "/inbox",
   invite: "/invite",
   library: "/library",
   spaces: "/spaces",

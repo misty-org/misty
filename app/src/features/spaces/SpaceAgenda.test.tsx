@@ -94,7 +94,7 @@ describe("SpaceAgenda", () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[`/spaces/space-1/planner/agenda/${view}?date=2026-08-04`]}>
-          <SpaceAgenda spaceId="space-1" view={view} canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view={view} canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -120,7 +120,7 @@ describe("SpaceAgenda", () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/week?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="week" canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view="week" canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -137,7 +137,7 @@ describe("SpaceAgenda", () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view="month" canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -148,33 +148,28 @@ describe("SpaceAgenda", () => {
     expect(container.querySelectorAll('main[aria-label="month agenda"] section')).toHaveLength(42);
   });
 
-  it("moves calendar visibility controls into the Calendars drawer", async () => {
+  it("does not expose external calendar connection controls", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view="month" canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    await act(async () => {
-      [...container.querySelectorAll("button")]
-        .find((button) => button.textContent?.includes("Calendars"))
-        ?.click();
-    });
-
-    expect(document.body.textContent).toContain("Visible calendars");
-    expect(document.querySelector('[aria-label="Misty"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="Google Calendar"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Calendars");
+    expect(document.querySelector('[aria-label="Google Calendar"]')).toBeNull();
+    expect(calendarSources).not.toHaveBeenCalled();
+    expect(integrations).not.toHaveBeenCalled();
   });
 
   it("uses the shared top-bar layout and zooms the timeline precision", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/week?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="week" canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view="week" canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();
@@ -206,7 +201,7 @@ describe("SpaceAgenda", () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/planner/agenda/month?date=2026-08-04"]}>
-          <SpaceAgenda spaceId="space-1" view="month" canManage canManageIntegrations />
+          <SpaceAgenda spaceId="space-1" view="month" canManage />
         </MemoryRouter>,
       );
       await Promise.resolve();

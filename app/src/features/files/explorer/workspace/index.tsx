@@ -58,7 +58,6 @@ import {
 import { usePanelResize } from "./explorerWorkspace/usePanelResize";
 import { usePluginRegistry } from "./explorerWorkspace/usePluginRegistry";
 import {
-  scopedWorkspaceEntries,
   useScopedExplorerWorkspace,
   type ExplorerWorkspaceProps,
 } from "./explorerWorkspace/useScopedExplorerWorkspace";
@@ -80,13 +79,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     previewWidth,
     pinnedPaths,
     library,
-    workspaceEntries,
-    activeWorkspaceId,
-    activeWorkspaceTitle,
-    selectWorkspace,
-    createWorkspace,
-    renameWorkspace,
-    deleteWorkspace,
     operationError,
     inlineEdit,
     notifications,
@@ -98,13 +90,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       previewWidth: state.previewWidth,
       pinnedPaths: state.pinnedPaths,
       library: state.library,
-      workspaceEntries: state.workspaceEntries,
-      activeWorkspaceId: state.activeWorkspaceId,
-      activeWorkspaceTitle: state.activeWorkspaceTitle,
-      selectWorkspace: state.selectWorkspace,
-      createWorkspace: state.createWorkspace,
-      renameWorkspace: state.renameWorkspace,
-      deleteWorkspace: state.deleteWorkspace,
       operationError: state.operationError,
       inlineEdit: state.inlineEdit,
       notifications: state.notifications,
@@ -262,30 +247,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     const paneId = useMultiPanelStore.getState().activePaneId;
     if (paneId) void useExplorerStore.getState().navigatePane(paneId, path);
   }, []);
-  const handleSelectWorkspace = useCallback(
-    (workspaceId: string) => {
-      void selectWorkspace(workspaceId, homePath);
-    },
-    [homePath, selectWorkspace],
-  );
-  const handleCreateWorkspace = useCallback(
-    (title: string) => {
-      void createWorkspace(title, homePath);
-    },
-    [createWorkspace, homePath],
-  );
-  const handleRenameWorkspace = useCallback(
-    (workspaceId: string, title: string) => {
-      void renameWorkspace(workspaceId, title);
-    },
-    [renameWorkspace],
-  );
-  const handleDeleteWorkspace = useCallback(
-    (workspaceId: string) => {
-      void deleteWorkspace(workspaceId, homePath);
-    },
-    [deleteWorkspace, homePath],
-  );
 
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
@@ -382,16 +343,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           devices={mountedDevices}
           devicesLoading={devicesLoading}
           pinnedPaths={pinnedPaths}
-          workspaceEntries={scopedWorkspaceEntries(workspaceEntries, props.workspaceId)}
-          activeWorkspaceId={activeWorkspaceId}
-          activeWorkspaceTitle={activeWorkspaceTitle}
-          workspaceLocked={Boolean(props.workspaceId)}
           onNavigate={navigateSidebar}
           onRefreshDevices={refreshDevices}
-          onSelectWorkspace={handleSelectWorkspace}
-          onCreateWorkspace={handleCreateWorkspace}
-          onRenameWorkspace={handleRenameWorkspace}
-          onDeleteWorkspace={handleDeleteWorkspace}
           onOpenInNewTab={openSidebarPathInNewTab}
           onManageRemotes={handleManageRemotes}
           onAddRemote={handleAddRemote}
@@ -404,15 +357,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       ) : undefined,
     [
       activePath,
-      activeWorkspaceId,
-      activeWorkspaceTitle,
       androidAllFilesAccess,
       androidGrantedFolders,
       devicesLoading,
-      handleCreateWorkspace,
-      handleDeleteWorkspace,
-      handleRenameWorkspace,
-      handleSelectWorkspace,
       handleAddRemote,
       handleGrantLocalFolder,
       handleManageRemotes,
@@ -424,11 +371,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       openSidebarPathInNewTab,
       pinnedPaths,
       providersLoading,
-      props.workspaceId,
       refreshDevices,
       sidebarRemotes,
       sidebarVisible,
-      workspaceEntries,
     ],
   );
   const renderTabActions = useCallback(

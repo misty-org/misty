@@ -1,5 +1,6 @@
 import { useAuth, type AuthUser } from "@/features/auth";
 import { JournalAttribution } from "@/features/journal";
+import { useSpacesStore } from "@/features/spaces";
 import { Button, EmptyState, PermissionState, Spinner } from "@/shared/ui";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,8 @@ import { NewDrawingDialog } from "./components/NewDrawingDialog";
 import { useDrawingRoom } from "./hooks/useDrawingRoom";
 import { useSpaceDrawings } from "./hooks/useSpaceDrawings";
 import type { SpaceDrawing } from "./types";
+import { FigmaDrawingsSheet } from "./figma/FigmaDrawingsSheet";
+import type { FigmaCanvasReference } from "./figma/figmaCanvasReference";
 
 const CollaborativeDrawingCanvas = lazy(() => import("./components/CollaborativeDrawingCanvas"));
 
@@ -16,6 +19,13 @@ export function SpaceDrawings(props: { spaceId: string; drawingId: string }) {
   const navigate = useNavigate();
   const drawings = useSpaceDrawings(props.spaceId);
   const [newDrawingOpen, setNewDrawingOpen] = useState(false);
+  const [figmaOpen, setFigmaOpen] = useState(false);
+  const [figmaImport, setFigmaImport] = useState<
+    { requestId: number; reference: FigmaCanvasReference } | undefined
+  >();
+  const space = useSpacesStore((state) => state.spaces.find((item) => item.id === props.spaceId));
+  const canManageIntegrations =
+    space?.role === "owner" || space?.permissions?.["integrations.manage"] === true;
   const selected = drawings.drawings.find((drawing) => drawing.id === props.drawingId);
 
   useEffect(() => {
@@ -62,9 +72,14 @@ export function SpaceDrawings(props: { spaceId: string; drawingId: string }) {
           title="Sketch ideas together"
           description="Create a live canvas for diagrams, planning, and visual collaboration."
           action={
-            <Button type="button" onClick={() => setNewDrawingOpen(true)}>
-              Create drawing
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button type="button" onClick={() => setNewDrawingOpen(true)}>
+                Create drawing
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setFigmaOpen(true)}>
+                Figma sources
+              </Button>
+            </div>
           }
         />
         <NewDrawingDialog
@@ -75,6 +90,12 @@ export function SpaceDrawings(props: { spaceId: string; drawingId: string }) {
             navigate(drawingPath(props.spaceId, drawing.id));
           }}
         />
+        <FigmaDrawingsSheet
+          spaceId={props.spaceId}
+          canManage={canManageIntegrations}
+          open={figmaOpen}
+          onOpenChange={setFigmaOpen}
+        />
       </>
     );
   }
@@ -82,18 +103,39 @@ export function SpaceDrawings(props: { spaceId: string; drawingId: string }) {
   if (!selected) return <DrawingLoading label="Opening drawing" />;
 
   return (
-    <DrawingWorkspace
-      key={selected.id}
-      drawing={selected}
-      user={user}
-      onRename={(title) => drawings.rename(selected.id, title).then(() => undefined)}
-      onDelete={async () => {
-        await drawings.remove(selected.id);
-        navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`, {
-          replace: true,
-        });
-      }}
-    />
+    <>
+      <DrawingWorkspace
+        key={selected.id}
+        drawing={selected}
+        user={user}
+        figmaImport={figmaImport}
+        onOpenFigma={() => setFigmaOpen(true)}
+        onRename={(title) => drawings.rename(selected.id, title).then(() => undefined)}
+        onDelete={async () => {
+          await drawings.remove(selected.id);
+          navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`, {
+            replace: true,
+          });
+        }}
+      />
+      <FigmaDrawingsSheet
+        spaceId={props.spaceId}
+        canManage={canManageIntegrations}
+        open={figmaOpen}
+        onOpenChange={setFigmaOpen}
+        onImport={
+          selected.role === "viewer"
+            ? undefined
+            : (reference) => {
+                setFigmaImport((current) => ({
+                  requestId: (current?.requestId ?? 0) + 1,
+                  reference,
+                }));
+                setFigmaOpen(false);
+              }
+        }
+      />
+    </>
   );
 }
 
@@ -102,6 +144,8 @@ function DrawingWorkspace(props: {
   user: AuthUser;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  onOpenFigma: () => void;
+  figmaImport?: { requestId: number; reference: FigmaCanvasReference };
 }) {
   const room = useDrawingRoom(props.drawing.space_id, props.drawing.id, props.user);
   return (
@@ -111,6 +155,7 @@ function DrawingWorkspace(props: {
         connection={room.connection}
         onRename={props.onRename}
         onDelete={props.onDelete}
+        onOpenFigma={props.onOpenFigma}
       />
       <div className="relative min-h-0 overflow-hidden">
         {room.notice ? (
@@ -131,7 +176,11 @@ function DrawingWorkspace(props: {
           />
         ) : room.session && room.synced ? (
           <Suspense fallback={<DrawingLoading label="Preparing canvas" />}>
-            <CollaborativeDrawingCanvas drawing={props.drawing} session={room.session} />
+            <CollaborativeDrawingCanvas
+              drawing={props.drawing}
+              session={room.session}
+              figmaImport={props.figmaImport}
+            />
           </Suspense>
         ) : (
           <DrawingLoading label="Joining live canvas" />

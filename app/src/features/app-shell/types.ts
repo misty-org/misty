@@ -1,5 +1,6 @@
 export type AppTab =
   | "home"
+  | "inbox"
   | "browser"
   | "terminal"
   | "code"

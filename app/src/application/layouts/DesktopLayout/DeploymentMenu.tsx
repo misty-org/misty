@@ -168,7 +168,7 @@ function Brand(props: { collapsed: boolean; mistyLogoSource: string | null }) {
     <>
       {props.mistyLogoSource ? (
         <img
-          className="pointer-events-none size-8 shrink-0 object-contain"
+          className="pointer-events-none size-5 shrink-0 object-contain"
           src={props.mistyLogoSource}
           alt="Misty"
           draggable={false}

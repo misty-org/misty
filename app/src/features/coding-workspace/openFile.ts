@@ -4,16 +4,15 @@ import { useCodingWorkspaceStore } from "./store/useCodingWorkspaceStore";
 export function openFileInWorkspace(
   path: string,
   name: string,
-  targetLine?: number,
-  groupId?: string,
+  targetLine: number | undefined,
+  viewId: string,
+  rootPath: string,
 ): void {
   const store = useCodingWorkspaceStore.getState();
-  const targetGroupId = groupId ?? store.activeGroupId;
-  const existing = store.groups
-    .find((group) => group.id === targetGroupId)
-    ?.tabs.find((tab) => tab.path === path);
+  const existing = store.projectBuffers[rootPath]?.[path];
   if (existing) {
-    store.setActiveTab(targetGroupId, path);
+    store.setActiveFile(rootPath, viewId, path);
+    store.recordRecent(rootPath, path);
     if (targetLine !== undefined) {
       window.dispatchEvent(
         new CustomEvent("misty:code-goto-line", { detail: { path, line: targetLine } }),
@@ -21,22 +20,20 @@ export function openFileInWorkspace(
     }
     return;
   }
-  store.openTab(
-    {
-      path,
-      name,
-      contents: "",
-      savedContents: "",
-      lineEnding: "lf",
-      readonly: false,
-      loading: true,
-      error: null,
-    },
-    targetGroupId,
-  );
+  store.openFile(rootPath, viewId, {
+    path,
+    name,
+    contents: "",
+    savedContents: "",
+    lineEnding: "lf",
+    readonly: false,
+    loading: true,
+    error: null,
+  });
+  store.recordRecent(rootPath, path);
   codeReadTextFile(path)
     .then((file) => {
-      store.patchTab(path, {
+      store.patchBuffer(rootPath, path, {
         contents: file.contents,
         savedContents: file.contents,
         lineEnding: file.lineEnding,
@@ -45,13 +42,17 @@ export function openFileInWorkspace(
         error: null,
       });
       if (targetLine !== undefined) {
-        window.dispatchEvent(
-          new CustomEvent("misty:code-goto-line", { detail: { path, line: targetLine } }),
+        window.setTimeout(
+          () =>
+            window.dispatchEvent(
+              new CustomEvent("misty:code-goto-line", { detail: { path, line: targetLine } }),
+            ),
+          0,
         );
       }
     })
     .catch((error: unknown) => {
-      store.patchTab(path, {
+      store.patchBuffer(rootPath, path, {
         loading: false,
         error: error instanceof Error ? error.message : "Could not open this file.",
       });

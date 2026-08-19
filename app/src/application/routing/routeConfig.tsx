@@ -6,6 +6,7 @@ import { DeveloperWorkspace } from "@/features/developer-workspace";
 import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
 import { HomeDashboard } from "@/features/home";
+import { InboxWorkspace } from "@/features/inbox";
 import { spaceNotesEnabled } from "@/features/notes";
 import { SettingsPage } from "@/features/settings";
 import { SpaceInvitationRedemption } from "@/features/spaces";
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
             element: <AppPagesLayout />,
             children: [
               { path: "home", element: desktopOnlyRoute("Home dashboard") ?? <HomeDashboard /> },
+              { path: "inbox", element: desktopOnlyRoute("Inbox") ?? <InboxWorkspace /> },
               { path: "browser", element: desktopOnlyRoute("Browser") ?? <BrowserWorkspace /> },
               { path: "terminal", element: desktopOnlyRoute("Terminal") ?? <TerminalWorkspace /> },
               { path: "files", element: desktopOnlyRoute("Files") ?? <FilesPage /> },

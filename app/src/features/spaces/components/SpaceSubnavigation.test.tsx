@@ -141,15 +141,11 @@ describe("Space subpage navigation", () => {
           <SpacePlannerHeader
             query=""
             activeFilterCount={0}
-            sources={[]}
             loading={false}
             canManage={false}
-            canManageIntegrations={false}
-            calendarImportAvailable={false}
             filters={null}
             onQuery={() => {}}
             onSync={() => {}}
-            onImport={() => {}}
             onCreate={() => {}}
           />
         </MemoryRouter>,

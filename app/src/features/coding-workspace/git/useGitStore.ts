@@ -3,12 +3,14 @@ import { codeGitDiff, codeGitStatus, type GitStatusSnapshot } from "../native";
 
 interface GitState {
   snapshot: GitStatusSnapshot | null;
+  snapshots: Record<string, GitStatusSnapshot>;
   loading: boolean;
+  loadingRoots: Record<string, boolean>;
   error: string | null;
   diffs: Record<string, GitDiff>;
   refresh: (root: string) => Promise<void>;
   refreshDiff: (root: string, path: string) => Promise<void>;
-  clear: () => void;
+  clear: (root?: string) => void;
 }
 
 export interface GitDiff {
@@ -20,21 +22,33 @@ export interface GitDiff {
 
 export const useGitStore = create<GitState>((set, get) => ({
   snapshot: null,
+  snapshots: {},
   loading: false,
+  loadingRoots: {},
   error: null,
   diffs: {},
 
   refresh: async (root) => {
-    if (get().loading) return;
-    set({ loading: true, error: null });
+    if (get().loadingRoots[root]) return;
+    set((state) => ({
+      loading: true,
+      loadingRoots: { ...state.loadingRoots, [root]: true },
+      error: null,
+    }));
     try {
       const snapshot = await codeGitStatus(root);
-      set({ snapshot, loading: false });
-    } catch (error) {
-      set({
+      set((state) => ({
+        snapshot,
+        snapshots: { ...state.snapshots, [root]: snapshot },
         loading: false,
+        loadingRoots: { ...state.loadingRoots, [root]: false },
+      }));
+    } catch (error) {
+      set((state) => ({
+        loading: false,
+        loadingRoots: { ...state.loadingRoots, [root]: false },
         error: error instanceof Error ? error.message : "Could not read git status.",
-      });
+      }));
     }
   },
 
@@ -56,7 +70,16 @@ export const useGitStore = create<GitState>((set, get) => ({
     }
   },
 
-  clear: () => set({ snapshot: null, diffs: {}, error: null }),
+  clear: (root) =>
+    set((state) => {
+      if (!root) return { snapshot: null, snapshots: {}, diffs: {}, error: null };
+      const snapshots = { ...state.snapshots };
+      delete snapshots[root];
+      return {
+        snapshots,
+        snapshot: state.snapshot === state.snapshots[root] ? null : state.snapshot,
+      };
+    }),
 }));
 
 function parseUnifiedDiff(text: string): {

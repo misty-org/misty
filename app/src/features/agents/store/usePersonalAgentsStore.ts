@@ -83,7 +83,8 @@ export const usePersonalAgentsStore = create<PersonalAgentsStore>((set, get) => 
       set({
         agents:
           agents.status === "fulfilled" ? agents.value.agents.map(withConcreteModelSelection) : [],
-        models: models.status === "fulfilled" ? models.value.models.filter(isMajorProviderModel) : [],
+        models:
+          models.status === "fulfilled" ? models.value.models.filter(isMajorProviderModel) : [],
         loading: false,
         loaded: true,
         error: agents.status === "rejected" ? errorText(agents.reason) : null,

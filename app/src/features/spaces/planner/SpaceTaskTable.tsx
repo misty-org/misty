@@ -16,7 +16,6 @@ import {
   TableRow,
 } from "@/shared/ui";
 import { LoaderCircle } from "lucide-react";
-import { TaskSyncBadge } from "./components/TaskSyncBadge";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -81,7 +80,6 @@ export function SpaceTaskList({
                   >
                     {taskBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                     <span className="truncate">{task.title}</span>
-                    <TaskSyncBadge task={task} />
                   </Button>
                 </TableCell>
                 <TableCell>

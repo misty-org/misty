@@ -106,6 +106,7 @@ export function useSpaceLibraryData(spaceId: string) {
     spaceId,
     activeSpace,
     canUploadLibrary: !referenceOnly && permissions?.["library.upload"] !== false,
+    canImportLibrary: !referenceOnly && permissions?.["library.import"] !== false,
     canEditLibrary,
     canCopyLibrary: permissions?.["library.download"] !== false,
     reloadKey,

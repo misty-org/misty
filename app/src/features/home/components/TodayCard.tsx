@@ -47,11 +47,8 @@ export function TodayCard(props: {
               />
             ))
         ) : (
-          <div className="grid min-h-[176px] place-items-center text-center">
-            <div>
-              <CalendarDays className="mx-auto size-5 text-cream-muted" strokeWidth={1.7} />
-              <p className="mt-2 text-sm text-cream-muted">Nothing scheduled today.</p>
-            </div>
+          <div className="grid min-h-[176px] place-items-center px-5 text-center">
+            <p className="text-sm text-cream-muted">Nothing scheduled today.</p>
           </div>
         )}
         {props.quickAddSpaceId ? (

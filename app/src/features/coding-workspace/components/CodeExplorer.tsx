@@ -1,6 +1,29 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { FilePlus, FolderInput, FolderPlus, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui";
 import type { FileEntry } from "@/native/contracts/app-explorer";
 import {
   codeCreateFile,
@@ -11,20 +34,40 @@ import {
   type GitFileStatus,
 } from "../native";
 import { useGitStore } from "../git/useGitStore";
-import { openFileInWorkspace } from "../openFile";
 import { useCodingWorkspaceStore, useDirtyPaths } from "../store/useCodingWorkspaceStore";
 import { CodeExplorerRow } from "./CodeExplorerRow";
 
-export function CodeExplorer() {
-  const rootPath = useCodingWorkspaceStore((state) => state.rootPath);
-  const setRootPath = useCodingWorkspaceStore((state) => state.setRootPath);
+type NameDialogState =
+  | { kind: "file" | "folder"; initialValue: string }
+  | { kind: "rename"; initialValue: string; path: string };
+
+interface DeleteTarget {
+  path: string;
+  name: string;
+  isDirectory: boolean;
+}
+
+interface CodeExplorerProps {
+  rootPath: string;
+  viewId: string;
+  onOpenFile: (path: string, name: string) => void;
+  onOpenFileInNewTab: (path: string, name: string) => void;
+  onOpenRoot: (path: string) => void;
+}
+
+export function CodeExplorer({
+  rootPath,
+  viewId,
+  onOpenFile,
+  onOpenFileInNewTab,
+  onOpenRoot,
+}: CodeExplorerProps) {
   const activeTabPath = useCodingWorkspaceStore(
-    (state) =>
-      state.groups.find((group) => group.id === state.activeGroupId)?.activeTabPath ?? null,
+    (state) => state.views[viewId]?.activeFilePath ?? null,
   );
-  const closeTab = useCodingWorkspaceStore((state) => state.closeTab);
+  const removeBuffer = useCodingWorkspaceStore((state) => state.removeBuffer);
   const dirtyPaths = useDirtyPaths();
-  const gitSnapshot = useGitStore((state) => state.snapshot);
+  const gitSnapshot = useGitStore((state) => state.snapshots[rootPath] ?? state.snapshot);
   const refreshGit = useGitStore((state) => state.refresh);
 
   const [rootEntries, setRootEntries] = useState<FileEntry[] | null>(null);
@@ -32,6 +75,10 @@ export function CodeExplorer() {
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
+  const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [operationError, setOperationError] = useState<string | null>(null);
 
   const rootName = useMemo(() => {
     if (!rootPath) return "";
@@ -49,12 +96,11 @@ export function CodeExplorer() {
     setError(null);
     codeListDirectory(rootPath)
       .then((listing) => {
-        if (cancelled) return;
-        setRootEntries(sortEntries(listing.entries));
+        if (!cancelled) setRootEntries(sortEntries(listing.entries));
       })
       .catch((nextError: unknown) => {
-        if (cancelled) return;
-        setError(nextError instanceof Error ? nextError.message : "Could not open that folder.");
+        if (!cancelled)
+          setError(nextError instanceof Error ? nextError.message : "Could not open that folder.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -66,167 +112,241 @@ export function CodeExplorer() {
 
   const gitStatuses = useMemo(() => {
     const map = new Map<string, GitFileStatus>();
-    if (!gitSnapshot?.files) return map;
-    for (const entry of gitSnapshot.files) {
-      map.set(entry.absolutePath, entry.status);
-    }
+    for (const entry of gitSnapshot?.files ?? []) map.set(entry.absolutePath, entry.status);
     return map;
   }, [gitSnapshot]);
 
-  const handleOpenFile = useCallback((entry: FileEntry) => {
-    openFileInWorkspace(entry.path, entry.name);
-  }, []);
+  const handleOpenFile = useCallback(
+    (entry: FileEntry) => onOpenFile(entry.path, entry.name),
+    [onOpenFile],
+  );
 
   const changeRoot = useCallback(async () => {
     try {
       const selection = await openDialog({ directory: true, multiple: false });
-      if (typeof selection === "string" && selection.length > 0) {
-        setRootPath(selection);
-      }
+      if (typeof selection === "string" && selection.length > 0) onOpenRoot(selection);
     } catch {
-      /* dialog cancelled */
+      /* native picker cancellation */
     }
-  }, [setRootPath]);
+  }, [onOpenRoot]);
 
-  const doCreate = useCallback(
-    async (kind: "file" | "folder") => {
-      if (!rootPath) return;
-      const name = window.prompt(`Name of new ${kind} (relative to ${rootName})`);
-      if (!name?.trim()) return;
-      setBusyMessage(`Creating ${name}…`);
+  const openNameDialog = useCallback((dialog: NameDialogState) => {
+    setNameDraft(dialog.initialValue);
+    setNameDialog(dialog);
+  }, []);
+
+  const submitNameDialog = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      if (!rootPath || !nameDialog || !nameDraft.trim()) return;
+      const name = nameDraft.trim();
+      setBusyMessage(nameDialog.kind === "rename" ? `Renaming ${name}…` : `Creating ${name}…`);
       try {
-        const target = `${rootPath.replace(/\/$/, "")}/${name.trim()}`;
-        if (kind === "file") await codeCreateFile(target, "");
-        else await codeCreateFolder(target);
-        setReloadToken((token) => token + 1);
-        if (kind === "file") {
-          const parts = name.trim().split("/");
-          openFileInWorkspace(target, parts[parts.length - 1] ?? name.trim());
+        if (nameDialog.kind === "rename") {
+          const parent = nameDialog.path.split("/").slice(0, -1).join("/");
+          await codeRenamePath(nameDialog.path, `${parent}/${name}`);
+        } else {
+          const target = `${rootPath.replace(/\/$/, "")}/${name}`;
+          if (nameDialog.kind === "file") {
+            await codeCreateFile(target, "");
+            const parts = name.split("/");
+            onOpenFile(target, parts[parts.length - 1] ?? name);
+          } else {
+            await codeCreateFolder(target);
+          }
         }
+        setNameDialog(null);
+        setReloadToken((token) => token + 1);
         void refreshGit(rootPath);
-      } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Could not create.");
+      } catch (nextError) {
+        setOperationError(nextError instanceof Error ? nextError.message : "The operation failed.");
       } finally {
         setBusyMessage(null);
       }
     },
-    [refreshGit, rootPath, rootName],
+    [nameDialog, nameDraft, onOpenFile, refreshGit, rootPath],
   );
 
-  useEffect(() => {
-    const handleRename = async (event: Event) => {
-      const detail = (event as CustomEvent<{ path: string; newName: string }>).detail;
-      if (!detail || !rootPath) return;
-      const trimmedName = detail.newName.trim();
-      if (!trimmedName) return;
-      const parent = detail.path.split("/").slice(0, -1).join("/");
-      const dest = `${parent}/${trimmedName}`;
-      try {
-        await codeRenamePath(detail.path, dest);
-        setReloadToken((token) => token + 1);
-        void refreshGit(rootPath);
-      } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Could not rename.");
-      }
-    };
-    window.addEventListener("misty:code-rename-request", handleRename);
-    return () => window.removeEventListener("misty:code-rename-request", handleRename);
-  }, [refreshGit, rootPath]);
-
-  const handleDelete = useCallback(
-    async (path: string, isDirectory: boolean) => {
-      try {
-        await codeDeletePath(path);
-        setReloadToken((token) => token + 1);
-        if (rootPath) void refreshGit(rootPath);
-        // Close any tabs matching path or under it if directory
-        const store = useCodingWorkspaceStore.getState();
-        for (const group of store.groups) {
-          for (const tab of group.tabs) {
-            if (tab.path === path || (isDirectory && tab.path.startsWith(`${path}/`))) {
-              closeTab(group.id, tab.path);
-            }
-          }
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    try {
+      await codeDeletePath(deleteTarget.path);
+      setReloadToken((token) => token + 1);
+      if (rootPath) void refreshGit(rootPath);
+      const store = useCodingWorkspaceStore.getState();
+      for (const buffer of Object.values(store.projectBuffers[rootPath] ?? {})) {
+        if (
+          buffer.path === deleteTarget.path ||
+          (deleteTarget.isDirectory && buffer.path.startsWith(`${deleteTarget.path}/`))
+        ) {
+          removeBuffer(rootPath, buffer.path);
         }
-      } catch (error) {
-        window.alert(error instanceof Error ? error.message : "Could not delete.");
       }
-    },
-    [closeTab, refreshGit, rootPath],
-  );
-
-  const handleRename = useCallback((_path: string) => {
-    /* The prompt handler in the row already dispatches; nothing else to do here. */
-  }, []);
+    } catch (nextError) {
+      setOperationError(nextError instanceof Error ? nextError.message : "Could not delete.");
+    } finally {
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, refreshGit, removeBuffer, rootPath]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-sidebar">
-      <header className="flex h-8 items-center justify-between border-b border-charcoal-border px-3 text-[10px] uppercase tracking-[0.18em] text-cream-muted">
-        <span className="truncate" title={rootPath ?? ""}>
+    <div className="code-theme-sidebar flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-sidebar text-cream">
+      <header className="code-explorer-header flex items-center justify-between border-b border-charcoal-border px-3">
+        <span className="truncate font-semibold" title={rootPath ?? ""}>
           {rootName || "Explorer"}
         </span>
-        <span className="flex items-center gap-1 text-cream-muted/60">
-          <IconButton label="New file" onClick={() => void doCreate("file")}>
-            <FilePlus size={11} />
-          </IconButton>
-          <IconButton label="New folder" onClick={() => void doCreate("folder")}>
-            <FolderPlus size={11} />
-          </IconButton>
-          <IconButton label="Reload folder" onClick={() => setReloadToken((token) => token + 1)}>
-            <RotateCcw size={11} />
-          </IconButton>
-          <IconButton label="Open a different folder" onClick={() => void changeRoot()}>
-            <FolderInput size={11} />
-          </IconButton>
+        <span className="flex items-center gap-1">
+          <ExplorerIconButton
+            label="New file"
+            onClick={() => openNameDialog({ kind: "file", initialValue: "" })}
+          >
+            <FilePlus />
+          </ExplorerIconButton>
+          <ExplorerIconButton
+            label="New folder"
+            onClick={() => openNameDialog({ kind: "folder", initialValue: "" })}
+          >
+            <FolderPlus />
+          </ExplorerIconButton>
+          <ExplorerIconButton
+            label="Reload folder"
+            onClick={() => setReloadToken((token) => token + 1)}
+          >
+            <RotateCcw />
+          </ExplorerIconButton>
+          <ExplorerIconButton label="Open a different folder" onClick={() => void changeRoot()}>
+            <FolderInput />
+          </ExplorerIconButton>
         </span>
       </header>
+
       {busyMessage ? (
-        <div className="border-b border-charcoal-border px-3 py-1 text-[11px] italic text-cream-muted">
+        <div className="border-b border-charcoal-border px-3 py-1.5 italic text-cream-muted">
           {busyMessage}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto py-1 pl-1 pr-1">
+
+      <div className="min-h-0 flex-1 overflow-auto p-1.5">
         {loading && rootEntries === null ? (
-          <p className="px-3 py-2 text-[11px] italic text-cream-muted/60">Loading…</p>
+          <p className="px-3 py-2 italic text-cream-muted">Loading…</p>
         ) : null}
-        {error ? <p className="px-3 py-2 text-[11px] italic text-[#d68b80]">{error}</p> : null}
+        {error ? <p className="code-danger px-3 py-2 italic">{error}</p> : null}
         {rootEntries?.map((entry) => (
           <CodeExplorerRow
             key={entry.id}
             entry={entry}
+            rootPath={rootPath}
             depth={0}
             activePath={activeTabPath}
             dirtyPaths={dirtyPaths}
             gitStatuses={gitStatuses}
             onOpenFile={handleOpenFile}
-            onRequestRename={handleRename}
-            onRequestDelete={handleDelete}
+            onOpenFileInNewTab={(entry) => onOpenFileInNewTab(entry.path, entry.name)}
+            onRequestRename={(path, name) =>
+              openNameDialog({ kind: "rename", path, initialValue: name })
+            }
+            onRequestDelete={(path, name, isDirectory) =>
+              setDeleteTarget({ path, name, isDirectory })
+            }
           />
         ))}
       </div>
+
+      <Dialog open={Boolean(nameDialog)} onOpenChange={(open) => !open && setNameDialog(null)}>
+        <DialogContent className="code-theme-overlay max-w-sm">
+          <form onSubmit={(event) => void submitNameDialog(event)} className="grid gap-4">
+            <DialogHeader>
+              <DialogTitle>
+                {nameDialog?.kind === "rename"
+                  ? "Rename item"
+                  : nameDialog?.kind === "folder"
+                    ? "New folder"
+                    : "New file"}
+              </DialogTitle>
+              <DialogDescription>
+                {nameDialog?.kind === "rename"
+                  ? "Enter a new name. The file extension may be changed."
+                  : `Create inside ${rootName}. Relative paths are supported.`}
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              autoFocus
+              value={nameDraft}
+              onChange={(event) => setNameDraft(event.target.value)}
+              aria-label="Name"
+              className="code-themed-control"
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={!nameDraft.trim() || Boolean(busyMessage)}>
+                {nameDialog?.kind === "rename" ? "Rename" : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent className="code-theme-overlay max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the {deleteTarget?.isDirectory ? "folder and its contents" : "file"}
+              from disk. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="code-destructive" onClick={() => void confirmDelete()}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={Boolean(operationError)} onOpenChange={() => setOperationError(null)}>
+        <DialogContent className="code-theme-overlay max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Couldn’t complete that action</DialogTitle>
+            <DialogDescription>{operationError}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button">OK</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function ExplorerIconButton(props: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="grid size-5 place-items-center rounded hover:bg-charcoal-hover hover:text-cream"
-    >
-      {children}
-    </button>
+    <TooltipProvider delayDuration={400}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={props.label}
+            onClick={props.onClick}
+            className="code-interface-icon-button text-cream-muted"
+          >
+            {props.children}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="code-theme-overlay">{props.label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

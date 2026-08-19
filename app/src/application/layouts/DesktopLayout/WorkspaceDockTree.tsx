@@ -33,6 +33,7 @@ import {
   FolderOpen,
   Globe2,
   House,
+  Inbox,
   MoreHorizontal,
   PanelRightOpen,
   PanelTopOpen,
@@ -57,6 +58,7 @@ import {
 
 const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
   home: House,
+  inbox: Inbox,
   space: Blocks,
   browser: Globe2,
   terminal: SquareTerminal,
@@ -68,6 +70,7 @@ const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
 };
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
+  inbox: "Inbox",
   space: "Space",
   browser: "Browser",
   terminal: "Terminal",
@@ -182,7 +185,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const [dropZone, setDropZone] = useState<DockDropZone | null>(null);
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
-  const codeTab = pane.tabs.find((tab) => tab.surfaceId === "code");
+  const codeTabs = pane.tabs.filter((tab) => tab.surfaceId === "code");
   const focused = pane.id === props.focusedPaneId;
   const groups = groupTabs(pane.tabs);
   const otherPanes = dockLeaves(useWorkspaceStore.getState().layout.root).filter(
@@ -279,7 +282,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         style={titlebarPadding}
         data-misty-window-titlebar-region={titlebarHeader ? "true" : undefined}
       >
-        <div className="relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           {groups.map((group) => (
             <WorkspaceTabGroupButton
               key={group.key}
@@ -292,7 +295,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
               onMoveTab={(tabId, index) => props.onMoveTab(tabId, pane.id, index)}
             />
           ))}
-          <div className="sticky right-0 z-10 flex shrink-0 items-center bg-charcoal-workspace/90 px-0.5 backdrop-blur-sm">
+          <div className="flex shrink-0 items-center">
             <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
           </div>
         </div>
@@ -342,8 +345,9 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         </div>
       </header>
       <div className="min-h-0 min-w-0 overflow-hidden">
-        {codeTab ? (
+        {codeTabs.map((codeTab) => (
           <div
+            key={codeTab.id}
             className={cn(
               "h-full min-h-0 w-full",
               activeTab?.id === codeTab.id ? "block" : "hidden",
@@ -351,8 +355,8 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
           >
             <WorkspaceSurface tab={codeTab} />
           </div>
-        ) : null}
-        {activeTab?.id === codeTab?.id ? null : activeTab ? (
+        ))}
+        {activeTab?.surfaceId === "code" ? null : activeTab ? (
           activeTab.surfaceId === "space" &&
           focused &&
           (sameRoute(activeTab.route, props.locationPath, props.locationSearch) ||
@@ -497,8 +501,10 @@ function minimumForTabs(tabs: WorkspaceTab[]): { width: number; height: number }
   );
 }
 
-const dockActionClass =
-  "grid size-7 place-items-center rounded text-cream-muted hover:bg-charcoal-card hover:text-cream disabled:pointer-events-none disabled:opacity-35";
+const dockActionClass = [
+  "grid size-7 place-items-center rounded text-cream-muted outline-none",
+  "hover:bg-charcoal-card hover:text-cream focus:outline-none disabled:pointer-events-none disabled:opacity-35",
+].join(" ");
 function sameRoute(route: string, pathname: string, search: string): boolean {
   return route === `${pathname}${search}` || route === pathname;
 }

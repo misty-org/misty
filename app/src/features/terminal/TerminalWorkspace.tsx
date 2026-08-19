@@ -2,6 +2,14 @@ import { dockLeaves, useWorkspaceStore, type WorkspaceTab } from "@/features/wor
 import { SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+import type { TerminalSessionStatus } from "./TerminalPane";
+import {
+  listSshEnvironments,
+  localTerminalEnvironment,
+  sshEnvironmentSummary,
+  type SshEnvironment,
+  type TerminalEnvironment,
+} from "./sshEnvironments";
 import {
   cwdBySlot,
   killTerminalSlot,
@@ -13,9 +21,11 @@ import {
 /** One dock tab owns zero or one shell. This map keeps that identity stable
  * while the tab is inactive or its React surface is temporarily detached. */
 const slotByTab = new Map<string, string | null>();
+const environmentByTab = new Map<string, TerminalEnvironment>();
 
 export function killTerminalTab(tabId: string): void {
   slotByTab.delete(tabId);
+  environmentByTab.delete(tabId);
   killRegisteredTerminalTab(tabId);
 }
 
@@ -42,6 +52,12 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
   });
   const [title, setTitle] = useState(() => (slotId ? (titleBySlot.get(slotId) ?? "zsh") : ""));
   const [cwd, setCwd] = useState(() => (slotId ? (cwdBySlot.get(slotId) ?? "") : ""));
+  const [environment, setEnvironment] = useState<TerminalEnvironment>(() =>
+    tabId ? (environmentByTab.get(tabId) ?? localTerminalEnvironment) : localTerminalEnvironment,
+  );
+  const [sshEnvironments, setSshEnvironments] = useState<SshEnvironment[]>([]);
+  const [environmentError, setEnvironmentError] = useState("");
+  const [sessionStatus, setSessionStatus] = useState<TerminalSessionStatus>("starting");
   const paneRef = useRef<TerminalPaneHandle | null>(null);
 
   useEffect(() => {
@@ -52,6 +68,20 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
       setSlotId(created);
     } else setSlotId(slotByTab.get(tabId) ?? null);
   }, [tabId]);
+
+  useEffect(() => {
+    let active = true;
+    void listSshEnvironments()
+      .then((items) => {
+        if (active) setSshEnvironments(items);
+      })
+      .catch(() => {
+        if (active) setEnvironmentError("SSH hosts unavailable");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!tabId) return;
@@ -78,6 +108,22 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
     setTitle("zsh");
     setCwd("");
   }, [tabId]);
+
+  const chooseEnvironment = useCallback(
+    (next: TerminalEnvironment) => {
+      if (!tabId) return;
+      if (slotId) killTerminalSlot(slotId);
+      const created = makeSlotId();
+      slotByTab.set(tabId, created);
+      environmentByTab.set(tabId, next);
+      setEnvironment(next);
+      setSlotId(created);
+      setTitle(next.kind === "ssh" ? next.ssh.label : "zsh");
+      setCwd("");
+      setSessionStatus("starting");
+    },
+    [slotId, tabId],
+  );
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -127,6 +173,36 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
         <span className="min-w-0 flex-1 truncate font-mono">
           {displayCwd || title || "Terminal"}
         </span>
+        <span className="rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] capitalize">
+          {sessionStatus.replace(/_/g, " ")}
+        </span>
+        {environment.kind === "ssh" ? (
+          <span className="hidden rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] lg:inline">
+            Agent tools · device-local
+          </span>
+        ) : null}
+        <select
+          aria-label="Terminal environment"
+          className="h-6 max-w-52 rounded border border-charcoal-border bg-charcoal-card px-1.5 text-[10px] text-cream outline-none"
+          value={environment.kind === "ssh" ? `ssh:${environment.ssh.id}` : "local"}
+          title={environmentError || "Terminal environment (device-local)"}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            if (value === "local") {
+              chooseEnvironment(localTerminalEnvironment);
+              return;
+            }
+            const selected = sshEnvironments.find((item) => `ssh:${item.id}` === value);
+            if (selected) chooseEnvironment({ kind: "ssh", ssh: selected });
+          }}
+        >
+          <option value="local">Local shell</option>
+          {sshEnvironments.map((item) => (
+            <option key={item.id} value={`ssh:${item.id}`}>
+              {item.label} · {sshEnvironmentSummary(item)}
+            </option>
+          ))}
+        </select>
         {slotId ? (
           <button
             type="button"
@@ -150,6 +226,9 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
             focused
             onTitleChange={setTitle}
             onCwdChange={setCwd}
+            environment={environment}
+            onSessionStatusChange={setSessionStatus}
+            onCancelSsh={() => chooseEnvironment(localTerminalEnvironment)}
           />
         ) : (
           <TerminalEmptyState onNewShell={newShell} />

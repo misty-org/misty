@@ -1,10 +1,11 @@
-import { useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore, type WorkspaceDockNode } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
+  hideAllBrowserWebviews,
   requestBrowserWebviewLayoutByRuntimeId,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
@@ -25,6 +26,13 @@ const browserBlockingOverlaySelector = [
 
 export function browserBlockingOverlayOpen(root: ParentNode = document): boolean {
   return root.querySelector(browserBlockingOverlaySelector) !== null;
+}
+
+export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
+  return dockLeaves(root).some((pane) => {
+    const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
+    return activeTab?.surfaceId === "browser";
+  });
 }
 
 interface BrowserPageEvent {
@@ -48,6 +56,11 @@ interface BrowserPopupEvent {
   url: string;
 }
 
+interface BrowserCursorEvent {
+  id: string;
+  cursor: string;
+}
+
 interface BrowserDownloadEvent {
   tabId: string;
   path: string;
@@ -58,6 +71,13 @@ interface BrowserDownloadEvent {
 
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
+  const browserSurfaceActive = useWorkspaceStore((state) =>
+    activeBrowserSurfaceExists(state.layout.root),
+  );
+
+  useLayoutEffect(() => {
+    if (!browserSurfaceActive) void hideAllBrowserWebviews();
+  }, [browserSurfaceActive]);
 
   useEffect(() => {
     const beginPointerGesture = () => setBrowserPointerGestureActive(true);
@@ -77,6 +97,9 @@ export function BrowserRuntimeBridge() {
 
   useEffect(() => {
     const reason = "dom-overlay";
+    // This observer is a fallback for app overlays outside Browser chrome.
+    // Browser toolbar menus suspend synchronously in onOpenChange so their
+    // first portal frame cannot race the native child WebView.
     let frame = 0;
     const synchronize = () => {
       frame = 0;
@@ -130,6 +153,11 @@ export function BrowserRuntimeBridge() {
         if (tabId) {
           useWorkspaceStore.getState().updateBrowserTab(tabId, { faviconUrl: payload.url });
         }
+      }),
+      listen<BrowserCursorEvent>("misty://browser-cursor", ({ payload }) => {
+        if (disposed) return;
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (tabId) useBrowserRuntimeStore.getState().setCursor(tabId, payload.cursor);
       }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
         if (disposed) return;

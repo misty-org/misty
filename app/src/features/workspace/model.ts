@@ -14,6 +14,7 @@ export {
 
 export type WorkspaceSurfaceId =
   | "home"
+  | "inbox"
   | "space"
   | "browser"
   | "terminal"
@@ -34,6 +35,46 @@ export interface BrowserTabState {
   version: 1;
   url: string;
   faviconUrl: string | null;
+}
+
+export interface CodeTabState {
+  version: 1;
+  rootPath: string | null;
+  activeFilePath: string | null;
+  explorerWidth: number;
+}
+
+export function createCodeTabState(
+  initial: Partial<Omit<CodeTabState, "version">> = {},
+): CodeTabState {
+  return {
+    version: 1,
+    rootPath: initial.rootPath ?? null,
+    activeFilePath: initial.activeFilePath ?? null,
+    explorerWidth: clampCodeExplorerWidth(initial.explorerWidth),
+  };
+}
+
+export function parseCodeTabState(value: unknown): CodeTabState {
+  if (!value || typeof value !== "object") return createCodeTabState();
+  const candidate = value as Partial<CodeTabState>;
+  return createCodeTabState({
+    rootPath:
+      typeof candidate.rootPath === "string" && candidate.rootPath.trim()
+        ? candidate.rootPath
+        : null,
+    activeFilePath:
+      typeof candidate.activeFilePath === "string" && candidate.activeFilePath.trim()
+        ? candidate.activeFilePath
+        : null,
+    explorerWidth: candidate.explorerWidth,
+  });
+}
+
+function clampCodeExplorerWidth(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(42, Math.max(14, value))
+    : 22;
 }
 
 export function createBrowserTabState(url = browserHomeUrl()): BrowserTabState {

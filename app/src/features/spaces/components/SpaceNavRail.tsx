@@ -10,8 +10,9 @@ import { LockKeyhole, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { invitedSpacePreview } from "../spaceInvitation";
-import { spaceDestination } from "../navigation";
+import { spaceDestination, spaceLandingRoute } from "../navigation";
 import { useSpacesStore } from "../store/useSpacesStore";
+import { useWorkspaceStore } from "@/features/workspace";
 import { SpaceAvatar } from "./SpaceAvatar";
 
 const spaceOrderStorageKey = "misty:space-nav-order:v1";
@@ -99,7 +100,7 @@ export function SpaceNavRail() {
             to={
               invitation
                 ? `/spaces/${encodeURIComponent(space.id)}/invitation`
-                : spaceDestination(location.pathname, space.id)
+                : spaceLandingRoute(space.id, undefined, location.pathname)
             }
             state={{ mistySpaceSwitch: true }}
             aria-label={accessibleLabel}
@@ -110,8 +111,13 @@ export function SpaceNavRail() {
             data-misty-window-drag-block="true"
             data-reorder-drag-source="true"
             onClick={(event) => {
-              if (!suppressClickRef.current) return;
-              event.preventDefault();
+              if (suppressClickRef.current) {
+                event.preventDefault();
+                return;
+              }
+              if (!invitation) {
+                useWorkspaceStore.getState().setScope(`space:${space.id}`);
+              }
             }}
             onDragStart={(event) => {
               suppressClickRef.current = true;

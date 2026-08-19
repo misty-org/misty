@@ -73,10 +73,15 @@ export function selectEditorPreferences(
       30_000,
     ),
     fontFamily: settingsString(source, "editor", "font_family", ""),
-    fontSize: clampSettingsNumber(settingsNumber(source, "editor", "font_size", 12.5), 8, 32),
+    fontSize: clampSettingsNumber(settingsNumber(source, "editor", "font_size", 14), 8, 32),
     formatOnSave: settingsBoolean(source, "editor", "format_on_save", false),
+    interfaceScale:
+      Math.round(
+        clampSettingsNumber(settingsNumber(source, "editor", "interface_scale", 1), 0.8, 1.5) * 10,
+      ) / 10,
     lineNumbers: settingsBoolean(source, "editor", "line_numbers", true),
     tabSize: clampSettingsNumber(settingsNumber(source, "editor", "tab_size", 2), 1, 8),
+    theme: settingsString(source, "editor", "theme", "gruvbox-dark"),
     wordWrap: settingsBoolean(source, "editor", "word_wrap", true),
   };
 }
@@ -250,8 +255,10 @@ export interface EditorPreferences {
   fontFamily: string;
   fontSize: number;
   formatOnSave: boolean;
+  interfaceScale: number;
   lineNumbers: boolean;
   tabSize: number;
+  theme: string;
   wordWrap: boolean;
 }
 

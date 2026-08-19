@@ -14,7 +14,11 @@ import {
   useSettingsStore,
 } from "@/features/settings";
 import { useMultiPanelStore } from "@/features/workspace";
-import { devicesSnapshot, explorerListDirectory } from "@/features/files/native";
+import {
+  devicesSnapshot,
+  explorerListDirectory,
+  explorerPrepareOpenItem,
+} from "@/features/files/native";
 import type {
   DirectoryListing,
   FileEntry,
@@ -44,6 +48,11 @@ import {
   type ReactNode,
 } from "react";
 import { PickerPlaces } from "./PickerPlaces";
+import { resolveMountRoot, resolvePreferredRoot } from "./filePickerPaths";
+import {
+  preparePickerSelections,
+  type MistyFilePickerPreparedSelection,
+} from "./preparePickerSelections";
 
 const emptyProviderRemotes: ProviderRemote[] = [];
 const emptyMountedDevices: MountedDevice[] = [];
@@ -65,6 +74,8 @@ export function MistyFilePicker({
   onCancel,
   onSelect,
   onSelectMany,
+  allowRemoteFiles = false,
+  onSelectPreparedMany,
 }: MistyFilePickerProps) {
   const app = useAppStore((state) => state.app);
   const homeDir = app?.environment.homeDir ?? "";
@@ -93,6 +104,7 @@ export function MistyFilePicker({
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const requestId = useRef(0);
   const selectionAnchorId = useRef<string | null>(null);
 
@@ -183,7 +195,8 @@ export function MistyFilePicker({
   };
 
   const canSelectEntry = (entry: FileEntry) =>
-    entry.location.kind === "local" && matchesModeAndExtension(entry);
+    matchesModeAndExtension(entry) &&
+    (entry.location.kind === "local" || (allowRemoteFiles && mode === "file"));
 
   const browserListing = useMemo(
     () => (listing ? sortListing(listing, sort, directorySizes) : null),
@@ -202,19 +215,34 @@ export function MistyFilePicker({
     void loadPath(path, "none");
   };
 
-  const choose = () => {
+  const choose = async () => {
     if (mode === "folder") {
       const path = selected?.kind === "folder" ? selected.path : listing?.path;
       const location = selected?.kind === "folder" ? selected.location : listing?.location;
       if (path && location?.kind === "local") onSelect(path);
       return;
     }
-    if (multiple && selectedPaths.length > 0) {
-      if (onSelectMany) onSelectMany(selectedPaths);
-      else onSelect(selectedPaths[0]);
-      return;
+    const chosen = multiple ? selectedEntries.filter(canSelectEntry) : selected ? [selected] : [];
+    if (chosen.length === 0) return;
+    setPreparing(true);
+    setError(null);
+    try {
+      const prepared = await preparePickerSelections(chosen, remotes, async (entry) => {
+        const local = await explorerPrepareOpenItem({
+          path: entry.path,
+          sizeBytes: entry.sizeBytes,
+          remoteModified: entry.remoteModified,
+        });
+        return local.localPath;
+      });
+      if (onSelectPreparedMany) onSelectPreparedMany(prepared);
+      else if (multiple && onSelectMany) onSelectMany(prepared.map((item) => item.localPath));
+      else onSelect(prepared[0].localPath);
+    } catch (nextError) {
+      setError(errorText(nextError));
+    } finally {
+      setPreparing(false);
     }
-    if (selected && canSelectEntry(selected)) onSelect(selected.path);
   };
 
   const selectionIsCloud =
@@ -320,7 +348,9 @@ export function MistyFilePicker({
             <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-charcoal-card px-4 py-2.5">
               <CloudDownload className="text-cream-muted" />
               <AlertDescription className="text-xs">
-                Cloud items must be downloaded to a local folder before you can choose them.
+                {allowRemoteFiles
+                  ? "Cloud items are downloaded to Misty’s private cache before import."
+                  : "Cloud items must be downloaded to a local folder before you can choose them."}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -380,16 +410,23 @@ export function MistyFilePicker({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="button" disabled={loading || !canChoose} onClick={choose}>
-            {mode === "folder"
-              ? selected
-                ? "Choose folder"
-                : "Choose this folder"
-              : multiple
-                ? selectedPaths.length > 0
-                  ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
-                  : "Choose files"
-                : "Choose file"}
+          <Button
+            type="button"
+            disabled={loading || preparing || !canChoose}
+            onClick={() => void choose()}
+          >
+            {preparing ? "Preparing import…" : null}
+            {!preparing
+              ? mode === "folder"
+                ? selected
+                  ? "Choose folder"
+                  : "Choose this folder"
+                : multiple
+                  ? selectedPaths.length > 0
+                    ? `Choose ${selectedPaths.length} file${selectedPaths.length === 1 ? "" : "s"}`
+                    : "Choose files"
+                  : "Choose file"
+              : null}
           </Button>
         </div>
       </DialogFooter>
@@ -427,25 +464,6 @@ export function MistyFilePicker({
   );
 }
 
-function joinPath(parent: string, child: string): string {
-  const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
-  return `${parent.replace(/[\\/]+$/, "")}${separator}${child}`;
-}
-
-function resolveMountRoot(homePath: string, configuredPath: string): string {
-  if (/^(?:\/|[A-Za-z]:[\\/])/.test(configuredPath)) return configuredPath.replace(/[\\/]+$/, "");
-  return joinPath(homePath, configuredPath.replace(/^[\\/]+|[\\/]+$/g, ""));
-}
-
-function resolvePreferredRoot(configuredPath: string, homePath: string): string {
-  const trimmed = configuredPath.trim();
-  if (!trimmed || trimmed === "~") return homePath;
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\"))
-    return joinPath(homePath, trimmed.slice(2));
-  if (/^(?:\/|[A-Za-z]:[\\/])/.test(trimmed)) return trimmed;
-  return joinPath(homePath, trimmed);
-}
-
 export type MistyFilePickerMode = "file" | "folder";
 
 export interface MistyFilePickerProps {
@@ -463,4 +481,7 @@ export interface MistyFilePickerProps {
   onCancel: () => void;
   onSelect: (path: string) => void;
   onSelectMany?: (paths: string[]) => void;
+  /** Allow device-local download of connected provider files before selection. */
+  allowRemoteFiles?: boolean;
+  onSelectPreparedMany?: (selection: MistyFilePickerPreparedSelection[]) => void;
 }

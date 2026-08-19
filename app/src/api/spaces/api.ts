@@ -139,6 +139,26 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     provider_exchange_failed: "The provider could not complete sign-in. Try connecting again.",
     provider_token_missing:
       "The provider completed sign-in without returning an access token. Try connecting again.",
+    github_app_not_configured: "GitHub is not configured on this Misty server.",
+    github_repository_permission_denied:
+      "The GitHub App does not have permission to read that repository.",
+    github_write_permission_denied: "The GitHub App does not have permission to make that change.",
+    github_mutation_confirmation_required: "Confirm this GitHub change before continuing.",
+    github_handoff_expired: "That one-time GitHub authorization expired. Try the action again.",
+    github_api_error: "GitHub could not complete that request. Try again in a moment.",
+    figma_api_error: "Figma could not complete that request. Try again in a moment.",
+    figma_rate_limited: "Figma is receiving too many requests. Wait a moment, then try again.",
+    figma_response_too_large:
+      "That Figma file is too large to read safely. Link a smaller file or project source.",
+    figma_comment_confirmation_required: "Review and confirm this Figma comment before posting.",
+    figma_idempotency_key_required: "Review this Figma comment again before posting.",
+    figma_comment_already_claimed:
+      "That Figma comment was already submitted. Refresh the file context before trying again.",
+    figma_discovery_unavailable:
+      "Project browsing is unavailable for this Figma app. Paste a direct file link instead.",
+    figma_webhook_setup_failed:
+      "Figma live sync could not be started. Check the connected user’s Can edit access.",
+    figma_sync_failed: "Figma context could not be refreshed. Try syncing again.",
     reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
@@ -196,6 +216,23 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/authorize`,
       { method: "POST", body: JSON.stringify({ return_to: returnTo }) },
     ),
+  bindAccountConnection: (
+    spaceId: string,
+    provider: string,
+    connectionId: string,
+    capability: "calendar_read" | "calendar_write",
+  ) =>
+    spaceRequest<{ integration: SpaceIntegration; connection_id: string; capability: string }>(
+      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/bind`,
+      {
+        method: "POST",
+        body: JSON.stringify({ connection_id: connectionId, capability }),
+      },
+    ),
+  deleteProviderIntegration: (integrationId: string) =>
+    spaceRequest<void>(`/integrations/${encodeURIComponent(integrationId)}`, {
+      method: "DELETE",
+    }),
   availableProviderResources: (spaceId: string, integrationId: string) =>
     spaceRequest<{ resources: AvailableProviderResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
