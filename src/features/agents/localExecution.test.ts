@@ -355,7 +355,7 @@ it("foreground control and separate browser execution retain distinct authority"
   expect(mocks.startAutopilot).toHaveBeenCalledWith(execution.taskId, "owner", "", undefined);
   expect(execution.deviceContexts[0].capabilities).toEqual([
     "browser.workspace.visual",
-    "browser.workspace.interact",
+    "browser.act",
   ]);
   expect(execution.deviceContexts[0].metadata?.workspace_control).toBe(true);
   await finishLocalExecution();
@@ -377,7 +377,7 @@ it("binds desktop control without moving focus or substituting an ordinary brows
     request: expect.objectContaining({ url: "about:blank" }),
   });
   expect(execution.deviceContexts[0]).toMatchObject({
-    capabilities: ["browser.workspace.visual", "browser.workspace.interact"],
+    capabilities: ["browser.workspace.visual", "browser.act"],
     metadata: { desktop_control: true },
   });
   await settleLocalExecution("finished", execution.taskId);

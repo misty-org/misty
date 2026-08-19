@@ -143,9 +143,11 @@ Each phase leaves the product working.
 - One account setting, *Ask before acting for you* (default on), covers sends,
   posts, shares, invites, payments, access changes and deletes in connected
   apps. Misty's own tools keep their current behavior.
-- The SDK provider capability system stays for now: it also carries the
-  official browser execution path. Remove it after Phase 4 retires the
-  low-level browser tools.
+- The SDK provider capability system stays for now. It is effectively unused
+  (no capability bindings are pinned in practice) but its official browser
+  providers are woven into the Planner provider and target resolution, and its
+  approval tables are shared with every runtime run. Removing it is a separate,
+  careful change.
 
 ### Phase 3 — Screens on demand (implemented and verified live October 4, 2026)
 
@@ -189,14 +191,43 @@ Each phase leaves the product working.
   user asked for exactly that.
 - Desktop browser grants no longer include `browser.click`, `browser.type` or
   `browser.interact`, so Misty-window tasks act only through `browser_act`.
-  The runtime's server-side planner (`misty_browser_act`) remains for paths
-  that still grant native input directly.
+  The runtime's server-side planner (`misty_browser_act`), its Midscene
+  dependency and the pinned SDK execution path were removed once no run could
+  grant native input directly.
+- Screen calls use the run's frozen *vision* route, which defaults to the run's
+  model. When the account points that route at its own provider connection,
+  calls go there with the account's key; billing meters the same route.
 - Midscene's Node-only helpers get browser stubs in the desktop build
   (`src/shared/platform/nodeShims`); reports and caches are not written.
-- Scope: Misty's own windows. Other Mac apps would need the user's real
-  pointer, so desktop control keeps its existing workspace tools for now.
+- Scope at first: Misty's own windows. Other Mac apps came next (below).
 - The companion stays the teacher: `screen_look` through it captures every
   display, so answers can point at things on screen while the user clicks.
+
+### Other Mac apps with Misty's own cursor (implemented October 4, 2026)
+
+- `screen_open` takes `target: desktop` for work in another app (Numbers,
+  Finder, Mail). The run hands off, desktop control starts after the user
+  allows it (when *Ask* is on), and the conversation continues with the
+  desktop attached. Desktop and Misty-window screens grant
+  `browser.workspace.visual` and `browser_act`, so the model works in goals
+  there too; the act job grants itself the workspace input it needs.
+- The same local loop runs on these surfaces. Midscene plans single clicks,
+  typing, named keys and scrolling; dragging is not available, and the
+  planner is told so.
+- Misty's cursor on the desktop is a click-through overlay drawn with the
+  same arrow as the in-page and Misty-window cursors, kept visible in every
+  capture. Clicks press the control under it or focus the field through
+  Accessibility; text is inserted into that field; keys and scrolling go only
+  to the target app. The person's pointer never moves and their input is never
+  blocked; Escape and Stop still end the task. Misty refuses to operate its own
+  control strip.
+- Accessibility cannot press everything (canvas apps, custom controls). Those
+  steps report that nothing usable is at the point, and a goal that makes no
+  visible progress stops after three tries.
+- `npm run check:desktop-agent` is the live check: it opens a scratch text file
+  in TextEdit, clicks into it, types and selects through the agent pointer,
+  and confirms the person's pointer did not move. It needs Accessibility for
+  the terminal that runs it.
 
 ## Acceptance prompts
 

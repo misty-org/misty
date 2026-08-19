@@ -36,6 +36,8 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
         println!("cargo:rerun-if-changed=native/macos/MistyBrowserInput.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopControl.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
@@ -50,6 +52,7 @@ fn main() {
             .file("native/macos/MistyAutopilot.m")
             .file("native/macos/MistyBrowserInput.m")
             .file("native/macos/MistyDesktopControl.m")
+            .file("native/macos/MistyAgentPointer.m")
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .flag("-fobjc-arc")

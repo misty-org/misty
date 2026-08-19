@@ -134,3 +134,52 @@ it("ends the goal when the page stops responding to its actions", async () => {
     'The screenshot did not change after "Click Save". Try something different or report that you cannot finish.',
   );
 });
+
+it("acts on the desktop through workspace actions with Misty's own cursor", async () => {
+  const desktop = { ...job, config: { ...job.config, surface: "desktop" } };
+  mocks.invoke.mockImplementation(
+    async (name: string, args: { request: { operation: string } }) => {
+      if (name === "browser_runtime_for_scope") return "runtime";
+      if (name !== "browser_agent_execute") return undefined;
+      return args.request.operation === "browser.workspace.visual"
+        ? { ...frame, image: { ...frame.image, dataUrl: `data:${Math.random()}` } }
+        : { attempted: true };
+    },
+  );
+  mocks.plan
+    .mockResolvedValueOnce({
+      action: { kind: "drag", fromX: 0.1, fromY: 0.1, toX: 0.2, toY: 0.2 },
+      consequential: false,
+      description: "Drag the slider",
+      complete: false,
+      message: "",
+    })
+    .mockResolvedValueOnce({
+      action: { kind: "click", x: 0.4, y: 0.6 },
+      consequential: false,
+      description: "Click Add Row",
+      complete: false,
+      message: "",
+    })
+    .mockResolvedValueOnce({
+      action: { kind: "key", key: "SelectAll" },
+      consequential: false,
+      description: "Select the cell text",
+      complete: false,
+      message: "",
+    })
+    .mockResolvedValueOnce({ complete: true, message: "Row added." });
+  const result = await runScreenAct(desktop, new AbortController().signal);
+  expect(result).toMatchObject({ status: "done", actions: 2, cursor: { x: 0.4, y: 0.6 } });
+  expect(mocks.invoke).toHaveBeenCalledWith("browser_agent_grant_register", {
+    request: expect.objectContaining({
+      capabilities: ["browser.workspace.visual", "browser.workspace.interact"],
+    }),
+  });
+  expect(calls("browser.workspace.interact").map(([, args]) => args.request.input.action)).toEqual([
+    { kind: "point", x: 0.4, y: 0.6 },
+    { kind: "key", key: "SelectAll" },
+  ]);
+  expect(mocks.plan.mock.calls[1][4][0]).toContain("drag is not available here");
+  expect(mocks.plan.mock.calls[0][5]).toBe("desktop");
+});

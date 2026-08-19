@@ -2,6 +2,7 @@
 #import <ApplicationServices/ApplicationServices.h>
 #import <Carbon/Carbon.h>
 #import "MistyDesktopCapture.h"
+#import "MistyAgentPointer.h"
 
 static NSString *task;
 static BOOL stopped, controlling;
@@ -34,7 +35,7 @@ static void (*notifyStopped)(const char *);
 }
 @end
 static MistyDesktopAsk *askPanel;
-static const int64_t agentEventTag = 0x4d49535459414754;
+static const int64_t agentEventTag = MistyAgentEventTag;
 
 static char *DesktopJSON(NSDictionary *value) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
@@ -58,6 +59,7 @@ static void stopControl(NSString *reason) {
   }
   [watchdog invalidate]; watchdog = nil;
   [controlPanel orderOut:nil]; controlPanel = nil;
+  misty_agent_pointer_hide();
   MistyDesktopCaptureStop();
   if (announce && notifyStopped) {
     char *value = DesktopJSON(@{@"taskId": task ?: @"", @"reason": reason});
@@ -73,28 +75,22 @@ static void stopControl(NSString *reason) {
 - (void)stopPressed:(id)sender { stopControl(@"Desktop control stopped. You have control."); }
 @end
 
+// Misty acts with its own cursor, so the person's input is never blocked. The
+// tap only listens for Escape and the voice shortcut, which stop the task.
 static CGEventRef guardInput(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *info) {
   (void)proxy;
   (void)info;
   if (type == kCGEventTapDisabledByTimeout || type == kCGEventTapDisabledByUserInput) {
-    stopControl(@"Desktop input protection stopped. You have control."); return event;
+    stopControl(@"Desktop control stopped. You have control."); return event;
   }
   if (!controlling || CGEventGetIntegerValueField(event, kCGEventSourceUserData) == agentEventTag) return event;
   if (type == kCGEventKeyDown && CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == kVK_Escape) {
     stopControl(@"Desktop control stopped with Escape. You have control."); return NULL;
   }
   CGEventFlags flags = CGEventGetFlags(event);
-  if (type == kCGEventFlagsChanged && (flags & kCGEventFlagMaskControl) && (flags & kCGEventFlagMaskAlternate)) {
-    stopControl(@"Desktop control interrupted by the voice shortcut."); return event;
-  }
-  // Let the user reach the native Stop button. Clicks/keys elsewhere cannot
-  // navigate, type, scroll, switch tabs, or alter the agent's target.
-  if (type == kCGEventMouseMoved) return event;
-  CGPoint point = CGEventGetLocation(event);
-  CGFloat top = CGDisplayBounds(CGMainDisplayID()).size.height;
-  if (controlPanel.visible && NSPointInRect(NSMakePoint(point.x, top - point.y), controlPanel.frame) &&
-      (type == kCGEventLeftMouseDown || type == kCGEventLeftMouseUp)) return event;
-  return NULL;
+  if (type == kCGEventFlagsChanged && (flags & kCGEventFlagMaskControl) && (flags & kCGEventFlagMaskAlternate))
+    stopControl(@"Desktop control interrupted by the voice shortcut.");
+  return event;
 }
 
 static NSString *beginControl(CGDirectDisplayID displayID) {
@@ -104,15 +100,11 @@ static NSString *beginControl(CGDirectDisplayID displayID) {
   NSString *name = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?: NSProcessInfo.processInfo.processName;
   if (!CGPreflightScreenCaptureAccess()) return [NSString stringWithFormat:@"Allow %@ in System Settings → Privacy & Security → Screen Recording, then retry.", name];
   if (!AXIsProcessTrusted()) return [NSString stringWithFormat:@"Allow %@ in System Settings → Privacy & Security → Accessibility to control the desktop, then retry.", name];
-  CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) | CGEventMaskBit(kCGEventFlagsChanged) |
-    CGEventMaskBit(kCGEventLeftMouseDown) | CGEventMaskBit(kCGEventLeftMouseUp) | CGEventMaskBit(kCGEventRightMouseDown) |
-    CGEventMaskBit(kCGEventRightMouseUp) | CGEventMaskBit(kCGEventOtherMouseDown) | CGEventMaskBit(kCGEventOtherMouseUp) |
-    CGEventMaskBit(kCGEventMouseMoved) | CGEventMaskBit(kCGEventLeftMouseDragged) | CGEventMaskBit(kCGEventRightMouseDragged) |
-    CGEventMaskBit(kCGEventOtherMouseDragged) | CGEventMaskBit(kCGEventScrollWheel);
+  CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged);
   inputTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault, mask, guardInput, NULL);
-  if (!inputTap) return @"Desktop input protection is unavailable. Check Accessibility and Input Monitoring for Misty.";
+  if (!inputTap) return @"Desktop control is unavailable. Check Accessibility for Misty.";
   inputSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, inputTap, 0);
-  if (!inputSource) { stopControl(nil); return @"Desktop input protection could not start."; }
+  if (!inputSource) { stopControl(nil); return @"Desktop control could not start."; }
   CFRunLoopAddSource(CFRunLoopGetMain(), inputSource, kCFRunLoopCommonModes);
   CGEventTapEnable(inputTap, YES);
   controlling = YES;
@@ -130,7 +122,7 @@ static NSString *beginControl(CGDirectDisplayID displayID) {
   panel.backgroundColor = [NSColor colorWithWhite:0.10 alpha:1];
   panel.contentView.wantsLayer = YES;
   panel.contentView.layer.cornerRadius = 10;
-  NSTextField *label = [NSTextField labelWithString:@"Misty is controlling this screen · Esc to stop"];
+  NSTextField *label = [NSTextField labelWithString:@"Misty is working with its own cursor · Esc to stop"];
   label.frame = NSMakeRect(12, 13, 333, 18);
   label.textColor = NSColor.whiteColor;
   label.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
@@ -179,7 +171,7 @@ static NSString *confirmControl(NSString *expected) {
     panel.level = NSStatusWindowLevel;
     panel.hidesOnDeactivate = NO;
     panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
-    NSTextField *label = [NSTextField wrappingLabelWithString:@"Misty is ready to use your screen, mouse, and keyboard for this task. You can stop at any time with Escape or Stop."];
+    NSTextField *label = [NSTextField wrappingLabelWithString:@"Misty is ready to use your apps with its own cursor for this task. Your pointer and keyboard stay yours. Stop at any time with Escape or Stop."];
     label.frame = NSMakeRect(20, 65, 370, 70);
     [panel.contentView addSubview:label];
     NSButton *cancel = [NSButton buttonWithTitle:@"Cancel" target:panel action:@selector(decline:)];
@@ -258,14 +250,8 @@ char *misty_desktop_capture(const char *taskID) {
   }
 }
 
-static void post(CGEventRef event) {
-  if (!event) return;
-  CGEventSetIntegerValueField(event, kCGEventSourceUserData, agentEventTag);
-  CGEventPost(kCGSessionEventTap, event);
-  CFRelease(event);
-}
 // Rust validates the task, operation grant, one-use snapshot and action first.
-// Main-queue dispatch rechecks native Stop and foreground identity before input.
+// Main-queue dispatch rechecks native Stop and display geometry before acting.
 char *misty_desktop_action(const char *json) {
   @autoreleasepool {
     if (stopped || !controlling || leaseUntil <= NSProcessInfo.processInfo.systemUptime)
@@ -277,51 +263,18 @@ char *misty_desktop_action(const char *json) {
     if (frame.count != 4 || !CGDisplayIsActive([input[@"displayID"] unsignedIntValue]) ||
         !CGRectEqualToRect(bounds, CGRectMake([frame[0] doubleValue], [frame[1] doubleValue], [frame[2] doubleValue], [frame[3] doubleValue])))
       return DesktopJSON(@{@"error": @"browser_snapshot_stale: display geometry changed; inspect again"});
-    if (NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier != [input[@"foregroundPID"] intValue])
-      return DesktopJSON(@{@"error": @"browser_snapshot_stale: the foreground app changed; inspect again"});
+    // The person may keep working in other apps, so the foreground app can
+    // change; Accessibility targets the control under Misty's own cursor.
     NSDictionary *action = input[@"action"];
-    NSString *kind = action[@"kind"];
-    if ([kind isEqual:@"point"] || [kind isEqual:@"scroll"]) {
-      CGPoint point = CGPointMake(bounds.origin.x + [action[@"x"] doubleValue] * bounds.size.width,
-        bounds.origin.y + [action[@"y"] doubleValue] * bounds.size.height);
-      post(CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, point, kCGMouseButtonLeft));
-      if ([kind isEqual:@"point"]) {
-        for (NSNumber *type in @[@(kCGEventLeftMouseDown), @(kCGEventLeftMouseUp)]) {
-          CGEventRef event = CGEventCreateMouseEvent(NULL, type.unsignedIntValue, point, kCGMouseButtonLeft);
-          CGEventSetIntegerValueField(event, kCGMouseEventClickState, 1);
-          post(event);
-        }
-      } else {
-        CGEventRef event = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 2,
-          -[action[@"deltaY"] intValue], -[action[@"deltaX"] intValue]);
-        CGEventSetLocation(event, point); post(event);
-      }
-    } else if ([kind isEqual:@"type"]) {
-      NSString *text = action[@"text"];
-      for (NSUInteger offset = 0; offset < text.length;) {
-        NSRange range = [text rangeOfComposedCharacterSequencesForRange:NSMakeRange(offset, MIN(20, text.length - offset))];
-        UniChar chars[64];
-        if (range.length > 64) return DesktopJSON(@{@"error": @"Text contains an unsupported character sequence."});
-        [text getCharacters:chars range:range];
-        CGEventRef event = CGEventCreateKeyboardEvent(NULL, 0, YES);
-        CGEventSetFlags(event, 0); CGEventKeyboardSetUnicodeString(event, range.length, chars); post(event);
-        CGEventRef up = CGEventCreateKeyboardEvent(NULL, 0, NO); CGEventSetFlags(up, 0); post(up);
-        offset = NSMaxRange(range);
-      }
-    } else if ([kind isEqual:@"key"]) {
-      NSString *key = action[@"key"];
-      NSDictionary *keys = @{@"Enter": @(kVK_Return), @"Escape": @(kVK_Escape), @"Tab": @(kVK_Tab), @"Backspace": @(kVK_Delete),
-        @"ArrowLeft": @(kVK_LeftArrow), @"ArrowRight": @(kVK_RightArrow), @"ArrowUp": @(kVK_UpArrow), @"ArrowDown": @(kVK_DownArrow),
-        @"SelectAll": @(kVK_ANSI_A), @"Undo": @(kVK_ANSI_Z), @"AddressBar": @(kVK_ANSI_L), @"NewTab": @(kVK_ANSI_T), @"Find": @(kVK_ANSI_F)};
-      NSNumber *code = keys[key];
-      if (!code) return DesktopJSON(@{@"error": @"Unsupported desktop key."});
-      BOOL command = [@[@"SelectAll", @"Undo", @"AddressBar", @"NewTab", @"Find"] containsObject:key];
-      for (NSNumber *down in @[@YES, @NO]) {
-        CGEventRef event = CGEventCreateKeyboardEvent(NULL, code.unsignedShortValue, down.boolValue);
-        CGEventSetFlags(event, command ? kCGEventFlagMaskCommand : 0); post(event);
-      }
-    } else return DesktopJSON(@{@"error": @"Unsupported desktop action."});
+    double x = [action[@"x"] doubleValue], y = [action[@"y"] doubleValue];
+    CGPoint point = CGPointMake(bounds.origin.x + x * bounds.size.width, bounds.origin.y + y * bounds.size.height);
+    NSDictionary *result = MistyAgentDesktopAction(action, point);
+    if (result[@"error"]) return DesktopJSON(@{@"error": result[@"error"]});
     lastActionAt = NSDate.date.timeIntervalSince1970;
-    return DesktopJSON(@{@"attempted": @YES, @"verified": @NO, @"input": @"macos-events"});
+    NSMutableDictionary *output = [@{@"attempted": @YES, @"verified": @NO, @"input": @"accessibility", @"effect": result[@"effect"] ?: @""} mutableCopy];
+    if (result[@"role"]) output[@"target"] = @{@"role": result[@"role"], @"title": result[@"title"] ?: @""};
+    NSString *kind = action[@"kind"];
+    if ([kind isEqual:@"point"] || [kind isEqual:@"scroll"]) output[@"cursor"] = @{@"x": @(x), @"y": @(y)};
+    return DesktopJSON(output);
   }
 }

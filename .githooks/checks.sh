@@ -7,6 +7,11 @@
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
 cd "$root"
+# Git exports GIT_DIR and friends to hooks (all of them in a linked
+# worktree). Tests that create their own repositories must not inherit them,
+# or their git init and config would write to this repository. From the
+# checkout root, git finds the same repository without them.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 hooks="$root/.githooks"
 
 frontend() {
@@ -37,6 +42,15 @@ rust_desktop() {
   done
 }
 # The same pinned gitleaks image and configuration the old CI used.
+# A linked worktree and the main repository's git directory point at each
+# other by absolute path, so a worktree is mounted at its own path.
+repo=/repo
+git_mounts=(-v "$root:/repo:ro")
+git_common=$(cd "$(git rev-parse --git-common-dir)" && pwd)
+if [ "$git_common" != "$root/.git" ]; then
+  repo=$root
+  git_mounts=(-v "$root:$root:ro" -v "$git_common:$git_common:ro")
+fi
 gitleaks_image=zricethezav/gitleaks@sha256:e1b35e12a8c6fa8901f060459cfb6b2fc4c484d3afbe3b029733a3bbfab07055
 # Scans commits, never the working folder: git-ignored .env files stay out.
 # On push, only the commits the remote does not have yet.
@@ -46,12 +60,12 @@ secrets() {
     range="$upstream..HEAD"
   fi
   [ -z "$(git rev-list "$range" 2>/dev/null | head -n 1)" ] && { echo "No new commits to scan."; return 0; }
-  docker run --rm -v "$root:/repo:ro" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory \
-    -e GIT_CONFIG_VALUE_0=/repo "$gitleaks_image" detect --source=/repo --redact --log-opts="$range" --config=/repo/.config/gitleaks.toml
+  docker run --rm "${git_mounts[@]}" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory \
+    -e GIT_CONFIG_VALUE_0="$repo" "$gitleaks_image" detect --source="$repo" --redact --log-opts="$range" --config="$repo/.config/gitleaks.toml"
 }
 staged_secrets() {
-  docker run --rm -v "$root:/repo:ro" -w /repo -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory \
-    -e GIT_CONFIG_VALUE_0=/repo "$gitleaks_image" protect --staged --source=/repo --redact --config=/repo/.config/gitleaks.toml
+  docker run --rm "${git_mounts[@]}" -w "$repo" -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory \
+    -e GIT_CONFIG_VALUE_0="$repo" "$gitleaks_image" protect --staged --source="$repo" --redact --config="$repo/.config/gitleaks.toml"
 }
 
 run() {
