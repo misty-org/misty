@@ -1,7 +1,7 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
-import { Avatar, AvatarFallback, AvatarImage, Badge, BrandIcon, Button } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Badge, Button } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -12,8 +12,6 @@ import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { initials, isAgentAuthoredMessage } from "./messageHelpers";
-import { InstagramBrandIcon } from "../../social/InstagramBrandIcon";
-import { MessengerBrandIcon, XBrandIcon } from "../../social/SocialProviderBrandIcons";
 
 export interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -178,26 +176,6 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
           <Bot />
           Agent
-        </Badge>
-      ) : null}
-      {message.social_provider === "instagram" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <InstagramBrandIcon size={12} />
-          Instagram
-        </Badge>
-      ) : message.social_provider === "discord" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <BrandIcon brand="discord" size={12} />
-          Discord
-        </Badge>
-      ) : message.social_provider === "messenger" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <MessengerBrandIcon size={12} />
-          Messenger
-        </Badge>
-      ) : message.social_provider === "x" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <XBrandIcon size={12} />X
         </Badge>
       ) : null}
       <time className="text-[11px] tabular-nums text-cream-muted">

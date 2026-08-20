@@ -1,7 +1,7 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Hash, MessagesSquare, MoreHorizontal, Plus, User, Users } from "lucide-react";
+import { Hash, MoreHorizontal, Plus, User, Users } from "lucide-react";
 import {
   Button,
   CollectionPage,
@@ -21,12 +21,7 @@ import {
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { useSpaceItemCreator } from "../useSpaceItemCreator";
-import {
-  socialConversationPath,
-  socialProvider,
-  socialProviderFromRoute,
-  socialProviderPath,
-} from "../social/socialRoute";
+import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { conversationName } from "./sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
@@ -38,8 +33,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceSocial>) 
   const detail = Boolean(
     location.pathname.split("/")[4] || new URLSearchParams(location.search).has("conversation"),
   );
-  if (detail)
-    return <SpaceSocial {...props} provider={socialProviderFromRoute(location.pathname)} />;
+  if (detail) return <SpaceSocial {...props} />;
   return <ChatCollection key={props.spaceId} spaceId={props.spaceId} />;
 }
 export function ChatCollection({ spaceId }: { spaceId: string }) {
@@ -60,28 +54,17 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
   const rows = data.conversations
     .filter((c) => !c.direct_agent_id)
     .map((c) => {
-      const provider = socialProvider(c.origin) ?? "misty";
-      const category =
-        provider !== "misty" ? "Connected" : c.kind === "direct" ? "Direct" : "Channels";
-      const open = () => navigate(socialConversationPath(spaceId, provider, c.id));
+      const category = c.kind === "direct" ? "Direct" : "Channels";
+      const open = () => navigate(spaceChatConversationPath(spaceId, c.id));
       return {
         id: c.id,
         title: conversationName(c, user?.id),
         category,
-        icon:
-          category === "Channels" ? (
-            <Hash />
-          ) : category === "Direct" ? (
-            <User />
-          ) : (
-            <MessagesSquare />
-          ),
+        icon: category === "Channels" ? <Hash /> : <User />,
         tone: itemTones.chat,
         creator: creator(c.created_by_user_id),
         metadata: {
           Members: c.participants.length,
-          Source:
-            provider === "misty" ? "Misty" : provider.charAt(0).toUpperCase() + provider.slice(1),
           Created: new Date(c.created_at).toLocaleDateString(),
         },
         sortValues: { Created: Date.parse(c.created_at) },
@@ -102,7 +85,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={open}>Open</DropdownMenuItem>
-              {c.created_by_user_id === user?.id && c.kind !== "direct" && provider === "misty" && (
+              {c.created_by_user_id === user?.id && c.kind !== "direct" && (
                 <DropdownMenuItem onSelect={() => setEditing(c)}>
                   Edit conversation
                 </DropdownMenuItem>
@@ -119,13 +102,13 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
     icon: <Users />,
     tone: itemTones.chat,
     creator: "Space members",
-    metadata: { Members: members?.length ?? 0, Source: "Misty", Created: "—" },
+    metadata: { Members: members?.length ?? 0, Created: "—" },
     sortValues: { Created: NaN },
     timestamp: "",
     ownership: "others",
     updatedAt: "",
     updated: "—",
-    onOpen: () => navigate(socialProviderPath(spaceId, "misty")),
+    onOpen: () => navigate(spaceChatPath(spaceId)),
     actions: <></>,
   });
   const searched = rows.filter(
@@ -172,7 +155,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
       <CollectionFilters
         collectionId="chat"
         value={section}
-        options={["All", "Channels", "Direct", "Connected"].map((label) => ({
+        options={["All", "Channels", "Direct"].map((label) => ({
           value: label,
           label,
         }))}
@@ -210,7 +193,7 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
         onSaved={(saved) => {
           data.upsert(saved);
           setEditing(undefined);
-          navigate(socialConversationPath(spaceId, "misty", saved.id));
+          navigate(spaceChatConversationPath(spaceId, saved.id));
         }}
       />
     </CollectionPage>
