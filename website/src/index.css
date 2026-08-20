@@ -398,3 +398,99 @@ button:disabled {
     transform: none !important;
   }
 }
+
+/* ── App-native mockup surfaces ──────────────────────────────────────────
+ *
+ * Marketing chrome renders in Inter. Anything *inside* a product mockup
+ * renders in the platform UI font instead, because the mockup is pretending
+ * to be the real desktop app rather than a picture of it. Keeping the two
+ * stacks distinct is most of why a hand-built mockup reads as a real window.
+ *
+ * The palette below is the desktop app's own charcoal/cream scale, copied
+ * verbatim from app/src/styles/styles.css. When the app's palette moves,
+ * these move with it.
+ */
+.app-chrome {
+  --app-workspace: #0f0f0f;
+  --app-bg: #131313;
+  --app-sidebar: #161616;
+  --app-card: #191919;
+  --app-border: #262626;
+  --app-hover: #2b2b2b;
+  --app-active: #3e3e3e;
+  --app-ink: #e0e0e0;
+  --app-ink-bright: #f1f1f1;
+  --app-ink-muted: #8c8c8c;
+
+  font-family:
+    -apple-system, system-ui, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--app-ink);
+  background-color: var(--app-bg);
+  /* The app runs at a 16px root; the marketing site runs at 17px. Without
+     this the mockup's type comes out a size too large for its own chrome. */
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-chrome h1,
+.app-chrome h2,
+.app-chrome h3,
+.app-chrome h4 {
+  font-family: inherit;
+}
+
+/* ── Full-bleed dark band ────────────────────────────────────────────────
+ *
+ * Re-points the marketing tokens instead of hardcoding colors, so every
+ * child component keeps working unchanged inside the band — in either theme.
+ */
+.marketing-dark {
+  --marketing-surface: #161616;
+  --marketing-border: rgba(255, 255, 255, 0.1);
+  --marketing-border-strong: rgba(255, 255, 255, 0.18);
+  --marketing-foreground: #f1f1f1;
+  --marketing-muted: #8c8c8c;
+
+  background-color: #0f0f0f;
+  color: var(--marketing-foreground);
+}
+
+/* ── Scroll-pinned sections ──────────────────────────────────────────────
+ *
+ * A tall parent scrolls past a viewport-height sticky child; scroll progress
+ * inside the parent selects which beat is active. Under reduced motion the
+ * whole thing is unpinned into a plain stacked list (see below), so no
+ * content is reachable only by animating.
+ */
+.pin-stage {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100svh;
+  align-items: center;
+  overflow: hidden;
+}
+
+.pin-beat {
+  transition:
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Under reduced motion the pinned track is dropped outright and the stacked
+ * fallback takes over at every width. Unpinning in place would leave the
+ * beats stacked in one grid cell on top of each other; swapping to the list
+ * that already exists for small screens is both simpler and the only version
+ * where every beat is actually readable.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .pin-track {
+    display: none !important;
+  }
+
+  .pin-stacked {
+    display: block !important;
+  }
+}

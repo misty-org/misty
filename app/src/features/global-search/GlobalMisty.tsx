@@ -4,6 +4,7 @@ import {
   useExplorerStore,
 } from "@/features/files/explorer";
 import { Button, ScrollArea, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
+import { useDismissableLayer } from "@/shared/hooks/useDismissableLayer";
 import { ArrowUp, CircleAlert, Loader2, X } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useMemo, useRef } from "react";
@@ -125,22 +126,11 @@ export function GlobalMisty(props: {
   useEffect(() => {
     if (!launcherOpen) return;
     const focusTimer = window.setTimeout(() => launcherInputRef.current?.focus(), 0);
-    const dismiss = (event: PointerEvent) => {
-      if (!launcherRef.current?.contains(event.target as Node)) closePanel();
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      closePanel();
-    };
-    window.addEventListener("pointerdown", dismiss, true);
-    window.addEventListener("keydown", escape, true);
     return () => {
       window.clearTimeout(focusTimer);
-      window.removeEventListener("pointerdown", dismiss, true);
-      window.removeEventListener("keydown", escape, true);
     };
-  }, [closePanel, launcherOpen]);
+  }, [launcherOpen]);
+  useDismissableLayer({ active: launcherOpen, layerRef: launcherRef, onDismiss: closePanel });
   useEffect(() => {
     setBrowserWebviewsSuspended(open || launcherOpen, "global-misty");
     return () => setBrowserWebviewsSuspended(false, "global-misty");
@@ -360,6 +350,7 @@ export function GlobalMisty(props: {
               inputRef={launcherInputRef}
               onModeChange={setMode}
               onQueryChange={setQuery}
+              onDismiss={closePanel}
               onExpand={() => openPanel(currentContext)}
             />
           ) : null}

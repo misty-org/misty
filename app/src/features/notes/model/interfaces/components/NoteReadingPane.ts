@@ -18,7 +18,6 @@ export interface NoteReadingPaneProps {
   onSaveBody?: (noteId: string, body: string) => void;
   onSaveContent?: (noteId: string, content: NoteContentDraft) => void;
   onDelete?: (noteId: string) => Promise<void>;
-  onToggleFavorite?: (noteId: string) => void;
   onNewNote: () => void;
 }
 

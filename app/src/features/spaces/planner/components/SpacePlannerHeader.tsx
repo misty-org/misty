@@ -1,6 +1,7 @@
 import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Badge, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 
 /** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
@@ -33,6 +34,7 @@ export function SpacePlannerHeader({
       <h1 className="m-0 shrink-0 text-sm font-semibold">Tasks</h1>
 
       <div className="ml-auto flex items-center gap-3">
+        <AiSurfaceButton />
         {showSearch ? (
           <div className="relative w-44">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />

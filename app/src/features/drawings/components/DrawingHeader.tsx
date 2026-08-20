@@ -13,6 +13,7 @@ import {
   Input,
   cn,
 } from "@/shared/ui";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 import { Check, Puzzle, Trash2 } from "lucide-react";
 import { FaFigma } from "react-icons/fa6";
 import { useEffect, useRef, useState } from "react";
@@ -104,6 +105,8 @@ export function DrawingHeader(props: {
       </div>
 
       <ConnectionBadge state={props.connection} />
+
+      <AiSurfaceButton />
 
       {props.onOpenFigma ? (
         <Button type="button" size="sm" variant="ghost" onClick={props.onOpenFigma}>

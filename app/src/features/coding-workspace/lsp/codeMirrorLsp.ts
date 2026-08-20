@@ -3,34 +3,37 @@ import {
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  snippetCompletion,
 } from "@codemirror/autocomplete";
-import { setDiagnostics, type Diagnostic } from "@codemirror/lint";
-import { StateEffect, StateField, type Extension, type Text } from "@codemirror/state";
-import { EditorView, ViewPlugin, hoverTooltip, keymap } from "@codemirror/view";
+import { forEachDiagnostic, setDiagnostics, type Diagnostic } from "@codemirror/lint";
+import { StateEffect, StateField, type Extension } from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  WidgetType,
+  hoverTooltip,
+  showTooltip,
+  type DecorationSet,
+  type Tooltip,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { getLspClient, languageFor } from "./useLsp";
 import { pathToUri, uriToPath } from "./client";
-
-export interface Position {
-  line: number;
-  character: number;
-}
-
-export interface LspRange {
-  start: Position;
-  end: Position;
-}
-
-export interface LspDiagnostic {
-  range: LspRange;
-  severity?: number;
-  message: string;
-  source?: string;
-}
-
-export interface TextEdit {
-  range: LspRange;
-  newText: string;
-}
+import { useEditorEphemeralStore } from "../store/useEditorEphemeralStore";
+import {
+  offsetToPosition,
+  positionToOffset,
+  type DocumentSymbol,
+  type LspCodeAction,
+  type LspDiagnostic,
+  type LspLocation,
+  type LspRange,
+  type Position,
+  type TextEdit,
+  type WorkspaceEdit,
+} from "./lspOperations";
+export * from "./lspOperations";
 
 interface LspContext {
   path: string;
@@ -40,6 +43,10 @@ interface LspContext {
 }
 
 const setLspContext = StateEffect.define<LspContext | null>();
+const setInlayHints = StateEffect.define<Array<{ position: number; label: string }>>();
+const setDocumentHighlights = StateEffect.define<Array<{ from: number; to: number }>>();
+const setSignatureHelp = StateEffect.define<{ position: number; label: string } | null>();
+const setManualHover = StateEffect.define<Tooltip | null>();
 
 const lspContextField = StateField.define<LspContext | null>({
   create: () => null,
@@ -51,16 +58,98 @@ const lspContextField = StateField.define<LspContext | null>({
   },
 });
 
-export function offsetToPosition(doc: Text, offset: number): Position {
-  const clamped = Math.min(Math.max(0, offset), doc.length);
-  const line = doc.lineAt(clamped);
-  return { line: line.number - 1, character: clamped - line.from };
-}
+const inlayHintsField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    value = value.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (effect.is(setInlayHints)) {
+        return Decoration.set(
+          effect.value.map((hint) =>
+            Decoration.widget({ widget: new InlayHintWidget(hint.label), side: 1 }).range(
+              hint.position,
+            ),
+          ),
+          true,
+        );
+      }
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
 
-export function positionToOffset(doc: Text, position: Position): number {
-  const lineNumber = Math.min(Math.max(1, position.line + 1), doc.lines);
-  const line = doc.line(lineNumber);
-  return Math.min(line.to, line.from + Math.max(0, position.character));
+const documentHighlightsField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    value = value.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (effect.is(setDocumentHighlights)) {
+        return Decoration.set(
+          effect.value.map((range) =>
+            Decoration.mark({ class: "cm-lsp-document-highlight" }).range(range.from, range.to),
+          ),
+          true,
+        );
+      }
+    }
+    return value;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+const signatureHelpField = StateField.define<readonly Tooltip[]>({
+  create: () => [],
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setSignatureHelp)) {
+        if (!effect.value) return [];
+        const { position, label } = effect.value;
+        return [
+          {
+            pos: position,
+            above: false,
+            strictSide: false,
+            create: () => {
+              const dom = document.createElement("div");
+              dom.className = "cm-lsp-signature-help";
+              dom.textContent = label;
+              return { dom };
+            },
+          },
+        ];
+      }
+    }
+    return value;
+  },
+  provide: (field) => showTooltip.computeN([field], (state) => state.field(field)),
+});
+
+const manualHoverField = StateField.define<readonly Tooltip[]>({
+  create: () => [],
+  update(value, transaction) {
+    for (const effect of transaction.effects) {
+      if (effect.is(setManualHover)) return effect.value ? [effect.value] : [];
+    }
+    if (transaction.docChanged || transaction.selection) return [];
+    return value;
+  },
+  provide: (field) => showTooltip.computeN([field], (state) => state.field(field)),
+});
+
+class InlayHintWidget extends WidgetType {
+  constructor(readonly label: string) {
+    super();
+  }
+  eq(other: InlayHintWidget) {
+    return other.label === this.label;
+  }
+  toDOM() {
+    const span = document.createElement("span");
+    span.className = "cm-lsp-inlay-hint";
+    span.textContent = this.label;
+    return span;
+  }
 }
 
 function severityToCm(severity: number | undefined): Diagnostic["severity"] {
@@ -76,7 +165,12 @@ function severityToCm(severity: number | undefined): Diagnostic["severity"] {
   }
 }
 
-function applyDiagnostics(view: EditorView, path: string, diagnostics: LspDiagnostic[]) {
+function applyDiagnostics(
+  view: EditorView,
+  path: string,
+  cwd: string,
+  diagnostics: LspDiagnostic[],
+) {
   const state = view.state;
   const doc = state.doc;
   const cmDiagnostics: Diagnostic[] = diagnostics.map((diagnostic) => {
@@ -90,7 +184,21 @@ function applyDiagnostics(view: EditorView, path: string, diagnostics: LspDiagno
     };
   });
   view.dispatch(setDiagnostics(state, cmDiagnostics));
-  void path;
+  useEditorEphemeralStore.getState().setProjectDiagnostics(
+    cwd,
+    path,
+    diagnostics.map((diagnostic) => ({
+      path,
+      fromLine: diagnostic.range.start.line,
+      fromCharacter: diagnostic.range.start.character,
+      toLine: diagnostic.range.end.line,
+      toCharacter: diagnostic.range.end.character,
+      severity:
+        diagnostic.severity === 1 ? "error" : diagnostic.severity === 2 ? "warning" : "info",
+      message: diagnostic.message,
+      source: diagnostic.source,
+    })),
+  );
 }
 
 export async function goToDefinition(
@@ -163,6 +271,28 @@ export async function goToDefinition(
   }
 }
 
+export async function showSymbolInformation(
+  view: EditorView,
+  path: string,
+  cwd: string,
+): Promise<boolean> {
+  const client = await clientFor(path, cwd);
+  if (!client) return false;
+  const pos = view.state.selection.main.head;
+  try {
+    const result = await client.request<{ contents?: unknown } | null>("textDocument/hover", {
+      textDocument: { uri: pathToUri(path) },
+      position: offsetToPosition(view.state.doc, pos),
+    });
+    const rendered = renderHoverContents(result?.contents);
+    if (!rendered) return false;
+    view.dispatch({ effects: setManualHover.of(lspHoverTooltip(pos, rendered)) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function formatDocument(
   view: EditorView,
   path: string,
@@ -195,7 +325,125 @@ export async function formatDocument(
   }
 }
 
-export function lspExtension(path: string, cwd: string, viewId: string): Extension[] {
+export async function findReferences(
+  view: EditorView,
+  path: string,
+  cwd: string,
+): Promise<LspLocation[]> {
+  const client = await clientFor(path, cwd);
+  if (!client) return [];
+  return client
+    .request<LspLocation[] | null>("textDocument/references", {
+      textDocument: { uri: pathToUri(path) },
+      position: offsetToPosition(view.state.doc, view.state.selection.main.head),
+      context: { includeDeclaration: true },
+    })
+    .then((result) => result ?? [])
+    .catch(() => []);
+}
+
+export async function findReferencesAt(
+  path: string,
+  cwd: string,
+  position: Position,
+): Promise<LspLocation[]> {
+  const client = await clientFor(path, cwd);
+  if (!client) return [];
+  return client
+    .request<LspLocation[] | null>("textDocument/references", {
+      textDocument: { uri: pathToUri(path) },
+      position,
+      context: { includeDeclaration: true },
+    })
+    .then((result) => result ?? [])
+    .catch(() => []);
+}
+
+export async function renameSymbol(
+  view: EditorView,
+  path: string,
+  cwd: string,
+  newName: string,
+): Promise<WorkspaceEdit | null> {
+  const client = await clientFor(path, cwd);
+  if (!client) return null;
+  return client
+    .request<WorkspaceEdit | null>("textDocument/rename", {
+      textDocument: { uri: pathToUri(path) },
+      position: offsetToPosition(view.state.doc, view.state.selection.main.head),
+      newName,
+    })
+    .catch(() => null);
+}
+
+export async function documentSymbols(path: string, cwd: string): Promise<DocumentSymbol[]> {
+  const client = await clientFor(path, cwd);
+  if (!client) return [];
+  return client
+    .request<DocumentSymbol[] | null>("textDocument/documentSymbol", {
+      textDocument: { uri: pathToUri(path) },
+    })
+    .then((result) => result ?? [])
+    .catch(() => []);
+}
+
+export async function codeActions(
+  view: EditorView,
+  path: string,
+  cwd: string,
+): Promise<LspCodeAction[]> {
+  const client = await clientFor(path, cwd);
+  if (!client) return [];
+  const { from, to } = view.state.selection.main;
+  const diagnostics: Array<{
+    range: LspRange;
+    severity?: number;
+    message: string;
+    source?: string;
+  }> = [];
+  forEachDiagnostic(view.state, (diagnostic) =>
+    diagnostics.push({
+      range: {
+        start: offsetToPosition(view.state.doc, diagnostic.from),
+        end: offsetToPosition(view.state.doc, diagnostic.to),
+      },
+      severity: diagnostic.severity === "error" ? 1 : diagnostic.severity === "warning" ? 2 : 3,
+      message: diagnostic.message,
+      source: diagnostic.source,
+    }),
+  );
+  return client
+    .request<LspCodeAction[] | null>("textDocument/codeAction", {
+      textDocument: { uri: pathToUri(path) },
+      range: {
+        start: offsetToPosition(view.state.doc, from),
+        end: offsetToPosition(view.state.doc, to),
+      },
+      context: { diagnostics },
+    })
+    .then((result) => result ?? [])
+    .catch(() => []);
+}
+
+export async function executeLspCommand(
+  path: string,
+  cwd: string,
+  command: LspCodeAction["command"],
+) {
+  if (!command) return;
+  const client = await clientFor(path, cwd);
+  await client?.request("workspace/executeCommand", {
+    command: command.command,
+    arguments: command.arguments ?? [],
+  });
+}
+
+async function clientFor(path: string, cwd: string) {
+  const language = languageFor(path);
+  return language ? getLspClient(language, cwd) : null;
+}
+
+export function lspExtension(path: string, cwd: string, _viewId: string): Extension[] {
   const language = languageFor(path);
   if (!language) return [];
 
@@ -229,7 +477,7 @@ export function lspExtension(path: string, cwd: string, viewId: string): Extensi
         if (disposed || message.method !== "textDocument/publishDiagnostics") return;
         const params = message.params as { uri: string; diagnostics: LspDiagnostic[] } | undefined;
         if (!params || params.uri !== pathToUri(path)) return;
-        applyDiagnostics(view, path, params.diagnostics);
+        applyDiagnostics(view, path, cwd, params.diagnostics);
       });
       return client;
     })().catch(() => null);
@@ -284,23 +532,7 @@ export function lspExtension(path: string, cwd: string, viewId: string): Extensi
       if (!result) return null;
       const rendered = renderHoverContents(result.contents);
       if (!rendered) return null;
-      return {
-        pos,
-        create: () => {
-          const dom = document.createElement("div");
-          dom.className = "cm-lsp-hover";
-          dom.style.padding = "8px 12px";
-          dom.style.maxWidth = "520px";
-          dom.style.whiteSpace = "pre-wrap";
-          dom.style.fontFamily = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace';
-          dom.style.fontSize = "12px";
-          dom.style.lineHeight = "1.5";
-          dom.style.borderRadius = "6px";
-          dom.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
-          dom.textContent = rendered;
-          return { dom };
-        },
-      };
+      return lspHoverTooltip(pos, rendered);
     } catch {
       return null;
     }
@@ -334,13 +566,17 @@ export function lspExtension(path: string, cwd: string, viewId: string): Extensi
               kind?: number;
               detail?: string;
               insertText?: string;
+              insertTextFormat?: number;
             };
-            return {
+            const completion: Completion = {
               label: item.label,
               detail: item.detail,
               apply: item.insertText ?? item.label,
               type: completionKind(item.kind),
             };
+            return item.insertTextFormat === 2
+              ? snippetCompletion(item.insertText ?? item.label, completion)
+              : completion;
           });
           return { from: word.from, options };
         } catch {
@@ -350,39 +586,157 @@ export function lspExtension(path: string, cwd: string, viewId: string): Extensi
     ],
   });
 
-  const lspKeymap = keymap.of([
-    {
-      key: "F12",
-      run: (view) => {
-        void goToDefinition(view, path, cwd, viewId);
-        return true;
-      },
+  const languageIntelligence = ViewPlugin.fromClass(
+    class {
+      private hintTimer: number | null = null;
+      private highlightTimer: number | null = null;
+
+      constructor(private view: EditorView) {
+        this.scheduleHints();
+        this.scheduleHighlights();
+      }
+
+      update(update: ViewUpdate) {
+        this.view = update.view;
+        if (update.docChanged) {
+          this.scheduleHints();
+          const head = update.state.selection.main.head;
+          const trigger = head > 0 ? update.state.sliceDoc(head - 1, head) : "";
+          if (trigger === "(" || trigger === ",") void this.requestSignature();
+          else
+            window.setTimeout(() => {
+              if (!disposed) update.view.dispatch({ effects: setSignatureHelp.of(null) });
+            }, 0);
+        }
+        if (update.selectionSet || update.docChanged) this.scheduleHighlights();
+      }
+
+      private scheduleHints() {
+        if (this.hintTimer !== null) window.clearTimeout(this.hintTimer);
+        this.hintTimer = window.setTimeout(() => {
+          this.hintTimer = null;
+          void this.requestHints();
+        }, 350);
+      }
+
+      private scheduleHighlights() {
+        if (this.highlightTimer !== null) window.clearTimeout(this.highlightTimer);
+        this.highlightTimer = window.setTimeout(() => {
+          this.highlightTimer = null;
+          void this.requestHighlights();
+        }, 180);
+      }
+
+      private async requestHints() {
+        const client = await getLspClient(language, cwd);
+        if (!client || disposed) return;
+        const doc = this.view.state.doc;
+        const result = await client
+          .request<Array<{
+            position: Position;
+            label: string | Array<{ value: string }>;
+          }> | null>("textDocument/inlayHint", {
+            textDocument: { uri: pathToUri(path) },
+            range: { start: { line: 0, character: 0 }, end: offsetToPosition(doc, doc.length) },
+          })
+          .catch(() => null);
+        if (!result || disposed) return;
+        this.view.dispatch({
+          effects: setInlayHints.of(
+            result.map((hint) => ({
+              position: positionToOffset(this.view.state.doc, hint.position),
+              label:
+                typeof hint.label === "string"
+                  ? hint.label
+                  : hint.label.map((part) => part.value).join(""),
+            })),
+          ),
+        });
+      }
+
+      private async requestHighlights() {
+        const client = await getLspClient(language, cwd);
+        if (!client || disposed) return;
+        const result = await client
+          .request<Array<{ range: LspRange }> | null>("textDocument/documentHighlight", {
+            textDocument: { uri: pathToUri(path) },
+            position: offsetToPosition(this.view.state.doc, this.view.state.selection.main.head),
+          })
+          .catch(() => null);
+        if (disposed) return;
+        this.view.dispatch({
+          effects: setDocumentHighlights.of(
+            (result ?? []).map((highlight) => ({
+              from: positionToOffset(this.view.state.doc, highlight.range.start),
+              to: positionToOffset(this.view.state.doc, highlight.range.end),
+            })),
+          ),
+        });
+      }
+
+      private async requestSignature() {
+        const client = await getLspClient(language, cwd);
+        if (!client || disposed) return;
+        const head = this.view.state.selection.main.head;
+        const result = await client
+          .request<{
+            signatures?: Array<{ label: string }>;
+            activeSignature?: number;
+          } | null>("textDocument/signatureHelp", {
+            textDocument: { uri: pathToUri(path) },
+            position: offsetToPosition(this.view.state.doc, head),
+            context: { triggerKind: 2 },
+          })
+          .catch(() => null);
+        const signature = result?.signatures?.[result.activeSignature ?? 0];
+        if (!disposed)
+          this.view.dispatch({
+            effects: setSignatureHelp.of(
+              signature ? { position: head, label: signature.label } : null,
+            ),
+          });
+      }
+
+      destroy() {
+        if (this.hintTimer !== null) window.clearTimeout(this.hintTimer);
+        if (this.highlightTimer !== null) window.clearTimeout(this.highlightTimer);
+      }
     },
-    {
-      key: "Mod-Shift-i",
-      run: (view) => {
-        void formatDocument(view, path, cwd);
-        return true;
-      },
-    },
-    {
-      key: "Alt-Shift-f",
-      run: (view) => {
-        void formatDocument(view, path, cwd);
-        return true;
-      },
-    },
-  ]);
+  );
 
   return [
     lspContextField.init(() => initialContext),
+    inlayHintsField,
+    documentHighlightsField,
+    signatureHelpField,
+    manualHoverField,
     updateListener,
     bootstrap,
     lifecycle,
     hover,
     completion,
-    lspKeymap,
+    languageIntelligence,
   ];
+}
+
+function lspHoverTooltip(pos: number, rendered: string): Tooltip {
+  return {
+    pos,
+    create: () => {
+      const dom = document.createElement("div");
+      dom.className = "cm-lsp-hover";
+      dom.style.padding = "8px 12px";
+      dom.style.maxWidth = "520px";
+      dom.style.whiteSpace = "pre-wrap";
+      dom.style.fontFamily = 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace';
+      dom.style.fontSize = "12px";
+      dom.style.lineHeight = "1.5";
+      dom.style.borderRadius = "6px";
+      dom.style.boxShadow = "0 6px 16px rgba(0,0,0,0.35)";
+      dom.textContent = rendered;
+      return { dom };
+    },
+  };
 }
 
 function completionKind(kind: number | undefined): Completion["type"] {

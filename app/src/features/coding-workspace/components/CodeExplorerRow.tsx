@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState, type MouseEvent } from "react";
 import type { FileEntry } from "@/native/contracts/app-explorer";
 import {
   ContextMenu,
@@ -10,7 +10,6 @@ import {
   cn,
 } from "@/shared/ui";
 import { FileIcon, FolderIcon } from "../icons/fileIcon";
-import type { GitFileStatus } from "../native";
 import { codeListDirectory } from "../native";
 import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
 
@@ -20,32 +19,16 @@ interface CodeExplorerRowProps {
   depth: number;
   activePath: string | null;
   dirtyPaths: Set<string>;
-  gitStatuses: Map<string, GitFileStatus>;
+  selectedPaths: Set<string>;
+  registerEntry: (entry: FileEntry) => () => void;
+  onSelectEntry: (entry: FileEntry, event: MouseEvent<HTMLButtonElement>) => void;
   onOpenFile: (entry: FileEntry) => void;
   onOpenFileInNewTab: (entry: FileEntry) => void;
   onRequestRename: (path: string, name: string) => void;
   onRequestDelete: (path: string, name: string, isDirectory: boolean) => void;
+  onRequestBatchRename: () => void;
+  onRequestBatchDelete: () => void;
 }
-
-const STATUS_CLASS: Record<GitFileStatus, string> = {
-  modified: "code-warning",
-  added: "code-success",
-  deleted: "code-danger",
-  renamed: "code-info",
-  untracked: "code-success",
-  ignored: "code-muted",
-  conflicted: "code-danger",
-};
-
-const STATUS_LETTER: Record<GitFileStatus, string> = {
-  modified: "M",
-  added: "A",
-  deleted: "D",
-  renamed: "R",
-  untracked: "U",
-  ignored: "I",
-  conflicted: "!",
-};
 
 export const CodeExplorerRow = memo(function CodeExplorerRow({
   entry,
@@ -53,11 +36,15 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
   depth,
   activePath,
   dirtyPaths,
-  gitStatuses,
+  selectedPaths,
+  registerEntry,
+  onSelectEntry,
   onOpenFile,
   onOpenFileInNewTab,
   onRequestRename,
   onRequestDelete,
+  onRequestBatchRename,
+  onRequestBatchDelete,
 }: CodeExplorerRowProps) {
   const isDirectory = entry.kind === "folder";
   const expanded = useCodingWorkspaceStore((state) =>
@@ -68,6 +55,8 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
   const [children, setChildren] = useState<FileEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => registerEntry(entry), [entry, registerEntry]);
 
   useEffect(() => {
     if (!isDirectory || !expanded || children !== null || loading) return;
@@ -83,14 +72,19 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
       .finally(() => setLoading(false));
   }, [entry.path, expanded, isDirectory, children, loading]);
 
-  const handleClick = useCallback(() => {
-    if (isDirectory) toggleFolder(rootPath, entry.path);
-    else onOpenFile(entry);
-  }, [entry, isDirectory, onOpenFile, rootPath, toggleFolder]);
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      onSelectEntry(entry, event);
+      if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+      if (isDirectory) toggleFolder(rootPath, entry.path);
+      else onOpenFile(entry);
+    },
+    [entry, isDirectory, onOpenFile, onSelectEntry, rootPath, toggleFolder],
+  );
 
   const isActive = !isDirectory && activePath === entry.path;
   const isDirty = !isDirectory && dirtyPaths.has(entry.path);
-  const status = gitStatuses.get(entry.path);
+  const isSelected = selectedPaths.has(entry.path);
   const indent = 8 + depth * 12;
 
   return (
@@ -104,7 +98,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
               "code-explorer-row group flex w-full items-center gap-2 rounded-md pr-2 text-left",
               "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
               isActive && "bg-charcoal-hover font-medium text-cream-bright",
-              status && STATUS_CLASS[status],
+              isSelected && "bg-charcoal-active text-cream-bright",
             )}
             style={{ paddingLeft: indent }}
           >
@@ -123,11 +117,6 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
               <FileIcon name={entry.name} />
             )}
             <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-            {status ? (
-              <span className={cn("font-mono text-[11px]", STATUS_CLASS[status])} title={status}>
-                {STATUS_LETTER[status]}
-              </span>
-            ) : null}
             {isDirty ? <span className="code-accent text-[13px]">●</span> : null}
           </button>
         </ContextMenuTrigger>
@@ -138,17 +127,27 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
             </ContextMenuItem>
           ) : null}
           {!isDirectory ? <ContextMenuSeparator /> : null}
-          <ContextMenuItem onSelect={() => onRequestRename(entry.path, entry.name)}>
+          <ContextMenuItem
+            onSelect={() =>
+              selectedPaths.size > 1
+                ? onRequestBatchRename()
+                : onRequestRename(entry.path, entry.name)
+            }
+          >
             <Pencil />
-            Rename
+            {selectedPaths.size > 1 ? `Rename ${selectedPaths.size} items` : "Rename"}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
             className="code-danger"
-            onSelect={() => onRequestDelete(entry.path, entry.name, isDirectory)}
+            onSelect={() =>
+              selectedPaths.size > 1
+                ? onRequestBatchDelete()
+                : onRequestDelete(entry.path, entry.name, isDirectory)
+            }
           >
             <Trash2 />
-            Delete
+            {selectedPaths.size > 1 ? `Delete ${selectedPaths.size} items` : "Delete"}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -179,11 +178,15 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
               depth={depth + 1}
               activePath={activePath}
               dirtyPaths={dirtyPaths}
-              gitStatuses={gitStatuses}
+              selectedPaths={selectedPaths}
+              registerEntry={registerEntry}
+              onSelectEntry={onSelectEntry}
               onOpenFile={onOpenFile}
               onOpenFileInNewTab={onOpenFileInNewTab}
               onRequestRename={onRequestRename}
               onRequestDelete={onRequestDelete}
+              onRequestBatchRename={onRequestBatchRename}
+              onRequestBatchDelete={onRequestBatchDelete}
             />
           ))}
         </div>

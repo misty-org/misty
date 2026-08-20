@@ -1,17 +1,21 @@
-import type { MultiPanelTab } from "@/features/workspace";
-import { useMultiPanelStore } from "@/features/workspace";
+import {
+  dockLeaves,
+  useMultiPanelStore,
+  useWorkspaceStore,
+  type MultiPanelTab,
+} from "@/features/workspace";
 import {
   androidGrantLocalFolder,
   androidOpenAllFilesAccessSettings,
 } from "@/features/files/native";
 import type { PluginCommandEntry } from "@/native/contracts";
+import { registerShortcutHandler, shortcutCommandsById } from "@/features/shortcuts";
 import { errorText } from "@/shared/lib/format";
-import type { ShortcutMap } from "@/shared/lib/shortcuts";
 import { useCallback, useEffect, type RefObject } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import type { AndroidLocalGrantRequest } from "../../model/interfaces/components/ExplorerSidebar";
 import { useExplorerStore } from "../../store";
-import { runExplorerCommand, runPluginCommand, shortcutCommandForEvent } from "../ExplorerCommands";
+import { runExplorerCommand, runPluginCommand } from "../ExplorerCommands";
 import { parsePluginTabPath } from "../ExplorerDesktopPlugins";
 
 export function useLegacyPluginTabMigration(options: {
@@ -68,11 +72,11 @@ export function useOperationErrorNotification(
 
 export function useExplorerKeyboardShortcuts(options: {
   navigate: NavigateFunction;
-  shortcutMapRef: RefObject<ShortcutMap>;
   executableCommandIdsRef: RefObject<readonly string[]>;
+  pluginCommands: PluginCommandEntry[];
   pluginCommandsRef: RefObject<PluginCommandEntry[]>;
 }): void {
-  const { navigate, shortcutMapRef, executableCommandIdsRef, pluginCommandsRef } = options;
+  const { navigate, executableCommandIdsRef, pluginCommands, pluginCommandsRef } = options;
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -86,31 +90,52 @@ export function useExplorerKeyboardShortcuts(options: {
         return;
       }
       if (editing) return;
-
-      const commandId = shortcutCommandForEvent(
-        event,
-        shortcutMapRef.current,
-        executableCommandIdsRef.current,
-      );
-      if (commandId) {
-        event.preventDefault();
-        const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
-        if (pluginCommand) void runPluginCommand(pluginCommand, paneId, navigate);
-        else runExplorerCommand(commandId, paneId, navigate);
-      } else if (event.altKey && event.key === "ArrowLeft") {
-        event.preventDefault();
-        void explorerState.navigateBack(paneId);
-      } else if (event.altKey && event.key === "ArrowRight") {
-        event.preventDefault();
-        void explorerState.navigateForward(paneId);
-      } else if (event.metaKey && event.key === "Backspace") {
-        event.preventDefault();
-        void explorerState.deleteSelected(paneId);
-      }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [executableCommandIdsRef, navigate, pluginCommandsRef, shortcutMapRef]);
+    const enabled = () => {
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find(
+        (candidate) => candidate.id === workspace.layout.focusedPaneId,
+      );
+      return pane?.tabs.find((tab) => tab.id === pane.activeTabId)?.surfaceId === "files";
+    };
+    const run = (commandId: string) => {
+      const paneId = useMultiPanelStore.getState().activePaneId;
+      if (!paneId) return;
+      const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
+      if (pluginCommand) void runPluginCommand(pluginCommand, paneId, navigate);
+      else runExplorerCommand(commandId, paneId, navigate);
+    };
+    const commandIds = [
+      ...executableCommandIdsRef.current,
+      ...pluginCommands.map((command) => command.id),
+    ].filter((commandId) => shortcutCommandsById.has(commandId));
+    const unregister = commandIds.map((commandId) =>
+      registerShortcutHandler(commandId, () => run(commandId), enabled),
+    );
+    unregister.push(
+      registerShortcutHandler(
+        "navigation.back",
+        () => {
+          const paneId = useMultiPanelStore.getState().activePaneId;
+          if (paneId) void useExplorerStore.getState().navigateBack(paneId);
+        },
+        enabled,
+      ),
+      registerShortcutHandler(
+        "navigation.forward",
+        () => {
+          const paneId = useMultiPanelStore.getState().activePaneId;
+          if (paneId) void useExplorerStore.getState().navigateForward(paneId);
+        },
+        enabled,
+      ),
+    );
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      unregister.forEach((remove) => remove());
+    };
+  }, [executableCommandIdsRef, navigate, pluginCommands, pluginCommandsRef]);
 }
 
 export function useAndroidLocalFolderGrant(options: {

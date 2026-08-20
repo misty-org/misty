@@ -1,6 +1,7 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
 import { useAppThemeStore } from "@/features/settings";
+import { useShortcutHandler } from "@/features/shortcuts";
 import type {
   SpaceRoadmapEdgeType,
   SpaceRoadmapSnapshot,
@@ -159,47 +160,32 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
     if (copiedNodeRef.current) props.onDuplicate(copiedNodeRef.current);
   }, [props]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target)) return;
-      const command = event.metaKey || event.ctrlKey;
-      if (command && event.key.toLowerCase() === "c") {
-        copySelection();
-        return;
-      }
-      if (command && event.key.toLowerCase() === "v" && copiedNodeRef.current) {
-        event.preventDefault();
-        pasteSelection();
-        return;
-      }
-      if (command && event.key.toLowerCase() === "d") {
-        event.preventDefault();
-        duplicateSelection();
-        return;
-      }
-      if (command && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        commitHistory(
-          event.shiftKey ? history.redo(nodesRef.current) : history.undo(nodesRef.current),
-        );
-        return;
-      }
-      if ((event.key === "Backspace" || event.key === "Delete") && props.selectedId) {
-        event.preventDefault();
-        deleteSelection();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    commitHistory,
-    copySelection,
-    deleteSelection,
-    duplicateSelection,
-    history,
+  useShortcutHandler("roadmap.copy", copySelection, Boolean(props.selectedId));
+  useShortcutHandler(
+    "roadmap.paste",
     pasteSelection,
-    props,
-  ]);
+    () => props.canManage && Boolean(copiedNodeRef.current),
+  );
+  useShortcutHandler(
+    "roadmap.duplicate",
+    duplicateSelection,
+    props.canManage && Boolean(props.selectedId),
+  );
+  useShortcutHandler(
+    "roadmap.undo",
+    useCallback(() => commitHistory(history.undo(nodesRef.current)), [commitHistory, history]),
+    props.canManage,
+  );
+  useShortcutHandler(
+    "roadmap.redo",
+    useCallback(() => commitHistory(history.redo(nodesRef.current)), [commitHistory, history]),
+    props.canManage,
+  );
+  useShortcutHandler(
+    "roadmap.delete",
+    deleteSelection,
+    props.canManage && Boolean(props.selectedId),
+  );
 
   const handleNodeChanges = useCallback(
     (changes: NodeChange<RoadmapNode>[]) => {
@@ -370,13 +356,4 @@ function cancelPending(
   setEdges((current) => current.filter((edge) => !edge.id.startsWith("pending:")));
   setPending(undefined);
 }
-function isTypingTarget(target: EventTarget | null) {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
 export type { RoadmapNode };

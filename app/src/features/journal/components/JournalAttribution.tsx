@@ -6,7 +6,7 @@ export function JournalAttribution({
   href,
   className,
 }: {
-  technology: "BlockNote" | "Excalidraw";
+  technology: "Excalidraw";
   href: string;
   className?: string;
 }) {

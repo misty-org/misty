@@ -2,3 +2,4 @@
 
 pub mod commands;
 pub mod runtime;
+pub mod shortcut_commands;

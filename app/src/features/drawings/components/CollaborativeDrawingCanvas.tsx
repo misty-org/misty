@@ -27,14 +27,40 @@ interface CollaborativeDrawingCanvasProps {
   drawing: SpaceDrawing;
   session: DrawingCollaborationSession;
   figmaImport?: { requestId: number; reference: FigmaCanvasReference };
+  onAiSnapshot?: (snapshot: DrawingAiSnapshot) => void;
+  onAiController?: (controller: DrawingAiController | null) => void;
+}
+
+export interface DrawingAiSnapshot {
+  content: string;
+  contentHash: string;
+  selectedCount: number;
+  elementCount: number;
+}
+
+export interface DrawingAiPatch {
+  base_hash?: string;
+  changes?: Array<{
+    op?: string;
+    element_id?: string;
+    element?: { x?: number; y?: number };
+  }>;
+}
+
+export interface DrawingAiController {
+  canApply: (patch: DrawingAiPatch) => boolean;
+  apply: (patch: DrawingAiPatch) => void;
 }
 
 export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCanvasProps) {
   const theme = useAppThemeStore((state) => state.resolvedTheme);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const selectedElementsRef = useRef("");
+  const aiSnapshotRef = useRef("");
   const fileUploadsRef = useRef(new Map<string, Promise<void>>());
   const fileHydrationsRef = useRef(new Map<string, Promise<void>>());
+  const onAiSnapshot = props.onAiSnapshot;
+  const onAiController = props.onAiController;
   const pointerPublisher = useMemo(() => createPointerPublisher(props.session), [props.session]);
   const followTracker = useMemo(() => new DrawingFollowTracker(), []);
 
@@ -198,6 +224,11 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
           appState.selectedElementIds,
         );
       }
+      const aiSnapshot = drawingAiSnapshot(elements, appState.selectedElementIds);
+      if (onAiSnapshot && aiSnapshot.contentHash !== aiSnapshotRef.current) {
+        aiSnapshotRef.current = aiSnapshot.contentHash;
+        onAiSnapshot(aiSnapshot);
+      }
       if (props.drawing.role === "viewer") return;
       void shareBinaryFiles(Object.values(files)).catch((cause) => {
         api?.setToast({
@@ -212,8 +243,77 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
         }, localDrawingOrigin);
       }
     },
-    [api, props.drawing.role, props.session, shareBinaryFiles],
+    [api, onAiSnapshot, props.drawing.role, props.session, shareBinaryFiles],
   );
+
+  useEffect(() => {
+    if (!api || !onAiController) return;
+    const resolvePatch = (patch: DrawingAiPatch) => {
+      const elements = api.getSceneElementsIncludingDeleted();
+      const selectedIds = api.getAppState().selectedElementIds;
+      const snapshot = drawingAiSnapshot(elements, selectedIds);
+      if (
+        props.drawing.role === "viewer" ||
+        snapshot.selectedCount === 0 ||
+        patch.base_hash !== snapshot.contentHash ||
+        !patch.changes?.length ||
+        patch.changes.length > 100
+      )
+        return null;
+      const byId = new Map(elements.map((element) => [element.id, element]));
+      const seen = new Set<string>();
+      const updates = new Map<string, { x: number; y: number }>();
+      for (const change of patch.changes) {
+        const id = change.element_id ?? "";
+        const current = byId.get(id);
+        const x = change.element?.x;
+        const y = change.element?.y;
+        if (
+          change.op !== "update" ||
+          !current ||
+          current.isDeleted ||
+          !selectedIds[id] ||
+          seen.has(id) ||
+          typeof x !== "number" ||
+          typeof y !== "number" ||
+          !Number.isFinite(x) ||
+          !Number.isFinite(y) ||
+          Math.abs(x) > 100_000 ||
+          Math.abs(y) > 100_000
+        )
+          return null;
+        seen.add(id);
+        updates.set(id, { x, y });
+      }
+      return { elements, updates };
+    };
+    const controller: DrawingAiController = {
+      canApply: (patch) => Boolean(resolvePatch(patch)),
+      apply: (patch) => {
+        const resolved = resolvePatch(patch);
+        if (!resolved)
+          throw new Error("The drawing selection changed. Ask Misty to regenerate this layout.");
+        const next = resolved.elements.map((element) => {
+          const update = resolved.updates.get(element.id);
+          return update
+            ? {
+                ...element,
+                ...update,
+                version: element.version + 1,
+                versionNonce: Math.floor(Math.random() * 2_147_483_647),
+                updated: Date.now(),
+              }
+            : element;
+        }) as OrderedExcalidrawElement[];
+        props.session.doc.transact(() => {
+          writeDrawingElements(props.session.elements, next);
+        }, localDrawingOrigin);
+        api.updateScene({ elements: next, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+      },
+    };
+    onAiController(controller);
+    return () => onAiController(null);
+  }, [api, onAiController, props.drawing.role, props.session]);
 
   return (
     <div className="misty-excalidraw h-full min-h-0 w-full" data-misty-window-drag-block="true">
@@ -267,6 +367,53 @@ export default function CollaborativeDrawingCanvas(props: CollaborativeDrawingCa
       />
     </div>
   );
+}
+
+function drawingAiSnapshot(
+  elements: readonly OrderedExcalidrawElement[],
+  selectedElementIds: Readonly<Record<string, boolean>>,
+): DrawingAiSnapshot {
+  const visible = elements.filter((element) => !element.isDeleted);
+  const selected = visible.filter((element) => selectedElementIds[element.id]);
+  const relevant = (selected.length ? selected : visible).slice(0, 160);
+  const content = JSON.stringify({
+    scope: selected.length ? "selection" : "visible_scene",
+    truncated: relevant.length < (selected.length ? selected.length : visible.length),
+    elements: relevant.map((element) => ({
+      id: element.id,
+      type: element.type,
+      x: Math.round(element.x),
+      y: Math.round(element.y),
+      width: Math.round(element.width),
+      height: Math.round(element.height),
+      angle: Math.round(element.angle * 1000) / 1000,
+      text:
+        "text" in element && typeof element.text === "string"
+          ? element.text.slice(0, 1000)
+          : undefined,
+      link: typeof element.link === "string" ? element.link.slice(0, 1000) : undefined,
+      group_ids: element.groupIds.slice(0, 20),
+      bound_to:
+        "boundElements" in element && Array.isArray(element.boundElements)
+          ? element.boundElements.slice(0, 20).map((bound) => bound.id)
+          : undefined,
+    })),
+  }).slice(0, 32 << 10);
+  return {
+    content,
+    contentHash: drawingAiHash(content),
+    selectedCount: selected.length,
+    elementCount: visible.length,
+  };
+}
+
+function drawingAiHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16)}`;
 }
 
 function createPointerPublisher(session: DrawingCollaborationSession) {

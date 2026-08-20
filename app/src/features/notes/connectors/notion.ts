@@ -90,7 +90,6 @@ export function createNotionConnector(
       backlinks: [],
       updatedAt: page.last_edited_time ?? nowIso(),
       createdAt: page.created_time ?? page.last_edited_time ?? nowIso(),
-      favorite: false,
       syncStatus: page.archived ? "error" : "synced",
       sourceUrl: page.url,
       connectorId: NOTION_CONNECTOR_ID,

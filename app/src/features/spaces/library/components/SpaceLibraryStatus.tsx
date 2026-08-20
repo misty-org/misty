@@ -1,6 +1,7 @@
 import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
 
 import { Button } from "@/shared/ui";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";
@@ -60,6 +61,9 @@ export function SpaceLibraryTopChrome() {
         onItemScale={setLibraryItemScale}
         visibleItemCount={visibleItems.length}
       />
+      <div className="absolute right-4 top-2 z-30 rounded bg-charcoal-bg/90">
+        <AiSurfaceButton />
+      </div>
       <SpaceLibraryInlineStatus />
     </>
   );

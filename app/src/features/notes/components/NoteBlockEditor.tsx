@@ -1,31 +1,83 @@
-import "@blocknote/core/fonts/inter.css";
-import "@blocknote/mantine/style.css";
-import "./noteBlockEditor.css";
+import "./noteTiptapEditor.css";
 
-import { usePointerDrag, type PointerDragPayload } from "@/features/dnd";
-import { useAppThemeStore } from "@/features/settings";
-import { cn } from "@/shared/ui";
-import { codeBlockOptions } from "@blocknote/code-block";
-import { BlockNoteSchema, createCodeBlockSpec, defaultBlockSpecs } from "@blocknote/core";
-import { SideMenuExtension } from "@blocknote/core/extensions";
-import { withCollaboration } from "@blocknote/core/yjs";
-import { BlockNoteView } from "@blocknote/mantine";
-import { useBlockNoteEditor, useCreateBlockNote } from "@blocknote/react";
-import { useCallback, useEffect, useRef, type PointerEvent, type ReactNode } from "react";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
+  cn,
+} from "@/shared/ui";
+import {
+  useAiSurfaceActions,
+  useAiSurfaceAdapter,
+  type AiArtifact,
+  type AiContextReference,
+  type AiSelectionSnapshot,
+  type AiSuggestedAction,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
+import { AiSelectionMenu } from "@/features/ai-surface/AiSelectionMenu";
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
+import DragHandle from "@tiptap/extension-drag-handle-react";
+import { FindAndReplace } from "@tiptap/extension-find-and-replace";
+import { Highlight } from "@tiptap/extension-highlight";
+import { Image } from "@tiptap/extension-image";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { Subscript } from "@tiptap/extension-subscript";
+import { Superscript } from "@tiptap/extension-superscript";
+import { TextAlign } from "@tiptap/extension-text-align";
+import { Typography } from "@tiptap/extension-typography";
+import { UniqueID } from "@tiptap/extension-unique-id";
+import { Markdown } from "@tiptap/markdown";
+import type { Editor, JSONContent } from "@tiptap/react";
+import { EditorContent, EditorContext, useEditor } from "@tiptap/react";
+import type { Text as YText } from "yjs";
+import { StarterKit } from "@tiptap/starter-kit";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Braces,
+  ChevronDown,
+  Code2,
+  Copy,
+  GripVertical,
+  Heading,
+  Highlighter,
+  ImagePlus,
+  Italic,
+  Link2,
+  List,
+  ListChecks,
+  ListOrdered,
+  Minus,
+  Pilcrow,
+  Plus,
+  Quote,
+  Redo2,
+  Search,
+  Strikethrough,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
+  Trash2,
+  Underline,
+  Undo2,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
 import type { NoteBodyFormat } from "../model/types/types";
-import { resolveNoteAssetUrl, uploadNoteAsset } from "../noteAssets";
+import { uploadNoteAsset } from "../noteAssets";
 import type { NoteCollaborationSession } from "../noteCollaboration";
-
-const mistyNotesSchema = BlockNoteSchema.create({
-  blockSpecs: {
-    ...defaultBlockSpecs,
-    codeBlock: createCodeBlockSpec(codeBlockOptions),
-  },
-});
-type NoteBlock = typeof mistyNotesSchema.Block;
-
-const NOTE_BLOCK_DRAG_KIND = "note-block";
 
 interface NoteBlockEditorProps {
   editable: boolean;
@@ -37,104 +89,30 @@ interface NoteBlockEditorProps {
   bodyFormat: NoteBodyFormat;
   bodyMarkdown?: string;
   autoFocus?: boolean;
+  linkableNotes?: Array<{ id: string; title: string }>;
+  onOpenNote?: (noteId: string) => void;
+  aiContext?: AiContextReference;
   onContentChange?: (content: {
     body: string;
-    bodyFormat: "blocknote-json";
+    bodyFormat: "tiptap-json";
     bodyMarkdown: string;
   }) => void;
 }
 
+/**
+ * Based on Tiptap's MIT-licensed Simple Editor template. Its toolbar groups
+ * and responsive horizontal overflow intentionally follow the upstream code.
+ * https://tiptap.dev/docs/ui-components/templates/simple-editor
+ */
 export function NoteBlockEditor(props: NoteBlockEditorProps) {
   if (props.collaborative && props.spaceId) {
-    return <CollaborativeNoteBlockEditor {...props} spaceId={props.spaceId} />;
+    return <CollaborativeNoteEditor {...props} spaceId={props.spaceId} />;
   }
-
-  return <LocalNoteBlockEditor {...props} />;
+  return <MistyTipTapEditor {...props} />;
 }
 
-function LocalNoteBlockEditor(props: NoteBlockEditorProps) {
-  const editor = useCreateBlockNote({
-    schema: mistyNotesSchema,
-    uploadFile: (file) =>
-      uploadNoteAsset({
-        accountId: props.accountId,
-        spaceId: props.spaceId,
-        noteId: props.noteId,
-        file,
-      }),
-    resolveFileUrl: resolveNoteAssetUrl,
-  });
-  const resolvedTheme = useAppThemeStore((state) => state.resolvedTheme);
-  const loadedContentRef = useRef<string | null>(null);
-  const loadingRef = useRef(false);
-  const onContentChangeRef = useRef(props.onContentChange);
-  const blockDropZoneRef = useNoteBlockPointerDropZones(editor, props.editable);
-
-  useEffect(() => {
-    onContentChangeRef.current = props.onContentChange;
-  }, [props.onContentChange]);
-
-  useEffect(() => {
-    const contentKey = [props.bodyFormat, props.body, props.bodyMarkdown ?? ""].join("\u0000");
-    if (loadedContentRef.current === contentKey) return;
-    loadingRef.current = true;
-    try {
-      const blocks =
-        props.bodyFormat === "blocknote-json"
-          ? JSON.parse(props.body)
-          : editor.tryParseMarkdownToBlocks(props.bodyMarkdown ?? props.body);
-      editor.replaceBlocks(editor.document, blocks);
-      loadedContentRef.current = contentKey;
-    } catch {
-      const blocks = editor.tryParseMarkdownToBlocks(props.bodyMarkdown ?? "");
-      editor.replaceBlocks(editor.document, blocks);
-      loadedContentRef.current = contentKey;
-    } finally {
-      loadingRef.current = false;
-    }
-  }, [editor, props.body, props.bodyFormat, props.bodyMarkdown]);
-
-  useEffect(() => {
-    if (!props.editable || !props.autoFocus) return;
-    const frame = window.requestAnimationFrame(() => editor.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [editor, props.autoFocus, props.editable]);
-
-  const handleChange = useCallback(() => {
-    if (loadingRef.current) return;
-    const body = JSON.stringify(editor.document);
-    const bodyMarkdown = editor.blocksToMarkdownLossy(editor.document);
-    loadedContentRef.current = ["blocknote-json", body, bodyMarkdown].join("\u0000");
-    onContentChangeRef.current?.({
-      body,
-      bodyFormat: "blocknote-json",
-      bodyMarkdown,
-    });
-  }, [editor]);
-
-  return (
-    <div
-      ref={blockDropZoneRef}
-      className={cn("misty-note-block-editor", !props.editable && "is-readonly")}
-      data-misty-window-drag-block="true"
-      data-pointer-drag-source={props.editable ? "true" : undefined}
-    >
-      {props.editable ? <div className="misty-note-block-drop-gutter" aria-hidden="true" /> : null}
-      <BlockNoteView
-        editor={editor}
-        editable={props.editable}
-        onChange={props.editable ? handleChange : undefined}
-        theme={resolvedTheme}
-      >
-        {props.editable ? <MistyBlockPointerDragBridge /> : null}
-      </BlockNoteView>
-    </div>
-  );
-}
-
-function CollaborativeNoteBlockEditor(props: NoteBlockEditorProps & { spaceId: string }) {
+function CollaborativeNoteEditor(props: NoteBlockEditorProps & { spaceId: string }) {
   const { session, error, notice } = useNoteCollaborationRoom(props.spaceId, props.noteId);
-
   if (error) {
     return (
       <div className="rounded-md border border-charcoal-active/30 bg-charcoal-active px-4 py-3 text-sm text-cream-bright">
@@ -142,11 +120,7 @@ function CollaborativeNoteBlockEditor(props: NoteBlockEditorProps & { spaceId: s
       </div>
     );
   }
-
-  if (!session) {
-    return <div className="px-2 py-3 text-sm text-cream-muted">Connecting note...</div>;
-  }
-
+  if (!session) return <div className="px-2 py-3 text-sm text-cream-muted">Connecting note…</div>;
   return (
     <div className="relative h-full">
       {notice ? (
@@ -154,343 +128,1047 @@ function CollaborativeNoteBlockEditor(props: NoteBlockEditorProps & { spaceId: s
           {notice}
         </div>
       ) : null}
-      <CollaborativeBlockNoteRoom
+      <MistyTipTapEditor
         key={`${props.noteId}:${session.ticket.room}`}
         {...props}
+        editable={props.editable && session.ticket.role !== "viewer"}
         session={session}
       />
     </div>
   );
 }
 
-function CollaborativeBlockNoteRoom(
-  props: NoteBlockEditorProps & { spaceId: string; session: NoteCollaborationSession },
-) {
-  const resolvedTheme = useAppThemeStore((state) => state.resolvedTheme);
-  const editor = useCreateBlockNote(
-    withCollaboration({
-      schema: mistyNotesSchema,
-      uploadFile: (file) =>
-        uploadNoteAsset({
-          accountId: props.accountId,
-          spaceId: props.spaceId,
-          noteId: props.noteId,
-          file,
-        }),
-      resolveFileUrl: resolveNoteAssetUrl,
-      collaboration: {
-        fragment: props.session.fragment,
-        provider: props.session.provider,
-        user: collaborationUser(props.accountId),
-      },
-    }),
-  );
+function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteCollaborationSession }) {
+  const { body, bodyFormat, bodyMarkdown, session } = props;
+  const loadingRef = useRef(true);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const onContentChangeRef = useRef(props.onContentChange);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [replace, setReplace] = useState("");
+  const [block, setBlock] = useState<{ pos: number; node: JSONContent } | null>(null);
+  const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
+  const [aiSelection, setAiSelection] = useState<NoteAiSelection | null>(null);
 
   useEffect(() => {
-    if (!props.editable || !props.autoFocus) return;
-    const frame = window.requestAnimationFrame(() => editor.focus());
-    return () => window.cancelAnimationFrame(frame);
+    onContentChangeRef.current = props.onContentChange;
+  }, [props.onContentChange]);
+
+  const extensions = useMemo(
+    () => [
+      StarterKit.configure({
+        undoRedo: props.session ? false : undefined,
+        link: { openOnClick: false, enableClickSelection: true },
+      }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight.configure({ multicolor: true }),
+      Image.configure({ allowBase64: false }),
+      Typography,
+      Superscript,
+      Subscript,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      UniqueID.configure({
+        types: [
+          "paragraph",
+          "heading",
+          "blockquote",
+          "codeBlock",
+          "bulletList",
+          "orderedList",
+          "taskList",
+          "image",
+        ],
+      }),
+      FindAndReplace.configure({ searchDebounceMs: 250, injectCSS: false }),
+      Markdown.configure({ markedOptions: { gfm: true } }),
+      ...(props.session
+        ? [
+            Collaboration.configure({ fragment: props.session.fragment }),
+            CollaborationCaret.configure({
+              provider: props.session.provider as never,
+              user: collaborationUser(props.accountId),
+            }),
+          ]
+        : []),
+    ],
+    [props.accountId, props.session],
+  );
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    editable: props.editable,
+    extensions,
+    content: props.session ? undefined : initialContent(props),
+    contentType: props.session || props.bodyFormat === "tiptap-json" ? "json" : "markdown",
+    editorProps: {
+      attributes: {
+        autocomplete: "off",
+        autocorrect: "on",
+        autocapitalize: "sentences",
+        spellcheck: "true",
+        "aria-label": "Note content",
+        class: "misty-tiptap-prosemirror",
+        "data-misty-window-drag-block": "true",
+      },
+      handleClick: (_view, _pos, event) => {
+        const anchor = (event.target as HTMLElement | null)?.closest<HTMLAnchorElement>("a[href]");
+        if (!anchor) return false;
+        const linkedNote = noteIdFromHref(anchor.getAttribute("href") ?? "");
+        if (!linkedNote) return false;
+        event.preventDefault();
+        props.onOpenNote?.(linkedNote);
+        return true;
+      },
+    },
+    onCreate: ({ editor: created }) => {
+      loadingRef.current = false;
+      applyPendingMarkdown(created, props.session);
+    },
+    onUpdate: ({ editor: updated }) => {
+      updateSuggestion(updated, setSuggestion);
+      updateAiSelection(updated, props.aiContext, setAiSelection);
+      if (loadingRef.current) return;
+      const markdown = updated.getMarkdown();
+      const body = JSON.stringify(updated.getJSON());
+      if (props.session) {
+        replaceYText(props.session.markdown, markdown);
+        props.session.metadata.set("schema", "tiptap-v1");
+        props.session.metadata.set("outgoing_note_ids", collectNoteLinks(updated));
+      }
+      onContentChangeRef.current?.({ body, bodyFormat: "tiptap-json", bodyMarkdown: markdown });
+    },
+    onSelectionUpdate: ({ editor: updated }) => {
+      updateSuggestion(updated, setSuggestion);
+      updateAiSelection(updated, props.aiContext, setAiSelection);
+    },
+  });
+
+  useEffect(() => editor?.setEditable(props.editable), [editor, props.editable]);
+  useEffect(() => {
+    if (!editor || session || loadingRef.current) return;
+    editor.commands.setContent(initialContent({ body, bodyFormat, bodyMarkdown }), {
+      contentType: bodyFormat === "tiptap-json" ? "json" : "markdown",
+      emitUpdate: false,
+    });
+  }, [body, bodyFormat, bodyMarkdown, editor, session]);
+  useEffect(() => {
+    if (!editor || !props.editable || !props.autoFocus) return;
+    const frame = requestAnimationFrame(() => editor.commands.focus("end"));
+    return () => cancelAnimationFrame(frame);
   }, [editor, props.autoFocus, props.editable]);
+  useEffect(() => {
+    if (!editor || !props.session) return;
+    const apply = () => applyPendingMarkdown(editor, props.session);
+    props.session.metadata.observe(apply);
+    props.session.provider.awareness.on("change", apply);
+    apply();
+    return () => {
+      props.session?.metadata.unobserve(apply);
+      props.session?.provider.awareness.off("change", apply);
+    };
+  }, [editor, props.session]);
+  useEffect(() => {
+    if (!editor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    editor.view.dom.addEventListener("keydown", onKeyDown);
+    return () => editor.view.dom.removeEventListener("keydown", onKeyDown);
+  }, [editor]);
 
-  const editable = props.editable && props.session.ticket.role !== "viewer";
-  const blockDropZoneRef = useNoteBlockPointerDropZones(editor, editable);
+  if (!editor) return <div className="px-2 py-3 text-sm text-cream-muted">Opening editor…</div>;
 
+  const aiAdapter = createNoteAiAdapter(editor, props, aiSelection);
+
+  const uploadImage = async (file?: File) => {
+    if (!file) return;
+    const src = await uploadNoteAsset({
+      accountId: props.accountId,
+      spaceId: props.spaceId,
+      noteId: props.noteId,
+      file,
+    });
+    editor.chain().focus().setImage({ src, alt: file.name }).run();
+  };
+
+  return (
+    <EditorContext.Provider value={{ editor }}>
+      <div className={cn("misty-tiptap-editor", !props.editable && "is-readonly")}>
+        <NoteAiRegistration adapter={aiAdapter} />
+        {props.editable ? (
+          <SimpleEditorToolbar
+            editor={editor}
+            searchOpen={searchOpen}
+            setSearchOpen={setSearchOpen}
+            onAddImage={() => imageInputRef.current?.click()}
+          />
+        ) : null}
+        <SearchReplacePanel
+          editor={editor}
+          open={searchOpen}
+          search={search}
+          replace={replace}
+          onSearchChange={(value) => {
+            setSearch(value);
+            findCommands(editor).setSearchTerm(value);
+          }}
+          onReplaceChange={(value) => {
+            setReplace(value);
+            findCommands(editor).setReplaceTerm(value);
+          }}
+          onClose={() => {
+            setSearchOpen(false);
+            findCommands(editor).setSearchTerm("");
+          }}
+        />
+        <div className="misty-tiptap-canvas">
+          {props.editable ? (
+            <DragHandle
+              editor={editor}
+              nested
+              computePositionConfig={{ placement: "left-start", strategy: "fixed" }}
+              onNodeChange={({ node, pos }) =>
+                setBlock(node && typeof pos === "number" ? { pos, node: node.toJSON() } : null)
+              }
+            >
+              <BlockHandle editor={editor} block={block} noteId={props.noteId} />
+            </DragHandle>
+          ) : null}
+          <EditorContent editor={editor} role="presentation" />
+          {aiSelection ? <NoteAiSelectionMenu adapter={aiAdapter} selection={aiSelection} /> : null}
+          {suggestion ? (
+            <SuggestionMenu
+              editor={editor}
+              suggestion={suggestion}
+              notes={props.linkableNotes ?? []}
+              onClose={() => setSuggestion(null)}
+            />
+          ) : null}
+        </div>
+        <input
+          ref={imageInputRef}
+          className="hidden"
+          type="file"
+          accept="image/*"
+          onChange={(event) => {
+            void uploadImage(event.currentTarget.files?.[0]);
+            event.currentTarget.value = "";
+          }}
+        />
+      </div>
+    </EditorContext.Provider>
+  );
+}
+
+type NoteAiSelection = {
+  snapshot: AiSelectionSnapshot;
+  from: number;
+  to: number;
+  x: number;
+  y: number;
+};
+
+const noteSelectionActions: AiSuggestedAction[] = [
+  {
+    id: "notes.improve",
+    label: "Improve writing",
+    prompt: "Improve this writing while preserving its meaning and voice.",
+    trigger: "selection",
+    requestedArtifactKind: "text_patch",
+  },
+  {
+    id: "notes.shorten",
+    label: "Make concise",
+    prompt: "Make this text clearer and more concise without losing important details.",
+    trigger: "selection",
+    requestedArtifactKind: "text_patch",
+  },
+  {
+    id: "notes.clarify",
+    label: "Clarify",
+    prompt: "Rewrite this text so it is easier to understand and preserves the original intent.",
+    trigger: "selection",
+    requestedArtifactKind: "text_patch",
+  },
+  {
+    id: "notes.summarize-selection",
+    label: "Summarize",
+    prompt: "Summarize the selected text and call out its most important point.",
+    trigger: "selection",
+  },
+  {
+    id: "notes.extract-tasks-selection",
+    label: "Extract tasks",
+    prompt: "Extract only concrete action items from this selection as reviewable tasks.",
+    trigger: "selection",
+    requestedArtifactKind: "task_set",
+  },
+];
+
+const notePageActions: AiSuggestedAction[] = [
+  {
+    id: "notes.summarize",
+    label: "Summarize note",
+    prompt: "Summarize this note, including its key points and any unresolved questions.",
+    trigger: "object",
+  },
+  {
+    id: "notes.decisions",
+    label: "Find decisions",
+    prompt: "Identify decisions, commitments, and open questions in this note.",
+    trigger: "object",
+  },
+  {
+    id: "notes.next-steps",
+    label: "Find next steps",
+    prompt: "Identify concrete next steps in this note. Do not create anything yet.",
+    trigger: "object",
+  },
+  {
+    id: "notes.extract-tasks",
+    label: "Extract tasks",
+    prompt: "Extract concrete action items from this note as reviewable tasks.",
+    trigger: "object",
+    requestedArtifactKind: "task_set",
+  },
+];
+
+function NoteAiRegistration({ adapter }: { adapter: AiSurfaceAdapter | null }) {
+  useAiSurfaceAdapter(adapter);
+  return null;
+}
+
+function NoteAiSelectionMenu({
+  adapter,
+  selection,
+}: {
+  adapter: AiSurfaceAdapter | null;
+  selection: NoteAiSelection;
+}) {
+  const actions = useAiSurfaceActions(adapter);
+  if (!adapter || !actions.available) return null;
   return (
     <div
-      ref={blockDropZoneRef}
-      className={cn("misty-note-block-editor", !editable && "is-readonly")}
-      data-misty-window-drag-block="true"
-      data-pointer-drag-source={editable ? "true" : undefined}
+      className="fixed z-[80]"
+      style={{ left: selection.x, top: selection.y }}
+      onMouseDown={(event) => event.preventDefault()}
     >
-      {editable ? <div className="misty-note-block-drop-gutter" aria-hidden="true" /> : null}
-      <BlockNoteView editor={editor} editable={editable} theme={resolvedTheme}>
-        {editable ? <MistyBlockPointerDragBridge /> : null}
-      </BlockNoteView>
+      <AiSelectionMenu
+        actions={noteSelectionActions}
+        onAction={(action) => void actions.runAction(action)}
+      />
     </div>
   );
 }
 
-function MistyBlockPointerDragBridge() {
-  const editor = useBlockNoteEditor();
-  const { startDrag, state } = usePointerDrag();
-  const armedElementRef = useRef<HTMLElement | null>(null);
-  const armedHandleRef = useRef<{ button: HTMLButtonElement; pointerId: number } | null>(null);
-
-  useEffect(() => {
-    const container = editor.prosemirrorView.dom.closest(".bn-container");
-    if (!container) return;
-
-    const dragHandleButton = (target: EventTarget | null) => {
-      if (!(target instanceof Element)) return null;
-      const button = target.closest<HTMLButtonElement>(".bn-side-menu button");
-      return button?.querySelector("[data-test='dragHandle']") ? button : null;
-    };
-
-    const prepareNativeHandle = () => {
-      container
-        .querySelectorAll<HTMLElement>(".bn-side-menu [data-test='dragHandle']")
-        .forEach((icon) => {
-          const button = icon.closest("button");
-          if (!button) return;
-          if (button.draggable) button.draggable = false;
-          button.dataset.mistyBlockDragHandle = "true";
-          button.dataset.mistyWindowDragBlock = "true";
-          button.dataset.pointerDragSource = "true";
-        });
-    };
-    prepareNativeHandle();
-    const observer = new MutationObserver(prepareNativeHandle);
-    observer.observe(container, {
-      attributes: true,
-      attributeFilter: ["draggable"],
-      childList: true,
-      subtree: true,
-    });
-
-    const onPointerDown = (event: globalThis.PointerEvent) => {
-      const activeBlock = editor.getExtension(SideMenuExtension)?.store.state?.block;
-      const button = dragHandleButton(event.target);
-      if (!editor.isEditable || !activeBlock || !button || !editor.isWithinEditor(button)) return;
-      // Disable WebKit's native drag before it has a chance to issue
-      // pointercancel and abort the pointer-based drag.
-      button.draggable = false;
-      event.preventDefault();
-      try {
-        button.setPointerCapture(event.pointerId);
-        armedHandleRef.current = { button, pointerId: event.pointerId };
-      } catch {
-        armedHandleRef.current = null;
-      }
-      setNoteBlockDragHighlight(armedElementRef.current, false);
-      const sourceElement = noteBlockElement(editor.prosemirrorView.dom, activeBlock.id);
-      setNoteBlockDragHighlight(sourceElement, true);
-      armedElementRef.current = sourceElement;
-      startDrag(
-        event as unknown as PointerEvent<HTMLElement>,
-        { kind: NOTE_BLOCK_DRAG_KIND, id: activeBlock.id },
-        <NoteBlockDragPreview block={activeBlock} />,
-      );
-    };
-    const clearArmedHighlight = () => {
-      setNoteBlockDragHighlight(armedElementRef.current, false);
-      armedElementRef.current = null;
-      const armedHandle = armedHandleRef.current;
-      armedHandleRef.current = null;
-      if (!armedHandle) return;
-      try {
-        if (armedHandle.button.hasPointerCapture(armedHandle.pointerId)) {
-          armedHandle.button.releasePointerCapture(armedHandle.pointerId);
-        }
-      } catch {}
-    };
-    const stopNativeDrag = (event: Event) => {
-      const button = dragHandleButton(event.target);
-      if (button && editor.isWithinEditor(button)) event.preventDefault();
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, { capture: true, passive: false });
-    document.addEventListener("pointerup", clearArmedHighlight, true);
-    document.addEventListener("pointercancel", clearArmedHighlight, true);
-    document.addEventListener("dragstart", stopNativeDrag, true);
-    return () => {
-      observer.disconnect();
-      clearArmedHighlight();
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("pointerup", clearArmedHighlight, true);
-      document.removeEventListener("pointercancel", clearArmedHighlight, true);
-      document.removeEventListener("dragstart", stopNativeDrag, true);
-    };
-  }, [editor, startDrag]);
-
-  useEffect(() => {
-    if (state.payload?.kind !== NOTE_BLOCK_DRAG_KIND) return;
-    const draggedElement = noteBlockElement(editor.prosemirrorView.dom, state.payload.id);
-    setNoteBlockDragHighlight(draggedElement, true);
-    editor.getExtension(SideMenuExtension)?.freezeMenu();
-    return () => {
-      setNoteBlockDragHighlight(draggedElement, false);
-      editor.getExtension(SideMenuExtension)?.unfreezeMenu();
-    };
-  }, [editor, state.payload]);
-
-  return null;
-}
-
-function NoteBlockDragPreview({ block }: { block: BlockPreviewSource }) {
-  return (
-    <div className="max-w-[260px] rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-sm text-cream shadow-lg">
-      {blockPreviewText(block)}
-    </div>
-  );
-}
-
-function useNoteBlockPointerDropZones(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  editable: boolean,
-) {
-  const { registerZone, state } = usePointerDrag();
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const zoneCleanupRef = useRef<(() => void) | null>(null);
-  const indicatorElementRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    indicatorElementRef.current?.removeAttribute("data-misty-note-drop-position");
-    indicatorElementRef.current = null;
-
-    if (
-      state.payload?.kind !== NOTE_BLOCK_DRAG_KIND ||
-      state.activeZoneId !== "note-editor" ||
-      !state.pointer ||
-      !rootRef.current
-    )
-      return;
-    const target = noteBlockTargetAt(rootRef.current, state.payload.id, state.pointer.y);
-    if (!target) return;
-
-    target.element.dataset.mistyNoteDropPosition = target.placement;
-    indicatorElementRef.current = target.element;
-
-    return () => {
-      target.element.removeAttribute("data-misty-note-drop-position");
-    };
-  }, [state.activeZoneId, state.payload, state.pointer]);
-
-  const register = useCallback(
-    (root: HTMLDivElement | null) => {
-      zoneCleanupRef.current?.();
-      zoneCleanupRef.current = null;
-      rootRef.current = root;
-      if (!root || !editable) return;
-
-      const spec = {
-        current: {
-          id: "note-editor",
-          accepts: (payload: PointerDragPayload) => payload.kind === NOTE_BLOCK_DRAG_KIND,
-          onDrop: (payload: PointerDragPayload, pointer: { x: number; y: number }) => {
-            if (payload.kind !== NOTE_BLOCK_DRAG_KIND) return;
-            const target = noteBlockTargetAt(root, payload.id, pointer.y);
-            const sourceBlock = findBlockById(editor.document, payload.id);
-            if (!target || !sourceBlock) return;
-            moveNoteBlock(editor, sourceBlock, target.blockId, target.placement);
-          },
-        },
-      };
-      zoneCleanupRef.current = registerZone(root, spec);
-    },
-    [editable, editor, registerZone],
-  );
-
-  useEffect(
-    () => () => {
-      indicatorElementRef.current?.removeAttribute("data-misty-note-drop-position");
-      zoneCleanupRef.current?.();
-      zoneCleanupRef.current = null;
-      rootRef.current = null;
-    },
-    [],
-  );
-
-  return register;
-}
-
-function noteBlockElement(root: HTMLElement, blockId: string) {
-  return root.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(blockId)}"]`);
-}
-
-function setNoteBlockDragHighlight(element: HTMLElement | null, active: boolean) {
-  element?.classList.toggle("misty-note-block-is-dragging", active);
-  element
-    ?.querySelectorAll<HTMLElement>(".bn-block-content")
-    .forEach((content) => content.classList.toggle("misty-note-block-is-dragging", active));
-}
-
-export function noteBlockTargetAt(root: HTMLElement, sourceBlockId: string, pointerY: number) {
-  let closest:
-    | {
-        element: HTMLElement;
-        blockId: string;
-        placement: "before" | "after";
-        distance: number;
-      }
-    | undefined;
-
-  root.querySelectorAll<HTMLElement>(".bn-block-outer[data-id]").forEach((element) => {
-    const blockId = element.dataset.id;
-    if (!blockId || blockId === sourceBlockId || !element.isConnected) return;
-    const rect = element.getBoundingClientRect();
-    const distance =
-      pointerY < rect.top
-        ? rect.top - pointerY
-        : pointerY > rect.bottom
-          ? pointerY - rect.bottom
-          : 0;
-    if (closest && closest.distance <= distance) return;
-    closest = {
-      element,
-      blockId,
-      placement: pointerY < rect.top + rect.height / 2 ? "before" : "after",
-      distance,
-    };
-  });
-
-  return closest;
-}
-
-function findBlockById(blocks: NoteBlock[], blockId: string): NoteBlock | null {
-  for (const block of blocks) {
-    if (block.id === blockId) return block;
-    const child = findBlockById(block.children, blockId);
-    if (child) return child;
-  }
-  return null;
-}
-
-function moveNoteBlock(
-  editor: ReturnType<typeof useCreateBlockNote>,
-  sourceBlock: NoteBlock,
-  targetBlockId: string,
-  placement: "before" | "after",
-) {
-  editor.transact(() => {
-    editor.removeBlocks([sourceBlock.id]);
-    editor.insertBlocks([sourceBlock], targetBlockId, placement);
-  });
-}
-
-function blockPreviewText(block: BlockPreviewSource): ReactNode {
-  const content = Array.isArray(block.content)
-    ? block.content
-        .map((item) =>
-          item && typeof item === "object" && "text" in item && typeof item.text === "string"
-            ? item.text
-            : "",
-        )
-        .join("")
-        .trim()
-    : "";
-  return content || block.type;
-}
-
-interface BlockPreviewSource {
-  type: string;
-  content?: unknown;
-}
-
-function collaborationUser(accountId?: string) {
-  const id = accountId?.trim() || "misty-user";
+function createNoteAiAdapter(
+  editor: Editor,
+  props: NoteBlockEditorProps & { session?: NoteCollaborationSession },
+  selection: NoteAiSelection | null,
+): AiSurfaceAdapter | null {
+  const context = props.aiContext;
+  if (!context) return null;
   return {
-    name: id,
-    color: colorForId(id),
+    surfaceId: "notes",
+    label: context.title || "this note",
+    getContext: () => [context],
+    getSelection: () => selection?.snapshot ?? null,
+    getSuggestedActions: () => (selection ? noteSelectionActions : notePageActions),
+    canApply: (artifact) => canApplyNoteArtifact(editor, props, artifact),
+    applyArtifact: (artifact) => applyNoteArtifact(editor, props, artifact),
+    openCitation: (citation) => {
+      const noteId = citation.kind === "note" ? noteIdFromHref(citation.href) : null;
+      if (noteId) props.onOpenNote?.(noteId);
+      else if (citation.href) {
+        window.dispatchEvent(new CustomEvent("misty:open-ai-citation", { detail: citation }));
+      }
+    },
   };
 }
 
-function colorForId(id: string): string {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+function updateAiSelection(
+  editor: Editor,
+  context: AiContextReference | undefined,
+  setSelection: (selection: NoteAiSelection | null) => void,
+) {
+  if (!context) return setSelection(null);
+  const { from, to, empty } = editor.state.selection;
+  if (empty || from === to) return setSelection(null);
+  const content = editor.state.doc.textBetween(from, to, "\n", "\n");
+  if (!content.trim()) return setSelection(null);
+  const start = editor.view.coordsAtPos(from);
+  const end = editor.view.coordsAtPos(to);
+  setSelection({
+    from,
+    to,
+    x: Math.max(12, Math.min(start.left, end.left)),
+    y: Math.max(12, Math.min(start.top, end.top) - 38),
+    snapshot: {
+      kind: "text",
+      content,
+      object: {
+        kind: context.kind,
+        id: context.id,
+        spaceId: context.spaceId,
+        revision: context.revision,
+      },
+      anchors: { from, to, editor: "tiptap-prosemirror-v1" },
+      contentHash: noteSelectionHash(content),
+    },
+  });
+}
+
+function canApplyNoteArtifact(editor: Editor, props: NoteBlockEditorProps, artifact: AiArtifact) {
+  if (!props.editable || artifact.kind !== "text_patch" || !props.aiContext) return false;
+  if (artifact.target?.id !== props.aiContext.id) return false;
+  if (
+    artifact.baseRevision != null &&
+    props.aiContext.revision != null &&
+    String(artifact.baseRevision) !== String(props.aiContext.revision)
+  ) {
+    return false;
   }
-  const colors = ["#3E3E3E", "#A3BFAB", "#52825A", "#8C8C8C", "#E0E0E0", "#28312B"];
-  return colors[hash % colors.length];
+  const selection = artifactSelection(artifact);
+  if (!selection) return false;
+  return noteSelectionAt(editor, selection) === selection.content;
+}
+
+async function applyNoteArtifact(
+  editor: Editor,
+  props: NoteBlockEditorProps,
+  artifact: AiArtifact,
+) {
+  if (!canApplyNoteArtifact(editor, props, artifact)) {
+    throw new Error("The note selection changed. Ask Misty to regenerate this draft.");
+  }
+  const operations = artifact.operations as Record<string, unknown>;
+  const replacement = operations.replacement;
+  const selection = artifactSelection(artifact);
+  if (typeof replacement !== "string" || !selection) {
+    throw new Error("This note draft is not compatible with the current editor.");
+  }
+  const from = Number(selection.anchors?.from);
+  const to = Number(selection.anchors?.to);
+  editor.view.dispatch(editor.state.tr.insertText(replacement, from, to));
+  editor.commands.focus(Math.min(from + replacement.length, editor.state.doc.content.size));
+}
+
+function artifactSelection(artifact: AiArtifact): AiSelectionSnapshot | null {
+  const value = (artifact.operations as Record<string, unknown>)?.selection;
+  if (!value || typeof value !== "object") return null;
+  const selection = value as AiSelectionSnapshot;
+  const from = Number(selection.anchors?.from);
+  const to = Number(selection.anchors?.to);
+  return Number.isInteger(from) && Number.isInteger(to) && from >= 0 && to >= from
+    ? selection
+    : null;
+}
+
+function noteSelectionAt(editor: Editor, selection: AiSelectionSnapshot) {
+  const from = Number(selection.anchors?.from);
+  const to = Number(selection.anchors?.to);
+  if (to > editor.state.doc.content.size) return null;
+  const current = editor.state.doc.textBetween(from, to, "\n", "\n");
+  return noteSelectionHash(current) === selection.contentHash ? current : null;
+}
+
+function noteSelectionHash(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function SimpleEditorToolbar(props: {
+  editor: Editor;
+  searchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
+  onAddImage: () => void;
+}) {
+  const { editor } = props;
+  const link = () => {
+    const previous = editor.getAttributes("link").href as string | undefined;
+    const href = window.prompt("Link URL", previous ?? "https://");
+    if (href === null) return;
+    if (!href.trim()) editor.chain().focus().unsetLink().run();
+    else editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
+  };
+  return (
+    <div className="misty-tiptap-toolbar" role="toolbar" aria-label="Text formatting">
+      <ToolbarGroup>
+        <ToolButton label="Undo" Icon={Undo2} onClick={() => editor.chain().focus().undo().run()} />
+        <ToolButton label="Redo" Icon={Redo2} onClick={() => editor.chain().focus().redo().run()} />
+      </ToolbarGroup>
+      <ToolbarRule />
+      <ToolbarGroup>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="misty-tiptap-tool gap-1"
+              aria-label="Headings"
+            >
+              <Heading size={17} />
+              <ChevronDown size={12} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
+              <Pilcrow />
+              Text
+            </DropdownMenuItem>
+            {[1, 2, 3, 4].map((level) => (
+              <DropdownMenuItem
+                key={level}
+                onSelect={() =>
+                  editor
+                    .chain()
+                    .focus()
+                    .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
+                    .run()
+                }
+              >
+                <Heading />
+                Heading {level}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="misty-tiptap-tool gap-1"
+              aria-label="Lists"
+            >
+              <List size={17} />
+              <ChevronDown size={12} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleBulletList().run()}>
+              <List />
+              Bullet list
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleOrderedList().run()}>
+              <ListOrdered />
+              Numbered list
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleTaskList().run()}>
+              <ListChecks />
+              To-do list
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ToolButton
+          label="Blockquote"
+          Icon={Quote}
+          active={editor.isActive("blockquote")}
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        />
+        <ToolButton
+          label="Code block"
+          Icon={Braces}
+          active={editor.isActive("codeBlock")}
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+        />
+      </ToolbarGroup>
+      <ToolbarRule />
+      <ToolbarGroup>
+        <ToolButton
+          label="Bold"
+          Icon={Bold}
+          active={editor.isActive("bold")}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+        />
+        <ToolButton
+          label="Italic"
+          Icon={Italic}
+          active={editor.isActive("italic")}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+        />
+        <ToolButton
+          label="Strikethrough"
+          Icon={Strikethrough}
+          active={editor.isActive("strike")}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+        />
+        <ToolButton
+          label="Inline code"
+          Icon={Code2}
+          active={editor.isActive("code")}
+          onClick={() => editor.chain().focus().toggleCode().run()}
+        />
+        <ToolButton
+          label="Underline"
+          Icon={Underline}
+          active={editor.isActive("underline")}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="misty-tiptap-tool"
+              aria-label="Highlight"
+            >
+              <Highlighter size={17} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="flex w-auto gap-1 p-2">
+            {["#7255d9", "#d7a928", "#3f8e72", "#b95656"].map((color) => (
+              <button
+                key={color}
+                type="button"
+                className="size-6 rounded-full ring-1 ring-white/15"
+                style={{ background: color }}
+                aria-label={`Highlight ${color}`}
+                onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+              />
+            ))}
+          </PopoverContent>
+        </Popover>
+        <ToolButton label="Link" Icon={Link2} active={editor.isActive("link")} onClick={link} />
+      </ToolbarGroup>
+      <ToolbarRule />
+      <ToolbarGroup>
+        <ToolButton
+          label="Superscript"
+          Icon={SuperscriptIcon}
+          active={editor.isActive("superscript")}
+          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+        />
+        <ToolButton
+          label="Subscript"
+          Icon={SubscriptIcon}
+          active={editor.isActive("subscript")}
+          onClick={() => editor.chain().focus().toggleSubscript().run()}
+        />
+      </ToolbarGroup>
+      <ToolbarRule />
+      <ToolbarGroup>
+        <ToolButton
+          label="Align left"
+          Icon={AlignLeft}
+          active={editor.isActive({ textAlign: "left" })}
+          onClick={() => editor.chain().focus().setTextAlign("left").run()}
+        />
+        <ToolButton
+          label="Align center"
+          Icon={AlignCenter}
+          active={editor.isActive({ textAlign: "center" })}
+          onClick={() => editor.chain().focus().setTextAlign("center").run()}
+        />
+        <ToolButton
+          label="Align right"
+          Icon={AlignRight}
+          active={editor.isActive({ textAlign: "right" })}
+          onClick={() => editor.chain().focus().setTextAlign("right").run()}
+        />
+        <ToolButton
+          label="Justify"
+          Icon={AlignJustify}
+          active={editor.isActive({ textAlign: "justify" })}
+          onClick={() => editor.chain().focus().setTextAlign("justify").run()}
+        />
+      </ToolbarGroup>
+      <ToolbarRule />
+      <ToolbarGroup>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="misty-tiptap-tool gap-1.5 px-2"
+          onClick={props.onAddImage}
+        >
+          <ImagePlus size={17} />
+          Add
+        </Button>
+      </ToolbarGroup>
+      <div className="min-w-2 flex-1" />
+      <ToolbarGroup>
+        <ToolButton
+          label="Search and replace"
+          Icon={Search}
+          active={props.searchOpen}
+          onClick={() => props.setSearchOpen(!props.searchOpen)}
+        />
+      </ToolbarGroup>
+    </div>
+  );
+}
+
+function ToolbarGroup({ children }: { children: ReactNode }) {
+  return <div className="flex shrink-0 items-center gap-0.5">{children}</div>;
+}
+function ToolbarRule() {
+  return <Separator orientation="vertical" className="mx-1.5 h-6 shrink-0" />;
+}
+function ToolButton(props: {
+  label: string;
+  Icon: ComponentType<{ size?: number }>;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      title={props.label}
+      aria-label={props.label}
+      aria-pressed={props.active}
+      className={cn("misty-tiptap-tool", props.active && "is-active")}
+      onClick={props.onClick}
+    >
+      <props.Icon size={17} />
+    </Button>
+  );
+}
+
+function SearchReplacePanel(props: {
+  editor: Editor;
+  open: boolean;
+  search: string;
+  replace: string;
+  onSearchChange: (value: string) => void;
+  onReplaceChange: (value: string) => void;
+  onClose: () => void;
+}) {
+  if (!props.open) return null;
+  const commands = findCommands(props.editor);
+  return (
+    <div className="misty-tiptap-search" role="search">
+      <Input
+        autoFocus
+        value={props.search}
+        placeholder="Find"
+        aria-label="Find text"
+        onChange={(event) => props.onSearchChange(event.target.value)}
+      />
+      <Input
+        value={props.replace}
+        placeholder="Replace"
+        aria-label="Replacement text"
+        onChange={(event) => props.onReplaceChange(event.target.value)}
+      />
+      <Button size="sm" variant="ghost" onClick={() => commands.goToPreviousResult()}>
+        Previous
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => commands.goToNextResult()}>
+        Next
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => commands.replace()}>
+        Replace
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => commands.replaceAll()}>
+        All
+      </Button>
+      <Button size="icon" variant="ghost" aria-label="Close search" onClick={props.onClose}>
+        <Minus size={16} />
+      </Button>
+    </div>
+  );
+}
+
+function BlockHandle(props: {
+  editor: Editor;
+  block: { pos: number; node: JSONContent } | null;
+  noteId: string;
+}) {
+  const { editor, block } = props;
+  const pos = block?.pos ?? Math.max(0, editor.state.selection.$from.before(1));
+  const node = editor.state.doc.nodeAt(pos);
+  const range = node ? { from: pos, to: pos + node.nodeSize } : null;
+  return (
+    <div className="misty-tiptap-block-handle" data-misty-window-drag-block="true">
+      <button
+        type="button"
+        aria-label="Add block"
+        title="Add block"
+        onClick={() => editor.chain().focus().insertContentAt(pos, { type: "paragraph" }).run()}
+      >
+        <Plus size={16} />
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Block actions" title="Drag or open block actions">
+            <GripVertical size={16} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="left" className="w-52">
+          <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
+            <Pilcrow />
+            Turn into text
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          >
+            <Heading />
+            Turn into heading
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!range}
+            onSelect={() =>
+              range &&
+              editor
+                .chain()
+                .focus()
+                .setTextSelection(range)
+                .toggleHighlight({ color: "#7255d9" })
+                .run()
+            }
+          >
+            <Highlighter />
+            Highlight block
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={!node}
+            onSelect={() =>
+              node &&
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(pos + node.nodeSize, node.toJSON())
+                .run()
+            }
+          >
+            <Copy />
+            Duplicate block
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!node}
+            onSelect={() => node && void navigator.clipboard.writeText(node.textContent)}
+          >
+            <Copy />
+            Copy to clipboard
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() =>
+              void navigator.clipboard.writeText(
+                `misty://notes/${props.noteId}#${String(node?.attrs.id || `block-${pos}`)}`,
+              )
+            }
+          >
+            <Link2 />
+            Copy anchor link
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={!range}
+            className="text-red-300"
+            onSelect={() => range && editor.chain().focus().deleteRange(range).run()}
+          >
+            <Trash2 />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+type SuggestionState = {
+  type: "slash" | "wiki";
+  query: string;
+  from: number;
+  to: number;
+  x: number;
+  y: number;
+};
+function updateSuggestion(editor: Editor, set: (value: SuggestionState | null) => void) {
+  const { $from } = editor.state.selection;
+  if (!$from.parent.isTextblock) return set(null);
+  const before = $from.parent.textBetween(0, $from.parentOffset, "\n", "\n");
+  const wiki = before.match(/\[\[([^\]]*)$/);
+  const slash = before.match(/(?:^|\s)\/([a-z\s]*)$/i);
+  const match = wiki ?? slash;
+  if (!match) return set(null);
+  const coords = editor.view.coordsAtPos(editor.state.selection.from);
+  set({
+    type: wiki ? "wiki" : "slash",
+    query: match[1] ?? "",
+    from: editor.state.selection.from - match[0].trimStart().length,
+    to: editor.state.selection.from,
+    x: coords.left,
+    y: coords.bottom + 8,
+  });
+}
+
+function SuggestionMenu(props: {
+  editor: Editor;
+  suggestion: SuggestionState;
+  notes: Array<{ id: string; title: string }>;
+  onClose: () => void;
+}) {
+  const slashItems = [
+    { label: "Text", icon: Pilcrow, run: () => props.editor.chain().focus().setParagraph().run() },
+    {
+      label: "Heading 1",
+      icon: Heading,
+      run: () => props.editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    },
+    {
+      label: "Heading 2",
+      icon: Heading,
+      run: () => props.editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    },
+    {
+      label: "Bullet list",
+      icon: List,
+      run: () => props.editor.chain().focus().toggleBulletList().run(),
+    },
+    {
+      label: "Numbered list",
+      icon: ListOrdered,
+      run: () => props.editor.chain().focus().toggleOrderedList().run(),
+    },
+    {
+      label: "To-do list",
+      icon: ListChecks,
+      run: () => props.editor.chain().focus().toggleTaskList().run(),
+    },
+    {
+      label: "Blockquote",
+      icon: Quote,
+      run: () => props.editor.chain().focus().toggleBlockquote().run(),
+    },
+    {
+      label: "Code block",
+      icon: Braces,
+      run: () => props.editor.chain().focus().toggleCodeBlock().run(),
+    },
+  ].filter((item) => item.label.toLowerCase().includes(props.suggestion.query.toLowerCase()));
+  const notes = props.notes
+    .filter((note) => note.title.toLowerCase().includes(props.suggestion.query.toLowerCase()))
+    .slice(0, 8);
+  return (
+    <div
+      className="misty-tiptap-suggestion"
+      style={{ left: props.suggestion.x, top: props.suggestion.y }}
+      role="listbox"
+    >
+      <p>{props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}</p>
+      {props.suggestion.type === "slash"
+        ? slashItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                props.editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from: props.suggestion.from, to: props.suggestion.to })
+                  .run();
+                item.run();
+                props.onClose();
+              }}
+            >
+              <item.icon size={16} />
+              {item.label}
+            </button>
+          ))
+        : notes.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              onClick={() => {
+                props.editor
+                  .chain()
+                  .focus()
+                  .deleteRange({ from: props.suggestion.from, to: props.suggestion.to })
+                  .insertContent({
+                    type: "text",
+                    text: note.title,
+                    marks: [{ type: "link", attrs: { href: `misty-note://${note.id}` } }],
+                  })
+                  .run();
+                props.onClose();
+              }}
+            >
+              <Link2 size={16} />
+              {note.title}
+            </button>
+          ))}
+      {props.suggestion.type === "wiki" && notes.length === 0 ? (
+        <span>No matching notes</span>
+      ) : null}
+    </div>
+  );
+}
+
+type FindCommands = {
+  setSearchTerm: (value: string) => boolean;
+  setReplaceTerm: (value: string) => boolean;
+  goToPreviousResult: () => boolean;
+  goToNextResult: () => boolean;
+  replace: () => boolean;
+  replaceAll: () => boolean;
+};
+function findCommands(editor: Editor) {
+  return editor.commands as unknown as FindCommands;
+}
+function initialContent(
+  props: Pick<NoteBlockEditorProps, "body" | "bodyFormat" | "bodyMarkdown">,
+): string | JSONContent {
+  if (props.bodyFormat === "tiptap-json") {
+    try {
+      return JSON.parse(props.body) as JSONContent;
+    } catch {
+      return { type: "doc", content: [{ type: "paragraph" }] };
+    }
+  }
+  return props.bodyMarkdown ?? props.body ?? "";
+}
+
+function replaceYText(text: YText, value: string) {
+  if (text.toString() === value) return;
+  text.doc?.transact(() => {
+    text.delete(0, text.length);
+    text.insert(0, value);
+  }, "misty-projection");
+}
+function applyPendingMarkdown(editor: Editor, session?: NoteCollaborationSession) {
+  if (!session) return;
+  const awareness = session.provider.awareness;
+  const connectedClients = [...awareness.getStates().keys()].sort((left, right) => left - right);
+  if (connectedClients[0] !== awareness.clientID) return;
+  const pending = Number(session.metadata.get("pending_version") ?? 0);
+  const applied = Number(session.metadata.get("applied_version") ?? 0);
+  const markdown = String(session.metadata.get("pending_markdown") ?? "");
+  if (!pending || pending <= applied) return;
+  editor.commands.setContent(markdown, { contentType: "markdown" });
+  session.metadata.set("applied_version", pending);
+}
+function collectNoteLinks(editor: Editor): string[] {
+  const ids = new Set<string>();
+  editor.state.doc.descendants((node) => {
+    for (const mark of node.marks) {
+      const id = noteIdFromHref(String(mark.attrs.href ?? ""));
+      if (id) ids.add(id);
+    }
+  });
+  return [...ids].sort();
+}
+function noteIdFromHref(href: string): string | null {
+  const match = href.match(/^misty-note:\/\/(note_[A-Za-z0-9-]+)$/);
+  return match?.[1] ?? null;
+}
+function collaborationUser(accountId?: string) {
+  const seed = accountId ?? "misty-user";
+  let hash = 0;
+  for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  const colors = ["#8b7cf6", "#48a889", "#d09a55", "#cf6f79", "#5b91d5"];
+  return { name: "Misty collaborator", color: colors[Math.abs(hash) % colors.length] };
 }
 
 export default NoteBlockEditor;

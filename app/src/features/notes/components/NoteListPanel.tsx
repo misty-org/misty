@@ -1,5 +1,16 @@
-import { Button, EmptyState, ScrollArea, Skeleton, cn } from "@/shared/ui";
-import { Star } from "lucide-react";
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  EmptyState,
+  ScrollArea,
+  Skeleton,
+  cn,
+} from "@/shared/ui";
+import { Archive, Pencil, Trash2 } from "lucide-react";
 import type { UnifiedNote } from "../model/types/types";
 import { SyncErrorNotice } from "./NotesConnectionCards";
 
@@ -54,6 +65,21 @@ export function NoteListPanel(props: NoteListPanelProps) {
                 note={note}
                 selected={note.id === props.selectedNoteId}
                 onSelect={() => props.onSelectNote(note.id)}
+                onRename={
+                  props.onRenameNote && note.source === "misty"
+                    ? () => props.onRenameNote?.(note)
+                    : undefined
+                }
+                onArchive={
+                  props.onArchiveNote && note.source === "misty" && note.canDelete
+                    ? () => props.onArchiveNote?.(note)
+                    : undefined
+                }
+                onDelete={
+                  props.onDeleteNote && note.canDelete
+                    ? () => props.onDeleteNote?.(note)
+                    : undefined
+                }
               />
             ))
           : null}
@@ -65,7 +91,7 @@ export function NoteListPanel(props: NoteListPanelProps) {
 function NoteListItem(props: NoteListItemProps) {
   const { note } = props;
 
-  return (
+  const row = (
     <Button
       type="button"
       variant="ghost"
@@ -77,9 +103,33 @@ function NoteListItem(props: NoteListItemProps) {
         <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-cream">
           {note.title}
         </span>
-        {note.favorite ? <Star size={12} className="shrink-0 fill-sage-fg text-sage-fg" /> : null}
       </span>
     </Button>
+  );
+  if (!props.onRename && !props.onArchive && !props.onDelete) return row;
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+      <ContextMenuContent className="w-44">
+        <ContextMenuItem disabled={!props.onRename} onSelect={props.onRename}>
+          <Pencil />
+          Rename
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!props.onArchive} onSelect={props.onArchive}>
+          <Archive />
+          Archive
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={!props.onDelete}
+          className="text-red-300"
+          onSelect={props.onDelete}
+        >
+          <Trash2 />
+          Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -108,10 +158,16 @@ export interface NoteListPanelProps {
   onSelectNote: (noteId: string) => void;
   onNewNote: () => void;
   onClearQuery: () => void;
+  onRenameNote?: (note: UnifiedNote) => void;
+  onArchiveNote?: (note: UnifiedNote) => void;
+  onDeleteNote?: (note: UnifiedNote) => void;
 }
 
 export interface NoteListItemProps {
   note: UnifiedNote;
   selected: boolean;
   onSelect: () => void;
+  onRename?: () => void;
+  onArchive?: () => void;
+  onDelete?: () => void;
 }

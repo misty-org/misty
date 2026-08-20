@@ -1,5 +1,6 @@
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
 import { ClipboardPaste, Copy, CopyPlus, Maximize2, Redo2, Trash2, Undo2 } from "lucide-react";
+import { useShortcutTitle } from "@/features/shortcuts";
 
 export function GraphToolbar(props: {
   canEdit: boolean;
@@ -12,24 +13,30 @@ export function GraphToolbar(props: {
   onDelete: () => void;
   onFit: () => void;
 }) {
+  const undoTitle = useShortcutTitle("Undo", "roadmap.undo");
+  const redoTitle = useShortcutTitle("Redo", "roadmap.redo");
+  const copyTitle = useShortcutTitle("Copy", "roadmap.copy");
+  const pasteTitle = useShortcutTitle("Paste", "roadmap.paste");
+  const duplicateTitle = useShortcutTitle("Duplicate", "roadmap.duplicate");
+  const deleteTitle = useShortcutTitle("Delete", "roadmap.delete");
   const tools = [
-    { label: "Undo", icon: Undo2, action: props.onUndo, disabled: !props.canEdit },
-    { label: "Redo", icon: Redo2, action: props.onRedo, disabled: !props.canEdit },
-    { label: "Copy", icon: Copy, action: props.onCopy, disabled: !props.hasSelection },
+    { label: undoTitle, icon: Undo2, action: props.onUndo, disabled: !props.canEdit },
+    { label: redoTitle, icon: Redo2, action: props.onRedo, disabled: !props.canEdit },
+    { label: copyTitle, icon: Copy, action: props.onCopy, disabled: !props.hasSelection },
     {
-      label: "Paste",
+      label: pasteTitle,
       icon: ClipboardPaste,
       action: props.onPaste,
       disabled: !props.canEdit,
     },
     {
-      label: "Duplicate",
+      label: duplicateTitle,
       icon: CopyPlus,
       action: props.onDuplicate,
       disabled: !props.canEdit || !props.hasSelection,
     },
     {
-      label: "Delete",
+      label: deleteTitle,
       icon: Trash2,
       action: props.onDelete,
       disabled: !props.canEdit || !props.hasSelection,
