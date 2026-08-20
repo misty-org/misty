@@ -51,7 +51,13 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
     if (desiredPath && desiredPath !== options.activePath) {
       void useExplorerStore.getState().navigatePane(options.activePaneId, desiredPath);
     }
-  }, [options.workspaceId, options.initialized, options.activePaneId, dockTabPath]);
+  }, [
+    dockTabPath,
+    options.activePaneId,
+    options.activePath,
+    options.initialized,
+    options.workspaceId,
+  ]);
 
   useEffect(() => {
     if (

@@ -1,6 +1,15 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { FilePlus, FolderInput, FolderPlus, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { FilePlus, FolderInput, FolderPlus, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,14 +35,17 @@ import {
 } from "@/shared/ui";
 import type { FileEntry } from "@/native/contracts/app-explorer";
 import {
+  explorerQueueDeleteItems,
+  explorerQueuePasteItems,
+  explorerQueueRenameItems,
+} from "@/features/files/native";
+import {
   codeCreateFile,
   codeCreateFolder,
   codeDeletePath,
   codeListDirectory,
   codeRenamePath,
-  type GitFileStatus,
 } from "../native";
-import { useGitStore } from "../git/useGitStore";
 import { useCodingWorkspaceStore, useDirtyPaths } from "../store/useCodingWorkspaceStore";
 import { CodeExplorerRow } from "./CodeExplorerRow";
 
@@ -45,6 +57,10 @@ interface DeleteTarget {
   path: string;
   name: string;
   isDirectory: boolean;
+}
+
+interface BatchRenameItem extends DeleteTarget {
+  draft: string;
 }
 
 interface CodeExplorerProps {
@@ -67,8 +83,6 @@ export function CodeExplorer({
   );
   const removeBuffer = useCodingWorkspaceStore((state) => state.removeBuffer);
   const dirtyPaths = useDirtyPaths();
-  const gitSnapshot = useGitStore((state) => state.snapshots[rootPath] ?? state.snapshot);
-  const refreshGit = useGitStore((state) => state.refresh);
 
   const [rootEntries, setRootEntries] = useState<FileEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,13 +91,33 @@ export function CodeExplorer({
   const [busyMessage, setBusyMessage] = useState<string | null>(null);
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const [nameDraft, setNameDraft] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<DeleteTarget[]>([]);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+  const [batchRenameItems, setBatchRenameItems] = useState<BatchRenameItem[] | null>(null);
+  const [renamePattern, setRenamePattern] = useState("{name}{ext}");
+  const [renameFind, setRenameFind] = useState("");
+  const [renameReplace, setRenameReplace] = useState("");
+  const [renameStart, setRenameStart] = useState(1);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [fileClipboard, setFileClipboard] = useState<{
+    operation: "copy" | "move";
+    sources: Array<{ path: string; isDirectory: boolean }>;
+  } | null>(null);
+  const entriesRef = useRef(new Map<string, FileEntry>());
+  const visibleOrderRef = useRef<string[]>([]);
 
   const rootName = useMemo(() => {
     if (!rootPath) return "";
     const parts = rootPath.split("/").filter(Boolean);
     return parts[parts.length - 1] ?? rootPath;
+  }, [rootPath]);
+
+  useEffect(() => {
+    setSelectedPaths(new Set());
+    setSelectionAnchor(null);
+    entriesRef.current.clear();
+    visibleOrderRef.current = [];
   }, [rootPath]);
 
   useEffect(() => {
@@ -110,16 +144,73 @@ export function CodeExplorer({
     };
   }, [rootPath, reloadToken]);
 
-  const gitStatuses = useMemo(() => {
-    const map = new Map<string, GitFileStatus>();
-    for (const entry of gitSnapshot?.files ?? []) map.set(entry.absolutePath, entry.status);
-    return map;
-  }, [gitSnapshot]);
-
   const handleOpenFile = useCallback(
     (entry: FileEntry) => onOpenFile(entry.path, entry.name),
     [onOpenFile],
   );
+
+  const registerEntry = useCallback((entry: FileEntry) => {
+    entriesRef.current.set(entry.path, entry);
+    if (!visibleOrderRef.current.includes(entry.path)) visibleOrderRef.current.push(entry.path);
+    return () => {
+      entriesRef.current.delete(entry.path);
+      visibleOrderRef.current = visibleOrderRef.current.filter((path) => path !== entry.path);
+    };
+  }, []);
+
+  const handleSelectEntry = useCallback(
+    (entry: FileEntry, event: MouseEvent<HTMLButtonElement>) => {
+      setSelectedPaths((current) => {
+        if (event.shiftKey && selectionAnchor) {
+          const order = visibleOrderRef.current;
+          const start = order.indexOf(selectionAnchor);
+          const end = order.indexOf(entry.path);
+          if (start >= 0 && end >= 0) {
+            const [from, to] = start < end ? [start, end] : [end, start];
+            return new Set(order.slice(from, to + 1));
+          }
+        }
+        if (event.metaKey || event.ctrlKey) {
+          const next = new Set(current);
+          if (next.has(entry.path)) next.delete(entry.path);
+          else next.add(entry.path);
+          return next;
+        }
+        return new Set([entry.path]);
+      });
+      if (!event.shiftKey) setSelectionAnchor(entry.path);
+    },
+    [selectionAnchor],
+  );
+
+  const selectedEntries = useCallback(
+    () =>
+      [...selectedPaths].map((path) => entriesRef.current.get(path)).filter(Boolean) as FileEntry[],
+    [selectedPaths],
+  );
+
+  const openBatchRename = useCallback(() => {
+    const items = selectedEntries();
+    if (items.length < 2) return;
+    setBatchRenameItems(
+      items.map((entry) => ({
+        path: entry.path,
+        name: entry.name,
+        isDirectory: entry.kind === "folder",
+        draft: entry.name,
+      })),
+    );
+  }, [selectedEntries]);
+
+  const openBatchDelete = useCallback(() => {
+    setDeleteTargets(
+      selectedEntries().map((entry) => ({
+        path: entry.path,
+        name: entry.name,
+        isDirectory: entry.kind === "folder",
+      })),
+    );
+  }, [selectedEntries]);
 
   const changeRoot = useCallback(async () => {
     try {
@@ -157,37 +248,43 @@ export function CodeExplorer({
         }
         setNameDialog(null);
         setReloadToken((token) => token + 1);
-        void refreshGit(rootPath);
       } catch (nextError) {
         setOperationError(nextError instanceof Error ? nextError.message : "The operation failed.");
       } finally {
         setBusyMessage(null);
       }
     },
-    [nameDialog, nameDraft, onOpenFile, refreshGit, rootPath],
+    [nameDialog, nameDraft, onOpenFile, rootPath],
   );
 
   const confirmDelete = useCallback(async () => {
-    if (!deleteTarget) return;
+    if (deleteTargets.length === 0) return;
     try {
-      await codeDeletePath(deleteTarget.path);
+      if (deleteTargets.length === 1) await codeDeletePath(deleteTargets[0]!.path);
+      else
+        await explorerQueueDeleteItems({
+          paths: deleteTargets.map((target) => target.path),
+          permanent: true,
+        });
       setReloadToken((token) => token + 1);
-      if (rootPath) void refreshGit(rootPath);
       const store = useCodingWorkspaceStore.getState();
-      for (const buffer of Object.values(store.projectBuffers[rootPath] ?? {})) {
-        if (
-          buffer.path === deleteTarget.path ||
-          (deleteTarget.isDirectory && buffer.path.startsWith(`${deleteTarget.path}/`))
-        ) {
-          removeBuffer(rootPath, buffer.path);
+      for (const target of deleteTargets) {
+        for (const buffer of Object.values(store.projectBuffers[rootPath] ?? {})) {
+          if (
+            buffer.path === target.path ||
+            (target.isDirectory && buffer.path.startsWith(`${target.path}/`))
+          ) {
+            removeBuffer(rootPath, buffer.path);
+          }
         }
       }
+      setSelectedPaths(new Set());
     } catch (nextError) {
       setOperationError(nextError instanceof Error ? nextError.message : "Could not delete.");
     } finally {
-      setDeleteTarget(null);
+      setDeleteTargets([]);
     }
-  }, [deleteTarget, refreshGit, removeBuffer, rootPath]);
+  }, [deleteTargets, removeBuffer, rootPath]);
 
   return (
     <div className="code-theme-sidebar flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-sidebar text-cream">
@@ -226,7 +323,76 @@ export function CodeExplorer({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto p-1.5">
+      {selectedPaths.size > 1 ? (
+        <div className="flex items-center gap-1 border-b border-charcoal-border px-2 py-1">
+          <span className="min-w-0 flex-1 truncate text-xs text-cream-muted">
+            {selectedPaths.size} selected
+          </span>
+          <ExplorerIconButton label="Batch rename" onClick={openBatchRename}>
+            <Pencil />
+          </ExplorerIconButton>
+          <ExplorerIconButton label="Delete selected" onClick={openBatchDelete}>
+            <Trash2 />
+          </ExplorerIconButton>
+        </div>
+      ) : null}
+
+      <div
+        className="min-h-0 flex-1 overflow-auto p-1.5"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          const command = event.metaKey || event.ctrlKey;
+          if (command && event.key.toLowerCase() === "a") {
+            event.preventDefault();
+            setSelectedPaths(new Set(visibleOrderRef.current));
+          } else if (
+            command &&
+            (event.key.toLowerCase() === "c" || event.key.toLowerCase() === "x") &&
+            selectedPaths.size > 0
+          ) {
+            event.preventDefault();
+            setFileClipboard({
+              operation: event.key.toLowerCase() === "x" ? "move" : "copy",
+              sources: selectedEntries().map((entry) => ({
+                path: entry.path,
+                isDirectory: entry.kind === "folder",
+              })),
+            });
+          } else if (command && event.key.toLowerCase() === "v" && fileClipboard) {
+            event.preventDefault();
+            const selected = selectedEntries();
+            const destinationDirectory =
+              selected.length === 1 && selected[0]?.kind === "folder" ? selected[0].path : rootPath;
+            setBusyMessage(
+              `${fileClipboard.operation === "move" ? "Moving" : "Copying"} ${fileClipboard.sources.length} items…`,
+            );
+            void explorerQueuePasteItems({
+              sources: fileClipboard.sources,
+              destinationDirectory,
+              operation: fileClipboard.operation,
+            })
+              .then(() => {
+                if (fileClipboard.operation === "move") setFileClipboard(null);
+                setReloadToken((token) => token + 1);
+              })
+              .catch((nextError: unknown) => {
+                setOperationError(
+                  nextError instanceof Error ? nextError.message : "Could not paste the selection.",
+                );
+              })
+              .finally(() => setBusyMessage(null));
+          } else if (event.key === "F2" && selectedPaths.size > 1) {
+            event.preventDefault();
+            openBatchRename();
+          } else if (
+            (event.key === "Delete" || event.key === "Backspace") &&
+            selectedPaths.size > 0
+          ) {
+            event.preventDefault();
+            openBatchDelete();
+          }
+        }}
+      >
         {loading && rootEntries === null ? (
           <p className="px-3 py-2 italic text-cream-muted">Loading…</p>
         ) : null}
@@ -239,15 +405,19 @@ export function CodeExplorer({
             depth={0}
             activePath={activeTabPath}
             dirtyPaths={dirtyPaths}
-            gitStatuses={gitStatuses}
+            selectedPaths={selectedPaths}
+            registerEntry={registerEntry}
+            onSelectEntry={handleSelectEntry}
             onOpenFile={handleOpenFile}
             onOpenFileInNewTab={(entry) => onOpenFileInNewTab(entry.path, entry.name)}
             onRequestRename={(path, name) =>
               openNameDialog({ kind: "rename", path, initialValue: name })
             }
             onRequestDelete={(path, name, isDirectory) =>
-              setDeleteTarget({ path, name, isDirectory })
+              setDeleteTargets([{ path, name, isDirectory }])
             }
+            onRequestBatchRename={openBatchRename}
+            onRequestBatchDelete={openBatchDelete}
           />
         ))}
       </div>
@@ -290,15 +460,167 @@ export function CodeExplorer({
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={Boolean(batchRenameItems)}
+        onOpenChange={(open) => !open && setBatchRenameItems(null)}
+      >
+        <DialogContent className="code-theme-overlay max-h-[80vh] max-w-2xl overflow-hidden">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!batchRenameItems) return;
+              const targets = batchRenameItems.map((item) => ({
+                ...item,
+                draft: item.draft.trim(),
+                target: `${item.path.split("/").slice(0, -1).join("/")}/${item.draft.trim()}`,
+              }));
+              const duplicate = targets.find(
+                (item, index) =>
+                  !item.draft ||
+                  targets.some(
+                    (other, otherIndex) => otherIndex !== index && other.target === item.target,
+                  ),
+              );
+              if (duplicate) {
+                setOperationError("Every selected item needs a unique, non-empty name.");
+                return;
+              }
+              setBusyMessage(`Renaming ${targets.length} items…`);
+              void explorerQueueRenameItems({
+                items: targets.map((item) => ({
+                  path: item.path,
+                  newName: item.draft,
+                  sourceIsDirectory: item.isDirectory,
+                })),
+              })
+                .then(() => {
+                  setBatchRenameItems(null);
+                  setSelectedPaths(new Set());
+                  setReloadToken((token) => token + 1);
+                })
+                .catch((nextError: unknown) => {
+                  setOperationError(
+                    nextError instanceof Error
+                      ? nextError.message
+                      : "Could not rename the selection.",
+                  );
+                })
+                .finally(() => setBusyMessage(null));
+            }}
+            className="flex min-h-0 flex-col gap-4"
+          >
+            <DialogHeader>
+              <DialogTitle>Rename {batchRenameItems?.length ?? 0} items</DialogTitle>
+              <DialogDescription>
+                Review every target name or apply a pattern. Use {`{name}`}, {`{ext}`}, and {`{n}`}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-[1fr_1fr_88px_auto] gap-2">
+              <Input
+                value={renameFind}
+                onChange={(event) => setRenameFind(event.target.value)}
+                placeholder="Find"
+                aria-label="Find in names"
+              />
+              <Input
+                value={renameReplace}
+                onChange={(event) => setRenameReplace(event.target.value)}
+                placeholder="Replace"
+                aria-label="Replace in names"
+              />
+              <Input
+                type="number"
+                min={0}
+                value={renameStart}
+                onChange={(event) => setRenameStart(Number(event.target.value) || 0)}
+                aria-label="Starting number"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setBatchRenameItems(
+                    (items) =>
+                      items?.map((item, index) => ({
+                        ...item,
+                        draft: batchRenameName(
+                          item.name,
+                          renamePattern,
+                          renameFind,
+                          renameReplace,
+                          renameStart + index,
+                        ),
+                      })) ?? null,
+                  )
+                }
+              >
+                Apply
+              </Button>
+            </div>
+            <Input
+              value={renamePattern}
+              onChange={(event) => setRenamePattern(event.target.value)}
+              aria-label="Rename pattern"
+              placeholder="{name}{ext}"
+            />
+            <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
+              {batchRenameItems?.map((item, index) => (
+                <label
+                  key={item.path}
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 text-xs"
+                >
+                  <span className="truncate text-cream-muted" title={item.path}>
+                    {item.name}
+                  </span>
+                  <Input
+                    value={item.draft}
+                    aria-label={`New name for ${item.name}`}
+                    onChange={(event) =>
+                      setBatchRenameItems(
+                        (items) =>
+                          items?.map((candidate, candidateIndex) =>
+                            candidateIndex === index
+                              ? { ...candidate, draft: event.target.value }
+                              : candidate,
+                          ) ?? null,
+                      )
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={Boolean(busyMessage)}>
+                Rename selected
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
-        open={Boolean(deleteTarget)}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        open={deleteTargets.length > 0}
+        onOpenChange={(open) => !open && setDeleteTargets([])}
       >
         <AlertDialogContent className="code-theme-overlay max-w-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteTargets.length > 1
+                ? `Delete ${deleteTargets.length} items?`
+                : `Delete ${deleteTargets[0]?.name ?? "item"}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the {deleteTarget?.isDirectory ? "folder and its contents" : "file"}
+              This permanently removes the selected{" "}
+              {deleteTargets.length === 1 && deleteTargets[0]?.isDirectory
+                ? "folder and its contents"
+                : deleteTargets.length === 1
+                  ? "file"
+                  : "items"}{" "}
               from disk. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -348,6 +670,27 @@ function ExplorerIconButton(props: { label: string; onClick: () => void; childre
       </Tooltip>
     </TooltipProvider>
   );
+}
+
+function batchRenameName(
+  original: string,
+  pattern: string,
+  find: string,
+  replacement: string,
+  number: number,
+) {
+  const dot = original.lastIndexOf(".");
+  const hasExtension = dot > 0;
+  const extension = hasExtension ? original.slice(dot) : "";
+  const stem = hasExtension ? original.slice(0, dot) : original;
+  const transformed = find ? stem.split(find).join(replacement) : stem;
+  return pattern
+    .split("{name}")
+    .join(transformed)
+    .split("{ext}")
+    .join(extension)
+    .split("{n}")
+    .join(String(number));
 }
 
 function sortEntries(entries: FileEntry[]): FileEntry[] {

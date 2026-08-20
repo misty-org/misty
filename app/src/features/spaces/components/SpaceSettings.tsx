@@ -1,5 +1,6 @@
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings";
 import { SpaceMembers } from "@/features/spaces/members";
+import { NotionConnectionPanel } from "@/features/spaces/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import {
   AlertDialog,
@@ -21,18 +22,19 @@ import {
   Switch,
 } from "@/shared/ui";
 import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
-import { Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
+import { Lightbulb, Plug, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { canManageSpaceLifecycle } from "../mistySpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 
-type SpaceSettingsSection = "general" | "members" | "suggestions";
+type SpaceSettingsSection = "general" | "members" | "connections" | "suggestions";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
+  { id: "connections", label: "Connections", icon: Plug },
   { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
@@ -145,7 +147,21 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
           presentation="overlay"
           title={settingsItems.find((item) => item.id === activeSection)?.label ?? "General"}
         >
-          {activeSection === "general" ? (
+          {activeSection === "connections" ? (
+            <div className="grid gap-5">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Journal connections</CardTitle>
+                  <p className="mb-0 mt-1 text-xs text-cream-muted">
+                    Bring selected Notion pages into Journal. Connector sync runs automatically.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <NotionConnectionPanel spaceId={spaceId} canManage={isOwner} expandedByDefault />
+                </CardContent>
+              </Card>
+            </div>
+          ) : activeSection === "general" ? (
             <div className="grid gap-5">
               <Card aria-labelledby="space-name-heading">
                 <CardHeader className="flex flex-row items-start justify-between gap-5">

@@ -129,7 +129,7 @@ export async function listMistySpaceNotes(
 
 function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
   const timestamp = note.updated_at ?? note.created_at ?? nowIso();
-  const bodyMarkdown = note.plain_text ?? "";
+  const bodyMarkdown = note.markdown ?? note.plain_text ?? "";
   return {
     id: `misty:${note.id}`,
     source: "misty",
@@ -138,18 +138,19 @@ function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
     body: bodyMarkdown,
     bodyFormat: "markdown",
     bodyMarkdown,
-    preview: previewFrom(bodyMarkdown),
+    preview: previewFrom(note.plain_text ?? bodyMarkdown),
     spaceId: note.space_id,
     spaceName,
     tags: [],
     backlinks: [],
+    backlinkCount: note.backlink_count ?? 0,
     updatedAt: timestamp,
     createdAt: note.created_at ?? timestamp,
-    favorite: false,
+    collaborationRevision: note.collaboration_revision,
     syncStatus: "synced",
     connectorId: MISTY_CONNECTOR_ID,
     providerStatus: "connected",
-    canDelete: note.role === "creator",
+    canDelete: note.can_delete ?? note.role === "creator",
   };
 }
 

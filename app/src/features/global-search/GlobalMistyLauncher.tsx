@@ -1,16 +1,44 @@
+import { invokeShortcutCommand, ShortcutHint, shortcutCommandRegistry } from "@/features/shortcuts";
+import { dockLeaves, dockTabs, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
 import { Button } from "@/shared/ui";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Clock3, Command, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
-import type { RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { ModeIcon } from "./GlobalMistyPanelContent";
 import type { GlobalAiMode } from "./types";
 
 const modes: GlobalAiMode[] = ["search", "ask", "action"];
+const launcherClass = [
+  "pointer-events-auto mx-auto w-[min(760px,calc(100dvw-128px))] overflow-hidden rounded-2xl",
+  "border border-charcoal-border bg-charcoal-card p-3 text-cream",
+  "shadow-[0_20px_64px_rgba(0,0,0,0.55)] transition-colors",
+  "focus-within:border-charcoal-active focus-within:ring-1 focus-within:ring-charcoal-active/40",
+].join(" ");
+const coreToolCommandIds = [
+  "tool.home",
+  "tool.journal",
+  "tool.planner",
+  "tool.chat",
+  "tool.inbox",
+  "tool.library",
+  "tool.browser",
+  "tool.files",
+  "tool.code",
+];
 
 interface LauncherOption {
   label: string;
   prompt: string;
   mode: GlobalAiMode;
+}
+
+interface CommandResult {
+  id: string;
+  label: string;
+  description: string;
+  commandId?: string;
+  tabId?: string;
+  recent?: boolean;
 }
 
 export function GlobalMistyLauncher(props: {
@@ -22,12 +50,39 @@ export function GlobalMistyLauncher(props: {
   inputRef: RefObject<HTMLInputElement | null>;
   onModeChange: (mode: GlobalAiMode) => void;
   onQueryChange: (query: string) => void;
+  onDismiss: () => void;
   onExpand: () => void;
 }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const options = launcherOptions(props.currentPath);
+  const commandOnly = props.query.trimStart().startsWith(">");
+  const commandQuery = (commandOnly ? props.query.trimStart().slice(1) : props.query)
+    .trim()
+    .toLowerCase();
+  const workspaceSignature = useWorkspaceStore((state) =>
+    dockLeaves(state.layout.root)
+      .flatMap((pane) => pane.tabs)
+      .map((tab) => `${tab.id}:${tab.lastFocusedAt}`)
+      .join("|"),
+  );
+  const results = useMemo(
+    () => launcherCommandResults(commandQuery, commandOnly, workspaceSignature),
+    [commandOnly, commandQuery, workspaceSignature],
+  );
+
+  useEffect(() => setSelectedIndex(0), [commandOnly, commandQuery]);
+
   const cycleMode = (direction = 1) => {
     const currentIndex = modes.indexOf(props.mode);
     props.onModeChange(modes[(currentIndex + direction + modes.length) % modes.length]);
+  };
+  const runResult = (result: CommandResult) => {
+    props.onDismiss();
+    if (result.commandId) invokeShortcutCommand(result.commandId);
+    else if (result.tabId)
+      window.dispatchEvent(
+        new CustomEvent("misty:focus-workspace-tab", { detail: { tabId: result.tabId } }),
+      );
   };
 
   return (
@@ -36,7 +91,7 @@ export function GlobalMistyLauncher(props: {
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 4 }}
-      className="pointer-events-auto mx-auto w-[min(760px,calc(100dvw-128px))] rounded-2xl border border-charcoal-border bg-charcoal-card p-3 text-cream shadow-[0_20px_64px_rgba(0,0,0,0.55)] transition-colors focus-within:border-charcoal-active focus-within:ring-1 focus-within:ring-charcoal-active/40"
+      className={launcherClass}
       aria-label="Open Misty — Search, Ask, or Action"
       onClick={() => props.inputRef.current?.focus()}
     >
@@ -54,6 +109,8 @@ export function GlobalMistyLauncher(props: {
         >
           {props.working ? (
             <Loader2 className="size-4 animate-spin" />
+          ) : commandOnly ? (
+            <Command className="size-[18px] text-cream-bright" />
           ) : (
             <ModeIcon mode={props.mode} className="size-[18px] text-cream-bright" />
           )}
@@ -63,31 +120,48 @@ export function GlobalMistyLauncher(props: {
           data-global-misty-launcher-input
           value={props.query}
           onChange={(event) => {
-            const nextQuery = event.target.value;
-            props.onQueryChange(nextQuery);
-            if (nextQuery.trim()) props.onExpand();
+            const value = event.target.value;
+            props.onQueryChange(value);
+            if (value.trim() && !value.trimStart().startsWith(">")) props.onExpand();
           }}
           onKeyDown={(event) => {
-            if (event.key === "Tab") {
+            if (event.key === "ArrowDown" && results.length) {
+              event.preventDefault();
+              setSelectedIndex((index) => (index + 1) % results.length);
+              return;
+            }
+            if (event.key === "ArrowUp" && results.length) {
+              event.preventDefault();
+              setSelectedIndex((index) => (index - 1 + results.length) % results.length);
+              return;
+            }
+            if (event.key === "Tab" && !commandOnly) {
               event.preventDefault();
               cycleMode(event.shiftKey ? -1 : 1);
               return;
             }
-            if (event.key === "Enter" && props.query.trim()) {
+            if (event.key === "Enter") {
               event.preventDefault();
-              props.onExpand();
+              if (results[selectedIndex]) runResult(results[selectedIndex]);
+              else if (!commandOnly && props.query.trim()) props.onExpand();
             }
           }}
           className="min-w-0 flex-1 bg-transparent text-base text-cream outline-none placeholder:text-cream-muted"
-          placeholder="Search, ask, or take action…"
+          placeholder={commandOnly ? "Type a command…" : "Search tools and commands, or ask Misty…"}
           aria-label="Misty prompt"
+          role="combobox"
+          aria-expanded={results.length > 0}
+          aria-controls="misty-launcher-results"
+          aria-activedescendant={
+            results[selectedIndex] ? `misty-result-${selectedIndex}` : undefined
+          }
         />
         <Button
           type="button"
           size="icon"
           className="size-10 shrink-0 rounded-xl bg-cream text-charcoal-bg hover:bg-cream-bright"
-          disabled={!props.query.trim()}
-          aria-label="Expand Misty"
+          disabled={!props.query.trim() || commandOnly}
+          aria-label="Ask Misty"
           onClick={(event) => {
             event.stopPropagation();
             props.onExpand();
@@ -96,26 +170,120 @@ export function GlobalMistyLauncher(props: {
           <ArrowUp className="size-4" />
         </Button>
       </div>
-      <div className="mt-2 flex min-h-8 items-center gap-1 border-t border-charcoal-border/70 pt-2">
-        {options.map((option) => (
-          <button
-            key={option.label}
-            type="button"
-            className="flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-medium text-cream-muted transition hover:bg-charcoal-hover hover:text-cream"
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onModeChange(option.mode);
-              props.onQueryChange(option.prompt);
-              props.onExpand();
-            }}
-          >
-            <ModeIcon mode={option.mode} />
-            {option.label}
-          </button>
-        ))}
-      </div>
+
+      {results.length ? (
+        <div
+          id="misty-launcher-results"
+          role="listbox"
+          className="mt-2 max-h-[360px] overflow-y-auto border-t border-charcoal-border/70 pt-2"
+        >
+          {results.map((result, index) => (
+            <button
+              id={`misty-result-${index}`}
+              role="option"
+              aria-selected={selectedIndex === index}
+              key={result.id}
+              type="button"
+              className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition ${
+                selectedIndex === index ? "bg-charcoal-hover text-cream" : "text-cream-muted"
+              }`}
+              onMouseEnter={() => setSelectedIndex(index)}
+              onClick={(event) => {
+                event.stopPropagation();
+                runResult(result);
+              }}
+            >
+              {result.recent ? <Clock3 size={14} /> : <Command size={14} />}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{result.label}</span>
+                <span className="block truncate text-xs text-mist-gray">{result.description}</span>
+              </span>
+              {result.commandId ? (
+                <ShortcutHint commandId={result.commandId} includeAlternate />
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : commandOnly ? (
+        <p className="border-t border-charcoal-border/70 px-2 py-5 text-center text-sm text-mist-gray">
+          No matching commands.
+        </p>
+      ) : null}
+      {!commandOnly ? (
+        <div className="mt-2 flex min-h-8 items-center gap-1 border-t border-charcoal-border/70 pt-2">
+          {options.map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              className="flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-medium text-cream-muted transition hover:bg-charcoal-hover hover:text-cream"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onModeChange(option.mode);
+                props.onQueryChange(option.prompt);
+                props.onExpand();
+              }}
+            >
+              <ModeIcon mode={option.mode} />
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </motion.div>
   );
+}
+
+function launcherCommandResults(
+  query: string,
+  commandOnly: boolean,
+  _workspaceSignature: string,
+): CommandResult[] {
+  if (!query) {
+    const recent = recentTabs().map((tab) => ({
+      id: `recent:${tab.id}`,
+      label: tab.title,
+      description: "Recent tab",
+      tabId: tab.id,
+      recent: true,
+    }));
+    const tools = shortcutCommandRegistry
+      .filter((command) => coreToolCommandIds.includes(command.id))
+      .map(commandResult);
+    return (commandOnly ? tools : [...recent.slice(0, 4), ...tools]).slice(0, 10);
+  }
+  return shortcutCommandRegistry
+    .filter((command) => {
+      if (!commandOnly && !command.id.startsWith("tool.") && query.length < 2) return false;
+      return [command.label, command.description, command.category, ...command.aliases]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    })
+    .slice(0, 10)
+    .map(commandResult);
+}
+
+function commandResult(command: (typeof shortcutCommandRegistry)[number]): CommandResult {
+  return {
+    id: `command:${command.id}`,
+    label: command.label,
+    description: `${command.description} · ${scopeLabel(command.scope)}`,
+    commandId: command.id,
+  };
+}
+
+function recentTabs(): WorkspaceTab[] {
+  const state = useWorkspaceStore.getState();
+  return (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
+    .flatMap((window) => dockTabs(window.layout.root))
+    .filter((tab) => tab.surfaceId !== "home")
+    .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt);
+}
+
+function scopeLabel(scope: string): string {
+  if (scope === "global") return "Everywhere";
+  if (scope === "workspace") return "Workspace";
+  return scope.slice(5).replace(/^./, (character) => character.toUpperCase());
 }
 
 function launcherOptions(path: string): LauncherOption[] {
@@ -132,16 +300,6 @@ function launcherOptions(path: string): LauncherOption[] {
     return [
       { label: "Search current folder", prompt: "Search this folder", mode: "search" },
       { label: "Summarize selection", prompt: "Summarize the selected files", mode: "ask" },
-    ];
-  if (path.startsWith("/agents"))
-    return [
-      { label: "Find an Agent", prompt: "Find an Agent for this work", mode: "search" },
-      { label: "Create workflow", prompt: "Create an Agent workflow", mode: "action" },
-    ];
-  if (path.startsWith("/extensions"))
-    return [
-      { label: "Find an extension", prompt: "Find an extension", mode: "search" },
-      { label: "Recommend extensions", prompt: "Recommend extensions for my work", mode: "ask" },
     ];
   return [
     { label: "Summarize updates", prompt: "Summarize my recent updates", mode: "ask" },

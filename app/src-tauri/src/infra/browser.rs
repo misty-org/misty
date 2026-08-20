@@ -13,16 +13,20 @@ use std::{
 use tauri::{
     utils::config::{Color, WebviewUrl},
     webview::{DownloadEvent, NewWindowResponse},
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Theme, Webview,
-    WebviewBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Webview, WebviewBuilder,
 };
 use url::Url;
 
 use super::browser_macos::configure_browser_webview;
 use super::browser_scripts::{
-    browser_cursor_navigation, normalized_browser_cursor, BROWSER_FAVICON_SCRIPT,
-    BROWSER_VIEWPORT_SCRIPT,
+    browser_cursor_navigation, browser_viewport_script, normalized_browser_cursor,
+    BROWSER_FAVICON_SCRIPT,
 };
+use super::browser_shortcuts::{
+    apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
+    BrowserShortcutBinding,
+};
+use super::browser_theme::{browser_background, browser_theme, default_browser_theme};
 
 const MAX_SNAPSHOT_CHARS: usize = 256 * 1024;
 const MAX_INTERACTIVE_ELEMENTS: usize = 500;
@@ -45,6 +49,8 @@ static BROWSER_RENDERER_ORIGINAL_HIT_TEST: OnceLock<usize> = OnceLock::new();
 pub struct BrowserSessionState {
     sessions: Mutex<HashMap<String, BrowserSession>>,
     reserved_downloads: Mutex<HashSet<PathBuf>>,
+    pub(super) shortcut_bindings: Mutex<Vec<BrowserShortcutBinding>>,
+    pub(super) shortcut_tokens: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Default)]
@@ -220,26 +226,6 @@ struct RawInteractiveElement {
     tag: String,
     role: String,
     name: String,
-}
-
-fn default_browser_theme() -> String {
-    "dark".to_owned()
-}
-
-fn browser_theme(value: &str) -> Result<Option<Theme>, String> {
-    match value {
-        "dark" => Ok(Some(Theme::Dark)),
-        "light" => Ok(Some(Theme::Light)),
-        "system" => Ok(None),
-        _ => Err("Browser theme must be dark, light, or system.".to_owned()),
-    }
-}
-
-fn browser_background(value: &str) -> Color {
-    match value {
-        "light" => Color(255, 255, 255, 255),
-        _ => Color(32, 33, 36, 255),
-    }
 }
 
 fn validated_user_agent(value: Option<&str>) -> Result<Option<&str>, String> {
@@ -622,9 +608,11 @@ pub fn browser_webview_create(
         .set_theme(browser_theme(&request.theme)?)
         .map_err(|error| error.to_string())?;
     register_session(&state, &request.id, &request.scope_id)?;
+    let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
         apply_macos_webview_theme(&webview, &request.theme)?;
         configure_browser_webview(&webview)?;
+        apply_shortcuts(&webview, &state)?;
         set_webview_bounds_if_changed(&webview, position, size)?;
         return present_macos_webview(&webview);
     }
@@ -643,10 +631,12 @@ pub fn browser_webview_create(
         .focused(false)
         .accept_first_mouse(true)
         .background_color(browser_background(&request.theme))
-        .initialization_script(BROWSER_VIEWPORT_SCRIPT)
+        .initialization_script(browser_viewport_script(&shortcut_token))
         .on_navigation(move |url| {
             if let Some(cursor) = browser_cursor_navigation(url) {
                 update_browser_cursor(&navigation_app, &navigation_id, cursor);
+                false
+            } else if forward_navigation(&navigation_app, &navigation_id, url) {
                 false
             } else {
                 external_url(url.as_str()).is_ok()
@@ -672,6 +662,7 @@ pub fn browser_webview_create(
                             session.element_selectors.clear();
                         }
                     }
+                    let _ = apply_shortcuts(&webview, &state);
                 }
             }
             let phase = match payload.event() {
@@ -711,6 +702,7 @@ pub fn browser_webview_create(
         .map_err(|error| error.to_string())?;
     apply_macos_webview_theme(&webview, &request.theme)?;
     configure_browser_webview(&webview)?;
+    apply_shortcuts(&webview, &state)?;
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     present_macos_webview(&webview)
 }
@@ -1108,6 +1100,7 @@ pub fn browser_webview_close(
     if let Ok(mut sessions) = state.sessions.lock() {
         sessions.remove(&request.id);
     }
+    forget_shortcut_token(&state, &request.id);
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };

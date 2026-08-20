@@ -4,6 +4,7 @@ import { Input } from "@/shared/ui/input";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { RefreshCcw } from "lucide-react";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 import { useMemo, useState } from "react";
 import { filterPlugins } from "./helpers";
 import { PluginCard } from "./PluginCard";
@@ -114,10 +115,12 @@ export function PluginBrowser({
           {showSkeleton ? "loading" : visiblePlugins.length}
         </span>
 
+        <AiSurfaceButton className="ml-auto" />
+
         {onRefresh ? (
           <Button
             aria-label="Reload extensions"
-            className="ml-auto size-8 text-cream-muted/70 shadow-none hover:text-cream"
+            className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
             disabled={loading}
             onClick={onRefresh}
             size="icon"

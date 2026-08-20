@@ -1,4 +1,11 @@
 import { dockLeaves, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { registerShortcutHandler } from "@/features/shortcuts";
+import {
+  AiSurfaceButton,
+  useAiSurfaceAdapter,
+  type AiArtifact,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
 import { SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
@@ -17,6 +24,7 @@ import {
   titleBySlot,
   unregisterSlot,
 } from "./terminalRegistry";
+import { hasTerminalControlCharacters } from "./terminalInputSafety";
 
 /** One dock tab owns zero or one shell. This map keeps that identity stable
  * while the tab is inactive or its React surface is temporarily detached. */
@@ -126,36 +134,28 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
   );
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const mod = event.metaKey || event.ctrlKey;
-      if (!mod || !paneRef.current) return;
-      const key = event.key.toLowerCase();
-      if (key === "k" && !event.shiftKey) {
-        event.preventDefault();
-        paneRef.current.clear();
-      } else if (key === "f" && !event.shiftKey) {
-        event.preventDefault();
-        paneRef.current.toggleSearch();
-      } else if (key === "=" || key === "+") {
-        event.preventDefault();
-        paneRef.current.bumpFontScale(0.1);
-      } else if (key === "-" || key === "_") {
-        event.preventDefault();
-        paneRef.current.bumpFontScale(-0.1);
-      } else if (key === "0") {
-        event.preventDefault();
-        paneRef.current.bumpFontScale("reset");
-      } else if (key === "c" && event.shiftKey) {
-        event.preventDefault();
-        void paneRef.current.copySelection();
-      } else if (key === "v" && !event.shiftKey) {
-        event.preventDefault();
-        void paneRef.current.paste();
-      }
+    const enabled = () => {
+      if (!tabId || !paneRef.current) return false;
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find(
+        (candidate) => candidate.id === workspace.layout.focusedPaneId,
+      );
+      return pane?.activeTabId === tabId;
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+    const actions: Record<string, () => void> = {
+      "terminal.clear": () => paneRef.current?.clear(),
+      "terminal.search": () => paneRef.current?.toggleSearch(),
+      "terminal.zoom_in": () => paneRef.current?.bumpFontScale(0.1),
+      "terminal.zoom_out": () => paneRef.current?.bumpFontScale(-0.1),
+      "terminal.zoom_reset": () => paneRef.current?.bumpFontScale("reset"),
+      "terminal.copy": () => void paneRef.current?.copySelection(),
+      "terminal.paste": () => void paneRef.current?.paste(),
+    };
+    const unregister = Object.entries(actions).map(([commandId, action]) =>
+      registerShortcutHandler(commandId, action, enabled),
+    );
+    return () => unregister.forEach((remove) => remove());
+  }, [tabId]);
 
   useEffect(() => {
     if (!slotId) return;
@@ -164,6 +164,93 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
   }, [slotId]);
 
   const displayCwd = useMemo(() => (cwd ? shortenHome(cwd) : ""), [cwd]);
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const scopeId = slotId || tabId || "terminal";
+    const stagedCommand = (artifact: AiArtifact) => {
+      if (artifact.kind !== "terminal_command" || !slotId || sessionStatus !== "running") return "";
+      const operations = artifact.operations as {
+        terminal_scope_id?: string;
+        commands?: Array<{ command?: string; destructive?: boolean }>;
+      };
+      if (operations.terminal_scope_id !== scopeId || operations.commands?.length !== 1) return "";
+      const command = operations.commands[0]?.command;
+      return typeof command === "string" &&
+        command.length <= 8_000 &&
+        !hasTerminalControlCharacters(command)
+        ? command
+        : "";
+    };
+    return {
+      surfaceId: "terminal",
+      label: title || "Terminal",
+      getContext: () => [
+        {
+          kind: "terminal.session",
+          id: scopeId,
+          title: `${environment.kind === "ssh" ? "SSH" : "Local"} terminal${title ? ` · ${title}` : ""}`,
+          privacy: "device",
+          opaqueScopeId: slotId ?? undefined,
+          metadata: { environment: environment.kind, status: sessionStatus },
+        },
+      ],
+      getSelection: () => {
+        const raw = paneRef.current?.aiSnapshot() ?? "";
+        const content = redactTerminalSecrets(raw);
+        return content
+          ? {
+              kind: "text",
+              content,
+              object: { kind: "terminal.session", id: scopeId },
+              anchors: {
+                source: raw.trim() === content.trim() ? "visible_buffer" : "redacted_buffer",
+              },
+              contentHash: terminalAiHash(content),
+            }
+          : null;
+      },
+      getSuggestedActions: () => [
+        {
+          id: "explain-output",
+          label: "Explain output",
+          prompt:
+            "Explain the selected or recent terminal output and identify the likely cause of any failure.",
+        },
+        {
+          id: "suggest-fix",
+          label: "Suggest fix",
+          prompt: "Suggest the safest next command or diagnostic step. Do not execute anything.",
+        },
+        {
+          id: "stage-command",
+          label: "Draft command",
+          prompt:
+            "Propose exactly one command for this terminal scope, with its exact effect and rollback. Do not execute it.",
+          requestedArtifactKind: "terminal_command",
+        },
+        {
+          id: "summarize-session",
+          label: "Summarize session",
+          prompt:
+            "Summarize what happened in this visible terminal session and any unresolved issue.",
+        },
+        {
+          id: "security-check",
+          label: "Security check",
+          prompt:
+            "Review the visible command output for security risks or accidental secret exposure. Do not repeat secrets.",
+        },
+      ],
+      canApply: (artifact) => Boolean(stagedCommand(artifact)),
+      applyArtifact: async (artifact) => {
+        const command = stagedCommand(artifact);
+        if (!command || !paneRef.current) {
+          throw new Error("The PTY scope changed. Ask Misty to regenerate this command.");
+        }
+        await paneRef.current.stageAiCommand(command);
+      },
+    };
+  }, [environment.kind, sessionStatus, slotId, tabId, title]);
+  useAiSurfaceAdapter(aiAdapter);
   if (!tabId) return <TerminalEmptyState onNewShell={() => undefined} disabled />;
 
   return (
@@ -176,6 +263,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
         <span className="rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] capitalize">
           {sessionStatus.replace(/_/g, " ")}
         </span>
+        <AiSurfaceButton />
         {environment.kind === "ssh" ? (
           <span className="hidden rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] lg:inline">
             Agent tools · device-local
@@ -236,6 +324,22 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
       </div>
     </section>
   );
+}
+
+function redactTerminalSecrets(value: string) {
+  return value
+    .replace(/(authorization:\s*(?:bearer|basic)\s+)[^\s]+/gi, "$1[REDACTED]")
+    .replace(/((?:api[_-]?key|access[_-]?token|secret|password)\s*[=:]\s*)[^\s]+/gi, "$1[REDACTED]")
+    .replace(/\b(?:sk|ghp|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{12,}\b/g, "[REDACTED]");
+}
+
+function terminalAiHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16)}`;
 }
 
 function TerminalEmptyState(props: { onNewShell: () => void; disabled?: boolean }) {

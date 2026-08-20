@@ -12,18 +12,25 @@ import type {
   ProviderJobStart,
   ProviderJobStatus,
   ProvidersSnapshot,
+  NativeShortcutsSnapshot,
+  ReassignShortcutRequest,
   RemoteEditDraft,
   RemoteTestResult,
   RenderPluginPanelRequest,
   RunPluginCommandRequest,
   SaveRemoteRequest,
   SaveSettingsRequest,
-  SaveShortcutsRequest,
+  ResetShortcutRequest,
   SettingsSnapshot,
   ShortcutsSnapshot,
+  UpdateShortcutRequest,
   VerifyResult,
   VerifyStartRequest,
 } from "@/native/contracts";
+// eslint-disable-next-line no-restricted-imports -- shortcut hydration is the adapter boundary for the native snapshot
+import { detectShortcutPlatform, normalizeShortcut } from "@/features/shortcuts/bindings";
+// eslint-disable-next-line no-restricted-imports -- the registry supplies transport-neutral command metadata
+import { defaultBindingsFor, shortcutCommandRegistry } from "@/features/shortcuts/registry";
 
 import { invoke } from "./invoke";
 export function settingsSnapshot(): Promise<SettingsSnapshot> {
@@ -50,16 +57,89 @@ export function settingsRemoveOpenWithAssociation(key: string): Promise<Settings
   return invoke("settings_remove_open_with_association", { key });
 }
 
-export function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
-  return invoke("shortcuts_snapshot");
+export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
+  return hydrateShortcutsSnapshot(await invoke<NativeShortcutsSnapshot>("shortcuts_snapshot"));
 }
 
-export function shortcutsReset(): Promise<ShortcutsSnapshot> {
-  return invoke("shortcuts_reset");
+export async function shortcutsReset(
+  request: ResetShortcutRequest = {},
+): Promise<ShortcutsSnapshot> {
+  return hydrateShortcutsSnapshot(
+    await invoke<NativeShortcutsSnapshot>("shortcuts_reset", { request }),
+  );
 }
 
-export function shortcutsSave(request: SaveShortcutsRequest): Promise<ShortcutsSnapshot> {
-  return invoke("shortcuts_save", { request });
+export async function shortcutsUpdate(request: UpdateShortcutRequest): Promise<ShortcutsSnapshot> {
+  return hydrateShortcutsSnapshot(
+    await invoke<NativeShortcutsSnapshot>("shortcuts_update", { request }),
+  );
+}
+
+export async function shortcutsReassign(
+  request: ReassignShortcutRequest,
+): Promise<ShortcutsSnapshot> {
+  return hydrateShortcutsSnapshot(
+    await invoke<NativeShortcutsSnapshot>("shortcuts_reassign", { request }),
+  );
+}
+
+function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsSnapshot {
+  const detectedPlatform = detectShortcutPlatform();
+  const overrides = new Map(snapshot.overrides.map((entry) => [entry.commandId, entry]));
+  const effectiveBindings = shortcutCommandRegistry.map((definition) => {
+    const defaults = defaultBindingsFor(definition, detectedPlatform);
+    const override = overrides.get(definition.id);
+    return {
+      commandId: definition.id,
+      primary: override?.primary !== undefined ? override.primary : defaults.primary,
+      alternate: override?.alternate !== undefined ? override.alternate : defaults.alternate,
+      primarySource: override?.primary !== undefined ? ("user" as const) : ("default" as const),
+      alternateSource: override?.alternate !== undefined ? ("user" as const) : ("default" as const),
+    };
+  });
+  const hydrated: ShortcutsSnapshot = {
+    detectedPlatform,
+    profileName:
+      detectedPlatform === "macos" ? "macOS" : detectedPlatform === "windows" ? "Windows" : "Linux",
+    commandDefinitions: [...shortcutCommandRegistry],
+    effectiveBindings,
+    bindings: effectiveBindings.flatMap((binding) =>
+      binding.primary
+        ? [
+            {
+              commandId: binding.commandId,
+              shortcut: binding.primary,
+              source: binding.primarySource,
+            },
+          ]
+        : [],
+    ),
+    configPath: snapshot.path,
+    overrides: snapshot.overrides,
+  };
+  const forwarded = hydrated.commandDefinitions
+    .filter((definition) => definition.scope === "global" || definition.scope === "workspace")
+    .flatMap((definition) => {
+      const binding = hydrated.effectiveBindings.find(
+        (candidate) => candidate.commandId === definition.id,
+      );
+      return [binding?.primary, binding?.alternate]
+        .map(normalizeShortcut)
+        .filter((value): value is string => Boolean(value))
+        .map((shortcut) => ({ shortcut, allowInEditable: definition.allowInEditable }));
+    });
+  const forwardedByShortcut = new Map<string, { shortcut: string; allowInEditable: boolean }>();
+  for (const binding of forwarded) {
+    const current = forwardedByShortcut.get(binding.shortcut);
+    forwardedByShortcut.set(binding.shortcut, {
+      shortcut: binding.shortcut,
+      allowInEditable: binding.allowInEditable || Boolean(current?.allowInEditable),
+    });
+  }
+  void invoke("browser_shortcuts_update", { bindings: [...forwardedByShortcut.values()] }).catch(
+    () => undefined,
+  );
+  return hydrated;
 }
 
 export function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {

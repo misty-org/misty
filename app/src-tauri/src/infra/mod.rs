@@ -10,12 +10,11 @@ pub mod browser;
 mod browser_macos;
 #[cfg(desktop)]
 mod browser_scripts;
+pub mod browser_shortcuts;
+#[cfg(desktop)]
+mod browser_theme;
 pub mod claude;
 pub(crate) mod cloud_handoff;
-#[cfg(desktop)]
-pub mod code_git;
-#[cfg(desktop)]
-pub mod code_git_remote;
 #[cfg(desktop)]
 pub mod code_lsp;
 #[cfg(desktop)]

@@ -9,11 +9,9 @@ import {
 } from "@/features/files/native";
 import type { PluginCommandEntry } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
-import type { ShortcutMap } from "@/shared/lib/model/types/shortcuts";
-import { shortcutMatchesEvent } from "@/shared/lib/shortcuts";
 import { selectedPathsForPane, useExplorerStore, useOperationQueueStore } from "../store";
-import { useSearchStore } from "@/features/files/search";
 import { openCompareWith } from "./ExplorerContextMenu";
+import { useSearchStore } from "@/features/files/search";
 import { openTransfersTab, toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
 import { applySharedClipboardToSystem } from "./explorerCommands/clipboardPayloads";
 import {
@@ -25,15 +23,16 @@ import {
 const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 
 export const executableShortcutCommands = [
-  "app.open_settings",
   "app.toggle_transfers",
   "app.toggle_plugin_launcher",
   "clipboard.publish_shared",
   "clipboard.apply_shared",
-  "search.toggle",
+  "explorer.new_folder",
+  "explorer.search",
   "explorer.copy",
   "explorer.cut",
   "explorer.paste",
+  "explorer.copy_path",
   "explorer.undo",
   "explorer.redo",
   "explorer.delete",
@@ -42,122 +41,12 @@ export const executableShortcutCommands = [
   "explorer.batch_rename",
   "explorer.duplicate_finder",
   "explorer.compare_with",
+  "explorer.open_with",
   "explorer.refresh",
-  "explorer.new_tab",
-  "explorer.restore_tab",
-  "explorer.close_pane",
-  "explorer.restore_pane",
-  "explorer.split_vertical",
-  "explorer.split_horizontal",
-  "explorer.next_workspace",
-  "explorer.tab_1",
-  "explorer.tab_2",
-  "explorer.tab_3",
-  "explorer.tab_4",
-  "explorer.tab_5",
-  "explorer.tab_6",
-  "explorer.tab_7",
-  "explorer.tab_8",
-  "explorer.tab_9",
+  "explorer.toggle_hidden",
+  "explorer.preview.toggle",
+  "explorer.sidebar.toggle",
 ] as const;
-const defaultMacExplorerShortcuts: ShortcutMap = {
-  "app.open_settings": "Cmd+Comma",
-  "app.toggle_transfers": "Cmd+Shift+Y",
-  "app.toggle_plugin_launcher": "Cmd+Shift+P",
-  "clipboard.publish_shared": "Cmd+Alt+C",
-  "clipboard.apply_shared": "Cmd+Alt+V",
-  "search.toggle": "Cmd+K",
-  "explorer.copy": "Cmd+C",
-  "explorer.cut": "Cmd+X",
-  "explorer.paste": "Cmd+V",
-  "explorer.undo": "Cmd+Z",
-  "explorer.redo": "Cmd+Shift+Z",
-  "explorer.delete": "Delete",
-  "explorer.rename": "F2",
-  "explorer.refresh": "Cmd+R",
-  "explorer.next_workspace": "Cmd+Shift+Grave",
-  "explorer.new_tab": "Cmd+T",
-  "explorer.restore_tab": "Cmd+Shift+T",
-  "explorer.close_pane": "Cmd+W",
-  "explorer.restore_pane": "Cmd+Ctrl+Backslash",
-  "explorer.split_vertical": "Cmd+Backslash",
-  "explorer.split_horizontal": "Cmd+Shift+Backslash",
-  "explorer.tab_1": "Cmd+1",
-  "explorer.tab_2": "Cmd+2",
-  "explorer.tab_3": "Cmd+3",
-  "explorer.tab_4": "Cmd+4",
-  "explorer.tab_5": "Cmd+5",
-  "explorer.tab_6": "Cmd+6",
-  "explorer.tab_7": "Cmd+7",
-  "explorer.tab_8": "Cmd+8",
-  "explorer.tab_9": "Cmd+9",
-};
-const defaultNonMacExplorerShortcuts: ShortcutMap = {
-  "app.open_settings": "Ctrl+Comma",
-  "app.toggle_transfers": "Ctrl+Shift+Y",
-  "app.toggle_plugin_launcher": "Ctrl+Shift+P",
-  "clipboard.publish_shared": "Ctrl+Alt+C",
-  "clipboard.apply_shared": "Ctrl+Alt+V",
-  "search.toggle": "Ctrl+K",
-  "explorer.copy": "Ctrl+C",
-  "explorer.cut": "Ctrl+X",
-  "explorer.paste": "Ctrl+V",
-  "explorer.undo": "Ctrl+Z",
-  "explorer.redo": "Ctrl+Shift+Z",
-  "explorer.delete": "Delete",
-  "explorer.rename": "F2",
-  "explorer.refresh": "Ctrl+R",
-  "explorer.next_workspace": "Ctrl+Shift+Grave",
-  "explorer.new_tab": "Ctrl+T",
-  "explorer.restore_tab": "Ctrl+Shift+T",
-  "explorer.close_pane": "Ctrl+W",
-  "explorer.restore_pane": "Ctrl+Ctrl+Backslash",
-  "explorer.split_vertical": "Ctrl+Backslash",
-  "explorer.split_horizontal": "Ctrl+Shift+Backslash",
-  "explorer.tab_1": "Ctrl+1",
-  "explorer.tab_2": "Ctrl+2",
-  "explorer.tab_3": "Ctrl+3",
-  "explorer.tab_4": "Ctrl+4",
-  "explorer.tab_5": "Ctrl+5",
-  "explorer.tab_6": "Ctrl+6",
-  "explorer.tab_7": "Ctrl+7",
-  "explorer.tab_8": "Ctrl+8",
-  "explorer.tab_9": "Ctrl+9",
-};
-
-const vscodeExplorerShortcutOverrides: ShortcutMap = {
-  "search.toggle": "Primary+P",
-};
-
-const finderExplorerShortcutOverrides: ShortcutMap = {
-  "search.toggle": "Primary+F",
-  "explorer.delete": "Primary+Backspace",
-  "explorer.rename": "Enter",
-};
-
-export function shortcutCommandForEvent(
-  event: KeyboardEvent,
-  shortcuts: ShortcutMap,
-  commandIds: readonly string[],
-): string | null {
-  for (const commandId of commandIds) {
-    if (shortcutMatchesEvent(shortcuts[commandId], event)) return commandId;
-  }
-  return null;
-}
-
-export function defaultExplorerShortcutMap(keymapIndex = 0): ShortcutMap {
-  const base = /mac|iphone|ipad|ipod/i.test(navigator.platform)
-    ? defaultMacExplorerShortcuts
-    : defaultNonMacExplorerShortcuts;
-  if (keymapIndex === 1) {
-    return { ...base, ...vscodeExplorerShortcutOverrides };
-  }
-  if (keymapIndex === 2) {
-    return { ...base, ...finderExplorerShortcutOverrides };
-  }
-  return { ...base };
-}
 
 export function runExplorerCommand(
   commandId: string,
@@ -195,9 +84,6 @@ export function runExplorerCommand(
     return;
   }
   switch (commandId) {
-    case "search.toggle":
-      openDeepSearch(paneId);
-      break;
     case "app.toggle_transfers":
       // Transfers is its own tool now, so this opens a dock tab rather than a
       // panel inside the file manager.
@@ -214,6 +100,12 @@ export function runExplorerCommand(
       break;
     case "clipboard.apply_shared":
       void applySharedClipboardToSystem();
+      break;
+    case "explorer.new_folder":
+      void explorer.createItem(paneId, "folder");
+      break;
+    case "explorer.search":
+      openDeepSearch(paneId);
       break;
     case "explorer.new_tab":
       openDockedFiles();
@@ -234,6 +126,9 @@ export function runExplorerCommand(
       break;
     case "explorer.refresh":
       void explorer.refreshPane(paneId);
+      break;
+    case "explorer.toggle_hidden":
+      void explorer.toggleHidden(paneId);
       break;
     case "explorer.rename":
       void explorer.renameSelected(paneId);
@@ -265,6 +160,11 @@ export function runExplorerCommand(
     case "explorer.paste":
       void explorer.pasteIntoPane(paneId);
       break;
+    case "explorer.copy_path": {
+      const path = selectedPathsForPane(explorer.panes[paneId])[0];
+      if (path) void explorer.copyPath(path);
+      break;
+    }
     case "explorer.undo":
       void undoLatestTransferOperation();
       break;
@@ -354,14 +254,13 @@ async function runPluginCommandById(
   }
 }
 
-function openDeepSearch(paneId: string): void {
-  const pane = useExplorerStore.getState().panes[paneId];
-  const currentPath = pane?.listing?.path ?? "";
-  void useSearchStore.getState().openSearch(currentPath);
-}
-
 function openDuplicateFinder(paneId: string): void {
   window.dispatchEvent(new CustomEvent(explorerDuplicateFinderEvent, { detail: { paneId } }));
+}
+
+function openDeepSearch(paneId: string): void {
+  const currentPath = useExplorerStore.getState().panes[paneId]?.listing?.path ?? "";
+  void useSearchStore.getState().openSearch(currentPath);
 }
 
 export async function undoLatestTransferOperation(): Promise<void> {

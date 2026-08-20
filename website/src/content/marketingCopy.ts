@@ -1,8 +1,10 @@
 export interface MarketingCopy {
   home: {
-    heroTitle: string;
+    eyebrow: string;
+    /** The headline splits across two lines: lead in full contrast, trail muted. */
+    heroTitleLead: string;
+    heroTitleTrail: string;
     heroDescription: string;
-    heroDescriptionEmphasis: string;
     ctaTitle: string;
   };
   features: {
@@ -29,9 +31,11 @@ export interface MarketingCopy {
 
 export const marketingCopy: MarketingCopy = {
   home: {
-    heroTitle: "The operating system for human and agent work.",
-    heroDescription: "Launch a collaborative, agentic workspace for any group in seconds.",
-    heroDescriptionEmphasis: "collaborative, agentic workspace",
+    eyebrow: "Public beta · v0.1.0",
+    heroTitleLead: "The operating system",
+    heroTitleTrail: "for human and agent work.",
+    heroDescription:
+      "Launch a collaborative, agentic workspace for any group in seconds.",
     ctaTitle: "Move the work out of scattered tabs.",
   },
   features: {
@@ -55,24 +59,24 @@ export const marketingCopy: MarketingCopy = {
       "Every plan includes Misty’s core collaboration experience. Choose a plan based on how many Spaces you need and how much you use AI agents.",
   },
   download: {
-    title: "Lorem ipsum dolor sit amet.",
+    title: "Get Misty for your desktop.",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas faucibus mollis interdum.",
+      "Public beta builds for macOS and Windows. Install it, sign in, and your Spaces are there.",
   },
   blog: {
-    title: "Lorem ipsum dolor sit amet.",
+    title: "Notes on building Misty.",
     description:
-      "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.",
+      "What we’re building, what changed our minds, and where the product is heading.",
   },
   changelog: {
-    title: "Lorem ipsum dolor sit amet.",
+    title: "What shipped, and when.",
     description:
-      "Sed posuere consectetur est at lobortis. Donec id elit non mi porta gravida.",
+      "Every release of Misty, with the changes that came with it.",
   },
   roadmap: {
-    title: "Lorem ipsum dolor sit amet.",
+    title: "What we’re building next.",
     description:
-      "Praesent commodo cursus magna, vel scelerisque nisl consectetur et.",
+      "What’s available in beta today, what’s in pilot, and what’s still planned.",
   },
   waitlist: {
     title: "Join Misty",
@@ -80,16 +84,14 @@ export const marketingCopy: MarketingCopy = {
       "Sign in to join your group and start working together in one shared Space.",
   },
   auth: {
-    signInDescription:
-      "Sign in to pick up where you left off in Misty.",
+    signInDescription: "Sign in to pick up where you left off in Misty.",
     forgotDescription:
       "Enter your email and we’ll send you a link to reset your password.",
     registerTitle: "Create an account",
     registerDescription: "Sign up to get started with Misty.",
-    resetDescription:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+    resetDescription: "Choose a new password for your Misty account.",
     notFoundDescription:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit sed do eiusmod.",
+      "That page doesn’t exist. Check the link, or head back to the homepage.",
   },
   metadata: {
     home: "Misty is the operating system for human and agent work. Launch a collaborative, agentic workspace for any group in seconds.",
@@ -98,12 +100,12 @@ export const marketingCopy: MarketingCopy = {
     pricing:
       "Compare Misty Basic, Pro, and Max plans by Space limits, AI agent usage, and monthly or annual pricing.",
     download:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis.",
-    blog: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+      "Download the Misty public beta for macOS and Windows, and get your Spaces on your desktop.",
+    blog: "Notes from the team building Misty — what we’re making, what changed our minds, and what’s next.",
     changelog:
-      "Sed posuere consectetur est at lobortis. Donec ullamcorper nulla non metus auctor fringilla.",
+      "Every Misty release and the changes that shipped with it, newest first.",
     roadmap:
-      "Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Cras mattis consectetur purus.",
+      "What’s available in the Misty beta today, what’s in pilot, and what’s still planned.",
     waitlist:
       "Sign in to Misty and join your group in one shared Space for files, conversations, tools, tasks, and Agents.",
   },

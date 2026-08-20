@@ -28,6 +28,7 @@ export default function DesktopAgentsPage() {
     [agents, selectedAgentId],
   );
   const activity = useAgentActivity(selectedAgent?.id ?? "");
+  const loadActivityDetail = activity.loadDetail;
   const editing = Boolean(editor.editing);
 
   useEffect(() => {
@@ -52,6 +53,11 @@ export default function DesktopAgentsPage() {
     else next.delete("space");
     if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
   }, [searchParams, selectedAgentId, setSearchParams, spaceId]);
+
+  useEffect(() => {
+    const runId = searchParams.get("run") ?? "";
+    if (runId && selectedAgentId) void loadActivityDetail(runId);
+  }, [loadActivityDetail, searchParams, selectedAgentId]);
 
   const gridClass =
     "grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)] overflow-hidden max-[700px]:grid-cols-[190px_minmax(0,1fr)]";

@@ -1,27 +1,21 @@
-import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { bracketMatching, foldGutter, foldKeymap, indentOnInput } from "@codemirror/language";
-import {
-  forceLinting,
-  forEachDiagnostic,
-  lintGutter,
-  lintKeymap,
-  setDiagnosticsEffect,
-} from "@codemirror/lint";
-import { searchKeymap } from "@codemirror/search";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import {
-  EditorView,
-  ViewPlugin,
-  drawSelection,
-  highlightActiveLine,
-  highlightActiveLineGutter,
-  keymap,
-} from "@codemirror/view";
+import { addCursorAbove, addCursorBelow, undoSelection } from "@codemirror/commands";
+import { forceLinting, forEachDiagnostic } from "@codemirror/lint";
+import { selectNextOccurrence, selectSelectionMatches } from "@codemirror/search";
+import { Compartment, EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
-import { gitGutter, pushGitDiff } from "../git/gitGutter";
-import { useGitStore } from "../git/useGitStore";
-import { formatDocument, lspExtension } from "../lsp/codeMirrorLsp";
+import {
+  codeActions,
+  documentSymbols,
+  executeLspCommand,
+  formatDocument,
+  lspExtension,
+  offsetToPosition,
+  renameSymbol,
+  showSymbolInformation,
+  type DocumentSymbol,
+  type LspCodeAction,
+} from "../lsp/codeMirrorLsp";
 import type { OpenTab } from "../store/useCodingWorkspaceStore";
 import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
 import { useEditorEphemeralStore } from "../store/useEditorEphemeralStore";
@@ -36,13 +30,12 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import {
   createEditorCompartments,
-  buildConfigurableExtensions,
   reconfigureEditorPreferences,
   type EditorCompartments,
 } from "./editorCompartments";
-
-const CONTENT_DEBOUNCE_MS = 400;
-const CURSOR_THROTTLE_MS = 100;
+import { buildCodeEditorExtensions } from "./codeEditorExtensions";
+import { useShortcutHandler } from "@/features/shortcuts";
+import { goToDefinition } from "../lsp/codeMirrorLsp";
 
 interface CodeEditorProps {
   tab: OpenTab;
@@ -54,15 +47,46 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const compartmentsRef = useRef<EditorCompartments | null>(null);
+  const editorFocused = () => Boolean(viewRef.current?.hasFocus);
+
+  useShortcutHandler(
+    "code.save",
+    () => {
+      const view = viewRef.current;
+      if (view) void saveTab(tab.path, view, editorPrefsRef.current, rootPath);
+    },
+    editorFocused,
+  );
+  useShortcutHandler(
+    "code.go_to_definition",
+    () => {
+      const view = viewRef.current;
+      if (view) void goToDefinition(view, tab.path, rootPath, groupId);
+    },
+    editorFocused,
+  );
+  useShortcutHandler(
+    "code.format_document",
+    () => {
+      const view = viewRef.current;
+      if (view) void formatDocument(view, tab.path, rootPath);
+    },
+    editorFocused,
+  );
+  useShortcutHandler(
+    "code.show_hover",
+    () => {
+      const view = viewRef.current;
+      if (view) void showSymbolInformation(view, tab.path, rootPath);
+    },
+    editorFocused,
+  );
 
   const editorPrefs = useSettingsStore(
     useShallow((state) => selectEditorPreferences(state.settings?.document)),
   );
   const editorPrefsRef = useRef(editorPrefs);
   editorPrefsRef.current = editorPrefs;
-
-  const gitDiff = useGitStore((state) => state.diffs[tab.path]);
-  const refreshDiff = useGitStore((state) => state.refreshDiff);
 
   const lintExtensions = useMemo(() => lintersFor(tab.name), [tab.name]);
   const lspExtensions = useMemo(() => {
@@ -85,7 +109,7 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
     const languageCompartment = new Compartment();
     const state = EditorState.create({
       doc: tab.contents,
-      extensions: buildExtensions({
+      extensions: buildCodeEditorExtensions({
         languageCompartment,
         compartments,
         editorPrefs,
@@ -97,6 +121,11 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
         groupId,
         readonly: tab.readonly,
         rootPath,
+        getLiveView: () => viewByGroup.get(groupId),
+        onCursor: (view) => reportCursor(view, groupId),
+        onDiagnostics: (view) => reportDiagnostics(view, groupId),
+        onInlineAi: (view) => dispatchInlineAi(view, tab.path, groupId),
+        onSave: (view) => void saveTab(tab.path, view, editorPrefsRef.current, rootPath),
       }),
     });
     const view = new EditorView({ state, parent: host });
@@ -112,13 +141,16 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
       view.dispatch({ effects: languageCompartment.reconfigure(language) });
       forceLinting(view);
     });
+    if (rootPath) {
+      void documentSymbols(tab.path, rootPath).then((symbols) => {
+        if (disposed) return;
+        symbolsByGroup.set(groupId, flattenSymbols(symbols));
+        reportCursor(view, groupId);
+      });
+    }
 
     reportCursor(view, groupId);
     reportDiagnostics(view, groupId);
-
-    const diffTimer = rootPath
-      ? window.setTimeout(() => void refreshDiff(rootPath, tab.path), 200)
-      : null;
 
     const handleGoto = (event: Event) => {
       const detail = (event as CustomEvent<{ path: string; line: number }>).detail;
@@ -137,7 +169,6 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
     return () => {
       disposed = true;
       window.cancelAnimationFrame(focusFrame);
-      if (diffTimer !== null) window.clearTimeout(diffTimer);
       window.removeEventListener("misty:code-goto-line", handleGoto);
       // Flush any pending debounced content update before tearing down the
       // view so the store's copy of `contents` reflects the final doc.
@@ -150,6 +181,7 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
       view.destroy();
       viewRef.current = null;
       if (viewByGroup.get(groupId) === view) viewByGroup.delete(groupId);
+      symbolsByGroup.delete(groupId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -172,12 +204,6 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
     });
   }, [tab.contents]);
 
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    pushGitDiff(view, gitDiff ?? null);
-  }, [gitDiff]);
-
   if (tab.loading) {
     return (
       <div className="grid h-full place-items-center bg-charcoal-bg text-xs italic text-cream-muted">
@@ -198,173 +224,97 @@ export function CodeEditor({ tab, groupId, rootPath }: CodeEditorProps) {
   return <div ref={hostRef} className="code-theme-editor h-full min-h-0 w-full bg-charcoal-bg" />;
 }
 
-interface BuildOpts {
-  languageCompartment: Compartment;
-  compartments: EditorCompartments;
-  editorPrefs: EditorPreferences;
-  editorPrefsRef: React.MutableRefObject<EditorPreferences>;
-  linters: Extension[];
-  lspExtensions: Extension[];
-  basicAutocomplete: boolean;
-  path: string;
-  groupId: string;
-  readonly: boolean;
-  rootPath: string;
-}
-
-function buildExtensions({
-  languageCompartment,
-  compartments,
-  editorPrefs,
-  editorPrefsRef,
-  linters,
-  lspExtensions,
-  basicAutocomplete,
-  path,
-  groupId,
-  readonly,
-  rootPath,
-}: BuildOpts): Extension[] {
-  let pendingContentTimer: number | null = null;
-  let pendingAutosaveTimer: number | null = null;
-  let lastCursorAt = 0;
-  let cursorScheduled: number | null = null;
-
-  const flushContent = (view: EditorView) => {
-    if (pendingContentTimer !== null) {
-      window.clearTimeout(pendingContentTimer);
-      pendingContentTimer = null;
-    }
-    const store = useCodingWorkspaceStore.getState();
-    const tab = store.projectBuffers[rootPath]?.[path];
-    if (!tab) return;
-    const current = view.state.doc.toString();
-    if (current === tab.contents) return;
-    store.updateBufferContents(rootPath, path, current);
-  };
-
-  const scheduleContent = (view: EditorView) => {
-    if (pendingContentTimer !== null) window.clearTimeout(pendingContentTimer);
-    pendingContentTimer = window.setTimeout(() => {
-      pendingContentTimer = null;
-      flushContent(view);
-    }, CONTENT_DEBOUNCE_MS);
-  };
-
-  const scheduleAutosave = (view: EditorView) => {
-    if (pendingAutosaveTimer !== null) window.clearTimeout(pendingAutosaveTimer);
-    const delay = editorPrefsRef.current.autosaveDelayMs;
-    if (delay <= 0) return;
-    pendingAutosaveTimer = window.setTimeout(() => {
-      pendingAutosaveTimer = null;
-      void saveTab(path, view, editorPrefsRef.current, rootPath);
-    }, delay);
-  };
-
-  const scheduleCursor = (view: EditorView) => {
-    const now = performance.now();
-    const elapsed = now - lastCursorAt;
-    if (elapsed >= CURSOR_THROTTLE_MS) {
-      lastCursorAt = now;
-      reportCursor(view, groupId);
-      return;
-    }
-    if (cursorScheduled !== null) return;
-    cursorScheduled = window.setTimeout(() => {
-      cursorScheduled = null;
-      lastCursorAt = performance.now();
-      reportCursor(view, groupId);
-    }, CURSOR_THROTTLE_MS - elapsed);
-  };
-
-  const extensions: Extension[] = [
-    ...buildConfigurableExtensions(compartments, editorPrefs),
-    foldGutter(),
-    gitGutter(),
-    history(),
-    indentOnInput(),
-    bracketMatching(),
-    closeBrackets(),
-    highlightActiveLine(),
-    highlightActiveLineGutter(),
-    drawSelection(),
-    ...(basicAutocomplete ? [autocompletion({ activateOnTyping: true, closeOnBlur: true })] : []),
-    lintGutter(),
-    languageCompartment.of([]),
-    ...linters,
-    ...lspExtensions,
-    keymap.of([
-      ...closeBracketsKeymap,
-      ...defaultKeymap,
-      ...historyKeymap,
-      ...searchKeymap,
-      ...foldKeymap,
-      ...lintKeymap,
-      {
-        key: "Mod-s",
-        preventDefault: true,
-        run: (view) => {
-          void saveTab(path, view, editorPrefsRef.current, rootPath);
-          return true;
-        },
-      },
-      {
-        key: "Mod-k",
-        preventDefault: true,
-        run: (view) => {
-          const { from, to } = view.state.selection.main;
-          const selection = view.state.sliceDoc(from, to);
-          window.dispatchEvent(
-            new CustomEvent("misty:code-inline-ai", {
-              detail: {
-                path,
-                viewId: groupId,
-                selection,
-                from,
-                to,
-              },
-            }),
-          );
-          return true;
-        },
-      },
-    ]),
-    EditorState.readOnly.of(readonly),
-    EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        scheduleContent(update.view);
-        scheduleAutosave(update.view);
-      }
-      if (update.selectionSet || update.docChanged) scheduleCursor(update.view);
-      const diagnosticsChanged = update.transactions.some((transaction) =>
-        transaction.effects.some((effect) => effect.is(setDiagnosticsEffect)),
-      );
-      if (diagnosticsChanged) reportDiagnostics(update.view, groupId);
-    }),
-    ViewPlugin.define(() => ({
-      destroy() {
-        if (pendingContentTimer !== null) window.clearTimeout(pendingContentTimer);
-        if (pendingAutosaveTimer !== null) window.clearTimeout(pendingAutosaveTimer);
-        if (cursorScheduled !== null) window.clearTimeout(cursorScheduled);
-      },
-    })),
-    EditorView.focusChangeEffect.of((state, focused) => {
-      if (!focused) {
-        // Flush pending doc changes so the store's view of `contents`
-        // catches up before another surface reads it.
-        const view = viewByGroup.get(groupId);
-        if (view) flushContent(view);
-      }
-      void state;
-      return null;
-    }),
-  ];
-  return extensions;
-}
-
 // Registry of live EditorView per group so extension closures can grab the
 // latest view when flushing content on blur.
 const viewByGroup = new Map<string, EditorView>();
+const symbolsByGroup = new Map<string, DocumentSymbol[]>();
+
+export function requestInlineAi(viewId: string): boolean {
+  const view = viewByGroup.get(viewId);
+  if (!view) return false;
+  const store = useCodingWorkspaceStore.getState();
+  const viewport = store.views[viewId];
+  if (!viewport?.activeFilePath) return false;
+  dispatchInlineAi(view, viewport.activeFilePath, viewId);
+  return true;
+}
+
+export function runEditorSelectionAction(
+  viewId: string,
+  action: "select-next" | "select-all" | "cursor-above" | "cursor-below" | "undo-selection",
+) {
+  const view = viewByGroup.get(viewId);
+  if (!view) return false;
+  const command = {
+    "select-next": selectNextOccurrence,
+    "select-all": selectSelectionMatches,
+    "cursor-above": addCursorAbove,
+    "cursor-below": addCursorBelow,
+    "undo-selection": undoSelection,
+  }[action];
+  return command(view);
+}
+
+export function editorLocation(viewId: string) {
+  const context = liveEditorContext(viewId);
+  if (!context) return null;
+  const position = offsetToPosition(context.view.state.doc, context.view.state.selection.main.head);
+  return { path: context.path, line: position.line, character: position.character };
+}
+
+export function editorWord(viewId: string) {
+  const context = liveEditorContext(viewId);
+  if (!context) return "";
+  const { state } = context.view;
+  const selected = state.sliceDoc(state.selection.main.from, state.selection.main.to);
+  if (selected) return selected;
+  const word = state.wordAt(state.selection.main.head);
+  return word ? state.sliceDoc(word.from, word.to) : "";
+}
+
+export async function documentSymbolsForEditor(viewId: string): Promise<DocumentSymbol[]> {
+  const context = liveEditorContext(viewId);
+  return context ? documentSymbols(context.path, context.rootPath) : [];
+}
+
+export async function codeActionsForEditor(viewId: string): Promise<LspCodeAction[]> {
+  const context = liveEditorContext(viewId);
+  return context ? codeActions(context.view, context.path, context.rootPath) : [];
+}
+
+export async function renameForEditor(viewId: string, newName: string) {
+  const context = liveEditorContext(viewId);
+  return context ? renameSymbol(context.view, context.path, context.rootPath, newName) : null;
+}
+
+export async function executeCodeActionCommand(viewId: string, action: LspCodeAction) {
+  const context = liveEditorContext(viewId);
+  if (context && action.command)
+    await executeLspCommand(context.path, context.rootPath, action.command);
+}
+
+function liveEditorContext(viewId: string) {
+  const view = viewByGroup.get(viewId);
+  const viewport = useCodingWorkspaceStore.getState().views[viewId];
+  if (!view || !viewport?.activeFilePath || !viewport.rootPath) return null;
+  return { view, path: viewport.activeFilePath, rootPath: viewport.rootPath };
+}
+
+function dispatchInlineAi(view: EditorView, path: string, viewId: string) {
+  const ranges = view.state.selection.ranges.map(({ from, to }) => ({ from, to }));
+  const selections = ranges.map(({ from, to }) => view.state.sliceDoc(from, to));
+  window.dispatchEvent(
+    new CustomEvent("misty:code-inline-ai", {
+      detail: {
+        path,
+        viewId,
+        selection:
+          selections.length === 1 ? selections[0] : selections.join("\n\n--- selection ---\n\n"),
+        ranges,
+      },
+    }),
+  );
+}
 
 function reportCursor(view: EditorView, groupId: string) {
   const head = view.state.selection.main.head;
@@ -373,6 +323,30 @@ function reportCursor(view: EditorView, groupId: string) {
     line: line.number,
     column: head - line.from + 1,
   });
+  const position = offsetToPosition(view.state.doc, head);
+  const symbol = symbolsByGroup
+    .get(groupId)
+    ?.filter((candidate) => rangeContains(candidate.range, position.line, position.character))
+    .sort((a, b) => rangeSpan(a.range) - rangeSpan(b.range))[0];
+  useEditorEphemeralStore.getState().setSymbolContext(groupId, symbol?.name ?? null);
+}
+
+function flattenSymbols(symbols: DocumentSymbol[]): DocumentSymbol[] {
+  return symbols.flatMap((symbol) => [symbol, ...flattenSymbols(symbol.children ?? [])]);
+}
+
+function rangeContains(range: DocumentSymbol["range"], line: number, character: number) {
+  const afterStart =
+    line > range.start.line || (line === range.start.line && character >= range.start.character);
+  const beforeEnd =
+    line < range.end.line || (line === range.end.line && character <= range.end.character);
+  return afterStart && beforeEnd;
+}
+
+function rangeSpan(range: DocumentSymbol["range"]) {
+  return (
+    (range.end.line - range.start.line) * 1_000_000 + range.end.character - range.start.character
+  );
 }
 
 function reportDiagnostics(view: EditorView, groupId: string) {
@@ -403,10 +377,6 @@ async function saveTab(path: string, view: EditorView, prefs: EditorPreferences,
     // flag settles (the debounced writer may not have flushed yet).
     if (tab.contents !== contents) state.updateBufferContents(rootPath, path, contents);
     state.markBufferSaved(rootPath, path);
-    if (rootPath) {
-      void useGitStore.getState().refresh(rootPath);
-      void useGitStore.getState().refreshDiff(rootPath, path);
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save file.";
     state.patchBuffer(rootPath, path, { error: message });

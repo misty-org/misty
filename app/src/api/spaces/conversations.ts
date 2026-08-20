@@ -61,6 +61,7 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       directAgent?: {
         agentId: string;
         timezone?: string;
+        contextNoteId?: string;
         contextReferences: Array<{
           device_id: string;
           kind: "browser_tab" | "project_root";
@@ -90,6 +91,7 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
                   {
                     agent_id: directAgent.agentId,
                     timezone: directAgent.timezone,
+                    context_note_id: directAgent.contextNoteId,
                     context_references: directAgent.contextReferences,
                   },
                 ]

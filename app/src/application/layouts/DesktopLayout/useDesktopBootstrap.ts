@@ -2,7 +2,6 @@ import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
 import { preloadDesktopFilesPage, useExplorerStore } from "@/features/files/explorer";
 import { useMediaSearchStore, useSearchStore } from "@/features/files/search";
-import { useGlobalSearchStore } from "@/features/global-search";
 import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 import { useTransfersStore } from "@/features/transfers";
@@ -97,46 +96,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     searchMaintenancePreferences.discoveryIntervalMinutes,
     settings,
   ]);
-
-  useEffect(() => {
-    const onGlobalSearchShortcut = (event: KeyboardEvent) => {
-      if (
-        !(event.metaKey || event.ctrlKey) ||
-        event.altKey ||
-        event.key.toLocaleLowerCase() !== "k"
-      )
-        return;
-      event.preventDefault();
-      event.stopPropagation();
-      useGlobalSearchStore.getState().activateLauncher();
-      window.setTimeout(
-        () =>
-          document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
-        0,
-      );
-    };
-    window.addEventListener("keydown", onGlobalSearchShortcut, true);
-    return () => window.removeEventListener("keydown", onGlobalSearchShortcut, true);
-  }, []);
-
-  useEffect(() => {
-    const onGlobalRefreshShortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLocaleLowerCase() !== "r") return;
-      // Cmd+R is bound to "explorer.refresh", but that binding is only
-      // intercepted while the Files page is mounted. Everywhere else (Spaces,
-      // Settings, Agents, ...) nothing prevents the default, so the
-      // webview does a real full-page reload: every bit of in-memory state is
-      // lost and the whole bootstrap sequence in main.tsx reruns from
-      // scratch, which is what causes the black-screen flash on refresh.
-      // This only calls preventDefault(), not stopPropagation(), so
-      // Explorer's own bubble-phase listener still runs its refresh command
-      // normally when it's mounted.
-      event.preventDefault();
-    };
-    window.addEventListener("keydown", onGlobalRefreshShortcut, true);
-    return () => window.removeEventListener("keydown", onGlobalRefreshShortcut, true);
-  }, []);
 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;

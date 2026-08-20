@@ -25,7 +25,7 @@ describe("SpacePanelContent", () => {
     container.remove();
   });
 
-  it("shows the selected Space as a static sidebar header", async () => {
+  it("does not repeat the selected Space in a sidebar header", async () => {
     const space = spaceFixture();
 
     await act(async () => {
@@ -41,14 +41,12 @@ describe("SpacePanelContent", () => {
       );
     });
 
-    expect(container.textContent).toContain("Design team");
-    // The header is the Space name alone: no avatar and no role subheading.
+    expect(container.textContent).not.toContain("Design team");
     expect(
       container.querySelector('[aria-label="Design team default profile picture"]'),
     ).toBeNull();
-    expect(container.querySelector("header")?.textContent).toBe("Design team");
+    expect(container.querySelector("header")).toBeNull();
     expect(container.querySelector('[aria-label^="Space menu"]')).toBeNull();
-    expect(container.querySelector("header > div")?.className).not.toContain("bg-charcoal-active");
     expect(container.querySelector("nav[aria-label='Space sections']")).toBeNull();
     expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
     expect(container.querySelector("nav[aria-label='Library collections']")).not.toBeNull();

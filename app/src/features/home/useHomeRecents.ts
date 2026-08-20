@@ -14,45 +14,42 @@ export interface HomeRecent {
 /**
  * What you had open, across every Space.
  *
- * The dock already persists a layout per Space, and every tab records when it
+ * The dock persists virtual windows per Space, and every tab records when it
  * was last focused — so "recent" is a read of state that was being stored and
  * never shown. Nothing new is tracked to build this.
  */
 export function useHomeRecents(limit = 6): HomeRecent[] {
-  const layoutsByScope = useWorkspaceStore((state) => state.layoutsByScope);
-  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const layout = useWorkspaceStore((state) => state.layout);
+  const virtualWindowsByScope = useWorkspaceStore((state) => state.virtualWindowsByScope);
 
   return useMemo(() => {
-    const scopes: [string, typeof layout][] = [
-      [activeScopeKey, layout],
-      ...Object.entries(layoutsByScope)
-        .filter(([scope, value]) => scope !== activeScopeKey && Boolean(value))
-        .map(([scope, value]) => [scope, value] as [string, typeof layout]),
-    ];
-
     const seen = new Set<string>();
     const recents: HomeRecent[] = [];
-    for (const [scopeKey, scopeLayout] of scopes) {
-      for (const tab of dockTabs(scopeLayout.root)) {
-        // Home is where this list is displayed, so listing it is noise.
-        if (tab.surfaceId === "home") continue;
-        const key = `${scopeKey}:${tab.route}:${tab.title}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        recents.push({
-          id: tab.id,
-          title: tab.title,
-          subtitle: surfaceLabel(tab.surfaceId),
-          route: tab.route,
-          surfaceId: tab.surfaceId,
-          lastFocusedAt: tab.lastFocusedAt,
-          scopeKey,
-        });
+    for (const [scopeKey, windows] of Object.entries(virtualWindowsByScope)) {
+      for (const window of windows ?? []) {
+        for (const tab of dockTabs(window.layout.root)) {
+          // Home is where this list is displayed, so listing it is noise.
+          if (
+            tab.surfaceId === "home" ||
+            (tab.surfaceId === "space" && tab.groupKey === scopeKey && tab.title === "Space")
+          )
+            continue;
+          const key = `${scopeKey}:${tab.route}:${tab.title}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          recents.push({
+            id: tab.id,
+            title: tab.title,
+            subtitle: `${surfaceLabel(tab.surfaceId)} · ${window.title}`,
+            route: tab.route,
+            surfaceId: tab.surfaceId,
+            lastFocusedAt: tab.lastFocusedAt,
+            scopeKey,
+          });
+        }
       }
     }
     return recents.sort((left, right) => right.lastFocusedAt - left.lastFocusedAt).slice(0, limit);
-  }, [activeScopeKey, layout, layoutsByScope, limit]);
+  }, [limit, virtualWindowsByScope]);
 }
 
 function surfaceLabel(surfaceId: WorkspaceTab["surfaceId"]): string {

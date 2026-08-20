@@ -35,30 +35,14 @@ describe("desktop window chrome drag suppression", () => {
     expect(shouldSuppressWindowDrag(title)).toBe(true);
   });
 
-  it("suppresses native window drag from BlockNote drag handles", () => {
-    const sideMenu = document.createElement("div");
-    sideMenu.className = "bn-side-menu";
-    const handle = document.createElement("button");
-    handle.draggable = true;
-    sideMenu.append(handle);
-
-    expect(shouldSuppressWindowDrag(handle)).toBe(true);
-  });
-
-  it("suppresses native window drag from current BlockNote side-menu handles", () => {
+  it("suppresses native window drag from TipTap block controls", () => {
     const editor = document.createElement("div");
-    editor.className = "bn-container";
-    const block = document.createElement("div");
-    block.className = "bn-block-outer";
-    const sideMenu = document.createElement("div");
-    sideMenu.className = "bn-side-menu";
-    const handle = document.createElement("div");
-    handle.dataset.dragHandle = "true";
-    sideMenu.append(handle);
-    editor.append(block, sideMenu);
+    editor.dataset.mistyWindowDragBlock = "true";
+    const handle = document.createElement("button");
+    editor.append(handle);
 
     expect(shouldSuppressWindowDrag(handle)).toBe(true);
-    expect(shouldSuppressWindowDrag(block)).toBe(true);
+    expect(shouldSuppressWindowDrag(editor)).toBe(true);
   });
 });
 
