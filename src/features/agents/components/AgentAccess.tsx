@@ -6,6 +6,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui";
 import { Cable, Laptop, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { SharedFolders } from "./SharedFolders";
 
 type AccessConnection = {
   id: string;
@@ -182,6 +183,7 @@ export function AgentAccess({
           Manage connections
         </Button>
       </section>
+      {showComputer && <SharedFolders />}
       {showComputer && (
         <section aria-label="Computer" className="grid gap-2">
           <h3 className="text-xs font-medium text-cream-muted">Computer</h3>

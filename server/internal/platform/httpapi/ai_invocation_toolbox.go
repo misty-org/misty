@@ -15,19 +15,22 @@ import (
 // context, the MCP server and every tool call use this same resolution.
 func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID}
-	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, s.aiInvocationConnectedTools(record)...)
+	connected := append(s.aiInvocationConnectedTools(record), s.deviceToolRegistrations(ctx, record)...)
+	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
 }
 
-// aiInvocationConnectedTools are the user's connected apps and, on the
-// desktop, the screen tools.
+// aiInvocationConnectedTools are the user's connected apps, the screen tools
+// on the desktop, and account administration: scheduled tasks and Spaces.
 func (s *SpacesService) aiInvocationConnectedTools(record *db.AIInvocationRecord) []agenttools.Registration {
-	return append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
+	tools := append(s.appsToolRegistrations(), s.screenToolRegistrations(record)...)
+	return append(tools, s.accountAdminToolRegistrations()...)
 }
 
 func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, connected ...agenttools.Registration) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	browserTabs, browserCapabilities := aiInvocationBrowserGrants(ctx, database, actor.userID, actor.runID)
 	options := agentToolboxOptions{
-		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities, extra: connected,
+		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
+		extra: append(connected, agentMemberToolRegistrations(database)...),
 	}
 	if actor.agentID == "" {
 		options.delegation = func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {

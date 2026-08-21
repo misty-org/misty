@@ -152,6 +152,14 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 				}
 			}
 		}
+		spaceID, spaceName := "", ""
+		if request, requestErr := s.database.AgentMemberRequestForRun(r.Context(), run.ID); requestErr == nil {
+			system, prompt = memberRequestRuntimePrompts(membership, request)
+			spaceID, spaceName = request.SpaceID, request.SpaceName
+		} else if !errors.Is(requestErr, db.ErrSpaceNotFound) {
+			writeAgentError(w, requestErr)
+			return
+		}
 		location, _ := time.LoadLocation(timezone)
 		now := time.Now().In(location)
 		// The run's catalog is its complete tool list; prompts describe only it.
@@ -184,8 +192,8 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"run_id": run.ID, "agent_id": run.AgentID, "space_id": "", "task": task, "run_mode": run.EffectiveRunMode,
-			"space_name": "", "is_default": false, "timezone": timezone, "current_time": now.Format(time.RFC3339), "members": []any{},
+			"run_id": run.ID, "agent_id": run.AgentID, "space_id": spaceID, "task": task, "run_mode": run.EffectiveRunMode,
+			"space_name": spaceName, "is_default": false, "timezone": timezone, "current_time": now.Format(time.RFC3339), "members": []any{},
 			"model_id": agentRoute.Model, "reasoning_effort": agentRoute.Reasoning, "vision_model_id": visionRoute.Model,
 			"system": system, "prompt": prompt, "attached_sources": sources, "file_warnings": fileWarnings,
 			"allowed_tools": allowedTools, "capture": capture, "display_captures": displayCaptures, "companion_mode": companionMode, "managed_misty": managedMisty,

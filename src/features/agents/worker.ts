@@ -9,6 +9,7 @@ import {
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
+import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
 import { invoke } from "@tauri-apps/api/core";
 import {
   browserUncertainErrorCode,
@@ -350,6 +351,9 @@ async function executeWorkflowNodeOnDevice(
           request: { id, grantId: `${job.contextId}:${job.id}` },
         }).catch(() => undefined);
     }
+  }
+  if (deviceAgentOperations.has(job.operation)) {
+    return runDeviceAgentOperation(job, signal);
   }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);

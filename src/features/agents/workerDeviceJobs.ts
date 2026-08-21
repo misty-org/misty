@@ -53,7 +53,9 @@ export function deviceWorkflowErrorCode(error: unknown): string {
     return "document_service_unavailable";
   if (message.startsWith("browser_snapshot_stale:")) return "browser_snapshot_stale";
   if (message.includes("unsupported_content")) return "unsupported_content";
-  if (message.includes("invalid_device_scope")) return "invalid_scope";
+  if (message.includes("invalid_device_scope") || message.includes("outside its device scope"))
+    return "invalid_scope";
+  if (message.includes("invalid_url")) return "invalid_url";
   if (message.includes("unsupported_device_operation")) return "unsupported_operation";
   if (message.includes("invalid_browser_grant") || message.includes("not active"))
     return "browser_grant_invalid";

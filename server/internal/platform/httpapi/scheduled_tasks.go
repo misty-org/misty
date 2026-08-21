@@ -171,25 +171,31 @@ func (s *AIService) RunScheduledTask() http.HandlerFunc {
 }
 
 func (s *AIService) createScheduledTaskConversation(ctx context.Context, userID, title, agentID string) (string, error) {
+	return createScheduledTaskConversation(ctx, s.database, userID, title, agentID)
+}
+
+// createScheduledTaskConversation gives a scheduled task its own conversation
+// with the chosen agent, or Misty when none is named.
+func createScheduledTaskConversation(ctx context.Context, database *db.Database, userID, title, agentID string) (string, error) {
 	var identity *db.AskIdentity
 	var err error
 	if agentID == "" {
-		identity, err = s.database.EnsureAskIdentity(ctx, userID, agent.FrontierDefaultModelID())
+		identity, err = database.EnsureAskIdentity(ctx, userID, agent.FrontierDefaultModelID())
 	} else {
-		identity, err = s.database.AskIdentityByID(ctx, userID, agentID)
+		identity, err = database.AskIdentityByID(ctx, userID, agentID)
 	}
 	if err != nil {
 		return "", err
 	}
-	conversationID, err := s.database.CreatePersonalAgentConversation(ctx, userID, "", identity.ID)
+	conversationID, err := database.CreatePersonalAgentConversation(ctx, userID, "", identity.ID)
 	if err != nil {
 		return "", err
 	}
-	if err := s.database.RenameAgentSession(ctx, userID, conversationID, cleanMistyTitle(title)); err != nil {
+	if err := database.RenameAgentSession(ctx, userID, conversationID, cleanMistyTitle(title)); err != nil {
 		return "", err
 	}
 	reasoning := agent.ManagedReasoning("", "")
-	return conversationID, s.database.UpdateMistyConversationModel(ctx, userID, conversationID, agent.FrontierDefaultModelID(), reasoning, agent.FrontierModelCatalogVersion)
+	return conversationID, database.UpdateMistyConversationModel(ctx, userID, conversationID, agent.FrontierDefaultModelID(), reasoning, agent.FrontierModelCatalogVersion)
 }
 
 // ProcessDueScheduledTasks starts every task whose time has come. Each run is an ordinary

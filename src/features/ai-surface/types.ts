@@ -54,7 +54,8 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  kind: "browser_tab";
+  /** A browser tab, a folder shared with agents, or the Misty browser itself. */
+  kind: "browser_tab" | "local_folder" | "workspace";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];

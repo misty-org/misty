@@ -1,4 +1,5 @@
 import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { AgentSpaceSharing } from "./AgentSpaceSharing";
 import { openMisty } from "@/features/misty/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, Field, Input, Pressable, Textarea, Toggle } from "@/shared/ui";
@@ -284,6 +285,7 @@ export function AgentEditor({
               onChange={(e) => update("instructions", e.target.value)}
             />
           </Field>
+          {profile && !profile.system_managed ? <AgentSpaceSharing agentId={profile.id} /> : null}
           {!!memories.length && (
             <section className="border-t border-charcoal-border pt-5">
               <h3 className="mb-2 text-sm font-medium">Remembered preferences</h3>

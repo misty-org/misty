@@ -33,7 +33,10 @@ type agentToolboxOptions struct {
 	browserCapabilities map[string]bool
 	// delegation registers ask.delegate for runs that may start a worker.
 	delegation agenttools.Handler
-	extra      []agenttools.Registration
+	// memberRequest builds the toolbox for work another member's agent asked
+	// for: Space data only, without the owner's memory or agent settings.
+	memberRequest bool
+	extra         []agenttools.Registration
 }
 
 func spaceAgentToolbox(database *db.Database) *agenttools.Registry {
@@ -54,12 +57,24 @@ func buildAgentToolbox(database *db.Database, options agentToolboxOptions) *agen
 	registrations := []agenttools.Registration{}
 	if options.accountLevel {
 		registrations = append(registrations, routedSpaceRegistrations(database)...)
+		for _, tool := range spaceToolRegistrations(database) {
+			if routed, ok := routeSpaceDescriptor(database, tool.Descriptor); ok {
+				registrations = append(registrations, routed)
+			}
+		}
 		registrations = append(registrations, weatherToolRegistration())
 	} else {
 		for _, descriptor := range spaceDataToolDescriptors() {
 			registrations = append(registrations, agenttools.Registration{Descriptor: withToolTriggers(descriptor, messageTriggers), Handler: legacyHandler})
 		}
+		registrations = append(registrations, spaceToolRegistrations(database)...)
 	}
+	registrations = append(registrations, searchAllToolRegistration(database))
+	if options.memberRequest {
+		return agenttools.MustNew(registrations...)
+	}
+	registrations = append(registrations, devicesListToolRegistration(database))
+	registrations = append(registrations, methodToolRegistrations(database)...)
 	for _, descriptor := range memoryAgentToolDescriptors() {
 		registrations = append(registrations, agenttools.Registration{Descriptor: withToolTriggers(descriptor, messageTriggers), Handler: legacyHandler})
 	}
