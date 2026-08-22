@@ -38,6 +38,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     let geometryError: string | null = null;
     const host = input.hostRef.current;
     const effectTab = { id: tabId, instanceKey: tabInstanceKey };
+    const macNativeLiveResize = input.nativeLiveResize && isMacNativeRuntime();
 
     const synchronize = () => {
       frame = 0;
@@ -57,6 +58,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
         url: current.url,
         bounds,
         theme: current.theme,
+        nativeLiveResize: current.nativeLiveResize,
       })
         .then(() => {
           if (
@@ -82,36 +84,29 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (settleTimer) window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(() => {
         windowResizeActive = false;
-        // Responsive mode has the same fixed top/left and flexible size as the
-        // AppKit child, so its native autoresizing mask is already exact during
-        // live resize. Fixed device previews still need one final measurement
-        // because they remain centered and width-capped.
-        if (!latest.current.nativeLiveResize) {
-          requestBrowserWebviewLayout(effectTab);
-        }
+        // AppKit keeps responsive children attached during live resize. One
+        // final DOM measurement corrects split panes or shell offsets that did
+        // not consume the entire window delta.
+        requestBrowserWebviewLayout(effectTab);
       }, 120);
     };
     const observeHostResize = () => {
       const nextWindowSize = currentWindowSize();
-      if (nextWindowSize !== windowSize) {
-        // AppKit owns live window resizing for the child WKWebView. Sending a
-        // reconcile IPC here fights its autoresizing mask on the main thread
-        // and stalls both Misty's renderer and the embedded page.
+      if (macNativeLiveResize && nextWindowSize !== windowSize) {
         windowSize = nextWindowSize;
         scheduleResizeSettle();
         return;
       }
-      if (windowResizeActive) {
+      if (macNativeLiveResize && windowResizeActive) {
         scheduleResizeSettle();
         return;
       }
-      // Pane splits, sidebars, viewport presets, and notices can move the host
-      // without resizing the native window, so those still reconcile now.
       schedule();
     };
     const observeWindowResize = () => {
       windowSize = currentWindowSize();
-      scheduleResizeSettle();
+      if (macNativeLiveResize) scheduleResizeSettle();
+      else schedule();
     };
     const observer = new ResizeObserver(observeHostResize);
     if (host) observer.observe(host);
@@ -123,12 +118,10 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     window.visualViewport?.addEventListener("scroll", schedule);
     document.addEventListener("visibilitychange", schedule);
     schedule();
-    // Native child visibility can finish changing just after a React layout
-    // transition. These bounded retries repair that race without returning to
-    // continuous animation-frame polling.
     const recoverLayout = () => requestBrowserWebviewLayout(effectTab);
-    recoveryTimers.push(window.setTimeout(recoverLayout, 150));
-    recoveryTimers.push(window.setTimeout(recoverLayout, 750));
+    recoveryTimers.push(window.setTimeout(recoverLayout, 50));
+    recoveryTimers.push(window.setTimeout(recoverLayout, 200));
+    recoveryTimers.push(window.setTimeout(recoverLayout, 600));
 
     return () => {
       disposed = true;
@@ -145,7 +138,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       document.removeEventListener("visibilitychange", schedule);
       void hideBrowserWebview(effectTab);
     };
-  }, [input.hostRef, input.nativeRuntime, tabId, tabInstanceKey]);
+  }, [input.hostRef, input.nativeLiveResize, input.nativeRuntime, tabId, tabInstanceKey]);
 }
 
 function currentWindowSize(): string {
@@ -163,6 +156,10 @@ function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
   const height = bottom - y;
   if (width < 2 || height < 2) return null;
   return browserBoundsAtAppZoom({ x, y, width, height }, getAppliedAppZoom());
+}
+
+function isMacNativeRuntime(): boolean {
+  return /Mac|iPhone|iPad/.test(navigator.platform);
 }
 
 export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {

@@ -87,7 +87,7 @@ use infra::browser::{
     browser_webview_hide, browser_webview_navigate, browser_webview_reconcile,
     browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
     browser_webview_show, browser_webviews_hide_all, browser_webviews_set_overlay_active,
-    BrowserSessionState,
+    browser_webviews_set_pointer_tracking, BrowserSessionState,
 };
 #[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
@@ -365,6 +365,8 @@ pub fn run() {
             browser_webview_show,
             #[cfg(desktop)]
             browser_webviews_set_overlay_active,
+            #[cfg(desktop)]
+            browser_webviews_set_pointer_tracking,
             #[cfg(desktop)]
             browser_webview_hide,
             #[cfg(desktop)]
