@@ -114,14 +114,14 @@ describe("BrowserWorkspace", () => {
       },
     });
   });
-  it("keeps Browser chrome and its page host on the tab surface", async () => {
+  it("keeps Browser chrome on the tab surface and its page host on the page's color", async () => {
     await act(async () => root.render(view(browserTab)));
     expect(
       container.querySelector<HTMLElement>("[data-browser-toolbar]")?.style.backgroundColor,
     ).toBe("var(--workspace-tab-surface)");
     expect(
       container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.backgroundColor,
-    ).toBe("var(--workspace-tab-surface)");
+    ).toBe("var(--browser-page-background, var(--workspace-tab-surface))");
   });
   it("never embeds a website frame when the native Browser runtime is unavailable", async () => {
     const webTab = {
