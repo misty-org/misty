@@ -30,6 +30,7 @@ import { ExtensionsSection } from "./sections/ExtensionsSection";
 import { FilesSection } from "./sections/FilesSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ModelsSection } from "./sections/ModelsSection";
+import { MistySection } from "./sections/MistySection";
 import { NotificationsSection } from "./sections/NotificationsSection";
 import { PrivacySection } from "./sections/PrivacySection";
 import { SearchSection } from "./sections/SearchSection";
@@ -101,6 +102,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   },
   { id: "code", label: "Code", icon: Code, group: "tools", Component: CodeSection },
   { id: "models", label: "Models", icon: Sparkles, group: "tools", Component: ModelsSection },
+  { id: "misty", label: "Misty", icon: Sparkles, group: "tools", Component: MistySection },
   { id: "agents", label: "Agents", icon: Bot, group: "tools", Component: AgentsSection },
   {
     id: "extensions",
@@ -150,8 +152,8 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     updateSetting,
     load,
     removeOpenWithAssociation,
-    setShortcut,
-    saveShortcuts,
+    updateShortcut,
+    reassignShortcut,
     resetShortcuts,
   } = useSettingsStore(
     useShallow((state) => ({
@@ -165,8 +167,8 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       updateSetting: state.updateSetting,
       load: state.load,
       removeOpenWithAssociation: state.removeOpenWithAssociation,
-      setShortcut: state.setShortcut,
-      saveShortcuts: state.saveShortcuts,
+      updateShortcut: state.updateShortcut,
+      reassignShortcut: state.reassignShortcut,
       resetShortcuts: state.resetShortcuts,
     })),
   );
@@ -179,11 +181,11 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     working,
     onSettingChange: updateSetting,
     onLoad: load,
-    onShortcutChange: setShortcut,
-    onSaveShortcuts: saveShortcuts,
+    onShortcutChange: updateShortcut,
+    onShortcutReassign: reassignShortcut,
     onResetShortcuts: resetShortcuts,
     onRemoveOpenWithAssociation: removeOpenWithAssociation,
-    shortcuts: shortcuts?.bindings ?? [],
+    shortcuts,
     openWithAssociations,
     app,
   };

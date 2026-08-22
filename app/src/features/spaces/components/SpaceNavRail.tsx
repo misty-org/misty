@@ -10,7 +10,7 @@ import { LockKeyhole, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { invitedSpacePreview } from "../spaceInvitation";
-import { spaceDestination, spaceLandingRoute } from "../navigation";
+import { spaceLandingRoute } from "../navigation";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { useWorkspaceStore } from "@/features/workspace";
 import { SpaceAvatar } from "./SpaceAvatar";

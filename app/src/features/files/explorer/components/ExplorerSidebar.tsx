@@ -8,15 +8,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/shared/ui";
-import {
-  ChevronDown,
-  HardDrive,
-  Pencil,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  Unplug,
-} from "lucide-react";
+import { HardDrive, Pencil, Plus, Search, SlidersHorizontal, Unplug } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { ExplorerDropTarget } from "../drag/ExplorerDropTarget";
 import type { ExplorerSidebarProps } from "../model/interfaces/components/ExplorerSidebar";

@@ -2,7 +2,10 @@ import type { useAppStore } from "@/features/app-shell";
 import type {
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
-  ShortcutBinding,
+  ReassignShortcutRequest,
+  ResetShortcutRequest,
+  ShortcutsSnapshot,
+  UpdateShortcutRequest,
 } from "@/native/contracts";
 import { type LucideIcon } from "lucide-react";
 
@@ -18,6 +21,7 @@ export type SettingsSection =
   | "terminal"
   | "code"
   | "models"
+  | "misty"
   | "agents"
   | "extensions"
   | "privacy"
@@ -41,11 +45,11 @@ export interface SettingsContentProps {
   working: boolean;
   onSettingChange: (section: string, key: string, value: SettingValue) => void;
   onLoad: () => Promise<void>;
-  onShortcutChange: (commandId: string, shortcut: string) => void;
-  onSaveShortcuts: () => Promise<void>;
-  onResetShortcuts: () => Promise<void>;
+  onShortcutChange: (request: UpdateShortcutRequest) => Promise<void>;
+  onShortcutReassign: (request: ReassignShortcutRequest) => Promise<void>;
+  onResetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;
   onRemoveOpenWithAssociation: (key: string) => Promise<void>;
-  shortcuts: ShortcutBinding[];
+  shortcuts: ShortcutsSnapshot | null;
   openWithAssociations: OpenWithAssociation[];
   app: ReturnType<typeof useAppStore.getState>["app"];
 }

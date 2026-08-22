@@ -5,6 +5,8 @@ import type {
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { Button } from "@/shared/ui";
+import { useShortcutHandler } from "@/features/shortcuts";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 import { PanelLeftOpen, RefreshCcw, X } from "lucide-react";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import type { NavigateFunction } from "react-router-dom";
@@ -72,6 +74,7 @@ export function RoadmapEditor(props: {
     setPlacementRequest,
   } = props;
   const [inspectorAnchor, setInspectorAnchor] = useState<{ x: number; y: number }>();
+  useShortcutHandler("roadmap.create", () => setNodeDrawerOpen(true), canManage);
   const selectForEditing = (id: string, anchor?: { x: number; y: number }) => {
     setSelectedId(id);
     setInspectorAnchor(id ? anchor : undefined);
@@ -108,6 +111,7 @@ export function RoadmapEditor(props: {
         >
           {saveState[0].toUpperCase() + saveState.slice(1)}
         </span>
+        <AiSurfaceButton />
         <Button
           size="icon"
           variant="ghost"

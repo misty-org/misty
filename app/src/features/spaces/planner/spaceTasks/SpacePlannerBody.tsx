@@ -52,6 +52,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           onOpen={actions.openEdit}
           onMove={actions.moveTask}
           onCreate={actions.quickCreate}
+          onOpenFullCreate={actions.openCreate}
         />
       ) : (
         <SpaceTaskList

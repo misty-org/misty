@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
 import { useImperativeHandle, type Dispatch, type ForwardedRef, type SetStateAction } from "react";
+import { hasTerminalControlCharacters } from "./terminalInputSafety";
 
 const MIN_FONT_SCALE = 0.6;
 const MAX_FONT_SCALE = 2;
@@ -12,6 +13,8 @@ export interface TerminalPaneHandle {
   copySelection: () => Promise<void>;
   paste: () => Promise<void>;
   toggleSearch: () => void;
+  aiSnapshot: () => string;
+  stageAiCommand: (command: string) => Promise<void>;
 }
 
 interface TerminalPaneHandleOptions {
@@ -61,6 +64,31 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
         }
       },
       toggleSearch: () => setSearchOpen((current) => !current),
+      aiSnapshot: () => {
+        const term = terminalRef.current;
+        if (!term) return "";
+        const selected = term.getSelection().trim();
+        if (selected) return selected.slice(0, 32 << 10);
+        const buffer = term.buffer.active;
+        const end = buffer.baseY + buffer.cursorY;
+        const start = Math.max(0, end - 120);
+        const lines: string[] = [];
+        for (let row = start; row <= end; row++) {
+          const line = buffer.getLine(row)?.translateToString(true) ?? "";
+          if (line.trim()) lines.push(line);
+        }
+        return lines.join("\n").slice(-(32 << 10));
+      },
+      stageAiCommand: async (command) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId || !command || hasTerminalControlCharacters(command)) {
+          throw new Error("The terminal command is not safe to stage.");
+        }
+        // Intentionally omit a newline: applying an AI artifact may prepare a
+        // command, but only the user's final Enter gesture may execute it.
+        await invoke("terminal_write", { sessionId, data: command });
+        terminalRef.current?.focus();
+      },
     }),
     [sessionIdRef, setFontScale, setSearchOpen, terminalRef],
   );

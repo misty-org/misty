@@ -1,4 +1,5 @@
 import { cn } from "@/shared/ui";
+import { useShortcutTitle } from "@/features/shortcuts";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
 
@@ -19,6 +20,7 @@ export function NavigatorControls(props: {
   className?: string;
 }) {
   const sticky = (props.visibility ?? props.layout?.visibility ?? "sticky") === "sticky";
+  const title = useShortcutTitle(sticky ? "Hide sidebar" : "Show sidebar", "app.toggle_navigator");
   return (
     <div className={cn("flex items-center", props.className)} data-misty-window-drag-block="true">
       <button
@@ -26,7 +28,7 @@ export function NavigatorControls(props: {
         className={controlButtonClass}
         aria-pressed={sticky}
         aria-label={sticky ? "Hide sidebar" : "Show sidebar"}
-        title={sticky ? "Hide sidebar (⌘⇧B)" : "Show sidebar (⌘⇧B)"}
+        title={title}
         onClick={props.onToggleVisibility}
       >
         {sticky ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}

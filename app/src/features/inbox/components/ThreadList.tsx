@@ -43,6 +43,7 @@ export function ThreadList(props: {
     action: { read?: boolean; archived?: boolean; starred?: boolean },
   ) => void;
 }) {
+  const onPrefetch = props.onPrefetch;
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const accountByConnection = useMemo(
     () => new Map(props.accounts.map((account) => [account.connection_id, account])),
@@ -55,12 +56,12 @@ export function ThreadList(props: {
       const next = new Set([...current].filter((key) => available.has(key)));
       return next.size === current.size ? current : next;
     });
-    if (props.onPrefetch && props.threads.length) {
+    if (onPrefetch && props.threads.length) {
       props.threads.slice(0, 15).forEach((thread) => {
-        props.onPrefetch?.(thread);
+        onPrefetch(thread);
       });
     }
-  }, [props.threads, props.onPrefetch]);
+  }, [onPrefetch, props.threads]);
 
   const allSelected = Boolean(props.threads.length) && selectedKeys.size === props.threads.length;
   const selectedThreads = props.threads.filter((thread) => selectedKeys.has(thread.key));

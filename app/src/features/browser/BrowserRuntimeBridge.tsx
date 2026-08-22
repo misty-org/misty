@@ -96,6 +96,23 @@ export function BrowserRuntimeBridge() {
   }, []);
 
   useEffect(() => {
+    const openPanes = new Set<string>();
+    const reason = "ai-drawer";
+    const update = (event: Event) => {
+      const detail = (event as CustomEvent<{ paneId?: string; open?: boolean }>).detail;
+      if (!detail?.paneId) return;
+      if (detail.open) openPanes.add(detail.paneId);
+      else openPanes.delete(detail.paneId);
+      setBrowserWebviewsSuspended(openPanes.size > 0, reason);
+    };
+    window.addEventListener("misty:ai-drawer-visibility", update);
+    return () => {
+      window.removeEventListener("misty:ai-drawer-visibility", update);
+      setBrowserWebviewsSuspended(false, reason);
+    };
+  }, []);
+
+  useEffect(() => {
     const reason = "dom-overlay";
     // This observer is a fallback for app overlays outside Browser chrome.
     // Browser toolbar menus suspend synchronously in onOpenChange so their

@@ -1,6 +1,7 @@
 import { PhotoEditor } from "@/features/editor";
 import { explorerOpenPath, explorerSavePreviewItem } from "@/features/files/native";
 import { errorText } from "@/shared/lib/format";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { Copy, ExternalLink, FileQuestion, Loader2, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,17 +33,6 @@ export function GlobalPreviewDialog(props: {
   useEffect(() => {
     if (resource?.text !== undefined) setTextDraft(resource.text);
   }, [resource?.text]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        void save(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
 
   const textDirty = Boolean(
     resource &&
@@ -86,6 +76,7 @@ export function GlobalPreviewDialog(props: {
       setSaving(null);
     }
   };
+  useShortcutHandler("explorer.preview_save", () => void save(false), canEditText && !saving);
 
   const saveImageBlob = async (blob: Blob, copy: boolean) => {
     const bytes = [...new Uint8Array(await blob.arrayBuffer())];

@@ -1,5 +1,6 @@
 import { Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ShortcutHint, useShortcutHandler } from "@/features/shortcuts";
 import { readApiKey } from "./keychain";
 import { streamRewrite } from "./providers";
 import { useAiSettings } from "./useAiSettings";
@@ -102,6 +103,8 @@ export function InlineRewrite({
     onClose();
   }, [preview, onApply, onClose]);
 
+  useShortcutHandler("code.apply_inline_ai", apply, () => open && Boolean(preview.trim()));
+
   const cancel = useCallback(() => {
     controllerRef.current?.abort();
     setStreaming(false);
@@ -113,14 +116,11 @@ export function InlineRewrite({
       if (event.key === "Escape") {
         cancel();
         onClose();
-      } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && preview) {
-        event.preventDefault();
-        apply();
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open, apply, cancel, onClose, preview]);
+  }, [open, cancel, onClose]);
 
   if (!open) return null;
 
@@ -202,7 +202,7 @@ export function InlineRewrite({
               disabled={!preview.trim()}
               className="rounded-md bg-cream-bright px-3 py-1 text-xs font-medium text-charcoal-workspace hover:bg-cream disabled:opacity-60"
             >
-              Apply (⌘⏎)
+              Apply <ShortcutHint commandId="code.apply_inline_ai" />
             </button>
           </div>
         ) : null}

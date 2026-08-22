@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
@@ -31,6 +32,52 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
   const { canUploadLibrary, setFilePickerOpen } = data;
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const selectedItems = data.selectedItems ?? [];
+    return {
+      surfaceId: "library",
+      label: selectedItems.length
+        ? `${selectedItems.length} Library item${selectedItems.length === 1 ? "" : "s"}`
+        : "Library",
+      getContext: () =>
+        selectedItems.slice(0, 12).map((item) => ({
+          kind: "library.item",
+          id: item.id,
+          title: item.display_name,
+          privacy: "shared" as const,
+          spaceId,
+          href: `/spaces/${encodeURIComponent(spaceId)}/library?item=${encodeURIComponent(item.id)}`,
+          revision: item.version,
+        })),
+      getSuggestedActions: () => [
+        {
+          id: "library-synthesize",
+          label: "Synthesize",
+          prompt:
+            "Synthesize the selected Library items from their authorized metadata and available intelligence. Cite each item used.",
+        },
+        {
+          id: "library-organize",
+          label: "Organize",
+          prompt:
+            "Suggest tags, captions, groupings, and album organization for the selected items. Do not change metadata.",
+        },
+        {
+          id: "library-compare",
+          label: "Compare",
+          prompt:
+            "Compare the selected items, noting relationships, duplicates, and meaningful differences.",
+        },
+        {
+          id: "library-find-related",
+          label: "Find related",
+          prompt:
+            "Describe semantic searches that would find related Library items and explain why.",
+        },
+      ],
+    };
+  }, [data.selectedItems, spaceId]);
+  useAiSurfaceAdapter(aiAdapter);
 
   useEffect(() => {
     if (searchParams.get("upload") !== "1") {

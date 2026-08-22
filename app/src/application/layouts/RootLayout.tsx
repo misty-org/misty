@@ -3,6 +3,7 @@ import { AuthProvider } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";
 import { useDocumentAppAppearance } from "@/features/settings";
+import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -18,6 +19,9 @@ export function RootLayout(props: {
 }) {
   const navigate = useNavigate();
   const appZoom = useAppZoom();
+  useShortcutHandler("app.zoom_in", appZoom.zoomIn);
+  useShortcutHandler("app.zoom_out", appZoom.zoomOut);
+  useShortcutHandler("app.zoom_reset", appZoom.resetZoom);
   useDocumentAppAppearance();
   const setupLoadStarted = useRef(false);
   const { loadSystem } = useSetupStore(
@@ -59,6 +63,7 @@ export function RootLayout(props: {
   return (
     <>
       <AuthProvider>
+        <ShortcutRuntime />
         <RenderErrorBoundary>
           <PointerDragProvider>
             <Outlet />

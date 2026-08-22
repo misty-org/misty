@@ -1,6 +1,7 @@
 import { Command } from "cmdk";
 import {
   ArrowLeft,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   FileCode,
@@ -12,64 +13,61 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, cn } from "@/shared/ui";
-import { codeFindInFiles, codeWalkFiles, type SearchMatch, type WalkedFile } from "../native";
+import { useDismissableLayer } from "@/shared/hooks/useDismissableLayer";
+import { ShortcutHint } from "@/features/shortcuts";
+import { codeFindInFiles, type SearchMatch, type WalkedFile } from "../native";
 import { projectState, useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
+import {
+  invalidateProjectFileIndex,
+  loadProjectFileIndex,
+  rankFiles,
+} from "./codeCommandCenterModel";
+import { CodeTopActionMenu } from "./CodeTopActionMenu";
+export { rankFiles } from "./codeCommandCenterModel";
 
 export type CommandCenterMode = "files" | "commands" | "search" | "harpoon";
 
 export interface CodeCommand {
   id: string;
   label: string;
+  shortcutCommandId?: string;
   shortcut?: string;
   icon?: React.ReactNode;
   run: () => void;
+}
+
+export interface CodeTopAction {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  active?: boolean;
+  run?: () => void;
+  menu?: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    label: string;
+    emptyLabel: string;
+    items: CodeCommand[];
+  };
 }
 
 interface Props {
   viewId: string;
   rootPath: string;
   activePath: string | null;
+  symbolContext?: string | null;
   mode: CommandCenterMode | null;
   onModeChange: (mode: CommandCenterMode | null) => void;
   onOpenFile: (path: string, name: string, line?: number) => void;
   onOpenFileInNewTab: (path: string, name: string, line?: number) => void;
+  onOpenSearchResults: (query: string) => void;
   onPreviousFile: () => void;
+  onNextFile?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
   commands: CodeCommand[];
-}
-
-interface FileIndexCacheEntry {
-  files: WalkedFile[];
-  dirty: boolean;
-  pending: Promise<WalkedFile[]> | null;
-}
-
-const fileIndexCache = new Map<string, FileIndexCacheEntry>();
-
-function loadProjectFileIndex(rootPath: string): Promise<WalkedFile[]> {
-  const cached = fileIndexCache.get(rootPath) ?? { files: [], dirty: true, pending: null };
-  fileIndexCache.set(rootPath, cached);
-  if (cached.pending) return cached.pending;
-  if (!cached.dirty) return Promise.resolve(cached.files);
-  cached.dirty = false;
-  cached.pending = codeWalkFiles(rootPath)
-    .then((files) => {
-      cached.files = files;
-      return files;
-    })
-    .catch((error) => {
-      cached.dirty = true;
-      throw error;
-    })
-    .finally(() => {
-      cached.pending = null;
-    });
-  return cached.pending;
-}
-
-function invalidateProjectFileIndex(rootPath: string) {
-  const cached = fileIndexCache.get(rootPath);
-  if (cached) cached.dirty = true;
-  else fileIndexCache.set(rootPath, { files: [], dirty: true, pending: null });
+  topActions?: CodeTopAction[];
 }
 
 export function CodeCommandCenter(props: Props) {
@@ -80,10 +78,17 @@ export function CodeCommandCenter(props: Props) {
   const [searching, setSearching] = useState(false);
   const [indexVersion, setIndexVersion] = useState(0);
   const openInNewRef = useRef(false);
+  const paletteRef = useRef<HTMLDivElement | null>(null);
   const project = useCodingWorkspaceStore((state) => projectState(state.projects[props.rootPath]));
   const toggleMark = useCodingWorkspaceStore((state) => state.toggleMark);
   const moveMark = useCodingWorkspaceStore((state) => state.moveMark);
   const marked = Boolean(props.activePath && project.marks.includes(props.activePath));
+
+  useDismissableLayer({
+    active: props.mode !== null,
+    layerRef: paletteRef,
+    onDismiss: () => props.onModeChange(null),
+  });
 
   useEffect(() => {
     setFiles([]);
@@ -166,22 +171,33 @@ export function CodeCommandCenter(props: Props) {
         type="button"
         variant="ghost"
         size="icon-xs"
-        aria-label="Previous file (Ctrl+O)"
-        title="Previous file (Ctrl+O)"
+        aria-label="Back"
+        title="Back"
         onClick={props.onPreviousFile}
-        disabled={project.recents.length < 2}
+        disabled={!props.canGoBack}
         className="text-cream-muted"
       >
         <ArrowLeft className="code-status-icon" />
       </Button>
-      <div className="relative min-w-0 flex-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label="Next file"
+        title="Next file"
+        onClick={props.onNextFile}
+        disabled={!props.onNextFile || !props.canGoForward}
+        className="text-cream-muted"
+      >
+        <ArrowRight className="code-status-icon" />
+      </Button>
+      <div ref={paletteRef} className="code-command-field relative min-w-0">
         {props.mode ? (
           <Command
             className="w-full"
             shouldFilter={props.mode !== "search" && props.mode !== "files"}
             loop
             onKeyDown={(event) => {
-              if (event.key === "Escape") props.onModeChange(null);
               if (event.key === "Enter") {
                 const line = lineNumberForInput(query);
                 if (line !== null && props.activePath) {
@@ -258,29 +274,52 @@ export function CodeCommandCenter(props: Props) {
                         {command.icon ?? <ListTree size={13} />}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{command.label}</span>
-                      {command.shortcut ? (
+                      {command.shortcutCommandId ? (
+                        <ShortcutHint commandId={command.shortcutCommandId} />
+                      ) : command.shortcut ? (
                         <kbd className="text-[10px] text-cream-muted">{command.shortcut}</kbd>
                       ) : null}
                     </Command.Item>
                   ))
                 : null}
               {props.mode === "search"
-                ? matches.slice(0, 300).map((match) => (
-                    <Command.Item
-                      key={`${match.path}:${match.lineNumber}:${match.column}`}
-                      value={`${match.relative}:${match.lineNumber}:${match.line}`}
-                      onSelect={() => choose(match.path, basename(match.path), match.lineNumber)}
-                      className={cn(itemClass, "items-start py-2")}
-                    >
-                      <Search size={12} className="mt-0.5 shrink-0 text-cream-muted" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[10px] text-cream-muted">
-                          {match.relative}:{match.lineNumber}
+                ? [
+                    ...(matches.length > 0
+                      ? [
+                          <Command.Item
+                            key="__open-search-results__"
+                            value={`Open ${matches.length} matches in a multibuffer`}
+                            onSelect={() => {
+                              props.onModeChange(null);
+                              props.onOpenSearchResults(query);
+                            }}
+                            className={cn(itemClass, "font-medium text-cream-bright")}
+                          >
+                            <ListTree size={13} />
+                            <span className="min-w-0 flex-1">
+                              Open {matches.length} matches in a multibuffer
+                            </span>
+                            <kbd className="text-[10px] text-cream-muted">↵</kbd>
+                          </Command.Item>,
+                        ]
+                      : []),
+                    ...matches.slice(0, 300).map((match) => (
+                      <Command.Item
+                        key={`${match.path}:${match.lineNumber}:${match.column}`}
+                        value={`${match.relative}:${match.lineNumber}:${match.line}`}
+                        onSelect={() => choose(match.path, basename(match.path), match.lineNumber)}
+                        className={cn(itemClass, "items-start py-2")}
+                      >
+                        <Search size={12} className="mt-0.5 shrink-0 text-cream-muted" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[10px] text-cream-muted">
+                            {match.relative}:{match.lineNumber}
+                          </span>
+                          <span className="block truncate font-mono text-xs">{match.line}</span>
                         </span>
-                        <span className="block truncate font-mono text-xs">{match.line}</span>
-                      </span>
-                    </Command.Item>
-                  ))
+                      </Command.Item>
+                    )),
+                  ]
                 : null}
               {props.mode === "harpoon"
                 ? harpoonFiles.map(({ path, file, marked: isMark }, index) => (
@@ -294,7 +333,7 @@ export function CodeCommandCenter(props: Props) {
                       {isMark ? <Pin size={12} /> : <FileCode size={12} />}
                       <span className="min-w-0 flex-1 truncate">{file?.relative ?? path}</span>
                       {isMark && index < 4 ? (
-                        <kbd className="text-[10px] text-cream-muted">⌥{index + 1}</kbd>
+                        <ShortcutHint commandId={`code.mark_${index + 1}`} />
                       ) : null}
                       {isMark ? (
                         <span
@@ -355,12 +394,15 @@ export function CodeCommandCenter(props: Props) {
           >
             <Search size={13} className="shrink-0" />
             <span className="min-w-0 flex-1 truncate font-mono">
-              {relativeActive || "Search files or type > for commands…"}
+              {relativeActive
+                ? `${relativeActive}${props.symbolContext ? ` › ${props.symbolContext}` : ""}`
+                : "Search files or type > for commands…"}
             </span>
-            <kbd className="shrink-0 text-[10px]">⌘P</kbd>
+            <ShortcutHint commandId="code.quick_open" />
           </button>
         )}
       </div>
+      <span className="min-w-0 flex-1" />
       <Button
         type="button"
         variant="ghost"
@@ -373,6 +415,29 @@ export function CodeCommandCenter(props: Props) {
       >
         {marked ? <PinOff className="code-status-icon" /> : <Pin className="code-status-icon" />}
       </Button>
+      {(props.topActions ?? []).map((action) =>
+        action.menu ? (
+          <CodeTopActionMenu key={action.id} action={action} />
+        ) : (
+          <Button
+            key={action.id}
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={action.label}
+            title={action.label}
+            aria-pressed={action.active}
+            disabled={action.disabled}
+            onClick={action.run}
+            className={cn(
+              "text-cream-muted",
+              action.active && "bg-charcoal-hover text-cream-bright",
+            )}
+          >
+            {action.icon}
+          </Button>
+        ),
+      )}
     </div>
   );
 }
@@ -387,38 +452,6 @@ export function commandCenterModeForInput(value: string): CommandCenterMode | nu
 export function lineNumberForInput(value: string): number | null {
   const match = /^:(\d+)$/.exec(value.trim());
   return match ? Number(match[1]) : null;
-}
-
-export function rankFiles(files: WalkedFile[], query: string, limit = 500): WalkedFile[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle || needle.startsWith(":")) return files.slice(0, limit);
-  return files
-    .map((file) => {
-      const pathScore = fuzzyScore(file.relative.toLowerCase(), needle);
-      const nameScore = fuzzyScore(file.name.toLowerCase(), needle);
-      return { file, score: Math.max(pathScore, nameScore < 0 ? -1 : nameScore + 2_000) };
-    })
-    .filter((entry) => entry.score >= 0)
-    .sort((a, b) => b.score - a.score || a.file.relative.length - b.file.relative.length)
-    .slice(0, limit)
-    .map((entry) => entry.file);
-}
-
-function fuzzyScore(value: string, needle: string): number {
-  const direct = value.indexOf(needle);
-  if (direct >= 0) return 10_000 - direct * 10 - value.length;
-  let cursor = 0;
-  let score = 0;
-  let previous = -2;
-  for (const character of needle) {
-    const index = value.indexOf(character, cursor);
-    if (index < 0) return -1;
-    score += index === previous + 1 ? 25 : 5;
-    if (index === 0 || "/._-".includes(value[index - 1] ?? "")) score += 20;
-    previous = index;
-    cursor = index + 1;
-  }
-  return score - value.length * 0.01;
 }
 
 function FileResult({ file, onChoose }: { file: WalkedFile; onChoose: () => void }) {

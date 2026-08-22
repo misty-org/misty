@@ -1,23 +1,38 @@
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowDownToLine,
+  ArrowLeftToLine,
+  ArrowRightToLine,
+  ArrowUpToLine,
   Blocks,
   Bot,
-  GitBranch,
   PanelLeft,
   Pin,
   Search,
   SlidersHorizontal,
   SquareTerminal,
 } from "lucide-react";
-import { FaGithub } from "react-icons/fa6";
 import { useShallow } from "zustand/react/shallow";
-import { Button, Popover, PopoverContent, PopoverTrigger, Slider, cn } from "@/shared/ui";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Slider,
+  cn,
+} from "@/shared/ui";
 import { selectEditorPreferences, useSettingsStore } from "@/features/settings";
+import { useShortcutTitle } from "@/features/shortcuts";
 import type { OpenTab } from "../store/useCodingWorkspaceStore";
 import { useCodingWorkspaceStore } from "../store/useCodingWorkspaceStore";
-import { useGitStore } from "../git/useGitStore";
-import { useGroupCursor, useGroupDiagnostics } from "../store/useEditorEphemeralStore";
+import { useEditorEphemeralStore, useGroupCursor } from "../store/useEditorEphemeralStore";
+import type { DockSplitDirection } from "@/features/workspace";
 
 const LANGUAGE_LABELS: Record<string, string> = {
   ts: "TypeScript",
@@ -59,9 +74,8 @@ interface Props {
   onToggleFiles: () => void;
   onOpenHarpoon: () => void;
   onOpenSearch: () => void;
-  onToggleTerminal: () => void;
-  onOpenFile: (path: string, name: string) => void;
-  onOpenGitHub: () => void;
+  onToggleTerminal: (direction?: DockSplitDirection | "current") => void;
+  onOpenDiagnostics?: () => void;
   onOpenAi: () => void;
   onOpenExtensions: () => void;
 }
@@ -73,10 +87,16 @@ export function CodeStatusBar(props: Props) {
         (buffer) => buffer.contents !== buffer.savedContents,
       ).length,
   );
-  const gitSnapshot = useGitStore((state) => state.snapshots[props.rootPath] ?? state.snapshot);
-  const refreshGit = useGitStore((state) => state.refresh);
   const cursor = useGroupCursor(props.viewId);
-  const diagnostics = useGroupDiagnostics(props.viewId);
+  const diagnostics = useEditorEphemeralStore(
+    useShallow((state) => {
+      const records = Object.values(state.projectDiagnostics[props.rootPath] ?? {}).flat();
+      return {
+        errors: records.filter((diagnostic) => diagnostic.severity === "error").length,
+        warnings: records.filter((diagnostic) => diagnostic.severity === "warning").length,
+      };
+    }),
+  );
   const editorPreferences = useSettingsStore(
     useShallow((state) => selectEditorPreferences(state.settings?.document)),
   );
@@ -88,39 +108,34 @@ export function CodeStatusBar(props: Props) {
     <div
       className={cn(
         "code-theme-statusbar flex min-w-0 items-center gap-0.5 border-t",
-        "border-charcoal-border bg-charcoal-sidebar px-1.5 font-mono text-cream-muted",
+        "border-charcoal-border bg-charcoal-sidebar px-1 font-mono text-cream-muted",
       )}
     >
       <RailButton
-        label="Toggle Explorer (⌘B)"
+        label="Toggle Explorer"
+        commandId="code.toggle_explorer"
         active={props.filesOpen}
         onClick={props.onToggleFiles}
       >
         <PanelLeft />
       </RailButton>
-      <RailButton label="Harpoon marks and recents (Ctrl+E)" onClick={props.onOpenHarpoon}>
+      <RailButton
+        label="Harpoon marks and recents"
+        commandId="code.harpoon"
+        onClick={props.onOpenHarpoon}
+      >
         <Pin />
       </RailButton>
-      <RailButton label="Search project (⌘⇧F)" onClick={props.onOpenSearch}>
+      <RailButton
+        label="Search project"
+        commandId="code.search_project"
+        onClick={props.onOpenSearch}
+      >
         <Search />
       </RailButton>
-      <RepositoryControl
-        rootPath={props.rootPath}
-        onRefresh={() => void refreshGit(props.rootPath)}
-        onOpenFile={props.onOpenFile}
-      />
-      <RailButton
-        label="Toggle Terminal (⌘J)"
-        active={props.terminalOpen}
-        onClick={props.onToggleTerminal}
-      >
-        <SquareTerminal />
-      </RailButton>
+      <TerminalDockMenu open={props.terminalOpen} onToggle={props.onToggleTerminal} />
 
-      <span className="mx-1 h-3.5 w-px bg-charcoal-border" aria-hidden />
-      <RailButton label="GitHub repositories" onClick={props.onOpenGitHub}>
-        <FaGithub />
-      </RailButton>
+      <span className="mx-1 h-4 w-px bg-charcoal-border" aria-hidden />
       <RailButton label="AI and model settings" onClick={props.onOpenAi}>
         <Bot />
       </RailButton>
@@ -129,16 +144,15 @@ export function CodeStatusBar(props: Props) {
       </RailButton>
 
       <span className="min-w-2 flex-1" />
-      {gitSnapshot?.isRepo ? (
-        <span className="hidden min-w-0 items-center gap-1 truncate px-1 @min-[720px]:inline-flex">
-          <GitBranch className="code-status-icon" /> {gitSnapshot.branch ?? "detached"}
-          {gitSnapshot.files.length ? ` · ${gitSnapshot.files.length}` : ""}
-        </span>
-      ) : null}
-      <StatusCount label="Errors" value={diagnostics.errors} danger>
+      <StatusCount
+        label="Errors"
+        value={diagnostics.errors}
+        danger
+        onClick={props.onOpenDiagnostics}
+      >
         <AlertCircle />
       </StatusCount>
-      <StatusCount label="Warnings" value={diagnostics.warnings}>
+      <StatusCount label="Warnings" value={diagnostics.warnings} onClick={props.onOpenDiagnostics}>
         <AlertTriangle />
       </StatusCount>
       {dirtyCount ? (
@@ -160,12 +174,11 @@ export function CodeStatusBar(props: Props) {
           <Button
             type="button"
             variant="ghost"
-            size="icon-xs"
             aria-label="Code display size"
             title="Code display size"
-            className="text-cream-muted"
+            className="code-rail-button text-cream-muted"
           >
-            <SlidersHorizontal className="code-status-icon" />
+            <SlidersHorizontal className="code-rail-icon" />
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="end" className="code-theme-overlay w-72 space-y-4">
@@ -199,81 +212,74 @@ export function CodeStatusBar(props: Props) {
   );
 }
 
-function RepositoryControl(props: {
-  rootPath: string;
-  onRefresh: () => void;
-  onOpenFile: (path: string, name: string) => void;
+function TerminalDockMenu(props: {
+  open: boolean;
+  onToggle: (direction?: DockSplitDirection | "current") => void;
 }) {
-  const snapshot = useGitStore((state) => state.snapshots[props.rootPath] ?? state.snapshot);
+  const title = useShortcutTitle("Terminal dock options", "code.toggle_terminal");
   return (
-    <Popover>
-      <PopoverTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          size="icon-xs"
-          aria-label="Repository status"
-          title="Repository status"
-          className="text-cream-muted"
+          aria-label={title}
+          title={title}
+          aria-pressed={props.open}
+          className={cn(
+            "code-rail-button text-cream-muted [&_svg]:code-rail-icon",
+            props.open && "bg-charcoal-hover text-cream-bright",
+          )}
         >
-          <GitBranch className="code-status-icon" />
+          <SquareTerminal />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="code-theme-overlay w-80 p-2">
-        <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
-          <GitBranch size={13} />
-          <strong className="min-w-0 flex-1 truncate text-cream-bright">
-            {snapshot?.isRepo ? (snapshot.branch ?? "Detached HEAD") : "Not a Git repository"}
-          </strong>
-          <Button type="button" variant="ghost" size="sm" onClick={props.onRefresh}>
-            Refresh
-          </Button>
-        </div>
-        {snapshot?.files.length ? (
-          <div className="max-h-64 overflow-y-auto border-t border-charcoal-border pt-1">
-            {snapshot.files.map((file) => (
-              <button
-                type="button"
-                key={file.absolutePath}
-                onClick={() =>
-                  props.onOpenFile(file.absolutePath, file.path.split("/").pop() ?? file.path)
-                }
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-charcoal-hover"
-              >
-                <span className="code-warning w-4 text-center">
-                  {file.status.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{file.path}</span>
-              </button>
-            ))}
-          </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="min-w-52">
+        <DropdownMenuLabel>{props.open ? "Terminal" : "Open Terminal"}</DropdownMenuLabel>
+        {props.open ? (
+          <DropdownMenuItem onSelect={() => props.onToggle()}>Close Terminal</DropdownMenuItem>
         ) : (
-          <p className="px-2 py-3 text-xs text-cream-muted">
-            {snapshot?.isRepo ? "Working tree is clean." : props.rootPath}
-          </p>
+          <>
+            <DropdownMenuItem onSelect={() => props.onToggle("current")}>
+              <SquareTerminal size={13} /> In this panel
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => props.onToggle("left")}>
+              <ArrowLeftToLine size={13} /> Dock left
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => props.onToggle("right")}>
+              <ArrowRightToLine size={13} /> Dock right
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => props.onToggle("up")}>
+              <ArrowUpToLine size={13} /> Dock above
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => props.onToggle("down")}>
+              <ArrowDownToLine size={13} /> Dock below
+            </DropdownMenuItem>
+          </>
         )}
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function RailButton(props: {
   label: string;
+  commandId?: string;
   active?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const title = useShortcutTitle(props.label, props.commandId ?? "");
   return (
     <Button
       type="button"
       variant="ghost"
-      size="icon-xs"
-      aria-label={props.label}
-      title={props.label}
+      aria-label={title}
+      title={title}
       aria-pressed={props.active}
       onClick={props.onClick}
       className={cn(
-        "text-cream-muted [&_svg]:code-status-icon",
+        "code-rail-button text-cream-muted [&_svg]:code-rail-icon",
         props.active && "bg-charcoal-hover text-cream-bright",
       )}
     >
@@ -286,16 +292,30 @@ function StatusCount(props: {
   label: string;
   value: number;
   danger?: boolean;
+  onClick?: () => void;
   children: React.ReactNode;
 }) {
+  const className = cn(
+    "inline-flex h-7 items-center gap-1 rounded px-1 [&_svg]:code-status-icon",
+    props.onClick && "hover:bg-charcoal-hover focus-visible:outline-none",
+    props.value > 0 && (props.danger ? "code-danger" : "code-warning"),
+  );
+  if (props.onClick) {
+    return (
+      <button
+        type="button"
+        title={props.label}
+        aria-label={`${props.label}: ${props.value}`}
+        onClick={props.onClick}
+        className={className}
+      >
+        {props.children}
+        {props.value}
+      </button>
+    );
+  }
   return (
-    <span
-      title={props.label}
-      className={cn(
-        "inline-flex items-center gap-0.5 px-0.5 [&_svg]:code-status-icon",
-        props.value > 0 && (props.danger ? "code-danger" : "code-warning"),
-      )}
-    >
+    <span title={props.label} className={className}>
       {props.children}
       {props.value}
     </span>

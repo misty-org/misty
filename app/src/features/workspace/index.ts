@@ -19,5 +19,6 @@ export type {
 export * from "./model";
 export * from "./dockTree";
 export * from "./dockRegistry";
+export * from "./paneNavigation";
 export * from "./routeSurface";
 export * from "./useWorkspaceStore";

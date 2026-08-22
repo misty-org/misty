@@ -33,6 +33,7 @@ interface Props {
   group: TabGroup;
   icon: LucideIcon;
   activeTabId: string | null;
+  canClose: boolean;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceTab) => void;
   onClose: (tab: WorkspaceTab) => void;
@@ -43,6 +44,7 @@ export function WorkspaceTabGroupButton({
   group,
   icon: Icon,
   activeTabId,
+  canClose,
   lastUsedTabByGroup,
   onOpen,
   onClose,
@@ -73,7 +75,7 @@ export function WorkspaceTabGroupButton({
       className={cn(
         "group/tab flex h-7 min-w-[36px] max-w-[200px] flex-1 items-center",
         "rounded-md border text-xs",
-        "transition-all duration-150 select-none",
+        "transition-colors duration-150 select-none",
         containsActive
           ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
           : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
@@ -195,6 +197,7 @@ export function WorkspaceTabGroupButton({
                   <span className="min-w-0 flex-1 truncate">{tab.title}</span>
                   <button
                     type="button"
+                    disabled={!canClose}
                     className="grid size-5 shrink-0 place-items-center rounded text-cream-muted/70 hover:bg-charcoal-active hover:text-cream"
                     aria-label={`Close ${tab.title}`}
                     onClick={(event) => {
@@ -209,7 +212,7 @@ export function WorkspaceTabGroupButton({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
-      ) : (
+      ) : canClose ? (
         <button
           type="button"
           aria-label={`Close ${displayTab?.title ?? group.label}`}
@@ -224,7 +227,7 @@ export function WorkspaceTabGroupButton({
         >
           <X size={12} />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

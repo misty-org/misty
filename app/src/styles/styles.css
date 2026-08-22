@@ -556,6 +556,19 @@
     color: var(--code-fg-muted);
   }
 
+  .coding-workspace .code-command-field {
+    width: clamp(280px, 44vw, 680px);
+    max-width: 680px;
+    flex: 0 1 680px;
+  }
+
+  @container (max-width: 560px) {
+    .coding-workspace .code-command-field {
+      width: auto;
+      flex: 1 1 auto;
+    }
+  }
+
   .coding-workspace .code-command-results {
     color: var(--code-fg);
   }
@@ -630,20 +643,68 @@
     font-size: var(--code-small-font-size) !important;
   }
 
-  .coding-workspace .code-theme-statusbar button > svg {
-    width: var(--code-small-font-size);
-    height: var(--code-small-font-size);
+  .coding-workspace .code-rail-button {
+    width: calc(var(--code-status-height) - 1px);
+    min-width: calc(var(--code-status-height) - 1px);
+    height: calc(var(--code-status-height) - 1px);
+    padding: 0;
+    border-radius: 5px;
+  }
+
+  .coding-workspace .code-rail-icon {
+    width: calc(var(--code-icon-size) * 1.0588);
+    height: calc(var(--code-icon-size) * 1.0588);
+    stroke-width: 1.8;
   }
 
   .coding-workspace .code-status-icon {
-    width: var(--code-small-font-size);
-    height: var(--code-small-font-size);
+    width: calc(var(--code-icon-size) * 0.8235);
+    height: calc(var(--code-icon-size) * 0.8235);
   }
 
   .coding-workspace .code-theme-editor,
   .coding-workspace .code-theme-active-tab {
     background: var(--code-editor-bg) !important;
     color: var(--code-fg-bright) !important;
+  }
+
+  .coding-workspace .cm-multibuffer-header {
+    background: color-mix(in srgb, var(--code-sidebar-bg) 88%, var(--code-accent) 12%);
+    color: var(--code-fg-muted);
+    border-top: 1px solid var(--code-border);
+    border-bottom: 1px solid var(--code-border);
+    font-weight: 600;
+  }
+
+  .coding-workspace .code-multibuffer .cm-content {
+    padding-bottom: 30vh;
+  }
+
+  .coding-workspace .cm-lsp-inlay-hint {
+    margin-left: 0.35em;
+    padding: 0 0.3em;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--code-raised-bg) 72%, transparent);
+    color: color-mix(in srgb, var(--code-fg-muted) 78%, transparent);
+    font-size: 0.82em;
+    font-style: italic;
+  }
+
+  .coding-workspace .cm-lsp-document-highlight {
+    background: color-mix(in srgb, var(--code-accent) 18%, transparent);
+    border-radius: 2px;
+  }
+
+  .coding-workspace .cm-lsp-signature-help {
+    max-width: min(620px, 80vw);
+    padding: 7px 10px;
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    background: var(--code-surface-bg);
+    color: var(--code-fg-bright);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: var(--code-small-font-size);
   }
 
   .coding-workspace .code-theme-accent {

@@ -9,7 +9,6 @@ import {
   Spinner,
   Toolbar,
   ToolbarGroup,
-  cn,
 } from "@/shared/ui";
 import {
   Archive,
@@ -21,6 +20,7 @@ import {
   Reply,
   Star,
 } from "lucide-react";
+import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
 import { formatAddress, type InboxThread } from "../model";
 import { EmailBody } from "./EmailBody";
 
@@ -77,6 +77,7 @@ export function ThreadDetail(props: {
           </Action>
         </ToolbarGroup>
         <ToolbarGroup align="end">
+          <AiSurfaceButton />
           <Action
             label={thread.starred ? "Unstar" : "Star"}
             onClick={() => props.onAction({ starred: !thread.starred })}

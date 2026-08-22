@@ -5,6 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth";
+import {
+  AiSurfaceButton,
+  useAiSurfaceAdapter,
+  type AiArtifact,
+  type AiSurfaceAdapter,
+} from "@/features/ai-surface/AiPaneHost";
 import { useSetupStore } from "@/features/installer";
 import type { MistyPickerSource } from "@/features/picker";
 import { SpaceSetupCards } from "@/features/spaces";
@@ -180,6 +186,100 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [messagesLoading] = useMinimumSpin(
     conversationId ? conversationChat.loading : store.loading && scope.defaultMessages.length === 0,
   );
+  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+    const scopeId = conversationId || "everyone";
+    const messageDraft = (artifact: AiArtifact) => {
+      if (artifact.kind !== "message_draft" || !access.canWriteMessages || draft.text.trim()) {
+        return null;
+      }
+      const operations = artifact.operations as {
+        conversation_id?: string;
+        text?: string;
+        reply_to_message_id?: string;
+      };
+      if (
+        operations.conversation_id !== scopeId ||
+        typeof operations.text !== "string" ||
+        !operations.text.trim() ||
+        operations.text.length > 20_000
+      ) {
+        return null;
+      }
+      if (
+        operations.reply_to_message_id &&
+        !scope.messages.some((message) => message.id === operations.reply_to_message_id)
+      ) {
+        return null;
+      }
+      return operations;
+    };
+    return {
+      surfaceId: "space.chat",
+      label: scope.activeConversation?.title || "Everyone chat",
+      getContext: () => [
+        {
+          kind: "space.chat",
+          id: scopeId,
+          title: scope.activeConversation?.title || "Everyone chat",
+          privacy: "shared",
+          spaceId,
+          href: `/spaces/${encodeURIComponent(spaceId)}/chat${conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : ""}`,
+          revision: scope.messages[scope.messages.length - 1]?.seq ?? 0,
+        },
+      ],
+      getSuggestedActions: () => [
+        {
+          id: "recap",
+          label: "Recap",
+          prompt:
+            "Recap the recent conversation with decisions, open questions, and important context. Cite the conversation.",
+        },
+        {
+          id: "decisions",
+          label: "Decisions",
+          prompt: "Extract decisions and explain the evidence for each one.",
+        },
+        {
+          id: "action-items",
+          label: "Action items",
+          prompt:
+            "Extract a reviewed set of actionable Space tasks from this conversation. Do not invent owners or due dates.",
+          requestedArtifactKind: "task_set",
+        },
+        {
+          id: "draft-message",
+          label: "Draft message",
+          prompt: "Draft a concise message for this exact Space conversation. Do not post it.",
+          requestedArtifactKind: "message_draft",
+        },
+        {
+          id: "explain-thread",
+          label: "Explain thread",
+          prompt:
+            "Explain this conversation to someone joining now, distinguishing facts from inference.",
+        },
+      ],
+      canApply: (artifact) => Boolean(messageDraft(artifact)),
+      applyArtifact: async (artifact) => {
+        const operations = messageDraft(artifact);
+        if (!operations) {
+          throw new Error(
+            "The conversation or composer changed. Ask Misty to regenerate this draft.",
+          );
+        }
+        draft.setText(operations.text!.trim());
+        draft.setReplyToMessageId(operations.reply_to_message_id ?? "");
+      },
+    };
+  }, [
+    access.canWriteMessages,
+    conversationId,
+    draft,
+    scope.activeConversation?.title,
+    scope.messages,
+    spaceId,
+  ]);
+  useAiSurfaceAdapter(aiAdapter);
   const chatScroll = useChatScrollRestoration({
     viewerId: user?.id,
     spaceId,
@@ -244,6 +344,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         </h1>
 
         <div className="ml-auto flex items-center gap-3">
+          <AiSurfaceButton />
           <Button
             type="button"
             variant="ghost"

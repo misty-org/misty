@@ -2,7 +2,11 @@
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      zIndex: {
+        "photo-editor-ai": "2147483350",
+      },
+    },
   },
   plugins: [],
 };

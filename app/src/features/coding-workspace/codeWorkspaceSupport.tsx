@@ -3,11 +3,12 @@ import { useCallback, useMemo, type Dispatch, type ReactNode, type SetStateActio
 import { useNavigate } from "react-router-dom";
 import {
   dockLeaves,
+  codeTabActiveFilePath,
   parseCodeTabState,
   useWorkspaceStore,
   type WorkspaceTab,
 } from "@/features/workspace";
-import { shortcutMatchesEvent, type ShortcutMap } from "@/shared/lib/shortcuts";
+import { ShortcutHint } from "@/features/shortcuts";
 import type { CodeCommand, CommandCenterMode } from "./components/CodeCommandCenter";
 
 export function useCodeCommands(
@@ -37,19 +38,33 @@ export function useCodeCommands(
   );
   const commands = useMemo<CodeCommand[]>(
     () => [
-      command("files", "Open file", "⌘P", <FolderOpen size={13} />, () => setCommandMode("files")),
-      command("toggle-files", "Toggle Explorer", "⌘B", <PanelLeft size={13} />, () => {
-        if (codeTab) useWorkspaceStore.getState().toggleSidebar(codeTab.id);
-      }),
-      command("harpoon", "Harpoon marks and recents", "Ctrl+E", <Pin size={13} />, () =>
+      command("files", "Open file", "code.quick_open", <FolderOpen size={13} />, () =>
+        setCommandMode("files"),
+      ),
+      command(
+        "toggle-files",
+        "Toggle Explorer",
+        "code.toggle_explorer",
+        <PanelLeft size={13} />,
+        () => {
+          if (codeTab) useWorkspaceStore.getState().toggleSidebar(codeTab.id);
+        },
+      ),
+      command("harpoon", "Harpoon marks and recents", "code.harpoon", <Pin size={13} />, () =>
         setCommandMode("harpoon"),
       ),
-      command("search", "Search project", "⌘⇧F", <Search size={13} />, () =>
+      command("search", "Search project", "code.search_project", <Search size={13} />, () =>
         setCommandMode("search"),
       ),
-      command("terminal", "Toggle Terminal", "⌘J", <SquareTerminal size={13} />, toggleTerminal),
-      command("ai", "AI and model settings", undefined, <Bot size={13} />, openModelsSettings),
-      command("extensions", "Open Extensions", undefined, <Blocks size={13} />, openExtensions),
+      command(
+        "terminal",
+        "Toggle Terminal",
+        "code.toggle_terminal",
+        <SquareTerminal size={13} />,
+        toggleTerminal,
+      ),
+      command("ai", "AI and model settings", null, <Bot size={13} />, openModelsSettings),
+      command("extensions", "Open Extensions", null, <Blocks size={13} />, openExtensions),
     ],
     [codeTab, openExtensions, openModelsSettings, setCommandMode, toggleTerminal],
   );
@@ -59,11 +74,11 @@ export function useCodeCommands(
 function command(
   id: string,
   label: string,
-  shortcut: string | undefined,
+  shortcutCommandId: string | null,
   icon: ReactNode,
   run: () => void,
 ): CodeCommand {
-  return { id, label, shortcut, icon, run };
+  return { id, label, shortcutCommandId: shortcutCommandId ?? undefined, icon, run };
 }
 
 export function EmptyEditor({ rootPath, onOpen }: { rootPath: string; onOpen: () => void }) {
@@ -75,7 +90,7 @@ export function EmptyEditor({ rootPath, onOpen }: { rootPath: string; onOpen: ()
     >
       <span>
         <span className="block">
-          Open a file with <kbd className="font-mono text-cream">⌘P</kbd>
+          Open a file with <ShortcutHint commandId="code.quick_open" />
         </span>
         <span className="mt-2 block max-w-md truncate font-mono text-xs text-cream-muted/70">
           {rootPath}
@@ -102,7 +117,8 @@ export function displayFileTitle(path: string, root: string, currentTabId?: stri
     .find((tab) => {
       if (tab.id === currentTabId || tab.surfaceId !== "code") return false;
       const candidate = parseCodeTabState(tab.state);
-      return candidate.activeFilePath !== path && basename(candidate.activeFilePath ?? "") === name;
+      const activeFilePath = codeTabActiveFilePath(candidate);
+      return activeFilePath !== path && basename(activeFilePath ?? "") === name;
     });
   if (!duplicate) return name;
   const relative = path.slice(root.length).replace(/^\//, "");
@@ -112,39 +128,4 @@ export function displayFileTitle(path: string, root: string, currentTabId?: stri
 
 export function languageOf(name: string | undefined) {
   return name?.split(".").pop()?.toLowerCase() ?? "";
-}
-
-const CODE_COMMAND_IDS = [
-  "code.quick_open",
-  "code.command_palette",
-  "code.search_project",
-  "code.harpoon",
-  "code.previous_file",
-  "code.toggle_explorer",
-  "code.toggle_terminal",
-  "code.mark_1",
-  "code.mark_2",
-  "code.mark_3",
-  "code.mark_4",
-] as const;
-
-export function codeCommandForEvent(event: KeyboardEvent, shortcuts: ShortcutMap) {
-  return CODE_COMMAND_IDS.find((id) => shortcutMatchesEvent(shortcuts[id], event)) ?? null;
-}
-
-export function defaultCodeShortcuts(): ShortcutMap {
-  const primary = /mac|iphone|ipad|ipod/i.test(navigator.platform) ? "Cmd" : "Ctrl";
-  return {
-    "code.quick_open": `${primary}+P`,
-    "code.command_palette": `${primary}+Shift+P`,
-    "code.search_project": `${primary}+Shift+F`,
-    "code.harpoon": "Ctrl+E",
-    "code.previous_file": "Ctrl+O",
-    "code.toggle_explorer": `${primary}+B`,
-    "code.toggle_terminal": `${primary}+J`,
-    "code.mark_1": "Alt+1",
-    "code.mark_2": "Alt+2",
-    "code.mark_3": "Alt+3",
-    "code.mark_4": "Alt+4",
-  };
 }

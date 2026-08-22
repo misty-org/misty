@@ -1,7 +1,6 @@
 import type { AppTab } from "../types";
 import { appSnapshot } from "@/native";
 import type { AppSnapshot } from "@/native/contracts";
-import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 
 export const useAppStore = create<AppStore>((set) => ({

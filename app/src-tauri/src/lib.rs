@@ -64,13 +64,12 @@ use app::commands::{
     search_start_scan, self_host_entitlement_load, self_host_entitlement_store,
     settings_apply_launch_on_login, settings_launch_on_login_snapshot,
     settings_open_with_associations, settings_remove_open_with_association, settings_save,
-    settings_snapshot, shortcuts_reset, shortcuts_save, shortcuts_snapshot,
-    smart_library_apply_results, smart_library_assets_page, smart_library_delete,
-    smart_library_import_files, smart_library_preflight_import, smart_library_prepare_previews,
-    smart_library_resolve_assets, smart_library_scan, smart_library_search,
-    smart_library_set_server_folder_id, smart_library_snapshot, storage_snapshot,
-    transfers_delete_all, transfers_delete_selected, transfers_snapshot, workspaces_save,
-    workspaces_snapshot,
+    settings_snapshot, smart_library_apply_results, smart_library_assets_page,
+    smart_library_delete, smart_library_import_files, smart_library_preflight_import,
+    smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
+    smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
+    storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
+    workspaces_save, workspaces_snapshot,
 };
 #[cfg(target_os = "android")]
 use app::commands::{
@@ -78,6 +77,9 @@ use app::commands::{
     android_open_all_files_access_settings,
 };
 use app::runtime::MistyRuntime;
+use app::shortcut_commands::{
+    shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
+};
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
@@ -88,12 +90,7 @@ use infra::browser::{
     BrowserSessionState,
 };
 #[cfg(desktop)]
-use infra::code_git::{code_git_diff, code_git_status};
-#[cfg(desktop)]
-use infra::code_git_remote::{
-    code_git_clone, code_git_commit, code_git_create_branch, code_git_fetch, code_git_push,
-    code_git_workspace_id,
-};
+use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(desktop)]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
 #[cfg(desktop)]
@@ -338,22 +335,6 @@ pub fn run() {
             #[cfg(desktop)]
             code_find_in_files,
             #[cfg(desktop)]
-            code_git_status,
-            #[cfg(desktop)]
-            code_git_diff,
-            #[cfg(desktop)]
-            code_git_workspace_id,
-            #[cfg(desktop)]
-            code_git_clone,
-            #[cfg(desktop)]
-            code_git_fetch,
-            #[cfg(desktop)]
-            code_git_push,
-            #[cfg(desktop)]
-            code_git_create_branch,
-            #[cfg(desktop)]
-            code_git_commit,
-            #[cfg(desktop)]
             code_watch_dir,
             #[cfg(desktop)]
             code_stop_watch,
@@ -365,6 +346,7 @@ pub fn run() {
             code_lsp_stop,
             #[cfg(desktop)]
             browser_webview_create,
+            browser_shortcuts_update,
             #[cfg(desktop)]
             browser_webview_set_bounds,
             #[cfg(desktop)]
@@ -500,7 +482,8 @@ pub fn run() {
             coding_ai_write_api_key,
             coding_ai_clear_api_key,
             shortcuts_snapshot,
-            shortcuts_save,
+            shortcuts_update,
+            shortcuts_reassign,
             shortcuts_reset,
             #[cfg(desktop)]
             plugin_commands_snapshot,

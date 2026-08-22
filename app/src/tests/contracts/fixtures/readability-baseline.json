@@ -335,12 +335,6 @@
       "hash": "0e4a31905cfa0a79"
     }
   ],
-  "src/features/global-search/GlobalMistyLauncher.tsx": [
-    {
-      "length": 302,
-      "hash": "4be5808e61ae50d9"
-    }
-  ],
   "src/features/journal/components/JournalAttribution.tsx": [
     {
       "length": 307,
@@ -485,12 +479,6 @@
     {
       "length": 180,
       "hash": "6112a241b5a46bac"
-    }
-  ],
-  "src/features/spaces/planner/taskDrawers/TaskDrawerProperties.tsx": [
-    {
-      "length": 171,
-      "hash": "bd6f2b6a85059e8b"
     }
   ],
   "src/features/transfers/transferStyles.ts": [

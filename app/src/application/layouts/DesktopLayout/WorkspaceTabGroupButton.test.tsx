@@ -40,6 +40,7 @@ describe("WorkspaceTabGroupButton", () => {
           }}
           icon={Code2}
           activeTabId={code.id}
+          canClose
           lastUsedTabByGroup={{ "tool:code": code.id }}
           onOpen={vi.fn()}
           onClose={vi.fn()}
@@ -83,6 +84,7 @@ describe("WorkspaceTabGroupButton", () => {
           group={group}
           icon={House}
           activeTabId={tab.id}
+          canClose
           lastUsedTabByGroup={{}}
           onOpen={vi.fn()}
           onClose={vi.fn()}
@@ -95,5 +97,43 @@ describe("WorkspaceTabGroupButton", () => {
     expect(renderedTab?.className).toContain("flex-1");
     expect(renderedTab?.className).toContain("min-w-[36px]");
     expect(renderedTab?.className).toContain("max-w-[200px]");
+  });
+
+  it("does not offer a close control for the final tab in the final window", () => {
+    const tab: WorkspaceTab = {
+      id: "tab:home",
+      surfaceId: "home",
+      groupKey: "tool:home",
+      instanceKey: "home",
+      title: "Home",
+      route: "/home",
+      sidebarVisible: false,
+      state: {},
+      createdAt: 1,
+      lastFocusedAt: 1,
+    };
+
+    act(() => {
+      root.render(
+        <WorkspaceTabGroupButton
+          group={{
+            key: tab.groupKey,
+            surfaceId: tab.surfaceId,
+            label: "Home",
+            tabs: [tab],
+            storeGroupKey: tab.groupKey,
+          }}
+          icon={House}
+          activeTabId={tab.id}
+          canClose={false}
+          lastUsedTabByGroup={{}}
+          onOpen={vi.fn()}
+          onClose={vi.fn()}
+          onMoveTab={vi.fn()}
+        />,
+      );
+    });
+
+    expect(container.querySelector('[aria-label="Close Home"]')).toBeNull();
   });
 });

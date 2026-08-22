@@ -48,6 +48,51 @@ export function dockTabs(node: WorkspaceDockNode): WorkspaceTab[] {
   return dockLeaves(node).flatMap((leaf) => leaf.tabs);
 }
 
+export function capDockLeaves(node: WorkspaceDockNode, maximum: number): WorkspaceDockNode {
+  const leaves = dockLeaves(node);
+  if (leaves.length <= maximum) return node;
+  const kept = leaves.slice(0, Math.max(1, maximum));
+  const overflowTabs = leaves
+    .slice(kept.length)
+    .flatMap((leaf) => leaf.tabs)
+    .filter((tab) => tab.surfaceId !== "home");
+  if (overflowTabs.length) {
+    const target = kept[kept.length - 1];
+    const existingTabs =
+      target.tabs.length === 1 && target.tabs[0]?.surfaceId === "home" ? [] : target.tabs;
+    kept[kept.length - 1] = {
+      ...target,
+      tabs: [...existingTabs, ...overflowTabs],
+      activeTabId: overflowTabs[0]?.id ?? target.activeTabId,
+    };
+  }
+  return dockGrid(kept);
+}
+
+function dockGrid(leaves: WorkspacePane[]): WorkspaceDockNode {
+  if (leaves.length === 1) return leaves[0];
+  const split = (
+    direction: "horizontal" | "vertical",
+    first: WorkspaceDockNode,
+    second: WorkspaceDockNode,
+  ): WorkspaceDockNode => ({
+    type: "split",
+    id: createDockId("split"),
+    direction,
+    ratio: 0.5,
+    first,
+    second,
+  });
+  if (leaves.length === 2) return split("horizontal", leaves[0], leaves[1]);
+  if (leaves.length === 3)
+    return split("horizontal", leaves[0], split("vertical", leaves[1], leaves[2]));
+  return split(
+    "horizontal",
+    split("vertical", leaves[0], leaves[2]),
+    split("vertical", leaves[1], leaves[3]),
+  );
+}
+
 export function findDockLeaf(node: WorkspaceDockNode, paneId: string): WorkspacePane | null {
   if (node.type === "leaf") return node.id === paneId ? node : null;
   return findDockLeaf(node.first, paneId) ?? findDockLeaf(node.second, paneId);
@@ -62,6 +107,26 @@ export function mapDockLeaf(
   const first = mapDockLeaf(node.first, paneId, update);
   const second = mapDockLeaf(node.second, paneId, update);
   return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+
+export function swapDockLeaves(
+  node: WorkspaceDockNode,
+  firstPaneId: string,
+  secondPaneId: string,
+): WorkspaceDockNode {
+  if (firstPaneId === secondPaneId) return node;
+  const first = findDockLeaf(node, firstPaneId);
+  const second = findDockLeaf(node, secondPaneId);
+  if (!first || !second) return node;
+  return mapDockLeaf(
+    mapDockLeaf(node, firstPaneId, (pane) => ({
+      ...pane,
+      tabs: second.tabs,
+      activeTabId: second.activeTabId,
+    })),
+    secondPaneId,
+    (pane) => ({ ...pane, tabs: first.tabs, activeTabId: first.activeTabId }),
+  );
 }
 
 export function mapDockTabs(
@@ -105,6 +170,15 @@ export function collapseEmptyDockLeaves(node: WorkspaceDockNode): WorkspaceDockN
   if (node.type === "leaf") return node.tabs.length ? node : null;
   const first = collapseEmptyDockLeaves(node.first);
   const second = collapseEmptyDockLeaves(node.second);
+  if (!first) return second;
+  if (!second) return first;
+  return first === node.first && second === node.second ? node : { ...node, first, second };
+}
+
+export function removeDockLeaf(node: WorkspaceDockNode, paneId: string): WorkspaceDockNode | null {
+  if (node.type === "leaf") return node.id === paneId ? null : node;
+  const first = removeDockLeaf(node.first, paneId);
+  const second = removeDockLeaf(node.second, paneId);
   if (!first) return second;
   if (!second) return first;
   return first === node.first && second === node.second ? node : { ...node, first, second };

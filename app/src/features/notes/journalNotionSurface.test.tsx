@@ -86,7 +86,6 @@ function note(overrides: Partial<UnifiedNote>): UnifiedNote {
     backlinks: [],
     updatedAt: "2026-08-19T00:00:00Z",
     createdAt: "2026-08-19T00:00:00Z",
-    favorite: false,
     syncStatus: "synced",
     ...overrides,
   };

@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useConnectionsStore } from "@/features/integrations";
 import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import { Button, cn, PermissionState } from "@/shared/ui";
@@ -19,6 +20,7 @@ export function InboxWorkspace() {
   const { user, transitioning } = useAuth();
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<InboxThread | null>(null);
+  const [aiDraft, setAiDraft] = useState<{ to?: string; subject?: string; text?: string }>();
   const [notice, setNotice] = useState("");
   const [leftShelfVisible, setLeftShelfVisible] = useState(true);
   const [messageVisible, setMessageVisible] = useState(false);
@@ -95,6 +97,74 @@ export function InboxWorkspace() {
     );
     return Math.max(threads.length, estimatedTotal);
   }, [inbox.estimatedTotalByConnection, threads.length]);
+  const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
+    const thread = inbox.selectedThread;
+    if (!thread || !messageVisible) return null;
+    const content = inboxThreadAiText(thread).slice(0, 32 << 10);
+    return {
+      surfaceId: "inbox",
+      label: thread.subject,
+      getContext: () => [
+        {
+          kind: "mail.thread",
+          id: thread.provider_id,
+          title: thread.subject,
+          privacy: "provider",
+          opaqueScopeId: thread.connectionId,
+          metadata: { provider: thread.provider, message_count: thread.messages.length },
+        },
+      ],
+      getSelection: () => ({
+        kind: "text",
+        content,
+        object: { kind: "mail.thread", id: thread.provider_id },
+        anchors: { message_count: thread.messages.length },
+        contentHash: aiContentHash(content),
+      }),
+      getSuggestedActions: () => [
+        {
+          id: "thread-summary",
+          label: "Summarize thread",
+          prompt:
+            "Summarize this email thread, including the latest state and any unanswered questions.",
+        },
+        {
+          id: "draft-reply",
+          label: "Draft reply",
+          prompt: "Draft a concise, helpful reply to this thread. Do not send it.",
+          requestedArtifactKind: "mail_draft",
+        },
+        {
+          id: "extract-commitments",
+          label: "Find commitments",
+          prompt: "List commitments, owners, dates, and unresolved decisions in this email thread.",
+        },
+        {
+          id: "attachment-check",
+          label: "Review attachments",
+          prompt:
+            "Explain what the attachment metadata suggests and what I should inspect; do not claim to have read attachment contents.",
+        },
+      ],
+      applyArtifact: async (artifact) => {
+        if (artifact.kind !== "mail_draft")
+          throw new Error("This email draft is not supported here.");
+        const operations = artifact.operations as {
+          to?: string[];
+          subject?: string;
+          text?: string;
+        };
+        setAiDraft({
+          to: operations.to?.join(", "),
+          subject: operations.subject,
+          text: operations.text,
+        });
+        setReplyTo(thread);
+        setComposeOpen(true);
+      },
+    };
+  }, [inbox.selectedThread, messageVisible]);
+  useAiSurfaceAdapter(aiAdapter);
 
   if (transitioning) return <CenteredMessage label="Switching accounts…" />;
   if (!user) {
@@ -120,6 +190,7 @@ export function InboxWorkspace() {
     }
   };
   const openCompose = (thread: InboxThread | null) => {
+    setAiDraft(undefined);
     setReplyTo(thread);
     setComposeOpen(true);
   };
@@ -224,6 +295,7 @@ export function InboxWorkspace() {
         open={composeOpen}
         accounts={inbox.accounts}
         replyTo={replyTo}
+        initialDraft={aiDraft}
         onOpenChange={setComposeOpen}
         onSave={inbox.saveDraft}
         onSend={inbox.sendDraft}
@@ -241,6 +313,29 @@ export function InboxWorkspace() {
       ) : null}
     </main>
   );
+}
+
+function inboxThreadAiText(thread: InboxThread) {
+  const messages = thread.messages.length
+    ? thread.messages.map((message) => {
+        const attachments = message.attachments
+          .map((item) => `${item.filename} (${item.content_type}, ${item.size} bytes)`)
+          .join(", ");
+        const sender = message.from.name || message.from.email;
+        const body = message.body.text || message.snippet;
+        return `${message.sent_at} — ${sender}\n${body}${attachments ? `\nAttachments: ${attachments}` : ""}`;
+      })
+    : [thread.snippet];
+  return `Subject: ${thread.subject}\nParticipants: ${thread.participants.map((item) => item.name || item.email).join(", ")}\n\n${messages.join("\n\n")}`;
+}
+
+function aiContentHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16)}`;
 }
 
 function CenteredMessage({ label }: { label: string }) {

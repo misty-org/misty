@@ -1,4 +1,5 @@
 import { cn } from "@/shared/ui";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { Circle, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, X } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -28,15 +29,13 @@ export function BrowserAnnotationLayer(props: {
   const [textDraft, setTextDraft] = useState<{ point: Point; value: string } | null>(null);
   const layerRef = useRef<SVGSVGElement | null>(null);
 
+  useShortcutHandler("browser.annotation_undo", () => undoLast(), props.active);
+  useShortcutHandler("browser.annotation_redo", () => redoLast(), props.active);
+
   useEffect(() => {
     if (!props.active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") props.onClose();
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        if (event.shiftKey) redoLast();
-        else undoLast();
-      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

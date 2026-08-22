@@ -1,6 +1,6 @@
 import { SpaceSidebarPageSection, SpaceSidebarSection } from "@/features/spaces";
-import { Button } from "@/shared/ui";
-import { Plus } from "lucide-react";
+import { Button, Input } from "@/shared/ui";
+import { Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -30,6 +30,8 @@ export function NotesPanelSidebar(
       setQuery: state.setQuery,
       selectNote: state.selectNote,
       createNote: state.createNote,
+      archiveNote: state.archiveNote,
+      deleteNote: state.deleteNote,
     })),
   );
 
@@ -60,18 +62,45 @@ export function NotesPanelSidebar(
     </Button>
   );
   const content = (
-    <NoteListPanel
-      notes={visibleNotes}
-      query={store.query}
-      loading={loading}
-      spaceName={props.spaceName}
-      showHeader={false}
-      selectedNoteId={store.selectedNoteId}
-      connectorErrors={store.connectorErrors}
-      onSelectNote={selectNote}
-      onNewNote={() => setNewNoteOpen(true)}
-      onClearQuery={() => actions.setQuery("")}
-    />
+    <div className="grid min-h-0 gap-2">
+      <label className="relative block px-0.5">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
+        <Input
+          value={store.query}
+          onChange={(event) => actions.setQuery(event.target.value)}
+          placeholder="Search notes"
+          aria-label="Search notes"
+          className="h-8 rounded-lg border-charcoal-border bg-charcoal-card pl-8 text-xs"
+        />
+      </label>
+      <NoteListPanel
+        notes={visibleNotes}
+        query={store.query}
+        loading={loading}
+        spaceName={props.spaceName}
+        showHeader={false}
+        selectedNoteId={store.selectedNoteId}
+        connectorErrors={store.connectorErrors}
+        onSelectNote={selectNote}
+        onNewNote={() => setNewNoteOpen(true)}
+        onClearQuery={() => actions.setQuery("")}
+        onRenameNote={(note) => {
+          selectNote(note.id);
+          window.setTimeout(
+            () =>
+              window.dispatchEvent(
+                new CustomEvent("misty:journal-rename-note", { detail: { noteId: note.sourceId } }),
+              ),
+            0,
+          );
+        }}
+        onArchiveNote={(note) => void actions.archiveNote(note.id)}
+        onDeleteNote={(note) => {
+          if (window.confirm(`Delete “${note.title}”? This cannot be undone.`))
+            void actions.deleteNote(note.id);
+        }}
+      />
+    </div>
   );
 
   return (

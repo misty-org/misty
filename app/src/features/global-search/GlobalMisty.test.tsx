@@ -103,5 +103,18 @@ describe("GlobalMisty", () => {
       container.querySelector('[aria-label="Open Misty — Search, Ask, or Action"]'),
     ).not.toBeNull();
     expect(useGlobalSearchStore.getState().query).toBe("");
+
+    await act(async () => {
+      container.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    expect(useGlobalSearchStore.getState().launcherOpen).toBe(false);
+
+    await act(async () => useGlobalSearchStore.getState().activateLauncher());
+    container.tabIndex = 0;
+    container.focus();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(useGlobalSearchStore.getState().launcherOpen).toBe(false);
   });
 });

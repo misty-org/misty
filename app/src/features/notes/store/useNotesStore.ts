@@ -1,3 +1,4 @@
+import { notesApi } from "@/api/notes/api";
 import { create } from "zustand";
 import { type NotesConnectorRegistry, createDefaultNotesRegistry } from "../connectors/registry";
 import { nowIso } from "../connectorUtils";
@@ -24,7 +25,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   lastSyncedAt: undefined,
   publishingNoteId: "",
   publishError: "",
-  integrationsOpen: false,
   connectorRevision: 0,
 
   async load(accountId: string, spaceId: string, spaceName: string) {
@@ -112,27 +112,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     set({ editingNoteId });
   },
 
-  setIntegrationsOpen(integrationsOpen: boolean) {
-    set({ integrationsOpen });
-  },
-
-  async toggleFavorite(noteId: string) {
-    const note = findNote(get().notes, noteId);
-    if (!note) return;
-    const generation = notesLoadGeneration;
-    const activeRegistry = registry;
-    const connector = activeRegistry.forSource(note.source);
-    try {
-      const updated = await connector?.updateNote?.(note.sourceId, {
-        favorite: !note.favorite,
-      });
-      if (!updated || !notesActionIsCurrent(generation, activeRegistry)) return;
-      replaceNote(set, noteId, updated);
-    } catch (reason) {
-      reportConnectorError(set, connector?.id ?? "notes:misty", reason);
-    }
-  },
-
   async createNote(input: CreateNoteInput) {
     const { spaceId, spaceName } = get();
     if (!spaceId || !spaceName) {
@@ -192,6 +171,21 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       reportConnectorError(set, connector.id, reason);
       throw reason;
     }
+  },
+
+  async archiveNote(noteId: string) {
+    const note = findNote(get().notes, noteId);
+    if (!note?.spaceId || note.source !== "misty" || !note.canDelete) {
+      throw new Error("This note cannot be archived.");
+    }
+    await notesApi.archive(note.spaceId, note.sourceId);
+    set((state) => ({
+      notes: state.notes.filter((candidate) => candidate.id !== noteId),
+      selectedNoteId:
+        state.selectedNoteId === noteId
+          ? state.notes.find((candidate) => candidate.id !== noteId)?.id
+          : state.selectedNoteId,
+    }));
   },
 
   async updateNoteBody(noteId: string, body: string) {
@@ -345,7 +339,6 @@ export function resetNotesAccountState(): void {
     lastSyncedAt: undefined,
     publishingNoteId: "",
     publishError: "",
-    integrationsOpen: false,
     connectorRevision: 0,
   });
 }
@@ -414,8 +407,6 @@ export interface NotesStoreState {
   query: string;
   syncing: boolean;
   lastSyncedAt?: string;
-  /** Lives in the store because the Space sidebar and the pane are sibling trees. */
-  integrationsOpen: boolean;
   /** Bumped whenever connector status changes so selectors recompute. */
   connectorRevision: number;
 }
@@ -432,10 +423,9 @@ export interface NotesStoreActions {
   setQuery: (query: string) => void;
   selectNote: (noteId: string | undefined) => void;
   setEditingNoteId: (noteId: string | undefined) => void;
-  setIntegrationsOpen: (open: boolean) => void;
-  toggleFavorite: (noteId: string) => Promise<void>;
   createNote: (input: CreateNoteInput) => Promise<UnifiedNote | undefined>;
   deleteNote: (noteId: string) => Promise<void>;
+  archiveNote: (noteId: string) => Promise<void>;
   updateNoteBody: (noteId: string, body: string) => Promise<void>;
   updateNoteContent: (noteId: string, content: UpdateNoteContentInput) => Promise<void>;
   assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;
