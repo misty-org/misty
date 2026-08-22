@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   hideAllBrowserWebviews,
   hideBrowserWebview,
+  setBrowserPointerTrackingEnabled,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   syncBrowserWebview,
+  useBrowserRuntimeStore,
 } from "./browserRuntime";
 
 const invoke = vi.hoisted(() =>
@@ -39,6 +41,42 @@ describe("browser native view synchronization", () => {
     );
   });
 
+  it("keeps compatibility recovery scoped to its tab", () => {
+    const tab = browserTab("challenge-recovery");
+    useBrowserRuntimeStore.getState().setCompatibilityIssue(tab.id, {
+      kind: "cloudflare_challenge",
+      url: "https://leetcode.com/",
+    });
+
+    expect(useBrowserRuntimeStore.getState().compatibilityIssues[tab.id]?.url).toBe(
+      "https://leetcode.com/",
+    );
+
+    useBrowserRuntimeStore.getState().removeTab(tab.id);
+    expect(useBrowserRuntimeStore.getState().compatibilityIssues[tab.id]).toBeUndefined();
+  });
+
+  it("enables page pointer IPC only while the Misty presence is active", async () => {
+    setBrowserPointerTrackingEnabled(true);
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_pointer_tracking", {
+        enabled: true,
+      }),
+    );
+
+    invoke.mockClear();
+    setBrowserPointerTrackingEnabled(true);
+    await Promise.resolve();
+    expect(invoke).not.toHaveBeenCalled();
+
+    setBrowserPointerTrackingEnabled(false);
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_pointer_tracking", {
+        enabled: false,
+      }),
+    );
+  });
+
   it("forces a native layout pass immediately after creating the child", async () => {
     const tab = browserTab("initial-layout");
     await syncBrowserWebview({
@@ -52,6 +90,27 @@ describe("browser native view synchronization", () => {
       "browser_webview_create",
       "browser_webview_reconcile",
     ]);
+    const createArgs = invoke.mock.calls[0]?.[1] as { request?: Record<string, unknown> };
+    expect(createArgs.request).not.toHaveProperty("userAgent");
+    expect(createArgs.request).toHaveProperty("nativeLiveResize", false);
+  });
+
+  it("reconfigures native live resize without requiring a bounds change", async () => {
+    const tab = browserTab("native-live-resize-mode");
+    const input = {
+      tab,
+      url: "https://example.com",
+      bounds: { x: 10, y: 20, width: 800, height: 600 },
+      theme: "dark" as const,
+    };
+    await syncBrowserWebview({ ...input, nativeLiveResize: false });
+    invoke.mockClear();
+
+    await syncBrowserWebview({ ...input, nativeLiveResize: true });
+
+    expect(invoke).toHaveBeenCalledWith("browser_webview_reconcile", {
+      request: { id: expect.any(String), nativeLiveResize: true, ...input.bounds },
+    });
   });
 
   it("resizes a visible child in place and reconciles native visibility", async () => {

@@ -17,9 +17,8 @@ export function useBrowserOverlayControl(reason: string) {
       }
 
       setBrowserWebviewsSuspended(true, reason);
-      // A native child WebView starts above the renderer so it can receive
-      // input. Do not mount the popup portal until macOS has moved that child
-      // below Misty's renderer, or the page can cover the popup for one frame.
+      // External pages are the top sibling during normal browsing. Mount the
+      // popup only after native ownership has moved back to Misty's renderer.
       void browserOverlayReady().then(() => {
         if (requestedOpen.current && generation.current === requestGeneration) {
           setOpen(true);

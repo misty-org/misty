@@ -4,35 +4,39 @@ import { revokeBrowserAgentGrant } from "./browserAgentAccess";
 import type { WorkspaceTab } from "@/features/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import { browserUserAgent } from "./browserUserAgent";
 
 interface BrowserHistory {
   entries: string[];
   index: number;
 }
 
+export interface BrowserCompatibilityIssue {
+  kind: "cloudflare_challenge";
+  url: string;
+}
+
 interface BrowserRuntimeUiState {
   grants: Record<string, ActiveBrowserAgentGrant[]>;
   histories: Record<string, BrowserHistory>;
-  cursors: Record<string, string>;
   errors: Record<string, string | null>;
   notices: Record<string, string | null>;
+  compatibilityIssues: Record<string, BrowserCompatibilityIssue | null>;
   setGrants: (tabId: string, grants: ActiveBrowserAgentGrant[]) => void;
   ensureHistory: (tabId: string, url: string) => void;
   pushHistory: (tabId: string, url: string) => void;
   moveHistory: (tabId: string, direction: -1 | 1) => string | null;
-  setCursor: (tabId: string, cursor: string) => void;
   setError: (tabId: string, error: string | null) => void;
   setNotice: (tabId: string, notice: string | null) => void;
+  setCompatibilityIssue: (tabId: string, issue: BrowserCompatibilityIssue | null) => void;
   removeTab: (tabId: string) => void;
 }
 
 export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) => ({
   grants: {},
   histories: {},
-  cursors: {},
   errors: {},
   notices: {},
+  compatibilityIssues: {},
   setGrants: (tabId, grants) => set((state) => ({ grants: { ...state.grants, [tabId]: grants } })),
   ensureHistory: (tabId, url) =>
     set((state) =>
@@ -64,26 +68,26 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     }));
     return current.entries[index] ?? null;
   },
-  setCursor: (tabId, cursor) =>
-    set((state) =>
-      state.cursors[tabId] === cursor ? state : { cursors: { ...state.cursors, [tabId]: cursor } },
-    ),
   setError: (tabId, error) => set((state) => ({ errors: { ...state.errors, [tabId]: error } })),
   setNotice: (tabId, notice) =>
     set((state) => ({ notices: { ...state.notices, [tabId]: notice } })),
+  setCompatibilityIssue: (tabId, issue) =>
+    set((state) => ({
+      compatibilityIssues: { ...state.compatibilityIssues, [tabId]: issue },
+    })),
   removeTab: (tabId) =>
     set((state) => {
       const grants = { ...state.grants };
       const histories = { ...state.histories };
-      const cursors = { ...state.cursors };
       const errors = { ...state.errors };
       const notices = { ...state.notices };
+      const compatibilityIssues = { ...state.compatibilityIssues };
       delete grants[tabId];
       delete histories[tabId];
-      delete cursors[tabId];
       delete errors[tabId];
       delete notices[tabId];
-      return { grants, histories, cursors, errors, notices };
+      delete compatibilityIssues[tabId];
+      return { grants, histories, errors, notices, compatibilityIssues };
     }),
 }));
 
@@ -99,6 +103,8 @@ let browserOverlayQueue = Promise.resolve();
 let browserPointerGestureActive = false;
 let browserOverlayResumeGeneration = 0;
 let browserOverlayActive = false;
+let browserPointerTrackingEnabled: boolean | null = null;
+let browserPointerTrackingQueue = Promise.resolve();
 
 export const browserRuntimeResumeEvent = "misty:browser-runtime-resume";
 
@@ -108,6 +114,7 @@ type BrowserSyncInput = {
   url: string;
   bounds: BrowserBounds;
   theme: BrowserTheme;
+  nativeLiveResize?: boolean;
 };
 
 interface BrowserSyncState {
@@ -155,7 +162,7 @@ export function requestBrowserWebviewLayoutByRuntimeId(runtimeId: string): void 
 export function syncBrowserWebview(input: BrowserSyncInput): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
   desiredVisibleRuntimeIds.add(id);
-  const boundsKey = serializeBounds(input.bounds);
+  const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   const existingState = browserSyncStates.get(id);
   if (
     !existingState &&
@@ -197,7 +204,7 @@ async function flushBrowserSync(id: string, state: BrowserSyncState): Promise<vo
 }
 
 async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<void> {
-  const boundsKey = serializeBounds(input.bounds);
+  const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   if (!createdRuntimeIds.has(id)) {
     await invoke("browser_webview_create", {
       request: {
@@ -205,7 +212,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         url: input.url,
         scopeId: browserScopeId(input.tab),
         theme: input.theme,
-        userAgent: browserUserAgent(),
+        nativeLiveResize: Boolean(input.nativeLiveResize),
         ...input.bounds,
       },
     });
@@ -216,7 +223,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
   // layout invalidation. Avoid no-op native frame writes: on macOS they
   // rebuild WKWebView tracking areas and make cursor ownership flicker.
   let exists = await invoke<boolean>("browser_webview_reconcile", {
-    request: { id, ...input.bounds },
+    request: { id, nativeLiveResize: Boolean(input.nativeLiveResize), ...input.bounds },
   });
   if (!exists) {
     createdRuntimeIds.delete(id);
@@ -227,13 +234,13 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         url: input.url,
         scopeId: browserScopeId(input.tab),
         theme: input.theme,
-        userAgent: browserUserAgent(),
+        nativeLiveResize: Boolean(input.nativeLiveResize),
         ...input.bounds,
       },
     });
     createdRuntimeIds.add(id);
     exists = await invoke<boolean>("browser_webview_reconcile", {
-      request: { id, ...input.bounds },
+      request: { id, nativeLiveResize: Boolean(input.nativeLiveResize), ...input.bounds },
     });
     if (!exists) throw new Error("Browser webview could not be attached.");
   }
@@ -270,12 +277,21 @@ export function setBrowserPointerGestureActive(active: boolean): void {
   }
 }
 
+export function setBrowserPointerTrackingEnabled(enabled: boolean): void {
+  if (browserPointerTrackingEnabled === enabled) return;
+  browserPointerTrackingEnabled = enabled;
+  browserPointerTrackingQueue = browserPointerTrackingQueue
+    .catch(() => undefined)
+    .then(() =>
+      invoke<void>("browser_webviews_set_pointer_tracking", { enabled }).catch(() => undefined),
+    );
+}
+
 function scheduleBrowserOverlayResume(): void {
   if (typeof window === "undefined" || browserPointerGestureActive || !browserOverlayActive) return;
   const generation = ++browserOverlayResumeGeneration;
-  // Radix can close a menu during the pointer sequence that activated its
-  // trigger. Keep the native page below the app through that sequence and the
-  // portal's closing frame so mouse-up/click cannot land in the page beneath.
+  // Keep the renderer above the page through the closing pointer sequence and
+  // the portal's final frame, then return the page to its normal sibling order.
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       if (
@@ -286,7 +302,15 @@ function scheduleBrowserOverlayResume(): void {
         return;
       }
       setBrowserOverlayActive(false);
-      window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+      void browserOverlayQueue.then(() => {
+        if (!browserOverlayActive && browserWebviewSuspensions.size === 0) {
+          // Non-macOS runtimes park child views while renderer popovers are
+          // open. Invalidate the cached frames so each desired page is shown
+          // again even when its geometry did not change.
+          desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
+          window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+        }
+      });
     });
   });
 }
@@ -356,8 +380,8 @@ export function hideAllBrowserWebviews(): Promise<void[]> {
   ]);
 }
 
-function serializeBounds(bounds: BrowserBounds): string {
-  return [bounds.x, bounds.y, bounds.width, bounds.height]
+function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): string {
+  return [bounds.x, bounds.y, bounds.width, bounds.height, nativeLiveResize ? 1 : 0]
     .map((value) => Math.round(value * 2) / 2)
     .join(":");
 }

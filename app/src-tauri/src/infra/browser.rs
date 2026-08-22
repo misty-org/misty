@@ -6,21 +6,25 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Mutex, OnceLock,
+        Mutex,
     },
     time::Duration,
 };
 use tauri::{
-    utils::config::{Color, WebviewUrl},
+    utils::config::{BackgroundThrottlingPolicy, Color, WebviewUrl},
     webview::{DownloadEvent, NewWindowResponse},
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Webview, WebviewBuilder,
 };
 use url::Url;
 
-use super::browser_macos::configure_browser_webview;
+use super::browser_macos::{
+    configure_browser_webview, configure_main_webview_pointer_guard,
+    native_macos_safari_user_agent, refresh_browser_cursor_ownership, reload_browser_webview,
+    unregister_browser_cursor_ownership,
+};
 use super::browser_scripts::{
-    browser_cursor_navigation, browser_viewport_script, normalized_browser_cursor,
-    BROWSER_FAVICON_SCRIPT,
+    browser_pointer_navigation, browser_viewport_script, emit_browser_pointer,
+    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
@@ -33,17 +37,12 @@ const MAX_INTERACTIVE_ELEMENTS: usize = 500;
 const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
 #[cfg(target_os = "macos")]
-const BROWSER_RENDERER_CHROME_HEIGHT: f64 = 84.0;
-#[cfg(target_os = "macos")]
 static BROWSER_OVERLAY_ACTIVE: AtomicBool = AtomicBool::new(false);
+static BROWSER_POINTER_TRACKING_ENABLED: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static MAIN_WEBVIEW_VIEW: AtomicUsize = AtomicUsize::new(0);
 #[cfg(target_os = "macos")]
 static MAIN_WEBVIEW_TRANSPARENT: AtomicBool = AtomicBool::new(false);
-#[cfg(target_os = "macos")]
-static BROWSER_WEBVIEW_VIEWS: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
-#[cfg(target_os = "macos")]
-static BROWSER_RENDERER_ORIGINAL_HIT_TEST: OnceLock<usize> = OnceLock::new();
 
 #[derive(Default)]
 pub struct BrowserSessionState {
@@ -61,7 +60,6 @@ struct BrowserSession {
     element_selectors: HashMap<String, String>,
     downloads: Vec<BrowserDownload>,
     pending_agent_download: Option<PendingAgentDownload>,
-    cursor: String,
 }
 
 #[derive(Clone)]
@@ -91,7 +89,7 @@ pub struct BrowserWebviewCreateRequest {
     #[serde(default = "default_browser_theme")]
     pub theme: String,
     #[serde(default)]
-    pub user_agent: Option<String>,
+    pub native_live_resize: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,6 +100,8 @@ pub struct BrowserWebviewBoundsRequest {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    #[serde(default)]
+    pub native_live_resize: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,18 +174,25 @@ struct BrowserFaviconEvent {
     url: String,
 }
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct BrowserPopupEvent {
-    source_id: String,
+#[derive(Debug, Deserialize)]
+struct BrowserCompatibilityProbe {
+    kind: String,
     url: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct BrowserCursorEvent {
+struct BrowserCompatibilityEvent {
     id: String,
-    cursor: String,
+    kind: String,
+    url: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BrowserPopupEvent {
+    source_id: String,
+    url: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -228,16 +235,6 @@ struct RawInteractiveElement {
     name: String,
 }
 
-fn validated_user_agent(value: Option<&str>) -> Result<Option<&str>, String> {
-    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Ok(None);
-    };
-    if value.len() > 512 || value.chars().any(char::is_control) {
-        return Err("Browser user agent is invalid.".to_owned());
-    }
-    Ok(Some(value))
-}
-
 #[cfg(target_os = "macos")]
 fn apply_macos_webview_theme(webview: &Webview, value: &str) -> Result<(), String> {
     use objc2_app_kit::{
@@ -269,9 +266,9 @@ fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
         .with_webview(|platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
             MAIN_WEBVIEW_VIEW.store(view as *const NSView as usize, Ordering::Release);
-            install_browser_renderer_hit_testing(view);
         })
         .map_err(|error| error.to_string())?;
+    configure_main_webview_pointer_guard(&main_webview)?;
     // Configure the renderer's native background once, before the Browser
     // child is first presented. Reapplying this during every popup transition
     // clears WKWebView's backing layer and produces a dark compositor frame.
@@ -284,112 +281,8 @@ fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
-fn browser_webview_views() -> &'static Mutex<HashSet<usize>> {
-    BROWSER_WEBVIEW_VIEWS.get_or_init(|| Mutex::new(HashSet::new()))
-}
-
-/// Keep Misty's renderer above Browser children permanently while allowing
-/// AppKit to continue hit-testing the native Browser underneath the renderer's
-/// transparent viewport. Returning no renderer hit is important here: calling
-/// a Browser child's `hitTest:` from its parent's callback can recurse through
-/// WebKit's internal view hierarchy until the process exhausts its stack.
-#[cfg(target_os = "macos")]
-unsafe fn install_browser_renderer_hit_testing(renderer: &objc2_app_kit::NSView) {
-    use objc2::runtime::{AnyClass, AnyObject, Imp, Method, Sel};
-    use std::ffi::{c_char, c_uchar};
-
-    unsafe extern "C" {
-        fn class_addMethod(
-            cls: *const AnyClass,
-            name: Sel,
-            imp: Imp,
-            types: *const c_char,
-        ) -> c_uchar;
-        fn method_getTypeEncoding(method: *const Method) -> *const c_char;
-    }
-
-    unsafe extern "C-unwind" fn hit_test(
-        this: &AnyObject,
-        _cmd: Sel,
-        point: objc2_foundation::NSPoint,
-    ) -> *mut AnyObject {
-        use objc2_app_kit::NSView;
-
-        let is_main_renderer =
-            this as *const AnyObject as usize == MAIN_WEBVIEW_VIEW.load(Ordering::Acquire);
-        if is_main_renderer && !BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire) {
-            let renderer: &NSView = unsafe { &*(this as *const AnyObject).cast() };
-            let bounds = renderer.bounds();
-            // `hitTest:` receives this WKWebView's AppKit coordinates, whose
-            // upper edge is the maximum Y even though WebKit reports a flipped
-            // content view internally.
-            let distance_from_top = bounds.origin.y + bounds.size.height - point.y;
-            // The workspace tab strip and Browser toolbar are renderer-owned.
-            // Never yield their hit tests to the native page, even if AppKit
-            // reports a temporarily stale Browser frame during a tab switch.
-            let inside_renderer_chrome =
-                (0.0..BROWSER_RENDERER_CHROME_HEIGHT).contains(&distance_from_top);
-            if !inside_renderer_chrome {
-                if let Some(parent) = renderer.superview() {
-                    let parent_point = parent.convertPoint_fromView(point, Some(renderer));
-                    if let Ok(browser_views) = browser_webview_views().lock() {
-                        for child in parent.subviews().iter() {
-                            let child_pointer = (&*child as *const NSView) as usize;
-                            if !browser_views.contains(&child_pointer) || child.isHidden() {
-                                continue;
-                            }
-                            let frame = child.frame();
-                            let inside = parent_point.x >= frame.origin.x
-                                && parent_point.y >= frame.origin.y
-                                && parent_point.x < frame.origin.x + frame.size.width
-                                && parent_point.y < frame.origin.y + frame.size.height;
-                            if inside {
-                                return std::ptr::null_mut();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let Some(original_hit_test) = BROWSER_RENDERER_ORIGINAL_HIT_TEST.get().copied() else {
-            return std::ptr::null_mut();
-        };
-        let original_hit_test: unsafe extern "C-unwind" fn(
-            &AnyObject,
-            Sel,
-            objc2_foundation::NSPoint,
-        ) -> *mut AnyObject = unsafe { std::mem::transmute(original_hit_test) };
-        unsafe { original_hit_test(this, _cmd, point) }
-    }
-
-    if BROWSER_RENDERER_ORIGINAL_HIT_TEST.get().is_some() {
-        return;
-    }
-    let current_class = objc2::runtime::AnyObject::class(renderer);
-    let selector = objc2::sel!(hitTest:);
-    let inherited_method = current_class
-        .instance_method(selector)
-        .expect("Browser renderer superclass implements hitTest:");
-    let original_hit_test = inherited_method.implementation();
-    let _ = BROWSER_RENDERER_ORIGINAL_HIT_TEST.set(original_hit_test as usize);
-
-    let replacement: unsafe extern "C-unwind" fn(_, _, _) -> _ = hit_test;
-    let replacement: Imp = unsafe { std::mem::transmute(replacement) };
-    let types = unsafe { method_getTypeEncoding(inherited_method) };
-    // Add the override directly to WebKit's existing renderer class. Keeping
-    // the object's class identity intact is required by AppKit's dynamic
-    // window properties during title-bar zoom and full-screen transitions.
-    if unsafe { class_addMethod(current_class, selector, replacement, types) } == 0 {
-        let own_methods = current_class.instance_methods();
-        let own_method = own_methods
-            .iter()
-            .find(|method| method.name() == selector)
-            .expect("Browser renderer hitTest: override is available");
-        let previous = unsafe { own_method.set_implementation(replacement) };
-        let _ = BROWSER_RENDERER_ORIGINAL_HIT_TEST.set(previous as usize);
-    }
+fn browser_child_should_be_below_renderer(overlay_active: bool) -> bool {
+    overlay_active
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -403,9 +296,6 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            if let Ok(mut browser_views) = browser_webview_views().lock() {
-                browser_views.insert(view as *const NSView as usize);
-            }
             if reveal && view.isHidden() {
                 view.setHidden(false);
             }
@@ -415,18 +305,30 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
             });
             if let Some(parent) = parent {
                 let main_view = MAIN_WEBVIEW_VIEW.load(Ordering::Acquire);
-                if main_view == 0 || browser_stacking_is_correct(&parent, view, main_view, true) {
+                let below_main = browser_child_should_be_below_renderer(
+                    BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire),
+                );
+                if main_view == 0
+                    || browser_stacking_is_correct(&parent, view, main_view, below_main)
+                {
                     return;
                 }
                 let main_view: &NSView = &*(main_view as *const NSView);
+                // The external page owns its measured rectangle normally. Misty's
+                // renderer moves above it only while app UI needs those pixels.
                 parent.addSubview_positioned_relativeTo(
                     view,
-                    NSWindowOrderingMode::Below,
+                    if below_main {
+                        NSWindowOrderingMode::Below
+                    } else {
+                        NSWindowOrderingMode::Above
+                    },
                     Some(main_view),
                 );
             }
         })
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    refresh_browser_cursor_ownership(webview)
 }
 
 /// Whether `view` already sits on the correct side of the app renderer inside
@@ -498,31 +400,6 @@ fn external_url(raw: &str) -> Result<Url, String> {
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
-fn update_browser_cursor(app: &AppHandle, id: &str, cursor: &str) {
-    let Some(state) = app.try_state::<BrowserSessionState>() else {
-        return;
-    };
-    let Ok(mut sessions) = state.sessions.lock() else {
-        return;
-    };
-    let Some(session) = sessions.get_mut(id) else {
-        return;
-    };
-    if session.cursor == cursor {
-        return;
-    }
-    session.cursor = cursor.to_owned();
-    drop(sessions);
-    let _ = app.emit_to(
-        "main",
-        "misty://browser-cursor",
-        BrowserCursorEvent {
-            id: id.to_owned(),
-            cursor: cursor.to_owned(),
-        },
-    );
-}
-
 fn logical_bounds(
     x: f64,
     y: f64,
@@ -536,6 +413,7 @@ fn logical_bounds(
 }
 
 fn set_webview_bounds_if_changed(
+    _app: &AppHandle,
     webview: &Webview,
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
@@ -556,25 +434,8 @@ fn set_webview_bounds_if_changed(
             position: position.into(),
             size: size.into(),
         })
-        .map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "macos")]
-fn reveal_macos_webview(webview: &Webview) -> Result<(), String> {
-    use objc2_app_kit::NSView;
-    webview
-        .with_webview(|platform_webview| unsafe {
-            let view: &NSView = &*platform_webview.inner().cast();
-            if view.isHidden() {
-                view.setHidden(false);
-            }
-        })
-        .map_err(|error| error.to_string())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn reveal_macos_webview(webview: &Webview) -> Result<(), String> {
-    webview.show().map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    refresh_browser_cursor_ownership(webview)
 }
 
 fn register_session(state: &BrowserSessionState, id: &str, scope_id: &str) -> Result<(), String> {
@@ -589,6 +450,15 @@ fn register_session(state: &BrowserSessionState, id: &str, scope_id: &str) -> Re
         session.scope_id = format!("browser-{id}");
     }
     Ok(())
+}
+
+fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<(), String> {
+    webview
+        .eval(&format!(
+            "window.__MISTY_SET_POINTER_TRACKING__?.({});",
+            if enabled { "true" } else { "false" }
+        ))
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -611,9 +481,13 @@ pub fn browser_webview_create(
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
         apply_macos_webview_theme(&webview, &request.theme)?;
-        configure_browser_webview(&webview)?;
+        configure_browser_webview(&webview, request.native_live_resize)?;
         apply_shortcuts(&webview, &state)?;
-        set_webview_bounds_if_changed(&webview, position, size)?;
+        apply_browser_pointer_tracking(
+            &webview,
+            BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+        )?;
+        set_webview_bounds_if_changed(&app, &webview, position, size)?;
         return present_macos_webview(&webview);
     }
 
@@ -627,14 +501,28 @@ pub fn browser_webview_create(
     let download_id = request.id.clone();
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
-    let mut builder = WebviewBuilder::new(label, WebviewUrl::External(external_url(&request.url)?))
+    let builder = WebviewBuilder::new(label, WebviewUrl::External(external_url(&request.url)?))
+        .background_throttling(BackgroundThrottlingPolicy::Disabled);
+    // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
+    // such as Google serve their legacy compatibility UI. Derive the desktop
+    // Safari identity from the installed Safari bundle instead of pinning a
+    // release in Misty's source.
+    let builder = if let Some(user_agent) = native_macos_safari_user_agent() {
+        builder.user_agent(&user_agent)
+    } else {
+        builder
+    };
+    let builder = builder
         .focused(false)
         .accept_first_mouse(true)
         .background_color(browser_background(&request.theme))
-        .initialization_script(browser_viewport_script(&shortcut_token))
+        .initialization_script(browser_viewport_script(
+            &shortcut_token,
+            BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+        ))
         .on_navigation(move |url| {
-            if let Some(cursor) = browser_cursor_navigation(url) {
-                update_browser_cursor(&navigation_app, &navigation_id, cursor);
+            if let Some(pointer) = browser_pointer_navigation(url) {
+                emit_browser_pointer(&navigation_app, &navigation_id, pointer);
                 false
             } else if forward_navigation(&navigation_app, &navigation_id, url) {
                 false
@@ -655,6 +543,10 @@ pub fn browser_webview_create(
             NewWindowResponse::Deny
         })
         .on_page_load(move |webview, payload| {
+            let _ = apply_browser_pointer_tracking(
+                &webview,
+                BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+            );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                     if let Ok(mut sessions) = state.sessions.lock() {
@@ -679,6 +571,7 @@ pub fn browser_webview_create(
             );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 request_browser_favicon(&webview, &page_app, &page_id);
+                request_browser_compatibility(&webview, &page_app, &page_id);
             }
         })
         .on_document_title_changed(move |webview, title| {
@@ -690,20 +583,19 @@ pub fn browser_webview_create(
                 },
             );
             request_browser_favicon(&webview, &title_app, &title_id);
+            request_browser_compatibility(&webview, &title_app, &title_id);
         })
         .on_download(move |_webview, event| {
             handle_download_event(&download_app, &download_id, event)
         });
-    if let Some(user_agent) = validated_user_agent(request.user_agent.as_deref())? {
-        builder = builder.user_agent(user_agent);
-    }
     let webview = window
         .add_child(builder, position, size)
         .map_err(|error| error.to_string())?;
     apply_macos_webview_theme(&webview, &request.theme)?;
-    configure_browser_webview(&webview)?;
+    configure_browser_webview(&webview, request.native_live_resize)?;
     apply_shortcuts(&webview, &state)?;
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
+    set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
 }
 
@@ -722,6 +614,28 @@ fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
             BrowserFaviconEvent {
                 id: favicon_id.clone(),
                 url,
+            },
+        );
+    });
+}
+
+fn request_browser_compatibility(webview: &Webview, app: &AppHandle, id: &str) {
+    let compatibility_app = app.clone();
+    let compatibility_id = id.to_owned();
+    let _ = webview.eval_with_callback(BROWSER_COMPATIBILITY_SCRIPT, move |value| {
+        let Ok(Some(probe)) = serde_json::from_str::<Option<BrowserCompatibilityProbe>>(&value)
+        else {
+            return;
+        };
+        if probe.kind != "cloudflare_challenge" || external_url(&probe.url).is_err() {
+            return;
+        }
+        let _ = compatibility_app.emit(
+            "misty://browser-compatibility",
+            BrowserCompatibilityEvent {
+                id: compatibility_id.clone(),
+                kind: probe.kind,
+                url: probe.url,
             },
         );
     });
@@ -946,7 +860,8 @@ pub fn browser_webview_set_bounds(
         .get_webview(&webview_label(&request.id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
-    set_webview_bounds_if_changed(&webview, position, size)
+    configure_browser_webview(&webview, request.native_live_resize)?;
+    set_webview_bounds_if_changed(&app, &webview, position, size)
 }
 
 #[tauri::command]
@@ -958,12 +873,11 @@ pub fn browser_webview_reconcile(
         return Ok(false);
     };
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
-    set_webview_bounds_if_changed(&webview, position, size)?;
-    // Reconciliation is frequent (layout recovery, page completion, and
-    // renderer hot reload). Revealing is enough here; changing sibling order
-    // rebuilds AppKit tracking areas and makes both the page and cursor flash.
-    // Overlay transitions and initial creation remain the only z-order owners.
-    reveal_macos_webview(&webview)?;
+    configure_browser_webview(&webview, request.native_live_resize)?;
+    set_webview_bounds_if_changed(&app, &webview, position, size)?;
+    // Reconciliation owns geometry, visibility, and sibling order so a stale
+    // frontend cache cannot leave the page detached from its Browser host.
+    present_macos_webview(&webview)?;
     Ok(true)
 }
 
@@ -1036,7 +950,7 @@ pub fn browser_webview_reload(
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     with_webview(&app, &request.id, |webview| {
-        webview.reload().map_err(|e| e.to_string())
+        reload_browser_webview(&webview)
     })
 }
 
@@ -1054,12 +968,48 @@ pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Resu
     {
         remember_main_macos_webview(&app)?;
         BROWSER_OVERLAY_ACTIVE.store(active, Ordering::Release);
-        return Ok(());
+        let mut errors = Vec::new();
+        for (label, webview) in app.webviews() {
+            if label.starts_with("misty-browser-") {
+                if let Err(error) = position_macos_webview(&webview, false) {
+                    errors.push(error);
+                }
+            }
+        }
+        return if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        };
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, active);
+        // WebView2 and WebKitGTK do not expose sibling z-order through Tauri.
+        // Park external pages while renderer-owned popovers are open; the
+        // frontend reconciles the active page when the overlay closes.
+        if active {
+            browser_webviews_hide_all(app)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[tauri::command]
+pub fn browser_webviews_set_pointer_tracking(app: AppHandle, enabled: bool) -> Result<(), String> {
+    BROWSER_POINTER_TRACKING_ENABLED.store(enabled, Ordering::Release);
+    let mut errors = Vec::new();
+    for (label, webview) in app.webviews() {
+        if label.starts_with("misty-browser-") {
+            if let Err(error) = apply_browser_pointer_tracking(&webview, enabled) {
+                errors.push(error);
+            }
+        }
+    }
+    if errors.is_empty() {
         Ok(())
+    } else {
+        Err(errors.join("; "))
     }
 }
 
@@ -1071,7 +1021,8 @@ pub fn browser_webview_hide(
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
-    webview.hide().map_err(|error| error.to_string())
+    webview.hide().map_err(|error| error.to_string())?;
+    refresh_browser_cursor_ownership(&webview)
 }
 
 #[tauri::command]
@@ -1079,8 +1030,12 @@ pub fn browser_webviews_hide_all(app: AppHandle) -> Result<(), String> {
     let mut errors = Vec::new();
     for (label, webview) in app.webviews() {
         if label.starts_with("misty-browser-") {
-            if let Err(error) = webview.hide() {
-                errors.push(error.to_string());
+            if let Err(error) = webview
+                .hide()
+                .map_err(|error| error.to_string())
+                .and_then(|()| refresh_browser_cursor_ownership(&webview))
+            {
+                errors.push(error);
             }
         }
     }
@@ -1104,15 +1059,9 @@ pub fn browser_webview_close(
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
-    #[cfg(target_os = "macos")]
-    webview
-        .with_webview(|platform_webview| {
-            if let Ok(mut browser_views) = browser_webview_views().lock() {
-                browser_views.remove(&(platform_webview.inner() as usize));
-            }
-        })
-        .map_err(|error| error.to_string())?;
-    webview.close().map_err(|error| error.to_string())
+    unregister_browser_cursor_ownership(&webview)?;
+    webview.close().map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -1531,13 +1480,9 @@ mod tests {
     }
 
     #[test]
-    fn browser_user_agents_reject_header_injection() {
-        assert_eq!(
-            validated_user_agent(Some("Mozilla/5.0 Safari/605.1.15")).unwrap(),
-            Some("Mozilla/5.0 Safari/605.1.15")
-        );
-        assert!(validated_user_agent(Some("Mozilla/5.0\r\nX-Test: unsafe")).is_err());
-        assert!(validated_user_agent(Some(&"x".repeat(513))).is_err());
+    fn browser_page_and_renderer_swap_sibling_order_for_overlays() {
+        assert!(!browser_child_should_be_below_renderer(false));
+        assert!(browser_child_should_be_below_renderer(true));
     }
 
     #[test]
@@ -1554,22 +1499,6 @@ mod tests {
     }
 
     #[test]
-    fn browser_cursors_are_restricted_to_safe_css_keywords() {
-        assert_eq!(normalized_browser_cursor("pointer"), "pointer");
-        assert_eq!(normalized_browser_cursor("text"), "text");
-        assert_eq!(
-            normalized_browser_cursor("url(file:///secret), auto"),
-            "default"
-        );
-        assert_eq!(normalized_browser_cursor("none"), "default");
-        assert_eq!(
-            browser_cursor_navigation(&Url::parse("misty-cursor:pointer").unwrap()),
-            Some("pointer")
-        );
-        assert!(browser_cursor_navigation(&Url::parse("https://example.com").unwrap()).is_none());
-    }
-
-    #[test]
     fn browser_bounds_do_not_require_creation_fields() {
         let request: BrowserWebviewBoundsRequest = serde_json::from_value(json!({
             "id": "tab-123",
@@ -1580,6 +1509,7 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(request.id, "tab-123");
+        assert!(!request.native_live_resize);
         let (_, size) = logical_bounds(request.x, request.y, request.width, request.height);
         assert_eq!(size.width, 800.0);
         assert_eq!(size.height, 600.0);

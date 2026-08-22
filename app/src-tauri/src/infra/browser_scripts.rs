@@ -1,8 +1,11 @@
+use serde::Serialize;
+use tauri::{AppHandle, Emitter};
 use url::Url;
 
 pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
+  let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
   const install = () => {
     if (document.getElementById('misty-browser-viewport-style')) return;
     const style = document.createElement('style');
@@ -11,16 +14,22 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     (document.head || document.documentElement).appendChild(style);
   };
 
-  const allowed = new Set([
-    'default', 'pointer', 'text', 'vertical-text', 'crosshair', 'move', 'grab', 'grabbing',
-    'not-allowed', 'wait', 'help', 'zoom-in', 'zoom-out', 'col-resize', 'row-resize',
-    'n-resize', 'e-resize', 's-resize', 'w-resize', 'ne-resize', 'nw-resize', 'se-resize',
-    'sw-resize', 'ew-resize', 'ns-resize', 'nesw-resize', 'nwse-resize', 'copy', 'alias',
-    'context-menu', 'cell', 'progress'
-  ]);
-  let lastCursor = '';
   let pendingEvent = null;
   let frame = 0;
+  let lastPointerReport = 0;
+
+  // Pointer coordinates are needed only while the explicitly summoned Misty
+  // companion is present. Keeping this off otherwise avoids forcing every
+  // page selection drag through DOM mutation, navigation, and native IPC.
+  window.__MISTY_SET_POINTER_TRACKING__ = (enabled) => {
+    pointerTrackingEnabled = Boolean(enabled);
+    if (!pointerTrackingEnabled) {
+      pendingEvent = null;
+      lastPointerReport = 0;
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+    }
+  };
 
   // Only bindings supplied by Misty's trusted shell are intercepted. Page
   // typing and ordinary browser shortcuts remain owned by the page.
@@ -60,150 +69,61 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     event.stopImmediatePropagation();
   }, true);
 
-  const semanticCursor = (target) => {
-    if (!(target instanceof Element)) return 'default';
-    const computed = getComputedStyle(target).cursor;
-    if (allowed.has(computed)) return computed;
-    if (target.closest('a[href], button, summary, select, [role="button"], [role="link"], [onclick]')) {
-      return 'pointer';
-    }
-    const editable = target.closest('textarea, [contenteditable="true"], input');
-    if (editable && !/^(button|checkbox|color|file|image|radio|range|reset|submit)$/i.test(editable.type || '')) {
-      return 'text';
-    }
-    return 'default';
+  const reportPointer = (event) => {
+    if (!pointerTrackingEnabled || !event?.isTrusted) return;
+    const now = performance.now();
+    if (now - lastPointerReport < 33) return;
+    lastPointerReport = now;
+    const x = Math.max(0, Math.min(window.innerWidth, Number(event.clientX) || 0));
+    const y = Math.max(0, Math.min(window.innerHeight, Number(event.clientY) || 0));
+    window.location.href = `misty-pointer:move?x=${Math.round(x * 10) / 10}&y=${Math.round(y * 10) / 10}`;
   };
 
-  const report = (cursor) => {
-    const normalized = allowed.has(cursor) ? cursor : 'default';
-    if (normalized === lastCursor) return;
-    lastCursor = normalized;
-    const signal = document.createElement('a');
-    signal.href = `misty-cursor:${normalized}`;
-    signal.hidden = true;
-    document.documentElement?.appendChild(signal);
-    signal.click();
-    signal.remove();
+  const reportPointerLeave = () => {
+    if (!pointerTrackingEnabled) return;
+    window.location.href = 'misty-pointer:leave';
   };
 
   const flush = () => {
     frame = 0;
-    if (pendingEvent) report(semanticCursor(pendingEvent.target));
+    if (pendingEvent) {
+      reportPointer(pendingEvent);
+    }
     pendingEvent = null;
   };
   const track = (event) => {
+    if (!pointerTrackingEnabled) return;
     pendingEvent = event;
     if (!frame) frame = requestAnimationFrame(flush);
   };
 
-  // Suppress automatic focus and suggestion popups prior to genuine user interaction.
-  let userInteracted = false;
-  const markInteraction = (event) => {
-    if (event.isTrusted) userInteracted = true;
-  };
-  window.addEventListener('pointerdown', markInteraction, true);
-  window.addEventListener('mousedown', markInteraction, true);
-  window.addEventListener('keydown', markInteraction, true);
-  window.addEventListener('touchstart', markInteraction, true);
-
-  // Prevent initial focus events from triggering page suggestion listeners
-  window.addEventListener('focusin', (event) => {
-    if (!userInteracted) {
-      event.stopImmediatePropagation();
-      if (document.activeElement && typeof document.activeElement.blur === 'function') {
-        try { document.activeElement.blur(); } catch (_) {}
-      }
-    }
-  }, true);
-  window.addEventListener('focus', (event) => {
-    if (!userInteracted) {
-      event.stopImmediatePropagation();
-    }
-  }, true);
-
-  const patchFocus = (proto) => {
-    if (!proto || typeof proto.focus !== 'function') return;
-    const raw = proto.focus;
-    proto.focus = function focus(...args) {
-      if (!userInteracted) return;
-      return raw.apply(this, args);
-    };
-  };
-  patchFocus(window.HTMLElement?.prototype);
-  patchFocus(window.Element?.prototype);
-  patchFocus(window.HTMLInputElement?.prototype);
-  patchFocus(window.HTMLTextAreaElement?.prototype);
-
-  try {
-    const stripAutofocus = (node) => {
-      if (node && node.nodeType === 1) {
-        if (node.hasAttribute('autofocus')) {
-          node.removeAttribute('autofocus');
-          node.autofocus = false;
-        }
-        const children = node.querySelectorAll?.('[autofocus]');
-        if (children) {
-          for (let i = 0; i < children.length; i++) {
-            children[i].removeAttribute('autofocus');
-            children[i].autofocus = false;
-          }
-        }
-      }
-    };
-    const observer = new MutationObserver((mutations) => {
-      if (userInteracted) {
-        observer.disconnect();
-        return;
-      }
-      for (let i = 0; i < mutations.length; i++) {
-        const added = mutations[i].addedNodes;
-        for (let j = 0; j < added.length; j++) {
-          stripAutofocus(added[j]);
-        }
-      }
-    });
-    observer.observe(document, { childList: true, subtree: true });
-  } catch (_) {}
-
-  const clearInitialAutofocus = () => {
-    if (
-      !userInteracted &&
-      document.activeElement &&
-      document.activeElement !== document.body &&
-      document.activeElement !== document.documentElement
-    ) {
-      try {
-        document.activeElement.blur();
-      } catch (_) {}
-    }
-  };
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', clearInitialAutofocus, { once: true });
-    document.addEventListener('readystatechange', clearInitialAutofocus);
-    window.addEventListener('load', clearInitialAutofocus, { once: true });
-  } else {
-    clearInitialAutofocus();
-  }
-
   install();
-  report('default');
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', install, { once: true });
   }
   document.addEventListener('pointerover', track, true);
   document.addEventListener('pointermove', track, true);
   document.addEventListener('pointerout', (event) => {
-    if (!event.relatedTarget) report('default');
+    if (!event.relatedTarget) {
+      reportPointerLeave();
+    }
   }, true);
-  window.addEventListener('blur', () => report('default'));
+  window.addEventListener('blur', () => {
+    reportPointerLeave();
+  });
 })();
 "#;
 
-pub(super) fn browser_viewport_script(shortcut_token: &str) -> String {
-    BROWSER_VIEWPORT_SCRIPT.replace(
-        "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
-        &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
-    )
+pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
+    BROWSER_VIEWPORT_SCRIPT
+        .replace(
+            "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
+            &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
+        )
+        .replace(
+            "__MISTY_POINTER_TRACKING_PLACEHOLDER__",
+            if pointer_tracking { "true" } else { "false" },
+        )
 }
 
 pub(super) const BROWSER_FAVICON_SCRIPT: &str = r#"
@@ -232,73 +152,136 @@ pub(super) const BROWSER_FAVICON_SCRIPT: &str = r#"
 })()
 "#;
 
-pub(super) fn normalized_browser_cursor(value: &str) -> &'static str {
-    match value {
-        "pointer" => "pointer",
-        "text" => "text",
-        "vertical-text" => "vertical-text",
-        "crosshair" => "crosshair",
-        "move" => "move",
-        "grab" => "grab",
-        "grabbing" => "grabbing",
-        "not-allowed" => "not-allowed",
-        "wait" => "wait",
-        "help" => "help",
-        "zoom-in" => "zoom-in",
-        "zoom-out" => "zoom-out",
-        "col-resize" => "col-resize",
-        "row-resize" => "row-resize",
-        "n-resize" => "n-resize",
-        "e-resize" => "e-resize",
-        "s-resize" => "s-resize",
-        "w-resize" => "w-resize",
-        "ne-resize" => "ne-resize",
-        "nw-resize" => "nw-resize",
-        "se-resize" => "se-resize",
-        "sw-resize" => "sw-resize",
-        "ew-resize" => "ew-resize",
-        "ns-resize" => "ns-resize",
-        "nesw-resize" => "nesw-resize",
-        "nwse-resize" => "nwse-resize",
-        "copy" => "copy",
-        "alias" => "alias",
-        "context-menu" => "context-menu",
-        "cell" => "cell",
-        "progress" => "progress",
-        _ => "default",
-    }
+pub(super) const BROWSER_COMPATIBILITY_SCRIPT: &str = r#"
+(() => {
+  const running = document.querySelector('#challenge-running');
+  const interstitial = Boolean(window._cf_chl_opt || running);
+  const challengePage = String(document.title || '').trim().toLowerCase() === 'just a moment...';
+  if (!interstitial || (!running && !challengePage)) return null;
+  return {
+    kind: 'cloudflare_challenge',
+    url: location.href,
+  };
+})()
+"#;
+
+#[derive(Debug, PartialEq)]
+pub(super) struct BrowserPointerNavigation {
+    pub x: f64,
+    pub y: f64,
+    pub inside: bool,
 }
 
-pub(super) fn browser_cursor_navigation(url: &Url) -> Option<&'static str> {
-    (url.scheme() == "misty-cursor")
-        .then(|| normalized_browser_cursor(url.path().trim_start_matches('/')))
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BrowserPointerEvent {
+    id: String,
+    x: f64,
+    y: f64,
+    inside: bool,
+}
+
+pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPointerNavigation) {
+    let _ = app.emit_to(
+        "main",
+        "misty://browser-pointer",
+        BrowserPointerEvent {
+            id: id.to_owned(),
+            x: pointer.x,
+            y: pointer.y,
+            inside: pointer.inside,
+        },
+    );
+}
+
+pub(super) fn browser_pointer_navigation(url: &Url) -> Option<BrowserPointerNavigation> {
+    if url.scheme() != "misty-pointer" {
+        return None;
+    }
+    if url.path().trim_start_matches('/') == "leave" {
+        return Some(BrowserPointerNavigation {
+            x: 0.0,
+            y: 0.0,
+            inside: false,
+        });
+    }
+    if url.path().trim_start_matches('/') != "move" {
+        return None;
+    }
+    let mut x = None;
+    let mut y = None;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "x" => x = value.parse::<f64>().ok(),
+            "y" => y = value.parse::<f64>().ok(),
+            _ => {}
+        }
+    }
+    let (x, y) = (x?, y?);
+    if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 || x > 100_000.0 || y > 100_000.0 {
+        return None;
+    }
+    Some(BrowserPointerNavigation { x, y, inside: true })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{browser_viewport_script, BROWSER_VIEWPORT_SCRIPT};
+    use super::{browser_pointer_navigation, browser_viewport_script, BROWSER_VIEWPORT_SCRIPT};
+    use url::Url;
 
     #[test]
-    fn cursor_reporting_does_not_enable_remote_desktop_ipc() {
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-cursor:"));
+    fn pointer_reporting_uses_no_page_dom_mutation_or_remote_desktop_ipc() {
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-cursor:"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:move"));
+    }
+
+    #[test]
+    fn pointer_navigation_accepts_only_bounded_coordinates() {
+        let pointer =
+            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=12.5&y=44").unwrap())
+                .unwrap();
+        assert_eq!(pointer.x, 12.5);
+        assert_eq!(pointer.y, 44.0);
+        assert!(pointer.inside);
+        assert!(
+            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=-1&y=4").unwrap())
+                .is_none()
+        );
+        assert!(
+            !browser_pointer_navigation(&Url::parse("misty-pointer:leave").unwrap())
+                .unwrap()
+                .inside
+        );
     }
 
     #[test]
     fn shortcut_token_is_embedded_as_json_without_becoming_a_window_global() {
-        let script = browser_viewport_script("secret-token");
+        let script = browser_viewport_script("secret-token", false);
         assert!(script.contains("const shortcutToken = \"secret-token\""));
+        assert!(script.contains("let pointerTrackingEnabled = false"));
+        assert!(script.contains("if (!pointerTrackingEnabled || !event?.isTrusted) return"));
         assert!(script.contains("if (!event.isTrusted) return"));
         assert!(!script.contains("__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__"));
+        assert!(!script.contains("__MISTY_POINTER_TRACKING_PLACEHOLDER__"));
         assert!(!script.contains("window.__MISTY_SHORTCUT_TOKEN"));
     }
 
     #[test]
-    fn initial_autofocus_is_suppressed_until_user_interaction() {
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("patchFocus(window.HTMLElement?.prototype)"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("userInteracted"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("if (event.isTrusted) userInteracted = true"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("document.activeElement.blur()"));
+    fn pointer_tracking_can_be_enabled_for_an_active_companion() {
+        let script = browser_viewport_script("token", true);
+        assert!(script.contains("let pointerTrackingEnabled = true"));
+        assert!(script.contains("window.__MISTY_SET_POINTER_TRACKING__"));
+        assert!(script.contains("if (!pointerTrackingEnabled) return"));
+    }
+
+    #[test]
+    fn embedded_pages_keep_their_native_focus_behavior() {
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("patchFocus"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("userInteracted"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.activeElement.blur()"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("report('default')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("HTMLElement.prototype.click ="));
     }
 }

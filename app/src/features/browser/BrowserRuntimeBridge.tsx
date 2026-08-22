@@ -51,14 +51,22 @@ interface BrowserFaviconEvent {
   url: string;
 }
 
+interface BrowserCompatibilityEvent {
+  id: string;
+  kind: "cloudflare_challenge";
+  url: string;
+}
+
 interface BrowserPopupEvent {
   sourceId: string;
   url: string;
 }
 
-interface BrowserCursorEvent {
+interface BrowserPointerEvent {
   id: string;
-  cursor: string;
+  x: number;
+  y: number;
+  inside: boolean;
 }
 
 interface BrowserDownloadEvent {
@@ -74,7 +82,6 @@ export function BrowserRuntimeBridge() {
   const browserSurfaceActive = useWorkspaceStore((state) =>
     activeBrowserSurfaceExists(state.layout.root),
   );
-
   useLayoutEffect(() => {
     if (!browserSurfaceActive) void hideAllBrowserWebviews();
   }, [browserSurfaceActive]);
@@ -92,23 +99,6 @@ export function BrowserRuntimeBridge() {
       window.removeEventListener("pointercancel", endPointerGesture, true);
       window.removeEventListener("blur", endPointerGesture);
       setBrowserPointerGestureActive(false);
-    };
-  }, []);
-
-  useEffect(() => {
-    const openPanes = new Set<string>();
-    const reason = "ai-drawer";
-    const update = (event: Event) => {
-      const detail = (event as CustomEvent<{ paneId?: string; open?: boolean }>).detail;
-      if (!detail?.paneId) return;
-      if (detail.open) openPanes.add(detail.paneId);
-      else openPanes.delete(detail.paneId);
-      setBrowserWebviewsSuspended(openPanes.size > 0, reason);
-    };
-    window.addEventListener("misty:ai-drawer-visibility", update);
-    return () => {
-      window.removeEventListener("misty:ai-drawer-visibility", update);
-      setBrowserWebviewsSuspended(false, reason);
     };
   }, []);
 
@@ -149,6 +139,9 @@ export function BrowserRuntimeBridge() {
         if (disposed) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
+        if (payload.phase === "started") {
+          useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
+        }
         useWorkspaceStore.getState().updateBrowserTab(tabId, { url: payload.url });
         if (payload.phase === "finished") {
           useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
@@ -171,10 +164,50 @@ export function BrowserRuntimeBridge() {
           useWorkspaceStore.getState().updateBrowserTab(tabId, { faviconUrl: payload.url });
         }
       }),
-      listen<BrowserCursorEvent>("misty://browser-cursor", ({ payload }) => {
-        if (disposed) return;
+      listen<BrowserCompatibilityEvent>("misty://browser-compatibility", ({ payload }) => {
+        if (
+          disposed ||
+          payload.kind !== "cloudflare_challenge" ||
+          !/^https?:\/\//i.test(payload.url)
+        ) {
+          return;
+        }
         const tabId = browserTabIdForRuntime(payload.id);
-        if (tabId) useBrowserRuntimeStore.getState().setCursor(tabId, payload.cursor);
+        if (tabId) {
+          useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, {
+            kind: payload.kind,
+            url: payload.url,
+          });
+        }
+      }),
+      listen<BrowserPointerEvent>("misty://browser-pointer", ({ payload }) => {
+        if (
+          disposed ||
+          !payload.inside ||
+          !Number.isFinite(payload.x) ||
+          !Number.isFinite(payload.y)
+        ) {
+          return;
+        }
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (!tabId) return;
+        const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
+          (candidate) => candidate.activeTabId === tabId,
+        );
+        if (!pane) return;
+        const workspace = document.querySelector<HTMLElement>(
+          `[data-browser-workspace-tab="${CSS.escape(tabId)}"]`,
+        );
+        const host = workspace?.querySelector<HTMLElement>("[data-browser-page-host]");
+        if (!host) return;
+        const rect = host.getBoundingClientRect();
+        const x = Math.min(rect.right, Math.max(rect.left, rect.left + payload.x));
+        const y = Math.min(rect.bottom, Math.max(rect.top, rect.top + payload.y));
+        window.dispatchEvent(
+          new CustomEvent("misty:browser-pointer", {
+            detail: { x, y, paneId: pane.id },
+          }),
+        );
       }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
         if (disposed) return;
