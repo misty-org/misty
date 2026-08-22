@@ -429,7 +429,11 @@ async function askMisty(
       prompt,
       context: safeContext,
     });
-    if (response.message) return response.message;
+    if (response.message)
+      return {
+        ...response.message,
+        citations: response.citations ?? response.message.citations ?? [],
+      };
     if (response.text)
       return {
         ...conversationMessage("assistant", "ask", response.text),

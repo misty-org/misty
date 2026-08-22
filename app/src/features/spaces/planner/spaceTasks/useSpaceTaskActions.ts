@@ -42,8 +42,8 @@ export function useSpaceTaskActions(options: {
 
   const failWith = (reason: unknown) => data.setError(errorText(reason));
 
-  const openCreate = (initialStatus: SpaceTaskStatus = "todo") => {
-    setDraft({ ...emptyDraft(), status: initialStatus });
+  const openCreate = (initialStatus: SpaceTaskStatus = "todo", initialTitle = "") => {
+    setDraft({ ...emptyDraft(), status: initialStatus, title: initialTitle });
     setEditing(null);
   };
 

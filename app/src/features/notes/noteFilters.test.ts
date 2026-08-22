@@ -22,7 +22,6 @@ function note(overrides: Partial<UnifiedNote> & { id: string }): UnifiedNote {
     backlinks: [],
     updatedAt: new Date(now - 60_000).toISOString(),
     createdAt: new Date(now - 60_000).toISOString(),
-    favorite: false,
     syncStatus: "synced",
     ...overrides,
   };

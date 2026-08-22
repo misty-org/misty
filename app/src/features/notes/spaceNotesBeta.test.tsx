@@ -54,7 +54,6 @@ function note(overrides: Partial<UnifiedNote> & { id: string }): UnifiedNote {
     backlinks: [],
     updatedAt: "2026-07-20T12:00:00.000Z",
     createdAt: "2026-07-20T12:00:00.000Z",
-    favorite: false,
     syncStatus: "local-only",
     ...rest,
   };
@@ -106,19 +105,20 @@ describe("SpaceNotes beta simplification", () => {
 
   const notesSurface = (entry = "/spaces/space-product/notes") => (
     <MemoryRouter initialEntries={[entry]}>
+      <NotesPanelSidebar spaceId="space-product" spaceName="Product" />
       <SpaceNotes spaceId="space-product" spaceName="Product" />
     </MemoryRouter>
   );
 
-  it("mounts Notion management inside Journal without replacing native notes", async () => {
+  it("keeps connector management out of Journal", async () => {
     await act(async () => {
       root.render(notesSurface());
     });
     await wait(180);
 
-    expect(document.body.textContent).not.toContain("Notion");
     expect(document.body.textContent).not.toContain("Sources");
     expect(document.body.textContent).not.toContain("Manage sources");
+    expect(document.body.textContent).not.toContain("Journal integrations");
     expect(document.body.textContent).not.toContain("Publish to Notion");
     expect(document.body.textContent).not.toContain("Open in Notion");
     expect(document.body.textContent).not.toContain("Unlinked");
@@ -127,15 +127,7 @@ describe("SpaceNotes beta simplification", () => {
     );
     expect(
       document.body.querySelector('button[aria-label="Manage Journal integrations"]'),
-    ).not.toBeNull();
-    await act(async () => {
-      document.body
-        .querySelector<HTMLButtonElement>('button[aria-label="Manage Journal integrations"]')
-        ?.click();
-    });
-    await wait();
-    expect(document.body.textContent).toContain("Journal integrations");
-    expect(document.body.textContent).toContain("Notion");
+    ).toBeNull();
   });
 
   it("opens the existing note dialog from a note creation query", async () => {
@@ -224,7 +216,9 @@ describe("SpaceNotes beta simplification", () => {
       syncStatus: "synced",
     });
     expect(useNotesStore.getState().selectedNoteId).toBe(created?.id);
-    expect(document.body.textContent).toContain("Beta note");
+    expect(document.body.querySelector<HTMLInputElement>('[aria-label="Note title"]')?.value).toBe(
+      "Beta note",
+    );
     expect(
       document.body.querySelector("[data-testid='block-editor']")?.getAttribute("data-editable"),
     ).toBe("true");
@@ -268,13 +262,22 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait(180);
 
-    const deleteTrigger = document.body.querySelector<HTMLButtonElement>(
-      'button[aria-label="Delete note"]',
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const noteRow = Array.from(document.body.querySelectorAll("button")).find(
+      (candidate) => candidate.textContent?.trim() === "Delete me",
     );
-    expect(deleteTrigger).toBeTruthy();
-    await act(async () => deleteTrigger?.click());
+    expect(noteRow).toBeTruthy();
+    await act(async () => {
+      noteRow?.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }),
+      );
+    });
     await wait();
-    await act(async () => buttonByText("Delete note").click());
+    const deleteAction = Array.from(document.body.querySelectorAll('[role="menuitem"]')).find(
+      (candidate) => candidate.textContent?.trim() === "Delete",
+    );
+    expect(deleteAction).toBeTruthy();
+    await act(async () => (deleteAction as HTMLElement | undefined)?.click());
     await wait();
 
     expect(spaceRequestMock).toHaveBeenLastCalledWith("/spaces/space-product/notes/note_delete", {
@@ -312,11 +315,12 @@ describe("SpaceNotes beta simplification", () => {
       updated_at: "2026-07-20T12:02:00.000Z",
     };
     let noteListReads = 0;
+    let changed = false;
     spaceRequestMock.mockImplementation(async (path: string) => {
       if (path.endsWith("/status")) return { connected: false };
       if (path.endsWith("/notes")) {
         noteListReads += 1;
-        return { notes: noteListReads === 1 ? [first] : [second, first] };
+        return { notes: changed ? [second, first] : [first] };
       }
       return undefined;
     });
@@ -326,9 +330,12 @@ describe("SpaceNotes beta simplification", () => {
     });
     await wait(180);
 
-    expect(document.body.textContent).toContain("First note");
+    expect(document.body.querySelector<HTMLInputElement>('[aria-label="Note title"]')?.value).toBe(
+      "First note",
+    );
     expect(document.body.textContent).not.toContain("Second note");
 
+    changed = true;
     window.dispatchEvent(
       new CustomEvent("misty:space-note-event", {
         detail: { space_id: "space-product", type: "note.created" },
@@ -341,6 +348,6 @@ describe("SpaceNotes beta simplification", () => {
       "Second note",
       "First note",
     ]);
-    expect(noteListReads).toBe(2);
+    expect(noteListReads).toBeGreaterThanOrEqual(2);
   });
 });

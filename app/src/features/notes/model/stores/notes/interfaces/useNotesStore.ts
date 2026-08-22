@@ -24,8 +24,6 @@ export interface NotesStoreState {
   query: string;
   syncing: boolean;
   lastSyncedAt?: string;
-  /** Lives in the store because the Space sidebar and the pane are sibling trees. */
-  integrationsOpen: boolean;
   /** Bumped whenever connector status changes so selectors recompute. */
   connectorRevision: number;
 }
@@ -42,10 +40,9 @@ export interface NotesStoreActions {
   setQuery: (query: string) => void;
   selectNote: (noteId: string | undefined) => void;
   setEditingNoteId: (noteId: string | undefined) => void;
-  setIntegrationsOpen: (open: boolean) => void;
-  toggleFavorite: (noteId: string) => Promise<void>;
   createNote: (input: CreateNoteInput) => Promise<UnifiedNote | undefined>;
   deleteNote: (noteId: string) => Promise<void>;
+  archiveNote: (noteId: string) => Promise<void>;
   updateNoteBody: (noteId: string, body: string) => Promise<void>;
   updateNoteContent: (noteId: string, content: UpdateNoteContentInput) => Promise<void>;
   assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;

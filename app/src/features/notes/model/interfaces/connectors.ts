@@ -19,7 +19,6 @@ export interface UpdateNoteInput {
   spaceId?: string;
   spaceName?: string;
   tags?: string[];
-  favorite?: boolean;
 }
 
 /** A page or database in the source that a Space can subscribe to. */

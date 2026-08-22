@@ -71,12 +71,31 @@ export class LspClient {
               hover: { contentFormat: ["markdown", "plaintext"] },
               completion: {
                 completionItem: {
-                  snippetSupport: false,
+                  snippetSupport: true,
                   documentationFormat: ["markdown", "plaintext"],
                 },
               },
               definition: { linkSupport: false },
+              typeDefinition: { linkSupport: false },
+              implementation: { linkSupport: false },
+              references: {},
+              rename: { prepareSupport: true },
+              codeAction: {
+                codeActionLiteralSupport: {
+                  codeActionKind: { valueSet: ["", "quickfix", "refactor", "source"] },
+                },
+              },
+              documentSymbol: { hierarchicalDocumentSymbolSupport: true },
+              signatureHelp: {
+                signatureInformation: {
+                  documentationFormat: ["markdown", "plaintext"],
+                  parameterInformation: { labelOffsetSupport: true },
+                },
+              },
+              inlayHint: { dynamicRegistration: false },
+              documentHighlight: {},
             },
+            workspace: { workspaceEdit: { documentChanges: true } },
           },
         },
       });

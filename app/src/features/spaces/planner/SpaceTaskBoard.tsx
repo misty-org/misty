@@ -6,9 +6,17 @@ import type {
   SpaceTask,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from "@/shared/ui";
-import { GripVertical, LoaderCircle, Plus } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
+import { CheckSquare, GripVertical, LoaderCircle, Maximize2, Pencil, Plus } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 import {
   dueTone,
   shortDue,
@@ -42,6 +50,7 @@ export function SpaceTaskBoard({
   onOpen,
   onMove,
   onCreate,
+  onOpenFullCreate,
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
@@ -52,6 +61,7 @@ export function SpaceTaskBoard({
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus, beforeTaskId?: string) => void;
   onCreate: (title: string, status: SpaceTaskStatus) => void;
+  onOpenFullCreate?: (status: SpaceTaskStatus, initialTitle?: string) => void;
 }) {
   const [creating, setCreating] = useState<SpaceTaskStatus>();
   const [title, setTitle] = useState("");
@@ -63,9 +73,6 @@ export function SpaceTaskBoard({
 
   return (
     <div
-      // The board scrolls sideways only. Scrolling it vertically let the
-      // columns grow past the viewport, so the tallest one dragged the whole
-      // board instead of each column scrolling its own tasks.
       className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden"
       aria-label="Task board"
     >
@@ -94,7 +101,12 @@ export function SpaceTaskBoard({
             if (!title.trim()) return;
             onCreate(title.trim(), column.id);
             setTitle("");
+          }}
+          onOpenFullCreate={() => {
+            const initialTitle = title;
             setCreating(undefined);
+            setTitle("");
+            onOpenFullCreate?.(column.id, initialTitle);
           }}
           onOpen={onOpen}
           onMove={onMove}
@@ -119,6 +131,7 @@ function BoardColumn({
   onStartCreate,
   onCancelCreate,
   onSubmitCreate,
+  onOpenFullCreate,
   onOpen,
   onMove,
   onMoveById,
@@ -136,6 +149,7 @@ function BoardColumn({
   onStartCreate: () => void;
   onCancelCreate: () => void;
   onSubmitCreate: (event: FormEvent) => void;
+  onOpenFullCreate: () => void;
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus) => void;
   onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
@@ -146,12 +160,21 @@ function BoardColumn({
     onDrop: (payload) => onMoveById(payload.id, column.id),
   });
 
+  const handleInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onCancelCreate();
+    }
+  };
+
   return (
     <section
       ref={dropZone.ref}
-      className={`flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0 ${
-        dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent"
-      }`}
+      className={cn(
+        "flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col",
+        "border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0",
+        dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent",
+      )}
     >
       <header className="flex min-h-11 items-center gap-2 px-2">
         <span className={`size-2 rounded-full ${statusDot(column.id)}`} />
@@ -159,7 +182,7 @@ function BoardColumn({
         <span className="text-[11px] tabular-nums text-cream-muted">{total ?? tasks.length}</span>
         {canManage ? (
           <Button
-            className="ml-auto size-7"
+            className="ml-auto size-7 text-cream-muted hover:bg-charcoal-card hover:text-cream"
             size="icon"
             variant="ghost"
             type="button"
@@ -172,6 +195,60 @@ function BoardColumn({
       </header>
 
       <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto overscroll-contain pr-0.5">
+        {/* Inline Quick Creation Card */}
+        {creating ? (
+          <Card className="gap-0 border-charcoal-border/80 bg-charcoal-card py-0 shadow-md ring-1 ring-charcoal-border/50">
+            <form onSubmit={onSubmitCreate}>
+              <CardContent className="space-y-2.5 p-3">
+                <Input
+                  autoFocus
+                  maxLength={240}
+                  placeholder="Task title"
+                  value={title}
+                  onChange={(event) => onTitle(event.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  className="h-auto border-0 bg-transparent p-0 text-xs font-medium text-cream shadow-none placeholder:text-cream-faint/40 focus-visible:ring-0"
+                />
+                <div className="flex items-center justify-between gap-1 border-t border-charcoal-border/40 pt-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    type="button"
+                    title="Expand into full task editor"
+                    onClick={onOpenFullCreate}
+                    className="size-6 text-cream-muted hover:bg-charcoal-hover hover:text-cream"
+                  >
+                    <Maximize2 className="size-3" />
+                  </Button>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      type="button"
+                      onClick={onCancelCreate}
+                      className="h-6 px-2 text-[11px] text-cream-muted hover:text-cream"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!title.trim() || busy === `create:${column.id}`}
+                      type="submit"
+                      className="h-6 px-2.5 text-[11px]"
+                    >
+                      {busy === `create:${column.id}` ? (
+                        <LoaderCircle className="size-3 animate-spin" />
+                      ) : (
+                        "Add"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </form>
+          </Card>
+        ) : null}
+
         {tasks.map((task) => (
           <TaskCard
             task={task}
@@ -186,52 +263,21 @@ function BoardColumn({
           />
         ))}
 
-        {creating ? (
-          <Card className="gap-0 py-0 shadow-none ring-cream/8">
-            <form onSubmit={onSubmitCreate}>
-              <CardContent className="p-3">
-                <Input
-                  autoFocus
-                  maxLength={240}
-                  placeholder="Task title"
-                  value={title}
-                  onChange={(event) => onTitle(event.target.value)}
-                />
-                <div className="mt-2 flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" type="button" onClick={onCancelCreate}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={!title.trim() || busy === `create:${column.id}`}
-                    type="submit"
-                  >
-                    {busy === `create:${column.id}` ? (
-                      <LoaderCircle className="size-3.5 animate-spin" />
-                    ) : null}
-                    Add
-                  </Button>
-                </div>
-              </CardContent>
-            </form>
-          </Card>
-        ) : null}
-
         {!tasks.length && !creating ? (
           <Button
-            className={[
-              "min-h-28 flex-col gap-2 rounded-md border-0 bg-transparent",
-              "text-xs text-cream-muted shadow-none hover:bg-charcoal-card",
-            ].join(" ")}
+            className={cn(
+              "min-h-24 flex-col gap-1.5 rounded-lg border border-dashed border-charcoal-border/50 bg-transparent",
+              "text-xs text-cream-muted/70 shadow-none hover:border-charcoal-border hover:bg-charcoal-card/40 hover:text-cream",
+            )}
             variant="ghost"
             type="button"
             disabled={!canManage}
             onClick={onStartCreate}
           >
-            <span className="grid size-7 place-items-center text-cream-muted">
+            <span className="grid size-6 place-items-center text-cream-muted">
               <Plus className="size-3.5" />
             </span>
-            Drop or create
+            <span>Drop or create</span>
           </Button>
         ) : null}
       </div>
@@ -270,6 +316,14 @@ function TaskCard({
     onDrop: onDropBefore,
   });
 
+  const checklistStats = useMemo(() => {
+    if (!notes) return null;
+    const matches = [...notes.matchAll(/- \[(x|X| )\]/g)];
+    if (!matches.length) return null;
+    const completed = matches.filter((m) => m[1].toLowerCase() === "x").length;
+    return { completed, total: matches.length };
+  }, [notes]);
+
   useEffect(() => {
     if (dragging) draggedRef.current = true;
   }, [dragging]);
@@ -281,54 +335,72 @@ function TaskCard({
     startDrag(event, { kind: TASK_DRAG_KIND, id: task.id }, <TaskDragPreview task={task} />);
   };
 
-  // A drag ends with a click on the source; opening the task then would be wrong.
-  const openTask = () => {
-    if (draggedRef.current) {
-      draggedRef.current = false;
-      return;
-    }
-    onOpen(task);
-  };
-
   return (
     <Card
       ref={dropZone.ref}
       data-misty-window-drag-block={canManage ? "true" : undefined}
       data-pointer-drag-source={canManage ? "true" : undefined}
-      className={`group gap-0 py-0 shadow-sm ring-cream/8 hover:shadow-md ${
-        canManage ? "cursor-grab" : "cursor-default"
-      } ${dragging ? "opacity-40" : ""} ${dropZone.active ? "ring-2 ring-charcoal-active" : ""}`}
+      className={cn(
+        "group gap-0 rounded-xl border border-charcoal-border/70 bg-charcoal-card/80 py-0 shadow-sm transition-all",
+        "hover:border-charcoal-border hover:bg-charcoal-card hover:shadow-md",
+        canManage ? "cursor-grab" : "cursor-default",
+        dragging ? "opacity-40" : "",
+        dropZone.active ? "ring-2 ring-charcoal-active" : "",
+      )}
       onPointerDown={beginDrag}
     >
       <CardHeader className="p-3 pb-2">
-        <div
-          className={[
-            "grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md",
-            "text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal-active",
-          ].join(" ")}
-          role="button"
-          tabIndex={0}
-          onClick={openTask}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            onOpen(task);
-          }}
-        >
+        <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md text-left">
           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-cream-muted opacity-0 transition-opacity group-hover:opacity-100" />
           <div className="min-w-0">
-            <CardTitle className="line-clamp-3 text-sm leading-5">{task.title}</CardTitle>
+            <CardTitle className="line-clamp-3 text-xs font-semibold leading-5 text-cream">
+              {task.title}
+            </CardTitle>
             {notes ? (
-              <p className="mb-0 mt-1 line-clamp-2 text-xs leading-4 text-cream-muted">{notes}</p>
+              <p className="mb-0 mt-1 line-clamp-2 text-[11px] leading-4 text-cream-muted">
+                {notes.replace(/[-*#_`[\]]/g, " ").trim()}
+              </p>
             ) : null}
           </div>
-          {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
+          <div className="flex items-center gap-0.5">
+            {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
+            <Button
+              size="icon"
+              variant="ghost"
+              type="button"
+              title="Edit task"
+              aria-label={`Edit ${task.title}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(task);
+              }}
+              className="size-6 rounded-md text-cream-muted opacity-0 transition-opacity hover:bg-charcoal-hover hover:text-cream group-hover:opacity-100"
+            >
+              <Pencil className="size-3" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-3 pt-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-medium text-cream-muted">{task.task_key}</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-semibold text-cream-muted/80">{task.task_key}</span>
           <TaskPriorityBadge priority={task.priority} />
+          {checklistStats ? (
+            <span
+              className={cn(
+                "flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium tracking-tight",
+                checklistStats.completed === checklistStats.total
+                  ? "bg-status-green/20 text-status-green"
+                  : "bg-charcoal-workspace text-cream-muted",
+              )}
+              title={`${checklistStats.completed} of ${checklistStats.total} checklist items completed`}
+            >
+              <CheckSquare className="size-3 shrink-0" />
+              <span>
+                {checklistStats.completed}/{checklistStats.total}
+              </span>
+            </span>
+          ) : null}
           {task.due_at ? (
             <span className={`text-[10px] font-medium ${dueTone(task)}`}>
               {shortDue(task.due_at)}
@@ -358,18 +430,6 @@ function TaskCard({
 
 function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMembership }) {
   const state = agentTaskDisplayState(taskId, agent);
-  const labels = {
-    ready: "Ready",
-    queued: "Queued",
-    working: "Working",
-    awaiting_approval: "Awaiting approval",
-    needs_approval: "Needs approval",
-    retrying: "Retrying",
-    failed: "Failed",
-    disabled: "Disabled",
-    update_available: "Update available",
-    assigned: "Assigned",
-  } as const;
   const attention = state === "needs_approval" || state === "failed";
   return (
     <span
@@ -380,18 +440,17 @@ function AgentTaskState({ taskId, agent }: { taskId: string; agent: SpaceAgentMe
             ? "bg-status-green text-sage-fg"
             : "bg-charcoal-card text-cream-muted"
       }`}
-      title={`${agent.name}: ${labels[state]}`}
     >
-      {labels[state]}
+      {state}
     </span>
   );
 }
 
 function TaskDragPreview({ task }: { task: SpaceTask }) {
   return (
-    <div className="rounded-xl border border-charcoal-border bg-charcoal-card px-3 py-2 shadow-lg">
-      <p className="m-0 line-clamp-2 text-sm font-medium text-cream">{task.title}</p>
-      <span className="text-[10px] font-medium text-cream-muted">{task.task_key}</span>
+    <div className="w-56 rounded-lg border border-charcoal-border bg-charcoal-card p-2.5 opacity-90 shadow-xl">
+      <div className="line-clamp-2 text-xs font-semibold text-cream">{task.title}</div>
+      <div className="mt-1 text-[10px] text-cream-muted">{task.task_key}</div>
     </div>
   );
 }

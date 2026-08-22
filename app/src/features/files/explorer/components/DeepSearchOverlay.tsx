@@ -1,5 +1,6 @@
 import type { SearchResult } from "@/native/contracts";
 import type { SearchQueryScope } from "@/native/contracts/primitives";
+import { ShortcutHint } from "@/features/shortcuts";
 import {
   Button,
   Dialog,
@@ -211,7 +212,7 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
               }
             />
           </label>
-          <kbd className={overlayStyles.keyHint}>⌘K</kbd>
+          <ShortcutHint commandId="explorer.search" className={overlayStyles.keyHint} />
         </header>
         <div className={overlayStyles.controls}>
           <div className={overlayStyles.scopes} role="tablist" aria-label="Search mode">

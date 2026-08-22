@@ -1,4 +1,3 @@
-import { useAppStore } from "@/features/app-shell";
 import { useEffect } from "react";
 import { useExplorerStore } from "../../store";
 

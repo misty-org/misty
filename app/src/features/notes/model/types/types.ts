@@ -1,6 +1,6 @@
 export type NoteSource = "misty" | "notion";
 
-export type NoteBodyFormat = "markdown" | "blocknote-json" | "html" | "notion-blocks";
+export type NoteBodyFormat = "markdown" | "tiptap-json" | "html" | "notion-blocks";
 
 export type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
 
@@ -27,7 +27,10 @@ export type UnifiedNote = {
   backlinks: string[];
   updatedAt: string;
   createdAt: string;
-  favorite: boolean;
+  /** Server projection revision used to reject stale AI and collaboration patches. */
+  collaborationRevision?: number;
+  /** Number of accessible native notes that link to this note. */
+  backlinkCount?: number;
   syncStatus: NoteSyncStatus;
   sourceUrl?: string;
   connectorId?: string;

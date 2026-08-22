@@ -29,12 +29,11 @@ export interface ArchiveToolsContext {
   hasRemoteSelection: boolean;
   hasSelection: boolean;
   paneId: string;
-  primaryShortcut: string;
   targetEntry: FileEntry | null;
   /** Closes the menu, then performs the action. */
   run: (action: () => void) => void;
   /** Returns the hint text, or undefined when shortcut hints are switched off. */
-  shortcut: (value: string) => string | undefined;
+  shortcutFor: (commandId: string) => string | undefined;
 }
 
 export function buildArchiveItems(context: ArchiveToolsContext): ContextMenuLeafItem[] {
@@ -85,7 +84,7 @@ export function buildArchiveItems(context: ArchiveToolsContext): ContextMenuLeaf
 }
 
 export function buildFileToolsItems(context: ArchiveToolsContext): ContextMenuLeafItem[] {
-  const { hasRemoteSelection, paneId, primaryShortcut, run, shortcut, targetEntry } = context;
+  const { hasRemoteSelection, paneId, run, shortcutFor, targetEntry } = context;
   return [
     {
       id: "sha256",
@@ -115,7 +114,7 @@ export function buildFileToolsItems(context: ArchiveToolsContext): ContextMenuLe
       id: "copy-path",
       icon: <Copy size={17} />,
       label: "Copy Path",
-      shortcut: shortcut(`${primaryShortcut}+Alt+C`),
+      shortcut: shortcutFor("explorer.copy_path"),
       disabled: !targetEntry,
       disabledReason: "Choose an item first.",
       onRun: () =>

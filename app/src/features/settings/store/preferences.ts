@@ -178,7 +178,6 @@ export function selectShortcutPreferences(
 ): ShortcutPreferences {
   const source = document ?? {};
   return {
-    customShortcutsEnabled: settingsBoolean(source, "shortcuts", "custom_shortcuts_enabled", false),
     shortcutHintsEnabled: settingsBoolean(source, "shortcuts", "shortcut_hints_enabled", true),
   };
 }
@@ -292,7 +291,6 @@ export interface AgentPreferences {
 }
 
 export interface ShortcutPreferences {
-  customShortcutsEnabled: boolean;
   shortcutHintsEnabled: boolean;
 }
 

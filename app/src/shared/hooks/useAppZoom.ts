@@ -95,26 +95,6 @@ export function useAppZoom() {
     return () => window.removeEventListener(appZoomChangedEvent, sync);
   }, [setClampedZoom]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-
-      if (isZoomInKey(event)) {
-        event.preventDefault();
-        zoomIn();
-      } else if (isZoomOutKey(event)) {
-        event.preventDefault();
-        zoomOut();
-      } else if (isZoomResetKey(event)) {
-        event.preventDefault();
-        resetZoom();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [resetZoom, zoomIn, zoomOut]);
-
   return {
     indicatorVisible,
     resetZoom,
@@ -171,25 +151,6 @@ function saveStoredAppZoom(zoom: number): void {
 function clampAppZoom(zoom: number): number {
   const rounded = Math.round(zoom * 10) / 10;
   return Math.min(appZoomMax, Math.max(appZoomMin, rounded));
-}
-
-function isZoomInKey(event: KeyboardEvent): boolean {
-  return (
-    event.key === "+" || event.key === "=" || event.code === "Equal" || event.code === "NumpadAdd"
-  );
-}
-
-function isZoomOutKey(event: KeyboardEvent): boolean {
-  return (
-    event.key === "-" ||
-    event.key === "_" ||
-    event.code === "Minus" ||
-    event.code === "NumpadSubtract"
-  );
-}
-
-function isZoomResetKey(event: KeyboardEvent): boolean {
-  return event.key === "0" || event.code === "Digit0" || event.code === "Numpad0";
 }
 
 function applyCssZoomFallback(zoom: number): void {

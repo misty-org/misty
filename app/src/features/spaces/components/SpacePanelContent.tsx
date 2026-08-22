@@ -15,7 +15,6 @@ import { useSpacesStore } from "../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
 import { SpacePanelSidebarContext } from "./spacePanel/SpacePanelSidebarContext";
 import { SpacePanelSkeleton } from "./spacePanel/SpacePanelSkeleton";
-import { SpaceSidebarHeader } from "./spacePanel/SpaceSidebarHeader";
 import {
   spaceConversationPath,
   spaceSectionPath,
@@ -124,8 +123,6 @@ export function SpacePanelContent(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {activeSpace ? <SpaceSidebarHeader space={activeSpace} /> : null}
-
       {props.notices ? (
         <div className="misty-transient-scrollbar mb-3 max-h-40 shrink-0 overflow-y-auto">
           {props.notices}

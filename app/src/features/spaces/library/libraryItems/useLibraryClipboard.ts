@@ -1,6 +1,7 @@
 import { spacesApi } from "@/api/spaces/api";
+import { useShortcutHandler } from "@/features/shortcuts";
 import type { LibrarySharedReference, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../libraryClipboard";
 import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
@@ -86,20 +87,14 @@ export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promis
     }, "The edits could not be pasted.");
   };
 
-  // Cmd/Ctrl-C copies the grid selection, but only while the viewer is closed —
-  // an open item binds its own copy shortcut.
-  useEffect(() => {
-    if (!canCopyLibrary || selectedItems.length === 0 || selectedItemId) return;
-    const copySelection = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "c") return;
-      const target = event.target as HTMLElement | null;
-      if (target?.matches("input, textarea, select, [contenteditable='true']")) return;
-      event.preventDefault();
-      void copyItemsToClipboard(selectedItems);
-    };
-    window.addEventListener("keydown", copySelection);
-    return () => window.removeEventListener("keydown", copySelection);
-  }, [canCopyLibrary, copyItemsToClipboard, selectedItemId, selectedItems]);
+  useShortcutHandler(
+    "library.copy",
+    useCallback(
+      () => void copyItemsToClipboard(selectedItems),
+      [copyItemsToClipboard, selectedItems],
+    ),
+    canCopyLibrary && selectedItems.length > 0 && !selectedItemId,
+  );
 
   return { copyItemsToClipboard, copySharedReferenceToClipboard, duplicateItems, pasteEdits };
 }
