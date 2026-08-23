@@ -19,8 +19,8 @@ use url::Url;
 
 use super::browser_macos::{
     configure_browser_webview, configure_main_webview_pointer_guard,
-    native_macos_safari_user_agent, refresh_browser_cursor_ownership, reload_browser_webview,
-    unregister_browser_cursor_ownership,
+    evaluate_browser_async_javascript, native_macos_safari_user_agent,
+    refresh_browser_cursor_ownership, reload_browser_webview, unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
     browser_pointer_navigation, browser_viewport_script, emit_browser_pointer,
@@ -28,7 +28,7 @@ use super::browser_scripts::{
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
-    BrowserShortcutBinding,
+    shortcut_token_matches, BrowserShortcutBinding,
 };
 use super::browser_theme::{browser_background, browser_theme, default_browser_theme};
 
@@ -36,6 +36,8 @@ const MAX_SNAPSHOT_CHARS: usize = 256 * 1024;
 const MAX_INTERACTIVE_ELEMENTS: usize = 500;
 const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
+const HTML2CANVAS_SOURCE: &str =
+    include_str!("../../../../node_modules/html2canvas/dist/html2canvas.min.js");
 #[cfg(target_os = "macos")]
 static BROWSER_OVERLAY_ACTIVE: AtomicBool = AtomicBool::new(false);
 static BROWSER_POINTER_TRACKING_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -106,6 +108,16 @@ pub struct BrowserWebviewBoundsRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BrowserCaptureRegionRequest {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewIdRequest {
     pub id: String,
 }
@@ -121,6 +133,42 @@ pub struct BrowserNavigateRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserThemeRequest {
     pub theme: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCompanionSuggestion {
+    id: String,
+    label: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserCompanionStateRequest {
+    target_id: String,
+    visible: bool,
+    phase: String,
+    name: String,
+    label: String,
+    #[serde(default)]
+    speech: String,
+    #[serde(default)]
+    capture_attached: bool,
+    #[serde(default)]
+    suggestions: Vec<BrowserCompanionSuggestion>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BrowserCompanionEvent {
+    id: String,
+    kind: String,
+    prompt: String,
+    action_id: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -524,6 +572,8 @@ pub fn browser_webview_create(
             if let Some(pointer) = browser_pointer_navigation(url) {
                 emit_browser_pointer(&navigation_app, &navigation_id, pointer);
                 false
+            } else if forward_companion_navigation(&navigation_app, &navigation_id, url) {
+                false
             } else if forward_navigation(&navigation_app, &navigation_id, url) {
                 false
             } else {
@@ -597,6 +647,41 @@ pub fn browser_webview_create(
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
+}
+
+fn forward_companion_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
+    if url.scheme() != "misty-companion" {
+        return false;
+    }
+    let values = url.query_pairs().collect::<HashMap<_, _>>();
+    let value = |key: &str| values.get(key).map(|value| value.as_ref()).unwrap_or("");
+    let trusted = app
+        .try_state::<BrowserSessionState>()
+        .map(|state| shortcut_token_matches(&state, id, value("token")))
+        .unwrap_or(false);
+    if !trusted {
+        return true;
+    }
+    let number = |key: &str| value(key).parse::<f64>().unwrap_or(0.0);
+    let kind = url.path().trim_start_matches('/').to_owned();
+    if !matches!(kind.as_str(), "submit" | "action" | "capture") {
+        return true;
+    }
+    let _ = app.emit_to(
+        "main",
+        "misty://browser-companion",
+        BrowserCompanionEvent {
+            id: id.to_owned(),
+            kind,
+            prompt: value("prompt").chars().take(32 << 10).collect(),
+            action_id: value("action").chars().take(200).collect(),
+            x: number("x"),
+            y: number("y"),
+            width: number("width"),
+            height: number("height"),
+        },
+    );
+    true
 }
 
 fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
@@ -865,6 +950,47 @@ pub fn browser_webview_set_bounds(
 }
 
 #[tauri::command]
+pub async fn browser_webview_capture_region(
+    app: AppHandle,
+    request: BrowserCaptureRegionRequest,
+) -> Result<Value, String> {
+    if !request.x.is_finite()
+        || !request.y.is_finite()
+        || !request.width.is_finite()
+        || !request.height.is_finite()
+        || request.x < 0.0
+        || request.y < 0.0
+        || request.width < 8.0
+        || request.height < 8.0
+        || request.width > 10_000.0
+        || request.height > 10_000.0
+    {
+        return Err("Capture region is invalid.".to_owned());
+    }
+    let webview = app
+        .get_webview(&webview_label(&request.id)?)
+        .ok_or_else(|| "Browser page is unavailable.".to_owned())?;
+    let options = json!({
+        "x": request.x,
+        "y": request.y,
+        "width": request.width,
+        "height": request.height,
+    });
+    let script = format!(
+        "{}\nconst region = {}; const companion = document.getElementById('misty-native-companion'); const display = companion?.style.display; if (companion) companion.style.display = 'none'; try {{ const source = await window.html2canvas(document.documentElement, {{ x: region.x + scrollX, y: region.y + scrollY, width: region.width, height: region.height, scale: Math.min(2, 1280 / Math.max(region.width, region.height)), useCORS: true, logging: false }}); const ratio = Math.min(1, 1280 / Math.max(source.width, source.height)); const output = document.createElement('canvas'); output.width = Math.max(1, Math.round(source.width * ratio)); output.height = Math.max(1, Math.round(source.height * ratio)); output.getContext('2d').drawImage(source, 0, 0, output.width, output.height); return JSON.stringify({{ dataUrl: output.toDataURL('image/jpeg', .82), width: output.width, height: output.height }}); }} catch (error) {{ return JSON.stringify({{ error: String(error) }}); }} finally {{ if (companion) companion.style.display = display || 'block'; }}",
+        HTML2CANVAS_SOURCE,
+        serde_json::to_string(&options).map_err(|error| error.to_string())?,
+    );
+    let serialized = evaluate_browser_async_javascript(webview, script).await?;
+    let value: Value = serde_json::from_str(&serialized)
+        .map_err(|error| format!("Browser page returned invalid capture data: {error}"))?;
+    if let Some(error) = value.get("error").and_then(Value::as_str) {
+        return Err(format!("Browser capture failed: {error}"));
+    }
+    Ok(value)
+}
+
+#[tauri::command]
 pub fn browser_webview_reconcile(
     app: AppHandle,
     request: BrowserWebviewBoundsRequest,
@@ -1004,6 +1130,34 @@ pub fn browser_webviews_set_pointer_tracking(app: AppHandle, enabled: bool) -> R
             if let Err(error) = apply_browser_pointer_tracking(&webview, enabled) {
                 errors.push(error);
             }
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
+#[tauri::command]
+pub fn browser_webviews_set_companion(
+    app: AppHandle,
+    request: BrowserCompanionStateRequest,
+) -> Result<(), String> {
+    let mut errors = Vec::new();
+    for (label, webview) in app.webviews() {
+        if !label.starts_with("misty-browser-") {
+            continue;
+        }
+        let runtime_id = label.trim_start_matches("misty-browser-");
+        let mut state = serde_json::to_value(&request).map_err(|error| error.to_string())?;
+        state["visible"] = Value::Bool(request.visible && runtime_id == request.target_id);
+        let script = format!(
+            "window.__MISTY_SET_COMPANION__?.({});",
+            serde_json::to_string(&state).map_err(|error| error.to_string())?
+        );
+        if let Err(error) = webview.eval(&script) {
+            errors.push(error.to_string());
         }
     }
     if errors.is_empty() {

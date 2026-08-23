@@ -73,7 +73,9 @@ function siteSuggestion(url: string, kind: "site" | "history"): BrowserSuggestio
     title: descriptor.title,
     detail: kind === "history" ? `History · ${descriptor.detail}` : descriptor.detail,
     destination: url,
-    faviconUrl: descriptor.faviconUrl,
+    // Never turn address-bar drafts into network requests. Favicons are only
+    // loaded for pages that already exist in the user's browsing history.
+    faviconUrl: kind === "history" ? descriptor.faviconUrl : null,
   };
 }
 
