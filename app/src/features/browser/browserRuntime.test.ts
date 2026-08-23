@@ -4,6 +4,7 @@ import {
   hideAllBrowserWebviews,
   hideBrowserWebview,
   setBrowserPointerTrackingEnabled,
+  setNativeBrowserCompanionState,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   syncBrowserWebview,
@@ -75,6 +76,21 @@ describe("browser native view synchronization", () => {
         enabled: false,
       }),
     );
+  });
+
+  it("targets the companion at one native Browser child", async () => {
+    await setNativeBrowserCompanionState({
+      targetId: "tab-native",
+      visible: true,
+      phase: "following",
+      name: "Misty",
+      label: "Browser",
+      suggestions: [{ id: "summarize", label: "Summarize" }],
+    });
+
+    expect(invoke).toHaveBeenCalledWith("browser_webviews_set_companion", {
+      request: expect.objectContaining({ targetId: "tab-native", visible: true }),
+    });
   });
 
   it("forces a native layout pass immediately after creating the child", async () => {

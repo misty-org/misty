@@ -7,6 +7,7 @@ describe("browser omnibox suggestions", () => {
 
     expect(suggestions.map((item) => item.kind)).toEqual(["site", "search"]);
     expect(suggestions[0]?.destination).toBe("https://youtube.com/");
+    expect(suggestions[0]?.faviconUrl).toBeNull();
     expect(suggestions[1]?.detail).toBe("Search with Google");
   });
 
@@ -19,6 +20,7 @@ describe("browser omnibox suggestions", () => {
 
     expect(suggestions.filter((item) => item.kind === "history")).toHaveLength(1);
     expect(suggestions[0]?.title).toBe("docs.example.com");
+    expect(suggestions[0]?.faviconUrl).toBe("https://docs.example.com/favicon.ico");
   });
 
   it("shows recent sites when the omnibox is empty", () => {
