@@ -130,6 +130,7 @@ DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}
 DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 DELETE /v1/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 DELETE /v1/spaces/{spaceID}/tasks/{taskID}
+GET /a2a/push
 GET /a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
 GET /agent-requests/{requestID}
 GET /agent-runs/{runID}
@@ -150,6 +151,7 @@ GET /ai/settings
 GET /ai/smart-library/folders/{folderID}/progress
 GET /ai/smart-library/folders/{folderID}/results
 GET /ai/status
+GET /api/a2a/push
 GET /api/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
 GET /api/agent-requests/{requestID}
 GET /api/agent-runs/{runID}
@@ -356,6 +358,7 @@ GET /spaces/{spaceID}/tasks
 GET /sync/devices
 GET /sync/vault
 GET /sync/ws
+GET /v1/a2a/push
 GET /v1/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
 GET /v1/agent-requests/{requestID}
 GET /v1/agent-runs/{runID}
@@ -541,6 +544,7 @@ PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/layout
 PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 PATCH /v1/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 PATCH /v1/spaces/{spaceID}/tasks/{taskID}
+POST /a2a/agents/{agentID}/token
 POST /a2a/spaces/{spaceID}/agents/{agentID}
 POST /agent-requests/{requestID}/approve
 POST /agent-requests/{requestID}/decline
@@ -572,6 +576,7 @@ POST /ai/smart-library/folders/{folderID}/sample/approve
 POST /ai/smart-library/reindex
 POST /ai/smart-library/reindex/{jobID}/complete
 POST /ai/smart-library/search
+POST /api/a2a/agents/{agentID}/token
 POST /api/a2a/spaces/{spaceID}/agents/{agentID}
 POST /api/agent-requests/{requestID}/approve
 POST /api/agent-requests/{requestID}/decline
@@ -802,6 +807,7 @@ POST /sync/devices
 POST /sync/restore/step
 POST /sync/ticket
 POST /sync/vault
+POST /v1/a2a/agents/{agentID}/token
 POST /v1/a2a/spaces/{spaceID}/agents/{agentID}
 POST /v1/agent-requests/{requestID}/approve
 POST /v1/agent-requests/{requestID}/decline
