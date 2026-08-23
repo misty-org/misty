@@ -50,10 +50,7 @@ export function restoreClosedWorkspaceTab(
       root: mapDockLeaf(layout.root, closed.paneId, (pane) => ({
         ...pane,
         activeTabId: tab.id,
-        tabs:
-          pane.tabs.length === 1 && pane.tabs[0]?.surfaceId === "home"
-            ? [tab]
-            : [...pane.tabs, tab],
+        tabs: [...pane.tabs, tab],
       })),
     };
   }
@@ -73,10 +70,7 @@ export function restoreClosedWorkspaceTab(
     root: mapDockLeaf(layout.root, pane.id, (candidate) => ({
       ...candidate,
       activeTabId: tab.id,
-      tabs:
-        candidate.tabs.length === 1 && candidate.tabs[0]?.surfaceId === "home"
-          ? [tab]
-          : [...candidate.tabs, tab],
+      tabs: [...candidate.tabs, tab],
     })),
   };
 }
