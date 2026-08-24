@@ -7,6 +7,8 @@ import {
   CollectionItems,
   CollectionCardTitle,
   CollectionCardMetadata,
+  Skeleton,
+  SkeletonList,
 } from "@/shared/ui";
 import { Check, EllipsisVertical, Star, RotateCcw } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
@@ -149,16 +151,13 @@ export function SpaceLibraryItems() {
               ) : undefined,
           }))}
         />
-        {nextAfter && (
-          <Button
-            variant="outline"
-            className="mx-auto mt-4 flex"
-            disabled={loadingMore}
-            onClick={() => void loadMore()}
-          >
-            {loadingMore ? "Loading…" : "Load more"}
+        {nextAfter && loadingMore ? (
+          <SkeletonList label="More items" rows={3} leading="tile" className="mt-1 px-4" />
+        ) : nextAfter ? (
+          <Button variant="outline" className="mx-auto mt-4 flex" onClick={() => void loadMore()}>
+            Load more
           </Button>
-        )}
+        ) : null}
       </>
     );
   return (
@@ -193,16 +192,18 @@ export function SpaceLibraryItems() {
           </Fragment>
         );
       })}
-      {nextAfter ? (
+      {nextAfter && loadingMore
+        ? [0, 1, 2, 3].map((tile) => (
+            <Skeleton
+              key={`more-${tile}`}
+              className={listLayout ? "h-14 w-full rounded-lg" : "aspect-square w-full rounded-xl"}
+            />
+          ))
+        : null}
+      {nextAfter && !loadingMore ? (
         <div className="col-span-full grid place-items-center pt-3">
-          <Button
-            size="sm"
-            variant="outline"
-            type="button"
-            disabled={loadingMore}
-            onClick={() => void loadMore()}
-          >
-            {loadingMore ? "Loading…" : "Load more"}
+          <Button size="sm" variant="outline" type="button" onClick={() => void loadMore()}>
+            Load more
           </Button>
         </div>
       ) : null}

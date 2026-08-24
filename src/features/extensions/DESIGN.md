@@ -1,8 +1,8 @@
 # Extensions
 
 Mode: Operate. Inherit the Spaces collection geometry, shared 224 px workspace rail,
-36 px search, list/grid controls, and monochrome palette. Rail icons are the exception:
-each category glyph carries a shared item tone (`src/shared/ui/icons/itemTones.ts`).
+36 px search, list/grid controls, and monochrome palette. Rail icons stay grayscale
+like every other sidebar.
 Discover and Installed are independent routes in one Extensions workspace. Category links belong to the
 rail; visible collection sections must not be duplicated by a filter menu.
 

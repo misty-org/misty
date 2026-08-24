@@ -5,7 +5,7 @@ import {
   type ShortcutSlot,
 } from "@/features/shortcuts";
 import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
-import { Button, cn, IconButton, Input, Pressable } from "@/shared/ui";
+import { Button, cn, IconButton, Input, Pressable, SkeletonList } from "@/shared/ui";
 import { RotateCcw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -222,9 +222,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
           ) : null}
 
           {!snapshot ? (
-            <div className="py-8 text-center text-sm text-cream-muted" role="status">
-              Loading shortcuts…
-            </div>
+            <SkeletonList label="Shortcuts" rows={8} leading="none" lines={1} trailing />
           ) : groups.length === 0 ? (
             <div className="py-8 text-center text-sm text-cream-muted">No matching commands.</div>
           ) : (

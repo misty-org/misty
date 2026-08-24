@@ -11,7 +11,7 @@ import {
   videoMimeTypes,
 } from "./previewMediaTables";
 import { PreviewMessage } from "./PreviewPrimitives";
-import { cn, Spinner } from "@/shared/ui";
+import { cn, SkeletonDocument } from "@/shared/ui";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(() => import("./PdfViewerView"));
@@ -51,14 +51,7 @@ export function EmbeddedUniversalPreviewView(props: {
     props.runtime.readBytes,
     props.runtime.extractDocumentText,
   );
-  if (props.loading || documentLoading)
-    return (
-      <PreviewMessage
-        icon={<Spinner size="lg" label={false} className="size-7" />}
-        title="Preparing preview"
-        detail="Loading the best available reader…"
-      />
-    );
+  if (props.loading || documentLoading) return <SkeletonDocument label="Preview" />;
   if (props.error || documentError)
     return (
       <>

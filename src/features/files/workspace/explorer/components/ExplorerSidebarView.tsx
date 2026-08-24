@@ -8,6 +8,7 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
   IconButton,
+  SkeletonList,
 } from "@/shared/ui";
 import { HardDrive, Pencil, Plus, Search, Unplug } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -111,7 +112,13 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
               />
             ) : null}
             {smartFoldersLoading && savedSearches.length === 0 ? (
-              <div className={sidebarStyles.muted}>Loading collections...</div>
+              <SkeletonList
+                label="Collections"
+                rows={3}
+                leading="icon"
+                lines={1}
+                rowClassName="px-2"
+              />
             ) : null}
             {!smartFoldersLoading && savedSearches.length === 0 ? (
               <div className={sidebarStyles.muted}>No collections yet</div>
@@ -166,10 +173,10 @@ export const ExplorerSidebarView = memo(function ExplorerSidebarView(
             open={localDevicesOpen}
             onOpenChange={setLocalDevicesOpen}
           >
-            {deviceEntries.length === 0 ? (
-              <div className={sidebarStyles.deviceGroupEmpty}>
-                {props.devicesLoading ? "Loading drives..." : "No local devices"}
-              </div>
+            {deviceEntries.length === 0 && props.devicesLoading ? (
+              <SkeletonList label="Drives" rows={2} leading="icon" rowClassName="px-2" />
+            ) : deviceEntries.length === 0 ? (
+              <div className={sidebarStyles.deviceGroupEmpty}>No local devices</div>
             ) : (
               <div className={sidebarStyles.list}>
                 {deviceEntries.map((device) => {
