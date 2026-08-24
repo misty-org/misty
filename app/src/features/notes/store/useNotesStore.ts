@@ -2,10 +2,8 @@ import { notesApi } from "@/api/notes/api";
 import { create } from "zustand";
 import { type NotesConnectorRegistry, createDefaultNotesRegistry } from "../connectors/registry";
 import { nowIso } from "../connectorUtils";
-import { NOTION_CONNECTOR_ID } from "../mockData";
 import type { CreateNoteInput } from "../model/interfaces/connectors";
 import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "../model/types/types";
-import { setNotionScope } from "./notionApi";
 
 let registry = createDefaultNotesRegistry();
 let notesLoadGeneration = 0;
@@ -23,8 +21,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   query: "",
   syncing: false,
   lastSyncedAt: undefined,
-  publishingNoteId: "",
-  publishError: "",
   connectorRevision: 0,
 
   async load(accountId: string, spaceId: string, spaceName: string) {
@@ -33,7 +29,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     if (sameScope && state.phase === "ready") return;
 
     const generation = ++notesLoadGeneration;
-    setNotionScope(accountId, spaceId);
     registry = createDefaultNotesRegistry(accountId, spaceId, spaceName);
     const activeRegistry = registry;
     set((current) => ({
@@ -222,48 +217,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
     }
   },
 
-  /**
-   * Publishes a Misty note outward as a new page in the target source. This is
-   * an explicit user action, never a side effect of editing — the note stays
-   * the Misty original and the Notion page is a published copy.
-   */
-  async publishNote(noteId: string, connectorId = NOTION_CONNECTOR_ID) {
-    const note = findNote(get().notes, noteId);
-    const generation = notesLoadGeneration;
-    const activeRegistry = registry;
-    const connector = activeRegistry.get(connectorId);
-    if (!note || !connector?.publishNote) return;
-    set({ publishingNoteId: noteId, publishError: "" });
-    try {
-      const result = await connector.publishNote({
-        title: note.title,
-        body: note.bodyMarkdown ?? note.body,
-      });
-      if (!notesActionIsCurrent(generation, activeRegistry)) return;
-      const skipped = result.skippedProperties.length
-        ? `Published. ${result.skippedProperties.length} field could not be mapped.`
-        : "";
-      set((state) => ({
-        publishingNoteId: "",
-        publishError: skipped,
-        connectorRevision: state.connectorRevision + 1,
-      }));
-    } catch (reason) {
-      if (!notesActionIsCurrent(generation, activeRegistry)) return;
-      set({
-        publishingNoteId: "",
-        publishError: reason instanceof Error ? reason.message : "Publishing to Notion failed.",
-      });
-    }
-  },
-
-  async openInSource(noteId: string) {
-    const note = findNote(get().notes, noteId);
-    if (!note) return;
-    const connector = registry.forSource(note.source);
-    await connector?.openInSource?.(note.sourceId);
-  },
-
   async connectConnector(connectorId: string) {
     const generation = notesLoadGeneration;
     const activeRegistry = registry;
@@ -322,7 +275,6 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 export function resetNotesAccountState(): void {
   closeOpenNoteCollaborationSessions();
   notesLoadGeneration += 1;
-  setNotionScope("", "");
   registry = createDefaultNotesRegistry();
   useNotesStore.setState({
     registry,
@@ -337,8 +289,6 @@ export function resetNotesAccountState(): void {
     query: "",
     syncing: false,
     lastSyncedAt: undefined,
-    publishingNoteId: "",
-    publishError: "",
     connectorRevision: 0,
   });
 }
@@ -414,11 +364,6 @@ export interface NotesStoreState {
 export interface NotesStoreActions {
   load: (accountId: string, spaceId: string, spaceName: string) => Promise<void>;
   refresh: () => Promise<void>;
-  /** Note currently being published outward, so the action can show progress. */
-  publishingNoteId: string;
-  /** Last publish outcome worth telling the user about. */
-  publishError: string;
-  publishNote: (noteId: string, connectorId?: string) => Promise<void>;
   syncAll: () => Promise<void>;
   setQuery: (query: string) => void;
   selectNote: (noteId: string | undefined) => void;
@@ -429,7 +374,6 @@ export interface NotesStoreActions {
   updateNoteBody: (noteId: string, body: string) => Promise<void>;
   updateNoteContent: (noteId: string, content: UpdateNoteContentInput) => Promise<void>;
   assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;
-  openInSource: (noteId: string) => Promise<void>;
   connectConnector: (connectorId: string) => Promise<void>;
   disconnectConnector: (connectorId: string) => Promise<void>;
 }
