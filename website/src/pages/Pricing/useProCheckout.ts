@@ -58,6 +58,7 @@ export function usePaidCheckout(
   const me = useUserStore((store) => store.me);
   const currentPlanTier = effectivePaidTier(me);
   const managedSubscription = hasManagedSubscription(me);
+  const trialEligible = me?.trial_eligible === true;
 
   const openCheckout = useCallback(
     async (tier: PaidTier, selectedInterval: PricingInterval) => {
@@ -138,6 +139,7 @@ export function usePaidCheckout(
     error,
     currentPlanTier,
     hasManagedSubscription: managedSubscription,
+    trialEligible,
     checkoutReady: sessionReady,
   };
 }

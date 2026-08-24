@@ -10,6 +10,7 @@ export default function PlanGrid({
   checkoutReady,
   currentPlanTier,
   hasManagedSubscription,
+  trialEligible,
   onIntervalChange,
   onPaidCheckout,
 }: {
@@ -19,6 +20,7 @@ export default function PlanGrid({
   checkoutReady: boolean;
   currentPlanTier: PaidTier | null;
   hasManagedSubscription: boolean;
+  trialEligible: boolean;
   onIntervalChange: (interval: PricingInterval) => void;
   onPaidCheckout: (tier: PaidTier) => void;
 }) {
@@ -68,6 +70,8 @@ export default function PlanGrid({
                       ? `Change to ${plan.name}`
                       : isCurrentPlan
                         ? "Current plan"
+                        : plan.id === "pro" && trialEligible
+                          ? "Start free trial"
                         : `Choose ${plan.name}`
               }
               ctaBusy={paidTier === checkoutPendingTier}
