@@ -1,4 +1,4 @@
-export { ConnectedDevicePairingDialog } from "./connected-devices/ConnectedDevicePairingDialog";
+export { ConnectedDevicePairingDialog } from "@/features/connected-devices";
 export { default as FilesPage } from "./explorer";
 export type * from "./explorer/model/stores/media/interfaces/useSmartLibraryServerStore";
 export {

@@ -2,81 +2,39 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/kannachi323/misty/server/internal/aimodels"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
-func TestScreenModelForwardsWithTheRunModelAndServerKey(t *testing.T) {
-	var got map[string]any
-	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/chat/completions" || r.Header.Get("Authorization") != "Bearer gateway-key" {
-			t.Errorf("unexpected request %s %q", r.URL.Path, r.Header.Get("Authorization"))
-		}
-		_ = json.NewDecoder(r.Body).Decode(&got)
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":120,"completion_tokens":30}}`))
-	}))
-	defer gateway.Close()
-	useGatewayScreenModel(t, gateway.URL)
-	body, usage, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[{"role":"user","content":"look"}]`))
-	if err != nil || usage.PromptTokens != 120 || usage.CompletionTokens != 30 || len(body) == 0 {
-		t.Fatalf("forward = %s %+v %v", body, usage, err)
+func TestScreenModelMessagesKeepSystemTextAndInlineScreenshots(t *testing.T) {
+	system, messages, err := screenModelMessages(json.RawMessage(`[
+		{"role":"system","content":"Plan one action."},
+		{"role":"user","content":[{"type":"text","text":"Draw a house"},{"type":"image_url","image_url":{"url":"data:image/png;base64,cG5n"}}]},
+		{"role":"assistant","content":"<action>click</action>"}
+	]`))
+	if err != nil || system != "Plan one action." || len(messages) != 2 {
+		t.Fatalf("messages = %q %+v %v", system, messages, err)
 	}
-	if got["model"] != "openai/gpt-5" || got["max_completion_tokens"] != float64(screenModelMaxOutput) || got["stream"] != false {
-		t.Fatalf("client could change the model or limits: %v", got)
+	user := messages[0]
+	if user.Role != "user" || len(user.Content) != 2 || user.Content[1].Type != "image" || user.Content[1].MediaType != "image/png" || user.Content[1].Data != "cG5n" {
+		t.Fatalf("screenshot not passed inline: %+v", user)
 	}
-	// Reasoning models reject both; the provider default applies.
-	if _, ok := got["max_tokens"]; ok {
-		t.Fatalf("sent max_tokens: %v", got)
-	}
-	if _, ok := got["temperature"]; ok {
-		t.Fatalf("sent temperature: %v", got)
+	if messages[1].Role != "assistant" || messages[1].Content[0].Text != "<action>click</action>" {
+		t.Fatalf("history lost: %+v", messages[1])
 	}
 }
 
-func useGatewayScreenModel(t *testing.T, url string) {
-	t.Helper()
-	t.Setenv("AI_GATEWAY_BASE_URL", url)
-	t.Setenv("AI_GATEWAY_API_KEY", "gateway-key")
-}
-
-func TestScreenModelReportsGatewayFailures(t *testing.T) {
-	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	defer gateway.Close()
-	useGatewayScreenModel(t, gateway.URL)
-	if _, _, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
-		t.Fatal("gateway failure was accepted")
-	}
-	t.Setenv("AI_GATEWAY_API_KEY", "")
-	if _, _, err := forwardTo(t, "openai/gpt-5", json.RawMessage(`[]`)); err == nil {
-		t.Fatal("forwarded without a gateway key")
-	}
-}
-
-func forwardTo(t *testing.T, model string, messages json.RawMessage) (json.RawMessage, screenModelUsage, error) {
-	t.Helper()
-	endpoint, err := resolveScreenModelEndpoint(model)
-	if err != nil {
-		return nil, screenModelUsage{}, err
-	}
-	return forwardScreenModel(t.Context(), endpoint, messages)
-}
-
-func TestScreenModelUsesTheAccountsOwnProvider(t *testing.T) {
-	for _, tc := range []struct {
-		provider, base, model, wantURL, wantModel string
-	}{
-		{"openai", "", "openai/gpt-6-luna", "https://api.openai.com/v1/chat/completions", "gpt-6-luna"},
-		{"gateway", "", "anthropic/claude-x", "https://ai-gateway.vercel.sh/v1/chat/completions", "anthropic/claude-x"},
-		{"google", "https://generativelanguage.googleapis.com/v1beta", "google/gemini-x", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-x"},
-		{"openai-compatible", "https://models.example.test/v1/", "local-model", "https://models.example.test/v1/chat/completions", "local-model"},
+func TestScreenModelMessagesRefuseRemoteImagesAndUnknownRoles(t *testing.T) {
+	for _, raw := range []string{
+		`[]`,
+		`[{"role":"system","content":"only instructions"}]`,
+		`[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/shot.png"}}]}]`,
+		`[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/svg+xml;base64,PHN2Zz4="}}]}]`,
+		`[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,***"}}]}]`,
+		`[{"role":"tool","content":"result"}]`,
+		`[{"role":"user","content":[{"type":"input_audio"}]}]`,
 	} {
-		endpoint, err := accountScreenModelEndpoint(aimodels.Resolved{Provider: tc.provider, BaseURL: tc.base, APIKey: "account-key"}, tc.model)
-		if err != nil || endpoint.url != tc.wantURL || endpoint.model != tc.wantModel || endpoint.key != "account-key" {
-			t.Fatalf("%s: %+v %v", tc.provider, endpoint, err)
+		if _, _, err := screenModelMessages(json.RawMessage(raw)); err == nil {
+			t.Fatalf("accepted %s", raw)
 		}
 	}
 }

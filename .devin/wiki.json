@@ -243,7 +243,7 @@
     },
     {
       "title": "Desktop Companion, Voice & Computer Control",
-      "purpose": "Explain companion entrypoints and UI, typed/voice turn ownership, native microphone and screen capture, WebRTC and fallback media transport, speech and pointing, and permission-bound desktop/browser actions with interruption and teardown.",
+      "purpose": "Explain companion entrypoints and UI, typed/voice turn ownership, native microphone and screen capture, the realtime voice conversation over the gateway WebSocket, speech and pointing, and permission-bound desktop/browser actions with interruption and teardown.",
       "parent": "AI & Agent System",
       "page_notes": [
         {

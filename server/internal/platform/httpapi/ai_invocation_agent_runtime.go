@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/aimodels"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	workflowv2 "github.com/kannachi323/misty/server/internal/workflows"
@@ -89,6 +90,7 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		"run_mode": "full", "system": prepared.system, "prompt": prepared.prompt,
 		"attached_sources": []any{}, "file_warnings": "", "allowed_tools": prepared.allowedTools,
 		"model_turn_limit":      record.ModelTurnLimit,
+		"context_window_tokens": serveragent.ModelContextWindow(r.Context(), agentRoute.Model),
 		"capture":               prepared.body.Capture,
 		"display_captures":      prepared.body.DisplayCaptures,
 		"companion_mode":        prepared.body.CompanionMode,

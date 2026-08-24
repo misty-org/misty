@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { routeForMistyDeepLink } from "@/app/routing/deepLinks";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "@/app/routing/navigation";
+import { isDevicePairingLink } from "@/features/connected-devices/pairingLinks";
 
 describe("Misty deep links", () => {
   it("preserves query state for open-form Space links", () => {
@@ -22,5 +23,15 @@ describe("Misty deep links", () => {
         resolveAuthDeepLinkRoute,
       ),
     ).toBe("/invite/token-123");
+  });
+
+  it("keeps pairing links, and their secret, out of routing", () => {
+    const link = "misty://devices/pair?session=pairing_abc&secret=SECRET";
+    expect(isDevicePairingLink(link)).toBe(true);
+    expect(isDevicePairingLink("misty://devices/pair?session=pairing_abc")).toBe(false);
+    expect(isDevicePairingLink("misty://open/files")).toBe(false);
+    expect(
+      routeForMistyDeepLink(link, isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute),
+    ).toBeNull();
   });
 });

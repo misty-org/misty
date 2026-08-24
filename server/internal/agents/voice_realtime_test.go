@@ -46,8 +46,7 @@ func TestRealtimeGatewayUsesServerSecretAndManualTurnProtocol(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	t.Setenv("AI_GATEWAY_EMBEDDING_BASE_URL", server.URL+"/v4/ai")
-	a := &SmartLibraryAnalyzer{APIKey: "fixture-key", Client: server.Client()}
+	a := &SmartLibraryAnalyzer{APIKey: "fixture-key", BaseURL: server.URL + "/v1", Client: server.Client()}
 	session, err := a.OpenVoiceRealtime(context.Background())
 	if err != nil {
 		t.Fatal(err)

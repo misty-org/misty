@@ -14,7 +14,8 @@ import { lazy, Suspense } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { desktopRouteIdFromPath } from "../routing/navigation";
-import { ConnectedDevicesProvider } from "@/features/connected-devices";
+import { ConnectedDevicesProvider, DevicePairingLinkDialog } from "@/features/connected-devices";
+import { useSettingsStore } from "@/features/settings";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
 
 const DesktopLayout = lazy(() =>
@@ -25,6 +26,10 @@ export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
   const recovery = useWorkspaceRecoveryState();
   const location = useLocation();
+  const deviceSessionDays = useSettingsStore((store) => {
+    const files = store.settings?.document.files as Record<string, unknown> | undefined;
+    return Number(files?.device_session_days ?? 30) || 30;
+  });
   const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
   const isInviteRoute = location.pathname.startsWith("/invite/");
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
@@ -65,8 +70,9 @@ export function AppFrameLayout() {
         accountId={syncAllowed ? (user?.id ?? "") : ""}
       >
         <Suspense fallback={<LoadingScreen fullScreen />}>
-          <ConnectedDevicesProvider>
+          <ConnectedDevicesProvider sessionDays={deviceSessionDays}>
             <DesktopLayout getRouteId={desktopRouteIdFromPath} />
+            <DevicePairingLinkDialog />
           </ConnectedDevicesProvider>
         </Suspense>
       </BrowserSyncStartup>

@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 	"net/http"
 	"net/http/httptest"
@@ -19,9 +20,6 @@ import (
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
-
-
-import ()
 
 // The desktop's screen loop calls the pass-through once per action while its
 // browser.act job runs. Each call is metered to the run without spending the
@@ -34,24 +32,15 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 		t.Fatal(err)
 	}
 	var forwarded []map[string]any
-	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]any
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		forwarded = append(forwarded, body)
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"<action>click</action>"}}],"usage":{"prompt_tokens":900,"completion_tokens":40}}`))
-	}))
-	defer provider.Close()
-	t.Setenv("MISTY_AGENT_MODEL_PROVIDER", "gateway")
-	t.Setenv("MISTY_AGENT_MODEL", "")
-	t.Setenv("MISTY_AGENT_MODEL_API_KEY", "")
-	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", "")
-	t.Setenv("AI_GATEWAY_BASE_URL", provider.URL)
-	t.Setenv("AI_GATEWAY_API_KEY", "gateway-key")
-
+	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
+		forwarded = append(forwarded, call.Body)
+		return http.StatusOK, map[string]any{"text": "<action>click</action>", "usage": map[string]int{"inputTokens": 900, "outputTokens": 40}}
+	})
 	service, err := NewSpacesService(database, nil, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("k", 32))))
 	if err != nil {
 		t.Fatal(err)
 	}
+	service.SetModels(runtime.Client)
 	space, err := database.TestingCreateSpace(ctx, user.ID, "Screen")
 	if err != nil {
 		t.Fatal(err)
@@ -121,11 +110,11 @@ func TestScreenModelPassThroughForALiveActJob(t *testing.T) {
 	// More calls than the run's ordinary agent-turn allowance.
 	for n := range 25 {
 		response := call(strconv.Itoa(n))
-		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "<action>click</action>") {
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "<action>click</action>") || !strings.Contains(response.Body.String(), `"prompt_tokens":900`) {
 			t.Fatalf("call %d: %d %s", n, response.Code, response.Body.String())
 		}
 	}
-	if len(forwarded) != 25 || forwarded[0]["model"] != "openai/gpt-6-luna" {
+	if len(forwarded) != 25 || forwarded[0]["model"] != "openai/gpt-6-luna" || forwarded[0]["maxOutputTokens"] != float64(6000) || forwarded[0]["route"].(map[string]any)["provider"] != "instance" {
 		t.Fatalf("forwarded %d calls, first %v", len(forwarded), forwarded[0])
 	}
 	if response := call("40"); response.Code != http.StatusBadRequest {

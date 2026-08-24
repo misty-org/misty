@@ -31,6 +31,8 @@ pub mod commands;
 pub mod connected_devices;
 pub mod credential_store;
 pub mod credentials;
+#[cfg(desktop)]
+pub mod device_sessions;
 pub mod devices;
 pub mod directory_size;
 mod directory_size_local;
@@ -50,6 +52,8 @@ pub mod operation_queue;
 pub mod paths;
 #[cfg(desktop)]
 pub mod peer_files;
+#[cfg(desktop)]
+pub mod peer_writes;
 #[cfg(desktop)]
 pub mod peer_identity;
 #[cfg(desktop)]

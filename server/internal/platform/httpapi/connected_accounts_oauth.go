@@ -160,7 +160,7 @@ func (s *SpacesService) BeginConnectedAccountAuthorization() http.HandlerFunc {
 			params.Set("prompt", "consent")
 		} else if provider == "dropbox" {
 			params.Set("token_access_type", "offline")
-		} else if provider != "instagram" && provider != "discord" {
+		} else {
 			params.Set("prompt", "select_account")
 		}
 		writeJSON(w, http.StatusOK, map[string]any{

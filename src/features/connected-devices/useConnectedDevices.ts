@@ -1,8 +1,10 @@
 import { useAuth } from "@/features/auth";
 import { platform } from "@tauri-apps/plugin-os";
 import {
-  connectedDevicesConnect,
+  connectedDevicesConfigure,
+  connectedDevicesEndSession,
   connectedDevicesInitialize,
+  connectedDevicesSetIdentity,
   connectedDevicesSnapshot,
 } from "@/native/connected-devices";
 import { readActiveSavedAccountSession } from "@/features/auth";
@@ -21,10 +23,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   connectedDevicePlatform,
   connectedDevicesErrorMessage,
-  peerIsOnline,
   type ServerConnectedPeer,
 } from "./connectedDeviceModel";
 import { useDevicePairing, type LocalConnectedDevice } from "./useDevicePairing";
+import { usePeerSync, type DeviceSetup } from "./usePeerSync";
 import { useFilesDeviceService } from "./useFilesDeviceService";
 
 export {
@@ -35,7 +37,7 @@ export {
 
 const refreshIntervalMs = 30_000;
 
-export function useConnectedDevices() {
+export function useConnectedDevices(sessionDays = 30) {
   const spaceId = "personal";
   const { user } = useAuth();
   const accountId = user?.id;
@@ -54,11 +56,7 @@ export function useConnectedDevices() {
   // One-time work per device identity and endpoint: ticket keys, native
   // initialization and server registration. Repeating it on every heartbeat
   // re-registered the device and re-fetched keys every 30 seconds.
-  const setupRef = useRef<{
-    scope: string;
-    local: LocalConnectedDevice;
-    endpointId: string;
-  } | null>(null);
+  const setupRef = useRef<DeviceSetup | null>(null);
 
   const ensureSetup = useCallback(
     async (check: () => void) => {
@@ -98,6 +96,9 @@ export function useConnectedDevices() {
         platform: connectedDevicePlatform(),
       });
       check();
+      // Paired devices, tickets and sessions know this device by its server id.
+      await connectedDevicesSetIdentity(server.id);
+      check();
       const setup = {
         scope,
         local: { localId: local.id, serverId: server.id, name: local.displayName },
@@ -117,7 +118,7 @@ export function useConnectedDevices() {
 
   /** Liveness: the one periodic call. It also refreshes agent eligibility on
    * servers that report deviceSeen, so the agent worker sends no heartbeat. */
-  const sendPresence = useCallback(async (setup: NonNullable<typeof setupRef.current>) => {
+  const sendPresence = useCallback(async (setup: DeviceSetup) => {
     const native = await connectedDevicesSnapshot();
     const result = await devicesApi.presence<{ deviceSeen?: boolean }>(
       signedAgentDeviceRequest,
@@ -133,50 +134,10 @@ export function useConnectedDevices() {
     if (result?.deviceSeen) noteServerAgentDeviceSeen(setup.local.serverId);
   }, []);
 
-  /** Peers change by push ("devices" account events); dial any online peer
-   * this device is not yet connected to. */
-  const syncPeers = useCallback(
-    async (setup: NonNullable<typeof setupRef.current>, check: () => void) => {
-      const response = await devicesApi.peers<{ peers: ServerConnectedPeer[] }>(
-        signedAgentDeviceRequest,
-        setup.local.localId,
-        setup.local.serverId,
-      );
-      check();
-      let currentNative = await connectedDevicesSnapshot();
-      check();
-      const connectedIds = new Set(
-        currentNative.peers.filter((peer) => peer.state === "online").map((peer) => peer.deviceId),
-      );
-      for (const peer of response.peers) {
-        if (!peerIsOnline(peer) || connectedIds.has(peer.deviceId) || !peer.addressing) continue;
-        try {
-          const issued = await devicesApi.issuePeerTicket<{ ticket: string }>(
-            signedAgentDeviceRequest,
-            setup.local.localId,
-            setup.local.serverId,
-            {
-              targetDeviceId: peer.deviceId,
-              protocolVersion: "misty-device/1",
-            },
-          );
-          check();
-          currentNative = await connectedDevicesConnect({
-            instance: deviceInstance || undefined,
-            deviceId: peer.deviceId,
-            address: peer.addressing,
-            ticket: issued.ticket,
-          });
-        } catch {
-          // A peer can disappear between presence and dialing. Keep its row;
-          // its next "devices" event or a later sync will retry.
-        }
-      }
-      check();
-      setSnapshot(currentNative);
-      setPeers(response.peers);
-    },
-    [deviceInstance],
+  const { syncPeers, connectPeer: connectWithSetup } = usePeerSync(
+    deviceInstance,
+    setSnapshot,
+    setPeers,
   );
 
   const pendingMode = useRef<"full" | "presence" | "peers" | null>(null);
@@ -218,11 +179,14 @@ export function useConnectedDevices() {
         if (mode !== "peers") await sendPresence(setup);
         check();
         if (mode !== "presence") await syncPeers(setup, check);
+        else setSnapshot(await connectedDevicesSnapshot());
         setError(null);
       } catch (cause) {
         // A device the server no longer knows must register again.
         if (cause instanceof ManagedAiRequestError && cause.status === 404) setupRef.current = null;
         if (origin === currentScope.current) setError(connectedDevicesErrorMessage(cause));
+        // Sessions keep reconnecting locally while the server is unreachable.
+        if (setupRef.current) void connectedDevicesSnapshot().then(setSnapshot, () => {});
       } finally {
         refreshInFlight.current = false;
         setLoading(false);
@@ -236,8 +200,8 @@ export function useConnectedDevices() {
 
   useEffect(() => {
     void refresh("full");
-    // Presence is a liveness heartbeat for the 90-second online window; it
-    // neither registers the device nor lists peers.
+    // Presence is a liveness heartbeat for the 90-second online window. Sessions
+    // reconnect natively, so it only refreshes what the UI shows.
     const timer = window.setInterval(() => void refresh("presence"), refreshIntervalMs);
     const stopEvents = subscribeAccountEvents(accountId ?? "", (event) => {
       if (event.topic === "devices") void refresh("peers");
@@ -265,6 +229,26 @@ export function useConnectedDevices() {
     return () => window.clearTimeout(timer);
   }, [peers]);
 
+  // The account's session length applies to sessions started from now on.
+  useEffect(() => {
+    if (ready) void connectedDevicesConfigure(sessionDays).catch(() => {});
+  }, [ready, sessionDays]);
+
+  /** Starts a new session with a device, after pairing or once one ended. */
+  const connectPeer = useCallback(
+    async (peer: ServerConnectedPeer) => {
+      const setup = setupRef.current;
+      if (!setup) throw new Error("Connected Devices is still starting.");
+      await connectWithSetup(setup, peer);
+    },
+    [connectWithSetup],
+  );
+
+  /** Ends the session on both devices; they stay paired. */
+  const endSession = useCallback(async (peer: ServerConnectedPeer) => {
+    setSnapshot(await connectedDevicesEndSession(peer.deviceId));
+  }, []);
+
   const pairingActions = useDevicePairing(localRef, refresh);
 
   return {
@@ -276,6 +260,8 @@ export function useConnectedDevices() {
     ready,
     error,
     refresh,
+    connectPeer,
+    endSession,
     ...pairingActions,
   };
 }

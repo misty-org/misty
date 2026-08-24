@@ -8,13 +8,17 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    Engine,
+};
 use ed25519_dalek::{
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
     SigningKey, VerifyingKey,
 };
 use rand::{rngs::OsRng, RngCore};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use url::Url;
 
 use crate::{
@@ -31,6 +35,7 @@ const PROJECTION_SECRET: &str = "JOURNAL_COLLAB_PROJECTION_SECRET";
 const ROOM_SALT: &str = "JOURNAL_COLLAB_ROOM_SALT";
 const DEVICE_TICKET_PRIVATE_KEY: &str = "MISTY_DEVICE_TICKET_PRIVATE_KEY";
 const DEVICE_PAIRING_PEPPER: &str = "MISTY_DEVICE_PAIRING_PEPPER";
+const DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS: &str = "MISTY_DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS";
 
 pub fn up(workspace: &Workspace, detach: bool, build: bool, verbose: bool) -> Result<()> {
     environment::check(workspace, Target::Dev)?;
@@ -1080,6 +1085,47 @@ fn ensure_room_salt(path: &std::path::Path, random: &mut OsRng) -> Result<()> {
     write_private(path, updated.as_bytes())
 }
 
+/// The ticket keys a desktop build pins for Connected Devices, as the app's
+/// `MISTY_DEVICE_TICKET_PUBLIC_KEYS` JSON: key id to base64 public key. Release
+/// builds trust only these, so a server cannot hand the app other keys.
+pub(crate) fn device_ticket_public_keys(devices_env: &Path) -> Result<String> {
+    let contents = fs::read_to_string(devices_env)
+        .with_context(|| format!("could not read {}", devices_env.display()))?;
+    let private = environment_values(&contents, DEVICE_TICKET_PRIVATE_KEY);
+    let encoded = private.first().with_context(|| {
+        format!(
+            "{DEVICE_TICKET_PRIVATE_KEY} is missing from {}",
+            devices_env.display()
+        )
+    })?;
+    let signing = SigningKey::from_pkcs8_der(&STANDARD.decode(encoded)?)
+        .context("the Connected Devices ticket key is not Ed25519 PKCS#8")?;
+    let mut keys = BTreeMap::new();
+    let current = VerifyingKey::from(&signing).to_bytes();
+    keys.insert(device_ticket_key_id(&current), STANDARD.encode(current));
+    for list in environment_values(&contents, DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS) {
+        for previous in list
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let raw = STANDARD
+                .decode(previous)
+                .context("a previous Connected Devices ticket key is not base64")?;
+            if raw.len() != 32 {
+                bail!("a previous Connected Devices ticket key is not an Ed25519 public key");
+            }
+            keys.insert(device_ticket_key_id(&raw), previous.to_owned());
+        }
+    }
+    Ok(serde_json::to_string(&keys)?)
+}
+
+/// Matches the server's key id: the first nine bytes of SHA-256, base64url.
+fn device_ticket_key_id(public_key: &[u8]) -> String {
+    URL_SAFE_NO_PAD.encode(&Sha256::digest(public_key)[..9])
+}
+
 fn environment_values<'a>(contents: &'a str, name: &str) -> Vec<&'a str> {
     contents
         .lines()
@@ -1267,6 +1313,24 @@ mod tests {
         assert!(env::var("MISTY_DEV_API_TUNNEL_HOSTNAME").is_err());
         assert!(env::var("MISTY_DEV_TUNNEL_HOSTNAME").is_err());
         assert_eq!(development_tunnel_hostname(), "");
+    }
+
+    #[test]
+    fn desktop_builds_pin_the_current_and_previous_ticket_keys() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("devices.env");
+        assert!(ensure_connected_devices_development_config(&path).unwrap());
+        let previous = STANDARD.encode([7u8; 32]);
+        let mut contents = fs::read_to_string(&path).unwrap();
+        contents.push_str(&format!(
+            "{DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS}={previous}\n"
+        ));
+        fs::write(&path, contents).unwrap();
+        let keys: BTreeMap<String, String> =
+            serde_json::from_str(&device_ticket_public_keys(&path).unwrap()).unwrap();
+        assert_eq!(keys.len(), 2);
+        assert_eq!(keys.get(&device_ticket_key_id(&[7u8; 32])), Some(&previous));
+        assert!(keys.iter().all(|(id, _)| id.len() == 12));
     }
 
     #[test]

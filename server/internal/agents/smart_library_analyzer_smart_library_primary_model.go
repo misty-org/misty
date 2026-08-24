@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
- "github.com/kannachi323/misty/server/internal/aimodels"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -10,7 +9,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/kannachi323/misty/server/internal/aimodels"
 	"github.com/kannachi323/misty/server/internal/library"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
 const (
@@ -99,18 +100,24 @@ type SmartLibraryEmbedding struct {
 }
 
 type SmartLibraryAnalyzer struct {
-	billing                     *library.Meter
- ModelResolver aimodels.Resolver
- account string
- roleConfigs map[string]*aimodels.Resolved
- callProvider, callReasoning string
- realtimeConfig *aimodels.Resolved
+	billing        *library.Meter
+	ModelResolver  aimodels.Resolver
+	account        string
+	roleConfigs    map[string]*aimodels.Resolved
+	realtimeConfig *aimodels.Resolved
+	// Models makes every Library model call through the agent runtime.
+	Models *modelruntime.Client
+	// APIKey, BaseURL and Client open the realtime voice socket, the one model
+	// connection Go makes itself.
 	APIKey, BaseURL             string
 	PrimaryModel, FallbackModel string
 	EmbeddingModel              string
 	Client                      *http.Client
 	ConfidenceThreshold         float64
 }
+
+// Available reports whether Library model calls can run.
+func (a *SmartLibraryAnalyzer) Available() bool { return a != nil && a.Models.Enabled() }
 
 func (a *SmartLibraryAnalyzer) Analyze(ctx context.Context, assets []SmartLibraryAsset) (SmartLibraryAnalysis, error) {
 	if len(assets) == 0 || len(assets) > SmartLibraryMaxBatchSize {
@@ -206,7 +213,7 @@ func (a *SmartLibraryAnalyzer) EmbedQuery(ctx context.Context, query string) ([]
 	if query == "" || len(query) > 512 || utf8.RuneCountInString(query) > 256 {
 		return nil, ModelUsage{}, errors.New("invalid semantic query")
 	}
-	vectors, usage, err := a.embedGateway(ctx, []string{"task: search result | query: " + query}, nil)
+	vectors, usage, err := a.embedGateway(ctx, []string{"task: search result | query: " + query})
 	if err != nil || len(vectors) != 1 {
 		return nil, usage, err
 	}
@@ -239,8 +246,10 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 	if len(assets) == 0 {
 		return nil, ModelUsage{}, nil
 	}
-	configured, _, configErr := a.forRole(ctx, "embedding")
- if configErr != nil { return nil, ModelUsage{}, configErr }; a = configured
+	route, model, routeErr := a.embeddingRoute(ctx)
+	if routeErr != nil {
+		return nil, ModelUsage{}, routeErr
+	}
 	results := make([]SmartLibraryEmbedding, 0, len(assets))
 	var total ModelUsage
 	for _, asset := range assets {
@@ -252,22 +261,22 @@ func (a *SmartLibraryAnalyzer) EmbedAssets(ctx context.Context, assets []SmartLi
 		var usage ModelUsage
 		var err error
 		switch {
-		case a.callProvider == "" && !strings.HasPrefix(a.embeddingModel(), "openai/text-embedding-") && len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
+		case !route.IsAccount() && !strings.HasPrefix(model, "openai/text-embedding-") && len(asset.Bytes) > 0 && (asset.MimeType == "image/jpeg" || asset.MimeType == "image/png"):
 			var vector []float64
 			vector, usage, err = a.embedImageV1(ctx, value, asset)
 			vectors = [][]float64{vector}
 		default:
-			vectors, usage, err = a.embedGateway(ctx, []string{value}, nil)
+			vectors, usage, err = a.embedGateway(ctx, []string{value})
 		}
 		total.InputTokens += usage.InputTokens
 		if err != nil {
 			return nil, total, err
 		}
 		if len(vectors) != 1 {
-			return nil, total, errors.New("gateway returned an unexpected embedding count")
+			return nil, total, errors.New("embedding model returned an unexpected embedding count")
 		}
 		inputHash := sha256.Sum256([]byte(value + "\x00" + asset.MimeType + "\x00" + string(asset.Bytes)))
-		results = append(results, SmartLibraryEmbedding{AssetID: asset.AssetID, Model: a.embeddingModel(), Version: SmartLibraryIndexVersion, InputHash: hex.EncodeToString(inputHash[:]), Vector: vectors[0]})
+		results = append(results, SmartLibraryEmbedding{AssetID: asset.AssetID, Model: model, Version: SmartLibraryIndexVersion, InputHash: hex.EncodeToString(inputHash[:]), Vector: vectors[0]})
 	}
 	return results, total, nil
 }

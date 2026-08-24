@@ -2,36 +2,24 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	. "github.com/kannachi323/misty/server/internal/agents"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
 func TestTranscribeMediaReturnsTimestampedSegments(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/transcription-model" {
-			t.Fatalf("path=%s", r.URL.Path)
+	runtime := modelruntime.TestingNewFake(t, func(call modelruntime.TestingCall) (int, any) {
+		if call.Path != "/v1/models/transcribe" || call.Body["model"] != MediaSearchTranscriptionModel || call.Body["mediaType"] != "audio/mpeg" || call.Body["audio"] == "" {
+			t.Fatalf("call=%s %v", call.Path, call.Body)
 		}
-		if r.Header.Get("Authorization") != "Bearer test-key" {
-			t.Fatal("missing authorization")
+		if call.Body["route"].(map[string]any)["provider"] != "instance" {
+			t.Fatalf("route=%v", call.Body["route"])
 		}
-		if r.Header.Get("ai-model-id") != MediaSearchTranscriptionModel || r.Header.Get("ai-transcription-model-specification-version") != "4" {
-			t.Fatalf("headers=%v", r.Header)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatal(err)
-		}
-		if body["mediaType"] != "audio/mpeg" || body["audio"] == "" {
-			t.Fatalf("body=%v", body)
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"text": "hello world", "segments": []map[string]any{{"startSecond": 1.25, "endSecond": 2.5, "text": "hello world"}}})
-	}))
-	defer server.Close()
-	analyzer := &SmartLibraryAnalyzer{APIKey: "test-key", BaseURL: server.URL, Client: server.Client()}
+		return http.StatusOK, map[string]any{"text": "hello world", "segments": []map[string]any{{"start": 1.25, "end": 2.5, "text": "hello world"}}}
+	})
+	analyzer := &SmartLibraryAnalyzer{Models: runtime.Client}
 	segments, _, err := analyzer.TranscribeMedia(context.Background(), []byte("fake mp3"), "audio/mpeg", 30_000)
 	if err != nil {
 		t.Fatal(err)

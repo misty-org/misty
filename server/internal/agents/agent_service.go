@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/modelruntime"
 )
 
 type Service struct {
@@ -17,6 +18,7 @@ type Service struct {
 	policy        PermissionPolicy
 	meter         UsageMeter
 	modelResolver aimodels.Resolver
+	models        *modelruntime.Client
 }
 
 type ToolExecutor func(context.Context, ToolRequest) (json.RawMessage, error)
@@ -128,7 +130,7 @@ func (s *Service) completeWithProviderContext(ctx context.Context, userID, space
 		}
 		if config != nil {
 			var providerErr error
-			selectedProvider, providerErr = accountCompletionProvider(config)
+			selectedProvider, providerErr = accountCompletionProvider(s.models, config)
 			if providerErr != nil {
 				return "", UsageSettlement{}, providerErr
 			}
@@ -178,6 +180,12 @@ type ServiceOption func(*Service)
 
 func WithUsageMeter(meter UsageMeter) ServiceOption {
 	return func(service *Service) { service.meter = meter }
+}
+
+// WithModelRuntime sends per-request model choices (an account's own
+// connection or a picked Gateway model) through the agent runtime.
+func WithModelRuntime(models *modelruntime.Client) ServiceOption {
+	return func(service *Service) { service.models = models }
 }
 
 func NewService(store *SessionStore, provider ModelProvider, options ...ServiceOption) *Service {

@@ -1,79 +1,13 @@
 package agent
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
 	"strings"
-	"time"
- "github.com/kannachi323/misty/server/internal/aimodels"
 
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 )
 
-func (a *SmartLibraryAnalyzer) requestAt(ctx context.Context, url string, body any, headers map[string]string, dst any) (resultErr error) {
-	key := strings.TrimSpace(a.APIKey)
-	if key == "" && a.callProvider != "openai-compatible" {
-		return errors.New("AI provider key is required")
-	}
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return err
-	}
-	wirePayload := payload
- if a.callProvider != "" {
-  var native map[string]any
-  if json.Unmarshal(payload, &native) == nil { if model, ok := native["model"].(string); ok { native["model"] = aimodels.NativeModel(a.callProvider, model); wirePayload, _ = json.Marshal(native) } }
- }
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(wirePayload))
-	if err != nil {
-		return err
-	}
-	if key != "" { request.Header.Set("Authorization", "Bearer "+key) }
-	request.Header.Set("Content-Type", "application/json")
-	for name, value := range headers {
-		request.Header.Set(name, value)
-	}
-	client := a.Client
-	if client == nil {
-		client = &http.Client{Timeout: 75 * time.Second}
-	}
-	attempt, err := a.beginLibraryRequest(ctx, url, payload, headers)
-	if err != nil {
-		return err
-	}
-	var raw []byte
-	success := false
-	defer func() {
-		units, estimated := libraryResponseUsage(raw)
-		if e := attempt.Finish(ctx, success, units, estimated); e != nil {
-			resultErr = e
-		}
-	}()
-	response, err := client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	success = response.StatusCode >= 200 && response.StatusCode < 300
-	raw, err = io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
-	if err != nil || len(raw) > 8<<20 {
-		return errors.New("AI provider response too large or incomplete")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("AI provider status %d", response.StatusCode)
-	}
-	if err = json.Unmarshal(raw, dst); err != nil {
-		return fmt.Errorf("AI provider returned invalid JSON: %w", err)
-	}
-	return nil
-}
-
-func (a *SmartLibraryAnalyzer) chatBaseURL() string {
+// gatewayBaseURL and realtimeBaseURL locate the realtime voice socket.
+func (a *SmartLibraryAnalyzer) gatewayBaseURL() string {
 	base := strings.TrimRight(strings.TrimSpace(a.BaseURL), "/")
 	if base == "" {
 		return "https://ai-gateway.vercel.sh/v1"
@@ -81,11 +15,8 @@ func (a *SmartLibraryAnalyzer) chatBaseURL() string {
 	return base
 }
 
-func (a *SmartLibraryAnalyzer) embeddingBaseURL() string {
-	if override := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("AI_GATEWAY_EMBEDDING_BASE_URL")), "/"); override != "" {
-		return override
-	}
-	base := a.chatBaseURL()
+func (a *SmartLibraryAnalyzer) realtimeBaseURL() string {
+	base := a.gatewayBaseURL()
 	if strings.HasSuffix(base, "/v1") {
 		return strings.TrimSuffix(base, "/v1") + "/v4/ai"
 	}

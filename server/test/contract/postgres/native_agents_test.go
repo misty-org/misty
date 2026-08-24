@@ -15,7 +15,6 @@ import ()
 
 func TestNativeAgentsPrivacyMemoryAndLeases(t *testing.T) {
 	database := openTestDatabase(t)
-	t.Setenv("MISTY_AGENT_MODEL_PROVIDER", "gateway")
 	t.Setenv("MISTY_AGENT_MODEL", serveragent.InitialSelectedModelID)
 	t.Setenv("MISTY_AGENT_MODEL_API_KEY", "")
 	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", "")

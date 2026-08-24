@@ -86,12 +86,21 @@ export interface ConnectedPeerStatus {
   connectionType: "direct" | "relay" | "unknown";
   authorizationExpiresAt: number;
 }
+export interface DeviceSessionSummary {
+  deviceId: string;
+  /** Unix seconds when this device's access to the peer ends; 0 once ended. */
+  outgoingExpiresAt: number;
+  /** Unix seconds when the peer's access to this device ends; 0 once ended. */
+  incomingExpiresAt: number;
+}
 export interface ConnectedDevicesSnapshot {
   enabled: boolean;
   endpointId: string | null;
   addressing: unknown | null;
-  relayPolicy: "managed" | "public-development" | "disabled";
+  relayPolicy: "managed" | "public-development" | "disabled" | "lan-only";
   peers: ConnectedPeerStatus[];
+  /** Local sessions with paired devices, live or ended. */
+  sessions: DeviceSessionSummary[];
   unavailableReason: string | null;
 }
 export interface PeerRoot {
@@ -107,6 +116,8 @@ export interface ExplorerLocation {
   remotePath: string | null;
   peerDeviceId?: string | null;
   peerRootId?: string | null;
+  /** For a connected device: whether it lets this device change its files. */
+  peerWritable?: boolean;
 }
 export interface FileEntry {
   id: string;

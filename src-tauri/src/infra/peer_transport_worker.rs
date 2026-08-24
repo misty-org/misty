@@ -193,6 +193,9 @@ impl Drop for ConnectionInner {
 #[derive(Clone)]
 pub(crate) struct Connection(Arc<ConnectionInner>);
 impl Connection {
+    pub(crate) fn id(&self) -> &str {
+        &self.0.id
+    }
     pub(crate) fn remote_id(&self) -> &str {
         &self.0.remote
     }

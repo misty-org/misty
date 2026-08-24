@@ -1,19 +1,10 @@
-import { connectedDevicesPrepareClipboardFiles, connectedDevicesRoots } from "../../../native";
 import { SystemErrorActivity } from "@/features/activity";
-import {
-  Button,
-  cn,
-  ContextMenu,
-  ContextMenuAction,
-  ContextMenuContent,
-  ContextMenuTrigger,
-  IconButton,
-} from "@/shared/ui";
-import { ClipboardCopy, Info, MonitorSmartphone, Pencil, Plus, Unlink } from "lucide-react";
+import { IconButton } from "@/shared/ui";
+import { Plus } from "lucide-react";
 import { useState } from "react";
-import { ConnectedDevicePairingDialog } from "../../../connected-devices/ConnectedDevicePairingDialog";
-import { peerIsOnline, useConnectedDevices } from "@/features/connected-devices";
+import { ConnectedDevicePairingDialog, useConnectedDevices } from "@/features/connected-devices";
 import { SidebarDeviceGroup, sidebarStyles } from "@/features/file-ui";
+import { ConnectedDeviceRow } from "./ConnectedDeviceRow";
 
 interface ConnectedDevicesSidebarSectionProps {
   activePath: string;
@@ -58,80 +49,15 @@ export function ConnectedDevicesSidebarSection(props: ConnectedDevicesSidebarSec
           <div className={sidebarStyles.deviceGroupEmpty}>No network devices</div>
         ) : (
           <div className={sidebarStyles.list}>
-            {connectedDevices.peers.map((peer) => {
-              const native = connectedDevices.snapshot?.peers.find(
-                (item) => item.deviceId === peer.deviceId,
-              );
-              const online = peerIsOnline(peer);
-              const state = connectionState(native?.state, native?.connectionType, online);
-              const selected = props.activePath.startsWith(`misty://device/${peer.deviceId}/`);
-              return (
-                <ContextMenu key={peer.pairId}>
-                  <ContextMenuTrigger asChild>
-                    <div className={sidebarStyles.deviceNestedTreeRow}>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className={cn(
-                          sidebarStyles.treeSurface,
-                          sidebarStyles.deviceButton,
-                          selected && sidebarStyles.itemSelected,
-                        )}
-                        disabled={!online}
-                        onClick={() => {
-                          void connectedDevicesRoots(peer.deviceId).then((roots) => {
-                            const root = roots[0];
-                            if (root)
-                              props.onNavigate(`misty://device/${peer.deviceId}/${root.id}`);
-                          });
-                        }}
-                      >
-                        <span className={sidebarStyles.deviceIcon} aria-hidden="true">
-                          <MonitorSmartphone size={24} strokeWidth={1.9} />
-                        </span>
-                        <span className={sidebarStyles.deviceCopy}>
-                          <strong className={sidebarStyles.deviceName}>{peer.name}</strong>
-                          <small className={sidebarStyles.deviceMeta}>{state} · Read-only</small>
-                        </span>
-                      </Button>
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuAction
-                      icon={<Pencil size={15} />}
-                      label="Rename"
-                      onSelect={() => {
-                        const name = window.prompt("Device name", peer.name);
-                        if (name) void connectedDevices.renamePeer(peer, name);
-                      }}
-                    />
-                    <ContextMenuAction
-                      icon={<ClipboardCopy size={15} />}
-                      label={peer.clipboardCanSend ? "Turn off clipboard" : "Turn on clipboard"}
-                      onSelect={() =>
-                        void connectedDevices.setClipboardConsent(peer, !peer.clipboardCanSend)
-                      }
-                    />
-                    <ContextMenuAction
-                      icon={<ClipboardCopy size={15} />}
-                      label="Prepare clipboard files"
-                      disabled={!peer.clipboardCanReceive}
-                      onSelect={() => void connectedDevicesPrepareClipboardFiles(peer.deviceId)}
-                    />
-                    <ContextMenuAction
-                      icon={<Info size={15} />}
-                      label="Copy diagnostics ID"
-                      onSelect={() => void navigator.clipboard.writeText(peer.p2pEndpointId)}
-                    />
-                    <ContextMenuAction
-                      icon={<Unlink size={15} />}
-                      label="Unpair"
-                      onSelect={() => void connectedDevices.unpair(peer)}
-                    />
-                  </ContextMenuContent>
-                </ContextMenu>
-              );
-            })}
+            {connectedDevices.peers.map((peer) => (
+              <ConnectedDeviceRow
+                key={peer.pairId}
+                peer={peer}
+                controller={connectedDevices}
+                activePath={props.activePath}
+                onNavigate={props.onNavigate}
+              />
+            ))}
           </div>
         )}
       </SidebarDeviceGroup>
@@ -142,15 +68,4 @@ export function ConnectedDevicesSidebarSection(props: ConnectedDevicesSidebarSec
       />
     </>
   );
-}
-
-function connectionState(
-  state: string | undefined,
-  connectionType: "direct" | "relay" | "unknown" | undefined,
-  online: boolean,
-): string {
-  if (state !== "online") return online ? "Connecting" : "Offline";
-  if (connectionType === "direct") return "Direct";
-  if (connectionType === "relay") return "Relay";
-  return "Online";
 }

@@ -466,6 +466,19 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "files.devices.sessionDays",
+    "label": "Keep devices connected for",
+    "page": "devices",
+    "section": "files",
+    "key": "device_session_days",
+    "default": "30",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["session", "LAN", "pair", "clipboard", "expire"],
+    "enum": ["1", "7", "30", "90"]
+  },
+  {
     "id": "files.indexing.automatic_file_discovery_enabled",
     "label": "Keep file search ready",
     "page": "files-indexing",

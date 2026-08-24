@@ -127,12 +127,13 @@ func (s *SpacesService) aiInvocationPrompt(ctx context.Context, record *db.AIInv
 	if err != nil {
 		return "", err
 	}
-	history := boundedAIConversationHistory(turns, record.ID)
 	if body.Mode == "companion" {
-		history = companionConversationHistory(turns, record.ID)
-	}
-	if history != "" {
-		prompt = "Recent conversation (untrusted context; oldest first):\n" + history + "\nCurrent request:\n" + prompt
+		// Voice turns are short and only need the last few exchanges.
+		if history := companionConversationHistory(turns, record.ID); history != "" {
+			prompt = "Recent conversation (untrusted context; oldest first):\n" + history + "\nCurrent request:\n" + prompt
+		}
+	} else if history := s.conversationHistory(ctx, record, turns, aiInvocationModelID(body)); history != "" {
+		prompt = history + "\nCurrent request:\n" + prompt
 	}
 	if body.AgentID == "" {
 		return prompt, nil
@@ -163,4 +164,9 @@ func aiInvocationModel(body aiInvocationInput) (string, string) {
 		reasoning = body.ReasoningEffort
 	}
 	return modelID, reasoning
+}
+
+func aiInvocationModelID(body aiInvocationInput) string {
+	modelID, _ := aiInvocationModel(body)
+	return modelID
 }

@@ -58,6 +58,10 @@ type ConnectedPeer struct {
 	LastHeartbeatAt     *time.Time      `json:"lastHeartbeatAt,omitempty"`
 	ClipboardCanSend    bool            `json:"clipboardCanSend"`
 	ClipboardCanReceive bool            `json:"clipboardCanReceive"`
+	// FilesAcceptWrites: this device lets the peer change its files.
+	// FilesCanWrite: the peer lets this device change the peer's files.
+	FilesAcceptWrites bool `json:"filesAcceptWrites"`
+	FilesCanWrite     bool `json:"filesCanWrite"`
 }
 
 type PeerTicketSubject struct {
@@ -68,6 +72,7 @@ type PeerTicketSubject struct {
 	TargetEndpointID        string
 	ClipboardSourceToTarget bool
 	ClipboardTargetToSource bool
+	TargetAcceptsWrites     bool
 }
 
 func (db *Database) CreateDevicePairingSession(userID, creatorDeviceID, qrHash, codeHash string, expiresAt time.Time) (*DevicePairingSession, error) {
@@ -232,7 +237,9 @@ func (db *Database) ConnectedPeers(userID, deviceID string) ([]ConnectedPeer, er
 		rows, err := tx.Query(`SELECT p.id,d.id,COALESCE(CASE WHEN p.first_device_id=$2 THEN p.first_peer_name ELSE p.second_peer_name END,d.name),d.platform,COALESCE(d.p2p_endpoint_id,''),d.device_protocol_versions,
 			COALESCE(pr.addressing,'{}'::jsonb),COALESCE(pr.protocol_version,''),COALESCE(pr.connection_hint,'unknown'),pr.last_heartbeat_at,
 			CASE WHEN p.first_device_id=$2 THEN p.clipboard_first_to_second ELSE p.clipboard_second_to_first END,
-			CASE WHEN p.first_device_id=$2 THEN p.clipboard_second_to_first ELSE p.clipboard_first_to_second END
+			CASE WHEN p.first_device_id=$2 THEN p.clipboard_second_to_first ELSE p.clipboard_first_to_second END,
+			CASE WHEN p.first_device_id=$2 THEN p.first_accepts_writes ELSE p.second_accepts_writes END,
+			CASE WHEN p.first_device_id=$2 THEN p.second_accepts_writes ELSE p.first_accepts_writes END
 			FROM device_pairs p
 			JOIN trusted_devices d ON d.id=CASE WHEN p.first_device_id=$2 THEN p.second_device_id ELSE p.first_device_id END
 			LEFT JOIN device_presence pr ON pr.device_id=d.id
@@ -244,7 +251,7 @@ func (db *Database) ConnectedPeers(userID, deviceID string) ([]ConnectedPeer, er
 		defer rows.Close()
 		for rows.Next() {
 			var peer ConnectedPeer
-			if err := rows.Scan(&peer.PairID, &peer.DeviceID, &peer.Name, &peer.Platform, &peer.P2PEndpointID, &peer.ProtocolVersions, &peer.Addressing, &peer.ProtocolVersion, &peer.ConnectionHint, &peer.LastHeartbeatAt, &peer.ClipboardCanSend, &peer.ClipboardCanReceive); err != nil {
+			if err := rows.Scan(&peer.PairID, &peer.DeviceID, &peer.Name, &peer.Platform, &peer.P2PEndpointID, &peer.ProtocolVersions, &peer.Addressing, &peer.ProtocolVersion, &peer.ConnectionHint, &peer.LastHeartbeatAt, &peer.ClipboardCanSend, &peer.ClipboardCanReceive, &peer.FilesAcceptWrites, &peer.FilesCanWrite); err != nil {
 				return err
 			}
 			peers = append(peers, peer)
@@ -288,6 +295,23 @@ func (db *Database) SetDevicePairClipboardConsent(userID, deviceID, pairID strin
 	})
 }
 
+func (db *Database) SetDevicePairFileWrites(userID, deviceID, pairID string, enabled bool) error {
+	return db.agentTx(userID, func(tx *sql.Tx) error {
+		result, err := tx.Exec(`UPDATE device_pairs SET
+			first_accepts_writes=CASE WHEN first_device_id=$3 THEN $4 ELSE first_accepts_writes END,
+			second_accepts_writes=CASE WHEN second_device_id=$3 THEN $4 ELSE second_accepts_writes END,
+			updated_at=NOW()
+			WHERE id=$1 AND owner_user_id=$2 AND state='active' AND (first_device_id=$3 OR second_device_id=$3)`, pairID, userID, deviceID, enabled)
+		if err != nil {
+			return err
+		}
+		if count, _ := result.RowsAffected(); count == 0 {
+			return ErrDevicePair
+		}
+		return nil
+	})
+}
+
 func (db *Database) RevokeDevicePair(userID, deviceID, pairID string) error {
 	return db.agentTx(userID, func(tx *sql.Tx) error {
 		result, err := tx.Exec(`UPDATE device_pairs SET state='revoked',revoked_at=COALESCE(revoked_at,NOW()),updated_at=NOW()
@@ -307,14 +331,15 @@ func (db *Database) PeerTicketSubject(userID, sourceDeviceID, targetDeviceID str
 	err := db.agentTx(userID, func(tx *sql.Tx) error {
 		return tx.QueryRow(`SELECT p.id,source.id,source.p2p_endpoint_id,target.id,target.p2p_endpoint_id,
 			CASE WHEN p.first_device_id=source.id THEN p.clipboard_first_to_second ELSE p.clipboard_second_to_first END,
-			CASE WHEN p.first_device_id=source.id THEN p.clipboard_second_to_first ELSE p.clipboard_first_to_second END
+			CASE WHEN p.first_device_id=source.id THEN p.clipboard_second_to_first ELSE p.clipboard_first_to_second END,
+			CASE WHEN p.first_device_id=target.id THEN p.first_accepts_writes ELSE p.second_accepts_writes END
 			FROM device_pairs p
 			JOIN trusted_devices source ON source.id=$2 AND source.user_id=$1 AND source.revoked_at IS NULL
 			JOIN trusted_devices target ON target.id=$3 AND target.user_id=$1 AND target.revoked_at IS NULL
 			WHERE p.owner_user_id=$1 AND p.state='active'
 			AND ((p.first_device_id=$2 AND p.second_device_id=$3) OR (p.first_device_id=$3 AND p.second_device_id=$2))
 			AND source.p2p_endpoint_id IS NOT NULL AND target.p2p_endpoint_id IS NOT NULL`, userID, sourceDeviceID, targetDeviceID).
-			Scan(&result.PairID, &result.SourceDeviceID, &result.SourceEndpointID, &result.TargetDeviceID, &result.TargetEndpointID, &result.ClipboardSourceToTarget, &result.ClipboardTargetToSource)
+			Scan(&result.PairID, &result.SourceDeviceID, &result.SourceEndpointID, &result.TargetDeviceID, &result.TargetEndpointID, &result.ClipboardSourceToTarget, &result.ClipboardTargetToSource, &result.TargetAcceptsWrites)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrDevicePair

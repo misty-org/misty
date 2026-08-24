@@ -1,5 +1,6 @@
 import { useCallback, useState, type RefObject } from "react";
 import { devicesApi } from "@/api/devices/api";
+import { connectedDevicesEndSession } from "@/native/connected-devices";
 import { signedAgentDeviceRequest } from "@/features/agents";
 import {
   parsePairingInput,
@@ -70,7 +71,10 @@ export function useDevicePairing(
       local.serverId,
       pairing.session.id,
     );
-    setPairing(null);
+    // Stay on the pairing so the dialog can show that the device connected.
+    setPairing((current) =>
+      current ? { ...current, session: { ...current.session, state: "confirmed" } } : current,
+    );
     await refresh();
   }, [localRef, pairing, refresh]);
 
@@ -79,6 +83,23 @@ export function useDevicePairing(
       const local = localRef.current;
       if (!local) return;
       await devicesApi.setClipboardConsent(
+        signedAgentDeviceRequest,
+        local.localId,
+        local.serverId,
+        peer.pairId,
+        enabled,
+      );
+      await refresh();
+    },
+    [localRef, refresh],
+  );
+
+  /** Lets the peer change this device's files, or stops it. */
+  const setFileWrites = useCallback(
+    async (peer: ServerConnectedPeer, enabled: boolean) => {
+      const local = localRef.current;
+      if (!local) return;
+      await devicesApi.setFileWrites(
         signedAgentDeviceRequest,
         local.localId,
         local.serverId,
@@ -111,6 +132,8 @@ export function useDevicePairing(
     async (peer: ServerConnectedPeer) => {
       const local = localRef.current;
       if (!local) return;
+      // Tell the device now; it would otherwise learn at its next account sync.
+      await connectedDevicesEndSession(peer.deviceId).catch(() => undefined);
       await devicesApi.revokePair(
         signedAgentDeviceRequest,
         local.localId,
@@ -130,6 +153,7 @@ export function useDevicePairing(
     refreshPairing,
     confirmPairing,
     setClipboardConsent,
+    setFileWrites,
     renamePeer,
     unpair,
   };

@@ -261,6 +261,10 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 	// Empty canonical conversations have no legacy Go transcript. They must be
 	// visible before admission so another renderer can attach the first task.
 	if len(turns) > 0 || !summary.HasLegacySession {
+		notes, notesErr := s.database.AIConversationSummary(r.Context(), userID, summary.ID)
+		if notesErr != nil {
+			return mistyConversation{}, notesErr
+		}
 		messages := make([]mistyConversationMessage, 0, len(turns)*2)
 		for _, turn := range turns {
 			mode := "ask"
@@ -341,6 +345,9 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 				})
 			}
 		}
+		if notes != nil {
+			markCompactedAfter(messages, notes.ThroughInvocationID)
+		}
 		modelID := agent.FrontierDefaultModelID()
 		return mistyConversation{
 			ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
@@ -380,4 +387,15 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 		CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt: summary.UpdatedAt.UTC().Format(time.RFC3339Nano), Messages: messages, Remote: true,
 	}, nil
+}
+
+// markCompactedAfter flags the last message of the newest summarized turn, so
+// the transcript can show where the model's notes end.
+func markCompactedAfter(messages []mistyConversationMessage, invocationID string) {
+	for index := len(messages) - 1; index >= 0; index-- {
+		if strings.HasPrefix(messages[index].ID, invocationID+"-") {
+			messages[index].CompactedAfter = true
+			return
+		}
+	}
 }
