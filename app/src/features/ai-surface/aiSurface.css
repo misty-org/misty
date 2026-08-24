@@ -1,7 +1,6 @@
 .misty-ai-pane-host {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: block;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -10,19 +9,11 @@
 }
 
 .misty-ai-pane-content {
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-}
-
-.misty-ai-default-launcher {
-  position: absolute;
-  right: 0.625rem;
-  top: 0.625rem;
-  z-index: 35;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--color-charcoal-bg) 86%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .misty-ai-proactive-nudge {
@@ -42,35 +33,333 @@
   backdrop-filter: blur(10px);
 }
 
-.misty-ai-drawer {
-  position: absolute;
-  inset: 0 0 0 auto;
-  z-index: 80;
-  display: flex;
-  width: min(100%, 390px);
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  border-left: 1px solid var(--color-charcoal-border);
-  background: var(--color-charcoal-bg);
-  color: var(--color-cream);
-  box-shadow: -18px 0 42px rgb(0 0 0 / 28%);
-}
-
-.misty-ai-pane-host.is-ai-open > .misty-ai-drawer {
+.misty-presence {
+  position: fixed;
+  top: 0;
+  left: 0;
   z-index: 2147483400;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  will-change: transform;
 }
 
-@container (min-width: 760px) {
-  .misty-ai-pane-host.is-ai-open {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, min(40cqw, 420px));
+/* The companion can visually glide across the pointer while catching up. It
+   must remain transparent to hit testing until it reaches its safe offset or
+   links and text underneath rapidly lose and regain cursor ownership. */
+.misty-presence[data-following="true"] *,
+.misty-presence[data-following="true"] *::before,
+.misty-presence[data-following="true"] *::after {
+  pointer-events: none !important;
+}
+
+.misty-presence-pet {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  overflow: visible;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgb(0 0 0 / 28%));
+}
+
+.misty-presence-pet img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  user-select: none;
+}
+
+.misty-presence-working {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--color-charcoal-bg);
+  border-radius: 999px;
+  background: var(--color-sage-fg);
+  animation: misty-working-pulse 1.2s ease-in-out infinite;
+}
+
+.misty-speech-bubble {
+  position: absolute;
+  left: -124px;
+  bottom: 54px;
+  z-index: 1;
+  width: min(300px, calc(100vw - 28px));
+  border: 1px solid color-mix(in srgb, var(--color-charcoal-border) 80%, white 8%);
+  border-radius: 18px 18px 18px 7px;
+  background: color-mix(in srgb, var(--color-charcoal-bg) 96%, transparent);
+  padding: 10px 12px;
+  color: var(--color-cream);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 32%);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+  animation: misty-speech-in 150ms ease-out;
+}
+
+.misty-speech-bubble.is-error {
+  border-color: color-mix(in srgb, var(--color-notification-red) 44%, transparent);
+}
+
+.misty-speech-bubble p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.misty-speech-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.misty-speech-actions:empty {
+  display: none;
+}
+
+.misty-input-pill {
+  position: absolute;
+  top: 52px;
+  left: -18px;
+  z-index: 3;
+  display: grid;
+  width: min(380px, calc(100vw - 28px));
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--color-charcoal-border) 76%, white 10%);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-charcoal-bg) 97%, transparent);
+  padding: 6px 7px 6px 10px;
+  box-shadow: 0 16px 38px rgb(0 0 0 / 34%);
+  backdrop-filter: blur(18px);
+  pointer-events: auto;
+  animation: misty-input-in 140ms ease-out;
+}
+
+.misty-input-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 30px 32px;
+  align-items: end;
+  gap: 6px;
+}
+
+.misty-input-capture {
+  width: 30px;
+  height: 30px;
+  align-self: end;
+  border-radius: 999px;
+  color: var(--color-cream-muted);
+}
+
+.misty-input-capture-preview {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 22px;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin: 0 3px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-charcoal-card) 92%, transparent);
+  padding: 4px;
+  color: var(--color-cream-muted);
+  font-size: 10px;
+}
+
+.misty-input-capture-preview img {
+  width: 38px;
+  height: 28px;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.misty-input-capture-preview button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.misty-region-capture {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  cursor: crosshair;
+  background: rgb(7 10 14 / 34%);
+  user-select: none;
+}
+
+.misty-region-capture-hint {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 999px;
+  background: rgb(18 21 25 / 94%);
+  padding: 8px 13px;
+  color: #eef5ff;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 30%);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.misty-region-capture-selection {
+  position: fixed;
+  border: 1px solid rgb(142 199 255 / 90%);
+  border-radius: 8px;
+  background: rgb(132 190 255 / 10%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 25%);
+  pointer-events: none;
+}
+
+.misty-input-context {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 0 5px 1px;
+  color: var(--color-cream-muted);
+  font-size: 10px;
+}
+
+.misty-input-selection {
+  flex: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-blue-400, #60a5fa) 14%, transparent);
+  padding: 2px 6px;
+  color: var(--color-cream-bright);
+}
+
+.misty-input-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 3px 2px;
+}
+
+.misty-input-suggestions button {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-charcoal-card) 90%, transparent);
+  padding: 4px 8px;
+  color: var(--color-cream-muted);
+  font-size: 10px;
+  line-height: 1;
+  transition:
+    border-color 120ms ease,
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.misty-input-suggestions button:hover {
+  border-color: color-mix(in srgb, var(--color-cream-muted) 45%, transparent);
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream-bright);
+}
+
+.misty-input-agent {
+  align-self: center;
+  max-width: 68px;
+  overflow: hidden;
+  color: var(--color-cream-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.misty-input-field {
+  field-sizing: content;
+  max-height: 92px;
+  min-height: 30px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  padding: 6px 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: none;
+}
+
+.misty-input-field:focus-visible {
+  box-shadow: none;
+  outline: none;
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+.misty-input-send,
+.misty-stop-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  pointer-events: auto;
+}
+
+.misty-stop-button {
+  position: absolute;
+  top: 49px;
+  left: 6px;
+  background: color-mix(in srgb, var(--color-charcoal-card) 94%, transparent);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+}
+
+.misty-presence[data-placement-y="above"] .misty-input-pill {
+  top: auto;
+  bottom: 52px;
+}
+
+.misty-presence[data-placement-y="above"] .misty-stop-button {
+  top: auto;
+  bottom: 49px;
+}
+
+.misty-presence[data-placement-x="before"] .misty-input-pill {
+  right: -18px;
+  left: auto;
+}
+
+@keyframes misty-speech-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
   }
 
-  .misty-ai-drawer {
-    position: relative;
-    inset: auto;
-    width: auto;
-    box-shadow: none;
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes misty-input-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+
+@keyframes misty-working-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.78);
   }
 }
 
@@ -83,4 +372,72 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  .misty-presence,
+  .misty-presence-pet,
+  .misty-speech-bubble,
+  .misty-input-pill,
+  .misty-presence-working {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.misty-markdown-message {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.misty-markdown-message > :first-child {
+  margin-top: 0;
+}
+
+.misty-markdown-message > :last-child {
+  margin-bottom: 0;
+}
+
+.misty-markdown-message p,
+.misty-markdown-message ul,
+.misty-markdown-message ol,
+.misty-markdown-message pre,
+.misty-markdown-message blockquote {
+  margin: 0.55rem 0;
+}
+
+.misty-markdown-message ul,
+.misty-markdown-message ol {
+  padding-left: 1.25rem;
+}
+
+.misty-markdown-message ul {
+  list-style: disc;
+}
+
+.misty-markdown-message ol {
+  list-style: decimal;
+}
+
+.misty-markdown-message code {
+  border-radius: 0.25rem;
+  background: rgb(255 255 255 / 7%);
+  padding: 0.08rem 0.25rem;
+  font-size: 0.9em;
+}
+
+.misty-markdown-message pre {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: rgb(0 0 0 / 28%);
+  padding: 0.75rem;
+}
+
+.misty-markdown-message pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.misty-markdown-message a {
+  color: var(--color-cream-bright);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
