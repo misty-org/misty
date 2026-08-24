@@ -2,21 +2,12 @@ import { create } from "zustand";
 import { mcpConnectionsApi } from "./api";
 import { normalizeMcpTool, publicMcpConnection } from "./normalization";
 import type { McpToolWire } from "./normalization";
-import type {
-  McpConnection,
-  McpConnectionInput,
-  McpExecution,
-  McpToolBinding,
-  McpToolDescriptor,
-} from "./types";
-import { mcpToolKey } from "./types";
+import type { McpConnection, McpConnectionInput, McpToolDescriptor } from "./types";
 
 interface McpConnectionsState {
   scopeKey: string;
   connections: McpConnection[];
   tools: McpToolDescriptor[];
-  executionsByAgent: Record<string, McpExecution[]>;
-  enabledByAgent: Record<string, string[]>;
   failedToolConnectionIds: string[];
   loading: boolean;
   busy: string;
@@ -26,13 +17,6 @@ interface McpConnectionsState {
   test: (connectionId: string) => Promise<void>;
   discover: (connectionId: string) => Promise<void>;
   remove: (connectionId: string) => Promise<void>;
-  loadAgentTools: (agentId: string) => Promise<void>;
-  setToolEnabled: (
-    agentId: string,
-    connectionId: string,
-    remoteName: string,
-    enabled: boolean,
-  ) => Promise<void>;
   reset: () => void;
 }
 
@@ -40,8 +24,6 @@ const empty = {
   scopeKey: "",
   connections: [],
   tools: [],
-  executionsByAgent: {},
-  enabledByAgent: {},
   failedToolConnectionIds: [],
   loading: false,
   busy: "",
@@ -79,7 +61,7 @@ export const useMcpConnectionsStore = create<McpConnectionsState>((set, get) => 
         ),
         failedToolConnectionIds,
         error: failedToolConnectionIds.length
-          ? "Some connected tools could not be loaded. Tool changes are paused so existing Agent access stays unchanged."
+          ? "Some connected tools could not be loaded. Reconnect or rediscover those servers before Misty uses them."
           : "",
       });
     } catch (error) {
@@ -143,9 +125,6 @@ export const useMcpConnectionsStore = create<McpConnectionsState>((set, get) => 
           busy: "",
         };
       });
-      await Promise.all(
-        Object.keys(get().enabledByAgent).map((agentId) => get().loadAgentTools(agentId)),
-      );
     } catch (error) {
       if (get().scopeKey !== scopeKey) return;
       set({ busy: "", error: errorMessage(error, "Misty could not find tools on that server.") });
@@ -166,12 +145,6 @@ export const useMcpConnectionsStore = create<McpConnectionsState>((set, get) => 
           connections: state.connections.filter((item) => item.id !== connectionId),
           tools: state.tools.filter((item) => item.connection_id !== connectionId),
           failedToolConnectionIds,
-          enabledByAgent: Object.fromEntries(
-            Object.entries(state.enabledByAgent).map(([agentId, keys]) => [
-              agentId,
-              keys.filter((key) => !key.startsWith(`${connectionId}:`)),
-            ]),
-          ),
           error: failedToolConnectionIds.length ? state.error : "",
           busy: "",
         };
@@ -179,70 +152,6 @@ export const useMcpConnectionsStore = create<McpConnectionsState>((set, get) => 
     } catch (error) {
       if (get().scopeKey !== scopeKey) return;
       set({ busy: "", error: errorMessage(error, "That connection could not be removed.") });
-    }
-  },
-
-  loadAgentTools: async (agentId) => {
-    const scopeKey = get().scopeKey;
-    const [toolResult, executionResult] = await Promise.allSettled([
-      mcpConnectionsApi.agentTools(agentId),
-      mcpConnectionsApi.executions(agentId),
-    ]);
-    if (get().scopeKey !== scopeKey) return;
-    if (toolResult.status === "rejected") {
-      set({ error: errorMessage(toolResult.reason, "This Agent's tools could not be loaded.") });
-      return;
-    }
-    set((state) => ({
-      tools: mergeBindingTools(state.tools, toolResult.value.tools),
-      enabledByAgent: {
-        ...state.enabledByAgent,
-        [agentId]: toolResult.value.tools
-          .filter((tool) => tool.enabled)
-          .map((tool) => mcpToolKey(tool.connection_id, tool.remote_name)),
-      },
-      executionsByAgent: {
-        ...state.executionsByAgent,
-        [agentId]: executionResult.status === "fulfilled" ? executionResult.value.executions : [],
-      },
-    }));
-  },
-
-  setToolEnabled: async (agentId, connectionId, remoteName, enabled) => {
-    if (get().failedToolConnectionIds.length) {
-      set({
-        error:
-          "Tool changes are paused until every connection loads, so existing Agent access cannot be changed accidentally.",
-      });
-      return;
-    }
-    const scopeKey = get().scopeKey;
-    const changedKey = mcpToolKey(connectionId, remoteName);
-    const current = new Set(get().enabledByAgent[agentId] ?? []);
-    if (enabled) current.add(changedKey);
-    else current.delete(changedKey);
-    const input = get().tools.map((tool) => ({
-      connection_id: tool.connection_id,
-      remote_name: tool.remote_name,
-      enabled: current.has(mcpToolKey(tool.connection_id, tool.remote_name)),
-    }));
-    set({ busy: `tool:${agentId}:${changedKey}`, error: "" });
-    try {
-      const result = await mcpConnectionsApi.setAgentTools(agentId, input);
-      if (get().scopeKey !== scopeKey) return;
-      set((state) => ({
-        tools: mergeBindingTools(state.tools, result.tools),
-        enabledByAgent: {
-          ...state.enabledByAgent,
-          [agentId]: result.tools
-            .filter((tool) => tool.enabled)
-            .map((tool) => mcpToolKey(tool.connection_id, tool.remote_name)),
-        },
-        busy: "",
-      }));
-    } catch (error) {
-      if (get().scopeKey !== scopeKey) return;
-      set({ busy: "", error: errorMessage(error, "That tool setting could not be saved.") });
     }
   },
 
@@ -258,16 +167,6 @@ function normalizeTools(tools: McpToolWire[]): McpToolDescriptor[] {
     const normalized = normalizeMcpTool(tool);
     return normalized ? [normalized] : [];
   });
-}
-
-function mergeBindingTools(current: McpToolDescriptor[], bindings: McpToolBinding[]) {
-  const byKey = new Map(
-    current.map((tool) => [mcpToolKey(tool.connection_id, tool.remote_name), tool]),
-  );
-  for (const binding of normalizeTools(bindings)) {
-    byKey.set(mcpToolKey(binding.connection_id, binding.remote_name), binding);
-  }
-  return Array.from(byKey.values());
 }
 
 function replace<T extends { id: string }>(items: T[], next: T): T[] {

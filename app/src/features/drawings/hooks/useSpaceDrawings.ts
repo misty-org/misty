@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { drawingsApi } from "@/api/drawings/api";
 import { notifyDrawingListChanged, subscribeToDrawingListChanges } from "../drawingEvents";
+import { closeDrawingCollaborationSession } from "../collaboration/drawingCollaboration";
 import type { SpaceDrawing } from "../types";
 
 export function useSpaceDrawings(spaceId: string) {
@@ -52,6 +53,7 @@ export function useSpaceDrawings(spaceId: string) {
   const remove = useCallback(
     async (drawingId: string) => {
       await drawingsApi.remove(spaceId, drawingId);
+      closeDrawingCollaborationSession(spaceId, drawingId);
       setDrawings((current) => current.filter((item) => item.id !== drawingId));
       notifyDrawingListChanged(spaceId);
     },

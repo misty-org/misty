@@ -1,14 +1,17 @@
-import { spacesApi } from "@/api/spaces/api";
 import type { Space, SpaceStorageUsage } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useMemo, useState } from "react";
 import { useSpacesStore } from "../../store/useSpacesStore";
+import {
+  fetchSpaceStorageUsage,
+  getCachedSpaceStorageUsage,
+  isSpaceStorageUsageStale,
+  subscribeUsageCache,
+  USAGE_CACHE_TTL_MS,
+} from "../../store/usageCache";
 
 /**
- * Storage quota for the active Space, refreshed whenever the Library changes.
- *
- * `enabled` exists because the quota now lives behind the header's usage
- * popover: there is no reason to poll a number nobody is looking at, so the
- * fetch waits until something actually displays it.
+ * Storage quota for the active Space, cached and rechecked every 5 minutes
+ * or when the Library changes.
  */
 export function useSpaceLibraryUsage(options: {
   activeSpaceId: string;
@@ -19,32 +22,40 @@ export function useSpaceLibraryUsage(options: {
   const { activeSpaceId, activeSpace, snapshotReady } = options;
   const enabled = options.enabled ?? true;
   const ownerStorage = useSpacesStore((state) => state.ownerStorage);
-  const [usage, setUsage] = useState<SpaceStorageUsage | null>(null);
+  const [usage, setUsage] = useState<SpaceStorageUsage | null>(() =>
+    getCachedSpaceStorageUsage(activeSpaceId),
+  );
 
   useEffect(() => {
-    setUsage(null);
     if (!enabled || !snapshotReady || !activeSpaceId || !activeSpace) {
       return;
     }
-    let active = true;
-    const loadUsage = () => {
-      void spacesApi
-        .libraryUsage(activeSpaceId)
-        .then((next) => {
-          if (active && (!next.space_id || next.space_id === activeSpaceId)) setUsage(next);
-        })
-        .catch(() => {
-          if (active) setUsage(null);
-        });
-    };
+
+    const unsubscribe = subscribeUsageCache(() => {
+      setUsage(getCachedSpaceStorageUsage(activeSpaceId));
+    });
+
+    if (isSpaceStorageUsageStale(activeSpaceId)) {
+      void fetchSpaceStorageUsage(activeSpaceId);
+    } else {
+      setUsage(getCachedSpaceStorageUsage(activeSpaceId));
+    }
+
+    const interval = setInterval(() => {
+      void fetchSpaceStorageUsage(activeSpaceId, true);
+    }, USAGE_CACHE_TTL_MS);
+
     const reloadOnLibraryEvent = (event: Event) => {
       const detail = (event as CustomEvent<{ space_id?: string }>).detail;
-      if (detail?.space_id === activeSpaceId) loadUsage();
+      if (detail?.space_id === activeSpaceId) {
+        void fetchSpaceStorageUsage(activeSpaceId, true);
+      }
     };
-    loadUsage();
+
     window.addEventListener("misty:space-library-event", reloadOnLibraryEvent);
     return () => {
-      active = false;
+      unsubscribe();
+      clearInterval(interval);
       window.removeEventListener("misty:space-library-event", reloadOnLibraryEvent);
     };
   }, [activeSpace, activeSpaceId, enabled, snapshotReady]);

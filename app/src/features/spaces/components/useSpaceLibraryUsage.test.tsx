@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSpaceLibraryUsage } from "../components/spacePanel/useSpaceLibraryUsage";
 import { useSpacesStore } from "../store/useSpacesStore";
+import { clearUsageCache } from "../store/usageCache";
 
 const dummySpace1: Space = {
   id: "space-1",
@@ -57,6 +58,7 @@ describe("useSpaceLibraryUsage", () => {
   let root: Root;
 
   beforeEach(() => {
+    clearUsageCache();
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -66,6 +68,7 @@ describe("useSpaceLibraryUsage", () => {
   });
 
   afterEach(async () => {
+    clearUsageCache();
     await act(async () => root.unmount());
     container.remove();
     vi.restoreAllMocks();

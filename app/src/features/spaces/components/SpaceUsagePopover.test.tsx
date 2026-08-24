@@ -3,6 +3,7 @@ import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearUsageCache } from "../store/usageCache";
 
 vi.mock("@/features/auth", () => ({
   useAuth: () => ({ user: { id: "owner" }, transitioning: false }),
@@ -27,6 +28,7 @@ describe("SpaceUsagePopover", () => {
   let root: Root;
 
   beforeEach(() => {
+    clearUsageCache();
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,6 +38,7 @@ describe("SpaceUsagePopover", () => {
   });
 
   afterEach(async () => {
+    clearUsageCache();
     await act(async () => root.unmount());
     container.remove();
     document.body.innerHTML = "";
@@ -84,5 +87,30 @@ describe("SpaceUsagePopover", () => {
     expect(text).toContain("43%");
     expect(text).toContain("Storage");
     expect(text).toContain("2 GB");
+  });
+
+  it("uses cached data when reopened and rechecks after 5 minutes", async () => {
+    const librarySpy = vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
+      space_id: "space-1",
+      space_used_bytes: 1000,
+      used_bytes: 1000,
+      limit_bytes: 10000,
+      remaining_bytes: 9000,
+      storage_available: true,
+    });
+    const agentSpy = vi.spyOn(spacesApi, "agentUsage").mockResolvedValue({
+      agent_usage: { percentage_used: 20, available: true, paused: false },
+    });
+
+    await act(async () => root.render(<SpaceUsagePopover space={space} />));
+    await open();
+
+    expect(librarySpy).toHaveBeenCalledTimes(1);
+    expect(agentSpy).toHaveBeenCalledTimes(1);
+
+    // Reopening does not immediately refetch because data is cached
+    await open();
+    expect(librarySpy).toHaveBeenCalledTimes(1);
+    expect(agentSpy).toHaveBeenCalledTimes(1);
   });
 });

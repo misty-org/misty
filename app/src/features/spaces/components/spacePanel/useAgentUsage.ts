@@ -1,33 +1,40 @@
-import { spacesApi } from "@/api/spaces/api";
 import type { AgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { useEffect, useState } from "react";
+import {
+  fetchAgentUsage,
+  getCachedAgentUsage,
+  isAgentUsageStale,
+  subscribeUsageCache,
+  USAGE_CACHE_TTL_MS,
+} from "../../store/usageCache";
 
 /**
  * The account's weekly hosted-AI allowance.
  *
- * It is per account rather than per Space, so it loads once the panel is ready
- * and refreshes when an Agent run finishes — the only thing that spends it.
- * A failed load leaves the row hidden rather than showing a scary zero.
+ * It is cached and rechecked every 5 minutes or when an Agent run finishes.
  */
 export function useAgentUsage(ready: boolean): AgentUsage | null {
-  const [usage, setUsage] = useState<AgentUsage | null>(null);
+  const [usage, setUsage] = useState<AgentUsage | null>(() => getCachedAgentUsage());
 
   useEffect(() => {
     if (!ready) {
-      setUsage(null);
       return;
     }
-    let active = true;
-    const load = () => {
-      void spacesApi
-        .agentUsage()
-        .then((result) => {
-          if (active) setUsage(result.agent_usage ?? null);
-        })
-        .catch(() => {
-          if (active) setUsage(null);
-        });
-    };
+
+    const unsubscribe = subscribeUsageCache(() => {
+      setUsage(getCachedAgentUsage());
+    });
+
+    if (isAgentUsageStale()) {
+      void fetchAgentUsage();
+    } else {
+      setUsage(getCachedAgentUsage());
+    }
+
+    const interval = setInterval(() => {
+      void fetchAgentUsage(true);
+    }, USAGE_CACHE_TTL_MS);
+
     const reloadWhenRunSettles = (event: Event) => {
       const type = (event as CustomEvent<{ type?: string }>).detail?.type ?? "";
       if (
@@ -36,13 +43,15 @@ export function useAgentUsage(ready: boolean): AgentUsage | null {
         type === "agent.run.failed" ||
         type === "agent.run.canceled" ||
         type === "agent.run.rejected"
-      )
-        load();
+      ) {
+        void fetchAgentUsage(true);
+      }
     };
-    load();
+
     window.addEventListener("misty:space-agent-run-event", reloadWhenRunSettles);
     return () => {
-      active = false;
+      unsubscribe();
+      clearInterval(interval);
       window.removeEventListener("misty:space-agent-run-event", reloadWhenRunSettles);
     };
   }, [ready]);
