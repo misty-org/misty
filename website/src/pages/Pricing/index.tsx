@@ -18,6 +18,7 @@ export default function Pricing() {
     error,
     currentPlanTier,
     hasManagedSubscription,
+    trialEligible,
     checkoutReady,
   } = usePaidCheckout(setInterval);
 
@@ -36,6 +37,7 @@ export default function Pricing() {
         checkoutReady={checkoutReady}
         currentPlanTier={currentPlanTier}
         hasManagedSubscription={hasManagedSubscription}
+        trialEligible={trialEligible}
         onIntervalChange={setInterval}
         onPaidCheckout={(tier) => void openCheckout(tier, interval)}
       />
