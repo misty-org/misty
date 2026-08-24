@@ -31,6 +31,8 @@ pub struct TerminalCreateRequest {
     pub cwd: Option<String>,
     pub cols: Option<u16>,
     pub rows: Option<u16>,
+    pub pixel_width: Option<u16>,
+    pub pixel_height: Option<u16>,
     #[serde(default)]
     pub env: HashMap<String, String>,
     pub environment: Option<TerminalEnvironmentRequest>,
@@ -76,8 +78,8 @@ fn terminal_create_blocking(
         .openpty(PtySize {
             rows: request.rows.unwrap_or(30).max(2),
             cols: request.cols.unwrap_or(100).max(2),
-            pixel_width: 0,
-            pixel_height: 0,
+            pixel_width: request.pixel_width.unwrap_or(0),
+            pixel_height: request.pixel_height.unwrap_or(0),
         })
         .map_err(|error| error.to_string())?;
 
@@ -236,13 +238,27 @@ fn terminal_write_blocking(session_id: String, data: String) -> Result<(), Strin
 }
 
 #[tauri::command]
-pub async fn terminal_resize(session_id: String, cols: u16, rows: u16) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || terminal_resize_blocking(session_id, cols, rows))
-        .await
-        .map_err(|error| error.to_string())?
+pub async fn terminal_resize(
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    pixel_width: Option<u16>,
+    pixel_height: Option<u16>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        terminal_resize_blocking(session_id, cols, rows, pixel_width, pixel_height)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-fn terminal_resize_blocking(session_id: String, cols: u16, rows: u16) -> Result<(), String> {
+fn terminal_resize_blocking(
+    session_id: String,
+    cols: u16,
+    rows: u16,
+    pixel_width: Option<u16>,
+    pixel_height: Option<u16>,
+) -> Result<(), String> {
     let registry = sessions()
         .lock()
         .map_err(|_| "Terminal session registry is unavailable.".to_owned())?;
@@ -256,8 +272,8 @@ fn terminal_resize_blocking(session_id: String, cols: u16, rows: u16) -> Result<
         .resize(PtySize {
             rows: rows.max(2),
             cols: cols.max(2),
-            pixel_width: 0,
-            pixel_height: 0,
+            pixel_width: pixel_width.unwrap_or(0),
+            pixel_height: pixel_height.unwrap_or(0),
         })
         .map_err(|error| error.to_string());
     result

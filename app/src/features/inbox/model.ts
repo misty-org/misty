@@ -5,11 +5,37 @@ export interface InboxThread extends MailThread {
   key: string;
 }
 
+export function decodeHtmlEntities(value: string | undefined | null): string {
+  if (!value) return "";
+  if (!value.includes("&") && !value.includes("&#")) return value;
+  if (typeof DOMParser !== "undefined") {
+    try {
+      const doc = new DOMParser().parseFromString(value, "text/html");
+      return doc.body.textContent || value;
+    } catch {
+      // Fall through to regex replacement
+    }
+  }
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
+}
+
 export function normalizeThread(thread: MailThread, connectionId: string): InboxThread {
+  const subject = decodeHtmlEntities(thread.subject).trim();
   return {
     ...thread,
-    subject: thread.subject.trim() || "(no subject)",
-    participants: thread.participants ?? [],
+    subject: subject || "(no subject)",
+    snippet: decodeHtmlEntities(thread.snippet),
+    participants: (thread.participants ?? []).map((p) => ({
+      ...p,
+      name: p.name ? decodeHtmlEntities(p.name).trim() : undefined,
+    })),
     labels: thread.labels ?? [],
     messages: thread.messages ?? [],
     connectionId,
@@ -47,5 +73,82 @@ export function parseAddressList(value: string): MailAddress[] {
 }
 
 export function formatAddress(address: MailAddress): string {
-  return address.name?.trim() || address.email;
+  const name = address.name ? decodeHtmlEntities(address.name).trim() : "";
+  return name || address.email;
+}
+
+export type ReplyMode = "reply" | "replyAll" | "forward";
+
+export interface PreparedReplyDraft {
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  text: string;
+}
+
+export function prepareReplyDraft(
+  thread: InboxThread,
+  userEmail?: string,
+  mode: ReplyMode = "reply",
+): PreparedReplyDraft {
+  const messages = thread.messages ?? [];
+  const latestMessage = messages[messages.length - 1];
+  const user = userEmail?.toLowerCase().trim();
+
+  const isSelf = (addr: MailAddress) => Boolean(user && addr.email.toLowerCase().trim() === user);
+
+  if (mode === "forward") {
+    const sender = latestMessage ? formatAddress(latestMessage.from) : "Unknown";
+    const date = latestMessage ? new Date(latestMessage.sent_at).toLocaleString() : "";
+    const recipients = latestMessage?.to.map(formatAddress).join(", ") || "";
+    const body = latestMessage?.body.text || latestMessage?.snippet || "";
+    const forwardHeader =
+      `\n\n---------- Forwarded message ---------\n` +
+      `From: ${sender}\nDate: ${date}\nSubject: ${thread.subject}\nTo: ${recipients}\n\n${body}`;
+
+    return {
+      to: "",
+      cc: "",
+      bcc: "",
+      subject: thread.subject.toLowerCase().startsWith("fwd:")
+        ? thread.subject
+        : `Fwd: ${thread.subject}`,
+      text: forwardHeader,
+    };
+  }
+
+  if (mode === "replyAll" && latestMessage) {
+    const toRecipients = [latestMessage.from, ...latestMessage.to]
+      .filter((addr) => !isSelf(addr))
+      .map(formatAddress);
+    const ccRecipients = (latestMessage.cc ?? [])
+      .filter((addr) => !isSelf(addr))
+      .map(formatAddress);
+
+    const uniqueTo = Array.from(new Set(toRecipients)).join(", ");
+    const uniqueCc = Array.from(new Set(ccRecipients)).join(", ");
+
+    return {
+      to: uniqueTo || (latestMessage.from ? formatAddress(latestMessage.from) : ""),
+      cc: uniqueCc,
+      bcc: "",
+      subject: thread.subject.toLowerCase().startsWith("re:")
+        ? thread.subject
+        : `Re: ${thread.subject}`,
+      text: "",
+    };
+  }
+
+  // Standard reply
+  const replyTo = latestMessage?.from ? formatAddress(latestMessage.from) : "";
+  return {
+    to: replyTo,
+    cc: "",
+    bcc: "",
+    subject: thread.subject.toLowerCase().startsWith("re:")
+      ? thread.subject
+      : `Re: ${thread.subject}`,
+    text: "",
+  };
 }

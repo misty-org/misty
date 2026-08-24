@@ -5,6 +5,7 @@ import {
   EmailBody,
   estimateEmailHeight,
   linkifyEmailContent,
+  measureDocumentHeight,
   prefetchEmailHtml,
   prefetchThreadHtml,
 } from "./EmailBody";
@@ -45,7 +46,7 @@ describe("EmailBody", () => {
     });
   });
 
-  describe("estimateEmailHeight", () => {
+  describe("estimateEmailHeight and measureDocumentHeight", () => {
     it("estimates realistic height for empty or minimal HTML", () => {
       expect(estimateEmailHeight("")).toBe(200);
       expect(estimateEmailHeight("<p>Short</p>")).toBeGreaterThanOrEqual(120);
@@ -57,6 +58,17 @@ describe("EmailBody", () => {
         "<h1>Welcome</h1><img src='banner.png' height='300'/><p>One</p><p>Two</p><p>Three</p>",
       );
       expect(large).toBeGreaterThan(small + 300);
+    });
+
+    it("accurately bounds document height without adding trailing white space", () => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(
+        `<!DOCTYPE html><html><body><div style="height: 150px;">Content</div></body></html>`,
+        "text/html",
+      );
+      const measured = measureDocumentHeight(doc);
+      expect(measured).toBeGreaterThanOrEqual(80);
+      expect(measured).toBeLessThan(500);
     });
   });
 

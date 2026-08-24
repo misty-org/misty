@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -122,10 +123,15 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       }
       const sessionId = sessionIdRef.current;
       if (!sessionId) return;
+      const host = hostRef.current;
+      const pixelWidth = host ? Math.round(host.clientWidth) : 0;
+      const pixelHeight = host ? Math.round(host.clientHeight) : 0;
       void invoke("terminal_resize", {
         sessionId,
         cols: term.cols,
         rows: term.rows,
+        pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+        pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
       }).catch(() => undefined);
     }, []);
 
@@ -176,6 +182,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
             void openSystemExternalLink(uri);
           });
           const clipboard = new ClipboardAddon();
+          const image = new ImageAddon({
+            sixelSupport: true,
+            sixelScrolling: true,
+            iipSupport: true,
+            enableSizeReports: true,
+          });
 
           term.loadAddon(fit);
           term.loadAddon(search);
@@ -183,6 +195,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           term.loadAddon(unicode);
           term.loadAddon(links);
           term.loadAddon(clipboard);
+          term.loadAddon(image);
           term.unicode.activeVersion = "11";
 
           term.open(host);
@@ -305,6 +318,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
               unlistens.push(outputUnlisten, exitUnlisten);
               if (disposed) return;
 
+              const pixelWidth = host ? Math.round(host.clientWidth) : 0;
+              const pixelHeight = host ? Math.round(host.clientHeight) : 0;
+
               const existing = sessionBySlot.get(slotId);
               if (existing) {
                 sessionIdRef.current = existing;
@@ -312,6 +328,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
                   sessionId: existing,
                   cols: term.cols,
                   rows: term.rows,
+                  pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+                  pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
                 }).catch(() => undefined);
                 // Nudge the shell to redraw its prompt after reattach so
                 // the visible line matches the shell's cursor tracker.
@@ -341,6 +359,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
                     cwd: cwd?.trim() || null,
                     cols: term.cols,
                     rows: term.rows,
+                    pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+                    pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
                     env: {},
                     environment: terminalEnvironmentRequest(environment),
                   },
