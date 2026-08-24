@@ -1,6 +1,5 @@
 import { PhotoEditor } from "@/features/editor";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -170,9 +169,6 @@ export function LibraryPhotoEditorView({
           onRenditionReady();
         }}
       />
-      <div className="fixed right-14 top-3 z-photo-editor-ai rounded-lg bg-charcoal-bg/90 shadow-md backdrop-blur">
-        <AiSurfaceButton />
-      </div>
     </>
   );
 }

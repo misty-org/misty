@@ -1,7 +1,8 @@
+import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { LoaderCircle, Plus, RotateCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Badge, Button, Input, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
-import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
+import { SpaceViewModeToggle } from "../../components/SpaceViewModeToggle";
 
 /** Compact task controls shared by the Board and List presentations. */
 export function SpacePlannerHeader({
@@ -10,6 +11,8 @@ export function SpacePlannerHeader({
   loading,
   canManage,
   filters,
+  view,
+  onViewChange,
   onQuery,
   onSync,
   onCreate,
@@ -18,6 +21,8 @@ export function SpacePlannerHeader({
   activeFilterCount: number;
   loading: boolean;
   canManage: boolean;
+  view?: TaskViewMode;
+  onViewChange?: (view: "board" | "list") => void;
   /** Filter controls, shown only when the user opens the popover. */
   filters: ReactNode;
   onQuery: (value: string) => void;
@@ -31,10 +36,22 @@ export function SpacePlannerHeader({
 
   return (
     <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
-      <h1 className="m-0 shrink-0 text-sm font-semibold">Tasks</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="m-0 shrink-0 text-sm font-semibold">Tasks</h1>
+        {view && onViewChange ? (
+          <SpaceViewModeToggle
+            label="Task presentation"
+            value={view === "list" ? "list" : "board"}
+            options={[
+              { value: "board", label: "Board" },
+              { value: "list", label: "List" },
+            ]}
+            onChange={onViewChange}
+          />
+        ) : null}
+      </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <AiSurfaceButton />
         {showSearch ? (
           <div className="relative w-44">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
