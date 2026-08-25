@@ -1,26 +1,10 @@
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { MistyFilePicker } from "@/features/picker";
 import { FolderOpen } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/shared/ui";
 
 export function OpenFolderCard({ onOpenRoot }: { onOpenRoot: (path: string) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const pick = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const selection = await openDialog({ directory: true, multiple: false });
-      if (typeof selection === "string" && selection.length > 0) {
-        onOpenRoot(selection);
-      }
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Could not open that folder.");
-    } finally {
-      setBusy(false);
-    }
-  }, [onOpenRoot]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <section className="code-theme-editor grid h-full place-items-center bg-charcoal-workspace p-8 text-cream">
@@ -36,12 +20,23 @@ export function OpenFolderCard({ onOpenRoot }: { onOpenRoot: (path: string) => v
           built-in terminal.
         </p>
         <div className="mt-6 flex justify-center">
-          <Button type="button" disabled={busy} onClick={() => void pick()} variant="default">
-            {busy ? "Opening…" : "Choose folder"}
+          <Button type="button" onClick={() => setPickerOpen(true)} variant="default">
+            Choose folder
           </Button>
         </div>
-        {error ? <p className="code-danger mt-3 text-xs">{error}</p> : null}
       </div>
+
+      {pickerOpen ? (
+        <MistyFilePicker
+          mode="folder"
+          title="Open project folder"
+          onCancel={() => setPickerOpen(false)}
+          onSelect={(path) => {
+            setPickerOpen(false);
+            onOpenRoot(path);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
