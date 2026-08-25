@@ -1,16 +1,24 @@
-import { dockLeaves, useWorkspaceStore, type WorkspaceDockNode } from "@/features/workspace";
+import {
+  dockLeaves,
+  useRecentToolsStore,
+  useWorkspaceStore,
+  type WorkspaceDockNode,
+} from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
+  captureNativeBrowserRegion,
   hideAllBrowserWebviews,
   requestBrowserWebviewLayoutByRuntimeId,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
+import { useAiSurfaceStore } from "@/features/ai-surface";
+import { captureAttachmentFromDataUrl } from "@/features/ai-surface/MistyRegionCapture";
 
 const browserBlockingOverlaySelector = [
   '[data-slot="dropdown-menu-content"][data-state="open"]',
@@ -77,6 +85,17 @@ interface BrowserDownloadEvent {
   error?: string;
 }
 
+interface BrowserCompanionEvent {
+  id: string;
+  kind: "submit" | "action" | "capture";
+  prompt: string;
+  actionId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
   const browserSurfaceActive = useWorkspaceStore((state) =>
@@ -141,9 +160,11 @@ export function BrowserRuntimeBridge() {
         if (!tabId) return;
         if (payload.phase === "started") {
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
+          useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }
         useWorkspaceStore.getState().updateBrowserTab(tabId, { url: payload.url });
         if (payload.phase === "finished") {
+          useBrowserRuntimeStore.getState().setLoading(tabId, false);
           useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
           // Page completion can race a layout transition that hid the native
           // child. Ask the geometry owner to reconcile bounds and visibility.
@@ -209,6 +230,56 @@ export function BrowserRuntimeBridge() {
           }),
         );
       }),
+      listen<BrowserCompanionEvent>("misty://browser-companion", ({ payload }) => {
+        if (disposed) return;
+        const tabId = browserTabIdForRuntime(payload.id);
+        if (!tabId) return;
+        const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
+          (candidate) => candidate.activeTabId === tabId,
+        );
+        if (!pane) return;
+        const ai = useAiSurfaceStore.getState();
+        const registration = Object.values(ai.registrations).find(
+          (candidate) => candidate.paneId === pane.id,
+        );
+        if (!registration) return;
+        if (payload.kind === "submit") {
+          ai.setPrompt(registration.accountId, pane.id, payload.prompt);
+          void ai.submit(registration.accountId, pane.id, registration.adapter);
+          return;
+        }
+        if (payload.kind === "action") {
+          const action = registration.adapter
+            .getSuggestedActions?.()
+            .find((candidate) => candidate.id === payload.actionId);
+          if (action) void ai.submit(registration.accountId, pane.id, registration.adapter, action);
+          return;
+        }
+        if (
+          payload.width < 8 ||
+          payload.height < 8 ||
+          ![payload.x, payload.y, payload.width, payload.height].every(Number.isFinite)
+        ) {
+          return;
+        }
+        void captureNativeBrowserRegion(payload.id, payload)
+          .then(({ dataUrl, width, height }) =>
+            captureAttachmentFromDataUrl(dataUrl, width, height),
+          )
+          .then((capture) => ai.setCapture(registration.accountId, pane.id, capture))
+          .catch((error: unknown) =>
+            useBrowserRuntimeStore
+              .getState()
+              .setError(
+                tabId,
+                error instanceof Error
+                  ? error.message
+                  : typeof error === "string"
+                    ? error
+                    : "Misty could not capture that region.",
+              ),
+          );
+      }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
         if (disposed) return;
         const sourceTabId = browserTabIdForRuntime(payload.sourceId);
@@ -216,6 +287,7 @@ export function BrowserRuntimeBridge() {
           url: payload.url,
           sourceTabId: sourceTabId ?? undefined,
         });
+        useRecentToolsStore.getState().recordToolUsage("browser");
         navigate("/browser");
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {

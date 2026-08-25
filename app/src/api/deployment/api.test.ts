@@ -14,6 +14,7 @@ vi.mock("@/native", () => ({
 import {
   inspectSelfHostedServer,
   readDeploymentScope,
+  resolveHostedApiBase,
   saveDeploymentConfiguration,
   validateSelfHostedServerUrl,
 } from "@/api/deployment/api";
@@ -45,6 +46,10 @@ describe("self-hosted deployment routing", () => {
     localStorage.clear();
     appConfigureServer.mockClear();
     vi.restoreAllMocks();
+  });
+
+  it("uses the loopback Go API for ordinary desktop development", () => {
+    expect(resolveHostedApiBase()).toBe("http://127.0.0.1:8081/v1");
   });
 
   it("requires HTTPS except for loopback development", () => {

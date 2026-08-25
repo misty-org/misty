@@ -21,6 +21,7 @@ interface BrowserRuntimeUiState {
   errors: Record<string, string | null>;
   notices: Record<string, string | null>;
   compatibilityIssues: Record<string, BrowserCompatibilityIssue | null>;
+  loading: Record<string, boolean>;
   setGrants: (tabId: string, grants: ActiveBrowserAgentGrant[]) => void;
   ensureHistory: (tabId: string, url: string) => void;
   pushHistory: (tabId: string, url: string) => void;
@@ -28,6 +29,7 @@ interface BrowserRuntimeUiState {
   setError: (tabId: string, error: string | null) => void;
   setNotice: (tabId: string, notice: string | null) => void;
   setCompatibilityIssue: (tabId: string, issue: BrowserCompatibilityIssue | null) => void;
+  setLoading: (tabId: string, loading: boolean) => void;
   removeTab: (tabId: string) => void;
 }
 
@@ -37,6 +39,7 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
   errors: {},
   notices: {},
   compatibilityIssues: {},
+  loading: {},
   setGrants: (tabId, grants) => set((state) => ({ grants: { ...state.grants, [tabId]: grants } })),
   ensureHistory: (tabId, url) =>
     set((state) =>
@@ -68,13 +71,19 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     }));
     return current.entries[index] ?? null;
   },
-  setError: (tabId, error) => set((state) => ({ errors: { ...state.errors, [tabId]: error } })),
+  setError: (tabId, error) =>
+    set((state) => ({
+      errors: { ...state.errors, [tabId]: error },
+      ...(error ? { loading: { ...state.loading, [tabId]: false } } : {}),
+    })),
   setNotice: (tabId, notice) =>
     set((state) => ({ notices: { ...state.notices, [tabId]: notice } })),
   setCompatibilityIssue: (tabId, issue) =>
     set((state) => ({
       compatibilityIssues: { ...state.compatibilityIssues, [tabId]: issue },
     })),
+  setLoading: (tabId, loading) =>
+    set((state) => ({ loading: { ...state.loading, [tabId]: loading } })),
   removeTab: (tabId) =>
     set((state) => {
       const grants = { ...state.grants };
@@ -82,12 +91,14 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
       const errors = { ...state.errors };
       const notices = { ...state.notices };
       const compatibilityIssues = { ...state.compatibilityIssues };
+      const loading = { ...state.loading };
       delete grants[tabId];
       delete histories[tabId];
       delete errors[tabId];
       delete notices[tabId];
       delete compatibilityIssues[tabId];
-      return { grants, histories, errors, notices, compatibilityIssues };
+      delete loading[tabId];
+      return { grants, histories, errors, notices, compatibilityIssues, loading };
     }),
 }));
 
@@ -133,6 +144,33 @@ export function browserScopeId(tab: BrowserRuntimeTab): string {
 
 export function browserTabIdForRuntime(runtimeId: string): string | null {
   return runtimeTabIds.get(runtimeId) ?? null;
+}
+
+export function browserRuntimeIdForTabId(tabId: string): string | null {
+  for (const [runtimeId, candidate] of runtimeTabIds) {
+    if (candidate === tabId) return runtimeId;
+  }
+  return null;
+}
+
+export function setNativeBrowserCompanionState(request: {
+  targetId: string;
+  visible: boolean;
+  phase: string;
+  name: string;
+  label: string;
+  speech?: string;
+  captureAttached?: boolean;
+  suggestions: Array<{ id: string; label: string }>;
+}): Promise<void> {
+  return invoke<void>("browser_webviews_set_companion", { request }).catch(() => undefined);
+}
+
+export function captureNativeBrowserRegion(
+  id: string,
+  region: { x: number; y: number; width: number; height: number },
+): Promise<{ dataUrl: string; width: number; height: number }> {
+  return invoke("browser_webview_capture_region", { request: { id, ...region } });
 }
 
 export function registerBrowserRuntime(tab: BrowserRuntimeTab): string {
@@ -254,6 +292,38 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     return;
   }
   visibleRuntimeIds.add(id);
+}
+
+export interface BrowserInspection {
+  url?: string;
+  title?: string;
+  text?: string;
+  truncated?: boolean;
+  interactive?: BrowserInteractiveControl[];
+}
+
+export interface BrowserInteractiveControl {
+  ref: string;
+  tag: string;
+  role: string;
+  name: string;
+}
+
+export interface BrowserMistyPage {
+  title: string;
+  text: string;
+  truncated: boolean;
+  urlFingerprint: string;
+  interactive: BrowserInteractiveControl[];
+}
+
+export function browserContentHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 export function setBrowserWebviewsSuspended(suspended: boolean, reason = "default"): void {

@@ -50,10 +50,6 @@ const mocks = vi.hoisted(() => {
   const useAgentSessionStore = Object.assign(vi.fn(), {
     getState: () => ({ refreshStatus: agentRefresh }),
   });
-  const personalAgentsLoad = vi.fn().mockResolvedValue(undefined);
-  const usePersonalAgentsStore = Object.assign(vi.fn(), {
-    getState: () => ({ load: personalAgentsLoad }),
-  });
   return {
     accountA,
     accountB,
@@ -64,10 +60,8 @@ const mocks = vi.hoisted(() => {
     useUserStore,
     useSpacesStore,
     useAgentSessionStore,
-    usePersonalAgentsStore,
     spacesLoad,
     agentRefresh,
-    personalAgentsLoad,
     activeAccountId: accountA.id,
     readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
@@ -80,7 +74,6 @@ const mocks = vi.hoisted(() => {
     signOut: vi.fn().mockResolvedValue(undefined),
     resetSpacesAccountState: vi.fn(),
     resetAgentAccountState: vi.fn(),
-    resetPersonalAgentsAccountState: vi.fn(),
     resetNotesAccountState: vi.fn(),
     resetSearchAccountState: vi.fn(),
     explorerSetState: vi.fn(),
@@ -133,14 +126,10 @@ vi.mock("@/features/agents/store/useAgentSessionStore", () => ({
 vi.mock("@/features/agents", () => ({
   resetAllAgentAccountState: () => {
     mocks.resetAgentAccountState();
-    mocks.resetPersonalAgentsAccountState();
   },
   refreshAllAgentAccountState: () => {
     void mocks.agentRefresh();
-    void mocks.personalAgentsLoad();
   },
-  resetPersonalAgentsAccountState: mocks.resetPersonalAgentsAccountState,
-  usePersonalAgentsStore: mocks.usePersonalAgentsStore,
 }));
 vi.mock("@/features/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
@@ -319,7 +308,6 @@ describe("AuthProvider account switching", () => {
     expect(mocks.resetSearchAccountState).toHaveBeenCalled();
     expect(mocks.resetSpacesAccountState).toHaveBeenCalled();
     expect(mocks.resetAgentAccountState).toHaveBeenCalled();
-    expect(mocks.resetPersonalAgentsAccountState).toHaveBeenCalled();
     expect(mocks.resetNotesAccountState).toHaveBeenCalled();
   });
 

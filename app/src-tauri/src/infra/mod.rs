@@ -28,6 +28,8 @@ pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
 pub mod credential_store;
+#[cfg(desktop)]
+pub mod desktop_pet;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;

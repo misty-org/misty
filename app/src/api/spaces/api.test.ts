@@ -108,7 +108,7 @@ describe("spaceRequest account isolation", () => {
       "/spaces/space%20%2F%20one/agenda?from=2026-08-01T00%3A00%3A00.000Z&to=2026-09-01T00%3A00%3A00.000Z",
     );
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      "http://localhost:8080/api/spaces/space%20%2F%20one/roadmaps/map%20%2F%20one/layout",
+      "http://127.0.0.1:8081/v1/spaces/space%20%2F%20one/roadmaps/map%20%2F%20one/layout",
     );
     expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("PATCH");
     expect(JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body))).toEqual({
@@ -117,7 +117,7 @@ describe("spaceRequest account isolation", () => {
       expected_version: 7,
     });
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
-      "http://localhost:8080/api/spaces/space%20%2F%20one/roadmap-node-definitions",
+      "http://127.0.0.1:8081/v1/spaces/space%20%2F%20one/roadmap-node-definitions",
     );
     expect((fetchMock.mock.calls[2]?.[1] as RequestInit).method).toBe("POST");
   });
@@ -166,7 +166,7 @@ describe("spaceRequest account isolation", () => {
     const request: Parameters<typeof spacesApi.create>[0] = {
       name: "Research group",
       template_id: "research",
-      integration_providers: ["google", "notion"],
+      integration_providers: ["github"],
     };
 
     await expect(spacesApi.create(request)).rejects.toMatchObject({ status: 503 });
@@ -279,11 +279,11 @@ describe("spaceRequest account isolation", () => {
     );
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "http://localhost:8080/api/spaces/space-a/messages/message-a/reactions/%F0%9F%91%8D",
+      "http://127.0.0.1:8081/v1/spaces/space-a/messages/message-a/reactions/%F0%9F%91%8D",
     );
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBe("PUT");
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      "http://localhost:8080/api/spaces/space-a/conversations/conversation-a/messages/message-a/reactions/%E2%9D%A4%EF%B8%8F",
+      "http://127.0.0.1:8081/v1/spaces/space-a/conversations/conversation-a/messages/message-a/reactions/%E2%9D%A4%EF%B8%8F",
     );
     expect((fetchMock.mock.calls[1]?.[1] as RequestInit).method).toBe("DELETE");
   });

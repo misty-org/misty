@@ -101,6 +101,36 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', install, { once: true });
   }
+  const handleLinkClick = (event) => {
+    if (!event.isTrusted) return;
+    const isMiddleClick = event.type === 'auxclick' && event.button === 1;
+    const isLeftClick = event.type === 'click' && event.button === 0;
+    const isModifierClick =
+      isLeftClick && (event.metaKey || event.ctrlKey);
+    const anchor = event.target?.closest?.('a[href]');
+    if (!anchor) return;
+    const target = (anchor.getAttribute('target') || '').trim().toLowerCase();
+    const isNewWindowTarget =
+      isLeftClick &&
+      (target === '_blank' ||
+        target === '_new' ||
+        (target && target !== '_self' && target !== '_top' && target !== '_parent'));
+
+    if (!isMiddleClick && !isModifierClick && !isNewWindowTarget) return;
+
+    const href = anchor.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+    try {
+      const resolved = new URL(href, window.location.href).href;
+      if (/^https?:\/\//i.test(resolved)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.open(resolved, '_blank');
+      }
+    } catch (_) {}
+  };
+  document.addEventListener('click', handleLinkClick, true);
+  document.addEventListener('auxclick', handleLinkClick, true);
   document.addEventListener('pointerover', track, true);
   document.addEventListener('pointermove', track, true);
   document.addEventListener('pointerout', (event) => {
@@ -111,6 +141,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   window.addEventListener('blur', () => {
     reportPointerLeave();
   });
+})();
+"#;
+
+pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
+(() => {
+  window.__MISTY_SET_COMPANION__ = () => {};
 })();
 "#;
 
@@ -226,7 +262,10 @@ pub(super) fn browser_pointer_navigation(url: &Url) -> Option<BrowserPointerNavi
 
 #[cfg(test)]
 mod tests {
-    use super::{browser_pointer_navigation, browser_viewport_script, BROWSER_VIEWPORT_SCRIPT};
+    use super::{
+        browser_pointer_navigation, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
+        BROWSER_VIEWPORT_SCRIPT,
+    };
     use url::Url;
 
     #[test]
@@ -265,7 +304,18 @@ mod tests {
         assert!(script.contains("if (!event.isTrusted) return"));
         assert!(!script.contains("__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__"));
         assert!(!script.contains("__MISTY_POINTER_TRACKING_PLACEHOLDER__"));
+        assert!(!script.contains("__MISTY_COMPANION_TOKEN_PLACEHOLDER__"));
         assert!(!script.contains("window.__MISTY_SHORTCUT_TOKEN"));
+        assert!(BROWSER_COMPANION_SCRIPT.contains("window.__MISTY_SET_COMPANION__"));
+    }
+
+    #[test]
+    fn link_click_interception_opens_modifier_and_middle_clicks_in_new_window() {
+        let script = browser_viewport_script("token", false);
+        assert!(script.contains("const handleLinkClick"));
+        assert!(script.contains("window.open(resolved, '_blank')"));
+        assert!(script.contains("event.button === 1"));
+        assert!(script.contains("event.metaKey || event.ctrlKey"));
     }
 
     #[test]

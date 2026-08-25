@@ -12,7 +12,6 @@ const protectedRoots = [
   "src/features/providers/",
   "src/features/settings/",
   "src/features/spaces/chat/",
-  "src/features/spaces/integrations/",
   "src/features/spaces/library/",
   "src/features/spaces/members/",
   "src/features/spaces/planner/",
