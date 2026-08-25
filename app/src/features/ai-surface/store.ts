@@ -1,36 +1,80 @@
+import { analytics } from "@/telemetry/client";
 import { create } from "zustand";
 import { aiSurfaceApi, subscribeToAiInvocation } from "./api";
+import { aiMessage, aiPaneSession, aiSessionKey } from "./storeHelpers";
+import {
+  clearSpeechTimer,
+  conciseSpeech,
+  consumeInvocationEvent,
+  failInvocation,
+  makeSpeech,
+  patchArtifact,
+  patchSession,
+  pointerAnchor,
+  scheduleHome,
+} from "./storeRuntime";
 import type {
   AiArtifact,
-  AiDrawerMessage,
-  AiInvocationEvent,
+  AiCaptureAttachment,
+  AiCompanionAnchor,
+  AiTranscriptMessage,
   AiInvocationState,
   AiSurfaceAdapter,
   AiSuggestedAction,
+  MistyApprovalPrompt,
+  MistyPresencePhase,
+  MistySpeech,
+  MistyUndoReceipt,
 } from "./types";
 
 export interface AiPaneSession {
   accountId: string;
   paneId: string;
-  open: boolean;
   prompt: string;
   conversationId?: string;
   invocationId?: string;
+  runId?: string;
   state: AiInvocationState | "idle";
   error?: string;
-  messages: AiDrawerMessage[];
-  pinnedAgentId?: string;
+  messages: AiTranscriptMessage[];
   contextBoundary?: string;
-  refiningArtifact?: AiArtifact;
+  activeTaskId?: string;
+  interactionOpen?: boolean;
+  capture?: AiCaptureAttachment;
 }
 
-interface AiSurfaceState {
+export interface AiPaneRegistration {
+  accountId: string;
+  paneId: string;
+  adapter: AiSurfaceAdapter;
+  element: HTMLElement;
+}
+
+export interface MistyCompanionSession {
+  phase: MistyPresencePhase;
+  accountId?: string;
+  paneId?: string;
+  anchor?: AiCompanionAnchor;
+  speech?: MistySpeech;
+  approval?: MistyApprovalPrompt;
+  undo?: MistyUndoReceipt;
+  completedCount: number;
+}
+
+export interface AiSurfaceState {
   sessions: Record<string, AiPaneSession>;
-  setOpen: (accountId: string, paneId: string, open: boolean) => void;
+  registrations: Record<string, AiPaneRegistration>;
+  companion: MistyCompanionSession;
+  registerPane: (registration: AiPaneRegistration) => () => void;
+  updatePaneAdapter: (accountId: string, paneId: string, adapter: AiSurfaceAdapter) => void;
+  follow: (accountId: string, paneId: string, anchor?: AiCompanionAnchor) => void;
+  summon: (accountId: string, paneId: string, anchor?: AiCompanionAnchor) => void;
+  returnHome: () => void;
+  dismiss: () => void;
   setPrompt: (accountId: string, paneId: string, prompt: string) => void;
+  setCapture: (accountId: string, paneId: string, capture?: AiCaptureAttachment) => void;
+  settle: () => void;
   setContextBoundary: (accountId: string, paneId: string, boundary: string) => void;
-  setPinnedAgent: (accountId: string, surfaceId: string, agentId?: string) => void;
-  pinnedAgent: (accountId: string, surfaceId: string) => string | undefined;
   submit: (
     accountId: string,
     paneId: string,
@@ -45,99 +89,216 @@ interface AiSurfaceState {
     artifact: AiArtifact,
     decision: "accept" | "reject" | "refine",
   ) => Promise<void>;
+  undoLast: () => Promise<void>;
   clearAccount: (accountId: string) => void;
 }
 
 const streamStops = new Map<string, () => void>();
-const pinnedAgentKey = "misty:ai-surface:pinned-agent:v1";
+const undoCallbacks = new Map<string, () => void | Promise<void>>();
 
 export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
   sessions: {},
-  setOpen: (accountId, paneId, open) =>
+  registrations: {},
+  companion: { phase: "home", completedCount: 0 },
+
+  registerPane: (registration) => {
+    const key = aiSessionKey(registration.accountId, registration.paneId);
+    set((state) => ({ registrations: { ...state.registrations, [key]: registration } }));
+    return () => {
+      if (get().registrations[key]?.element !== registration.element) return;
+      set((state) => {
+        const registrations = { ...state.registrations };
+        delete registrations[key];
+        return { registrations };
+      });
+    };
+  },
+
+  updatePaneAdapter: (accountId, paneId, adapter) => {
+    const key = aiSessionKey(accountId, paneId);
+    const current = get().registrations[key];
+    if (!current || current.adapter === adapter) return;
     set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionKey(accountId, paneId)]: {
-          ...session(state.sessions, accountId, paneId),
-          open,
-        },
+      registrations: {
+        ...state.registrations,
+        [key]: { ...current, adapter },
       },
-    })),
+    }));
+  },
+
+  follow: (accountId, paneId, anchor) => {
+    const key = aiSessionKey(accountId, paneId);
+    const registration = get().registrations[key] ?? Object.values(get().registrations)[0];
+    const resolvedAccountId = accountId || registration?.accountId || "";
+    const resolvedPaneId = paneId || registration?.paneId || "";
+    get().summon(resolvedAccountId, resolvedPaneId, anchor);
+    set((state) => ({
+      companion: {
+        ...state.companion,
+        phase: "following",
+        accountId: resolvedAccountId || state.companion.accountId,
+        paneId: resolvedPaneId || state.companion.paneId,
+      },
+    }));
+  },
+
+  summon: (accountId, paneId, anchor) => {
+    const key = aiSessionKey(accountId, paneId);
+    const registration = get().registrations[key] ?? Object.values(get().registrations)[0];
+    clearSpeechTimer(accountId);
+    const current = aiPaneSession(get().sessions, accountId, paneId);
+    const companion = get().companion;
+    const recalling =
+      companion.completedCount > 0 &&
+      Boolean(companion.speech) &&
+      (!companion.accountId || companion.accountId === accountId);
+    const session =
+      current.interactionOpen || recalling
+        ? current
+        : {
+            ...current,
+            conversationId: undefined,
+            invocationId: undefined,
+            activeTaskId: undefined,
+            messages: [],
+            error: undefined,
+            interactionOpen: true,
+          };
+    set((state) => ({
+      sessions: { ...state.sessions, [key]: session },
+      companion: {
+        phase: state.companion.approval
+          ? "awaiting_approval"
+          : recalling
+            ? "speaking"
+            : "composing",
+        accountId,
+        paneId,
+        anchor: pointerAnchor(paneId, anchor, registration.element),
+        speech: state.companion.speech,
+        completedCount: Math.max(0, state.companion.completedCount - 1),
+      },
+    }));
+    if (recalling) {
+      analytics.track("ai_companion_reply_recalled", { surface: registration.adapter.surfaceId });
+    }
+    analytics.track("ai_companion_summoned", {
+      surface: registration.adapter.surfaceId,
+      anchor_kind: "pointer",
+    });
+  },
+
+  returnHome: () => {
+    const current = get().companion;
+    const registration =
+      current.accountId && current.paneId
+        ? get().registrations[aiSessionKey(current.accountId, current.paneId)]
+        : undefined;
+    if (current.accountId && current.paneId) {
+      const session = aiPaneSession(get().sessions, current.accountId, current.paneId);
+      const inFlight = session.state === "queued" || session.state === "running";
+      patchSession(set, get, current.accountId, current.paneId, {
+        interactionOpen: inFlight || Boolean(current.approval),
+      });
+    }
+    clearSpeechTimer(current.accountId);
+    set({
+      companion: {
+        phase: "home",
+        accountId: current.accountId,
+        paneId: current.paneId,
+        speech: current.speech,
+        approval: current.approval,
+        undo: current.undo,
+        completedCount: current.completedCount,
+      },
+    });
+    if (registration) {
+      analytics.track("ai_companion_dismissed", {
+        surface: registration.adapter.surfaceId,
+        had_task: Boolean(current.speech || current.approval),
+      });
+    }
+  },
+  dismiss: () => get().returnHome(),
+  settle: () => {
+    const current = get().companion;
+    if (current.phase === "home" || !current.accountId || !current.paneId) return;
+    set({
+      companion: {
+        ...current,
+        phase: "following",
+        speech: undefined,
+        approval: undefined,
+      },
+    });
+  },
   setPrompt: (accountId, paneId, prompt) =>
     patchSession(set, get, accountId, paneId, { prompt, error: undefined }),
+  setCapture: (accountId, paneId, capture) =>
+    patchSession(set, get, accountId, paneId, { capture }),
+
   setContextBoundary: (accountId, paneId, boundary) => {
-    const current = session(get().sessions, accountId, paneId);
+    const current = aiPaneSession(get().sessions, accountId, paneId);
     if (current.contextBoundary === boundary) return;
-    const crossingPrivacyBoundary =
-      Boolean(current.contextBoundary) && current.contextBoundary !== boundary;
-    if (crossingPrivacyBoundary) {
-      streamStops.get(sessionKey(accountId, paneId))?.();
-      patchSession(set, get, accountId, paneId, {
-        contextBoundary: boundary,
-        conversationId: undefined,
-        invocationId: undefined,
-        state: "idle",
-        messages: [],
-        prompt: "",
-        error: undefined,
-      });
-      return;
-    }
-    patchSession(set, get, accountId, paneId, { contextBoundary: boundary });
+    const crossed = Boolean(current.contextBoundary) && current.contextBoundary !== boundary;
+    patchSession(set, get, accountId, paneId, {
+      contextBoundary: boundary,
+      ...(crossed
+        ? {
+            conversationId: undefined,
+            invocationId: undefined,
+            activeTaskId: undefined,
+            interactionOpen: false,
+            messages: [],
+            prompt: "",
+          }
+        : {}),
+    });
   },
-  setPinnedAgent: (accountId, surfaceId, agentId) => {
-    if (readPinnedAgent(accountId, surfaceId) === agentId) return;
-    writePinnedAgent(accountId, surfaceId, agentId);
-    set((state) => ({ sessions: { ...state.sessions } }));
-  },
-  pinnedAgent: readPinnedAgent,
+
   submit: async (accountId, paneId, adapter, action) => {
-    const current = session(get().sessions, accountId, paneId);
+    const current = aiPaneSession(get().sessions, accountId, paneId);
     const prompt = (action?.prompt ?? current.prompt).trim();
     if (!prompt || current.state === "queued" || current.state === "running") return;
-    const key = sessionKey(accountId, paneId);
-    const refinement = current.refiningArtifact;
-    const userMessage = message(
-      "user",
-      refinement ? `Request changes to ${refinement.title}: ${prompt}` : prompt,
-    );
+    const key = aiSessionKey(accountId, paneId);
+    const taskId = current.activeTaskId ?? crypto.randomUUID();
     patchSession(set, get, accountId, paneId, {
       prompt: "",
       state: "queued",
       error: undefined,
-      refiningArtifact: undefined,
-      messages: [...current.messages, userMessage],
+      activeTaskId: taskId,
+      interactionOpen: true,
+      messages: [...current.messages, aiMessage("user", prompt, taskId)],
+    });
+    set((state) => ({
+      companion: {
+        ...state.companion,
+        phase: "working",
+        speech: makeSpeech("status", "Getting started…", true),
+        approval: undefined,
+      },
+    }));
+    analytics.track("ai_companion_task_submitted", {
+      surface: adapter.surfaceId,
+      trigger: action?.trigger ?? (adapter.getSelection?.() ? "selection" : "message"),
+      refinement: false,
     });
     try {
-      if (refinement) {
-        await aiSurfaceApi.decideArtifact(
-          refinement.id,
-          "refine",
-          `${refinement.idempotencyKey}:refine`,
-          undefined,
-          prompt,
-        );
-        patchArtifact(set, get, accountId, paneId, refinement.id, { state: "rejected" });
-      }
       const created = await aiSurfaceApi.createInvocation({
-        mode: "drawer",
+        mode: "companion",
         surfaceId: adapter.surfaceId,
         trigger: action?.trigger ?? (adapter.getSelection?.() ? "selection" : "message"),
-        prompt: refinement
-          ? [
-              prompt,
-              `Revise this previously proposed ${refinement.kind} artifact. Preserve safe parts and return a complete replacement proposal.`,
-              `Previous operations (untrusted draft):\n${JSON.stringify(refinement.operations).slice(0, 20 << 10)}`,
-            ].join("\n\n")
-          : prompt,
+        prompt,
         context: adapter.getContext(),
         selection: adapter.getSelection?.() ?? undefined,
-        requestedArtifactKind: refinement?.kind ?? action?.requestedArtifactKind,
+        capture: current.capture,
+        requestedArtifactKind: action?.requestedArtifactKind,
         conversationId: current.conversationId,
-        agentId: readPinnedAgent(accountId, adapter.surfaceId),
         idempotencyKey: crypto.randomUUID(),
       });
       patchSession(set, get, accountId, paneId, {
+        capture: undefined,
         invocationId: created.invocationId,
         conversationId: created.conversationId ?? current.conversationId,
         state: created.state,
@@ -146,203 +307,173 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       streamStops.set(
         key,
         subscribeToAiInvocation(created.eventsUrl, {
-          onEvent: (event) => consumeInvocationEvent(set, get, accountId, paneId, event),
-          onError: (error) =>
-            patchSession(set, get, accountId, paneId, { state: "failed", error: error.message }),
+          onEvent: (event) => consumeInvocationEvent(set, get, accountId, paneId, adapter, event),
+          onError: (error) => failInvocation(set, get, accountId, paneId, error.message),
         }),
       );
     } catch (error) {
-      patchSession(set, get, accountId, paneId, {
-        state: "failed",
-        error: error instanceof Error ? error.message : "Misty could not start this request.",
-      });
+      failInvocation(
+        set,
+        get,
+        accountId,
+        paneId,
+        error instanceof Error ? error.message : "Misty could not start this task.",
+      );
     }
   },
+
   cancel: async (accountId, paneId) => {
-    const current = session(get().sessions, accountId, paneId);
+    const current = aiPaneSession(get().sessions, accountId, paneId);
     if (!current.invocationId) return;
     await aiSurfaceApi.cancelInvocation(current.invocationId).catch(() => undefined);
-    streamStops.get(sessionKey(accountId, paneId))?.();
+    streamStops.get(aiSessionKey(accountId, paneId))?.();
     patchSession(set, get, accountId, paneId, { state: "canceled" });
+    set((state) => ({
+      companion: {
+        ...state.companion,
+        phase: "speaking",
+        speech: makeSpeech("reply", "Stopped."),
+      },
+    }));
   },
+
   decideArtifact: async (accountId, paneId, adapter, artifact, decision) => {
+    analytics.track("ai_companion_artifact_decided", {
+      surface: adapter.surfaceId,
+      artifact_kind: artifact.kind,
+      decision,
+    });
     if (decision === "refine") {
-      patchSession(set, get, accountId, paneId, {
-        prompt: "",
-        refiningArtifact: artifact,
-        error: undefined,
-      });
+      set((state) => ({
+        companion: {
+          ...state.companion,
+          phase: "composing",
+          approval: undefined,
+          speech: makeSpeech(
+            "clarification",
+            `What should I change about ${artifact.title}?`,
+            true,
+          ),
+        },
+      }));
       return;
     }
     patchArtifact(set, get, accountId, paneId, artifact.id, {
       state: decision === "accept" ? "applying" : "rejected",
     });
+    if (decision === "reject") {
+      set((state) => ({
+        companion: {
+          ...state.companion,
+          phase: "speaking",
+          approval: undefined,
+          speech: makeSpeech("reply", "Canceled."),
+        },
+      }));
+      scheduleHome(get, accountId);
+      return;
+    }
     try {
       const response = await aiSurfaceApi.decideArtifact(
         artifact.id,
-        decision,
+        "accept",
         artifact.idempotencyKey,
-        decision === "accept" && artifact.kind === "task_set" ? artifact.operations : undefined,
+        artifact.kind === "task_set" ? artifact.operations : undefined,
       );
-      if (decision === "reject") return;
       if (response.applyMode === "client") {
         if (!adapter.applyArtifact || adapter.canApply?.(artifact) === false) {
-          throw new Error("The source changed. Ask Misty to regenerate this draft.");
+          throw new Error("The source changed. Ask Misty to regenerate this change.");
         }
+        const clearHighlight = adapter.highlightArtifactTarget?.(artifact);
         await adapter.applyArtifact(artifact);
+        if (typeof clearHighlight === "function") window.setTimeout(clearHighlight, 1_500);
         await aiSurfaceApi.completeArtifact(artifact.id, "applied");
       }
       await adapter.onArtifactApplied?.(response.artifact ?? artifact, response.result);
+      analytics.track("ai_companion_direct_effect", {
+        surface: adapter.surfaceId,
+        artifact_kind: artifact.kind,
+      });
       patchArtifact(set, get, accountId, paneId, artifact.id, { state: "applied" });
+      let undo: MistyUndoReceipt | undefined;
+      if (adapter.undoArtifact) {
+        undo = {
+          id: crypto.randomUUID(),
+          artifactId: artifact.id,
+          title: `Undo ${artifact.title.toLowerCase()}`,
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        };
+        undoCallbacks.set(undo.id, () => adapter.undoArtifact!(artifact));
+      }
+      set((state) => ({
+        companion: {
+          ...state.companion,
+          phase: state.companion.phase === "home" ? "home" : "speaking",
+          approval: undefined,
+          undo,
+          speech: makeSpeech("reply", artifact.summary || "Done."),
+          completedCount:
+            state.companion.phase === "home"
+              ? state.companion.completedCount + 1
+              : state.companion.completedCount,
+        },
+      }));
+      scheduleHome(get, accountId);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "This draft could not be applied.";
+      const message = error instanceof Error ? error.message : "That change could not be applied.";
       patchArtifact(set, get, accountId, paneId, artifact.id, {
         state: message.includes("changed") ? "stale" : "failed",
         error: message,
       });
       void aiSurfaceApi.completeArtifact(artifact.id, "failed", message).catch(() => undefined);
+      failInvocation(set, get, accountId, paneId, message);
     }
   },
+
+  undoLast: async () => {
+    const receipt = get().companion.undo;
+    if (!receipt || Date.parse(receipt.expiresAt) < Date.now()) return;
+    await undoCallbacks.get(receipt.id)?.();
+    const current = get().companion;
+    const registration =
+      current.accountId && current.paneId
+        ? get().registrations[aiSessionKey(current.accountId, current.paneId)]
+        : undefined;
+    if (registration)
+      analytics.track("ai_companion_undo", { surface: registration.adapter.surfaceId });
+    undoCallbacks.delete(receipt.id);
+    set((state) => ({
+      companion: {
+        ...state.companion,
+        undo: undefined,
+        speech: makeSpeech("reply", "Undone."),
+        phase: "speaking",
+      },
+    }));
+    scheduleHome(get, get().companion.accountId);
+  },
+
   clearAccount: (accountId) => {
     for (const [key, stop] of streamStops) {
       if (!key.startsWith(`${accountId}:`)) continue;
       stop();
       streamStops.delete(key);
     }
+    clearSpeechTimer(accountId);
     set((state) => ({
       sessions: Object.fromEntries(
         Object.entries(state.sessions).filter(([, value]) => value.accountId !== accountId),
       ),
+      registrations: Object.fromEntries(
+        Object.entries(state.registrations).filter(([, value]) => value.accountId !== accountId),
+      ),
+      companion:
+        state.companion.accountId === accountId
+          ? { phase: "home", completedCount: 0 }
+          : state.companion,
     }));
   },
 }));
 
-type SetState = Parameters<typeof useAiSurfaceStore.setState>[0] extends (...args: never[]) => never
-  ? never
-  : (
-      partial: Partial<AiSurfaceState> | ((state: AiSurfaceState) => Partial<AiSurfaceState>),
-    ) => void;
-type GetState = () => AiSurfaceState;
-
-function sessionKey(accountId: string, paneId: string) {
-  return `${accountId}:${paneId}`;
-}
-
-function session(
-  sessions: Record<string, AiPaneSession>,
-  accountId: string,
-  paneId: string,
-): AiPaneSession {
-  return (
-    sessions[sessionKey(accountId, paneId)] ?? {
-      accountId,
-      paneId,
-      open: false,
-      prompt: "",
-      state: "idle",
-      messages: [],
-    }
-  );
-}
-
-function patchSession(
-  set: SetState,
-  get: GetState,
-  accountId: string,
-  paneId: string,
-  patch: Partial<AiPaneSession>,
-) {
-  const key = sessionKey(accountId, paneId);
-  set({
-    sessions: {
-      ...get().sessions,
-      [key]: { ...session(get().sessions, accountId, paneId), ...patch },
-    },
-  });
-}
-
-function message(role: AiDrawerMessage["role"], content = ""): AiDrawerMessage {
-  return {
-    id: crypto.randomUUID(),
-    role,
-    content,
-    createdAt: new Date().toISOString(),
-    citations: [],
-    artifacts: [],
-  };
-}
-
-function consumeInvocationEvent(
-  set: SetState,
-  get: GetState,
-  accountId: string,
-  paneId: string,
-  event: AiInvocationEvent,
-) {
-  const current = session(get().sessions, accountId, paneId);
-  if (event.type === "invocation.started") {
-    patchSession(set, get, accountId, paneId, { state: event.state });
-    return;
-  }
-  if (event.type === "invocation.completed" || event.type === "invocation.canceled") {
-    patchSession(set, get, accountId, paneId, { state: event.state });
-    return;
-  }
-  if (event.type === "invocation.failed") {
-    patchSession(set, get, accountId, paneId, { state: event.state, error: event.error });
-    return;
-  }
-  const messages = [...current.messages];
-  let assistant = messages[messages.length - 1];
-  if (!assistant || assistant.role !== "assistant") {
-    assistant = { ...message("assistant"), invocationId: current.invocationId };
-    messages.push(assistant);
-  }
-  const replacement = { ...assistant };
-  if (event.type === "response.delta") replacement.content += event.delta;
-  if (event.type === "citation") replacement.citations = [...replacement.citations, event.citation];
-  if (event.type === "artifact.proposed")
-    replacement.artifacts = [...replacement.artifacts, event.artifact];
-  messages[messages.length - 1] = replacement;
-  patchSession(set, get, accountId, paneId, { messages, state: "running" });
-}
-
-function patchArtifact(
-  set: SetState,
-  get: GetState,
-  accountId: string,
-  paneId: string,
-  artifactId: string,
-  patch: Partial<AiArtifact>,
-) {
-  const current = session(get().sessions, accountId, paneId);
-  patchSession(set, get, accountId, paneId, {
-    messages: current.messages.map((item) => ({
-      ...item,
-      artifacts: item.artifacts.map((artifact) =>
-        artifact.id === artifactId ? { ...artifact, ...patch } : artifact,
-      ),
-    })),
-  });
-}
-
-function readPinnedAgent(accountId: string, surfaceId: string): string | undefined {
-  try {
-    const value = window.localStorage.getItem(`${pinnedAgentKey}:${accountId}:${surfaceId}`);
-    return value || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function writePinnedAgent(accountId: string, surfaceId: string, agentId?: string) {
-  try {
-    const key = `${pinnedAgentKey}:${accountId}:${surfaceId}`;
-    if (agentId) window.localStorage.setItem(key, agentId);
-    else window.localStorage.removeItem(key);
-  } catch {
-    // Pinning is an optional personal preference.
-  }
-}
-
-export const testingAiPaneSession = session;
+export const testingAiPaneSession = aiPaneSession;
+export const testingConciseSpeech = conciseSpeech;
