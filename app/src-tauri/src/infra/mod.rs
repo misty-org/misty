@@ -8,6 +8,8 @@ pub mod autostart;
 pub mod browser;
 #[cfg(desktop)]
 mod browser_macos;
+#[cfg(target_os = "macos")]
+mod browser_pointer_guard_macos;
 #[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_shortcuts;
@@ -26,6 +28,8 @@ pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
 pub mod credential_store;
+#[cfg(desktop)]
+pub mod desktop_pet;
 pub mod devices;
 mod direct_cloud;
 pub mod directory_size;

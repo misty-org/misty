@@ -43,8 +43,14 @@ function apiProxyTarget(value?: string) {
 // https://vite.dev/config/
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const proxyTarget = apiProxyTarget(env.VITE_API_PROXY_TARGET);
-  if (command === "build" && mode === "production" && isLocalApiBase(env.VITE_API_BASE)) {
+  const proxyTarget = apiProxyTarget(
+    env.VITE_API_PROXY_TARGET ||
+      (command === "serve" ? "http://127.0.0.1:8081" : undefined),
+  );
+  const apiBase =
+    env.VITE_API_BASE?.trim() ||
+    (command === "serve" ? "/v1" : undefined);
+  if (command === "build" && mode === "production" && isLocalApiBase(apiBase)) {
     throw new Error(
       "Production builds cannot use a localhost VITE_API_BASE. Set VITE_API_BASE to the deployed API URL or omit it to use /api.",
     );
@@ -52,11 +58,18 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react(), tailwindcss(), sites()],
+    define: {
+      "import.meta.env.VITE_API_BASE": JSON.stringify(apiBase ?? ""),
+    },
     server: {
       port: 5174,
       proxy: proxyTarget
         ? {
             "/api": {
+              target: proxyTarget,
+              changeOrigin: true,
+            },
+            "/v1": {
               target: proxyTarget,
               changeOrigin: true,
             },

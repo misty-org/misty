@@ -1,5 +1,5 @@
 import { NewTabMenu } from "@/features/workspace";
-import { FolderOpen, House } from "lucide-react";
+import { FolderOpen, Inbox } from "lucide-react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,14 +23,14 @@ describe("NewTabMenu", () => {
   });
 
   it("shows concise icon-and-label options", async () => {
-    const openHome = vi.fn();
+    const openInbox = vi.fn();
     await act(async () => {
       root.render(
         <NewTabMenu
           ariaLabel="New Files tab"
           options={[
             { id: "current", label: "Current path", icon: FolderOpen, onSelect: vi.fn() },
-            { id: "home", label: "Home", icon: House, onSelect: openHome },
+            { id: "inbox", label: "Inbox", icon: Inbox, onSelect: openInbox },
           ]}
         />,
       );
@@ -42,14 +42,14 @@ describe("NewTabMenu", () => {
         ?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
     const options = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
-    expect(options.map((option) => option.textContent)).toEqual(["Current path", "Home"]);
+    expect(options.map((option) => option.textContent)).toEqual(["Current path", "Inbox"]);
     expect(options.every((option) => option.querySelector("svg"))).toBe(true);
 
     await act(async () => {
       options
-        .find((option) => option.textContent === "Home")
+        .find((option) => option.textContent === "Inbox")
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(openHome).toHaveBeenCalledOnce();
+    expect(openInbox).toHaveBeenCalledOnce();
   });
 });

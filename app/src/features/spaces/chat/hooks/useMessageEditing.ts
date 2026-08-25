@@ -1,4 +1,4 @@
-import { spansToText } from "@/features/spaces/integrations";
+import { spansToText } from "../components/messageHelpers";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { useCallback, useState } from "react";
 

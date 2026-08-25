@@ -78,7 +78,7 @@ function hashString(str: string): string {
 
 export function estimateEmailHeight(html: string): number {
   if (!html) return 200;
-  let estimated = 50;
+  let estimated = 60;
 
   const imgMatches = html.match(/<img[^>]*>/gi) || [];
   for (const imgTag of imgMatches) {
@@ -86,33 +86,62 @@ export function estimateEmailHeight(html: string): number {
     if (heightAttr && heightAttr[1]) {
       const h = parseInt(heightAttr[1], 10);
       if (!isNaN(h) && h > 0) {
-        estimated += Math.min(h, 500);
+        estimated += Math.min(h, 400);
         continue;
       }
     }
-    estimated += 150;
+    estimated += 100;
   }
 
-  const trCount = (html.match(/<tr[^>]*>/gi) || []).length;
-  estimated += trCount * 26;
-
   const pCount = (html.match(/<p[^>]*>/gi) || []).length;
-  estimated += pCount * 24;
-
-  const brCount = (html.match(/<br\s*\/?>/gi) || []).length;
-  estimated += brCount * 14;
+  estimated += pCount * 18;
 
   const hCount = (html.match(/<h[1-6][^>]*>/gi) || []).length;
-  estimated += hCount * 32;
-
-  const liCount = (html.match(/<li[^>]*>/gi) || []).length;
-  estimated += liCount * 20;
+  estimated += hCount * 24;
 
   const plainLength = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").length;
-  const textLines = Math.ceil(plainLength / 70);
-  estimated += Math.min(textLines * 18, 1500);
+  const textLines = Math.ceil(plainLength / 80);
+  estimated += Math.min(textLines * 16, 600);
 
-  return Math.min(Math.max(estimated, 120), 4000);
+  return Math.min(Math.max(estimated, 120), 1200);
+}
+
+export function measureDocumentHeight(doc: Document): number {
+  const body = doc.body;
+  if (!body) return 120;
+
+  let maxBottom = 0;
+  const scanElements = (parent: Element, depth: number) => {
+    if (depth > 4) return;
+    for (let i = 0; i < parent.children.length; i++) {
+      const el = parent.children[i] as HTMLElement;
+      if (!el || el.nodeType !== 1) continue;
+      const tag = el.tagName.toUpperCase();
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT") continue;
+
+      const bottom = (el.offsetTop || 0) + (el.offsetHeight || 0);
+      if (bottom > maxBottom) maxBottom = bottom;
+
+      try {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+      } catch {
+        // Ignore
+      }
+
+      if (el.children.length > 0 && depth < 3) {
+        scanElements(el, depth + 1);
+      }
+    }
+  };
+
+  scanElements(body, 0);
+
+  if (maxBottom > 30) {
+    return Math.ceil(maxBottom + 24);
+  }
+
+  return Math.ceil(Math.max(body.scrollHeight, body.offsetHeight, 100));
 }
 
 export function prefetchEmailHtml(html: string): void {
@@ -150,13 +179,7 @@ export function prefetchEmailHtml(html: string): void {
       try {
         const doc = measurementIframe?.contentDocument;
         if (doc && doc.body) {
-          const exact = Math.max(
-            doc.body.scrollHeight,
-            doc.body.offsetHeight,
-            doc.documentElement.scrollHeight,
-            doc.documentElement.offsetHeight,
-            100,
-          );
+          const exact = measureDocumentHeight(doc);
           heightCache.set(contentKey, exact);
         }
       } catch {
@@ -211,22 +234,23 @@ export function EmailHtmlFrame(props: { html: string }) {
     });
 
     const updateHeight = () => {
-      if (!iframe.contentDocument?.body) return;
-      const docElement = iframe.contentDocument.documentElement;
-      const bodyElement = iframe.contentDocument.body;
-      const nextHeight = Math.max(
-        bodyElement.scrollHeight,
-        bodyElement.offsetHeight,
-        docElement.scrollHeight,
-        docElement.offsetHeight,
-        100,
-      );
+      const currentDoc = iframeRef.current?.contentDocument;
+      if (!currentDoc?.body) return;
+      const nextHeight = measureDocumentHeight(currentDoc);
       setHeight(nextHeight);
       heightCache.set(contentKey, nextHeight);
       setIsReady(true);
     };
 
     updateHeight();
+
+    const images = doc.querySelectorAll("img");
+    images.forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener("load", updateHeight, { once: true });
+        img.addEventListener("error", updateHeight, { once: true });
+      }
+    });
 
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(updateHeight);
@@ -249,7 +273,7 @@ export function EmailHtmlFrame(props: { html: string }) {
         sandbox="allow-same-origin allow-popups"
         loading="eager"
         className="w-full border-0 transition-[height] duration-200 ease-out"
-        style={{ height: `${height}px`, minHeight: "120px", display: "block" }}
+        style={{ height: `${height}px`, minHeight: "80px", display: "block" }}
         onLoad={handleLoad}
       />
     </div>
@@ -363,9 +387,17 @@ function prepareEmailDocument(rawHtml: string): string {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <base target="_blank">
     <style>
-      html, body {
+      html {
+        margin: 0;
+        padding: 0;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      body {
         margin: 0;
         padding: 16px;
+        height: auto !important;
+        min-height: 0 !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         font-size: 14px;
         line-height: 1.5;
@@ -373,6 +405,7 @@ function prepareEmailDocument(rawHtml: string): string {
         background-color: #ffffff;
         word-break: break-word;
         overflow-wrap: break-word;
+        overflow-y: hidden;
         box-sizing: border-box;
       }
       *, *:before, *:after {

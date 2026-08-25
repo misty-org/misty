@@ -73,9 +73,11 @@ function PlanRows({
 
 function UpgradeOffer({
   disabled,
+  trialEligible,
   onBillingAction,
 }: {
   disabled: boolean;
+  trialEligible: boolean;
   onBillingAction: (action: () => Promise<{ url: string }>) => void;
 }) {
   return (
@@ -85,9 +87,10 @@ function UpgradeOffer({
         and {PRICING_MODEL.pro.agentUsage}.
       </p>
       <p className="m-0 text-sm leading-6 text-muted-foreground">
-        Start with a one-time {PRICING_MODEL.pro.trialDays}-day trial. A card is
-        required, and your plan automatically renews unless canceled. There are
-        no automatic overages or surprise charges.
+        {trialEligible
+          ? `Start with a one-time ${PRICING_MODEL.pro.trialDays}-day trial. A card is required, and your plan automatically renews unless canceled.`
+          : "Your one-time trial has already been used. Subscribe directly to restore Pro access."}{" "}
+        There are no automatic overages or surprise charges.
       </p>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -97,7 +100,8 @@ function UpgradeOffer({
             onBillingAction(() => createSubscriptionCheckout("pro", "month"))
           }
         >
-          Start Pro trial · {PRICING_MODEL.pro.monthlyPrice}/mo
+          {trialEligible ? "Start Pro trial" : "Subscribe monthly"} ·{" "}
+          {PRICING_MODEL.pro.monthlyPrice}/mo
         </Button>
         <Button
           type="button"
@@ -107,7 +111,8 @@ function UpgradeOffer({
             onBillingAction(() => createSubscriptionCheckout("pro", "year"))
           }
         >
-          Start annual trial · {PRICING_MODEL.pro.yearlyPrice}/yr
+          {trialEligible ? "Start annual trial" : "Subscribe yearly"} ·{" "}
+          {PRICING_MODEL.pro.yearlyPrice}/yr
         </Button>
       </div>
     </div>
@@ -171,6 +176,7 @@ export function BillingPanel({
         ) : (
           <UpgradeOffer
             disabled={billingWorking}
+            trialEligible={me?.trial_eligible === true}
             onBillingAction={onBillingAction}
           />
         )}

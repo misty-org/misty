@@ -1,6 +1,12 @@
 import type { MailThread } from "@/api/mail";
 import { describe, expect, it } from "vitest";
-import { mergeThreads, normalizeThread, parseAddressList, unifiedThreads } from "./model";
+import {
+  mergeThreads,
+  normalizeThread,
+  parseAddressList,
+  prepareReplyDraft,
+  unifiedThreads,
+} from "./model";
 
 function thread(id: string, date: string, subject = " Subject "): MailThread {
   return {
@@ -53,5 +59,57 @@ describe("Inbox normalization", () => {
       "connection-a",
     );
     expect(mergeThreads([first], [updated])).toEqual([updated]);
+  });
+
+  it("prepares reply, reply-all, and forward drafts with proper recipients and subjects", () => {
+    const t = normalizeThread(
+      {
+        ...thread("th-1", "2026-01-01T00:00:00Z", "Project Update"),
+        messages: [
+          {
+            provider: "gmail",
+            provider_id: "m-1",
+            account_id: "google-1",
+            thread_id: "th-1",
+            subject: "Project Update",
+            from: { name: "Alice", email: "alice@example.com" },
+            to: [
+              { name: "Bob", email: "bob@example.com" },
+              { name: "Me", email: "me@example.com" },
+            ],
+            cc: [{ name: "Charlie", email: "charlie@example.com" }],
+            bcc: [],
+            reply_to: [],
+            sent_at: "2026-01-01T00:00:00Z",
+            snippet: "Status is green",
+            body: { text: "Status is green and ready.", had_html: false, truncated: false },
+            labels: ["INBOX"],
+            unread: false,
+            starred: false,
+            draft: false,
+            attachments: [],
+          },
+        ],
+      },
+      "conn-1",
+    );
+
+    // Reply
+    const replyDraft = prepareReplyDraft(t, "me@example.com", "reply");
+    expect(replyDraft.to).toBe("Alice");
+    expect(replyDraft.subject).toBe("Re: Project Update");
+
+    // Reply All
+    const replyAllDraft = prepareReplyDraft(t, "me@example.com", "replyAll");
+    expect(replyAllDraft.to).toBe("Alice, Bob");
+    expect(replyAllDraft.cc).toBe("Charlie");
+    expect(replyAllDraft.subject).toBe("Re: Project Update");
+
+    // Forward
+    const forwardDraft = prepareReplyDraft(t, "me@example.com", "forward");
+    expect(forwardDraft.to).toBe("");
+    expect(forwardDraft.subject).toBe("Fwd: Project Update");
+    expect(forwardDraft.text).toContain("---------- Forwarded message ---------");
+    expect(forwardDraft.text).toContain("Status is green and ready.");
   });
 });

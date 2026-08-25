@@ -1,6 +1,6 @@
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { Button } from "@/shared/ui";
-import { LoaderCircle, Pencil, Reply, Send, Trash2 } from "lucide-react";
+import { Pencil, Reply, Trash2 } from "lucide-react";
 import { quickReactionEmojis } from "./messageHelpers";
 
 export interface MessageHoverActionsProps {
@@ -11,9 +11,6 @@ export interface MessageHoverActionsProps {
   onToggleReaction: (message: SpaceMessage, emoji: string, reacted: boolean) => void;
   onBeginEditing: (message: SpaceMessage) => void;
   onDelete: (message: SpaceMessage) => void;
-  onPublish?: () => void;
-  publishing?: boolean;
-  publishProvider?: "Discord" | "Slack";
 }
 
 /** The toolbar that appears on hover or focus: quick reactions, reply, edit, delete. */
@@ -48,18 +45,6 @@ export function MessageHoverActions(props: MessageHoverActionsProps) {
       <span className="mx-0.5 h-5 w-px bg-charcoal-border" aria-hidden="true" />
 
       <ActionButton icon={<Reply />} label="Reply" onClick={() => props.onReply(message.id)} />
-      {props.onPublish ? (
-        <ActionButton
-          icon={props.publishing ? <LoaderCircle className="animate-spin" /> : <Send />}
-          label={
-            props.publishing
-              ? `Sending to ${props.publishProvider ?? "Discord"}`
-              : `Send to ${props.publishProvider ?? "Discord"}`
-          }
-          disabled={props.publishing}
-          onClick={props.onPublish}
-        />
-      ) : null}
       {canEdit ? (
         <ActionButton
           icon={<Pencil />}
