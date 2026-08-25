@@ -257,8 +257,8 @@ export interface ProviderConnectionAvailability {
 }
 
 export interface AvailableProviderResource {
-  provider: "slack" | "discord" | "notion";
-  resource_type: "channel" | "page" | "database" | "data_source";
+  provider: string;
+  resource_type: string;
   external_resource_id: string;
   display_name: string;
   configuration: Record<string, unknown>;

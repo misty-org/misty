@@ -8,7 +8,6 @@ function at(minutesAgo: number): string {
 }
 
 export const MISTY_CONNECTOR_ID = "notes:misty";
-export const NOTION_CONNECTOR_ID = "notes:notion";
 
 export const mistyNoteSeed: UnifiedNote[] = [
   {
@@ -117,112 +116,6 @@ export const mistyNoteSeed: UnifiedNote[] = [
     createdAt: at(60 * 24 * 4),
     syncStatus: "synced",
     connectorId: MISTY_CONNECTOR_ID,
-    providerStatus: "connected",
-  },
-];
-
-export const notionNoteSeed: UnifiedNote[] = [
-  {
-    id: "notion:roadmap-h2",
-    source: "notion",
-    sourceId: "a1f4c2e0-7b3d-4c11-9f2a-6d8e0b5c3a91",
-    title: "H2 Roadmap",
-    bodyFormat: "notion-blocks",
-    body: [
-      "## Q3",
-      "",
-      "Unified workspace layer — Notes, Files, and Spaces addressable from one",
-      "search box.",
-      "",
-      "## Q4",
-      "",
-      "Two-way Notion editing. Read-first until conflict handling is proven.",
-    ].join("\n"),
-    preview:
-      "Q3: unified workspace layer across Notes, Files, and Spaces. Q4: two-way Notion editing.",
-    spaceId: "space-product",
-    spaceName: "Product",
-    tags: ["roadmap"],
-    backlinks: ["Beta launch checklist"],
-    updatedAt: at(96),
-    createdAt: at(60 * 24 * 40),
-    syncStatus: "synced",
-    sourceUrl: "https://www.notion.so/a1f4c2e07b3d4c119f2a6d8e0b5c3a91",
-    connectorId: NOTION_CONNECTOR_ID,
-    providerStatus: "connected",
-  },
-  {
-    id: "notion:notion-sync-design",
-    source: "notion",
-    sourceId: "b2e5d3f1-8c4e-4d22-a03b-7e9f1c6d4b02",
-    title: "Notion sync design",
-    bodyFormat: "notion-blocks",
-    body: [
-      "Read path is a normalized fetch: pages become `UnifiedNote` records with",
-      '`bodyFormat: "notion-blocks"`. Misty never renders Notion block JSON',
-      "directly — the connector flattens it first.",
-      "",
-      "Write path stays closed for beta. Opening it needs block-level identity,",
-      "which we do not preserve yet.",
-    ].join("\n"),
-    preview:
-      "Read path normalizes pages into UnifiedNote records. Write path stays closed until block identity is preserved.",
-    spaceId: "space-platform",
-    spaceName: "Platform",
-    tags: ["connectors", "notion"],
-    backlinks: ["Connector status vocabulary"],
-    updatedAt: at(60 * 20),
-    createdAt: at(60 * 24 * 12),
-    syncStatus: "conflict",
-    sourceUrl: "https://www.notion.so/b2e5d3f18c4e4d22a03b7e9f1c6d4b02",
-    connectorId: NOTION_CONNECTOR_ID,
-    providerStatus: "connected",
-  },
-  {
-    id: "notion:customer-interviews",
-    source: "notion",
-    sourceId: "c3f6e4a2-9d5f-4e33-b14c-8f0a2d7e5c13",
-    title: "Customer interviews — July",
-    bodyFormat: "notion-blocks",
-    body: [
-      "Eleven calls. The recurring ask is not another editor.",
-      "",
-      '> "I don\'t want to move my docs. I want to stop looking in four places."',
-      "",
-      "Which is the whole thesis: Misty is a layer, not a replacement.",
-    ].join("\n"),
-    preview:
-      "Eleven calls. Nobody asked for another editor — they asked to stop looking in four places.",
-    tags: ["research"],
-    backlinks: [],
-    updatedAt: at(60 * 44),
-    createdAt: at(60 * 24 * 6),
-    syncStatus: "error",
-    sourceUrl: "https://www.notion.so/c3f6e4a29d5f4e33b14c8f0a2d7e5c13",
-    connectorId: NOTION_CONNECTOR_ID,
-    providerStatus: "connected",
-  },
-  {
-    id: "notion:meeting-notes-platform",
-    source: "notion",
-    sourceId: "d4a7f5b3-0e60-4f44-c25d-9a1b3e8f6d24",
-    title: "Platform sync — weekly",
-    bodyFormat: "notion-blocks",
-    body: [
-      "Agenda carried over: connector retry budget, cache eviction, and whether",
-      "sync errors should page anyone (they should not).",
-    ].join("\n"),
-    preview:
-      "Carried over: connector retry budget, cache eviction, whether sync errors should page anyone.",
-    spaceId: "space-platform",
-    spaceName: "Platform",
-    tags: ["meeting"],
-    backlinks: [],
-    updatedAt: at(60 * 8),
-    createdAt: at(60 * 24 * 2),
-    syncStatus: "synced",
-    sourceUrl: "https://www.notion.so/d4a7f5b30e604f44c25d9a1b3e8f6d24",
-    connectorId: NOTION_CONNECTOR_ID,
     providerStatus: "connected",
   },
 ];

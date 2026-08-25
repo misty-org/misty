@@ -122,8 +122,6 @@ export function createSpacesRealtimeActions(
                 }));
               } else {
                 void Promise.all([get().load({ force: true }), get().loadInbox()]);
-                if (window.location.pathname.startsWith(`/spaces/${envelope.space_id}/`))
-                  window.location.assign("/spaces");
               }
             } catch {
               /* malformed server frames are ignored and recovered on reconnect */

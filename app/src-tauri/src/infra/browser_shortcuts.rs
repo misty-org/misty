@@ -38,7 +38,7 @@ pub(super) fn shortcut_token_for(state: &BrowserSessionState, id: &str) -> Resul
         .clone())
 }
 
-fn shortcut_token_matches(state: &BrowserSessionState, id: &str, token: &str) -> bool {
+pub(super) fn shortcut_token_matches(state: &BrowserSessionState, id: &str, token: &str) -> bool {
     state
         .shortcut_tokens
         .lock()

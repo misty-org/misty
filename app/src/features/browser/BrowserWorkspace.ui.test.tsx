@@ -56,19 +56,15 @@ describe("BrowserWorkspace", () => {
     });
   });
 
-  it("mirrors the native page cursor onto the host webview", async () => {
+  it("leaves cursor ownership with the native page webview", async () => {
     (
       window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
-    useBrowserRuntimeStore.getState().setCursor(browserTab.id, "pointer");
-
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
 
-    expect(container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.cursor).toBe(
-      "pointer",
-    );
+    expect(container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.cursor).toBe("");
   });
 
   it("keeps Browser chrome and its backing surface dark across page colors", async () => {
@@ -89,7 +85,9 @@ describe("BrowserWorkspace", () => {
     expect(workspace).not.toBeNull();
     expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(true);
     expect(workspace?.classList.contains("grid-rows-[44px_auto_minmax(0,1fr)]")).toBe(false);
-    expect(container.querySelector('[aria-label="Search or enter address"]')).not.toBeNull();
+    const omnibox = container.querySelector('[aria-label="Search or enter address"]');
+    expect(omnibox).not.toBeNull();
+    expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
     expect(container.querySelector('[aria-label="Annotate page"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Viewport: Responsive"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
@@ -193,31 +191,33 @@ describe("BrowserWorkspace", () => {
     expect(menuItems).toContain("Open in default browser");
   });
 
-  it("waits for the native layer handoff before showing a browser popup", async () => {
+  it("waits for native sibling order before mounting browser popups", async () => {
     (
       window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
     ).__TAURI_INTERNALS__ = {
       invoke: () => undefined,
     };
-    let releaseOverlay: (() => void) | undefined;
-    const overlayReady = new Promise<void>((resolve) => {
-      releaseOverlay = resolve;
+    let releaseRestack: (() => void) | undefined;
+    invoke.mockImplementation((command, args) => {
+      const active = (args as { active?: boolean } | undefined)?.active;
+      if (command === "browser_webviews_set_overlay_active" && active === true) {
+        return new Promise<void>((resolve) => {
+          releaseRestack = resolve;
+        });
+      }
+      return Promise.resolve(undefined);
     });
-    invoke.mockImplementation((command) =>
-      command === "browser_webviews_set_overlay_active" ? overlayReady : Promise.resolve(undefined),
-    );
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
 
     const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]');
     await act(async () => {
       trigger?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
-      await Promise.resolve();
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 20));
     });
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
 
     await act(async () => {
-      releaseOverlay?.();
-      await overlayReady;
+      releaseRestack?.();
       await settleBrowserOverlay();
     });
     expect(document.body.querySelector('[role="menu"]')).not.toBeNull();

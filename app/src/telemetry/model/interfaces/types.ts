@@ -77,6 +77,28 @@ export interface AnalyticsEventProperties {
     surface: "files" | "space";
     reason_code: string;
   };
+  ai_companion_summoned: {
+    surface: string;
+    anchor_kind: "pointer" | "selection" | "object" | "element" | "focus";
+  };
+  ai_companion_dismissed: {
+    surface: string;
+    had_task: boolean;
+  };
+  ai_companion_agent_switched: { agent_kind: "built_in" | "personal" };
+  ai_companion_task_submitted: {
+    surface: string;
+    trigger: string;
+    refinement: boolean;
+  };
+  ai_companion_artifact_decided: {
+    surface: string;
+    artifact_kind: string;
+    decision: "accept" | "reject" | "refine";
+  };
+  ai_companion_direct_effect: { surface: string; artifact_kind: string };
+  ai_companion_undo: { surface: string };
+  ai_companion_reply_recalled: { surface: string };
 }
 
 export interface SafeUserProperties {

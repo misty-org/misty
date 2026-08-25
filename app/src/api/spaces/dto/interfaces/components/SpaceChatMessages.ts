@@ -39,19 +39,6 @@ export interface SpaceChatMessagesProps {
   onError: (message: string) => void;
   onLibraryItem: (item: SpaceLibraryItem) => void;
   onReload: () => void;
-  /**
-   * Publishes one message to the linked Discord channel. Omitted when the Space
-   * has no outbound link, which is how the action stays hidden rather than
-   * appearing and failing.
-   */
-  onPublishToDiscord?: (message: SpaceMessage) => void;
-  /** Keeps publish controls limited to eligible Misty messages in a linked channel. */
-  canPublishToDiscord?: (message: SpaceMessage) => boolean;
-  /** Message id currently being published, so the row can show progress. */
-  publishingMessageId?: string;
-  onPublishToSlack?: (message: SpaceMessage) => void;
-  canPublishToSlack?: (message: SpaceMessage) => boolean;
-  publishingSlackMessageId?: string;
   /** Names the empty conversation, e.g. "What should we work on in Design?". */
   spaceName?: string;
   /**

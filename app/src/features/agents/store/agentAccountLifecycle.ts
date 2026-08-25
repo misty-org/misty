@@ -1,14 +1,12 @@
-import { resetPersonalAgentsAccountState, usePersonalAgentsStore } from "./usePersonalAgentsStore";
 import { resetMcpConnectionsAccountState } from "../mcp/useMcpConnectionsStore";
 
 export function resetAllAgentAccountState(): void {
-  resetPersonalAgentsAccountState();
   resetMcpConnectionsAccountState();
   clearLegacyAgentChatState();
 }
 
 export function refreshAllAgentAccountState(): void {
-  void usePersonalAgentsStore.getState().load();
+  // Tool connections load lazily when the managed Misty sheet is opened.
 }
 
 function clearLegacyAgentChatState(): void {

@@ -29,6 +29,8 @@ import {
   Target,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { SpaceViewModeToggle } from "../components/SpaceViewModeToggle";
 import { ErrorBanner } from "./spaceRoadmap/RoadmapEditor";
 import { GoalForm, MilestoneForm } from "./spaceRoadmap/RoadmapInspector";
 
@@ -43,6 +45,7 @@ export function SpaceRoadmapItemsWorkspace({
   kind: ItemKind;
   canManage: boolean;
 }) {
+  const navigate = useNavigate();
   const [roadmaps, setRoadmaps] = useState<SpaceRoadmap[]>([]);
   const [snapshots, setSnapshots] = useState<SpaceRoadmapSnapshot[]>([]);
   const [tasks, setTasks] = useState<SpaceTask[]>([]);
@@ -110,7 +113,26 @@ export function SpaceRoadmapItemsWorkspace({
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
-        <h1 className="m-0 shrink-0 text-sm font-semibold">{title}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="m-0 shrink-0 text-sm font-semibold">{title}</h1>
+          <SpaceViewModeToggle
+            label="Roadmap section"
+            value={kind === "goal" ? "goals" : "milestones"}
+            options={[
+              { value: "graph", label: "Graph" },
+              { value: "goals", label: "Goals" },
+              { value: "milestones", label: "Milestones" },
+            ]}
+            onChange={(section) => {
+              if (section === "graph")
+                navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`);
+              else if (section === "goals")
+                navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/goals`);
+              else if (section === "milestones")
+                navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/milestones`);
+            }}
+          />
+        </div>
         {canManage ? (
           <div className="ml-auto flex items-center gap-3">
             <CreateRoadmapItem
