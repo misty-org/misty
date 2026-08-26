@@ -24,6 +24,10 @@ describe("support bundle", () => {
     const bundle = await buildSupportBundle();
     const serialized = JSON.stringify(bundle);
     expect(bundle.notice).toContain("Review");
+    expect(bundle.runtime).toMatchObject({
+      route_family: expect.any(String),
+      captured_event_count: 1,
+    });
     expect(serialized).not.toContain("person@example.com");
     expect(serialized).not.toContain("abcdefghijklmnopqrstuvwxyz");
     expect(serialized).toContain("[REDACTED_USER_DATA]");

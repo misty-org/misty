@@ -1,6 +1,6 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { describe, expect, it } from "vitest";
-import { resolveAgentSpaceId } from "./agentSpaceSelection";
+import { resolveAgentSpaceId, resolveMentionedAgentSpaceId } from "./agentSpaceSelection";
 
 function space(id: string, kind: "standard" | "misty"): Space {
   return {
@@ -27,5 +27,22 @@ describe("resolveAgentSpaceId", () => {
   it("preserves an explicit current Space, including Misty", () => {
     expect(resolveAgentSpaceId(spaces, "space:misty")).toBe("misty");
     expect(resolveAgentSpaceId(spaces, "space:family")).toBe("family");
+  });
+
+  it("resolves one explicitly named Space from natural language", () => {
+    expect(resolveMentionedAgentSpaceId(spaces, "How many people are in family Space?")).toBe(
+      "family",
+    );
+    expect(resolveMentionedAgentSpaceId(spaces, "Please work in FAMILY.")).toBe("family");
+  });
+
+  it("does not guess when no Space or more than one Space matches", () => {
+    expect(resolveMentionedAgentSpaceId(spaces, "How many people are there?")).toBe("");
+    expect(
+      resolveMentionedAgentSpaceId(
+        [...spaces, { ...spaces[1], id: "family-two" }],
+        "Use family Space",
+      ),
+    ).toBe("");
   });
 });

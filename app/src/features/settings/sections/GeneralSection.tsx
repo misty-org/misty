@@ -18,6 +18,7 @@ export function GeneralSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Startup">
         <SettingsRow
           label="Launch on login"
+          muted={launchOnLoginUnsupported}
           description={
             launchOnLoginUnsupported
               ? "Unavailable on this platform."

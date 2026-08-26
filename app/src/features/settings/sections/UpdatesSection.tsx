@@ -26,8 +26,16 @@ export function UpdatesSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Runtime">
-        <div className="bg-charcoal-card p-4">
-          <InstallerCard embedded variant="compact" />
+        <div className="bg-charcoal-card">
+          <InstallerCard
+            embedded
+            variant="compact"
+            className={
+              "[&_button:disabled]:border-charcoal-border/80 " +
+              "[&_button:disabled]:bg-charcoal-bg [&_button:disabled]:text-cream-muted " +
+              "[&_button:disabled]:opacity-100 [&_button:disabled]:shadow-none"
+            }
+          />
         </div>
       </SettingsSectionBlock>
     </>

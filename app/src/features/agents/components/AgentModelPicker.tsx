@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
   cn,
 } from "@/shared/ui";
-import { Check, ChevronDown, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Cpu } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { GatewayModel } from "../model/interfaces/personal";
 import { selectedAgentModelName } from "../modelSelection";
@@ -59,7 +59,7 @@ export function AgentModelPicker({
           aria-label={`Model: ${label}`}
           aria-expanded={open}
         >
-          <Sparkles size={15} className="shrink-0 text-cream-muted" />
+          <Cpu size={15} className="shrink-0 text-cream-muted" />
           <span className="min-w-0 flex-1 truncate text-left">{label}</span>
           <ChevronDown size={14} className="shrink-0 text-cream-muted" />
         </Button>
