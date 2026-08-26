@@ -1,5 +1,5 @@
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
-import { Sparkles } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AiSuggestedAction } from "./types";
 
@@ -18,11 +18,11 @@ export function AiSelectionMenu({
       <PopoverTrigger asChild>
         {trigger ?? (
           <Button type="button" size="sm" variant="secondary" className="h-7 gap-1.5 text-xs">
-            <Sparkles className="size-3.5" /> Ask Misty
+            <MessageCircle className="size-3.5" /> Ask Misty
           </Button>
         )}
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="start">
+      <PopoverContent className="w-56 p-1" align="start">
         {actions.map((action) => (
           <button
             key={action.id}
