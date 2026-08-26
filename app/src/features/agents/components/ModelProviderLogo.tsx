@@ -1,4 +1,4 @@
-import { Aperture, Bot, BrainCircuit, Cpu, Sparkles, Wand2, Zap } from "lucide-react";
+import { Aperture, Bot, BrainCircuit, Cpu, Zap, type LucideIcon } from "lucide-react";
 import type { IconType } from "react-icons";
 import {
   SiAlibabacloud,
@@ -17,7 +17,7 @@ import { TbBrandAws } from "react-icons/tb";
 
 export type ModelProviderLogoSpec =
   | { kind: "react"; icon: IconType; color?: string }
-  | { kind: "lucide"; icon: typeof Sparkles; color?: string };
+  | { kind: "lucide"; icon: LucideIcon; color?: string };
 
 // Keyed by the provider prefix in a Vercel AI Gateway model id (the part before "/").
 // Providers with a recognizable brand mark use react-icons; the rest fall back to a
@@ -30,7 +30,7 @@ const providerLogoMap: Record<string, ModelProviderLogoSpec> = {
   baseten: { kind: "lucide", icon: Cpu, color: "#4F46E5" },
   bfl: { kind: "lucide", icon: Aperture, color: "#111827" },
   bytedance: { kind: "react", icon: SiBytedance, color: "#325AB4" },
-  cohere: { kind: "lucide", icon: Sparkles, color: "#39594D" },
+  cohere: { kind: "lucide", icon: BrainCircuit, color: "#39594D" },
   deepinfra: { kind: "lucide", icon: Cpu, color: "#4F46E5" },
   deepseek: { kind: "lucide", icon: BrainCircuit, color: "#4D6BFE" },
   google: { kind: "react", icon: SiGooglegemini, color: "#886FBF" },
@@ -38,8 +38,8 @@ const providerLogoMap: Record<string, ModelProviderLogoSpec> = {
   inception: { kind: "lucide", icon: Zap, color: "#7C3AED" },
   meta: { kind: "react", icon: SiMeta, color: "#0467DF" },
   mistral: { kind: "react", icon: SiMistralai, color: "#FA520F" },
-  moonshotai: { kind: "lucide", icon: Sparkles, color: "#111827" },
-  morph: { kind: "lucide", icon: Wand2, color: "#10B981" },
+  moonshotai: { kind: "lucide", icon: Aperture, color: "#111827" },
+  morph: { kind: "lucide", icon: Cpu, color: "#10B981" },
   nvidia: { kind: "react", icon: SiNvidia, color: "#76B900" },
   ollama: { kind: "react", icon: SiOllama, color: "#000000" },
   openai: { kind: "lucide", icon: Bot, color: "#000000" },
@@ -50,7 +50,7 @@ const providerLogoMap: Record<string, ModelProviderLogoSpec> = {
   zai: { kind: "lucide", icon: BrainCircuit, color: "#0EA5E9" },
 };
 
-const fallbackSpec: ModelProviderLogoSpec = { kind: "lucide", icon: Sparkles };
+const fallbackSpec: ModelProviderLogoSpec = { kind: "lucide", icon: Cpu };
 
 export function providerFromModelId(modelId: string): string {
   return modelId.split("/")[0] || "";

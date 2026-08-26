@@ -12,9 +12,7 @@ export function AgentSpacesRail({ activity }: { activity?: PersonalAgentActivity
       aria-label="Agents by space"
       className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto border-l border-charcoal-border bg-charcoal-sidebar px-3 py-4"
     >
-      <div className="px-2 text-[10px] font-medium uppercase tracking-wider text-cream-muted">
-        Recent Spaces
-      </div>
+      <div className="px-2 text-[10px] font-medium text-cream-muted">Recent spaces</div>
       {spaces.size === 0 ? (
         <p className="m-0 px-2 text-xs leading-5 text-cream-muted">
           No assigned-task activity yet.
@@ -22,9 +20,7 @@ export function AgentSpacesRail({ activity }: { activity?: PersonalAgentActivity
       ) : null}
       {[...spaces.entries()].map(([space, runs]) => (
         <section key={space}>
-          <div className="mb-1.5 px-2 text-[10px] font-medium uppercase tracking-wider text-cream-muted">
-            {space}
-          </div>
+          <div className="mb-1.5 px-2 text-[10px] font-medium text-cream-muted">{space}</div>
           <ul className="m-0 grid list-none gap-0.5 p-0">
             {runs.slice(0, 4).map((run) => (
               <li key={run.run_id} className="rounded-md px-2 py-1.5">
