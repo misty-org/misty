@@ -12,6 +12,28 @@ vi.mock("./mcp/McpConnectionsSheet", () => ({
   McpConnectionsSheet: () => null,
 }));
 
+// Agents opens straight into an agent's workspace, so the store needs one.
+vi.mock("./personalAgentsStore", () => ({
+  usePersonalAgentsStore: () => ({
+    agents: [
+      {
+        id: "misty",
+        name: "Misty",
+        role: "",
+        instructions: "",
+        avatar: {},
+        model_mode: "automatic",
+        model_id: "",
+        enabled: true,
+        system_managed: true,
+      },
+    ],
+    loading: false,
+    error: "",
+    load: async () => {},
+  }),
+}));
+
 vi.mock("./AgentsRuntime", async (original) => ({
   ...(await original<typeof AgentsRuntimeModule>()),
   useAgentsAuth: () => ({ user: { id: "owner" } }),
@@ -50,7 +72,7 @@ describe("Agents automation route state", () => {
     container.remove();
   });
 
-  it("opens the dashboard for old automation links without removing saved workflow data", async () => {
+  it("opens Activity for old automation links without removing saved workflow data", async () => {
     await act(async () => root.render(agentsSurface("/agents?view=automations&automation=flow-1")));
     expect(document.body.querySelector('[data-testid="activity"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(

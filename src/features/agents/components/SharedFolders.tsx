@@ -1,27 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Folder, X } from "lucide-react";
+import { Folder, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton } from "@/shared/ui";
-import type { AgentScope } from "../model/interfaces/types";
+import { Button } from "@/shared/ui";
+import type { AgentDeviceSnapshot, AgentScope } from "../model/interfaces/types";
 import { agentsDeviceSnapshot, agentsRevokeFolderScope } from "../store/useAgentsStore";
+
+const description =
+  "Agents can list and read files in these folders when you chat on this computer. They can’t " +
+  "change or delete anything.";
 
 /**
  * Folders on this computer that agents may list and read in desktop chats.
  * The folder is chosen in the system picker; agents never pick paths.
  */
-export function SharedFolders() {
-  const [folders, setFolders] = useState<AgentScope[]>();
+export function useSharedFolders() {
+  const [snapshot, setSnapshot] = useState<AgentDeviceSnapshot>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    const snapshot = await agentsDeviceSnapshot();
-    setFolders(snapshot.scopes.filter((scope) => scope.kind === "local_folder"));
-  }, []);
+  const load = useCallback(async () => setSnapshot(await agentsDeviceSnapshot()), []);
   useEffect(() => {
     if (hasTauriInternals()) void load().catch(() => setError("Shared folders couldn’t load."));
   }, [load]);
-  if (!hasTauriInternals()) return null;
   const run = async (action: () => Promise<unknown>, failure: string) => {
     setBusy(true);
     setError("");
@@ -34,46 +34,66 @@ export function SharedFolders() {
       setBusy(false);
     }
   };
+  const folders = snapshot?.scopes.filter((scope) => scope.kind === "local_folder");
+  return {
+    available: hasTauriInternals(),
+    device: snapshot?.device ?? undefined,
+    folders,
+    busy,
+    error,
+    share: () =>
+      void run(() => invoke("agents_choose_folder_scope"), "That folder couldn’t be shared."),
+    revoke: (folder: AgentScope) =>
+      void run(() => agentsRevokeFolderScope(folder.id), "That folder couldn’t be removed."),
+  };
+}
+
+/** The Integrations page section: each folder gets a full row. */
+export function SharedFoldersSection({ shared }: { shared: ReturnType<typeof useSharedFolders> }) {
+  if (!shared.available) return null;
   return (
-    <section aria-label="Shared folders" className="grid gap-2">
-      <h3 className="text-xs font-medium text-cream-muted">Shared folders</h3>
-      <p className="text-xs text-cream-muted">
-        Agents can list and read files in these folders when you chat on this computer. They can’t
-        change or delete anything.
-      </p>
-      {folders?.map((folder) => (
-        <div key={folder.id} className="flex items-center gap-3 py-1">
-          <Folder className="size-4 shrink-0 text-cream-muted" />
-          <span className="min-w-0 flex-1 truncate text-sm">{folder.displayName}</span>
-          <IconButton
-            label={`Stop sharing ${folder.displayName}`}
-            disabled={busy}
-            onClick={() =>
-              void run(() => agentsRevokeFolderScope(folder.id), "That folder couldn’t be removed.")
-            }
-          >
-            <X size={14} />
-          </IconButton>
+    <section aria-labelledby="shared-folders-heading" className="agent-integrations-section">
+      <header>
+        <h2 id="shared-folders-heading">Shared folders</h2>
+      </header>
+      <p className="agent-integrations-description">{description}</p>
+      {shared.folders?.length ? (
+        <div className="agent-integrations-list">
+          {shared.folders.map((folder) => (
+            <div key={folder.id} className="agent-integrations-row">
+              <Folder size={18} aria-hidden="true" />
+              <div className="agent-integrations-row-text">
+                <strong>{folder.displayName}</strong>
+                <span>{folder.available ? "Read only" : "Not found on this computer"}</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={shared.busy}
+                aria-label={`Stop sharing ${folder.displayName}`}
+                onClick={() => shared.revoke(folder)}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
         </div>
-      ))}
-      {folders && !folders.length ? (
-        <p className="text-xs text-cream-muted">No folders shared yet.</p>
+      ) : shared.folders ? (
+        <p className="agent-integrations-description">No folders shared yet.</p>
       ) : null}
       <Button
-        type="button"
         variant="outline"
         size="sm"
-        className="justify-self-start"
-        disabled={busy}
-        onClick={() =>
-          void run(() => invoke("agents_choose_folder_scope"), "That folder couldn’t be shared.")
-        }
+        className="agent-integrations-add"
+        disabled={shared.busy}
+        onClick={shared.share}
       >
+        <FolderPlus size={14} />
         Share a folder
       </Button>
-      {error ? (
-        <p role="alert" className="text-xs text-cream-muted">
-          {error}
+      {shared.error ? (
+        <p role="alert" className="agent-integrations-description">
+          {shared.error}
         </p>
       ) : null}
     </section>

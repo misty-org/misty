@@ -1,0 +1,104 @@
+/* Under the empty composer: context chips, then two columns on the composer's edges. */
+.agent-context-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.agent-context-chips > button {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  color: var(--color-cream-muted);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+.agent-context-chips > button strong {
+  color: var(--color-cream);
+  font-weight: 500;
+}
+.agent-context-chips > .agent-context-chip-skeleton {
+  height: 28px;
+  border-radius: 999px;
+}
+.agent-context-chips > button.agent-context-chip-attention {
+  color: var(--color-cream-bright);
+  border-color: var(--color-charcoal-active);
+}
+.agent-landing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 40px;
+  margin-top: 56px;
+  padding-bottom: 32px;
+}
+.agent-landing section {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+}
+.agent-landing header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.agent-landing h2 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-cream-muted);
+}
+.agent-landing header > button {
+  color: var(--color-cream-muted);
+  font-weight: 400;
+}
+/* Icons sit on the column edge; the hover surface extends 10px either side. */
+.agent-landing-row {
+  width: calc(100% + 20px);
+  height: auto;
+  margin-inline: -10px;
+  padding: 9px 10px;
+  gap: 12px;
+  align-items: flex-start;
+  white-space: normal;
+  text-align: left;
+  font-weight: 400;
+}
+.agent-landing-row > svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+}
+.agent-landing-row > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.agent-landing-row strong {
+  overflow: hidden;
+  color: var(--color-cream);
+  font-weight: 400;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-landing-row small {
+  overflow: hidden;
+  color: var(--color-cream-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-landing-note {
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  padding-block: 9px;
+}
+@container agent-studio (max-width: 760px) {
+  .agent-landing {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    margin-top: 36px;
+  }
+}

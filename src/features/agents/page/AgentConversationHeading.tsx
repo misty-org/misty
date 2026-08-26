@@ -1,5 +1,5 @@
 import type { ComponentProps, Ref } from "react";
-import { ArrowLeft, PanelRight, Plus, X } from "lucide-react";
+import { PanelRight, Plus, X } from "lucide-react";
 import { IconButton, Input } from "@/shared/ui";
 import { AgentConversationActions } from "../components/AgentConversationActions";
 import { AgentSwitcher } from "../components/AgentSwitcher";
@@ -7,9 +7,9 @@ import { AgentSwitcher } from "../components/AgentSwitcher";
 type SwitcherProps = ComponentProps<typeof AgentSwitcher>;
 
 /**
- * The conversation title bar: back, the agent switcher, and the panel controls.
- * Inside the agent workspace the sidebar already owns back, identity and New task,
- * so the bar names only the open conversation.
+ * The conversation title bar. Inside the agent workspace the sidebar owns identity and
+ * New task, so the bar carries only the conversation's title, its actions and the task
+ * panel toggle. Outside it (loading, or picking a recipient) the bar keeps the switcher.
  */
 export function AgentConversationHeading({
   workspace = false,
@@ -21,11 +21,11 @@ export function AgentConversationHeading({
   disabled,
   panelDisabled,
   panelVisible,
-  onBack,
   onRecipientSearch,
   onCloseNewChat,
   onNewChat,
   onTogglePanel,
+  onFloat,
 }: {
   workspace?: boolean;
   newChat: boolean;
@@ -36,11 +36,11 @@ export function AgentConversationHeading({
   disabled: boolean;
   panelDisabled: boolean;
   panelVisible: boolean;
-  onBack(): void;
   onRecipientSearch(value: string): void;
   onCloseNewChat(): void;
   onNewChat(): void;
   onTogglePanel(): void;
+  onFloat?(): void;
 }) {
   if (workspace && !newChat)
     return (
@@ -56,10 +56,14 @@ export function AgentConversationHeading({
         </h1>
         <div className="agent-heading-end">
           {conversation && (
-            <AgentConversationActions conversation={conversation} disabled={disabled} />
+            <AgentConversationActions
+              conversation={conversation}
+              disabled={disabled}
+              onFloat={onFloat}
+            />
           )}
           <IconButton
-            label="Show agent panel"
+            label="Show task panel"
             disabled={panelDisabled}
             data-agent-navigation-control
             aria-pressed={panelVisible}
@@ -77,11 +81,6 @@ export function AgentConversationHeading({
       data-tauri-drag-region
       data-misty-window-titlebar-region="true"
     >
-      <div className="agent-heading-start">
-        <IconButton label="Back to agents" onClick={onBack}>
-          <ArrowLeft size={16} />
-        </IconButton>
-      </div>
       {newChat ? (
         <>
           <label className="agent-recipient-input">
@@ -116,7 +115,7 @@ export function AgentConversationHeading({
               <Plus />
             </IconButton>
             <IconButton
-              label="Show agent panel"
+              label="Show task panel"
               disabled={panelDisabled}
               data-agent-navigation-control
               aria-pressed={panelVisible}

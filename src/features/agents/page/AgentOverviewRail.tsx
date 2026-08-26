@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 /**
- * The agent panel beside the conversation. It stays mounted after its first
+ * The task panel beside the conversation. It stays mounted after its first
  * opening so it can slide out as well as in.
  */
 export function AgentOverviewRail({
@@ -21,7 +21,7 @@ export function AgentOverviewRail({
     <aside
       id={id}
       className="agent-overview-rail"
-      aria-label="Agent panel"
+      aria-label="Task panel"
       data-open={open}
       aria-hidden={!open}
       inert={!open}

@@ -1,4 +1,4 @@
-/* The existing Agents collection is untouched. This shell belongs to one selected agent. */
+/* Agents opens straight into this shell for the selected agent; there is no collection. */
 .agent-studio {
   display: flex;
   flex: 1;
@@ -79,11 +79,6 @@
 .agent-studio-recent-row > button:first-child {
   color: var(--color-cream-muted);
 }
-.agent-studio-float-action {
-  margin-top: 12px;
-  gap: 8px;
-  font-size: 12px;
-}
 .agent-studio-canvas {
   position: relative;
   flex: 1;
@@ -110,6 +105,8 @@
 .agent-studio .agent-conversation[data-empty="true"] {
   justify-content: flex-start;
   padding-top: clamp(40px, 18vh, 210px);
+  /* Recent work and templates sit under the composer, so a short window scrolls. */
+  overflow-y: auto;
 }
 .agent-studio .agent-conversation[data-empty="true"] .agent-conversation-scroll {
   flex: 0 0 auto;
@@ -188,7 +185,9 @@
   min-height: 0;
   overflow: auto;
 }
-.agent-studio-task[data-floating="true"] .agent-studio-welcome {
+.agent-studio-task[data-floating="true"] .agent-studio-welcome,
+.agent-studio-task[data-floating="true"] .agent-context-chips,
+.agent-studio-task[data-floating="true"] .agent-landing {
   display: none;
 }
 .agent-studio-floating-placeholder {
@@ -210,18 +209,6 @@
   color: var(--color-cream-muted);
   margin: 12px 0 24px;
 }
-.agent-studio-availability-note {
-  color: var(--color-cream-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.agent-studio-instructions-save {
-  align-items: center;
-  gap: 16px;
-}
-.agent-studio-instructions-save .agent-studio-availability-note {
-  flex: 1;
-}
 @container agent-studio (max-width:1100px) {
   .agent-studio-sidebar {
     width: 190px;
@@ -231,12 +218,6 @@
   }
   .agent-studio-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .agent-studio-skills > aside {
-    width: 240px;
-  }
-  .agent-studio-skills > aside header {
-    flex-wrap: wrap;
   }
   .agent-studio .agent-overview-rail {
     --agent-rail-width: 260px;
@@ -283,19 +264,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .agent-studio-catalog,
-  .agent-studio-connectors,
-  .agent-studio-workflows,
-  .agent-studio-instructions {
+  .agent-studio-workflows {
     max-width: calc(100% - 32px);
     margin-top: 24px;
-  }
-  .agent-studio-skills {
-    flex-direction: column;
-  }
-  .agent-studio-skills > aside {
-    width: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-charcoal-border);
   }
   .agent-studio .agent-overview-rail {
     display: none;
@@ -312,10 +283,6 @@
 }
 .agent-studio-subnav button[aria-current="page"] {
   background: var(--color-charcoal-active);
-}
-.agent-studio-profile-action {
-  gap: 8px;
-  font-size: 12px;
 }
 .agent-studio
   .agent-conversation[data-empty="true"]
@@ -354,8 +321,8 @@
   grid-row: 2;
 }
 /*
- * Control bar: a tab tucked behind the composer's top edge. Where work runs and folder
- * work start on the left; usage sits at the end. Receipts and notices span below.
+ * Control bar: a tab tucked behind the composer's top edge for active folder work and
+ * the agent window. Usage lives in the composer as a ring. Receipts and notices span below.
  */
 .agent-control-bar {
   display: flex;
@@ -369,6 +336,10 @@
   border-bottom: 0;
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   background: color-mix(in srgb, var(--color-charcoal-card) 55%, transparent);
+}
+/* Folder work and the agent window appear only while active; an idle bar takes no space. */
+.agent-control-bar:empty {
+  display: none;
 }
 .agent-control-bar button {
   height: 28px;
@@ -387,29 +358,12 @@
   margin: 0;
   padding: 2px 8px 6px;
 }
-.agent-usage-trigger {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
+/* The usage ring sits beside the mic; exact numbers live in the popover. */
+.agent-usage-ring circle:first-child {
+  stroke: color-mix(in srgb, var(--color-cream) 18%, transparent);
 }
-/* A 36px meter: enough to read at a glance; exact numbers live in the popover. */
-.agent-usage-meter {
-  position: relative;
-  width: 36px;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-cream) 12%, transparent);
-}
-.agent-usage-meter > span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--color-cream) 70%, transparent);
-}
-@container agent-studio (max-width: 760px) {
-  .agent-usage-draft {
-    display: none;
-  }
+.agent-usage-ring circle:last-child {
+  stroke: var(--color-cream);
 }
 
 .agent-studio-recent-row {

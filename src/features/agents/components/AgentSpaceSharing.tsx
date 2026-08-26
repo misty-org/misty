@@ -1,6 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import { agentMemberRequestsApi, type AcceptPolicy } from "@/features/agent-member-requests/api";
-import { OptionSelect } from "@/shared/ui";
+import { OptionSelect, SkeletonList } from "@/shared/ui";
 import { useCallback, useEffect, useState } from "react";
 
 type Row = { spaceId: string; spaceName: string; policy: AcceptPolicy };
@@ -63,9 +63,7 @@ export function AgentSpaceSharing({ agentId }: { agentId: string }) {
         with your permissions there, and you pay for its work.
       </p>
       {!rows && !error ? (
-        <p role="status" className="text-xs text-cream-muted">
-          Loading Spaces…
-        </p>
+        <SkeletonList label="Spaces" rows={2} leading="none" lines={1} trailing />
       ) : null}
       {rows && !rows.length ? (
         <p className="text-xs text-cream-muted">You’re not in any Spaces with other members yet.</p>

@@ -120,6 +120,8 @@ export interface GlobalAiMessage {
   screenRequest?: ScreenRequest;
   /** Set on turns Misty started itself rather than the person typing them. */
   source?: "scheduled_task";
+  /** Misty sees this message and everything before it only as summarized notes. */
+  compactedAfter?: boolean;
 }
 
 export interface MistyImageAttachment {

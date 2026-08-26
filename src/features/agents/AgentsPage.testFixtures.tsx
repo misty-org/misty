@@ -62,6 +62,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   useMistyStore.setState({
     accountId: "owner",
+    selectedAgentId: undefined,
     conversations: [],
     activeConversationId: "",
     working: false,
@@ -82,9 +83,25 @@ export function renderAgentsPage() {
   );
 }
 
-/** Opens the agent's workspace from the directory. */
-export function openCommunications() {
-  fireEvent.click(screen.getByRole("button", { name: "Communications" }));
+/** Opens the agent switcher in the sidebar and chooses one of its items. */
+export function chooseFromSwitcher(option: string | RegExp, agent = "Communications") {
+  fireEvent.click(screen.getByRole("button", { name: `Switch agent: ${agent}` }));
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+
+/** Agent settings live in the switcher now that the sidebar has no footer. */
+export function openAgentSettings(agent = "Communications") {
+  chooseFromSwitcher(`${agent} settings`, agent);
+}
+
+/** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */
+export async function chooseConversationAction(title: string, action: string) {
+  const trigger = screen
+    .getAllByRole("button", { name: `More actions for ${title}` })
+    .find((button) => button.closest(".agent-conversation-heading"));
+  if (!trigger) throw new Error(`No header actions for ${title}`);
+  fireEvent.keyDown(trigger, { key: "Enter" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: action }));
 }
 
 export const composer = () => screen.getByLabelText("Message Misty") as HTMLTextAreaElement;

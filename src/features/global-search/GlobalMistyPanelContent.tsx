@@ -9,6 +9,7 @@ import {
   Input,
   MenuItem,
   MenuTrigger,
+  Skeleton,
 } from "@/shared/ui";
 import {
   Check,
@@ -171,7 +172,10 @@ export function ConversationMenu(props: {
       ) : (
         <MenuTrigger
           label="Conversation history"
-          value={active?.title ?? (props.loading ? "Loading…" : "New conversation")}
+          value={
+            active?.title ??
+            (props.loading ? <Skeleton className="h-3 w-24" /> : "New conversation")
+          }
           icon={<History className="size-3.5" />}
           className="max-w-48 text-xs text-cream-muted"
         />
