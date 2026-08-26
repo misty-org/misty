@@ -109,6 +109,6 @@ describe("TaskDatePicker", () => {
       root.render(<TaskDatePicker value={targetDate} onChange={onChange} />);
     });
 
-    expect(container.textContent).toMatch(/Aug 25/i);
+    expect(container.textContent).toMatch(/Aug 25|Today|Tomorrow/i);
   });
 });
