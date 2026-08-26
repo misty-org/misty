@@ -3,6 +3,7 @@ import { useSetupStore } from "@/features/installer";
 import { useTransfersStore } from "@/features/transfers";
 import type { TransferRecord } from "@/native/contracts";
 import type { TransferStatus } from "@/native/contracts/primitives";
+import { isWebBuild } from "@/shared/platform/buildTarget";
 import { memo, useEffect, useRef, useState } from "react";
 import {
   advanceTransferCompletionTracker,
@@ -24,6 +25,7 @@ export const WorkStatusPopup = memo(function WorkStatusPopup() {
   );
 
   useEffect(() => {
+    if (isWebBuild) return;
     let disposed = false;
     const refresh = () => {
       if (!disposed) void loadTransfers(undefined, { silent: true });
