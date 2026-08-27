@@ -3,12 +3,21 @@ import { normalizeShortcut, scopesOverlap } from "./bindings";
 import { shortcutCommandRegistry, shortcutCommandsById } from "./registry";
 
 describe("shortcut platform defaults", () => {
+  it("registers every command ID exactly once", () => {
+    expect(new Set(shortcutCommandRegistry.map((definition) => definition.id)).size).toBe(
+      shortcutCommandRegistry.length,
+    );
+  });
+
   it("uses native primary modifiers for shell navigation", () => {
     const launcher = shortcutCommandsById.get("search.toggle")!;
     const nextTab = shortcutCommandsById.get("workspace.next_tab")!;
     expect(launcher.defaults.macos.primary).toBe("Cmd+K");
     expect(launcher.defaults.windows.primary).toBe("Ctrl+K");
     expect(launcher.defaults.linux.primary).toBe("Ctrl+K");
+    const companion = shortcutCommandsById.get("misty.contextual_companion")!;
+    expect(companion.defaults.macos.primary).toBe("Cmd+Shift+K");
+    expect(companion.defaults.windows.primary).toBe("Ctrl+Shift+K");
     expect(nextTab.defaults.macos).toEqual({
       primary: "Cmd+Shift+RightBracket",
       alternate: "Ctrl+Tab",
@@ -16,6 +25,21 @@ describe("shortcut platform defaults", () => {
     expect(nextTab.defaults.windows).toEqual({
       primary: "Ctrl+Tab",
       alternate: "Ctrl+PageDown",
+    });
+  });
+
+  it("accepts Control as an alternate app zoom modifier on macOS", () => {
+    expect(shortcutCommandsById.get("app.zoom_in")?.defaults.macos).toEqual({
+      primary: "Cmd+Plus",
+      alternate: "Ctrl+Plus",
+    });
+    expect(shortcutCommandsById.get("app.zoom_out")?.defaults.macos).toEqual({
+      primary: "Cmd+Minus",
+      alternate: "Ctrl+Minus",
+    });
+    expect(shortcutCommandsById.get("app.zoom_reset")?.defaults.macos).toEqual({
+      primary: "Cmd+0",
+      alternate: "Ctrl+0",
     });
   });
 

@@ -1,12 +1,12 @@
 import { agentsApi } from "@/api/agents/api";
 import { cn } from "@/shared/ui";
-import { Bot, CalendarDays, Code2, PenLine, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { Bot, CalendarDays, Code2, PenLine, Search, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AgentAvatar as AgentAvatarValue } from "./model/interfaces/personal";
 
 const presetIcons: Record<string, LucideIcon> = {
   bot: Bot,
-  sparkles: Sparkles,
+  sparkles: Users,
   researcher: Search,
   writer: PenLine,
   planner: CalendarDays,
@@ -29,7 +29,7 @@ export const agentAvatarPresets = [
   { id: "writer", label: "Writer", icon: PenLine },
   { id: "planner", label: "Planner", icon: CalendarDays },
   { id: "builder", label: "Builder", icon: Code2 },
-  { id: "sparkles", label: "Coordinator", icon: Sparkles },
+  { id: "sparkles", label: "Coordinator", icon: Users },
 ] as const;
 
 export const agentAvatarAccents = ["indigo", "violet", "blue", "emerald", "amber", "rose"];

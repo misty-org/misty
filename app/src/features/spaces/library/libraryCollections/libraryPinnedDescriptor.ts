@@ -5,10 +5,10 @@ import {
   History,
   Image as ImageIcon,
   BookOpenText as LibraryIcon,
+  BrainCircuit,
   MapPin,
   MessagesSquare,
   Music2,
-  Sparkles,
   Star,
   Trash2,
   Video,
@@ -124,7 +124,7 @@ export function usePinnedDescriptor(data: SpaceLibraryData, selectCollection: Se
         ? {
             label: group.title,
             count: group.item_count,
-            icon: kind === "memory" ? Sparkles : MapPin,
+            icon: kind === "memory" ? BrainCircuit : MapPin,
             onClick: () => selectCollection(kind, group.id),
           }
         : null;

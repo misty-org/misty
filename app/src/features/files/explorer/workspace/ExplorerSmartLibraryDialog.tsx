@@ -14,8 +14,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui";
-import { open } from "@tauri-apps/plugin-dialog";
+import { MistyFilePicker } from "@/features/picker";
 import {
+  BrainCircuit,
   Cloud,
   Folder,
   FolderSearch,
@@ -24,7 +25,6 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -83,18 +83,14 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmFullAnalysis, setConfirmFullAnalysis] = useState(false);
   const [confirmIndexUpgrade, setConfirmIndexUpgrade] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const chooseLocalFolder = async () => {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Choose one Smart Library folder",
-    });
-    if (typeof selected === "string") await chooseFolder(selected);
+    setPickerOpen(true);
   };
   const analyzedAssets = library?.assets.filter((asset) => asset.status === "analyzed") ?? [];
   const failedAssets = library?.assets.filter((asset) => asset.status === "failed") ?? [];
@@ -257,7 +253,7 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
                             ) : null}
                             {library.preflight.eligibleImages > 0 ? (
                               <Button type="button" onClick={() => setConfirmFullAnalysis(true)}>
-                                <Sparkles size={16} />
+                                <BrainCircuit size={16} />
                                 Analyze this folder
                               </Button>
                             ) : null}
@@ -319,6 +315,17 @@ export function SmartLibraryDialog(props: { workingDirectory: string; onClose: (
         onOpenChange={setConfirmIndexUpgrade}
         onConfirm={() => void upgradeIndex()}
       />
+      {pickerOpen ? (
+        <MistyFilePicker
+          mode="folder"
+          title="Choose one Smart Library folder"
+          onCancel={() => setPickerOpen(false)}
+          onSelect={(path) => {
+            setPickerOpen(false);
+            void chooseFolder(path);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -333,7 +340,7 @@ function LibraryOnboarding(props: {
     <div className="grid min-h-full place-items-center p-8">
       <div className="grid w-full max-w-3xl justify-items-center gap-7 text-center">
         <div className="grid size-20 place-items-center rounded-xl bg-charcoal-active text-cream-bright">
-          <Sparkles size={34} />
+          <BrainCircuit size={34} />
         </div>
         <div className="grid gap-3">
           <h3 className="m-0 text-2xl font-semibold tracking-tight">

@@ -58,9 +58,7 @@ export function BrowserViewportMenu(props: {
         sideOffset={8}
         className="w-56 p-1.5 data-[state=closed]:animate-none data-[state=open]:animate-none"
       >
-        <p className="px-2 pb-1.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-cream-muted">
-          Viewport
-        </p>
+        <p className="px-2 pb-1.5 pt-1 text-[11px] font-medium text-cream-muted">Viewport</p>
         {viewportOptions.map((option) => {
           const Icon = option.icon;
           const selected = option.id === props.value;

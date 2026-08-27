@@ -1,6 +1,8 @@
 import { useMediaViewerStore } from "@/features/files/preview";
 import type { SearchResult } from "@/native/contracts";
+import { normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
+import { parentDirectory, samePath } from "../store/helpers/listing";
 import { useExplorerStore } from "../store";
 export type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
 
@@ -8,7 +10,7 @@ export function searchResultNavigationTarget(result: SearchResult): ExplorerSear
   const entry = result.entry;
   return {
     result,
-    path: entry.kind === "folder" ? entry.path : parentPath(entry.path),
+    path: entry.kind === "folder" ? normalizeExplorerPath(entry.path) : parentDirectory(entry.path),
     selectEntryId: entry.kind === "folder" ? null : entry.id,
   };
 }
@@ -40,10 +42,12 @@ export async function revealSearchResultInPane(
     return;
   }
   if (!target.selectEntryId) return;
+  const targetPathKey = normalizeExplorerPath(target.result.entry.path);
   const resolvedEntry = pane?.listing?.entries.find(
     (entry) =>
       entry.id === target.selectEntryId ||
-      normalizePath(entry.path) === normalizePath(target.result.entry.path),
+      samePath(entry.path, target.result.entry.path) ||
+      normalizeExplorerPath(entry.path) === targetPathKey,
   );
   if (resolvedEntry) {
     useExplorerStore.getState().selectEntry(paneId, resolvedEntry.id);
@@ -58,20 +62,4 @@ export function searchResultStaleMessage(result: SearchResult): string {
       ? (result.entry.location.remoteName ?? "remote")
       : "local disk";
   return `Could not open indexed result from ${source}. It may have moved or changed; reindex search and try again.`;
-}
-
-function parentPath(path: string): string {
-  const normalized = path.replace(/\/+/g, "/");
-  const index = normalized.lastIndexOf("/");
-  if (index <= 0) return "/";
-  return normalized.slice(0, index);
-}
-
-function normalizePath(path: string): string {
-  return (
-    path
-      .replace(/\\/g, "/")
-      .replace(/\/{2,}/g, "/")
-      .replace(/\/$/, "") || "/"
-  );
 }

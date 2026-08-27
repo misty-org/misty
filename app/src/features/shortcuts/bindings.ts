@@ -192,6 +192,8 @@ function normalizeKey(token: string): string {
     ",": "comma",
     ".": "period",
     "-": "minus",
+    "−": "minus",
+    "–": "minus",
     "=": "plus",
     "+": "plus",
     "[": "leftbracket",
@@ -205,6 +207,10 @@ function normalizeKey(token: string): string {
     esc: "escape",
     return: "enter",
     spacebar: "space",
+    add: "plus",
+    subtract: "minus",
+    numpadadd: "plus",
+    numpadsubtract: "minus",
   };
   return aliases[lower] ?? lower.replace(/ /g, "");
 }
@@ -222,6 +228,8 @@ function eventKey(event: KeyboardEvent): string {
     Period: "period",
     Equal: "plus",
     Minus: "minus",
+    NumpadAdd: "plus",
+    NumpadSubtract: "minus",
     ArrowLeft: "arrowleft",
     ArrowRight: "arrowright",
     ArrowUp: "arrowup",

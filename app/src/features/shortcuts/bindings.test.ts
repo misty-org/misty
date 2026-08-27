@@ -34,6 +34,23 @@ describe("shortcut bindings", () => {
     expect(shortcutMatchesEvent("Cmd+Plus", event)).toBe(true);
   });
 
+  it("matches minus on both the main keyboard and numpad", () => {
+    const main = new KeyboardEvent("keydown", {
+      code: "Minus",
+      key: "-",
+      ctrlKey: true,
+    });
+    const numpad = new KeyboardEvent("keydown", {
+      code: "NumpadSubtract",
+      key: "Subtract",
+      ctrlKey: true,
+    });
+
+    expect(shortcutMatchesEvent("Ctrl+Minus", main)).toBe(true);
+    expect(shortcutMatchesEvent("Ctrl+Minus", numpad)).toBe(true);
+    expect(shortcutFromEvent(numpad)).toBe("Ctrl+Minus");
+  });
+
   it("renders native keycaps", () => {
     expect(formatShortcut("Cmd+Option+Shift+1", "macos")).toEqual(["⌥", "⇧", "⌘", "1"]);
     expect(formatShortcut("Ctrl+Shift+PageDown", "windows")).toEqual([

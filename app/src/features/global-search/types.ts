@@ -32,11 +32,49 @@ export interface GlobalSearchDocument {
   updatedAt?: string;
   source: "local" | "server" | "device";
   fileResult?: SearchResult;
+  canonicalId?: string;
+  revision?: string | number;
+  lexicalScore?: number;
+  semanticScore?: number;
 }
 
 export interface GlobalSearchResult extends GlobalSearchDocument {
   score: number;
 }
+
+export type UnifiedMistyPanel = "closed" | "results" | "answer" | "agent";
+export type GlobalSearchSourceFilter = "all" | "device" | "cloud";
+export type GlobalSearchIntentFilter = "all" | "misty" | "agent";
+
+export interface GlobalSearchFilters {
+  kinds: GlobalSearchKind[];
+  spaceId?: string;
+  source: GlobalSearchSourceFilter;
+  intent: GlobalSearchIntentFilter;
+}
+
+interface UnifiedMistyCandidateBase {
+  id: string;
+  title: string;
+  description: string;
+  score: number;
+  ranking: string[];
+}
+
+export type UnifiedMistyCandidate =
+  | (UnifiedMistyCandidateBase & {
+      type: "object" | "navigation";
+      result: GlobalSearchResult;
+    })
+  | (UnifiedMistyCandidateBase & {
+      type: "command";
+      commandId?: string;
+      tabId?: string;
+    })
+  | (UnifiedMistyCandidateBase & {
+      type: "answer" | "agent_task";
+      prompt: string;
+    });
 
 export interface GlobalSearchContextItem {
   kind: GlobalSearchKind;
@@ -49,7 +87,7 @@ export interface GlobalSearchContextItem {
 
 export interface GlobalAiContextRef {
   id: string;
-  kind: GlobalSearchKind | "route";
+  kind: string;
   title: string;
   href?: string;
   source: "current" | GlobalSearchDocument["source"];
@@ -58,6 +96,10 @@ export interface GlobalAiContextRef {
   /** Device paths are local-only and must never be serialized into AI requests. */
   localPath?: string;
   attached?: boolean;
+  privacy?: "shared" | "private" | "device" | "provider";
+  revision?: string | number;
+  opaqueScopeId?: string;
+  metadata?: Record<string, string | number | boolean>;
 }
 
 export interface GlobalAiCitation {
@@ -75,11 +117,11 @@ export interface GlobalAiActionProposal {
   risk: "read" | "write" | "dangerous";
   state: "proposed" | "running" | "awaiting_approval" | "completed" | "failed" | "rejected";
   requiresConfirmation: boolean;
-  agentId?: string;
   agentName?: string;
   spaceId?: string;
   spaceName?: string;
   runId?: string;
+  approvalId?: string;
   resultHref?: string;
   error?: string;
 }
@@ -90,15 +132,35 @@ export interface GlobalAiMessage {
   mode: Exclude<GlobalAiMode, "search">;
   content: string;
   createdAt: string;
+  state?: "pending" | "streaming" | "completed" | "failed" | "canceled";
+  retryable?: boolean;
+  activity?: string;
+  attachments?: MistyImageAttachment[];
   citations?: GlobalAiCitation[];
   action?: GlobalAiActionProposal;
+}
+
+export interface MistyImageAttachment {
+  id: string;
+  name: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  byteSize: number;
+  width: number;
+  height: number;
+  previewUrl: string;
+  progress?: number;
+  state: "preparing" | "uploading" | "ready" | "failed";
+  error?: string;
 }
 
 export interface GlobalAiConversation {
   id: string;
   title: string;
+  spaceId?: string;
   createdAt: string;
   updatedAt: string;
+  modelId?: string;
+  reasoningEffort?: "" | "low" | "medium" | "high";
   messages: GlobalAiMessage[];
   remote: boolean;
 }

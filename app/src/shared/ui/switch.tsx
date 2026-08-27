@@ -14,7 +14,7 @@ const Switch = React.forwardRef<
       "border-cream/10 bg-charcoal-hover",
       "shadow-xs outline-none transition-colors duration-150 ease-out focus-visible:border-charcoal-active",
       "focus-visible:ring-[3px] focus-visible:ring-charcoal-active/40 disabled:cursor-not-allowed",
-      "disabled:opacity-50 data-[state=checked]:border-charcoal-active data-[state=checked]:bg-charcoal-active",
+      "disabled:opacity-50 data-[state=checked]:border-cream-muted data-[state=checked]:bg-cream-muted",
       className,
     )}
     {...props}
@@ -25,7 +25,8 @@ const Switch = React.forwardRef<
       className={cn(
         "pointer-events-none block size-4 rounded-full bg-charcoal-bg shadow-sm",
         "ring-1 ring-cream/15 transition-transform duration-150 ease-out data-[state=checked]:translate-x-4",
-        "data-[state=unchecked]:translate-x-0",
+        "data-[state=checked]:bg-cream-bright data-[state=checked]:ring-cream-bright/20 data-[state=unchecked]:translate-x-0",
+        "data-[disabled]:bg-charcoal-border data-[disabled]:ring-charcoal-border",
       )}
     />
   </SwitchPrimitives.Root>

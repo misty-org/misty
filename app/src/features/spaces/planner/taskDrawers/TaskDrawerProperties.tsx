@@ -53,9 +53,7 @@ export function TaskDrawerProperties({
         "max-sm:border-l-0 max-sm:border-t max-sm:border-charcoal-border/60",
       )}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-cream-faint/70">
-        Properties
-      </div>
+      <div className="text-[11px] font-semibold text-cream-faint/70">Properties</div>
 
       <div className="grid gap-3.5">
         {/* Status */}
@@ -194,7 +192,7 @@ export function TaskDrawerProperties({
               </DropdownMenuItem>
               {members.length > 0 ? (
                 <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60 uppercase tracking-wider">
+                  <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60">
                     Members
                   </div>
                   {members.map((member) => (
@@ -221,7 +219,7 @@ export function TaskDrawerProperties({
               ) : null}
               {agents.filter((a) => a.enabled && a.can_control).length > 0 ? (
                 <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60 uppercase tracking-wider">
+                  <div className="px-2 py-1 text-[10px] font-semibold text-cream-faint/60">
                     Agents
                   </div>
                   {agents

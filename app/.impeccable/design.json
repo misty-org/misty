@@ -1,0 +1,425 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T15:19:33Z",
+  "title": "Design System: Misty Product Workspace",
+  "extensions": {
+    "colorMeta": {
+      "workspace-black": {
+        "role": "neutral",
+        "displayName": "Workspace Black",
+        "canonical": "#0f0f0f",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "canvas-charcoal": {
+        "role": "neutral",
+        "displayName": "Canvas Charcoal",
+        "canonical": "#131313",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "sidebar-charcoal": {
+        "role": "neutral",
+        "displayName": "Sidebar Charcoal",
+        "canonical": "#161616",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "raised-charcoal": {
+        "role": "neutral",
+        "displayName": "Raised Charcoal",
+        "canonical": "#191919",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "structural-line": {
+        "role": "neutral",
+        "displayName": "Structural Line",
+        "canonical": "#262626",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "hover-charcoal": {
+        "role": "neutral",
+        "displayName": "Hover Charcoal",
+        "canonical": "#2b2b2b",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "active-charcoal": {
+        "role": "neutral",
+        "displayName": "Active Charcoal",
+        "canonical": "#3e3e3e",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "primary-cream": {
+        "role": "neutral",
+        "displayName": "Primary Cream",
+        "canonical": "#e0e0e0",
+        "tonalRamp": [
+          "oklch(15% 0.004 90)",
+          "oklch(25% 0.004 90)",
+          "oklch(35% 0.004 90)",
+          "oklch(45% 0.004 90)",
+          "oklch(58% 0.004 90)",
+          "oklch(70% 0.004 90)",
+          "oklch(83% 0.004 90)",
+          "oklch(95% 0.004 90)"
+        ]
+      },
+      "bright-cream": {
+        "role": "neutral",
+        "displayName": "Bright Cream",
+        "canonical": "#f1f1f1",
+        "tonalRamp": [
+          "oklch(15% 0.004 90)",
+          "oklch(25% 0.004 90)",
+          "oklch(35% 0.004 90)",
+          "oklch(45% 0.004 90)",
+          "oklch(58% 0.004 90)",
+          "oklch(70% 0.004 90)",
+          "oklch(83% 0.004 90)",
+          "oklch(95% 0.004 90)"
+        ]
+      },
+      "muted-ash": {
+        "role": "neutral",
+        "displayName": "Muted Ash",
+        "canonical": "#8c8c8c",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(25% 0 0)",
+          "oklch(35% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(58% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(83% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "notification-red": {
+        "role": "secondary",
+        "displayName": "Notification Red",
+        "canonical": "#c94747",
+        "tonalRamp": [
+          "oklch(15% 0.08 25)",
+          "oklch(25% 0.10 25)",
+          "oklch(35% 0.12 25)",
+          "oklch(45% 0.14 25)",
+          "oklch(58% 0.16 25)",
+          "oklch(70% 0.13 25)",
+          "oklch(83% 0.08 25)",
+          "oklch(95% 0.03 25)"
+        ]
+      },
+      "collaborative-sage": {
+        "role": "primary",
+        "displayName": "Collaborative Sage",
+        "canonical": "#a3bfab",
+        "tonalRamp": [
+          "oklch(15% 0.04 150)",
+          "oklch(25% 0.05 150)",
+          "oklch(35% 0.06 150)",
+          "oklch(45% 0.07 150)",
+          "oklch(58% 0.08 150)",
+          "oklch(70% 0.07 150)",
+          "oklch(83% 0.05 150)",
+          "oklch(95% 0.02 150)"
+        ]
+      },
+      "sage-wash": {
+        "role": "primary",
+        "displayName": "Sage Wash",
+        "canonical": "#28312b",
+        "tonalRamp": [
+          "oklch(15% 0.02 150)",
+          "oklch(25% 0.03 150)",
+          "oklch(35% 0.04 150)",
+          "oklch(45% 0.05 150)",
+          "oklch(58% 0.06 150)",
+          "oklch(70% 0.05 150)",
+          "oklch(83% 0.03 150)",
+          "oklch(95% 0.01 150)"
+        ]
+      },
+      "mention-indigo": {
+        "role": "secondary",
+        "displayName": "Mention Indigo",
+        "canonical": "#5865f2",
+        "tonalRamp": [
+          "oklch(15% 0.09 275)",
+          "oklch(25% 0.13 275)",
+          "oklch(35% 0.17 275)",
+          "oklch(45% 0.20 275)",
+          "oklch(58% 0.22 275)",
+          "oklch(70% 0.17 275)",
+          "oklch(83% 0.10 275)",
+          "oklch(95% 0.03 275)"
+        ]
+      },
+      "mention-cream": {
+        "role": "neutral",
+        "displayName": "Mention Cream",
+        "canonical": "#f5f2ed",
+        "tonalRamp": [
+          "oklch(15% 0.01 80)",
+          "oklch(25% 0.01 80)",
+          "oklch(35% 0.01 80)",
+          "oklch(45% 0.01 80)",
+          "oklch(58% 0.01 80)",
+          "oklch(70% 0.01 80)",
+          "oklch(83% 0.01 80)",
+          "oklch(95% 0.01 80)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Rare error, onboarding, or empty-state headings."
+      },
+      "title": { "displayName": "Title", "purpose": "Compact tool, object, and dialog titles." },
+      "subtitle": { "displayName": "Subtitle", "purpose": "Section and selected-object headings." },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Primary content and controls across work surfaces."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Navigation, buttons, tabs, and dense interactive labels."
+      },
+      "dense": {
+        "displayName": "Dense Body",
+        "purpose": "Tables, lists, planner cards, and compact supporting copy."
+      },
+      "label": { "displayName": "Label", "purpose": "Status and section labels." },
+      "metadata": {
+        "displayName": "Metadata",
+        "purpose": "Counts, timestamps, secondary status, and keyboard hints."
+      },
+      "micro": {
+        "displayName": "Micro Label",
+        "purpose": "Nonessential compact counts and status only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "compact-float",
+        "value": "0 12px 30px rgba(0,0,0,0.5)",
+        "purpose": "Floating navigation islands and detached compact controls."
+      },
+      {
+        "name": "navigation-float",
+        "value": "0 18px 44px rgba(0,0,0,0.6)",
+        "purpose": "Auto-revealed navigation above the workspace."
+      },
+      {
+        "name": "overlay-lift",
+        "value": "0 20px 48px rgba(0,0,0,0.55)",
+        "purpose": "Dialogs, sheets, menus, and high-layer popovers."
+      }
+    ],
+    "motion": [
+      {
+        "name": "misty-fast",
+        "value": "160ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Hover, selection, and compact overlay feedback."
+      },
+      {
+        "name": "misty-page",
+        "value": "320ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Pane, route, and large shell transitions."
+      },
+      {
+        "name": "misty-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "State changes that must feel steady rather than springy."
+      }
+    ],
+    "breakpoints": [
+      { "name": "compact-desktop", "value": "1100px" },
+      { "name": "tablet", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The sober filled action used to commit or advance the current task.",
+      "html": "<button class=\"ds-btn-primary\">New</button>",
+      "css": ".ds-btn-primary { height: 36px; border: 1px solid transparent; border-radius: 6px; background: var(--color-charcoal-active, #3e3e3e); color: var(--color-cream-bright, #f1f1f1); padding: 0 10px; font: 500 14px/1 system-ui, sans-serif; transition: background-color 160ms cubic-bezier(0.16,1,0.3,1), transform 160ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: #494949; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-charcoal-active, #3e3e3e) 50%, transparent); outline-offset: 1px; } .ds-btn-primary:disabled { border-color: var(--color-charcoal-border, #262626); background: var(--color-charcoal-bg, #131313); color: var(--color-cream-muted, #8c8c8c); box-shadow: none; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Toolbar Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "A compact unfilled tool action that brightens without adding visual weight.",
+      "html": "<button class=\"ds-btn-ghost\" aria-label=\"Refresh\"><svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M20 6v5h-5\"/><path d=\"M4 18v-5h5\"/><path d=\"M18.5 9A7 7 0 0 0 6 6.5L4 11\"/><path d=\"M5.5 15A7 7 0 0 0 18 17.5l2-4.5\"/></svg></button>",
+      "css": ".ds-btn-ghost { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--color-cream-muted, #8c8c8c); transition: color 160ms cubic-bezier(0.16,1,0.3,1), background-color 160ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-ghost:hover { color: var(--color-cream-bright, #f1f1f1); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-charcoal-active, #3e3e3e); outline-offset: 1px; } .ds-btn-ghost:disabled { border: 1px solid var(--color-charcoal-border, #262626); background: var(--color-charcoal-bg, #131313); color: var(--color-cream-muted, #8c8c8c); cursor: not-allowed; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "A compact raised field with low-contrast structure and quiet placeholder text.",
+      "html": "<input class=\"ds-input-search\" type=\"search\" placeholder=\"Search…\" />",
+      "css": ".ds-input-search { width: 260px; height: 36px; border: 1px solid var(--color-charcoal-border, #262626); border-radius: 6px; background: var(--color-charcoal-card, #191919); color: var(--color-cream, #e0e0e0); padding: 0 10px; font: 400 14px/1 system-ui, sans-serif; transition: border-color 160ms cubic-bezier(0.16,1,0.3,1), box-shadow 160ms cubic-bezier(0.16,1,0.3,1); } .ds-input-search::placeholder { color: var(--color-cream-muted, #8c8c8c); } .ds-input-search:focus-visible { outline: none; border-color: var(--color-charcoal-active, #3e3e3e); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-charcoal-active, #3e3e3e) 45%, transparent); } .ds-input-search:disabled { background: var(--color-charcoal-bg, #131313); color: var(--color-cream-muted, #8c8c8c); box-shadow: none; cursor: not-allowed; }"
+    },
+    {
+      "name": "Active Navigation Row",
+      "kind": "nav",
+      "refersTo": "navigation-row",
+      "description": "A selected location with one tonal fill and a narrow sage edge marker.",
+      "html": "<button class=\"ds-nav-row\"><span class=\"ds-nav-marker\"></span><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 6h18v12H3z\"/><path d=\"M3 9h18\"/></svg><span>Planner</span></button>",
+      "css": ".ds-nav-row { position: relative; display: flex; width: 220px; height: 36px; align-items: center; gap: 10px; border: 0; border-radius: 6px; background: var(--color-charcoal-card, #191919); color: var(--color-cream-bright, #f1f1f1); padding: 0 10px; font: 500 14px/1 system-ui, sans-serif; text-align: left; } .ds-nav-marker { position: absolute; left: -12px; width: 2px; height: 24px; border-radius: 0 2px 2px 0; background: var(--color-sage-fg, #a3bfab); } .ds-nav-row:hover { background: var(--color-charcoal-hover, #2b2b2b); } .ds-nav-row:focus-visible { outline: 2px solid var(--color-charcoal-active, #3e3e3e); outline-offset: 1px; }"
+    },
+    {
+      "name": "Segmented Tabs",
+      "kind": "nav",
+      "description": "A compact charcoal segmented control for switching views inside one tool.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\">Board</button><button class=\"ds-tab\">List</button></div>",
+      "css": ".ds-tabs { display: inline-flex; height: 36px; align-items: center; gap: 2px; border-radius: 8px; background: var(--color-charcoal-card, #191919); padding: 3px; } .ds-tab { height: 30px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--color-cream-muted, #8c8c8c); padding: 0 9px; font: 500 14px/1 system-ui, sans-serif; transition: color 150ms ease-out, background-color 150ms ease-out; } .ds-tab:hover { color: var(--color-cream, #e0e0e0); } .ds-tab-active { border-color: var(--color-charcoal-border, #262626); background: var(--color-charcoal-active, #3e3e3e); color: var(--color-cream-bright, #f1f1f1); } .ds-tab:focus-visible { outline: 2px solid var(--color-charcoal-active, #3e3e3e); outline-offset: 1px; }"
+    },
+    {
+      "name": "Work Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "A flat bordered task card that contains only the information needed to act.",
+      "html": "<article class=\"ds-work-card\"><strong>Wash the dishes</strong><p>Please complete this by tonight at 7pm.</p><small>In progress · Aug 19</small></article>",
+      "css": ".ds-work-card { width: 320px; border: 1px solid var(--color-charcoal-border, #262626); border-radius: 12px; background: var(--color-charcoal-card, #191919); color: var(--color-cream, #e0e0e0); padding: 16px; font-family: system-ui, sans-serif; } .ds-work-card strong { display: block; color: var(--color-cream-bright, #f1f1f1); font-size: 14px; font-weight: 600; } .ds-work-card p { margin: 8px 0 14px; color: var(--color-cream-muted, #8c8c8c); font-size: 13px; line-height: 1.45; } .ds-work-card small { color: var(--color-cream-muted, #8c8c8c); font-size: 11px; } .ds-work-card:hover { border-color: var(--color-charcoal-active, #3e3e3e); } .ds-work-card:focus-within { outline: 2px solid var(--color-charcoal-active, #3e3e3e); outline-offset: 1px; }"
+    },
+    {
+      "name": "Dense List Row",
+      "kind": "custom",
+      "description": "A continuous-surface row with stable columns, hairline separation, and weight-based state.",
+      "html": "<button class=\"ds-list-row\"><span class=\"ds-unread\"></span><strong>Atlassian</strong><span class=\"ds-subject\">Organize, sort, and filter data with views</span><time>Aug 25</time></button>",
+      "css": ".ds-list-row { display: grid; width: 700px; min-height: 48px; grid-template-columns: 8px 150px minmax(0,1fr) 64px; align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--color-charcoal-border, #262626); background: var(--color-charcoal-workspace, #0f0f0f); color: var(--color-cream-muted, #8c8c8c); padding: 0 14px; font: 400 13px/1.3 system-ui, sans-serif; text-align: left; } .ds-list-row strong { color: var(--color-cream-bright, #f1f1f1); font-weight: 600; } .ds-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-list-row time { justify-self: end; } .ds-unread { width: 6px; height: 6px; border-radius: 999px; background: var(--color-notification-red, #c94747); } .ds-list-row:hover, .ds-list-row:focus-visible { background: var(--color-charcoal-card, #191919); color: var(--color-cream, #e0e0e0); outline: none; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "description": "A short semantic label that uses one controlled accent and remains secondary to the task title.",
+      "html": "<span class=\"ds-status-chip\">In progress</span>",
+      "css": ".ds-status-chip { display: inline-flex; height: 22px; align-items: center; border: 1px solid color-mix(in srgb, var(--color-sage-fg, #a3bfab) 28%, transparent); border-radius: 999px; background: var(--color-sage-bg, #28312b); color: var(--color-sage-fg, #a3bfab); padding: 0 8px; font: 500 12px/1 system-ui, sans-serif; } .ds-status-chip:hover { border-color: color-mix(in srgb, var(--color-sage-fg, #a3bfab) 50%, transparent); } .ds-status-chip:focus-visible { outline: 2px solid var(--color-sage-fg, #a3bfab); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Operating Desk",
+    "overview": "Misty should feel like a serious desktop environment that disappears behind the work. The supplied Inbox, Planner, and Files references establish an almost-monochrome charcoal field whose structure comes from alignment, narrow tonal steps, and fine dividers rather than decorative containers. The interface is compact and calm: a person can scan a great deal of information without feeling that every object is competing for attention. The workspace may contain many different tools, but all of them should feel built into the same operating environment. Shell chrome, sidebars, toolbars, tables, boards, empty states, and overlays share one density and one interaction language. Color appears only when it carries meaning—identity, status, unread activity, collaboration, or a file type—not as ambient decoration.",
+    "keyCharacteristics": [
+      "Dark, tonal, and low-glare rather than pure black and high-contrast.",
+      "Dense desktop-tool rhythm with generous empty canvas where the task benefits from it.",
+      "Hairline structure, compact controls, restrained rounding, and almost no ornament.",
+      "Clear hierarchy through weight, alignment, and brightness before size.",
+      "Sparse, semantic color reserved for information and state."
+    ],
+    "rules": [
+      {
+        "name": "The Tonal Ladder Rule",
+        "body": "Establish hierarchy by moving one step through the charcoal scale; do not introduce a new gray for each component.",
+        "section": "colors"
+      },
+      {
+        "name": "The Earned Color Rule",
+        "body": "An accent must communicate identity, state, or action. Decorative gradients, ambient color washes, and arbitrary colored cards do not belong in the product UI.",
+        "section": "colors"
+      },
+      {
+        "name": "The Brightness-Before-Size Rule",
+        "body": "Create most hierarchy with weight and cream-to-ash contrast; reserve size jumps for true page or object titles.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence-Case Rule",
+        "body": "Controls and navigation use familiar sentence case. Avoid ornamental all-caps except tiny technical labels where the incumbent surface already uses them.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-at-Rest Rule",
+        "body": "If an element does not overlap another surface, it usually needs a divider or tonal step, not a shadow.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Disabled-Is-a-State Rule",
+        "body": "A disabled control must differ from both its enabled and ordinary off states through surface, border, and marker treatment; opacity alone is never sufficient.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do preserve the compact, dark desktop-tool character shown in the supplied Inbox, Planner, and Files references.",
+      "Do reuse the established charcoal ladder and shared UI primitives before creating a new value or component.",
+      "Do establish hierarchy through alignment, weight, brightness, and one-pixel structure.",
+      "Do keep controls compact, scannable, keyboard operable, and understandable without hover.",
+      "Do make disabled controls visibly inert while keeping their labels readable and their original shape intact.",
+      "Do use accent color only for identity, semantic status, file type, collaboration, or direct targeting.",
+      "Do let large working canvases remain open when empty space serves the task."
+    ],
+    "donts": [
+      "Don't introduce gradients, glassmorphism, colorful ambient glows, or marketing-page aesthetics into product surfaces.",
+      "Don't wrap every section in a rounded card or nest cards inside cards.",
+      "Don't use oversized headings, oversized empty-state illustrations, or generous landing-page spacing in dense tools.",
+      "Don't turn every control into a pill or apply large radii to small elements.",
+      "Don't use pure black and white when the established charcoal and cream tokens provide the intended lower-glare contrast.",
+      "Don't add color merely to make a monochrome page feel more exciting.",
+      "Don't rewrite factual product copy or invent integrations, proof, testimonials, or capabilities while polishing the UI."
+    ]
+  }
+}

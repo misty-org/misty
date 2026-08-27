@@ -1,6 +1,6 @@
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   Button,
+  cn,
   Input,
   Select,
   SelectContent,
@@ -11,14 +11,27 @@ import {
   Switch,
   Textarea,
 } from "@/shared/ui";
-import { open } from "@tauri-apps/plugin-dialog";
 import { Copy } from "lucide-react";
-import { type ChangeEvent, type ReactNode } from "react";
+import { lazy, Suspense, useContext, useState, type ChangeEvent, type ReactNode } from "react";
 
-import { settingsControlButtonCompactClass } from "./settingsConstants";
+const LazyMistyFilePicker = lazy(() =>
+  import("@/features/picker").then((m) => ({ default: m.MistyFilePicker })),
+);
+
+import {
+  settingsControlButtonCompactClass,
+  settingsDisabledControlClass,
+} from "./settingsConstants";
+import { SettingsControlLabelContext } from "./components/DesktopSettingsUI";
+
+function useSettingsControlLabel(fallback: string) {
+  return useContext(SettingsControlLabelContext) ?? fallback;
+}
 export function SettingsNote(props: { children: ReactNode }) {
   return (
-    <p className="m-0 max-w-2xl px-5 py-4 text-sm leading-5 text-cream-muted">{props.children}</p>
+    <p className="m-0 max-w-2xl px-5 py-4 text-[13px] leading-[18px] text-cream-muted">
+      {props.children}
+    </p>
   );
 }
 
@@ -27,22 +40,16 @@ export function WorkspaceRootControl(props: {
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
-  const pickerAvailable = hasTauriInternals();
-  const chooseFolder = async () => {
-    if (!pickerAvailable) return;
-    const selection = await open({
-      title: "Choose Workspace Root",
-      multiple: false,
-      directory: true,
-    });
-    const path = Array.isArray(selection) ? selection[0] : selection;
-    if (path) props.onChange(path);
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
       <span
-        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-cream" : "text-cream-muted"}`}
+        className={cn(
+          "max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
+          "max-[760px]:text-left",
+          props.disabled || !props.value ? "text-cream-muted" : "text-cream",
+        )}
         title={props.value || "Default"}
       >
         {props.value || "Default"}
@@ -53,11 +60,9 @@ export function WorkspaceRootControl(props: {
           size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
-          disabled={props.disabled || !pickerAvailable}
-          title={
-            pickerAvailable ? "Choose workspace root" : "Folder picker unavailable on this platform"
-          }
-          onClick={() => void chooseFolder()}
+          disabled={props.disabled}
+          title="Choose workspace root"
+          onClick={() => setPickerOpen(true)}
         >
           Choose
         </Button>
@@ -72,6 +77,20 @@ export function WorkspaceRootControl(props: {
           Reset
         </Button>
       </div>
+
+      {pickerOpen ? (
+        <Suspense fallback={null}>
+          <LazyMistyFilePicker
+            mode="folder"
+            title="Choose Workspace Root"
+            onCancel={() => setPickerOpen(false)}
+            onSelect={(path) => {
+              setPickerOpen(false);
+              props.onChange(path);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
@@ -82,13 +101,17 @@ export function SelectControl(props: {
   disabled: boolean;
   onChange: (value: number) => void;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   return (
     <Select
       value={String(Math.min(props.value, props.options.length - 1))}
       disabled={props.disabled}
       onValueChange={(value) => props.onChange(Number(value))}
     >
-      <SelectTrigger className="w-[220px] max-w-full">
+      <SelectTrigger
+        aria-label={ariaLabel}
+        className={cn("w-[220px] max-w-full", settingsDisabledControlClass)}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -107,8 +130,19 @@ export function SwitchControl(props: {
   disabled: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   return (
-    <Switch checked={props.checked} disabled={props.disabled} onCheckedChange={props.onChange} />
+    <Switch
+      aria-label={ariaLabel}
+      className={cn(
+        "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100",
+        "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border",
+        "disabled:[&_[data-slot=switch-thumb]]:ring-charcoal-border",
+      )}
+      checked={props.checked}
+      disabled={props.disabled}
+      onCheckedChange={props.onChange}
+    />
   );
 }
 
@@ -119,6 +153,7 @@ export function TextControl(props: {
   onCommit: (value: string) => void;
   wide?: boolean;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.currentTarget.value !== props.value) {
       props.onCommit(event.currentTarget.value);
@@ -127,8 +162,12 @@ export function TextControl(props: {
 
   return (
     <Input
+      aria-label={ariaLabel}
       key={props.value}
-      className={props.wide ? "w-full max-w-[520px]" : "w-[220px] max-w-full"}
+      className={cn(
+        props.wide ? "w-full max-w-[520px]" : "w-[220px] max-w-full",
+        settingsDisabledControlClass,
+      )}
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -150,13 +189,27 @@ export function SliderControl(props: {
   step: number;
   disabled: boolean;
   format?: (value: number) => string;
+  onChange?: (value: number) => void;
   onCommit: (value: number) => void;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   const format = props.format ?? ((value: number) => String(value));
   return (
     <div className="flex w-[220px] max-w-full items-center gap-3">
       <Slider
-        className="flex-1"
+        aria-label={ariaLabel}
+        aria-valuetext={format(props.value)}
+        className={cn(
+          "flex-1",
+          props.disabled &&
+            cn(
+              "[&_[data-slot=slider-range]]:bg-charcoal-border",
+              "[&_[data-slot=slider-thumb]]:border-charcoal-border",
+              "[&_[data-slot=slider-thumb]]:bg-charcoal-border",
+              "[&_[data-slot=slider-thumb]]:opacity-100",
+              "[&_[data-slot=slider-track]]:bg-charcoal-bg",
+            ),
+        )}
         value={[props.value]}
         min={props.min}
         max={props.max}
@@ -164,10 +217,19 @@ export function SliderControl(props: {
         disabled={props.disabled}
         onValueChange={(next) => {
           const value = next[0];
-          if (typeof value === "number") props.onCommit(value);
+          if (typeof value === "number") (props.onChange ?? props.onCommit)(value);
+        }}
+        onValueCommit={(next) => {
+          const value = next[0];
+          if (props.onChange && typeof value === "number") props.onCommit(value);
         }}
       />
-      <span className="w-12 shrink-0 text-right text-sm tabular-nums text-cream-muted">
+      <span
+        className={cn(
+          "w-12 shrink-0 text-right text-sm font-medium tabular-nums",
+          props.disabled ? "text-cream-muted" : "text-cream",
+        )}
+      >
         {format(props.value)}
       </span>
     </div>
@@ -183,6 +245,7 @@ export function NumberControl(props: {
   disabled: boolean;
   onCommit: (value: number) => void;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   const commit = (raw: string) => {
     const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return;
@@ -193,9 +256,10 @@ export function NumberControl(props: {
   return (
     <div className="flex items-center gap-2">
       <Input
+        aria-label={ariaLabel}
         key={props.value}
         type="number"
-        className="w-[110px]"
+        className={cn("w-[110px]", settingsDisabledControlClass)}
         defaultValue={props.value}
         min={props.min}
         max={props.max}
@@ -219,10 +283,12 @@ export function TextAreaControl(props: {
   disabled: boolean;
   onCommit: (value: string) => void;
 }) {
+  const ariaLabel = useSettingsControlLabel("Setting");
   return (
     <Textarea
+      aria-label={ariaLabel}
       key={props.value}
-      className="w-full max-w-[520px] font-mono text-xs"
+      className={cn("w-full max-w-[520px] font-mono text-xs", settingsDisabledControlClass)}
       defaultValue={props.value}
       placeholder={props.placeholder}
       rows={props.rows ?? 4}
@@ -243,18 +309,17 @@ export function FilePathControl(props: {
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
-  const pickerAvailable = hasTauriInternals();
-  const chooseFile = async () => {
-    if (!pickerAvailable) return;
-    const selection = await open({ title: props.title, multiple: false, filters: props.filters });
-    const path = Array.isArray(selection) ? selection[0] : selection;
-    if (path) props.onChange(path);
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const allowedExtensions = props.filters?.flatMap((f) => f.extensions);
 
   return (
     <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
       <span
-        className={`max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.value ? "text-cream" : "text-cream-muted"}`}
+        className={cn(
+          "max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
+          "max-[760px]:text-left",
+          props.disabled || !props.value ? "text-cream-muted" : "text-cream",
+        )}
         title={props.value || props.emptyLabel || "None"}
       >
         {props.value || props.emptyLabel || "None"}
@@ -265,9 +330,9 @@ export function FilePathControl(props: {
           size="sm"
           type="button"
           className={settingsControlButtonCompactClass}
-          disabled={props.disabled || !pickerAvailable}
-          title={pickerAvailable ? props.title : "File picker unavailable on this platform"}
-          onClick={() => void chooseFile()}
+          disabled={props.disabled}
+          title={props.title}
+          onClick={() => setPickerOpen(true)}
         >
           Choose
         </Button>
@@ -282,6 +347,21 @@ export function FilePathControl(props: {
           Clear
         </Button>
       </div>
+
+      {pickerOpen ? (
+        <Suspense fallback={null}>
+          <LazyMistyFilePicker
+            mode="file"
+            title={props.title}
+            allowedExtensions={allowedExtensions}
+            onCancel={() => setPickerOpen(false)}
+            onSelect={(path) => {
+              setPickerOpen(false);
+              props.onChange(path);
+            }}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
@@ -297,6 +377,7 @@ export function ValueText(props: { value: string; muted?: boolean }) {
 }
 
 export function CopyableValueText(props: { value: string; disabled?: boolean }) {
+  const settingLabel = useSettingsControlLabel("value");
   const copyValue = () => {
     if (props.disabled) return;
     void navigator.clipboard?.writeText(props.value).catch(() => undefined);
@@ -314,8 +395,9 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
         variant="outline"
         size="icon"
         type="button"
+        className={settingsDisabledControlClass}
         disabled={props.disabled}
-        aria-label="Copy value"
+        aria-label={`Copy ${settingLabel.toLowerCase()}`}
         title="Copy"
         onClick={copyValue}
       >

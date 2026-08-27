@@ -56,7 +56,7 @@ pub fn delete(service: &str, account: &str) -> Result<(), CredentialStoreError> 
     #[cfg(not(all(target_os = "macos", debug_assertions)))]
     {
         let entry = keyring::Entry::new(service, account)?;
-        match entry.delete_password() {
+        match entry.delete_credential() {
             Ok(()) => Ok(()),
             Err(keyring::Error::NoEntry) => Ok(()),
             Err(error) => Err(error.into()),
