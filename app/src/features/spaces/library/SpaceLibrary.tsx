@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
+import { useWorkspaceTabTitle } from "@/features/workspace";
+import { ComingSoonSurface } from "@/shared/ui";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryCollectionOverview } from "./components/SpaceLibraryCollections";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
@@ -25,13 +27,20 @@ import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
  * concerns it, so adding a collection means adding one component here rather
  * than another branch in a shared conditional.
  */
-export function SpaceLibrary({ spaceId }: { spaceId: string }) {
+export function SpaceLibrary({
+  spaceId,
+  workspaceTabId,
+}: {
+  spaceId: string;
+  workspaceTabId?: string;
+}) {
   const data = useSpaceLibraryData(spaceId);
   const [searchParams, setSearchParams] = useSearchParams();
   const uploadQueryConsumedRef = useRef(false);
   const itemActions = useSpaceLibraryItemActions(data);
   const collectionActions = useSpaceLibraryCollectionActions(data, itemActions);
   const { canUploadLibrary, setFilePickerOpen } = data;
+  useWorkspaceTabTitle(workspaceTabId, libraryWorkspaceTitle(data));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const selectedItems = data.selectedItems ?? [];
     return {
@@ -92,6 +101,10 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
     if (canUploadLibrary) setFilePickerOpen(true);
   }, [canUploadLibrary, searchParams, setFilePickerOpen, setSearchParams]);
 
+  if (data.collection === "memory") {
+    return <ComingSoonSurface feature="Library memories" />;
+  }
+
   return (
     <SpaceLibraryProvider value={{ data, itemActions, collectionActions }}>
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
@@ -112,5 +125,44 @@ export function SpaceLibrary({ spaceId }: { spaceId: string }) {
         </div>
       </LibraryCanEditContext.Provider>
     </SpaceLibraryProvider>
+  );
+}
+
+const collectionTitles: Partial<Record<string, string>> = {
+  recent: "Library",
+  months: "Months",
+  years: "Years",
+  "recent-days": "Recent days",
+  utility: "Utilities",
+  collections: "Collections",
+  favorites: "Favorites",
+  hidden: "Hidden",
+  deleted: "Recently deleted",
+  people: "People",
+  albums: "Albums",
+  groups: "Groups",
+  memory: "Memories",
+  trip: "Trips",
+  map: "Map",
+  duplicate: "Duplicates",
+  shared: "Shared references",
+  imports: "Imports",
+};
+
+function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): string {
+  const viewedItem = data.displayItems.find((item) => item.id === data.selectedItemId);
+  if (viewedItem?.display_name.trim()) return viewedItem.display_name.trim();
+  if (data.selectedItems.length === 1 && data.selectedItems[0].display_name.trim()) {
+    return data.selectedItems[0].display_name.trim();
+  }
+  return (
+    data.currentAlbum?.name?.trim() ||
+    data.currentAlbumFolder?.name?.trim() ||
+    data.currentGroup?.name?.trim() ||
+    data.currentPerson?.name?.trim() ||
+    data.currentDiscoveryGroup?.title?.trim() ||
+    data.currentDateGroup?.title?.trim() ||
+    collectionTitles[data.collection] ||
+    "Library"
   );
 }
