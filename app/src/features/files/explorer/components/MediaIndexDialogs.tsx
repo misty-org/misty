@@ -7,7 +7,7 @@ import {
   AlertDialogTitle,
   Button,
 } from "@/shared/ui";
-import { AlertTriangle, Sparkles } from "lucide-react";
+import { AlertTriangle, BrainCircuit } from "lucide-react";
 
 export function MediaIndexApprovalDialog(props: {
   estimate: {
@@ -35,7 +35,7 @@ export function MediaIndexApprovalDialog(props: {
               className="grid size-9 shrink-0 place-items-center rounded-lg bg-sage-bg text-sage-fg"
               aria-hidden="true"
             >
-              <Sparkles size={18} />
+              <BrainCircuit size={18} />
             </span>
             <div className="grid gap-1.5">
               <AlertDialogTitle>

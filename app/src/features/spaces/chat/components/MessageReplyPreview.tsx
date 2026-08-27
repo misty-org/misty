@@ -2,7 +2,12 @@ import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Button, cn } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
-import { hasAnyAttachment, initials, messageReplyPreviewText } from "./messageHelpers";
+import {
+  hasAnyAttachment,
+  initials,
+  isAgentAuthoredMessage,
+  messageReplyPreviewText,
+} from "./messageHelpers";
 
 /**
  * The quoted line above a reply, with the elbow connector to its parent.
@@ -19,6 +24,7 @@ export function MessageReplyPreview({
   message?: SpaceMessage;
   onOpen: () => void;
 }) {
+  const agentAuthored = Boolean(message && isAgentAuthoredMessage(message));
   return (
     <div className="col-span-2 col-start-1 row-start-1 grid h-7 grid-cols-[44px_minmax(0,1fr)] gap-x-5">
       <div aria-hidden="true" className="relative">
@@ -40,12 +46,12 @@ export function MessageReplyPreview({
               <AvatarFallback
                 className={cn(
                   "text-[7px] font-semibold",
-                  message.sender_kind === "agent"
+                  agentAuthored
                     ? cn(robotAvatarClass, avatarInkClass)
                     : cn(avatarColorClass(message.sender_name), avatarInkClass),
                 )}
               >
-                {message.sender_kind === "agent" ? "AI" : initials(message.sender_name)}
+                {agentAuthored ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>
             <strong className="shrink-0 font-semibold text-cream-bright">

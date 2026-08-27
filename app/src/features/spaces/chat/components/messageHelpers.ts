@@ -5,6 +5,11 @@ export { personInitials as initials };
 
 export const quickReactionEmojis = ["👍", "❤️", "😂", "🎉", "👀", "🙏"];
 
+/** Managed Misty messages are stored as system events but are visibly Agent-authored. */
+export function isAgentAuthoredMessage(message: SpaceMessage): boolean {
+  return message.sender_kind === "agent" || message.origin?.kind === "misty_assistant";
+}
+
 /** Flattens a message to one line, rendering mentions as plain @labels. */
 export function messageReplyPreviewText(message: SpaceMessage): string {
   return message.content
@@ -14,17 +19,8 @@ export function messageReplyPreviewText(message: SpaceMessage): string {
     .trim();
 }
 
-/**
- * Only a person's own Misty message may be mirrored outward. Agent output,
- * system notices, and messages that arrived *from* Discord are never republished
- * — that is what keeps the mirror from looping.
- */
-export function canPublish(message: SpaceMessage, currentUserId?: string) {
-  return (
-    message.sender_kind === "person" &&
-    message.sender_user_id === currentUserId &&
-    (message.origin?.system ?? "misty") === "misty"
-  );
+export function spansToText(content: SpaceMessage["content"]): string {
+  return content.map((span) => (span.type === "text" ? span.text : `@${span.label}`)).join("");
 }
 
 /**

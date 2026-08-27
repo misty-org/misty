@@ -79,9 +79,7 @@ export function InspectorDetail(props: { label: string; value: string; compact?:
     );
   return (
     <div>
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-cream-muted">
-        {props.label}
-      </dt>
+      <dt className="text-[11px] font-medium text-cream-muted">{props.label}</dt>
       <dd className="m-0 mt-1 break-words text-sm leading-5 text-cream/80">{props.value}</dd>
     </div>
   );
