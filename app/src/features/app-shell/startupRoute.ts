@@ -11,16 +11,9 @@ import { routes } from "./routes";
  */
 const startupPreferenceKey = "misty:startup-preference:v1";
 
-export const startupViewOptions = ["Home", "Files", "Agents", "Code", "Transfers", "Spaces"];
+export const startupViewOptions = ["Spaces", "Files", "Agents", "Code"];
 
-const startupViewRoutes = [
-  routes.home,
-  routes.files,
-  routes.agents,
-  routes.code,
-  routes.transfers,
-  routes.spaces,
-];
+const startupViewRoutes = [routes.spaces, routes.files, routes.agents, routes.code];
 
 export interface StartupPreference {
   reopenLastSession: boolean;

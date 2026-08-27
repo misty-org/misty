@@ -38,7 +38,118 @@ describe("GlobalMisty", () => {
     container.remove();
   });
 
-  it("shows contextual actions, cycles mode with Tab, and expands when typing", async () => {
+  it("keeps one stable input while search results expand beneath it", async () => {
+    const requestDrag = vi.fn();
+    const contentVisibilityChanged = vi.fn();
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/home"]}>
+          <GlobalMisty
+            accountId="account-1"
+            currentPath="/home"
+            activePaneId=""
+            activePanePath=""
+            onRequestDrag={requestDrag}
+            onContentVisibilityChange={contentVisibilityChanged}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    await act(async () => useGlobalSearchStore.getState().activateLauncher());
+
+    const input = container.querySelector<HTMLTextAreaElement>(
+      "[data-global-misty-launcher-input]",
+    );
+    expect(input).not.toBeNull();
+    expect(document.activeElement).toBe(input);
+    expect(container.querySelector('[aria-label="Misty Search"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Search or Ask"]')).not.toBeNull();
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('[data-misty-mode="search"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(container.querySelector('[aria-label="Misty candidates"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Search filters"]')).toBeNull();
+    expect(contentVisibilityChanged).toHaveBeenLastCalledWith(false);
+
+    const dragHandle = container.querySelector<HTMLElement>("[data-misty-panel-drag-handle]");
+    await act(async () => {
+      dragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    expect(requestDrag).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      input?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    expect(requestDrag).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(input, "a ");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+    });
+
+    expect(container.querySelector("[data-global-misty-launcher-input]")).toBe(input);
+    expect(input?.value).toBe("a ");
+    expect(document.activeElement).toBe(input);
+    expect(container.textContent).not.toContain("Ask Misty “a”");
+    expect(container.querySelector('[aria-label="Misty candidates"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Search filters"]')).not.toBeNull();
+    expect(contentVisibilityChanged).toHaveBeenLastCalledWith(true);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-misty-mode="ask"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const askInput = container.querySelector<HTMLTextAreaElement>(
+      "[data-global-misty-launcher-input]",
+    );
+    expect(askInput?.value).toBe("a ");
+    expect(askInput?.placeholder).toBe("Ask a follow-up…");
+    expect(useGlobalSearchStore.getState().mode).toBe("ask");
+    expect(useGlobalSearchStore.getState().panel).toBe("answer");
+    expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
+    expect(container.querySelector("[data-misty-voice-island]")).not.toBeNull();
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('[data-misty-mode="ask"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    const islandDragHandle = container.querySelector<HTMLButtonElement>(
+      '[data-misty-voice-island] [aria-label="Move Misty window"]',
+    );
+    expect(islandDragHandle).not.toBeNull();
+    await act(async () => {
+      islandDragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    expect(requestDrag).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      container.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    // Floating panel stays open on outside click
+    expect(useGlobalSearchStore.getState().panel).toBe("answer");
+
+    container.tabIndex = 0;
+    container.focus();
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(useGlobalSearchStore.getState().panel).toBe("closed");
+  });
+
+  it("keeps Ask history scrollable while a follow-up is composed", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/home"]}>
@@ -52,69 +163,66 @@ describe("GlobalMisty", () => {
       );
     });
 
-    expect(
-      container.querySelector('[aria-label="Open Misty — Search, Ask, or Action"]'),
-    ).toBeNull();
-    await act(async () => useGlobalSearchStore.getState().activateLauncher());
+    await act(async () => {
+      useGlobalSearchStore.setState({
+        panel: "answer",
+        mode: "ask",
+        activeConversationId: "conversation-1",
+        conversations: [
+          {
+            id: "conversation-1",
+            title: "Arcadia weather",
+            createdAt: "2026-08-25T18:00:00.000Z",
+            updatedAt: "2026-08-25T18:01:00.000Z",
+            remote: false,
+            messages: [
+              {
+                id: "user-1",
+                role: "user",
+                mode: "ask",
+                content: "How hot will it be in Arcadia today?",
+                createdAt: "2026-08-25T18:00:00.000Z",
+              },
+              {
+                id: "assistant-1",
+                role: "assistant",
+                mode: "ask",
+                content: "Arcadia will be warm this afternoon.",
+                createdAt: "2026-08-25T18:01:00.000Z",
+              },
+            ],
+          },
+        ],
+      });
+    });
 
-    const launcher = container.querySelector<HTMLElement>(
-      '[aria-label="Open Misty — Search, Ask, or Action"]',
-    );
-    expect(launcher).not.toBeNull();
-    expect(launcher?.textContent).toContain("Summarize updates");
-    expect(launcher?.textContent).toContain("Create task");
-    await act(async () => launcher?.click());
+    expect(container.querySelector('[data-misty-conversation="true"]')).not.toBeNull();
+    expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
+    expect(container.querySelector('[data-misty-composer="follow-up"]')).not.toBeNull();
+    expect(container.textContent).toContain("Arcadia will be warm this afternoon.");
 
-    const compactInput = container.querySelector<HTMLInputElement>(
+    const input = container.querySelector<HTMLTextAreaElement>(
       "[data-global-misty-launcher-input]",
     );
-    expect(document.activeElement).toBe(compactInput);
-    expect(container.querySelector('[aria-label="Misty Search, Ask, and Action"]')).toBeNull();
-
     await act(async () => {
-      compactInput?.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-    });
-    expect(useGlobalSearchStore.getState().mode).toBe("ask");
-
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      valueSetter?.call(compactInput, "l");
-      compactInput?.dispatchEvent(new Event("input", { bubbles: true }));
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      valueSetter?.call(input, "What about tonight?");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Search");
-    expect(container.textContent).toContain("Ask");
-    expect(container.textContent).toContain("Action");
-
-    const expandedInput = container.querySelector<HTMLInputElement>(
-      '[aria-label="Ask with Misty"]',
-    );
-    expect(document.activeElement).toBe(expandedInput);
-    await act(async () => {
-      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      valueSetter?.call(expandedInput, "");
-      expandedInput?.dispatchEvent(new Event("input", { bubbles: true }));
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
-    });
-
-    expect(useGlobalSearchStore.getState().open).toBe(false);
-    expect(useGlobalSearchStore.getState().launcherOpen).toBe(true);
-    expect(
-      container.querySelector('[aria-label="Open Misty — Search, Ask, or Action"]'),
-    ).not.toBeNull();
-    expect(useGlobalSearchStore.getState().query).toBe("");
+    expect(input?.placeholder).toBe("Ask a follow-up…");
+    expect(useGlobalSearchStore.getState().panel).toBe("answer");
+    expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
 
     await act(async () => {
-      container.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      container
+        .querySelector<HTMLButtonElement>('[data-misty-mode="search"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(useGlobalSearchStore.getState().launcherOpen).toBe(false);
 
-    await act(async () => useGlobalSearchStore.getState().activateLauncher());
-    container.tabIndex = 0;
-    container.focus();
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    });
-    expect(useGlobalSearchStore.getState().launcherOpen).toBe(false);
+    expect(useGlobalSearchStore.getState().panel).toBe("results");
   });
 });

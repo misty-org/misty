@@ -18,6 +18,7 @@ interface BrowserGeometryInput {
   tab: WorkspaceTab;
   url: string;
   theme: BrowserTheme;
+  offline?: boolean;
 }
 
 export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
@@ -44,6 +45,13 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       frame = 0;
       if (disposed) return;
       const current = latest.current;
+      if (current.offline) {
+        if (!hiddenForInvalidBounds) {
+          hiddenForInvalidBounds = true;
+          void hideBrowserWebview(current.tab);
+        }
+        return;
+      }
       const bounds = current.hostRef.current ? visibleBrowserBounds(current.hostRef.current) : null;
       if (!bounds) {
         if (!hiddenForInvalidBounds) {
@@ -136,9 +144,19 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       window.visualViewport?.removeEventListener("resize", observeWindowResize);
       window.visualViewport?.removeEventListener("scroll", schedule);
       document.removeEventListener("visibilitychange", schedule);
+      // The native page is a sibling of the React renderer, so unmounting the
+      // Browser workspace does not remove it. Explicitly release this tab's
+      // layer before the next active tab is presented.
       void hideBrowserWebview(effectTab);
     };
-  }, [input.hostRef, input.nativeLiveResize, input.nativeRuntime, tabId, tabInstanceKey]);
+  }, [
+    input.hostRef,
+    input.nativeLiveResize,
+    input.nativeRuntime,
+    input.offline,
+    tabId,
+    tabInstanceKey,
+  ]);
 }
 
 function currentWindowSize(): string {

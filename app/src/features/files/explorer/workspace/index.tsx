@@ -8,7 +8,6 @@ import {
 } from "@/features/settings";
 import { useMultiPanelStore } from "@/features/workspace";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -22,7 +21,8 @@ import { ChromeTabShell } from "./ChromeTabShell";
 import { ExplorerLoadingShell } from "../components/ExplorerLoadingShell";
 import { ExplorerPane } from "../components/ExplorerPane";
 import { ExplorerSidebar } from "../components/ExplorerSidebar";
-import { LibraryWorkspace, libraryWorkspacePath } from "../components/LibraryWorkspace";
+import { libraryWorkspacePath } from "../components/LibraryWorkspace";
+import { ComingSoonSurface } from "@/shared/ui";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
 import { useExplorerStore } from "../store";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
@@ -328,7 +328,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     navigate,
   });
 
-  const extensionsEnabled = !isAndroidBuild;
+  // Extension execution is outside the first public-beta surface. Keeping the
+  // registry hook disabled also retires plugin tabs restored from older builds.
+  const extensionsEnabled = false;
   useLegacyPluginTabMigration({ extensionsEnabled, homePath, navigate, workspacePathSignature });
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
@@ -418,7 +420,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       const paneActions =
         activePaneId === paneId ? (
           <div className="flex items-center gap-1">
-            <AiSurfaceButton />
             <ExplorerPaneHeaderActions paneId={paneId} />
           </div>
         ) : undefined;
@@ -430,7 +431,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         );
       }
       if (path === libraryWorkspacePath) {
-        return <LibraryWorkspace paneId={paneId} workingDirectory={homePath} />;
+        return <ComingSoonSurface feature="Smart Library" />;
       }
       const pluginTab = extensionsEnabled ? parsePluginTabPath(path) : null;
       if (pluginTab) {
@@ -523,9 +524,6 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     () =>
       props.workspaceId ? null : (
         <ExplorerTray
-          commands={pluginCommands}
-          panels={pluginPanels}
-          selectedPath={activePath}
           onToggleFileManagerMode={() =>
             navigate(useAppRouteMemoryStore.getState().lastSpacesRoute)
           }
@@ -537,15 +535,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           terminalPath={activePath}
         />
       ),
-    [
-      activePath,
-      activeTabPath,
-      activeTabSupportsSidePanels,
-      navigate,
-      pluginCommands,
-      pluginPanels,
-      props.workspaceId,
-    ],
+    [activePath, activeTabPath, activeTabSupportsSidePanels, navigate, props.workspaceId],
   );
   const renderAddTabControl = useMemo(() => createExplorerAddTabControl(homePath), [homePath]);
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;

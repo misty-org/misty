@@ -6,7 +6,7 @@ import {
   normalizeBrowserHomeUrl,
 } from "./browserHome";
 import { blankBrowserUrl } from "./browserUrl";
-import { createBrowserTabState } from "./model";
+import { createBrowserTabState, parseBrowserTabState } from "./model";
 
 afterEach(() => configureBrowserHomeUrl(""));
 
@@ -44,5 +44,10 @@ describe("browser homepage", () => {
     configureBrowserHomeUrl("example.com/start");
     expect(browserHomeUrl()).toBe("https://example.com/start");
     expect(createBrowserTabState().url).toBe("https://example.com/start");
+  });
+
+  it("preserves the agent-owned tab marker", () => {
+    const state = parseBrowserTabState({ ...createBrowserTabState(), agentOwned: true });
+    expect(state.agentOwned).toBe(true);
   });
 });

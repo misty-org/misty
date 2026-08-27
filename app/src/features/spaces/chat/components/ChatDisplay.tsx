@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import { isAgentAuthoredMessage } from "./messageHelpers";
 
 export interface ChatDisplayRow {
   message: SpaceMessage;
@@ -70,14 +71,9 @@ function sameLocalDate(left: string, right: string): boolean {
 }
 
 function messageIdentity(message: SpaceMessage): string {
-  if (message.origin?.system && message.origin.system !== "misty") {
-    return [
-      message.origin.system,
-      message.origin.author_handle || message.origin.author_name || message.sender_name,
-    ].join(":");
-  }
+  if (message.origin?.kind === "misty_assistant") return "misty:managed";
   return [
-    message.sender_kind,
+    isAgentAuthoredMessage(message) ? "agent" : message.sender_kind,
     message.sender_agent_id || message.sender_user_id || message.sender_name,
   ].join(":");
 }
@@ -106,8 +102,7 @@ export function useMemberAvatarUrls(
       if (
         message.sender_kind !== "person" ||
         !message.sender_user_id ||
-        (message.sender_avatar_version ?? 0) <= 0 ||
-        message.origin?.author_avatar_url
+        (message.sender_avatar_version ?? 0) <= 0
       ) {
         return;
       }

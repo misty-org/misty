@@ -20,6 +20,7 @@ export function NotificationsSection(props: SettingsContentProps) {
     notificationsDeviceKey,
     true,
   );
+  const desktopNotificationsActive = desktopEnabled && permission === "granted";
 
   useEffect(() => {
     void nativeNotificationPermission().then(setPermission);
@@ -42,15 +43,18 @@ export function NotificationsSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Delivery">
         <SettingsRow
           label="Desktop notifications"
+          muted={permission === "unsupported" || permission === "denied"}
           description={
-            permission === "denied"
-              ? "Blocked by macOS. Allow Misty in System Settings to receive banners."
-              : "Show a native notification when Misty is running in the background."
+            permission === "unsupported"
+              ? "Available in packaged desktop builds."
+              : permission === "denied"
+                ? "Blocked by macOS. Allow Misty in System Settings to receive banners."
+                : "Show a native notification when Misty is running in the background."
           }
         >
           <SwitchControl
-            checked={desktopEnabled && permission === "granted"}
-            disabled={props.working || permission === "unsupported"}
+            checked={desktopNotificationsActive}
+            disabled={props.working || permission === "unsupported" || permission === "denied"}
             onChange={(value) => void setDesktopEnabled(value)}
           />
         </SettingsRow>
@@ -90,6 +94,7 @@ export function NotificationsSection(props: SettingsContentProps) {
         <SettingsRow
           label="Notification sound"
           description="Play a system sound with background desktop notifications."
+          muted={!desktopNotificationsActive}
         >
           <SwitchControl
             checked={booleanSetting(
@@ -98,7 +103,7 @@ export function NotificationsSection(props: SettingsContentProps) {
               "sound_notifications_enabled",
               false,
             )}
-            disabled={props.working || !desktopEnabled}
+            disabled={props.working || !desktopNotificationsActive}
             onChange={(value) =>
               props.onSettingChange("notifications", "sound_notifications_enabled", value)
             }

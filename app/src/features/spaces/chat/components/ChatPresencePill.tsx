@@ -104,7 +104,7 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
         sideOffset={6}
         className="w-48 overflow-hidden rounded-lg border border-charcoal-border/70 bg-charcoal-card p-1 shadow-md"
       >
-        <div className="px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-cream-muted">
+        <div className="px-2 py-1 text-[11px] font-medium text-cream-muted">
           Active now ({activeMembers.length})
         </div>
         <div className="grid gap-0.5">
