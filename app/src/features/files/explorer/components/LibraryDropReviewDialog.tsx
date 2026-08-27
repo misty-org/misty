@@ -8,7 +8,7 @@ import {
   AlertDialogTitle,
   Button,
 } from "@/shared/ui";
-import { AlertTriangle, Files, Sparkles } from "lucide-react";
+import { AlertTriangle, BrainCircuit, Files, Gauge } from "lucide-react";
 
 export function LibraryDropReviewDialog(props: {
   preflight: SmartLibraryImportPreflight;
@@ -32,7 +32,7 @@ export function LibraryDropReviewDialog(props: {
               className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-active text-cream-bright"
               aria-hidden="true"
             >
-              <Sparkles size={18} />
+              <BrainCircuit size={18} />
             </span>
             <div className="grid gap-1.5">
               <AlertDialogTitle>Review files for Library</AlertDialogTitle>
@@ -49,7 +49,7 @@ export function LibraryDropReviewDialog(props: {
             <span className="ml-1 text-cream-muted">eligible</span>
           </div>
           <div className="p-3">
-            <Sparkles className="mb-2 text-cream-muted" size={17} />
+            <Gauge className="mb-2 text-cream-muted" size={17} />
             <strong>{weeklyPercent}%</strong>
             <span className="ml-1 text-cream-muted">weekly AI impact</span>
           </div>

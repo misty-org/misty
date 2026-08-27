@@ -62,10 +62,7 @@ export function SpaceTaskCalendar({
 
       <div className="grid grid-cols-7 border-b border-charcoal-border/60 bg-charcoal-card">
         {weekDays.map((day) => (
-          <span
-            className="p-2 text-center text-[10px] font-medium uppercase tracking-wide text-cream-muted"
-            key={day}
-          >
+          <span className="p-2 text-center text-[10px] font-medium text-cream-muted" key={day}>
             {day}
           </span>
         ))}

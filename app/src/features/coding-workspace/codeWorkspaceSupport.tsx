@@ -1,6 +1,5 @@
-import { Blocks, Bot, FolderOpen, PanelLeft, Pin, Search, SquareTerminal } from "lucide-react";
+import { Bot, FolderOpen, PanelLeft, Pin, Search, SquareTerminal } from "lucide-react";
 import { useCallback, useMemo, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   dockLeaves,
   codeTabActiveFilePath,
@@ -16,19 +15,6 @@ export function useCodeCommands(
   setCommandMode: Dispatch<SetStateAction<CommandCenterMode | null>>,
   toggleTerminal: () => void,
 ) {
-  const navigate = useNavigate();
-  const openExtensions = useCallback(() => {
-    const workspace = useWorkspaceStore.getState();
-    const opened = workspace.openSurface({
-      surfaceId: "extensions",
-      groupKey: "tool:extensions",
-      title: "Extensions",
-      route: "/extensions",
-      instancePolicy: "single",
-    });
-    workspace.focusTab(opened.id);
-    navigate(opened.route);
-  }, [navigate]);
   const openModelsSettings = useCallback(
     () =>
       window.dispatchEvent(
@@ -64,11 +50,10 @@ export function useCodeCommands(
         toggleTerminal,
       ),
       command("ai", "AI and model settings", null, <Bot size={13} />, openModelsSettings),
-      command("extensions", "Open Extensions", null, <Blocks size={13} />, openExtensions),
     ],
-    [codeTab, openExtensions, openModelsSettings, setCommandMode, toggleTerminal],
+    [codeTab, openModelsSettings, setCommandMode, toggleTerminal],
   );
-  return { commands, openExtensions, openModelsSettings };
+  return { commands, openModelsSettings };
 }
 
 function command(

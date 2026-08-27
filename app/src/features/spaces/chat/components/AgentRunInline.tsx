@@ -5,7 +5,7 @@ import type {
   SpaceRunDetail,
 } from "@/api/spaces/dto/interfaces/types";
 import { Button } from "@/shared/ui";
-import { AlertTriangle, LoaderCircle, RotateCcw, Sparkles, Square } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LoaderCircle, RotateCcw, Square } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function AgentRunInline({ run: initial }: { run: SpaceMessageAgentRun }) {
@@ -47,7 +47,7 @@ export function AgentRunInline({ run: initial }: { run: SpaceMessageAgentRun }) 
         ) : run.state === "queued" || run.state === "working" || run.state === "retrying" ? (
           <LoaderCircle className="size-3.5 animate-spin text-cream-bright" />
         ) : (
-          <Sparkles className="size-3.5 text-cream-bright" />
+          <CheckCircle2 className="size-3.5 text-cream-bright" />
         )}
         {statusLabel(run.state)}
       </div>

@@ -25,7 +25,7 @@ export function RoadmapOutline({
         <Button
           type="button"
           variant="ghost"
-          className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold uppercase tracking-wider text-cream-muted"
+          className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold text-cream-muted"
         >
           <ListTree className="size-3.5" />
           Accessible outline

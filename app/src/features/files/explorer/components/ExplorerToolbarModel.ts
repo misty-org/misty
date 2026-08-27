@@ -9,23 +9,7 @@ export type {
 } from "../model/interfaces/components/ExplorerToolbarModel";
 
 const explorerCommands: ExplorerCommandPaletteEntry[] = [
-  {
-    id: "app.toggle_transfers",
-    label: "Open Transfers",
-    hint: "Show transfer history and active work",
-  },
   { id: "app.open_settings", label: "Open Settings", hint: "Switch to application settings" },
-  { id: "app.toggle_plugin_launcher", label: "Open Extensions", hint: "Open Extensions" },
-  {
-    id: "clipboard.publish_shared",
-    label: "Publish Shared Clipboard",
-    hint: "Send the current clipboard to shared devices",
-  },
-  {
-    id: "clipboard.apply_shared",
-    label: "Apply Shared Clipboard",
-    hint: "Copy the latest shared clipboard payload locally",
-  },
   { id: "search.toggle", label: "Search", hint: "Focus Explorer search for the active folder" },
   { id: "explorer.new_tab", label: "New Tab", hint: "Open another tab for the active folder" },
   {

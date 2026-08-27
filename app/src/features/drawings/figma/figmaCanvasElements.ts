@@ -49,7 +49,7 @@ export function buildFigmaReferenceElements(
         x: x + 38,
         y: y + 93,
         width: 84,
-        text: reference.thumbnailUrl ? "FIGMA\nPREVIEW" : "FIGMA\nFILE",
+        text: reference.thumbnailUrl ? "Figma\npreview" : "Figma\nfile",
         fontSize: 18,
         textAlign: "center",
         strokeColor: "#5b21b6",

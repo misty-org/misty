@@ -1,4 +1,4 @@
-import { ListTree, MoreHorizontal, Sparkles, Wand2 } from "lucide-react";
+import { Bot, ListTree, MoreHorizontal, Wand2 } from "lucide-react";
 import type { CodeCommand, CodeTopAction } from "./CodeCommandCenter";
 
 interface CodeTopActionsOptions {
@@ -45,7 +45,7 @@ export function codeTopActions(options: CodeTopActionsOptions): CodeTopAction[] 
     {
       id: "inline-ai",
       label: options.labels.inlineAi,
-      icon: <Sparkles className="code-status-icon" />,
+      icon: <Bot className="code-status-icon" />,
       disabled: !options.active,
       run: options.openInlineAi,
     },

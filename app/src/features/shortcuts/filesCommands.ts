@@ -1,30 +1,6 @@
 import { command } from "./factory";
 
 export const filesShortcutCommands = [
-  command("app.toggle_transfers", "Open Transfers", {
-    description: "Open the Transfers tool from Files.",
-    category: "Files",
-    scope: "tool:files",
-    mac: "Cmd+Shift+Y",
-    windows: "Ctrl+Shift+Y",
-    allowInEditable: true,
-  }),
-  command("app.toggle_plugin_launcher", "Open Extensions", {
-    description: "Open installed extensions from Files.",
-    category: "Files",
-    scope: "tool:files",
-    allowShadowing: true,
-  }),
-  command("clipboard.publish_shared", "Share clipboard", {
-    description: "Publish the local clipboard to connected Misty devices.",
-    category: "Files",
-    scope: "tool:files",
-  }),
-  command("clipboard.apply_shared", "Use shared clipboard", {
-    description: "Apply the latest shared clipboard to this device.",
-    category: "Files",
-    scope: "tool:files",
-  }),
   command("explorer.new_folder", "New folder", {
     description: "Create a folder in the focused Files location.",
     category: "Files",

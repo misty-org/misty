@@ -212,9 +212,7 @@ function NodeValueField({
 function Header({ title, status }: { title: string; status: string }) {
   return (
     <div>
-      <p className="m-0 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
-        {title}
-      </p>
+      <p className="m-0 text-[10px] font-semibold text-cream-muted">{title}</p>
       <p className="mt-1 text-xs text-cream-muted">{status}</p>
     </div>
   );

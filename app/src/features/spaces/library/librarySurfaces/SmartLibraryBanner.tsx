@@ -1,5 +1,5 @@
 import { Button } from "@/shared/ui";
-import { Sparkles } from "lucide-react";
+import { BrainCircuit } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 
 /** The Smart Library explainer and its owner-only AI switches. */
@@ -19,7 +19,7 @@ export function SmartLibraryBanner() {
     <section className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-charcoal-border bg-charcoal-card p-4">
       <div className="flex min-w-0 items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-active text-cream-bright">
-          <Sparkles size={18} />
+          <BrainCircuit size={18} />
         </span>
         <div>
           <h2 className="m-0 text-sm font-semibold">Smart Library</h2>

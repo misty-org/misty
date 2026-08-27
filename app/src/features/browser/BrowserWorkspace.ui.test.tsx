@@ -67,6 +67,29 @@ describe("BrowserWorkspace", () => {
     expect(container.querySelector<HTMLElement>("[data-browser-page-host]")?.style.cursor).toBe("");
   });
 
+  it("hides the previous native page when switching browser tabs", async () => {
+    (
+      window as typeof window & { __TAURI_INTERNALS__?: { invoke: () => void } }
+    ).__TAURI_INTERNALS__ = {
+      invoke: () => undefined,
+    };
+    const nextTab: WorkspaceTab = {
+      ...browserTab,
+      id: "tab:google",
+      instanceKey: "browser:google",
+      title: "Google",
+      state: createBrowserTabState("https://google.com"),
+    };
+    await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
+    invoke.mockClear();
+
+    await act(async () => root.render(<BrowserWorkspace tab={nextTab} />));
+
+    expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
+      request: { id: "tab-browser-one" },
+    });
+  });
+
   it("keeps Browser chrome and its backing surface dark across page colors", async () => {
     await act(async () => root.render(<BrowserWorkspace tab={browserTab} />));
 
@@ -92,6 +115,24 @@ describe("BrowserWorkspace", () => {
     expect(container.querySelector('[aria-label="Viewport: Responsive"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
+  });
+
+  it("quietly identifies browser tabs owned by Misty's current work", () => {
+    const agentOwnedTab: WorkspaceTab = {
+      ...browserTab,
+      title: "Misty research · family activities",
+      state: {
+        ...createBrowserTabState("https://www.google.com/search?q=family+activities"),
+        agentOwned: true,
+      },
+    };
+
+    act(() => root.render(<BrowserWorkspace tab={agentOwnedTab} />));
+
+    const ownershipMarker = container.querySelector<HTMLElement>(
+      '[title="This browser tab is scoped to Misty\'s current work"]',
+    );
+    expect(ownershipMarker?.textContent?.trim()).toBe("Misty");
   });
 
   it("opens the page annotation toolkit and closes it without navigating", async () => {

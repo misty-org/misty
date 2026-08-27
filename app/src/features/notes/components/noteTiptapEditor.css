@@ -85,7 +85,7 @@
   font-size: 1.25em;
 }
 .misty-tiptap-prosemirror blockquote {
-  border-left: 3px solid #7255d9;
+  border-left: 1px solid var(--color-charcoal-border);
   padding-left: 1rem;
   color: var(--color-cream-muted);
 }
@@ -185,8 +185,6 @@
   color: var(--color-cream-muted);
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 .misty-tiptap-suggestion button {
   display: flex;

@@ -8,24 +8,11 @@ import {
   PenLine,
   RefreshCw,
 } from "lucide-react";
-import { SiDropbox, SiGoogledrive, SiNotion, SiObsidian } from "react-icons/si";
+import { SiDropbox, SiGoogledrive, SiObsidian } from "react-icons/si";
 import type { NoteProviderStatus, NoteSource, NoteSyncStatus } from "../model/types/types";
-
-const notionBrand = "#E16259";
 
 export function NoteSourceIcon(props: NoteSourceIconProps) {
   const size = props.size ?? 14;
-  if (props.source === "notion") {
-    return (
-      <SiNotion
-        size={size}
-        className={props.className}
-        color={notionBrand}
-        aria-label={props.title}
-        aria-hidden={props.title ? undefined : true}
-      />
-    );
-  }
   return (
     <PenLine
       size={size}
@@ -42,12 +29,12 @@ export function NoteSourceBadge(props: NoteSourceBadgeProps) {
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded border border-charcoal-border/70 bg-charcoal-card",
-        "px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-cream-muted",
+        "px-1.5 py-0.5 text-[10px] font-medium text-cream-muted",
         props.className,
       )}
     >
       <NoteSourceIcon source={props.source} size={11} />
-      {props.source === "notion" ? "Notion" : "Misty"}
+      Misty
     </span>
   );
 }
@@ -109,8 +96,7 @@ export const providerStatusPresentation: Record<
   disconnected: { tone: "neutral", label: "Not connected" },
 };
 
-const providerGlyphs: Record<string, { icon: typeof SiNotion; color: string }> = {
-  notion: { icon: SiNotion, color: notionBrand },
+const providerGlyphs: Record<string, { icon: typeof SiObsidian; color: string }> = {
   obsidian: { icon: SiObsidian, color: "#8B7BD8" },
   drive: { icon: SiGoogledrive, color: "#4285F4" },
   dropbox: { icon: SiDropbox, color: "#0061FF" },
