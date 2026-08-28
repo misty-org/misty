@@ -36,17 +36,17 @@ describe("app route memory", () => {
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/files",
-      lastSpacesRoute: "/spaces/space-2/chat?conversation=group-4",
+      lastSpacesRoute: "/spaces/space-2/social/misty?conversation=group-4",
     });
   });
 
   it("remembers global navbar pages without changing the last Space", () => {
     useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/library");
-    for (const route of ["/files", "/agents", "/code", "/extensions"])
+    for (const route of ["/files", "/agents", "/marketplace", "/code", "/transfers"])
       useAppRouteMemoryStore.getState().rememberAppRoute(route);
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/extensions",
+      lastAppRoute: "/code",
       lastSpacesRoute: "/spaces/space-2/library",
     });
   });
@@ -83,8 +83,27 @@ describe("app route memory", () => {
       );
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
-      lastAppRoute: "/spaces/space-7/chat",
-      lastSpacesRoute: "/spaces/space-7/chat?conversation=group-4&message=message-2",
+      lastAppRoute: "/spaces/space-7/social/misty",
+      lastSpacesRoute: "/spaces/space-7/social/misty?conversation=group-4&message=message-2",
+    });
+  });
+
+  it("remembers every external provider as a distinct Social page", () => {
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute("/spaces/space-7/social?provider=discord&conversation=group-4");
+
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7/social/discord",
+      lastSpacesRoute: "/spaces/space-7/social/discord?conversation=group-4",
+    });
+
+    useAppRouteMemoryStore
+      .getState()
+      .rememberAppRoute("/spaces/space-7/social/x?conversation=direct-2");
+    expect(useAppRouteMemoryStore.getState()).toMatchObject({
+      lastAppRoute: "/spaces/space-7/social/x",
+      lastSpacesRoute: "/spaces/space-7/social/x?conversation=direct-2",
     });
   });
 

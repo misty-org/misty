@@ -3,16 +3,17 @@ import { persist } from "zustand/middleware";
 
 const defaultAppRoute = "/home";
 const defaultSpacesRoute = "/spaces";
+const socialProviders = new Set(["misty", "instagram", "discord", "messenger", "x"]);
 const desktopRememberableRoutes = [
   "/home",
   "/files",
   "/agents",
   "/code",
-  "/extensions",
-  "/transfers",
+  "/marketplace",
   "/spaces",
 ];
 const validSpaceSections = new Set([
+  "social",
   "chat",
   "planner",
   "notes",
@@ -97,8 +98,9 @@ export function normalizeRememberedSpacesRoute(path: string): string | null {
   if (parts[0] !== "spaces" || !parts[1]) return null;
 
   const base = `/spaces/${parts[1]}`;
-  const requestedSection =
+  let requestedSection =
     parts[2] === "files" ? "library" : parts[2] === "tasks" ? "planner" : parts[2];
+  if (requestedSection === "chat") requestedSection = "social";
   if (!requestedSection || !validSpaceSections.has(requestedSection)) return base;
 
   let normalizedPath = `${base}/${requestedSection}`;
@@ -113,6 +115,15 @@ export function normalizeRememberedSpacesRoute(path: string): string | null {
         : "general"
     }`;
   }
+  if (requestedSection === "social") {
+    const legacyProvider = new URL(path, "https://misty.local").searchParams.get("provider") ?? "";
+    const provider = socialProviders.has(parts[3] ?? "")
+      ? parts[3]
+      : socialProviders.has(legacyProvider)
+        ? legacyProvider
+        : "misty";
+    normalizedPath += `/${provider}`;
+  }
 
   const query = safeSpaceQuery(path, requestedSection);
   return `${normalizedPath}${query}`;
@@ -126,7 +137,7 @@ function safeSpaceQuery(path: string, section: string): string {
     path.slice(queryIndex + 1, hashIndex >= 0 ? hashIndex : path.length),
   );
   const allowed =
-    section === "chat"
+    section === "social"
       ? new Set(["conversation", "message"])
       : section === "planner"
         ? new Set(["q", "status", "assignee", "priority", "due", "mine", "sort"])
