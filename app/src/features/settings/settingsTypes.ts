@@ -14,9 +14,14 @@ export type SettingsSection =
   | "appearance"
   | "notifications"
   | "shortcuts"
+  | "inbox"
+  | "social"
+  | "journal"
   | "files"
   | "search"
   | "transfers"
+  | "planner"
+  | "library"
   | "browser"
   | "terminal"
   | "code"
@@ -25,7 +30,9 @@ export type SettingsSection =
   | "agents"
   | "extensions"
   | "privacy"
+  | "server"
   | "updates"
+  | "support"
   | "advanced";
 
 export type SettingValue =

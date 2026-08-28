@@ -1,7 +1,9 @@
-import { usePersonalAgentsStore } from "@/features/agents";
 import { useAuth } from "@/features/auth";
+import { SystemErrorActivity } from "@/features/activity";
+import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
   aiSurfaceApi,
+  type AiMemoryRecord,
   type AiRecapRecord,
   type AiSurfacePreferenceRecord,
   type AiUserSettings,
@@ -11,74 +13,29 @@ import type { AiSurfaceId } from "@/features/ai-surface/types";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import {
   Button,
-  Input,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Switch,
-  Textarea,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
+import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
-
-const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
-  { id: "global", label: "Global Misty" },
-  { id: "notes", label: "Notes" },
-  { id: "planner.tasks", label: "Planner" },
-  { id: "planner.agenda", label: "Agenda" },
-  { id: "planner.roadmap", label: "Roadmaps" },
-  { id: "browser", label: "Browser" },
-  { id: "inbox", label: "Inbox" },
-  { id: "space.chat", label: "Space Chat" },
-  { id: "drawings", label: "Drawings" },
-  { id: "library", label: "Library" },
-  { id: "photo-editor", label: "Photo editor" },
-  { id: "code", label: "Code" },
-  { id: "terminal", label: "Terminal" },
-  { id: "files", label: "Files" },
-  { id: "transfers", label: "Transfers" },
-  { id: "extensions", label: "Extensions" },
-  { id: "home", label: "Home" },
-  { id: "activity", label: "Activity" },
-];
-
-const recapSurfaces: Array<{ id: AiRecapRecord["surface_id"]; label: string }> = [
-  { id: "home", label: "Home" },
-  { id: "activity", label: "Activity" },
-  { id: "global", label: "Global Misty" },
-];
-
-const defaultRecapPrompt =
-  "Summarize recent progress, upcoming commitments, decisions, risks, and blockers. Be concise and omit sections with no grounded evidence.";
-
-function defaultRecap(surfaceId: AiRecapRecord["surface_id"]): AiRecapRecord {
-  return {
-    surface_id: surfaceId,
-    enabled: false,
-    cadence: "daily",
-    local_time: "08:00",
-    weekday: 1,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    prompt: defaultRecapPrompt,
-    state: "idle",
-    last_citations: [],
-    updated_at: new Date(0).toISOString(),
-  };
-}
+import { MistyBriefingsSection } from "./MistyBriefingsSection";
+import { defaultRecap, managedSurfaces } from "./mistySettingsConfig";
 
 export function MistySection(_props: SettingsContentProps) {
   const { user } = useAuth();
-  const agents = usePersonalAgentsStore((state) => state.agents);
-  const loadAgents = usePersonalAgentsStore((state) => state.load);
   const [settings, setSettings] = useState<AiUserSettings | null>(null);
   const [preferences, setPreferences] = useState<Record<string, AiSurfacePreferenceRecord>>({});
   const [recaps, setRecaps] = useState<Record<string, AiRecapRecord>>({});
+  const [memories, setMemories] = useState<AiMemoryRecord[]>([]);
   const [recapSurface, setRecapSurface] = useState<AiRecapRecord["surface_id"]>("home");
   const [recapDraft, setRecapDraft] = useState<AiRecapRecord>(() => defaultRecap("home"));
   const [working, setWorking] = useState(false);
@@ -108,20 +65,25 @@ export function MistySection(_props: SettingsContentProps) {
           active &&
           setError(reason instanceof Error ? reason.message : "Misty settings could not load."),
       );
-    void loadAgents();
     void aiSurfaceApi
       .status()
       .then((result) => active && setProvider(result))
       .catch(() => undefined);
     void aiSurfaceApi
-      .recaps()
-      .then((result) => {
-        if (!active) return;
-        const values = Object.fromEntries(result.recaps.map((item) => [item.surface_id, item]));
-        setRecaps(values);
-        setRecapDraft(values.home ?? defaultRecap("home"));
-      })
+      .memories()
+      .then((result) => active && setMemories(result.memories))
       .catch(() => undefined);
+    if (publicBetaFeatureEnabled("recurringBriefings")) {
+      void aiSurfaceApi
+        .recaps()
+        .then((result) => {
+          if (!active) return;
+          const values = Object.fromEntries(result.recaps.map((item) => [item.surface_id, item]));
+          setRecaps(values);
+          setRecapDraft(values.home ?? defaultRecap("home"));
+        })
+        .catch(() => undefined);
+    }
     void aiSurfaceApi
       .usage()
       .then((result) => active && setUsage(result.agent_usage ?? null))
@@ -129,7 +91,7 @@ export function MistySection(_props: SettingsContentProps) {
     return () => {
       active = false;
     };
-  }, [loadAgents]);
+  }, []);
 
   useEffect(() => {
     setRecapDraft(recaps[recapSurface] ?? defaultRecap(recapSurface));
@@ -138,6 +100,7 @@ export function MistySection(_props: SettingsContentProps) {
   const updateSettings = async (
     enabled: boolean,
     retentionDays = settings?.retention_days ?? 30,
+    memoryEnabled = settings?.memory_enabled ?? true,
   ) => {
     if (!settings || working) return;
     if (
@@ -153,11 +116,25 @@ export function MistySection(_props: SettingsContentProps) {
     setWorking(true);
     setError("");
     try {
-      const result = await aiSurfaceApi.updateSettings(enabled, retentionDays);
+      const result = await aiSurfaceApi.updateSettings(enabled, retentionDays, memoryEnabled);
       setSettings(result.settings);
       if (!enabled && user?.id) useAiSurfaceStore.getState().clearAccount(user.id);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Misty settings could not be saved.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const forgetMemory = async (memoryId: string) => {
+    if (working) return;
+    setWorking(true);
+    setError("");
+    try {
+      await aiSurfaceApi.forgetMemory(memoryId);
+      setMemories((items) => items.filter((item) => item.id !== memoryId));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "That memory could not be forgotten.");
     } finally {
       setWorking(false);
     }
@@ -175,16 +152,11 @@ export function MistySection(_props: SettingsContentProps) {
     setWorking(true);
     try {
       const result = await aiSurfaceApi.updatePreference(surfaceId, {
-        pinned_agent_id: patch.pinned_agent_id ?? current.pinned_agent_id,
+        pinned_agent_id: "",
         proactive_enabled: patch.proactive_enabled ?? current.proactive_enabled,
         saved_actions: patch.saved_actions ?? current.saved_actions,
       });
       setPreferences((values) => ({ ...values, [surfaceId]: result.preference }));
-      if (user?.id && "pinned_agent_id" in patch) {
-        useAiSurfaceStore
-          .getState()
-          .setPinnedAgent(user.id, surfaceId, patch.pinned_agent_id || undefined);
-      }
       window.dispatchEvent(new Event("misty:ai-preferences-changed"));
     } catch (reason) {
       setError(
@@ -229,7 +201,9 @@ export function MistySection(_props: SettingsContentProps) {
           description="Allow hosted AI in embedded surfaces and Global Misty. Lexical search continues when this is off."
         >
           <Switch
-            checked={settings?.enabled ?? true}
+            aria-label="Enable Misty"
+            className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+            checked={settings?.enabled ?? false}
             disabled={!settings || working}
             onCheckedChange={(value) => void updateSettings(value)}
           />
@@ -237,13 +211,17 @@ export function MistySection(_props: SettingsContentProps) {
         <SettingsRow
           label="Conversation retention"
           description="Accepted work and required security audits follow their domain retention rules."
+          muted={!settings || !settings.enabled}
         >
           <Select
             value={String(settings?.retention_days ?? 30)}
             disabled={!settings || working || !settings.enabled}
             onValueChange={(value) => void updateSettings(true, Number(value))}
           >
-            <SelectTrigger className="w-40">
+            <SelectTrigger
+              aria-label="Conversation retention"
+              className={`w-40 ${settingsDisabledControlClass}`}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -305,6 +283,21 @@ export function MistySection(_props: SettingsContentProps) {
           <span className="text-xs text-cream-muted">Never shared silently</span>
         </SettingsRow>
         <SettingsRow
+          label="Remembered context"
+          description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
+          muted={!settings || !settings.enabled}
+        >
+          <Switch
+            aria-label="Use remembered context"
+            className="disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:opacity-100 disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
+            checked={settings?.memory_enabled ?? false}
+            disabled={!settings || working || !settings.enabled}
+            onCheckedChange={(value) =>
+              void updateSettings(true, settings?.retention_days ?? 30, value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
           label="Dangerous actions"
           description="External, destructive, permission-changing, and device actions always require exact review and confirmation."
           last
@@ -314,8 +307,56 @@ export function MistySection(_props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock
+        title="Remembered details"
+        description="Review exactly what Misty can recall. Forgetting a detail removes it from future conversations."
+      >
+        {memories.length === 0 ? (
+          <div className="px-5 py-4 text-[13px] text-cream-muted">Nothing remembered yet.</div>
+        ) : (
+          memories.map((memory, index) => (
+            <SettingsRow
+              key={memory.id}
+              label={
+                memory.kind === "instruction"
+                  ? "Standing instruction"
+                  : memory.kind === "preference"
+                    ? "Preference"
+                    : "Detail"
+              }
+              description={
+                memory.space_id
+                  ? "Private · used only in its Space"
+                  : "Private · available across Misty"
+              }
+              last={index === memories.length - 1}
+            >
+              <div className="flex w-full min-w-0 items-center justify-end gap-3 max-[760px]:justify-between">
+                <span className="min-w-0 flex-1 truncate text-right text-[13px] text-cream max-[760px]:text-left">
+                  {memory.content}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={settingsDisabledControlClass}
+                  disabled={working}
+                  aria-label={`Forget ${memory.content}`}
+                  onClick={() => void forgetMemory(memory.id)}
+                >
+                  Forget
+                </Button>
+              </div>
+            </SettingsRow>
+          ))
+        )}
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock
         title="Per-surface behavior"
-        description="Proactive suggestions are off by default. A pinned Agent is personal and only used for that surface."
+        description={
+          "Proactive suggestions are off by default. When enabled, a quiet nudge explains " +
+          "why it appeared, respects cooldowns and snooze, and never starts work until you review it."
+        }
       >
         {managedSurfaces.map((surface, index) => {
           const preference = preferences[surface.id];
@@ -323,171 +364,44 @@ export function MistySection(_props: SettingsContentProps) {
             <SettingsRow
               key={surface.id}
               label={surface.label}
+              muted={!settings || settings.enabled === false}
               last={index === managedSurfaces.length - 1}
             >
               <div className="flex w-full items-center justify-end gap-3 max-[760px]:justify-start">
-                <label className="flex items-center gap-2 text-xs text-cream-muted">
-                  Proactive
-                  <Switch
-                    checked={preference?.proactive_enabled ?? false}
-                    disabled={working || settings?.enabled === false}
-                    onCheckedChange={(value) =>
-                      void updatePreference(surface.id, { proactive_enabled: value })
-                    }
-                  />
-                </label>
-                <Select
-                  value={preference?.pinned_agent_id || "misty"}
-                  disabled={working || settings?.enabled === false}
-                  onValueChange={(value) =>
-                    void updatePreference(surface.id, {
-                      pinned_agent_id: value === "misty" ? "" : value,
-                    })
+                <Switch
+                  aria-label={`Proactive suggestions in ${surface.label}`}
+                  className={
+                    "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg " +
+                    "disabled:opacity-100 " +
+                    "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
                   }
-                >
-                  <SelectTrigger className="w-44">
-                    <SelectValue placeholder="Misty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="misty">Misty</SelectItem>
-                    {agents
-                      .filter((agent) => agent.enabled)
-                      .map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  checked={preference?.proactive_enabled ?? false}
+                  disabled={working || !settings || settings.enabled === false}
+                  onCheckedChange={(value) =>
+                    void updatePreference(surface.id, { proactive_enabled: value })
+                  }
+                />
               </div>
             </SettingsRow>
           );
         })}
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock
-        title="Recurring briefings"
-        description={
-          "Personal briefings run only on an explicit schedule, use content you can still access, " +
-          "and appear natively on the selected surface. They are off by default."
-        }
-      >
-        <SettingsRow label="Deliver to">
-          <Select
-            value={recapSurface}
-            disabled={working || settings?.enabled === false}
-            onValueChange={(value) => setRecapSurface(value as AiRecapRecord["surface_id"])}
-          >
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {recapSurfaces.map((surface) => (
-                <SelectItem key={surface.id} value={surface.id}>
-                  {surface.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </SettingsRow>
-        <SettingsRow label="Schedule">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Select
-              value={recapDraft.enabled ? recapDraft.cadence : "off"}
-              disabled={working || settings?.enabled === false}
-              onValueChange={(value) =>
-                setRecapDraft((current) => ({
-                  ...current,
-                  enabled: value !== "off",
-                  cadence: value === "weekly" ? "weekly" : "daily",
-                }))
-              }
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-              </SelectContent>
-            </Select>
-            {recapDraft.enabled && recapDraft.cadence === "weekly" ? (
-              <Select
-                value={String(recapDraft.weekday)}
-                onValueChange={(value) =>
-                  setRecapDraft((current) => ({ ...current, weekday: Number(value) }))
-                }
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "Sunday",
-                    "Monday",
-                    "Tuesday",
-                    "Wednesday",
-                    "Thursday",
-                    "Friday",
-                    "Saturday",
-                  ].map((day, index) => (
-                    <SelectItem key={day} value={String(index)}>
-                      {day}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-            {recapDraft.enabled ? (
-              <Input
-                type="time"
-                className="w-28"
-                value={recapDraft.local_time}
-                onChange={(event) =>
-                  setRecapDraft((current) => ({ ...current, local_time: event.target.value }))
-                }
-              />
-            ) : null}
-          </div>
-        </SettingsRow>
-        <SettingsRow
-          label="Briefing focus"
-          description={`Runs in ${recapDraft.timezone}. Scheduled outputs are personal and cite their source objects.`}
-          last
-        >
-          <div className="w-full max-w-md space-y-2">
-            <Textarea
-              rows={3}
-              maxLength={8000}
-              disabled={working || settings?.enabled === false}
-              value={recapDraft.prompt}
-              onChange={(event) =>
-                setRecapDraft((current) => ({ ...current, prompt: event.target.value }))
-              }
-            />
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] text-cream-muted">
-                {recapDraft.next_run_at
-                  ? `Next: ${new Date(recapDraft.next_run_at).toLocaleString()}`
-                  : "No run is scheduled"}
-              </span>
-              <Button
-                type="button"
-                size="sm"
-                disabled={working || settings?.enabled === false || !recapDraft.prompt.trim()}
-                onClick={() => void saveRecap()}
-              >
-                Save briefing
-              </Button>
-            </div>
-          </div>
-        </SettingsRow>
-      </SettingsSectionBlock>
+      <MistyBriefingsSection
+        working={working}
+        settings={settings}
+        recapSurface={recapSurface}
+        setRecapSurface={setRecapSurface}
+        recapDraft={recapDraft}
+        setRecapDraft={setRecapDraft}
+        onSave={() => void saveRecap()}
+      />
       {error ? (
-        <p className="text-sm text-notification-red" role="alert">
-          {error}
-        </p>
+        <SystemErrorActivity
+          error={error}
+          scope="settings:misty"
+          title="Misty settings need attention"
+        />
       ) : null}
     </>
   );

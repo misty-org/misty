@@ -62,7 +62,7 @@ export const useConnectionsStore = create<ConnectionsStore>((set, get) => ({
   beginAuthorization: async (provider, capabilities, returnTo = "/inbox") => {
     const generation = accountGeneration;
     const accountId = get().accountId;
-    if (!accountId) throw new Error("Sign in before connecting an email account.");
+    if (!accountId) throw new Error("Sign in before connecting an account.");
     set({ authorizingProvider: provider, error: null });
     try {
       const result = await connectionsApi.authorize(provider, capabilities, returnTo);

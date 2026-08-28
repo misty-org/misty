@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import { remoteDisplayName } from "@/native";
 import type { ProviderRemote } from "@/native/contracts";
 import { iconAssets } from "@/shared/assets/icons";
@@ -10,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
-  ErrorState,
   PrimitiveIconButton,
   StatusBadge,
 } from "@/shared/ui";
@@ -87,10 +87,11 @@ export function RemoteListPanel(props: RemoteListPanelProps) {
         ))}
         {!props.loading && props.remotes.length === 0 ? (
           props.serviceError ? (
-            <ErrorState
-              compact
-              title="Remote service unavailable"
-              description={props.serviceError}
+            <SystemErrorActivity
+              error={props.serviceError}
+              scope="files:remotes"
+              title="Remote service is unavailable"
+              target={{ kind: "workspace-tool", tool: "files" }}
             />
           ) : (
             <EmptyState
@@ -117,11 +118,19 @@ function RemoteRow(props: {
 
   return (
     <div className={`${remoteRowClass} ${selected ? remoteRowSelectedClass : ""}`}>
+      {remote.error ? (
+        <SystemErrorActivity
+          error={remote.error}
+          scope={`files:remote:${remote.name}`}
+          title={`${remote.name} needs attention`}
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       <Button
         variant="ghost"
         className={remoteRowSelectClass}
         type="button"
-        title={remote.error ?? undefined}
+        title={remote.error ? "Repair remote" : undefined}
         onClick={externalConfig ? props.onRepair : onSelect}
       >
         <span
