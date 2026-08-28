@@ -13,27 +13,9 @@ export function createDockLeaf(tabs: WorkspaceTab[] = []): WorkspacePane {
   };
 }
 
-export function createHomeDockTab(): WorkspaceTab {
-  const now = Date.now();
-  return {
-    id: createDockId("tab"),
-    surfaceId: "home",
-    groupKey: "tool:home",
-    instanceKey: createDockId("tab"),
-    title: "Home",
-    route: "/home",
-    sidebarVisible: false,
-    state: {},
-    createdAt: now,
-    lastFocusedAt: now,
-  };
-}
-
 export function fillEmptyDockLeaves(node: WorkspaceDockNode): WorkspaceDockNode {
   if (node.type === "leaf") {
-    if (node.tabs.length) return node;
-    const home = createHomeDockTab();
-    return { ...node, tabs: [home], activeTabId: home.id };
+    return node;
   }
   const first = fillEmptyDockLeaves(node.first);
   const second = fillEmptyDockLeaves(node.second);
@@ -52,17 +34,12 @@ export function capDockLeaves(node: WorkspaceDockNode, maximum: number): Workspa
   const leaves = dockLeaves(node);
   if (leaves.length <= maximum) return node;
   const kept = leaves.slice(0, Math.max(1, maximum));
-  const overflowTabs = leaves
-    .slice(kept.length)
-    .flatMap((leaf) => leaf.tabs)
-    .filter((tab) => tab.surfaceId !== "home");
+  const overflowTabs = leaves.slice(kept.length).flatMap((leaf) => leaf.tabs);
   if (overflowTabs.length) {
     const target = kept[kept.length - 1];
-    const existingTabs =
-      target.tabs.length === 1 && target.tabs[0]?.surfaceId === "home" ? [] : target.tabs;
     kept[kept.length - 1] = {
       ...target,
-      tabs: [...existingTabs, ...overflowTabs],
+      tabs: [...target.tabs, ...overflowTabs],
       activeTabId: overflowTabs[0]?.id ?? target.activeTabId,
     };
   }

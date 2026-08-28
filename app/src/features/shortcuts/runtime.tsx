@@ -137,6 +137,7 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
     return false;
   const activeScope = focusedShortcutScope();
   const editable = editableOverride ?? isEditableShortcutTarget(event.target);
+  const target = event.target instanceof Element ? event.target : document.activeElement;
   const snapshot = useSettingsStore.getState().shortcuts;
   const platform = snapshot?.detectedPlatform ?? detectShortcutPlatform();
   const effectiveById = new Map(
@@ -147,6 +148,7 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
     .filter((definition) => scopeIsActive(definition.scope, activeScope))
     .filter((definition) => definition.repeatable || !event.repeat)
     .filter((definition) => definition.allowInEditable || !editable)
+    .filter((definition) => !agentChatBlocksSearch(definition.id, target, editable))
     .filter((definition) => {
       const storedOverride = snapshot?.overrides.find(
         (override) => override.commandId === definition.id,
@@ -181,6 +183,13 @@ export function invokeShortcutCommand(commandId: string): boolean {
   if (!definition) return false;
   const activeScope = focusedShortcutScope();
   if (!scopeIsActive(definition.scope, activeScope)) return false;
+  const target = document.activeElement;
+  const editable = isEditableShortcutTarget(target);
+  if (
+    (!definition.allowInEditable && editable) ||
+    agentChatBlocksSearch(commandId, target, editable)
+  )
+    return false;
   const event = new KeyboardEvent("keydown", { cancelable: true });
   for (const registration of [...(handlers.get(commandId) ?? [])].reverse()) {
     if (!registration.enabled()) continue;
@@ -188,6 +197,15 @@ export function invokeShortcutCommand(commandId: string): boolean {
     return true;
   }
   return false;
+}
+
+function agentChatBlocksSearch(commandId: string, target: EventTarget | null, editable: boolean) {
+  return Boolean(
+    commandId === "search.toggle" &&
+    editable &&
+    target instanceof Element &&
+    target.closest("[data-misty-agent-chat]"),
+  );
 }
 
 export function effectiveShortcut(commandId: string): {

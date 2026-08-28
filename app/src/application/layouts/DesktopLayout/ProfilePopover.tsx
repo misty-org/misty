@@ -1,4 +1,5 @@
 import { useAuth, useUserStore } from "@/features/auth";
+import { reportSystemError } from "@/features/activity";
 import { useSetupStore } from "@/features/installer";
 import { Button } from "@/shared/ui";
 import {
@@ -50,7 +51,7 @@ export function ProfilePopover(props: {
   const [accountChooserStyle, setAccountChooserStyle] = useState<CSSProperties>({});
   const [accountChooserOpen, setAccountChooserOpen] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
-  const [switchError, setSwitchError] = useState("");
+  const previouslyOpenRef = useRef(false);
   const account = user ?? currentUser;
   const accountMe = me.id === account?.id ? me : null;
   const email = accountMe?.email ?? account?.email ?? "";
@@ -125,7 +126,7 @@ export function ProfilePopover(props: {
   useLayoutEffect(() => {
     if (!props.open) return;
     updatePosition();
-  }, [accountChooserOpen, accounts.length, props.open, switchError, updatePosition]);
+  }, [accountChooserOpen, accounts.length, props.open, updatePosition]);
 
   useEffect(() => {
     if (!props.open) return;
@@ -171,8 +172,20 @@ export function ProfilePopover(props: {
     if (props.open) return;
     setAccountChooserOpen(false);
     setSwitchingAccountId("");
-    setSwitchError("");
   }, [props.open]);
+
+  useEffect(() => {
+    if (props.open) {
+      previouslyOpenRef.current = true;
+      window.setTimeout(
+        () => menuRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus(),
+        0,
+      );
+      return;
+    }
+    if (previouslyOpenRef.current) props.anchorRef.current?.focus();
+    previouslyOpenRef.current = false;
+  }, [props.anchorRef, props.open]);
 
   if (!props.open) return null;
 
@@ -183,21 +196,23 @@ export function ProfilePopover(props: {
 
   const switchAccounts = () => {
     if (transitioning) return;
-    setSwitchError("");
     setAccountChooserOpen(true);
   };
 
   const chooseAccount = async (accountId: string) => {
     if (accountId === account?.id || switchingAccountId || transitioning) return;
-    setSwitchError("");
     setSwitchingAccountId(accountId);
     try {
       await switchAccount(accountId);
       props.onClose();
     } catch (error) {
-      setSwitchError(
-        error instanceof Error ? error.message : "That account could not be activated.",
-      );
+      reportSystemError({
+        accountId: account?.id,
+        scope: "account:switch",
+        title: "Account could not be switched",
+        error,
+        target: { kind: "route", href: props.currentPath },
+      });
     } finally {
       setSwitchingAccountId("");
     }
@@ -247,7 +262,7 @@ export function ProfilePopover(props: {
             role="menuitem"
             onClick={openAccountSettings}
           >
-            <UserCircle size={17} />
+            <UserCircle size={18} strokeWidth={2} />
             <span>Account settings</span>
             {/* This leaves the app for the browser, so say so rather than
                 surprising people with a new window. */}
@@ -267,7 +282,7 @@ export function ProfilePopover(props: {
             disabled={transitioning}
             onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
           >
-            <Repeat2 size={17} />
+            <Repeat2 size={18} strokeWidth={2} />
             <span>Switch accounts</span>
             <ChevronRight
               size={14}
@@ -285,7 +300,7 @@ export function ProfilePopover(props: {
             disabled={transitioning}
             onClick={signOut}
           >
-            <LogOut size={17} />
+            <LogOut size={18} strokeWidth={2} />
             <span>Log out</span>
           </Button>
         </div>
@@ -355,14 +370,6 @@ export function ProfilePopover(props: {
               </p>
             ) : null}
           </div>
-          {switchError ? (
-            <p
-              className="m-0 mb-2 rounded-lg border border-charcoal-active/20 bg-charcoal-active px-2.5 py-2 text-[11px] leading-relaxed text-cream-bright"
-              role="alert"
-            >
-              {switchError}
-            </p>
-          ) : null}
           <Button
             className={profileMenuItemClass}
             type="button"
@@ -370,7 +377,7 @@ export function ProfilePopover(props: {
             disabled={Boolean(switchingAccountId) || transitioning}
             onClick={addAccount}
           >
-            <Plus size={17} />
+            <Plus size={18} strokeWidth={2} />
             <span>Add another account</span>
           </Button>
           <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-cream-muted">
@@ -380,6 +387,6 @@ export function ProfilePopover(props: {
         </div>
       ) : null}
     </>,
-    document.body,
+    document.getElementById("misty-shell-overlays") ?? document.body,
   );
 }

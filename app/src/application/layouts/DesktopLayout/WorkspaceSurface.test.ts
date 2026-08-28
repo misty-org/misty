@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { parseSpaceTabRoute } from "./WorkspaceSurface";
+import { desktopFeatureForSurface, parseSpaceTabRoute } from "./WorkspaceSurface";
+
+describe("desktop-only workspace surfaces", () => {
+  it("keeps restored Transfers tabs behind the web download state", () => {
+    expect(desktopFeatureForSurface("transfers")).toBe("Transfers");
+  });
+
+  it("leaves cloud-backed surfaces available", () => {
+    expect(desktopFeatureForSurface("agents")).toBeNull();
+    expect(desktopFeatureForSurface("space")).toBeNull();
+  });
+});
 
 describe("space pane route", () => {
   it("reads the Space and section a pane should render", () => {
@@ -23,6 +34,25 @@ describe("space pane route", () => {
       spaceId: "team",
       section: "planner",
       studioKind: "tasks",
+    });
+  });
+
+  it("keeps each Social provider page distinct, including legacy saved routes", () => {
+    expect(parseSpaceTabRoute("/spaces/team/social/discord")).toMatchObject({
+      section: "social",
+      studioKind: "discord",
+    });
+    expect(parseSpaceTabRoute("/spaces/team/social?provider=instagram")).toMatchObject({
+      section: "social",
+      studioKind: "instagram",
+    });
+    expect(parseSpaceTabRoute("/spaces/team/social/messenger")).toMatchObject({
+      section: "social",
+      studioKind: "messenger",
+    });
+    expect(parseSpaceTabRoute("/spaces/team/social/x")).toMatchObject({
+      section: "social",
+      studioKind: "x",
     });
   });
 

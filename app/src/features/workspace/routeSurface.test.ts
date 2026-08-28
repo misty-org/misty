@@ -6,6 +6,19 @@ describe("workspace deep links", () => {
     expect(workspaceSurfaceFromRoute("/settings")).toBeNull();
   });
 
+  it("keeps legacy global Home outside the app workspace", () => {
+    expect(workspaceSurfaceFromRoute("/home")).toBeNull();
+  });
+
+  it("opens Home inside its Space scope", () => {
+    expect(workspaceSurfaceFromRoute("/spaces/family/home")).toMatchObject({
+      surfaceId: "space",
+      groupKey: "space:family",
+      scopeKey: "space:family",
+      title: "Home",
+    });
+  });
+
   it("gives each Space tool its own tab identity within the decoded Space scope", () => {
     expect(workspaceSurfaceFromRoute("/spaces/product%20launch/planner")).toMatchObject({
       surfaceId: "space",
@@ -13,6 +26,26 @@ describe("workspace deep links", () => {
       scopeKey: "space:product launch",
       title: "Planner",
       route: "/spaces/product%20launch/planner",
+    });
+  });
+
+  it("keeps Social separate and maps legacy Chat routes into its group", () => {
+    expect(workspaceSurfaceFromRoute("/spaces/family/social")).toMatchObject({
+      groupKey: "space:family:social",
+      title: "Social",
+    });
+    expect(workspaceSurfaceFromRoute("/spaces/family/chat")).toMatchObject({
+      groupKey: "space:family:social",
+      title: "Social",
+    });
+  });
+
+  it("preserves the selected Social provider in the workspace tab route", () => {
+    const route = "/spaces/family/social/messenger";
+
+    expect(workspaceSurfaceFromRoute(route)).toMatchObject({
+      groupKey: "space:family:social",
+      route,
     });
   });
 
@@ -35,16 +68,23 @@ describe("workspace deep links", () => {
     ["/code", "code"],
     ["/files", "files"],
     ["/agents", "agents"],
-    ["/extensions", "extensions"],
+    ["/transfers", "transfers"],
+    ["/marketplace", "marketplace"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
     expect(workspaceSurfaceFromRoute(route)?.surfaceId).toBe(surfaceId);
+  });
+
+  it("opens coming-soon launch surfaces as singleton tabs", () => {
+    for (const route of ["/marketplace", "/transfers"]) {
+      expect(workspaceSurfaceFromRoute(route)?.instancePolicy).toBe("single");
+    }
   });
 
   it("opens Inbox as one account-level tool surface", () => {
     expect(workspaceSurfaceFromRoute("/inbox")).toMatchObject({
       surfaceId: "inbox",
       groupKey: "tool:inbox",
-      instancePolicy: "single",
+      instancePolicy: "multiple",
     });
   });
 
@@ -52,18 +92,6 @@ describe("workspace deep links", () => {
     expect(workspaceSurfaceFromRoute("/code")).toMatchObject({
       surfaceId: "code",
       groupKey: "tool:code",
-      instancePolicy: "multiple",
-    });
-  });
-});
-
-describe("home route", () => {
-  it("resolves to a stackable Home surface", () => {
-    // Home used to resolve to null, which meant it could only switch scope and
-    // never open a tab. It is an ordinary, stackable tab now.
-    expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
-      surfaceId: "home",
-      groupKey: "tool:home",
       instancePolicy: "multiple",
     });
   });
