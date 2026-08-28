@@ -50,7 +50,7 @@ func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 		owner.ID,
 		"Research group",
 		"research",
-		[]string{"notion", "google", "notion"},
+		[]string{"google", " GOOGLE ", "google"},
 		"create-research-once",
 	)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 		owner.ID,
 		"Research group",
 		"research",
-		[]string{"google", "notion"},
+		[]string{"google"},
 		"create-research-once",
 	)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestTemplateCreationIsTransactionalAndIdempotent(t *testing.T) {
 	if first.Space.ID != repeated.Space.ID {
 		t.Fatalf("idempotent creation returned %q then %q", first.Space.ID, repeated.Space.ID)
 	}
-	if !reflect.DeepEqual(first.Setup.SelectedProviders, []string{"google", "notion"}) {
+	if !reflect.DeepEqual(first.Setup.SelectedProviders, []string{"google"}) {
 		t.Fatalf("selected providers = %#v", first.Setup.SelectedProviders)
 	}
 	if _, err := database.CreateSpaceWithTemplateIdempotent(
