@@ -1,15 +1,15 @@
 import { Button } from "@/shared/ui/button";
 import { actionLabel } from "./helpers";
-import type { PluginBrowserEntry } from "./types";
+import type { MarketplaceEntry } from "./types";
 
-export type PluginActionHandlers = {
-  onInstall?: (plugin: PluginBrowserEntry) => void;
-  onToggle?: (plugin: PluginBrowserEntry, enabled: boolean) => void;
-  onPrimaryAction?: (plugin: PluginBrowserEntry) => void;
+export type MarketplaceActionHandlers = {
+  onInstall?: (plugin: MarketplaceEntry) => void;
+  onToggle?: (plugin: MarketplaceEntry, enabled: boolean) => void;
+  onPrimaryAction?: (plugin: MarketplaceEntry) => void;
   primaryActionLabel?: string;
 };
 
-export function PluginPrimaryAction({
+export function MarketplacePrimaryAction({
   plugin,
   busy,
   className,
@@ -18,8 +18,8 @@ export function PluginPrimaryAction({
   onToggle,
   onPrimaryAction,
   primaryActionLabel,
-}: PluginActionHandlers & {
-  plugin: PluginBrowserEntry;
+}: MarketplaceActionHandlers & {
+  plugin: MarketplaceEntry;
   busy: boolean;
   className?: string;
   size?: "sm" | "default";
@@ -29,11 +29,16 @@ export function PluginPrimaryAction({
       className={className}
       disabled={
         busy ||
+        (plugin.kind === "builtin" && !onPrimaryAction) ||
         (!plugin.installed && !onInstall) ||
         (plugin.installed && !plugin.enabled && !onToggle) ||
         (plugin.installed && plugin.enabled && !onPrimaryAction)
       }
       onClick={() => {
+        if (plugin.kind === "builtin") {
+          onPrimaryAction?.(plugin);
+          return;
+        }
         if (!plugin.installed) {
           onInstall?.(plugin);
           return;

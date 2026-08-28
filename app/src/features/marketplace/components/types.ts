@@ -1,7 +1,8 @@
-export type PluginBrowserTab = "marketplace" | "installed";
+export type MarketplaceView = "marketplace" | "installed";
 
-export type PluginBrowserEntry = {
+export type MarketplaceEntry = {
   id: string;
+  kind?: "extension" | "builtin";
   name: string;
   version: string;
   author: string;
