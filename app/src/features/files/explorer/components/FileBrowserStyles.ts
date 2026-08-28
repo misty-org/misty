@@ -1,9 +1,9 @@
 export const fileBrowserStyles = {
   browser: [
     "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden",
-    "bg-charcoal-bg outline outline-0 outline-offset-[-2px]",
+    "bg-charcoal-sidebar outline outline-0 outline-offset-[-2px]",
   ].join(" "),
-  browserLoading: "bg-charcoal-bg",
+  browserLoading: "bg-charcoal-sidebar",
   tableSkeleton: "min-h-0 min-w-[720px] overflow-hidden",
   tableSkeletonLine:
     "grid grid-cols-[minmax(240px,1fr)_220px_128px_128px] items-center gap-4 px-3.5",
@@ -15,7 +15,8 @@ export const fileBrowserStyles = {
   gridSkeleton:
     "grid min-h-0 min-w-0 content-start gap-[18px] overflow-hidden p-1 [grid-template-columns:repeat(auto-fill,minmax(144px,1fr))] [[data-compact-mode=true]_&]:gap-2.5 [[data-compact-mode=true]_&]:p-0.5 [[data-compact-mode=true]_&]:[grid-template-columns:repeat(auto-fill,minmax(124px,1fr))]",
   gridSkeletonCell: "h-[156px] [[data-compact-mode=true]_&]:h-[132px]",
-  tableWrap: "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg",
+  tableWrap:
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-sidebar",
   tableHeaderWrap: "min-w-0 overflow-hidden",
   tableResetButton:
     "absolute right-2 top-1.5 z-[4] inline-grid size-7 place-items-center rounded-md border border-transparent text-cream-muted hover:bg-charcoal-hover hover:text-cream focus-visible:border-charcoal-active max-[720px]:hidden",
@@ -52,7 +53,7 @@ export const fileBrowserStyles = {
   tableNameCellEditing: "overflow-visible",
   tableNameText:
     "min-w-0 cursor-default select-none overflow-hidden text-ellipsis whitespace-nowrap",
-  tableIconSlot: "grid size-[22px] flex-none place-items-center",
+  tableIconSlot: "grid size-5 flex-none place-items-center",
   materialIcon: "block shrink-0 object-contain",
   folderIcon: "text-cream-muted",
   fileIcon: "text-cream-muted",

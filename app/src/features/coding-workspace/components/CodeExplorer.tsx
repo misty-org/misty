@@ -1,5 +1,6 @@
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { MistyFilePicker } from "@/features/picker";
 import { FilePlus, FolderInput, FolderPlus, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   useCallback,
   useEffect,
@@ -212,14 +213,11 @@ export function CodeExplorer({
     );
   }, [selectedEntries]);
 
-  const changeRoot = useCallback(async () => {
-    try {
-      const selection = await openDialog({ directory: true, multiple: false });
-      if (typeof selection === "string" && selection.length > 0) onOpenRoot(selection);
-    } catch {
-      /* native picker cancellation */
-    }
-  }, [onOpenRoot]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const changeRoot = useCallback(() => {
+    setPickerOpen(true);
+  }, []);
 
   const openNameDialog = useCallback((dialog: NameDialogState) => {
     setNameDraft(dialog.initialValue);
@@ -338,7 +336,7 @@ export function CodeExplorer({
       ) : null}
 
       <div
-        className="min-h-0 flex-1 overflow-auto p-1.5"
+        className="flex min-h-0 flex-1 flex-col overflow-auto p-1.5"
         tabIndex={0}
         onKeyDown={(event) => {
           const command = event.metaKey || event.ctrlKey;
@@ -396,7 +394,14 @@ export function CodeExplorer({
         {loading && rootEntries === null ? (
           <p className="px-3 py-2 italic text-cream-muted">Loading…</p>
         ) : null}
-        {error ? <p className="code-danger px-3 py-2 italic">{error}</p> : null}
+        {error ? (
+          <SystemErrorActivity
+            error={error}
+            scope="code:explorer"
+            title="Code files could not be loaded"
+            target={{ kind: "route", href: "/code" }}
+          />
+        ) : null}
         {rootEntries?.map((entry) => (
           <CodeExplorerRow
             key={entry.id}
@@ -633,19 +638,26 @@ export function CodeExplorer({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={Boolean(operationError)} onOpenChange={() => setOperationError(null)}>
-        <DialogContent className="code-theme-overlay max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Couldn’t complete that action</DialogTitle>
-            <DialogDescription>{operationError}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button">OK</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {operationError ? (
+        <SystemErrorActivity
+          error={operationError}
+          scope="code:explorer:operation"
+          title="File operation could not be completed"
+          target={{ kind: "route", href: "/code" }}
+        />
+      ) : null}
+
+      {pickerOpen ? (
+        <MistyFilePicker
+          mode="folder"
+          title="Open project folder"
+          onCancel={() => setPickerOpen(false)}
+          onSelect={(path) => {
+            setPickerOpen(false);
+            onOpenRoot(path);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

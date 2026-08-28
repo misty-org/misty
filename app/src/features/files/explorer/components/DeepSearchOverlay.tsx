@@ -1,4 +1,5 @@
 import type { SearchResult } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import type { SearchQueryScope } from "@/native/contracts/primitives";
 import { ShortcutHint } from "@/features/shortcuts";
 import {
@@ -281,8 +282,16 @@ export const DeepSearchOverlay = memo(function DeepSearchOverlay(props: DeepSear
             </div>
           )}
         </div>
+        {error ? (
+          <SystemErrorActivity
+            error={error}
+            scope="files:search"
+            title="File search could not be completed"
+            target={{ kind: "workspace-tool", tool: "files" }}
+          />
+        ) : null}
         <footer className={overlayStyles.footer}>
-          <span className={error ? overlayStyles.error : ""}>{error || statusText}</span>
+          <span>{statusText}</span>
           <span className="inline-flex items-center gap-2">
             {mode === "search" && searching ? (
               <>

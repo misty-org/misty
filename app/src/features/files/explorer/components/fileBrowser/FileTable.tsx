@@ -63,7 +63,7 @@ export function FileTable(props: FileBrowserProps & { listing: DirectoryListing 
   const activeInlineEdit = props.inlineEdit?.paneId === props.paneId ? props.inlineEdit : null;
   const itemScale = normalizeItemScale(props.itemScale);
   const rowHeight = 42 + itemScale * 8;
-  const tableIconSize = 19 + itemScale * 4;
+  const tableIconSize = 20;
   const rowCount = props.listing.entries.length;
   const tableWidth = columnOrder.reduce((sum, column) => sum + columnWidths[column], 0);
   const fillerColumnWidth = Math.max(0, viewportWidth - tableWidth);

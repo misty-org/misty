@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { Loader2, Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -134,7 +135,12 @@ export default function PdfViewer({
         aria-label={`PDF reader for ${name}`}
       >
         {loadError ? (
-          <p className="mt-10 max-w-sm text-center text-sm text-cream-bright">{loadError}</p>
+          <SystemErrorActivity
+            error={loadError}
+            scope="files:pdf-viewer"
+            title="PDF could not be opened"
+            target={{ kind: "workspace-tool", tool: "files" }}
+          />
         ) : (
           <Document
             file={url}

@@ -60,7 +60,7 @@ export function SearchResultThumbnail(props: {
       {url ? (
         <img className={props.imageClassName} src={url} alt="" />
       ) : (
-        <FileIcon entry={entry} size={props.iconSize ?? 22} />
+        <FileIcon entry={entry} size={props.iconSize ?? 20} />
       )}
     </span>
   );
