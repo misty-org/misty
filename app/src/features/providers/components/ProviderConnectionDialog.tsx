@@ -1,9 +1,7 @@
 import type { ProviderWorkflow, ProviderWorkflowOption } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import { iconAssets } from "@/shared/assets/icons";
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
   AssetIcon,
   Button,
   Dialog,
@@ -196,10 +194,12 @@ export function ProviderConnectionDialog(props: ProviderConnectionDialogProps) {
           ) : null}
 
           {session.error ? (
-            <Alert variant="destructive" className="mt-3.5">
-              <AlertTitle>Connection error</AlertTitle>
-              <AlertDescription>{session.error}</AlertDescription>
-            </Alert>
+            <SystemErrorActivity
+              error={session.error}
+              scope="files:remote-connection"
+              title="Remote connection could not be completed"
+              target={{ kind: "workspace-tool", tool: "files" }}
+            />
           ) : null}
         </div>
 
