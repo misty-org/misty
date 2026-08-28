@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import { selectAppearancePreferences, useSettingsStore } from "@/features/settings";
 import type { FileEntry } from "@/native/contracts";
 import { memo, useDeferredValue, useEffect, useMemo } from "react";
@@ -78,9 +79,12 @@ export const FileBrowser = memo(function FileBrowser(props: FileBrowserProps) {
 
   if (props.error) {
     return (
-      <div className={`${fileBrowserStyles.empty} ${fileBrowserStyles.emptyError}`}>
-        {props.error}
-      </div>
+      <SystemErrorActivity
+        error={props.error}
+        scope={`files:browser:${props.paneId}`}
+        title="Files could not be loaded"
+        target={{ kind: "workspace-tool", tool: "files" }}
+      />
     );
   }
   if (props.loading) {

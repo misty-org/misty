@@ -5,6 +5,7 @@ import {
   explorerQueueDeleteItems,
   explorerQueuePasteItems,
 } from "@/features/files/native";
+import { SystemErrorActivity } from "@/features/activity";
 import type {
   CompareFilesResult,
   CompareFolderRow,
@@ -231,7 +232,14 @@ export function CompareDialog(props: { seed: CompareDialogSeed; onClose: () => v
                   />
                 </label>
               </div>
-              {error ? <div className={compareStyles.error}>{error}</div> : null}
+              {error ? (
+                <SystemErrorActivity
+                  error={error}
+                  scope="files:compare"
+                  title="File comparison could not be completed"
+                  target={{ kind: "workspace-tool", tool: "files" }}
+                />
+              ) : null}
               {fileResult ? (
                 <div className={compareStyles.result}>
                   <strong>{fileResult.message}</strong>

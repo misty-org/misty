@@ -28,7 +28,7 @@ export function InlineCreateTableRow(props: {
               key={column}
             >
               <span className="flex min-w-0 items-center gap-2 font-medium">
-                <FileIcon entry={entry} size={16} variant="table" />
+                <FileIcon entry={entry} size={20} variant="table" />
                 <InlineNameEditor {...props} variant="table" />
               </span>
             </TableCell>

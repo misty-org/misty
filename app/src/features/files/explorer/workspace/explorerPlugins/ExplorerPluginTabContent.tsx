@@ -1,4 +1,5 @@
 import { pluginCommandRun } from "@/features/files/native";
+import { SystemErrorActivity } from "@/features/activity";
 import type { PluginCommandEntry, PluginPanelEntry } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { Button } from "@/shared/ui";
@@ -105,7 +106,14 @@ export function ExplorerPluginTabContent(props: {
 
   return (
     <div className={pluginTabHostStyles.body}>
-      {error ? <div className={pluginTabHostStyles.error}>{error}</div> : null}
+      {error ? (
+        <SystemErrorActivity
+          error={error}
+          scope={`files:plugin:${props.tab.pluginId}`}
+          title="File extension command could not be completed"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       {message ? <div className={pluginTabHostStyles.message}>{message}</div> : null}
       {panel ? (
         <ExplorerPluginPanelHost panel={panel} selectedPath={props.tab.selectedPath} />

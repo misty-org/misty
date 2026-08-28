@@ -1,6 +1,6 @@
 export const explorerShellStyles = {
   workspaceBase:
-    "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] bg-charcoal-bg max-[980px]:grid-cols-1 max-[720px]:h-full",
+    "relative grid h-full min-h-0 overflow-hidden grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] bg-charcoal-sidebar max-[980px]:grid-cols-1 max-[720px]:h-full",
   workspaceCollapsed: "sidebar-collapsed grid-cols-[minmax(0,1fr)]",
   main: "col-start-1 col-end-2 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:

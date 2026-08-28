@@ -1,4 +1,5 @@
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
+import { routes } from "@/features/app-shell";
 import { useTransfersStore } from "@/features/transfers";
 import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import {
@@ -23,10 +24,6 @@ import {
 const explorerDuplicateFinderEvent = "misty:explorer-duplicate-finder";
 
 export const executableShortcutCommands = [
-  "app.toggle_transfers",
-  "app.toggle_plugin_launcher",
-  "clipboard.publish_shared",
-  "clipboard.apply_shared",
   "explorer.new_folder",
   "explorer.search",
   "explorer.copy",
@@ -93,7 +90,7 @@ export function runExplorerCommand(
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute("/extensions");
+      navigateRoute(routes.marketplace);
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();

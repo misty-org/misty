@@ -91,7 +91,9 @@ export function FolderContentsPreview(props: {
     return <span className={inspectorStyles.previewStatus}>Loading contents...</span>;
   if (props.entries.length === 0) {
     return (
-      <span className={inspectorStyles.previewStatus}>{props.error ?? "Folder is empty"}</span>
+      <span className={inspectorStyles.previewStatus}>
+        {props.error ? "Preview unavailable" : "Folder is empty"}
+      </span>
     );
   }
   return (
@@ -110,7 +112,7 @@ export function FolderContentsPreview(props: {
             onClick={() => props.onOpenEntry(entry)}
           >
             <div className={inspectorStyles.folderPreviewThumb}>
-              <FileIcon entry={entry} size={21} variant="table" />
+              <FileIcon entry={entry} size={20} variant="table" />
             </div>
             <span className={inspectorStyles.folderPreviewName} title={entry.name}>
               {entry.name}

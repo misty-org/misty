@@ -1,6 +1,6 @@
 import type { PluginCommandEntry, SearchResult } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import {
-  Button,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -10,13 +10,8 @@ import {
   CommandSeparator,
   Popover,
   PopoverContent,
-  PopoverTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
 } from "@/shared/ui";
-import { ArrowLeftRight, Folder } from "lucide-react";
+import { Folder } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExplorerLocationResult } from "../model/interfaces/components/ExplorerToolbarModel";
 import type { ExplorerSearchNavigationTarget } from "../model/interfaces/utils/searchNavigation";
@@ -37,10 +32,8 @@ import {
   toolbarStyles,
 } from "./ExplorerToolbarSupport";
 import { SearchResultThumbnail } from "./SearchResultThumbnail";
-import { useNavigate } from "react-router-dom";
 
 export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
-  const navigate = useNavigate();
   const [searchFocused, setSearchFocused] = useState(false);
   const [indexedResults, setIndexedResults] = useState<SearchResult[]>([]);
   const [indexedSearching, setIndexedSearching] = useState(false);
@@ -183,25 +176,6 @@ export function ExplorerToolbarSearch(props: ExplorerToolbarSearchProps) {
         if (!open) closePalette();
       }}
     >
-      <TooltipProvider delayDuration={450}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Transfers"
-                title="Transfers"
-                onClick={() => navigate("/transfers")}
-              >
-                <ArrowLeftRight size={18} />
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Transfers</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
       <PopoverContent
         align="end"
         sideOffset={6}
@@ -242,6 +216,14 @@ function LocationResults(props: {
   const empty = props.locations.length === 0 && props.indexedResults.length === 0;
   return (
     <>
+      {props.error ? (
+        <SystemErrorActivity
+          error={props.error}
+          scope="files:toolbar-search"
+          title="File search could not be completed"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       {props.locations.length > 0 ? (
         <CommandGroup heading="Locations">
           {props.locations.map((location) => (

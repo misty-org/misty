@@ -1,4 +1,5 @@
 import { useMediaSearchStore } from "@/features/files/search";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button, Progress } from "@/shared/ui";
 import { Film, Music, Pause, Play, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -127,7 +128,12 @@ export function MediaLibraryPanel() {
         </p>
       ) : null}
       {error ? (
-        <p className="rounded-lg bg-charcoal-active p-4 text-sm text-cream-bright">{error}</p>
+        <SystemErrorActivity
+          error={error}
+          scope="files:media-index"
+          title="Media index needs attention"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
       ) : null}
       {snapshot?.assets.length ? (
         <div className="grid gap-2">
@@ -238,16 +244,26 @@ export function MediaLibraryPanel() {
         />
       ) : null}
       {removeTarget ? (
-        <MediaIndexRemovalDialog
-          target={removeTarget}
-          pending={mutationPending}
-          error={mutationError}
-          onCancel={() => {
-            setRemoveTarget(null);
-            setMutationError(null);
-          }}
-          onConfirm={() => void confirmRemoval()}
-        />
+        <>
+          {mutationError ? (
+            <SystemErrorActivity
+              error={mutationError}
+              scope="files:media-index:remove"
+              title="Media index could not be removed"
+              target={{ kind: "workspace-tool", tool: "files" }}
+            />
+          ) : null}
+          <MediaIndexRemovalDialog
+            target={removeTarget}
+            pending={mutationPending}
+            error={null}
+            onCancel={() => {
+              setRemoveTarget(null);
+              setMutationError(null);
+            }}
+            onConfirm={() => void confirmRemoval()}
+          />
+        </>
       ) : null}
     </div>
   );

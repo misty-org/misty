@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import { ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useState, type MouseEvent } from "react";
 import type { FileEntry } from "@/native/contracts/app-explorer";
@@ -95,7 +96,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
             type="button"
             onClick={handleClick}
             className={cn(
-              "code-explorer-row group flex w-full items-center gap-2 rounded-md pr-2 text-left",
+              "code-explorer-row group my-0.5 flex w-full items-center gap-2 rounded-md py-0.5 pr-2 text-left",
               "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
               isActive && "bg-charcoal-hover font-medium text-cream-bright",
               isSelected && "bg-charcoal-active text-cream-bright",
@@ -153,7 +154,7 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
       </ContextMenu>
 
       {isDirectory && expanded ? (
-        <div>
+        <div className="flex flex-col">
           {loading && children === null ? (
             <div
               className="py-1 text-[11px] italic text-cream-muted/60"
@@ -163,12 +164,12 @@ export const CodeExplorerRow = memo(function CodeExplorerRow({
             </div>
           ) : null}
           {error ? (
-            <div
-              className="code-danger py-1 text-[11px] italic"
-              style={{ paddingLeft: indent + 20 }}
-            >
-              {error}
-            </div>
+            <SystemErrorActivity
+              error={error}
+              scope={`code:folder:${entry.path}`}
+              title="Code folder could not be loaded"
+              target={{ kind: "route", href: "/code" }}
+            />
           ) : null}
           {children?.map((child) => (
             <CodeExplorerRow

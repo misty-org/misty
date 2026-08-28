@@ -1,4 +1,5 @@
-import { Sparkles, X } from "lucide-react";
+import { PencilLine, X } from "lucide-react";
+import { SystemErrorActivity } from "@/features/activity";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShortcutHint, useShortcutHandler } from "@/features/shortcuts";
 import { readApiKey } from "./keychain";
@@ -129,7 +130,7 @@ export function InlineRewrite({
       <div className="w-full max-w-2xl rounded-xl border border-charcoal-border bg-charcoal-card shadow-2xl">
         <form onSubmit={submit} className="border-b border-charcoal-border px-4 py-3">
           <div className="flex items-start gap-3">
-            <Sparkles size={16} className="code-accent mt-1" />
+            <PencilLine size={16} className="code-accent mt-1" />
             <textarea
               ref={inputRef}
               value={instruction}
@@ -180,9 +181,12 @@ export function InlineRewrite({
         ) : null}
 
         {error ? (
-          <p className="code-danger border-t border-charcoal-border px-4 py-2 text-[12px]">
-            {error}
-          </p>
+          <SystemErrorActivity
+            error={error}
+            scope={`code:rewrite:${filename}`}
+            title="Rewrite could not be completed"
+            target={{ kind: "route", href: "/code" }}
+          />
         ) : null}
 
         {preview ? (

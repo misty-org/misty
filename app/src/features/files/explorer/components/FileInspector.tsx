@@ -1,4 +1,5 @@
 import type { DirectoryListing, DirectorySizeRecord, FileEntry } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { FileSearch, Maximize2 } from "lucide-react";
 import { lazy, Suspense, useState, type ReactNode } from "react";
@@ -53,6 +54,30 @@ export function FileInspector(props: FileInspectorProps) {
 
   return (
     <aside className={inspectorStyles.root}>
+      {previewError ? (
+        <SystemErrorActivity
+          error={previewError}
+          scope="files:inspector:preview"
+          title="File preview could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
+      {folderPreview.error ? (
+        <SystemErrorActivity
+          error={folderPreview.error}
+          scope="files:inspector:folder"
+          title="Folder preview could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
+      {metadataError ? (
+        <SystemErrorActivity
+          error={metadataError}
+          scope="files:inspector:metadata"
+          title="File details could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       <div
         className={`${inspectorStyles.previewCard} group`}
         aria-busy={showPreviewTransition || undefined}
@@ -92,7 +117,7 @@ export function FileInspector(props: FileInspectorProps) {
             alt={`Preview of ${title}`}
           />
         ) : previewError ? (
-          <span className={inspectorStyles.previewStatus}>{previewError}</span>
+          <span className={inspectorStyles.previewStatus}>Preview unavailable</span>
         ) : !showPreviewTransition && (displayEntry?.kind !== "folder" || multiple) ? (
           <span className={inspectorStyles.previewStatus}>Open the full reader</span>
         ) : null}
@@ -159,11 +184,6 @@ export function FileInspector(props: FileInspectorProps) {
           </>
         )}
       </section>
-      {!multiple && displayEntry && metadataError ? (
-        <section className={inspectorStyles.detailsCard} aria-label="Stat metadata">
-          <Detail label="Stat" value={metadataError} />
-        </section>
-      ) : null}
     </aside>
   );
 }
