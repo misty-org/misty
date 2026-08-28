@@ -141,6 +141,8 @@ function mapServerNote(note: ServerSpaceNote, spaceName = ""): UnifiedNote {
     preview: previewFrom(note.plain_text ?? bodyMarkdown),
     spaceId: note.space_id,
     spaceName,
+    creatorUserId: note.creator_user_id,
+    role: note.role,
     tags: [],
     backlinks: [],
     backlinkCount: note.backlink_count ?? 0,

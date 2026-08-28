@@ -1,6 +1,7 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
 import { httpBlob } from "@/api/client/http";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { Copy, Loader2, X } from "lucide-react";
 import {
@@ -143,7 +144,12 @@ function EditorStatus(props: { name: string; error?: string; onClose: () => void
       <div className="grid h-full place-items-center text-sm text-cream-bright/60">
         <div className="grid justify-items-center gap-3">
           {props.error ? (
-            <p className="max-w-sm text-center text-cream-bright">{props.error}</p>
+            <SystemErrorActivity
+              error={props.error}
+              scope="files:photo-editor"
+              title="Image could not be prepared"
+              target={{ kind: "workspace-tool", tool: "files" }}
+            />
           ) : (
             <>
               <Loader2 className="animate-spin" size={28} />
@@ -237,12 +243,12 @@ export function PhotoEditor(props: PhotoEditorProps) {
         />
       </Suspense>
       {saveError ? (
-        <p
-          className="pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-          role="status"
-        >
-          {saveError}
-        </p>
+        <SystemErrorActivity
+          error={saveError}
+          scope="files:photo-editor:save"
+          title="Edited image could not be saved"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
       ) : null}
     </EditorShell>
   );

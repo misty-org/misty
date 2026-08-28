@@ -1,6 +1,6 @@
-export type NoteSource = "misty" | "notion";
+export type NoteSource = "misty";
 
-export type NoteBodyFormat = "markdown" | "tiptap-json" | "html" | "notion-blocks";
+export type NoteBodyFormat = "markdown" | "tiptap-json" | "html";
 
 export type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
 
@@ -23,6 +23,8 @@ export type UnifiedNote = {
   preview: string;
   spaceId?: string;
   spaceName?: string;
+  creatorUserId?: string;
+  role?: "creator" | "editor" | "viewer";
   tags: string[];
   backlinks: string[];
   updatedAt: string;
