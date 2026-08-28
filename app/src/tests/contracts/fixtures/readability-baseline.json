@@ -5,12 +5,6 @@
       "hash": "4cdf78067b35b51e"
     }
   ],
-  "src/application/layouts/DesktopLayout/GlobalNavigator.tsx": [
-    {
-      "length": 300,
-      "hash": "f0628661caf953cc"
-    }
-  ],
   "src/application/layouts/RootLayout.tsx": [
     {
       "length": 308,
@@ -329,12 +323,6 @@
       "hash": "927a2c3f702b9865"
     }
   ],
-  "src/features/global-search/GlobalMisty.tsx": [
-    {
-      "length": 164,
-      "hash": "0e4a31905cfa0a79"
-    }
-  ],
   "src/features/journal/components/JournalAttribution.tsx": [
     {
       "length": 307,
@@ -353,21 +341,7 @@
       "hash": "99c8dc05c6c0ef8d"
     }
   ],
-  "src/features/settings/settingsConstants.ts": [
-    {
-      "length": 162,
-      "hash": "3d7dcf66ddbb7e89"
-    }
-  ],
   "src/features/settings/settingsControls.tsx": [
-    {
-      "length": 175,
-      "hash": "e976147355e1cb29"
-    },
-    {
-      "length": 175,
-      "hash": "e976147355e1cb29"
-    },
     {
       "length": 173,
       "hash": "a31d88740c6ecdc9"
