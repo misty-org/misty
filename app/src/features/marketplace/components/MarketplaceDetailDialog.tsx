@@ -9,10 +9,13 @@ import {
   DialogTitle,
 } from "@/shared/ui/dialog";
 import { CheckCircle2, ExternalLink } from "lucide-react";
-import { ExtensionCatalogIcon } from "./ExtensionCatalogIcon";
+import { MarketplaceCatalogIcon } from "./MarketplaceCatalogIcon";
 import { pluginStatus, statusBadgeVariant } from "./helpers";
-import { PluginPrimaryAction, type PluginActionHandlers } from "./PluginPrimaryAction";
-import type { PluginBrowserEntry } from "./types";
+import {
+  MarketplacePrimaryAction,
+  type MarketplaceActionHandlers,
+} from "./MarketplacePrimaryAction";
+import type { MarketplaceEntry } from "./types";
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -25,18 +28,18 @@ function DetailSection({ title, children }: { title: string; children: React.Rea
   );
 }
 
-export function PluginDetailDialog({
+export function MarketplaceDetailDialog({
   plugin,
   busy,
   onClose,
   onToggle,
   onUninstall,
   ...actions
-}: PluginActionHandlers & {
-  plugin: PluginBrowserEntry | undefined;
+}: MarketplaceActionHandlers & {
+  plugin: MarketplaceEntry | undefined;
   busy: boolean;
   onClose: () => void;
-  onUninstall?: (plugin: PluginBrowserEntry) => void;
+  onUninstall?: (plugin: MarketplaceEntry) => void;
 }) {
   return (
     <Dialog onOpenChange={(open) => (open ? undefined : onClose())} open={Boolean(plugin)}>
@@ -45,7 +48,7 @@ export function PluginDetailDialog({
           <>
             <DialogHeader className="pr-8">
               <div className="flex items-center gap-3">
-                <ExtensionCatalogIcon
+                <MarketplaceCatalogIcon
                   className="size-10 shrink-0"
                   logoSrc={plugin.logoSrc}
                   pluginId={plugin.id}
@@ -158,17 +161,17 @@ export function PluginDetailDialog({
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">
-              {plugin.installed && onUninstall ? (
+              {plugin.kind !== "builtin" && plugin.installed && onUninstall ? (
                 <Button onClick={() => onUninstall(plugin)} size="sm" variant="destructive">
                   Uninstall
                 </Button>
               ) : null}
-              {plugin.installed && plugin.enabled && onToggle ? (
+              {plugin.kind !== "builtin" && plugin.installed && plugin.enabled && onToggle ? (
                 <Button onClick={() => onToggle(plugin, false)} size="sm" variant="outline">
                   Disable
                 </Button>
               ) : null}
-              <PluginPrimaryAction
+              <MarketplacePrimaryAction
                 busy={busy}
                 onToggle={onToggle}
                 plugin={plugin}

@@ -1,7 +1,9 @@
+import { isNavigatorAppId, WorkspaceAppIcon } from "@/features/workspace";
+import { Puzzle } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 
-type ExtensionCatalogIconProps = {
+type MarketplaceCatalogIconProps = {
   pluginId?: string;
   pluginName?: string;
   logoSrc?: string;
@@ -13,17 +15,7 @@ type ExtensionCatalogIconProps = {
   style?: CSSProperties;
 };
 
-export function extensionCatalogInitials(pluginName?: string, pluginId?: string): string {
-  const source = (pluginName || pluginId || "Extension").trim();
-  return source
-    .split(/[\s_-]+/)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-export function ExtensionCatalogIcon({
+export function MarketplaceCatalogIcon({
   pluginId,
   pluginName,
   logoSrc,
@@ -33,7 +25,7 @@ export function ExtensionCatalogIcon({
   imageClassName = "h-[72%] w-[72%] object-contain",
   size,
   style,
-}: ExtensionCatalogIconProps) {
+}: MarketplaceCatalogIconProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const [cacheBust, setCacheBust] = useState(() => Date.now().toString());
 
@@ -45,11 +37,14 @@ export function ExtensionCatalogIcon({
   const src =
     logoSrc && !imgFailed ? `${logoSrc}${logoSrc.includes("?") ? "&" : "?"}t=${cacheBust}` : "";
   const sizedStyle = size ? { width: size, height: size, ...style } : style;
-
+  const builtInAppId = pluginId?.startsWith("builtin:") ? pluginId.slice("builtin:".length) : "";
+  if (isNavigatorAppId(builtInAppId)) {
+    return <WorkspaceAppIcon appId={builtInAppId} className={className} size="marketplace" />;
+  }
   return (
     <span
       className={`inline-flex shrink-0 items-center justify-center border border-charcoal-border bg-charcoal-card ${roundedClassName} ${textClassName} ${className}`}
-      data-plugin-icon={normalizedExtensionCatalogIconId(pluginId)}
+      data-plugin-icon={normalizedMarketplaceCatalogIconId(pluginId)}
       style={sizedStyle}
     >
       {src ? (
@@ -60,12 +55,12 @@ export function ExtensionCatalogIcon({
           src={src}
         />
       ) : (
-        extensionCatalogInitials(pluginName, pluginId)
+        <Puzzle aria-hidden="true" size={20} strokeWidth={1.9} />
       )}
     </span>
   );
 }
 
-function normalizedExtensionCatalogIconId(pluginId?: string): string {
+function normalizedMarketplaceCatalogIconId(pluginId?: string): string {
   return (pluginId || "generic").trim().toLowerCase().replace(/-/g, "_") || "generic";
 }

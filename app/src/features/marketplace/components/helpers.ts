@@ -1,24 +1,30 @@
-import type { PluginBrowserEntry, PluginBrowserTab } from "./types";
+import type { MarketplaceEntry, MarketplaceView } from "./types";
 
-export function pluginStatus(plugin: PluginBrowserEntry) {
+export function pluginStatus(plugin: MarketplaceEntry) {
+  if (plugin.kind === "builtin") {
+    return "built-in";
+  }
   if (!plugin.installed) {
     return "available";
   }
   return plugin.enabled ? "installed" : "disabled";
 }
 
-export function statusBadgeVariant(plugin: PluginBrowserEntry) {
+export function statusBadgeVariant(plugin: MarketplaceEntry) {
   return plugin.installed && plugin.enabled ? ("secondary" as const) : ("outline" as const);
 }
 
-export function actionLabel(plugin: PluginBrowserEntry) {
+export function actionLabel(plugin: MarketplaceEntry) {
+  if (plugin.kind === "builtin") {
+    return "Open";
+  }
   if (!plugin.installed) {
     return "Install";
   }
   return plugin.enabled ? "Open" : "Enable";
 }
 
-export function filterPlugins(plugins: PluginBrowserEntry[], query: string, tab: PluginBrowserTab) {
+export function filterPlugins(plugins: MarketplaceEntry[], query: string, tab: MarketplaceView) {
   const normalized = query.trim().toLowerCase();
   return plugins.filter((plugin) => {
     if (tab === "installed" && !plugin.installed) {

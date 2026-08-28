@@ -1,10 +1,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PluginBrowser } from "./components/PluginBrowser";
-import type { PluginBrowserEntry } from "./components/types";
+import { MarketplaceBrowser } from "./components/MarketplaceBrowser";
+import type { MarketplaceEntry } from "./components/types";
 
-function entry(overrides: Partial<PluginBrowserEntry> & { id: string }): PluginBrowserEntry {
+function entry(overrides: Partial<MarketplaceEntry> & { id: string }): MarketplaceEntry {
   return {
     name: `Plugin ${overrides.id}`,
     version: "0.3.0",
@@ -37,7 +37,7 @@ function cardTitles(container: HTMLElement) {
   );
 }
 
-describe("PluginBrowser", () => {
+describe("MarketplaceBrowser", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -61,9 +61,9 @@ describe("PluginBrowser", () => {
     });
   }
 
-  it("renders one card per extension and no page heading", async () => {
+  it("renders one card per app beneath the catalog heading", async () => {
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
         onSelect={() => {}}
@@ -72,12 +72,12 @@ describe("PluginBrowser", () => {
     );
 
     expect(cardTitles(container)).toEqual(["Storage Report", "Themes", "Backups"]);
-    expect(container.querySelector("h1")).toBeNull();
+    expect(container.querySelector("h1")?.textContent).toBe("Marketplace");
   });
 
   it("keeps the manual reload fallback quiet and icon-only", async () => {
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
         onRefresh={() => {}}
@@ -93,7 +93,7 @@ describe("PluginBrowser", () => {
 
   it("opens the detail dialog only for the selected extension", async () => {
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
         onSelect={() => {}}
@@ -103,7 +103,7 @@ describe("PluginBrowser", () => {
     expect(document.querySelector('[data-slot="dialog-content"]')).toBeNull();
 
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
         onSelect={() => {}}
@@ -120,7 +120,7 @@ describe("PluginBrowser", () => {
   it("reports the selected extension when a card is opened", async () => {
     const selected: string[] = [];
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
         onSelect={(pluginId) => selected.push(pluginId)}
@@ -140,7 +140,7 @@ describe("PluginBrowser", () => {
 
   it("filters by query and narrows the installed tab", async () => {
     await render(
-      <PluginBrowser
+      <MarketplaceBrowser
         installedPlugins={marketplace.filter((plugin) => plugin.installed)}
         marketplacePlugins={marketplace}
         onQueryChange={() => {}}
@@ -150,5 +150,73 @@ describe("PluginBrowser", () => {
     );
 
     expect(cardTitles(container)).toEqual(["Backups"]);
+  });
+
+  it("paginates results in groups of 50", async () => {
+    const catalog = Array.from({ length: 120 }, (_, index) =>
+      entry({ id: `app-${index + 1}`, name: `App ${index + 1}` }),
+    );
+    await render(
+      <MarketplaceBrowser
+        marketplacePlugins={catalog}
+        onQueryChange={() => {}}
+        onSelect={() => {}}
+        query=""
+      />,
+    );
+
+    expect(cardTitles(container)).toHaveLength(50);
+    expect(container.textContent).toContain("1–50 of 120");
+    expect(
+      container.querySelector<HTMLButtonElement>('button[aria-label="Previous page"]')?.disabled,
+    ).toBe(true);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Next page"]')?.click();
+    });
+
+    expect(cardTitles(container)).toHaveLength(50);
+    expect(cardTitles(container)[0]).toBe("App 51");
+    expect(container.textContent).toContain("51–100 of 120");
+  });
+
+  it("treats Extensions as a Marketplace category", async () => {
+    const catalog = [
+      entry({ id: "builtin:journal", kind: "builtin", name: "Journal" }),
+      entry({ id: "storage-report", kind: "extension", name: "Storage Report" }),
+    ];
+    await render(
+      <MarketplaceBrowser
+        marketplacePlugins={catalog}
+        onQueryChange={() => {}}
+        onSelect={() => {}}
+        query=""
+      />,
+    );
+
+    const builtInIcon = container.querySelector<HTMLElement>('[data-app-icon="journal"]');
+    expect(builtInIcon?.className.split(/\s+/)).toContain("text-cream-bright");
+    expect(builtInIcon?.className).not.toMatch(/text-(?:avatar|agent)-/);
+
+    const filter = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Filter by app type: All"]',
+    );
+    await act(async () => {
+      filter?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
+    });
+    const menuItems = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
+    expect(document.body.textContent).not.toContain("App type");
+    expect(
+      menuItems.find((item) => item.textContent === "All")?.querySelector(".lucide-check"),
+    ).not.toBeNull();
+    const extensions = menuItems.find((item) => item.textContent === "Extensions");
+    await act(async () => extensions?.click());
+    expect(cardTitles(container)).toEqual(["Storage Report"]);
+    const fallbackIcon = container.querySelector<HTMLElement>(
+      '[data-plugin-icon="storage_report"]',
+    );
+    expect(fallbackIcon?.className.split(/\s+/)).toContain("text-cream-bright");
+    expect(fallbackIcon?.style.backgroundColor).toBe("");
+    expect(fallbackIcon?.style.color).toBe("");
   });
 });

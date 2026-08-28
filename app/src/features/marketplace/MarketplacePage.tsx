@@ -1,4 +1,19 @@
 import { useSetupStore } from "@/features/installer";
+import { routes } from "@/features/app-shell";
+import { useAuth } from "@/features/auth";
+import {
+  preferredMistySpace,
+  rememberedJournalRoute,
+  rememberedPlannerRoute,
+  socialProviderPath,
+  useSpacesStore,
+} from "@/features/spaces";
+import {
+  NAVIGATOR_APP_DESCRIPTIONS,
+  NAVIGATOR_APP_IDS,
+  WORKSPACE_TOOLS_META,
+  type NavigatorAppId,
+} from "@/features/workspace";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
@@ -7,12 +22,11 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { PluginBrowser } from "./components/PluginBrowser";
-import type { PluginBrowserEntry } from "./components/types";
-import type { PluginEntry } from "./model/types";
-import { currentPluginPlatform, usePluginsStore } from "./store/usePluginsStore";
+import { MarketplaceBrowser } from "./components/MarketplaceBrowser";
+import type { MarketplaceEntry } from "./components/types";
+import { currentPluginPlatform, usePluginsStore, type PluginEntry } from "@/features/extensions";
 
-function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
+function toBrowserEntry(plugin: PluginEntry): MarketplaceEntry {
   return {
     id: plugin.id,
     name: plugin.name,
@@ -38,8 +52,36 @@ function toBrowserEntry(plugin: PluginEntry): PluginBrowserEntry {
   };
 }
 
-export default function PluginsPage(props: { embedded?: boolean }) {
+const builtInApps: MarketplaceEntry[] = NAVIGATOR_APP_IDS.map((id) => ({
+  id: `builtin:${id}`,
+  kind: "builtin",
+  name: WORKSPACE_TOOLS_META[id].label,
+  version: "1",
+  author: "Misty",
+  overview: NAVIGATOR_APP_DESCRIPTIONS[id],
+  installed: true,
+  enabled: true,
+  verified: true,
+  capabilities: [NAVIGATOR_APP_DESCRIPTIONS[id]],
+  whereItAppears: ["Sidebar", "Workspace"],
+  permissions: [],
+  gettingStarted: ["Add this app from the Apps menu in the sidebar."],
+  changelog: [],
+  includedTools: [],
+  links: [],
+  placement: { views: ["sidebar", "workspace"], openMode: "workspace", requiresSelection: false },
+}));
+
+function builtInAppId(entry: MarketplaceEntry): NavigatorAppId | null {
+  if (entry.kind !== "builtin") return null;
+  const id = entry.id.slice("builtin:".length);
+  return NAVIGATOR_APP_IDS.find((candidate) => candidate === id) ?? null;
+}
+
+export default function MarketplacePage(props: { embedded?: boolean }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const spaces = useSpacesStore((state) => state.spaces);
   const [searchParams, setSearchParams] = useSearchParams();
   const [embeddedPluginId, setEmbeddedPluginId] = useState("");
   const routePluginId = props.embedded
@@ -91,17 +133,19 @@ export default function PluginsPage(props: { embedded?: boolean }) {
   }, [loadPlugins, pluginPlatform]);
 
   const browserMarketplacePlugins = useMemo(
-    () => marketplacePlugins.map(toBrowserEntry),
+    () => [...builtInApps, ...marketplacePlugins.map(toBrowserEntry)],
     [marketplacePlugins],
   );
   const browserInstalledPlugins = useMemo(
-    () => installedPlugins.map(toBrowserEntry),
+    () => [...builtInApps, ...installedPlugins.map(toBrowserEntry)],
     [installedPlugins],
   );
   const routePluginAvailable = useMemo(
     () =>
       Boolean(routePluginId) &&
-      [...marketplacePlugins, ...installedPlugins].some((plugin) => plugin.id === routePluginId),
+      [...builtInApps, ...marketplacePlugins, ...installedPlugins].some(
+        (plugin) => plugin.id === routePluginId,
+      ),
     [installedPlugins, marketplacePlugins, routePluginId],
   );
 
@@ -160,8 +204,8 @@ export default function PluginsPage(props: { embedded?: boolean }) {
         : null;
     };
     return {
-      surfaceId: "extensions",
-      label: selected?.name ?? "Extensions",
+      surfaceId: "marketplace",
+      label: selected?.name ?? "Marketplace",
       getContext: () => [
         {
           kind: "extensions.catalog",
@@ -263,7 +307,7 @@ export default function PluginsPage(props: { embedded?: boolean }) {
   );
 
   return (
-    <PluginBrowser
+    <MarketplaceBrowser
       error={error}
       installedPlugins={browserInstalledPlugins}
       loading={loading || actionPluginId.length > 0}
@@ -277,7 +321,14 @@ export default function PluginsPage(props: { embedded?: boolean }) {
           void installPlugin(match);
         }
       }}
-      onPrimaryAction={(plugin) => navigate(`/files?extension=${encodeURIComponent(plugin.id)}`)}
+      onPrimaryAction={(plugin) => {
+        const appId = builtInAppId(plugin);
+        if (appId) {
+          navigate(builtInAppRoute(appId, preferredMistySpace(spaces)?.id, user?.id ?? ""));
+          return;
+        }
+        navigate(`/files?extension=${encodeURIComponent(plugin.id)}`);
+      }}
       onQueryChange={(value) => {
         setQuery(value);
       }}
@@ -307,6 +358,17 @@ export default function PluginsPage(props: { embedded?: boolean }) {
       selectedPluginId={selectedPluginId}
     />
   );
+}
+
+function builtInAppRoute(appId: NavigatorAppId, spaceId: string | undefined, accountId: string) {
+  if (appId === "social") return spaceId ? socialProviderPath(spaceId, "misty") : routes.spaces;
+  if (appId === "journal")
+    return spaceId ? rememberedJournalRoute(accountId, spaceId) : routes.spaces;
+  if (appId === "planner")
+    return spaceId ? rememberedPlannerRoute(accountId, spaceId) : routes.spaces;
+  if (appId === "library")
+    return spaceId ? `/spaces/${encodeURIComponent(spaceId)}/library` : routes.spaces;
+  return routes[appId];
 }
 
 function extensionAiHash(value: string) {

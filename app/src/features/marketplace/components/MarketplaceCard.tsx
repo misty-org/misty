@@ -1,25 +1,28 @@
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/shared/ui/card";
-import { ExtensionCatalogIcon } from "./ExtensionCatalogIcon";
+import { MarketplaceCatalogIcon } from "./MarketplaceCatalogIcon";
 import { pluginStatus, statusBadgeVariant } from "./helpers";
-import { PluginPrimaryAction, type PluginActionHandlers } from "./PluginPrimaryAction";
-import type { PluginBrowserEntry } from "./types";
+import {
+  MarketplacePrimaryAction,
+  type MarketplaceActionHandlers,
+} from "./MarketplacePrimaryAction";
+import type { MarketplaceEntry } from "./types";
 
-export function PluginCard({
+export function MarketplaceCard({
   plugin,
   busy,
   onOpenDetails,
   ...actions
-}: PluginActionHandlers & {
-  plugin: PluginBrowserEntry;
+}: MarketplaceActionHandlers & {
+  plugin: MarketplaceEntry;
   busy: boolean;
   onOpenDetails: () => void;
 }) {
   return (
     <Card className="relative h-full gap-3 transition-colors hover:bg-charcoal-card" size="sm">
       <CardHeader className="grid-cols-[auto_minmax(0,1fr)] items-center gap-3">
-        <ExtensionCatalogIcon
+        <MarketplaceCatalogIcon
           className="size-10"
           logoSrc={plugin.logoSrc}
           pluginId={plugin.id}
@@ -47,7 +50,7 @@ export function PluginCard({
       </CardContent>
 
       <CardFooter className="justify-end">
-        <PluginPrimaryAction
+        <MarketplacePrimaryAction
           busy={busy}
           className="relative z-20"
           plugin={plugin}
