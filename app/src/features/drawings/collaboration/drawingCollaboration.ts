@@ -20,6 +20,7 @@ export interface DrawingCollaborationSession {
 
 type SessionEntry = {
   refs: number;
+  presenceRefs: number;
   idleTimer: number | null;
   session?: DrawingCollaborationSession;
   promise?: Promise<DrawingCollaborationSession>;
@@ -31,14 +32,16 @@ const sessionIdleMs = 5 * 60 * 1000;
 export async function acquireDrawingSession(
   spaceId: string,
   drawingId: string,
+  options?: { publishPresence?: boolean },
 ): Promise<DrawingCollaborationSession> {
   const key = `${spaceId}:${drawingId}`;
   let entry = sessions.get(key);
   if (!entry) {
-    entry = { refs: 0, idleTimer: null };
+    entry = { refs: 0, presenceRefs: 0, idleTimer: null };
     sessions.set(key, entry);
   }
   entry.refs += 1;
+  if (options?.publishPresence !== false) entry.presenceRefs += 1;
   clearIdleTimer(entry);
   if (entry.session) return entry.session;
   if (entry.promise) return entry.promise;
@@ -63,17 +66,31 @@ export async function acquireDrawingSession(
   return entry.promise;
 }
 
-export function releaseDrawingSession(spaceId: string, drawingId: string): void {
+export function releaseDrawingSession(
+  spaceId: string,
+  drawingId: string,
+  options?: { publishPresence?: boolean },
+): void {
   const key = `${spaceId}:${drawingId}`;
   const entry = sessions.get(key);
   if (!entry) return;
   entry.refs = Math.max(0, entry.refs - 1);
+  if (options?.publishPresence !== false) {
+    entry.presenceRefs = Math.max(0, entry.presenceRefs - 1);
+    if (entry.presenceRefs === 0) entry.session?.provider.awareness.setLocalState(null);
+  }
   if (entry.refs === 0) {
-    // Keep the warm document cache, but remove presence immediately so other
-    // collaborators never see a five-minute "ghost" cursor.
-    entry.session?.provider.awareness.setLocalState(null);
     scheduleIdleClose(key, entry);
   }
+}
+
+export function closeDrawingCollaborationSession(spaceId: string, drawingId: string): void {
+  const key = `${spaceId}:${drawingId}`;
+  const entry = sessions.get(key);
+  if (!entry) return;
+  sessions.delete(key);
+  clearIdleTimer(entry);
+  if (entry.session) destroySession(entry.session);
 }
 
 export function closeAllDrawingCollaborationSessions(): void {

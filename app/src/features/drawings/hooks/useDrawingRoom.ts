@@ -8,13 +8,19 @@ import {
 } from "../collaboration/drawingCollaboration";
 import type { DrawingConnectionState } from "../types";
 
-export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUser) {
+export function useDrawingRoom(
+  spaceId: string,
+  drawingId: string,
+  user: AuthUser,
+  options?: { publishPresence?: boolean },
+) {
   const [session, setSession] = useState<DrawingCollaborationSession | null>(null);
   const [connection, setConnection] = useState<DrawingConnectionState>("connecting");
   const [synced, setSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const acquiredRef = useRef(false);
+  const publishPresence = options?.publishPresence !== false;
 
   useEffect(() => {
     let active = true;
@@ -26,7 +32,7 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
     setError(null);
     setNotice(null);
 
-    acquireDrawingSession(spaceId, drawingId)
+    acquireDrawingSession(spaceId, drawingId, { publishPresence })
       .then((nextSession) => {
         if (!active) return;
         setSession(nextSession);
@@ -36,7 +42,11 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
           name: user.name || user.email,
           color: collaborationColor(user.id),
         };
-        const publishUserPresence = () => awareness.setLocalStateField("user", userPresence);
+        const publishUserPresence = () => {
+          if (publishPresence) {
+            awareness.setLocalStateField("user", userPresence);
+          }
+        };
         publishUserPresence();
 
         const onSynced = (ready: boolean) => {
@@ -84,10 +94,10 @@ export function useDrawingRoom(spaceId: string, drawingId: string, user: AuthUse
       detachProviderListeners?.();
       if (acquiredRef.current) {
         acquiredRef.current = false;
-        releaseDrawingSession(spaceId, drawingId);
+        releaseDrawingSession(spaceId, drawingId, { publishPresence });
       }
     };
-  }, [drawingId, spaceId, user.email, user.id, user.name]);
+  }, [drawingId, publishPresence, spaceId, user.email, user.id, user.name]);
 
   return { session, connection, synced, error, notice };
 }

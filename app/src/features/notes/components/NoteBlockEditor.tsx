@@ -1,5 +1,6 @@
 import "./noteTiptapEditor.css";
 
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
   DropdownMenu,
@@ -8,12 +9,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Separator,
   cn,
 } from "@/shared/ui";
+import { MistyFilePicker, readFileFromPath } from "@/features/picker";
 import {
   useAiSurfaceActions,
   useAiSurfaceAdapter,
@@ -24,6 +23,7 @@ import {
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
 import { AiSelectionMenu } from "@/features/ai-surface/AiSelectionMenu";
+import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import DragHandle from "@tiptap/extension-drag-handle-react";
@@ -46,38 +46,38 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
-  Bold,
   Braces,
-  ChevronDown,
-  Code2,
+  Check,
   Copy,
   GripVertical,
   Heading,
   Highlighter,
   ImagePlus,
-  Italic,
   Link2,
   List,
   ListChecks,
   ListOrdered,
   Minus,
+  Pencil,
   Pilcrow,
   Plus,
   Quote,
-  Redo2,
+  RotateCcw,
   Search,
-  Strikethrough,
   Subscript as SubscriptIcon,
   Superscript as SuperscriptIcon,
   Trash2,
-  Underline,
-  Undo2,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
 import type { NoteBodyFormat } from "../model/types/types";
 import { uploadNoteAsset } from "../noteAssets";
 import type { NoteCollaborationSession } from "../noteCollaboration";
+import {
+  NoteToolbarInlineControls,
+  NoteToolbarStructureControls,
+} from "./NoteEditorToolbarControls";
 
 interface NoteBlockEditorProps {
   editable: boolean;
@@ -115,9 +115,17 @@ function CollaborativeNoteEditor(props: NoteBlockEditorProps & { spaceId: string
   const { session, error, notice } = useNoteCollaborationRoom(props.spaceId, props.noteId);
   if (error) {
     return (
-      <div className="rounded-md border border-charcoal-active/30 bg-charcoal-active px-4 py-3 text-sm text-cream-bright">
-        Note collaboration unavailable.
-      </div>
+      <>
+        <SystemErrorActivity
+          error={error}
+          scope={`notes:collaboration:${props.noteId}`}
+          title="Note collaboration is unavailable"
+          target={{ kind: "route", href: `/spaces/${encodeURIComponent(props.spaceId)}/notes` }}
+        />
+        <div className="rounded-md border border-charcoal-border bg-charcoal-card px-4 py-3 text-sm text-cream-muted">
+          Open Activity for details.
+        </div>
+      </>
     );
   }
   if (!session) return <div className="px-2 py-3 text-sm text-cream-muted">Connecting note…</div>;
@@ -141,7 +149,7 @@ function CollaborativeNoteEditor(props: NoteBlockEditorProps & { spaceId: string
 function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteCollaborationSession }) {
   const { body, bodyFormat, bodyMarkdown, session } = props;
   const loadingRef = useRef(true);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const onContentChangeRef = useRef(props.onContentChange);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -304,7 +312,7 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteCollabo
             editor={editor}
             searchOpen={searchOpen}
             setSearchOpen={setSearchOpen}
-            onAddImage={() => imageInputRef.current?.click()}
+            onAddImage={() => setImagePickerOpen(true)}
           />
         ) : null}
         <SearchReplacePanel
@@ -349,16 +357,20 @@ function MistyTipTapEditor(props: NoteBlockEditorProps & { session?: NoteCollabo
             />
           ) : null}
         </div>
-        <input
-          ref={imageInputRef}
-          className="hidden"
-          type="file"
-          accept="image/*"
-          onChange={(event) => {
-            void uploadImage(event.currentTarget.files?.[0]);
-            event.currentTarget.value = "";
-          }}
-        />
+        {imagePickerOpen ? (
+          <MistyFilePicker
+            mode="file"
+            title="Insert image into note"
+            allowedExtensions={["png", "jpg", "jpeg", "webp", "gif", "svg", "bmp"]}
+            onCancel={() => setImagePickerOpen(false)}
+            onSelect={(path) => {
+              setImagePickerOpen(false);
+              void readFileFromPath(path)
+                .then((file) => uploadImage(file))
+                .catch(() => undefined);
+            }}
+          />
+        ) : null}
       </div>
     </EditorContext.Provider>
   );
@@ -371,6 +383,14 @@ type NoteAiSelection = {
   x: number;
   y: number;
 };
+
+export interface NotesInlineProposal {
+  selection: AiSelectionSnapshot;
+  replacement: string;
+  artifactId: string;
+  invocationId?: string;
+  status: "proposed" | "stale" | "applying" | "applied" | "discarded" | "failed";
+}
 
 const noteSelectionActions: AiSuggestedAction[] = [
   {
@@ -450,17 +470,105 @@ function NoteAiSelectionMenu({
   selection: NoteAiSelection;
 }) {
   const actions = useAiSurfaceActions(adapter);
-  if (!adapter || !actions.available) return null;
+  const followEnabled = useAiSurfaceStore((state) => state.companion.phase === "following");
+  const [lastAction, setLastAction] = useState<AiSuggestedAction>(noteSelectionActions[0]);
+  const proposal = actions.proposal?.kind === "text_patch" ? actions.proposal : undefined;
+  const replacement = proposal
+    ? (proposal.operations as Record<string, unknown>)?.replacement
+    : undefined;
+  const inlineProposal: NotesInlineProposal | undefined =
+    proposal && typeof replacement === "string"
+      ? {
+          selection: selection.snapshot,
+          replacement,
+          artifactId: proposal.id,
+          status: actions.proposalStale
+            ? "stale"
+            : proposal.state === "rejected"
+              ? "discarded"
+              : proposal.state,
+        }
+      : undefined;
+  if (!adapter || !actions.available || (!followEnabled && !proposal)) return null;
   return (
     <div
       className="fixed z-[80]"
       style={{ left: selection.x, top: selection.y }}
       onMouseDown={(event) => event.preventDefault()}
     >
-      <AiSelectionMenu
-        actions={noteSelectionActions}
-        onAction={(action) => void actions.runAction(action)}
-      />
+      {inlineProposal ? (
+        <div className="w-[min(440px,calc(100vw-24px))] rounded-xl border border-charcoal-border bg-charcoal-card p-3 shadow-2xl">
+          <div className="mb-2 flex items-center justify-between gap-3 text-xs font-medium text-cream">
+            <span>Misty inline edit</span>
+            <span className="text-[10px] text-cream-muted">
+              {inlineProposal.status === "stale" ? "Selection changed" : "Review before applying"}
+            </span>
+          </div>
+          <div className="max-h-36 space-y-2 overflow-y-auto text-xs leading-relaxed">
+            <p className="rounded-md bg-red-950/20 px-2 py-1.5 text-cream-muted line-through">
+              {selection.snapshot.content}
+            </p>
+            <p className="rounded-md bg-emerald-950/25 px-2 py-1.5 text-cream">
+              {inlineProposal.replacement}
+            </p>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 text-xs"
+              disabled={actions.proposalStale}
+              onClick={() => void actions.decideProposal("accept")}
+            >
+              <Check className="size-3.5" /> Accept
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() => void actions.decideProposal("reject")}
+            >
+              <X className="size-3.5" /> Discard
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              onClick={() =>
+                void actions.decideProposal("reject").then(() => actions.runAction(lastAction))
+              }
+            >
+              <RotateCcw className="size-3.5" /> Retry
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <AiSelectionMenu
+          actions={noteSelectionActions}
+          trigger={
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              className="size-7 rounded-full"
+              aria-label="Edit selection with Misty"
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          }
+          onAction={(action) => {
+            setLastAction(action);
+            void actions.runAction(action, {
+              kind: "selection",
+              paneId: "",
+              x: selection.x,
+              y: selection.y,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -480,6 +588,9 @@ function createNoteAiAdapter(
     getSuggestedActions: () => (selection ? noteSelectionActions : notePageActions),
     canApply: (artifact) => canApplyNoteArtifact(editor, props, artifact),
     applyArtifact: (artifact) => applyNoteArtifact(editor, props, artifact),
+    undoArtifact: () => {
+      editor.chain().focus().undo().run();
+    },
     openCitation: (citation) => {
       const noteId = citation.kind === "note" ? noteIdFromHref(citation.href) : null;
       if (noteId) props.onOpenNote?.(noteId);
@@ -592,153 +703,12 @@ function SimpleEditorToolbar(props: {
   onAddImage: () => void;
 }) {
   const { editor } = props;
-  const link = () => {
-    const previous = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Link URL", previous ?? "https://");
-    if (href === null) return;
-    if (!href.trim()) editor.chain().focus().unsetLink().run();
-    else editor.chain().focus().extendMarkRange("link").setLink({ href: href.trim() }).run();
-  };
   return (
     <div className="misty-tiptap-toolbar" role="toolbar" aria-label="Text formatting">
-      <ToolbarGroup>
-        <ToolButton label="Undo" Icon={Undo2} onClick={() => editor.chain().focus().undo().run()} />
-        <ToolButton label="Redo" Icon={Redo2} onClick={() => editor.chain().focus().redo().run()} />
-      </ToolbarGroup>
+      <NoteToolbarStructureControls editor={editor} />
       <ToolbarRule />
-      <ToolbarGroup>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="misty-tiptap-tool gap-1"
-              aria-label="Headings"
-            >
-              <Heading size={17} />
-              <ChevronDown size={12} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => editor.chain().focus().setParagraph().run()}>
-              <Pilcrow />
-              Text
-            </DropdownMenuItem>
-            {[1, 2, 3, 4].map((level) => (
-              <DropdownMenuItem
-                key={level}
-                onSelect={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .toggleHeading({ level: level as 1 | 2 | 3 | 4 })
-                    .run()
-                }
-              >
-                <Heading />
-                Heading {level}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="misty-tiptap-tool gap-1"
-              aria-label="Lists"
-            >
-              <List size={17} />
-              <ChevronDown size={12} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleBulletList().run()}>
-              <List />
-              Bullet list
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleOrderedList().run()}>
-              <ListOrdered />
-              Numbered list
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => editor.chain().focus().toggleTaskList().run()}>
-              <ListChecks />
-              To-do list
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <ToolButton
-          label="Blockquote"
-          Icon={Quote}
-          active={editor.isActive("blockquote")}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        />
-        <ToolButton
-          label="Code block"
-          Icon={Braces}
-          active={editor.isActive("codeBlock")}
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-        />
-      </ToolbarGroup>
       <ToolbarRule />
-      <ToolbarGroup>
-        <ToolButton
-          label="Bold"
-          Icon={Bold}
-          active={editor.isActive("bold")}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        />
-        <ToolButton
-          label="Italic"
-          Icon={Italic}
-          active={editor.isActive("italic")}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        />
-        <ToolButton
-          label="Strikethrough"
-          Icon={Strikethrough}
-          active={editor.isActive("strike")}
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-        />
-        <ToolButton
-          label="Inline code"
-          Icon={Code2}
-          active={editor.isActive("code")}
-          onClick={() => editor.chain().focus().toggleCode().run()}
-        />
-        <ToolButton
-          label="Underline"
-          Icon={Underline}
-          active={editor.isActive("underline")}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-        />
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="misty-tiptap-tool"
-              aria-label="Highlight"
-            >
-              <Highlighter size={17} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="flex w-auto gap-1 p-2">
-            {["#7255d9", "#d7a928", "#3f8e72", "#b95656"].map((color) => (
-              <button
-                key={color}
-                type="button"
-                className="size-6 rounded-full ring-1 ring-white/15"
-                style={{ background: color }}
-                aria-label={`Highlight ${color}`}
-                onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-              />
-            ))}
-          </PopoverContent>
-        </Popover>
-        <ToolButton label="Link" Icon={Link2} active={editor.isActive("link")} onClick={link} />
-      </ToolbarGroup>
+      <NoteToolbarInlineControls editor={editor} />
       <ToolbarRule />
       <ToolbarGroup>
         <ToolButton

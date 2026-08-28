@@ -1,6 +1,7 @@
 import { connectionsApi, type AccountConnection } from "@/api/connections";
 import { useAuth } from "@/features/auth";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { SystemErrorActivity } from "@/features/activity";
+import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,7 +65,7 @@ export function FigmaDrawingsSheet(props: {
         [...FIGMA_READ_CAPABILITIES, ...capabilities],
         `/spaces/${props.spaceId}/drawings`,
       );
-      await openSystemExternalLink(start.authorization_url);
+      await openProviderAuthorizationLink(start.authorization_url);
     } catch (error) {
       setAuthorizationError(
         error instanceof Error ? error.message : "Figma authorization could not be opened.",
@@ -157,12 +158,11 @@ export function FigmaDrawingsSheet(props: {
         </section>
 
         {state.error || authorizationError ? (
-          <p
-            className="mt-4 rounded-lg border border-[#d68b80]/30 bg-[#d68b80]/5 p-3 text-xs text-[#d68b80]"
-            role="alert"
-          >
-            {state.error || authorizationError}
-          </p>
+          <SystemErrorActivity
+            error={state.error || authorizationError}
+            scope={`figma:${props.spaceId}`}
+            title="Figma could not be refreshed"
+          />
         ) : null}
       </SheetContent>
     </Sheet>
