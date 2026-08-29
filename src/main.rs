@@ -3,6 +3,7 @@ mod checks;
 mod cli;
 mod config;
 mod desktop;
+mod environment;
 mod process;
 mod release;
 mod server;
@@ -22,6 +23,5 @@ fn main() {
 fn run() -> Result<()> {
     let arguments = cli::Cli::parse();
     let settings = config::Settings::load(arguments.workspace.as_deref())?;
-    config::load_workspace_environment(&settings.workspace)?;
     cli::dispatch(arguments, settings)
 }

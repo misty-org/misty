@@ -242,15 +242,14 @@ export const referencePages: DocPage[] = [
       },
       {
         id: "example",
-        title: "Safe .env template",
+        title: "Inspect scoped configuration",
         blocks: [
           code(
-            "MISTY_ROOT=/Users/you/misty-org/misty\nTAURI_UPDATER_ENDPOINT=https://mistysys.com/latest.json\nTAURI_CSP_CONNECT_SOURCES=https://mistysys.com wss://mistysys.com\nTAURI_CSP_IMAGE_SOURCES=https://mistysys.com\nR2_BUCKET=misty-server\nMISTY_R2_ALLOWED_ORIGINS=https://mistysys.com,tauri://localhost",
-            "cli/.env",
+            "misty env status dev\nmisty env check dev\nmisty env status prod\nmisty env check prod",
           ),
           note(
-            "Illustrative only",
-            "Add signing keys and real service origins from your secure configuration. Do not copy placeholder values into a release and never commit the populated file.",
+            "Values stay private",
+            "Status reports names and readiness without printing values. The real files remain ignored and command-scoped.",
           ),
         ],
       },
@@ -312,7 +311,7 @@ export const referencePages: DocPage[] = [
         title: "Secret handling",
         blocks: [
           list([
-            "The ignored cli/.env is loaded without replacing exported shell values.",
+            "Only the command-specific files under the ignored cli/.env directory are loaded, without replacing exported shell values.",
             "Doctor reports only whether release inputs exist.",
             "Worker secret files use restricted permissions on Unix.",
             "The collaboration private key is written to the server secret file and never printed.",
@@ -385,7 +384,7 @@ export const referencePages: DocPage[] = [
           list([
             "Run misty server logs and find the first failing dependency, not just repeated /health entries.",
             "Confirm Docker Desktop is running and the database container is healthy.",
-            "Check server/.env.dev because Compose, not the Go binary, supplies development server environment values.",
+            "Run misty env check dev; Compose, not the Go binary, supplies values from server/.env/dev.",
             "If the database schema is disposable and irreparably stale, stop with --volumes and recreate it—but only after accepting the data loss.",
           ]),
         ],
@@ -423,7 +422,7 @@ export const referencePages: DocPage[] = [
         blocks: [
           code("misty doctor"),
           p(
-            "Doctor prints missing variable names. Add them to an ignored cli/.env or export them in the shell. It never prints their current values.",
+            "Doctor prints missing variable names. Add release values to cli/.env/release.env or export them in the shell. It never prints their current values.",
           ),
         ],
       },
