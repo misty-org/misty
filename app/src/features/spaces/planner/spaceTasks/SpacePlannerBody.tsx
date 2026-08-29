@@ -1,4 +1,8 @@
-import type { SpaceAgentMembership, SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/api/spaces/dto/interfaces/types";
 import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { Button } from "@/shared/ui";
 import { LoaderCircle } from "lucide-react";
@@ -17,6 +21,7 @@ export interface SpacePlannerBodyProps {
   due: DueFilter;
   data: SpaceTasksData;
   actions: SpaceTaskActions;
+  onDeleteRequest: (task: SpaceTask) => void;
 }
 
 /** The task surface itself — board, list or calendar — plus its loading and error states. */
@@ -34,9 +39,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
     <section
       className={`min-h-0 ${view === "board" ? "overflow-hidden p-0" : "overflow-auto p-3"}`}
     >
-      {data.error ? (
-        <TaskErrorState message={data.error} onDismiss={() => data.setError("")} />
-      ) : null}
+      {data.error ? <TaskErrorState message={data.error} /> : null}
       {isEmptyLoad ? (
         <div className="grid h-full min-h-56 place-items-center text-cream-muted">
           <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />
@@ -51,6 +54,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           canManage={props.canManage}
           onOpen={actions.openEdit}
           onMove={actions.moveTask}
+          onDelete={props.onDeleteRequest}
           onCreate={actions.quickCreate}
           onOpenFullCreate={actions.openCreate}
         />
@@ -63,6 +67,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
           canManage={props.canManage}
           onOpen={actions.openEdit}
           onUpdate={actions.updateTask}
+          onDelete={props.onDeleteRequest}
         />
       )}
 

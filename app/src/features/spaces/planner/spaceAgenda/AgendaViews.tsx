@@ -34,7 +34,7 @@ export function AgendaMonthView({ anchor, entries, onOpen }: AgendaViewProps) {
         <div className="grid grid-cols-7 border-b border-charcoal-border/60 bg-charcoal-bg">
           {days.slice(0, 7).map((day) => (
             <div
-              className="border-r border-charcoal-border/60 px-3 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide text-cream-muted"
+              className="border-r border-charcoal-border/60 px-3 py-2.5 text-center text-[11px] font-medium text-cream-muted"
               key={day.toISOString()}
             >
               {day.toLocaleDateString(undefined, { weekday: "short" })}
@@ -133,7 +133,6 @@ export function AgendaTimelineView({
   const showNow = days.some((day) => isSameDay(day, now));
   const nowTop = ((now.getHours() * 60 + now.getMinutes()) / 60) * hourHeight;
   const currentTimeLabel = formatTime(now.toISOString());
-  const currentTimeMatchesHour = now.getMinutes() === 0;
 
   return (
     <div
@@ -207,7 +206,7 @@ export function AgendaTimelineView({
         >
           <div className="relative border-r border-charcoal-border/60" aria-hidden="true">
             {hours.map((hour) => {
-              if (showNow && currentTimeMatchesHour && hour === now.getHours()) return null;
+              if (showNow && hourLabelOverlapsCurrentTime(hour, hourHeight, nowTop)) return null;
               return (
                 <span
                   className="absolute right-3 text-[11px] text-cream-muted"
@@ -245,22 +244,32 @@ export function AgendaTimelineView({
                     onOpen={onOpen}
                   />
                 ))}
+                {isSameDay(day, now) ? (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-10"
+                    style={{ top: nowTop }}
+                    data-agenda-current-time-line
+                    aria-hidden="true"
+                  >
+                    <span className="absolute inset-x-0 top-0 h-px bg-avatar-red" />
+                    {view === "day" ? (
+                      <span className="absolute -left-2 top-0 h-px w-2 bg-avatar-red" />
+                    ) : null}
+                    <span className="absolute left-0 top-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-avatar-red ring-2 ring-charcoal-bg" />
+                  </div>
+                ) : null}
               </div>
             );
           })}
           {showNow ? (
             <div
-              className="pointer-events-none absolute inset-x-0 z-20"
+              className="pointer-events-none absolute left-0 z-10 w-[72px] -translate-y-1/2"
               style={{ top: nowTop }}
               aria-label={`Current time ${currentTimeLabel}`}
+              data-agenda-current-time-label
             >
-              <span className="absolute left-[72px] right-0 flex -translate-y-1/2 items-center">
-                <span className="size-3 shrink-0 -translate-x-1/2 rounded-full bg-avatar-red" />
-                <span className="-ml-1.5 h-px w-2 shrink-0 bg-avatar-red" />
-                <span className="shrink-0 whitespace-nowrap rounded bg-charcoal-bg px-1.5 py-0.5 text-[10px] font-semibold text-avatar-red">
-                  {currentTimeLabel}
-                </span>
-                <span className="h-px min-w-0 flex-1 bg-avatar-red" />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-avatar-red px-2 py-0.5 text-[10px] font-semibold tabular-nums text-charcoal-bg shadow-sm">
+                {currentTimeLabel}
               </span>
             </div>
           ) : null}
@@ -346,13 +355,14 @@ function AgendaTimedEvent({
       type="button"
       variant="ghost"
       className={cn(
-        "absolute inset-x-1 z-10 h-auto min-h-7 items-start justify-start gap-1.5",
+        "absolute inset-x-1 z-20 h-auto min-h-7 items-start justify-start gap-1.5",
         "overflow-hidden rounded-md border px-2 py-1.5 text-left font-normal shadow-sm",
         kindSurface(entry.kind),
       )}
       style={{ top, height }}
       title={`${entry.title}, ${formatTimeRange(entry)}`}
       onClick={() => onOpen(entry)}
+      data-agenda-timed-event
     >
       <EntryIcon entry={entry} className="mt-0.5 size-3.5 shrink-0" />
       <span className="min-w-0">
@@ -397,4 +407,12 @@ function formatTime(value: string) {
 
 function formatTimeRange(entry: SpaceAgendaEntry) {
   return `${formatTime(entry.starts_at)} – ${formatTime(entry.ends_at)}`;
+}
+
+function hourLabelOverlapsCurrentTime(hour: number, hourHeight: number, nowTop: number) {
+  const hourLabelTop = hour * hourHeight + 8;
+  const hourLabelBottom = hourLabelTop + 16;
+  const currentLabelTop = nowTop - 10;
+  const currentLabelBottom = nowTop + 10;
+  return currentLabelBottom >= hourLabelTop && currentLabelTop <= hourLabelBottom;
 }

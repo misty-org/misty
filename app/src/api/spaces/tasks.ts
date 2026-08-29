@@ -7,7 +7,6 @@ import type {
   SpaceTaskMoveResult,
   SpaceTaskPage,
 } from "@/api/spaces/dto/interfaces/types";
-import type { ConflictResolution } from "@/api/spaces/dto/types/connections/calendarTasks";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 
 import type { SpaceRequest } from "./types";
@@ -99,25 +98,6 @@ export function createSpaceTasksApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}?version=${task.version}`,
         { method: "DELETE" },
       ),
-    publishTaskToCalendar: (spaceId: string, task: SpaceTask) =>
-      request<SpaceTask>(
-        `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/calendar/publish`,
-        { method: "POST", body: JSON.stringify({ version: task.version }) },
-      ),
-    resolveTaskCalendarConflict: (
-      spaceId: string,
-      task: SpaceTask,
-      resolution: ConflictResolution,
-    ) =>
-      request<SpaceTask>(
-        `/spaces/${encodeURIComponent(spaceId)}/tasks/${encodeURIComponent(task.id)}/calendar/resolve`,
-        { method: "POST", body: JSON.stringify({ version: task.version, resolution }) },
-      ),
-    syncCalendarTasks: (spaceId: string, sourceId?: string) =>
-      request<{ tasks: SpaceTask[]; synced_at: string; sources: SpaceCalendarSource[] }>(
-        `/spaces/${encodeURIComponent(spaceId)}/calendar/sync`,
-        { method: "POST", body: JSON.stringify({ source_id: sourceId }) },
-      ),
     calendarEvents: (spaceId: string, from: string, to: string) =>
       request<{ events: SpaceCalendarEvent[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
@@ -142,6 +122,11 @@ export function createSpaceTasksApi(request: SpaceRequest) {
       request(
         `/spaces/${encodeURIComponent(spaceId)}/calendar/events/${encodeURIComponent(event.id)}?version=${event.version ?? 1}`,
         { method: "DELETE" },
+      ),
+    syncCalendarTasks: (spaceId: string, sourceId?: string) =>
+      request<{ tasks: SpaceTask[]; synced_at: string; sources: SpaceCalendarSource[] }>(
+        `/spaces/${encodeURIComponent(spaceId)}/calendar/sync`,
+        { method: "POST", body: JSON.stringify({ source_id: sourceId }) },
       ),
     calendarSources: (spaceId: string) =>
       request<{ sources: SpaceCalendarSource[] }>(
