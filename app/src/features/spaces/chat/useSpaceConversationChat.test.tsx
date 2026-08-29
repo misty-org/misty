@@ -67,6 +67,54 @@ describe("useSpaceConversationChat realtime messages", () => {
     expect(apiMocks.conversationMessages).toHaveBeenCalledOnce();
     expect(latest.messages).toEqual([included]);
   });
+
+  it("keeps a failed optimistic row when a realtime refresh returns no replacement", async () => {
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const failed = {
+      ...messageFixture(),
+      id: "optimistic-client-failed",
+      local_delivery_state: "failed" as const,
+    };
+    await act(async () => latest.setMessages([failed]));
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent("misty:space-message-event", {
+          detail: { spaceId: "space-1", conversationId: "conversation-1" },
+        }),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(latest.messages).toEqual([failed]);
+  });
+
+  it("retries a failed conversation load without remounting the chat", async () => {
+    apiMocks.conversationMessages
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce({ messages: [messageFixture()] });
+
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(latest.error).toBe("network unavailable");
+
+    await act(async () => {
+      latest.reload();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(latest.error).toBe("");
+    expect(latest.messages).toEqual([messageFixture()]);
+  });
 });
 
 function messageFixture(): SpaceMessage {

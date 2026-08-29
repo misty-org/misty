@@ -6,6 +6,9 @@ export { DeleteMessageDialog } from "./DeleteMessageDialog";
 export { messageReplyPreviewText } from "./messageHelpers";
 
 import type { SpaceChatMessagesProps } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
+import { SystemErrorActivity, systemErrorMessage } from "@/features/activity";
+import { Button } from "@/shared/ui";
+import { CircleAlert, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { AgentTypingIndicator } from "./AgentTypingIndicator";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
@@ -32,18 +35,38 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
     >
       <div>
         {props.error ? (
-          <div
-            className="mb-4 rounded-lg border border-charcoal-active/30 bg-charcoal-active px-3 py-2 text-sm text-cream-bright"
-            role="alert"
-          >
-            {props.error}
-          </div>
+          <>
+            <SystemErrorActivity
+              error={props.error}
+              scope={`social:${props.spaceId}`}
+              title="Social messages could not be loaded"
+              target={{ kind: "space-chat", spaceId: props.spaceId }}
+            />
+            <div
+              className="mb-3 flex items-start gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"
+              role="alert"
+            >
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-notification-red" />
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-sm font-medium text-cream-bright">
+                  Messages couldn’t be loaded
+                </p>
+                <p className="m-0 mt-0.5 text-xs leading-5 text-cream-muted">
+                  {systemErrorMessage(props.error)}
+                </p>
+              </div>
+              <Button type="button" size="sm" variant="secondary" onClick={props.onReload}>
+                <RefreshCw data-icon="inline-start" />
+                Try again
+              </Button>
+            </div>
+          </>
         ) : null}
 
-        {props.loading ? (
+        {props.loading && props.messages.length === 0 ? (
           <ChatMessagesSkeleton />
         ) : props.messages.length === 0 ? (
-          props.directRecipient ? (
+          props.error ? null : props.directRecipient ? (
             <SpaceDirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
           ) : (
             <SpaceChatStarters
