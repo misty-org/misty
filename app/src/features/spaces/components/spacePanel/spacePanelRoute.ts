@@ -1,8 +1,15 @@
+import type { SocialProviderId } from "@/api/social";
 import { spaceNotesEnabled } from "@/features/notes";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
+import {
+  socialConversationPath as providerConversationPath,
+  socialProviderFromRoute,
+} from "../../social/socialRoute";
 
 const validSections = new Set([
+  "home",
+  "social",
   "chat",
   "planner",
   "notes",
@@ -22,6 +29,7 @@ export interface SpacePanelRoute {
   roadmapId: string;
   settingsSection: string;
   libraryCollection: string;
+  socialProvider: SocialProviderId;
   conversationId: string | null;
   drawingId: string;
 }
@@ -37,7 +45,7 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
   const defaultJournalSection = spaceNotesEnabled ? "notes" : "drawings";
-  const requestedSection = routeParts[2] ?? defaultJournalSection;
+  const requestedSection = routeParts[2] ?? "home";
   const routeSection =
     requestedSection === "files"
       ? "library"
@@ -77,6 +85,7 @@ export function useSpacePanelRoute(): SpacePanelRoute {
       ? requestedSettingsSection
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
+    socialProvider: socialProviderFromRoute(`${location.pathname}${location.search}`),
     conversationId: search.get("conversation"),
     drawingId: routeSection === "drawings" ? decodeRouteSegment(routeParts[3] ?? "") : "",
   };
@@ -87,8 +96,12 @@ export function spaceSectionPath(spaceId: string, section: string, settingsSecti
   return `/spaces/${encodeURIComponent(spaceId)}/${destination}`;
 }
 
-export function spaceConversationPath(spaceId: string, conversationId: string) {
-  return `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(conversationId)}`;
+export function spaceConversationPath(
+  spaceId: string,
+  conversationId: string,
+  provider: SocialProviderId = "misty",
+) {
+  return providerConversationPath(spaceId, provider, conversationId);
 }
 
 function decodeRouteSegment(value: string): string {

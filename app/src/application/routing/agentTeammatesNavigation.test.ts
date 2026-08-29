@@ -2,19 +2,15 @@ import { desktopNavItems, desktopRouteIdFromPath } from "@/application/routing/n
 import { describe, expect, it } from "vitest";
 
 describe("first-class Agent navigation", () => {
-  it("puts global destinations in the primary rail", () => {
+  it("keeps available and coming-soon global destinations discoverable", () => {
     expect(desktopNavItems.map((item) => item.id)).toEqual([
       "home",
       "files",
+      "transfers",
       "agents",
-      "extensions",
+      "marketplace",
     ]);
     expect(desktopNavItems.map((item) => item.id)).not.toContain("spaces");
-    expect(desktopNavItems.map((item) => item.id)).not.toContain("transfers");
-  });
-
-  it("treats Home as a first-class desktop route", () => {
-    expect(desktopRouteIdFromPath("/home")).toBe("home");
   });
 
   it("maps global destinations to their own app pages", () => {
@@ -23,6 +19,8 @@ describe("first-class Agent navigation", () => {
     expect(desktopRouteIdFromPath("/agents")).toBe("agents");
     expect(desktopRouteIdFromPath("/assistant")).toBe("agents");
     expect(desktopRouteIdFromPath("/code")).toBe("code");
-    expect(desktopRouteIdFromPath("/extensions")).toBe("extensions");
+    expect(desktopRouteIdFromPath("/marketplace")).toBe("marketplace");
+    expect(desktopRouteIdFromPath("/transfers")).toBe("transfers");
   });
 });
+expect(desktopRouteIdFromPath("/home")).toBe("home");

@@ -4,6 +4,7 @@ export interface AssetIconProps {
   src: string;
   size?: number;
   color?: boolean;
+  paint?: CSSProperties["background"];
   className?: string;
   title?: string;
 }

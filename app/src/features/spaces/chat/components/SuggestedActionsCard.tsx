@@ -1,4 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
+import { SystemErrorActivity } from "@/features/activity";
 import type { SpaceRoadmap } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type {
   SpaceActionSuggestionBatch,
@@ -117,13 +118,9 @@ function SuggestionReviewDialog({
   const [error, setError] = useState("");
   useEffect(() => {
     if (!open) return;
-    const needsCalendar = batch.items.some((item) => item.action_kind === "calendar.event.create");
     const needsRoadmap = batch.items.some((item) => item.action_kind === "roadmap.item.create");
     void Promise.all([
       spacesApi.actionSuggestionReview(spaceId, batch.id),
-      needsCalendar
-        ? spacesApi.calendarSources(spaceId).catch(() => ({ sources: [] }))
-        : Promise.resolve({ sources: [] }),
       needsRoadmap
         ? spacesApi.roadmaps(spaceId).catch(() => ({ roadmaps: [] }))
         : Promise.resolve({ roadmaps: [] }),
@@ -142,17 +139,15 @@ function SuggestionReviewDialog({
                 .filter((participant) => participant.id) ?? [],
           ),
     ])
-      .then(([review, sources, roadmapResult, recipientOptions]) => {
+      .then(([review, roadmapResult, recipientOptions]) => {
         setAgentsByItem(review.eligible_agents_by_item ?? {});
         setAudience(review.destination_audience.kind);
-        setCalendarSources(
-          sources.sources.filter(
-            (source) => review.destination_audience.kind === "space" || source.id === "misty",
-          ),
-        );
+        setCalendarSources([
+          { id: "misty", display_name: "Misty Calendar" } as SpaceCalendarSource,
+        ]);
         setRoadmaps(
           roadmapResult.roadmaps.filter(
-            (roadmap) =>
+            (roadmap: SpaceRoadmap) =>
               roadmap.audience_kind === review.destination_audience.kind &&
               (roadmap.audience_kind === "space" ||
                 roadmap.audience_conversation_id === review.destination_audience.conversation_id),
@@ -161,7 +156,7 @@ function SuggestionReviewDialog({
         setRecipients(recipientOptions);
         setDrafts(
           Object.fromEntries(
-            review.suggestion.items.map((item) => [
+            review.suggestion.items.map((item: SpaceActionSuggestionItem) => [
               item.id,
               {
                 selected: true,
@@ -235,9 +230,12 @@ function SuggestionReviewDialog({
           ))}
         </div>
         {error ? (
-          <p className="m-0 text-sm text-cream-bright" role="alert">
-            {error}
-          </p>
+          <SystemErrorActivity
+            error={error}
+            scope={`spaces:suggestions:${spaceId}`}
+            title="Suggested actions could not be applied"
+            target={{ kind: "space-chat", spaceId }}
+          />
         ) : null}
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
