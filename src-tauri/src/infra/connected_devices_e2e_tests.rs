@@ -1,7 +1,7 @@
 //! Two devices in one process, each with its own built-in peer transport
-//! worker, exercising the whole Connected Devices flow over a real connection:
-//! an explicit connect, browsing, file changes and transfers with byte counts,
-//! consent, clipboard sharing, reconnecting from a local session, and ending it.
+//! worker, exercising the whole flow over a real LAN connection: trust from the
+//! root-signed device list, browsing, file changes and transfers with byte
+//! counts, policy changes, clipboard sharing, reconnecting, and removal.
 
 use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -9,6 +9,10 @@ use std::{
 };
 
 use super::*;
+use crate::infra::{
+    device_records::{DeviceList, DevicePolicy, ListMember, SignedRecord},
+    device_trust,
+};
 use crate::{
     domain::{
         clipboard::{ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient},
@@ -26,10 +30,10 @@ use crate::{
     },
     platform::mini_app::{insert_builtin_test_instance, MiniAppState},
 };
-use ed25519_dalek::{Signer, SigningKey};
+use misty_browser_sync::crypto::VaultRoot;
 
 const ACCOUNT: &str = "e2e-account";
-const KEY_ID: &str = "e2e-key";
+const VAULT: &str = "00000000-0000-0000-0000-0000000000e2";
 
 struct Device {
     service: ConnectedDevicesService,
@@ -42,7 +46,7 @@ struct Device {
     _directories: Vec<tempfile::TempDir>,
 }
 
-async fn device(label: &str, local_id: &str, network_id: &str, signing: &SigningKey) -> Device {
+async fn device(label: &str, local_id: &str, network_id: &str) -> Device {
     let state = MiniAppState::default();
     insert_builtin_test_instance(&state, label, ACCOUNT, "devices");
     let lease = Arc::new(
@@ -67,10 +71,6 @@ async fn device(label: &str, local_id: &str, network_id: &str, signing: &Signing
                 account_id: ACCOUNT.into(),
                 device_id: local_id.into(),
                 device_name: label.into(),
-                development_ticket_keys: HashMap::from([(
-                    KEY_ID.to_owned(),
-                    STANDARD.encode(signing.verifying_key().to_bytes()),
-                )]),
                 instance: label.into(),
             },
             lease,
@@ -78,7 +78,6 @@ async fn device(label: &str, local_id: &str, network_id: &str, signing: &Signing
         .await
         .unwrap();
     service.set_network_identity(network_id.into()).unwrap();
-    service.configure_sessions(7).unwrap();
     Device {
         service,
         explorer,
@@ -91,38 +90,42 @@ async fn device(label: &str, local_id: &str, network_id: &str, signing: &Signing
     }
 }
 
-/// A ticket as Misty's server issues one for `source` to reach `target`.
-fn ticket(signing: &SigningKey, source: &Device, target: &Device) -> String {
-    let now = unix_now();
-    let encode = |value: serde_json::Value| URL_SAFE_NO_PAD.encode(value.to_string());
-    let header = encode(serde_json::json!({"alg": "EdDSA", "typ": "JWT", "kid": KEY_ID}));
-    let claims = encode(serde_json::json!({
-        "iss": "misty-api",
-        "aud": DEVICE_PROTOCOL_VERSION,
-        "jti": uuid::Uuid::new_v4().to_string(),
-        "pairId": "pair_e2e",
-        "sourceDeviceId": source.network_id,
-        "sourceEndpointId": source.endpoint_id,
-        "targetDeviceId": target.network_id,
-        "targetEndpointId": target.endpoint_id,
-        "protocolVersion": DEVICE_PROTOCOL_VERSION,
-        "permissions": ["roots:read", "files:read", "directories:subscribe"],
-        "iat": now,
-        "exp": now + 240,
-    }));
-    let signature = signing.sign(format!("{header}.{claims}").as_bytes());
-    format!(
-        "{header}.{claims}.{}",
-        URL_SAFE_NO_PAD.encode(signature.to_bytes())
-    )
+fn member(device: &Device) -> ListMember {
+    ListMember {
+        device_id: device.network_id.clone(),
+        public_key: STANDARD.encode(hex::decode(&device.endpoint_id).unwrap()),
+    }
 }
 
-fn consent(device: &Device, accepts_writes: bool) -> Vec<PairConsent> {
-    vec![PairConsent {
-        device_id: device.network_id.clone(),
-        accepts_writes,
-        shares_clipboard: true,
-    }]
+/// The account's device list, signed by the vault root as an added device would.
+fn signed_list(
+    root: &VaultRoot,
+    version: u64,
+    admitted: &[ListMember],
+    revoked: &[ListMember],
+) -> SignedRecord {
+    let payload =
+        DeviceList::next_payload(ACCOUNT, VAULT, version, 1, admitted, revoked, unix_now())
+            .unwrap();
+    SignedRecord::new(&payload, root.sign_device_record(&payload).unwrap())
+}
+
+fn set_policy(files: &str, clipboard: bool) {
+    let policy = DevicePolicy {
+        version: unix_now() as u64,
+        files: files.into(),
+        clipboard,
+        agent_surfaces: vec![],
+        shared_folders: vec![],
+    };
+    device_trust::store_own_policy(
+        policy,
+        SignedRecord {
+            payload: String::new(),
+            signature: String::new(),
+        },
+    )
+    .unwrap();
 }
 
 fn watch<'a>(bytes: &'a AtomicU64, canceled: &'a AtomicBool) -> TransferWatch<'a> {
@@ -147,42 +150,42 @@ async fn eventually(mut condition: impl FnMut() -> bool) -> bool {
 // cargo test --lib e2e_tests -- --ignored
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "starts two peer transport workers on the local network"]
-async fn devices_connect_share_files_and_clipboard_and_keep_local_sessions() {
+async fn devices_trust_the_signed_list_share_files_and_clipboard_and_drop_removed_devices() {
     let credentials = tempfile::tempdir().unwrap();
     let _ = misty_credential_store::configure_root(credentials.path().to_path_buf());
-    let signing = SigningKey::from_bytes(&[42u8; 32]);
-    let a = device("device-a", "device_aaaaaaaaaaaa", "device_net-a", &signing).await;
-    let b = device("device-b", "device_bbbbbbbbbbbb", "device_net-b", &signing).await;
-    let (peer_a, peer_b) = (a.network_id.as_str(), b.network_id.as_str());
+    let trust = tempfile::tempdir().unwrap();
+    device_trust::set_storage_root(trust.path().to_path_buf());
+    device_trust::open("https://misty.test", ACCOUNT, "device_eeeeeeeeeeee").unwrap();
+    // Both devices share this process's trust state; neither key is "this device".
+    device_trust::set_server_device_id("device_00000000-0000-0000-0000-000000000000").unwrap();
+    device_trust::set_own_endpoint(&"0".repeat(64)).unwrap();
+    let a = device(
+        "device-a",
+        "device_aaaaaaaaaaaa",
+        "device_00000000-0000-0000-0000-00000000000a",
+    )
+    .await;
+    let b = device(
+        "device-b",
+        "device_bbbbbbbbbbbb",
+        "device_00000000-0000-0000-0000-00000000000b",
+    )
+    .await;
+    let peer_b = b.network_id.as_str();
+    let root = VaultRoot::generate();
+    device_trust::pin_root(&root.public_key().unwrap(), VAULT).unwrap();
+    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[])))
+        .unwrap();
+    set_policy("edit", true);
 
-    // Each device keeps its own consent: B lets A change its files.
-    a.service.sync_pairs(consent(&b, false)).unwrap();
-    b.service.sync_pairs(consent(&a, true)).unwrap();
-
-    // An explicit connect, authorized once by a server ticket.
+    // No ticket and no session: the list is the only trust, the handshake
+    // proves the key, and the address is only a hint.
+    let candidates = crate::infra::device_channel::lan_candidates(&b.address);
     a.service
-        .connect(ConnectPeerRequest {
-            instance: "device-a".into(),
-            device_id: peer_b.into(),
-            address: b.address.clone(),
-            ticket: ticket(&signing, &a, &b),
-        })
+        .connect_device(peer_b, &b.endpoint_id, candidates.clone())
         .await
         .unwrap();
     assert!(a.service.is_connected(peer_b));
-    let now = unix_now();
-    let session = |device: &Device, peer: &str| {
-        device
-            .service
-            .snapshot()
-            .unwrap()
-            .sessions
-            .into_iter()
-            .find(|session| session.device_id == peer)
-            .unwrap()
-    };
-    assert!(session(&a, peer_b).outgoing_expires_at > now + 6 * 86_400);
-    assert!(session(&b, peer_a).incoming_expires_at > now + 6 * 86_400);
 
     // B's shared folder, as A addresses it.
     let shared = tempfile::tempdir().unwrap();
@@ -334,8 +337,8 @@ async fn devices_connect_share_files_and_clipboard_and_keep_local_sessions() {
     assert_eq!(record.transferred_bytes, content.len() as i64);
     assert_eq!(record.total_bytes, content.len() as i64);
 
-    // B changes its mind: the next change is refused at once, without the server.
-    b.service.sync_pairs(consent(&a, false)).unwrap();
+    // B changes its policy: the next change is refused at once, without the server.
+    set_policy("view", true);
     assert!(a
         .service
         .create_item(&directory, "Denied", true)
@@ -364,17 +367,82 @@ async fn devices_connect_share_files_and_clipboard_and_keep_local_sessions() {
         .await
     );
 
-    // A dropped connection comes back from the local session alone.
+    // An agent's file send: A delivers a file straight to B over the LAN, and
+    // B keeps it only because B signed the grant for its own inbox.
+    let inbox = tempfile::tempdir().unwrap();
+    delivery::set_test_inbox(inbox.path().to_path_buf());
+    device_trust::open("https://misty.test", ACCOUNT, "device_bbbbbbbbbbbb").unwrap();
+    device_trust::set_server_device_id(peer_b).unwrap();
+    device_trust::set_own_endpoint(&"0".repeat(64)).unwrap();
+    device_trust::pin_root(&root.public_key().unwrap(), VAULT).unwrap();
+    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[]))).unwrap();
+    set_policy("view", true);
+    let inbox_scope = format!("inbox:{peer_b}");
+    let grant_for = |signer: &crate::infra::device_identity::DeviceIdentity, requester: &str, scope: &str| {
+        let grant = crate::infra::device_records::RunGrant {
+            account_id: ACCOUNT.into(),
+            grant_id: format!("rungrant_{}", uuid::Uuid::new_v4()),
+            requester_device_id: requester.into(),
+            target_device_id: peer_b.into(),
+            agent_id: String::new(),
+            capabilities: vec!["files.receive".into()],
+            scopes: vec![scope.into()],
+            issued_at: unix_now(),
+            expires_at: unix_now() + 600,
+        };
+        let payload = grant.payload().unwrap();
+        SignedRecord::new(&payload, signer.sign_record(&payload).unwrap())
+    };
+    let b_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_bbbbbbbbbbbb").unwrap();
+    let a_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_aaaaaaaaaaaa").unwrap();
+    let report = local.path().join("report.pdf");
+    std::fs::write(&report, &content[..200_000]).unwrap();
+    let receipt = a
+        .service
+        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &inbox_scope), &inbox_scope)
+        .await
+        .unwrap();
+    assert_eq!(receipt.size, 200_000);
+    assert_eq!(receipt.sha256, hex::encode(Sha256::digest(&content[..200_000])));
+    assert_eq!(std::fs::read(inbox.path().join(&receipt.file_name)).unwrap(), &content[..200_000]);
+    // A grant B did not sign, or for another inbox, delivers nothing.
+    assert!(a
+        .service
+        .deliver_file(peer_b, &report, grant_for(&a_identity, &a.network_id, &inbox_scope), &inbox_scope)
+        .await
+        .is_err());
+    let other_scope = format!("inbox:{}", a.network_id);
+    assert!(a
+        .service
+        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &other_scope), &other_scope)
+        .await
+        .is_err());
+    assert_eq!(std::fs::read_dir(inbox.path()).unwrap().count(), 1);
+
+    // A dropped connection comes back from the cached address alone.
     let connection = a.service.authorized_connection(peer_b).unwrap();
     a.service.drop_connection(peer_b, &connection);
     assert!(!a.service.is_connected(peer_b));
-    a.service.resume_sessions(HashMap::new()).await.unwrap();
+    // This trust state was reopened as B above; cache A's last dial again.
+    device_trust::remember_addresses(peer_b, &candidates);
+    a.service
+        .connect_device(
+            peer_b,
+            &b.endpoint_id,
+            device_trust::known_addresses(peer_b),
+        )
+        .await
+        .unwrap();
     assert!(a.service.is_connected(peer_b));
 
-    // Ending the session ends it on both devices; nothing reconnects by itself.
-    a.service.end_session(peer_b).await.unwrap();
-    assert_eq!(session(&a, peer_b).outgoing_expires_at, 0);
-    assert!(eventually(|| session(&b, peer_a).incoming_expires_at == 0).await);
-    a.service.resume_sessions(HashMap::new()).await.unwrap();
+    // Removing B ends its connections, and it cannot connect again.
+    device_trust::apply_server_list(Some(&signed_list(&root, 2, &[member(&a)], &[member(&b)])))
+        .unwrap();
+    a.service.close_untrusted();
     assert!(!a.service.is_connected(peer_b));
+    assert!(a
+        .service
+        .connect_device(peer_b, &b.endpoint_id, candidates)
+        .await
+        .is_err());
 }

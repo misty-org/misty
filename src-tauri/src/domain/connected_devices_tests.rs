@@ -44,14 +44,14 @@ fn tickets_enforce_signature_expiry_endpoint_identity_and_replay() {
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"EdDSA","kid":"current"}"#);
     let claims = PeerTicketClaims {
         iss: "misty-api".to_owned(),
-        aud: DEVICE_PROTOCOL_VERSION.to_owned(),
+        aud: TICKET_PROTOCOL_VERSION.to_owned(),
         jti: "ticket-1".to_owned(),
         pair_id: "pair-1".to_owned(),
         source_device_id: "device-a".to_owned(),
         source_endpoint_id: "endpoint-a".to_owned(),
         target_device_id: "device-b".to_owned(),
         target_endpoint_id: "endpoint-b".to_owned(),
-        protocol_version: DEVICE_PROTOCOL_VERSION.to_owned(),
+        protocol_version: TICKET_PROTOCOL_VERSION.to_owned(),
         permissions: vec!["files:read".to_owned()],
         iat: 1_000,
         exp: 1_300,

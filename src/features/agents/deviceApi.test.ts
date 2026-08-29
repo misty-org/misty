@@ -1,54 +1,50 @@
-import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  deviceSignaturePayload,
-  signedAgentDeviceRequest,
-  ensureServerAgentDevice,
-} from "./store/useAgentDeviceStore";
+import { deviceSignaturePayload, signedAgentDeviceRequest } from "./store/useAgentDeviceStore";
 
-const requests = vi.hoisted(() => ({ register: vi.fn(), request: vi.fn() }));
-vi.mock("@/api/devices/api", () => ({ devicesApi: requests }));
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+const mocks = vi.hoisted(() => ({ request: vi.fn(), signRequest: vi.fn() }));
+vi.mock("@/api/devices/api", () => ({ devicesApi: { request: mocks.request } }));
+vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://misty.test/api" }));
+vi.mock("@/features/auth/core", () => ({
+  useUserStore: { getState: () => ({ me: { id: "user_1" } }) },
+}));
+vi.mock("@/native/devices", () => ({ devicesNative: { signRequest: mocks.signRequest } }));
 
 beforeEach(() => {
-  vi.mocked(invoke).mockReset();
+  mocks.request.mockReset().mockResolvedValue({ ok: true });
+  mocks.signRequest.mockReset().mockResolvedValue("c2lnbmF0dXJl");
 });
 
 describe("device request signing", () => {
-  it("rejects late identity loads before registering or dispatching after scope changes", async () => {
-    for (const operation of ["register", "sign"]) {
-      let finish!: (value: string) => void;
-      vi.mocked(invoke).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            finish = resolve as (value: string) => void;
-          }),
-      );
-      let current = true;
-      const assertCurrent = () => {
-        if (!current) throw new Error("Scope closed");
-      };
-      const deviceId = `device_late_scope_${operation}`;
-      const pending =
-        operation === "register"
-          ? ensureServerAgentDevice({ id: deviceId } as never, {
-              endpointId: "personal",
-              platform: "macos",
-              scope: { assertCurrent, signal: new AbortController().signal },
-            })
-          : signedAgentDeviceRequest(
-              deviceId,
-              "/devices/test/heartbeat",
-              { method: "POST" },
-              assertCurrent,
-            );
-      await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+  it("signs natively over the server path, never with a key held here", async () => {
+    await signedAgentDeviceRequest("local", "/devices/device_1/heartbeat?x=1", {
+      method: "post",
+      body: "{}",
+    });
+    const [account, request] = mocks.signRequest.mock.calls[0];
+    expect(account).toEqual({ apiBase: "https://misty.test/api", accountId: "user_1" });
+    expect(request).toMatchObject({ method: "POST", path: "/api/devices/device_1/heartbeat" });
+    expect(request.bodyDigest).toBe(
+      "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    );
+    const [, init] = mocks.request.mock.calls[0];
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Misty-Device-Signature")).toBe("c2lnbmF0dXJl");
+    expect(headers.get("X-Misty-Device-Timestamp")).toBe(request.timestamp);
+    expect(headers.get("X-Misty-Device-Nonce")).toBe(request.nonce);
+  });
+
+  it("stops before sending when the scope closed while signing", async () => {
+    let current = true;
+    mocks.signRequest.mockImplementation(async () => {
       current = false;
-      finish(JSON.stringify({ publicKey: "public", privateKey: "private" }));
-      await expect(pending).rejects.toThrow("Scope closed");
-    }
-    expect(requests.register).not.toHaveBeenCalled();
-    expect(requests.request).not.toHaveBeenCalled();
+      return "c2lnbmF0dXJl";
+    });
+    await expect(
+      signedAgentDeviceRequest("local", "/devices/device_1/heartbeat", { method: "POST" }, () => {
+        if (!current) throw new Error("Scope closed");
+      }),
+    ).rejects.toThrow("Scope closed");
+    expect(mocks.request).not.toHaveBeenCalled();
   });
 
   it("uses the server-visible API pathname and exact canonical line order", () => {
@@ -63,9 +59,6 @@ describe("device request signing", () => {
     ).toBe(
       "POST\n/api/devices/device_123/workflow-node-jobs/claim\n1900000000\nbm9uY2U=\ne3b0c442",
     );
-  });
-
-  it("uses the configured versioned API base when signing hosted requests", () => {
     expect(
       deviceSignaturePayload(
         "post",
@@ -76,23 +69,5 @@ describe("device request signing", () => {
         "/v1",
       ),
     ).toBe("POST\n/v1/devices/device_123/presence\n1900000000\nbm9uY2U=\ne3b0c442");
-  });
-
-  it("does not reopen a denied device-identity credential read during the same session", async () => {
-    vi.mocked(invoke).mockRejectedValue(new Error("Credential file access denied"));
-    const deviceId = "device_credential_denied_for_this_session";
-
-    await expect(
-      signedAgentDeviceRequest(deviceId, "/devices/test/heartbeat", {
-        method: "POST",
-      }),
-    ).rejects.toThrow("Credential file access denied");
-    await expect(
-      signedAgentDeviceRequest(deviceId, "/devices/test/heartbeat", {
-        method: "POST",
-      }),
-    ).rejects.toThrow("Credential file access denied");
-
-    expect(invoke).toHaveBeenCalledTimes(1);
   });
 });

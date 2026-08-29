@@ -1,5 +1,3 @@
-#[cfg(desktop)]
-pub mod agent_device_identity;
 pub mod agent_workspace;
 pub mod agents;
 #[cfg(target_os = "macos")]
@@ -32,7 +30,27 @@ pub mod connected_devices;
 pub mod credential_store;
 pub mod credentials;
 #[cfg(desktop)]
-pub mod device_sessions;
+pub mod device_admission;
+#[cfg(desktop)]
+pub mod device_approval;
+#[cfg(desktop)]
+pub mod device_approval_approver;
+#[cfg(desktop)]
+pub mod device_channel;
+#[cfg(desktop)]
+pub mod device_discovery;
+#[cfg(desktop)]
+pub mod device_http;
+#[cfg(desktop)]
+pub mod device_identity;
+#[cfg(desktop)]
+pub mod device_records;
+#[cfg(all(test, desktop))]
+mod device_records_fixture;
+#[cfg(all(test, desktop))]
+mod device_server_e2e_tests;
+#[cfg(desktop)]
+pub mod device_trust;
 pub mod devices;
 pub mod directory_size;
 mod directory_size_local;

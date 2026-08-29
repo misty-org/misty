@@ -120,7 +120,7 @@ func (s *SpacesService) prepareInvocationDelivery(ctx context.Context, record *d
 		if found {
 			continue
 		}
-		if _, err := s.database.AttachAIInvocationContext(ctx, record.UserID, record.ID, record.SpaceID, target.DeviceID, target.Kind, target.OpaqueRef, target.DisplayName, target.Capabilities, target.Metadata); err != nil {
+		if _, err := s.database.AttachAIInvocationContext(ctx, record.UserID, record.ID, record.SpaceID, target.DeviceID, target.Kind, target.OpaqueRef, target.DisplayName, target.Capabilities, target.Metadata, runGrantRecord(target.RunGrant)); err != nil {
 			return err
 		}
 	}

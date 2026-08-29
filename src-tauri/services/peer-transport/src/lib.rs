@@ -35,6 +35,8 @@ pub enum Relay {
 pub enum Command {
     Initialize { secret: [u8; 32], relay: Relay },
     InitializeLegacy { secret: [u8; 32], relay: Relay },
+    /// Same-account devices trusting each other through the signed device list.
+    InitializeDevice { secret: [u8; 32], relay: Relay },
     Snapshot,
     Connect { address: EndpointAddr },
     Accept,
@@ -213,6 +215,9 @@ impl Transport {
             Command::Initialize { secret, relay } => self.initialize(secret, relay, ALPN).await,
             Command::InitializeLegacy { secret, relay } => {
                 self.initialize(secret, relay, b"misty-device/1").await
+            }
+            Command::InitializeDevice { secret, relay } => {
+                self.initialize(secret, relay, b"misty-device/3").await
             }
             Command::Snapshot => self.snapshot(),
             Command::Connect { mut address } => {

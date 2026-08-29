@@ -55,6 +55,8 @@ type aiInvocationDeviceContext struct {
 	DisplayName  string          `json:"display_name,omitempty"`
 	Capabilities json.RawMessage `json:"capabilities"`
 	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	// RunGrant is signed by the device that asked for this context.
+	RunGrant *signedDeviceRecord `json:"run_grant,omitempty"`
 }
 
 type aiInvocationInput struct {
@@ -278,6 +280,10 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		}
 		if err := validateAIInvocationDeviceContexts(body.Context, body.DeviceContexts, spaceID); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_device_context", "message": err.Error()})
+			return
+		}
+		if err := verifyDeviceContextGrants(r.Context(), s.database, userID, body.AgentID, body.DeviceContexts); err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]any{"code": "device_grant_required", "message": "This device couldn't confirm the request. Make sure it's added to your account and allows agents."})
 			return
 		}
 		if conversationID == "" && (body.Mode == "drawer" || body.Mode == "companion") && body.RequestedArtifactKind == "" {

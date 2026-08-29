@@ -46,7 +46,7 @@ impl Endpoint {
         })
         .await
         .map_err(|_| "Peer identity task stopped.")??;
-        Self::initialize_with_key(lease, secret, relay, false).await
+        Self::initialize_with_key(lease, secret, relay, "initialize").await
     }
     #[cfg(test)]
     pub(crate) async fn initialize(
@@ -54,14 +54,22 @@ impl Endpoint {
         secret: [u8; 32],
         relay: Relay,
     ) -> Result<Arc<Self>, String> {
-        Self::initialize_with_key(lease, secret, relay, false).await
+        Self::initialize_with_key(lease, secret, relay, "initialize").await
     }
     pub(crate) async fn initialize_legacy(
         lease: Arc<ServiceLease>,
         secret: [u8; 32],
         relay: Relay,
     ) -> Result<Arc<Self>, String> {
-        Self::initialize_with_key(lease, secret, relay, true).await
+        Self::initialize_with_key(lease, secret, relay, "initializeLegacy").await
+    }
+    /// The account's own devices (protocol 3, device-list trust).
+    pub(crate) async fn initialize_device(
+        lease: Arc<ServiceLease>,
+        secret: [u8; 32],
+        relay: Relay,
+    ) -> Result<Arc<Self>, String> {
+        Self::initialize_with_key(lease, secret, relay, "initializeDevice").await
     }
     pub(crate) fn address(&self) -> Value {
         self.address
@@ -73,7 +81,7 @@ impl Endpoint {
         lease: Arc<ServiceLease>,
         secret: [u8; 32],
         relay: Relay,
-        legacy: bool,
+        operation: &'static str,
     ) -> Result<Arc<Self>, String> {
         let worker = Arc::new(ProcessWorker::launch_peer(lease)?);
         let expected = hex::encode(
@@ -92,7 +100,7 @@ impl Endpoint {
             endpoint
                 .worker
                 .peer_request(
-                    json!({"operation":if legacy {"initializeLegacy"} else {"initialize"}, "secret":secret.to_vec(), "relay":relay}),
+                    json!({"operation":operation, "secret":secret.to_vec(), "relay":relay}),
                 )
                 .await?,
         )

@@ -42,19 +42,23 @@ use crate::{
         SharedClipboardClient,
     },
     domain::connected_devices::{
-        decode_control_frame, encode_control_frame, validate_clipboard_offer, verify_peer_ticket,
-        ClipboardOffer, ClipboardOfferKind, OpenWorkspaceRouteRequest, OpenWorkspaceRouteResult,
+        decode_control_frame, encode_control_frame, validate_clipboard_offer, ClipboardOffer,
+        ClipboardOfferKind, OpenWorkspaceRouteRequest, OpenWorkspaceRouteResult,
         OpenWorkspaceRouteStatus, PeerError, PeerErrorCode, PeerFileReference, PeerRequest,
         PeerRequestEnvelope, PeerResponse, PeerResponseEnvelope, PeerRoot, PeerTicketClaims,
-        SessionOffer, WorkspaceRouteSurface, DEVICE_PROTOCOL_VERSION, MAX_CONTROL_FRAME_BYTES,
+        WorkspaceRouteSurface, DEVICE_PROTOCOL_VERSION, MAX_CONTROL_FRAME_BYTES,
     },
     error::{ApiError, ApiResult},
-    infra::{
-        device_sessions::{DeviceSessionStore, PeerConsent, SessionSummary, MAX_SESSION_DAYS},
-        peer_files::PeerRootRegistry,
-        peer_identity,
-    },
+    infra::{device_trust, peer_files::PeerRootRegistry, peer_identity},
 };
+
+/// This device's own decisions toward the account's other devices, from its
+/// signed policy. With no policy yet, the first-run defaults apply.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PeerConsent {
+    pub accepts_writes: bool,
+    pub shares_clipboard: bool,
+}
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,20 +67,8 @@ pub struct InitializeConnectedDevicesRequest {
     pub device_id: String,
     #[serde(default)]
     pub device_name: String,
-    #[serde(default)]
-    pub development_ticket_keys: HashMap<String, String>,
     #[cfg(target_os = "macos")]
     pub instance: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectPeerRequest {
-    #[cfg(target_os = "macos")]
-    pub instance: String,
-    pub device_id: String,
-    pub address: serde_json::Value,
-    pub ticket: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -106,8 +98,6 @@ pub struct ConnectedDevicesSnapshot {
     pub addressing: Option<serde_json::Value>,
     pub relay_policy: String,
     pub peers: Vec<ConnectedPeerStatus>,
-    /// Local sessions with paired devices, live or ended.
-    pub sessions: Vec<SessionSummary>,
     pub unavailable_reason: Option<String>,
 }
 
@@ -117,7 +107,6 @@ pub struct ConnectedPeerStatus {
     pub device_id: String,
     pub state: String,
     pub connection_type: String,
-    pub authorization_expires_at: i64,
 }
 
 /// Optional progress and cancellation for a long transfer: bytes are added to
@@ -164,9 +153,7 @@ struct ConnectedDevicesState {
     endpoint: Endpoint,
     account_id: String,
     local_device_id: String,
-    keys: HashMap<String, VerifyingKey>,
     connections: Arc<RwLock<HashMap<String, AuthorizedConnection>>>,
-    used_ticket_ids: Arc<Mutex<HashMap<String, i64>>>,
     roots: PeerRootRegistry,
     relay_policy: String,
 }
@@ -183,26 +170,28 @@ pub struct ConnectedDevicesService {
     directory_subscriptions: Arc<Mutex<HashSet<String>>>,
     clipboard_blobs: Arc<Mutex<HashMap<String, ClipboardBlobRecord>>>,
     local: PeerLocal,
-    /// Bumped on every initialize, so an older reconnect loop stops.
+    /// Bumped on every initialize, so an older address refresher stops.
     resume_generation: Arc<AtomicU64>,
-    /// This device's id on Misty's server. Tickets, sessions, clipboard file
+    /// This device's id on Misty's server. The device list, clipboard file
     /// references and `misty://device/` paths all name devices by it. The
     /// local agent id only scopes this device's own keychain entries.
     network_device_id: Arc<RwLock<String>>,
 }
 
-/// This device's own decisions about its paired devices: the local sessions
-/// and consent it checks without the server, and the file service that applies
-/// changes it accepts. Consent defaults to none, so it fails closed.
+/// This device's own decisions toward its other devices, from its signed
+/// policy, and the file service that applies changes it accepts.
 #[derive(Clone, Default)]
 struct PeerLocal {
-    sessions: DeviceSessionStore,
     explorer: Arc<RwLock<Option<crate::infra::explorer::ExplorerService>>>,
 }
 
 impl PeerLocal {
-    fn consent(&self, device_id: &str) -> PeerConsent {
-        self.sessions.consent(device_id)
+    fn consent(&self, _device_id: &str) -> PeerConsent {
+        let policy = device_trust::effective_policy();
+        PeerConsent {
+            accepts_writes: policy.files == "edit",
+            shares_clipboard: policy.clipboard,
+        }
     }
 
     fn explorer(&self) -> Option<crate::infra::explorer::ExplorerService> {
@@ -216,9 +205,12 @@ use clipboard::clipboard_offer_to_payload;
 #[path = "connected_devices_media.rs"]
 mod media;
 use media::{peer_media_handler, PeerMediaGateway, PeerMediaGrant, PeerMediaState};
-#[path = "connected_devices_sessions.rs"]
-mod sessions;
-pub use sessions::PairConsent;
+#[path = "connected_devices_delivery.rs"]
+mod delivery;
+#[path = "connected_devices_links.rs"]
+mod links;
+pub use delivery::DeliveryReceipt;
+use links::{device_claims, exchange_envelope, policy_permissions};
 #[path = "connected_devices_writes.rs"]
 mod writes;
 pub use writes::local_tree_size;
@@ -403,12 +395,8 @@ impl ConnectedDevicesService {
             }
         }
         let secret = peer_identity::load_or_create(&request.account_id, &request.device_id)?;
-        self.local
-            .sessions
-            .open(&request.account_id, &request.device_id)?;
         // The previous owner's server id must never answer for this one.
         *self.network_device_id.write().map_err(lock_error)? = String::new();
-        let keys = pinned_ticket_keys(&request.development_ticket_keys)?;
         let (relay_mode, relay_policy) = configured_relay_mode()?;
         #[cfg(not(target_os = "macos"))]
         // IPv4 only, as in the macOS transport worker: a global IPv6 path
@@ -428,7 +416,7 @@ impl ConnectedDevicesService {
                 ))
             })?;
         #[cfg(target_os = "macos")]
-        let endpoint = crate::infra::peer_transport_worker::Endpoint::initialize_legacy(
+        let endpoint = crate::infra::peer_transport_worker::Endpoint::initialize_device(
             lease, secret, relay_mode,
         )
         .await
@@ -439,17 +427,13 @@ impl ConnectedDevicesService {
             endpoint: endpoint.clone(),
             account_id: request.account_id,
             local_device_id: request.device_id,
-            keys,
             connections: Arc::new(RwLock::new(HashMap::new())),
-            used_ticket_ids: Arc::new(Mutex::new(HashMap::new())),
             roots: PeerRootRegistry::discover(),
             relay_policy,
         };
         let accept_context = PeerAcceptContext {
             endpoint: endpoint.clone(),
             network_device_id: self.network_device_id.clone(),
-            keys: state.keys.clone(),
-            used_ticket_ids: state.used_ticket_ids.clone(),
             roots: state.roots.clone(),
             clipboard_handler: self.clipboard_handler.clone(),
             clipboard_blobs: self.clipboard_blobs.clone(),
@@ -460,7 +444,7 @@ impl ConnectedDevicesService {
         };
         *self.state.write().map_err(lock_error)? = Some(state);
         tokio::spawn(run_accept_loop(accept_context));
-        self.start_session_resumer();
+        self.start_address_refresher();
         self.ensure_media_gateway().await?;
         self.snapshot()
     }
@@ -490,12 +474,7 @@ impl ConnectedDevicesService {
             .filter(|(_, connection)| !connection_closed(&connection.connection))
             .map(|(device_id, connection)| ConnectedPeerStatus {
                 device_id: device_id.clone(),
-                state: if connection.claims.exp > unix_now() {
-                    "online"
-                } else {
-                    "authorization_expired"
-                }
-                .to_owned(),
+                state: "online".to_owned(),
                 #[cfg(target_os = "macos")]
                 connection_type: "direct".into(),
                 #[cfg(not(target_os = "macos"))]
@@ -515,7 +494,6 @@ impl ConnectedDevicesService {
                     })
                     .unwrap_or("unknown")
                     .to_owned(),
-                authorization_expires_at: connection.claims.exp,
             })
             .collect();
         Ok(ConnectedDevicesSnapshot {
@@ -527,7 +505,6 @@ impl ConnectedDevicesService {
             addressing: Some(state.endpoint.address()),
             relay_policy: state.relay_policy.clone(),
             peers,
-            sessions: self.local.sessions.summaries(),
             unavailable_reason: None,
         })
     }
@@ -968,9 +945,10 @@ impl ConnectedDevicesService {
             .get(device_id)
             .filter(|peer| !connection_closed(&peer.connection))
             .ok_or_else(|| ApiError::Unavailable("The device is offline.".to_owned()))?;
-        if peer.claims.exp <= unix_now() {
+        if device_trust::trusted_peer(&peer.claims.target_endpoint_id).as_deref() != Some(device_id)
+        {
             return Err(ApiError::Unavailable(
-                "The device session ended. Connect again from Files.".to_owned(),
+                "That device is no longer one of your devices.".to_owned(),
             ));
         }
         Ok(peer.connection.clone())
@@ -1067,8 +1045,6 @@ fn cleanup_peer_cache(root: &Path) {
 struct PeerAcceptContext {
     endpoint: Endpoint,
     network_device_id: Arc<RwLock<String>>,
-    keys: HashMap<String, VerifyingKey>,
-    used_ticket_ids: Arc<Mutex<HashMap<String, i64>>>,
     roots: PeerRootRegistry,
     clipboard_handler: Arc<RwLock<Option<Arc<dyn Fn(ClipboardPayload) + Send + Sync>>>>,
     clipboard_blobs: Arc<Mutex<HashMap<String, ClipboardBlobRecord>>>,
@@ -1112,6 +1088,12 @@ async fn handle_incoming_connection(
         return Err(ApiError::Message("Files connections require a local network address.".into()));
     }
     let remote_endpoint = connection.remote_id().to_string();
+    // Only the account's added devices may connect, and only while this
+    // device's list is fresh. The handshake already proved the remote key.
+    let Some(source_device_id) = device_trust::trusted_peer(&remote_endpoint) else {
+        close_connection(&connection);
+        return Err(ApiError::Message("Unknown device.".to_owned()));
+    };
     let (mut send, mut receive) = connection
         .accept_bi()
         .await
@@ -1128,125 +1110,45 @@ async fn handle_incoming_connection(
             "This device is not registered with Misty yet.".to_owned(),
         ));
     }
-    let verify_ticket = |ticket: &str| -> ApiResult<PeerTicketClaims> {
-        let mut used = context.used_ticket_ids.lock().map_err(lock_error)?;
-        verify_peer_ticket(
-            ticket,
-            &context.keys,
-            &remote_endpoint,
-            &local_endpoint,
-            unix_now(),
-            &mut used,
-        )
-    };
-    // A server ticket alone (Hello) authorizes a short connection. Connect
-    // also starts a local session; Resume continues one, checked only here.
-    let (claims, response, session_based) = match hello.request {
-        PeerRequest::Hello { ticket } => {
-            let claims = verify_ticket(&ticket)?;
-            let expires_at = claims.exp;
-            (claims, PeerResponse::Authorized { expires_at }, false)
-        }
-        PeerRequest::Connect {
-            ticket,
-            session,
-            address,
-        } => {
-            let mut claims = verify_ticket(&ticket)?;
-            let now = unix_now();
-            let expires_at = session
-                .expires_at
-                .min(now + i64::from(MAX_SESSION_DAYS) * 24 * 60 * 60);
-            if expires_at <= now || !(32..=128).contains(&session.token.len()) {
-                return Err(ApiError::Message(
-                    "The session offer is invalid.".to_owned(),
-                ));
-            }
-            let sessions = &context.local.sessions;
-            sessions.store_outgoing(
-                &claims.source_device_id,
-                &remote_endpoint,
-                session.token,
-                expires_at,
-                address,
-            )?;
-            let token =
-                sessions.issue_incoming(&claims.source_device_id, &remote_endpoint, expires_at)?;
-            claims.exp = expires_at;
-            let writable = context
-                .local
-                .consent(&claims.source_device_id)
-                .accepts_writes;
-            let response = PeerResponse::Connected {
-                expires_at,
-                session: Some(SessionOffer { token, expires_at }),
-                writable,
-            };
-            (claims, response, true)
-        }
-        PeerRequest::Resume {
-            device_id,
-            token,
-            address,
-        } => {
-            let sessions = &context.local.sessions;
-            let Some(expires_at) =
-                sessions.verify_incoming(&device_id, &remote_endpoint, &token, unix_now())
-            else {
-                let _ = write_response(
-                    &mut send,
-                    &hello.request_id,
-                    Err(PeerError {
-                        code: PeerErrorCode::Revoked,
-                        message: "This device session has ended. Connect again from Misty."
-                            .to_owned(),
-                        retry_after_ms: None,
-                    }),
-                )
-                .await;
-                return Err(ApiError::Message("Device session ended.".to_owned()));
-            };
-            if let Some(address) = address {
-                let _ = sessions.remember_address(&device_id, address);
-            }
-            let writable = context.local.consent(&device_id).accepts_writes;
-            let claims = session_claims(
-                &device_id,
-                &remote_endpoint,
-                &local_device_id,
-                &local_endpoint,
-                expires_at,
-                writable,
-            );
-            let response = PeerResponse::Connected {
-                expires_at,
-                session: None,
-                writable,
-            };
-            (claims, response, true)
-        }
-        _ => {
-            return Err(ApiError::Message(
-                "The first peer request must authorize the connection.".to_owned(),
-            ))
-        }
-    };
-    if claims.target_device_id != local_device_id {
+    let PeerRequest::Join { list, .. } = hello.request else {
         return Err(ApiError::Message(
-            "Peer ticket targets a different device.".to_owned(),
+            "The first peer request must join the connection.".to_owned(),
         ));
+    };
+    if let Some(list) = list {
+        let _ = device_trust::apply_peer_list(&list);
     }
+    if device_trust::trusted_peer(&remote_endpoint).as_deref() != Some(source_device_id.as_str()) {
+        close_connection(&connection);
+        return Err(ApiError::Message("That device was removed.".to_owned()));
+    }
+    let policy = device_trust::effective_policy();
+    let own_list = device_trust::current_list();
+    let response = PeerResponse::Joined {
+        list_version: own_list
+            .as_ref()
+            .map(|list| list.version)
+            .unwrap_or_default(),
+        list: own_list.map(|list| list.record),
+        files: policy.files.clone(),
+        clipboard: policy.clipboard,
+    };
+    let claims = device_claims(
+        &source_device_id,
+        &remote_endpoint,
+        &local_device_id,
+        &local_endpoint,
+        policy_permissions(&policy.files, policy.clipboard),
+    );
     write_response(&mut send, &hello.request_id, Ok(response)).await?;
 
     loop {
-        let ended = session_based
-            && !context
-                .local
-                .sessions
-                .incoming_active(&claims.source_device_id, unix_now());
-        if claims.exp <= unix_now() || ended {
+        // Removed devices lose their connections as soon as this device learns it.
+        if device_trust::trusted_peer(&remote_endpoint).as_deref()
+            != Some(claims.source_device_id.as_str())
+        {
             #[cfg(not(target_os = "macos"))]
-            connection.close(1u8.into(), b"authorization expired");
+            connection.close(1u8.into(), b"device removed");
             #[cfg(target_os = "macos")]
             connection.close();
             return Ok(());
@@ -1302,38 +1204,33 @@ async fn handle_authorized_stream(
         ));
     }
 
-    if claims.exp <= unix_now() {
-        return write_response(
-            &mut send,
-            &envelope.request_id,
-            Err(PeerError {
-                code: PeerErrorCode::AuthorizationExpired,
-                message: "Authorization expired.".to_owned(),
-                retry_after_ms: None,
-            }),
-        )
-        .await;
-    }
-    // Changes and clipboard follow this device's own current consent, so a
-    // change of mind applies at once, without the server or a new session.
+    // Every permission follows this device's own current policy, so a change
+    // of mind applies at once, without the server or a reconnect.
+    let policy = device_trust::effective_policy();
+    let mut claims = claims;
+    claims.permissions = policy_permissions(&policy.files, policy.clipboard);
     let consent = local.consent(&claims.source_device_id);
     let writable = consent.accepts_writes;
+    let _ = &connections;
     match envelope.request {
-        PeerRequest::EndSession => {
-            let _ = local.sessions.end(&claims.source_device_id);
-            let dropped = connections
-                .write()
-                .ok()
-                .and_then(|mut connections| connections.remove(&claims.source_device_id));
-            if let Some(dropped) = dropped {
-                close_connection(&dropped.connection);
-            }
-            write_response(
-                &mut send,
-                &envelope.request_id,
-                Ok(PeerResponse::SessionEnded),
+        PeerRequest::DeliverFile {
+            grant,
+            inbox_scope_id,
+            name,
+            size,
+            sha256,
+        } => {
+            let result = delivery::receive_delivery(
+                &claims.source_device_id,
+                &grant,
+                &inbox_scope_id,
+                &name,
+                size,
+                &sha256,
+                &mut receive,
             )
-            .await
+            .await;
+            write_response(&mut send, &envelope.request_id, result).await
         }
         PeerRequest::GetRoots if has_permission(&claims, "roots:read") => {
             let mut shared = roots.roots();
@@ -1757,7 +1654,7 @@ async fn handle_authorized_stream(
             )
             .await
         }
-        PeerRequest::Hello { .. } | PeerRequest::Connect { .. } | PeerRequest::Resume { .. } => {
+        PeerRequest::Hello { .. } | PeerRequest::Join { .. } => {
             write_response(
                 &mut send,
                 &envelope.request_id,
@@ -1898,40 +1795,6 @@ fn writable_entry(result: ApiResult<PeerResponse>) -> ApiResult<PeerResponse> {
         }
         other => other,
     })
-}
-
-/// Claims for a connection authorized by a local session instead of a ticket.
-/// Reads are part of every session; changes are checked against consent.
-fn session_claims(
-    source_device_id: &str,
-    source_endpoint_id: &str,
-    target_device_id: &str,
-    target_endpoint_id: &str,
-    expires_at: i64,
-    writable: bool,
-) -> PeerTicketClaims {
-    let mut permissions = vec![
-        "roots:read".to_owned(),
-        "files:read".to_owned(),
-        "directories:subscribe".to_owned(),
-    ];
-    if writable {
-        permissions.push("files:write".to_owned());
-    }
-    PeerTicketClaims {
-        iss: "misty-device-session".to_owned(),
-        aud: DEVICE_PROTOCOL_VERSION.to_owned(),
-        jti: uuid::Uuid::new_v4().to_string(),
-        pair_id: String::new(),
-        source_device_id: source_device_id.to_owned(),
-        source_endpoint_id: source_endpoint_id.to_owned(),
-        target_device_id: target_device_id.to_owned(),
-        target_endpoint_id: target_endpoint_id.to_owned(),
-        protocol_version: DEVICE_PROTOCOL_VERSION.to_owned(),
-        permissions,
-        iat: unix_now(),
-        exp: expires_at,
-    }
 }
 
 fn connection_closed(connection: &TransportConnection) -> bool {

@@ -1,4 +1,5 @@
 import { subscribeAccountEvents } from "@/api/accountEvents";
+import { devicesNative } from "@/native/devices";
 import { mistyDeviceJobsEnabled } from "./flags";
 import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "./model/interfaces/types";
@@ -301,6 +302,15 @@ async function executeWorkflowNodeOnDevice(
   signal: AbortSignal,
   leaseExpiresAt: string | null | undefined,
 ): Promise<Record<string, unknown>> {
+  signal.throwIfAborted();
+  // Every job carries the run grant the asking device signed. This device
+  // checks it natively before acting; the server only carried it, and cannot
+  // widen it (docs/design/devices/BRIEF.md).
+  try {
+    await devicesNative.verifyJob(job.operation, job.scopeId, job.config);
+  } catch {
+    throw new DeviceOperationNotAttempted(new Error("device_grant_invalid"));
+  }
   signal.throwIfAborted();
   if (job.operation === "browser.act") {
     // One goal runs as a local loop: Midscene plans, Misty's native input acts.

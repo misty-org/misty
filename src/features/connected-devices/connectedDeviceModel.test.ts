@@ -1,83 +1,78 @@
-import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 import { describe, expect, it } from "vitest";
-import {
-  connectsAutomatically,
-  deviceLink,
-  type ServerConnectedPeer,
-} from "./connectedDeviceModel";
+import type { ChannelSnapshot } from "@/native/devices";
+import { devicePeers, deviceStatusLabel, type AccountDevice } from "./connectedDeviceModel";
 
-const nowSeconds = () => Math.floor(Date.now() / 1000);
+const device = (
+  id: string,
+  name: string,
+  admissionState: AccountDevice["admissionState"] = "admitted",
+): AccountDevice => ({
+  id,
+  name,
+  platform: "macos",
+  publicKey: "",
+  admissionState,
+  osVersion: "",
+  appVersion: "",
+  lastSeenAt: "2026-10-05T00:00:00Z",
+  createdAt: "2026-10-05T00:00:00Z",
+});
 
-function peer(deviceId: string): ServerConnectedPeer {
-  return {
-    pairId: `pair_${deviceId}`,
-    deviceId,
-    name: deviceId,
-    platform: "macos",
-    p2pEndpointId: "endpoint",
-    protocolVersions: [],
-    addressing: { id: "endpoint" },
-    connectionHint: "unknown",
-    lastHeartbeatAt: new Date().toISOString(),
-    clipboardCanSend: false,
-    clipboardCanReceive: false,
-    filesAcceptWrites: false,
-    filesCanWrite: false,
-  };
-}
+const channel = (peers: ChannelSnapshot["peers"]): ChannelSnapshot => ({
+  connected: true,
+  admitted: true,
+  networkKey: "home",
+  overlay: false,
+  peers,
+});
 
-function snapshot(
-  sessions: ConnectedDevicesSnapshot["sessions"],
-  online: string[] = [],
-): ConnectedDevicesSnapshot {
-  return {
-    enabled: true,
-    endpointId: "self",
-    addressing: null,
-    relayPolicy: "lan-only",
-    peers: online.map((deviceId) => ({
-      deviceId,
-      state: "online",
-      connectionType: "direct",
-      authorizationExpiresAt: nowSeconds() + 3600,
-    })),
-    sessions,
-    unavailableReason: null,
-  };
-}
-
-describe("device links", () => {
-  it("separates a new pair, a live session and an ended one", () => {
-    const later = nowSeconds() + 86_400;
-    expect(deviceLink(peer("device_b"), snapshot([])).state).toBe("new");
-    expect(
-      deviceLink(
-        peer("device_b"),
-        snapshot([{ deviceId: "device_b", outgoingExpiresAt: later, incomingExpiresAt: later }]),
-      ).state,
-    ).toBe("reconnecting");
-    expect(
-      deviceLink(
-        peer("device_b"),
-        snapshot(
-          [{ deviceId: "device_b", outgoingExpiresAt: later, incomingExpiresAt: later }],
-          ["device_b"],
-        ),
-      ).state,
-    ).toBe("connected");
-    expect(
-      deviceLink(
-        peer("device_b"),
-        snapshot([{ deviceId: "device_b", outgoingExpiresAt: 0, incomingExpiresAt: 0 }]),
-      ).state,
-    ).toBe("ended");
+describe("device peers", () => {
+  it("lists this device first and labels each other device by network", () => {
+    const peers = devicePeers(
+      [device("b", "Studio"), device("self", "Laptop"), device("c", "Office"), device("d", "Old")],
+      "self",
+      channel([
+        { deviceId: "b", endpointId: "", online: true, networkKey: "home", overlay: false },
+        { deviceId: "c", endpointId: "", online: true, networkKey: "work", overlay: false },
+      ]),
+      [],
+      new Set(),
+    );
+    expect(peers.map((peer) => [peer.name, deviceStatusLabel(peer.status)])).toEqual([
+      ["Laptop", "This device"],
+      ["Office", "Other network"],
+      ["Old", "Offline"],
+      ["Studio", "Same network"],
+    ]);
   });
 
-  it("starts only new pairs on their own, from one side", () => {
-    const empty = snapshot([]);
-    expect(connectsAutomatically(peer("device_b"), empty, "device_a")).toBe(true);
-    expect(connectsAutomatically(peer("device_a"), empty, "device_b")).toBe(false);
-    const ended = snapshot([{ deviceId: "device_b", outgoingExpiresAt: 0, incomingExpiresAt: 0 }]);
-    expect(connectsAutomatically(peer("device_b"), ended, "device_a")).toBe(false);
+  it("omits devices that are not added, and reports unreachable dials", () => {
+    const peers = devicePeers(
+      [device("self", "Laptop"), device("p", "Pending", "pending"), device("c", "Office")],
+      "self",
+      channel([
+        { deviceId: "c", endpointId: "", online: true, networkKey: "work", overlay: false },
+      ]),
+      [],
+      new Set(["c"]),
+    );
+    expect(peers.map((peer) => peer.id)).toEqual(["self", "c"]);
+    expect(deviceStatusLabel(peers[1].status)).toBe("Can't reach");
+  });
+
+  it("treats a shared overlay network as the same network", () => {
+    const [, peer] = devicePeers(
+      [device("self", "Laptop"), device("t", "Tailnet")],
+      "self",
+      {
+        ...channel([
+          { deviceId: "t", endpointId: "", online: true, networkKey: "elsewhere", overlay: true },
+        ]),
+        overlay: true,
+      },
+      [],
+      new Set(),
+    );
+    expect(peer.status).toBe("same-network");
   });
 });

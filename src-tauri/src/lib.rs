@@ -16,7 +16,6 @@ mod telemetry;
 
 #[cfg(desktop)]
 use app::commands::{
-    agents_device_identity_load, agents_device_identity_store,
     media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
     media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
     media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
@@ -56,11 +55,23 @@ use app::commands::{
 
 #[cfg(desktop)]
 use app::commands::{
-    connected_devices_configure, connected_devices_connect, connected_devices_end_session,
     connected_devices_initialize, connected_devices_media_url,
-    connected_devices_prepare_clipboard_files, connected_devices_resume_sessions,
-    connected_devices_roots, connected_devices_set_identity, connected_devices_snapshot,
-    connected_devices_subscribe_directory, connected_devices_sync_pairs,
+    connected_devices_prepare_clipboard_files, connected_devices_roots,
+    connected_devices_set_identity, connected_devices_snapshot,
+    connected_devices_subscribe_directory,
+};
+#[cfg(desktop)]
+use app::device_admission_commands::{
+    devices_admit_self, devices_approval_status, devices_approve_confirm, devices_approve_start,
+    devices_approve_status, devices_connect, devices_deny, devices_pending_requests,
+    devices_publish_folders, devices_remove, devices_rename, devices_request_approval,
+    devices_set_policy,
+};
+#[cfg(desktop)]
+use app::device_commands::{devices_refresh, devices_start, devices_stop, devices_view};
+#[cfg(desktop)]
+use app::device_job_commands::{
+    device_send_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
@@ -178,6 +189,10 @@ pub fn run() {
                     .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
             }
             let runtime = MistyRuntime::new();
+            // What this device trusts (vault root pin, device list, its own
+            // policy) lives beside its other app data.
+            #[cfg(desktop)]
+            infra::device_trust::set_storage_root(runtime.environment.config_dir());
             #[cfg(desktop)]
             {
                 let route_app = app.handle().clone();
@@ -342,29 +357,57 @@ pub fn run() {
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
-                    agents_device_identity_load,
-                    #[cfg(desktop)]
-                    agents_device_identity_store,
-                    #[cfg(desktop)]
                     connected_devices_initialize,
                     #[cfg(desktop)]
                     connected_devices_snapshot,
                     #[cfg(desktop)]
                     connected_devices_subscribe_directory,
                     #[cfg(desktop)]
-                    connected_devices_connect,
-                    #[cfg(desktop)]
                     connected_devices_roots,
                     #[cfg(desktop)]
                     connected_devices_set_identity,
                     #[cfg(desktop)]
-                    connected_devices_sync_pairs,
+                    devices_start,
                     #[cfg(desktop)]
-                    connected_devices_configure,
+                    devices_stop,
                     #[cfg(desktop)]
-                    connected_devices_resume_sessions,
+                    devices_view,
                     #[cfg(desktop)]
-                    connected_devices_end_session,
+                    devices_refresh,
+                    #[cfg(desktop)]
+                    devices_admit_self,
+                    #[cfg(desktop)]
+                    devices_request_approval,
+                    #[cfg(desktop)]
+                    devices_approval_status,
+                    #[cfg(desktop)]
+                    devices_pending_requests,
+                    #[cfg(desktop)]
+                    devices_approve_start,
+                    #[cfg(desktop)]
+                    devices_approve_status,
+                    #[cfg(desktop)]
+                    devices_approve_confirm,
+                    #[cfg(desktop)]
+                    devices_deny,
+                    #[cfg(desktop)]
+                    devices_remove,
+                    #[cfg(desktop)]
+                    devices_rename,
+                    #[cfg(desktop)]
+                    devices_set_policy,
+                    #[cfg(desktop)]
+                    devices_publish_folders,
+                    #[cfg(desktop)]
+                    devices_connect,
+                    #[cfg(desktop)]
+                    device_sign_request,
+                    #[cfg(desktop)]
+                    device_sign_run_grants,
+                    #[cfg(desktop)]
+                    device_verify_job,
+                    #[cfg(desktop)]
+                    device_send_file,
                     #[cfg(desktop)]
                     connected_devices_media_url,
                     #[cfg(desktop)]
