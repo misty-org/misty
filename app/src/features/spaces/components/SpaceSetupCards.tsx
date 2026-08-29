@@ -24,7 +24,7 @@ export function SpaceSetupCards({
         <div className="min-w-0 flex-1">
           <p className="m-0 text-sm font-medium">Your Space is ready</p>
           <p className="mb-0 mt-1 text-xs text-cream-muted">
-            Invite someone to start collaborating in Chat, Tasks, Journal, and the Library.
+            Invite someone to start collaborating in Social, Planner, Journal, and the Library.
           </p>
         </div>
         {dismissible ? (

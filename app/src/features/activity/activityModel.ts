@@ -84,11 +84,11 @@ export function unreadActivityCountForSpace(items: ActivityItem[], spaceId: stri
 export function unreadActivityCountForSpaceSection(
   items: ActivityItem[],
   spaceId: string,
-  section: "journal" | "planner" | "chat" | "library",
+  section: "journal" | "planner" | "social" | "chat" | "library",
 ): number {
   return items.filter((item) => {
     if (item.readAt || !("spaceId" in item.target) || item.target.spaceId !== spaceId) return false;
-    if (section === "chat") return item.target.kind === "space-chat";
+    if (section === "social" || section === "chat") return item.target.kind === "space-chat";
     if (section === "planner") return item.target.kind === "space-task";
     return false;
   }).length;
@@ -96,7 +96,7 @@ export function unreadActivityCountForSpaceSection(
 
 export function unreadActivityCountForTool(
   items: ActivityItem[],
-  tool: "files" | "agents" | "extensions" | "transfers",
+  tool: "files" | "agents" | "marketplace" | "transfers",
 ): number {
   return items.filter(
     (item) => !item.readAt && item.target.kind === "workspace-tool" && item.target.tool === tool,
@@ -112,7 +112,7 @@ export function activityTargetMatchesLocation(target: ActivityTarget, pathname: 
   if (!("spaceId" in target) || parts[0] !== "spaces") return false;
   const routeSpaceId = safeDecode(parts[1] ?? "");
   if (routeSpaceId !== target.spaceId) return false;
-  if (target.kind === "space-chat") return parts[2] === "chat";
+  if (target.kind === "space-chat") return parts[2] === "social" || parts[2] === "chat";
   if (target.kind === "space-task") return parts[2] === "planner";
   return parts[2] === "invitation";
 }

@@ -96,7 +96,7 @@ export function AssetIcon(props: AssetIconProps) {
       style={
         {
           WebkitMask: `url("${source}") center / contain no-repeat`,
-          background: "currentColor",
+          background: props.paint ?? "currentColor",
           mask: `url("${source}") center / contain no-repeat`,
           width: size,
           height: size,
@@ -130,6 +130,7 @@ export interface AssetIconProps {
   src: string;
   size?: number;
   color?: boolean;
+  paint?: CSSProperties["background"];
   className?: string;
   title?: string;
 }

@@ -21,41 +21,141 @@ describe("SpaceChatConversationList", () => {
     container.remove();
   });
 
-  it("keeps native conversations and groups linked Discord channels in Chat", async () => {
+  it("keeps conversations in one list and connected accounts at the bottom", async () => {
+    const onConnectAccount = vi.fn();
     await act(async () => {
       root.render(
         <MemoryRouter>
           <SpaceChatConversationList
             activeSpaceId="space-1"
             activeConversationId={null}
+            provider="instagram"
             currentUserId="user-1"
             conversations={[
               conversation("direct", "Mina", "misty", ["user-1", "user-2"]),
               conversation("group", "Launch", "misty", ["user-1", "user-2", "user-3"]),
               conversation("discord-art", "art", "discord", []),
               conversation("discord-builds", "builds", "discord", []),
-              conversation("slack-launch", "launch", "slack", []),
+              conversation("instagram-launch", "launch", "instagram", []),
             ]}
             onCreateConversation={vi.fn()}
             onEditConversation={vi.fn()}
+            onConnectAccount={onConnectAccount}
+            accounts={[
+              {
+                id: "instagram-account",
+                provider: "instagram",
+                account_display: "Misty Studio",
+                status: "active",
+              },
+              {
+                id: "discord-account",
+                provider: "discord",
+                account_display: "Misty Community",
+                status: "active",
+              },
+            ]}
           />
         </MemoryRouter>,
       );
     });
 
-    expect(container.textContent).toContain("Conversations - 2");
-    expect(container.textContent).toContain("Discord - 2");
-    expect(container.textContent).toContain("Slack - 1");
-    expect(container.textContent).toContain("Everyone");
-    expect(container.querySelector('a[href="/spaces/space-1/chat"]')).not.toBeNull();
+    expect(container.textContent).toContain("Conversations - 1");
+    expect(container.textContent).not.toContain("Instagram - 1");
+    expect(container.querySelector('[aria-label="Filter Instagram conversations"]')).toBeNull();
+    expect(container.textContent).not.toContain("Everyone");
     expect(container.textContent).not.toContain("Direct");
     expect(container.textContent).not.toContain("Group");
     expect(
-      container.querySelector('a[href="/spaces/space-1/chat?conversation=discord-art"]'),
-    ).not.toBeNull();
+      container.querySelector('a[href="/spaces/space-1/social/discord?conversation=discord-art"]'),
+    ).toBeNull();
     expect(
-      container.querySelector('a[href="/spaces/space-1/chat?conversation=slack-launch"]'),
+      container.querySelector(
+        'a[href="/spaces/space-1/social/instagram?conversation=instagram-launch"]',
+      ),
     ).not.toBeNull();
+    expect(container.textContent).toContain("Accounts");
+    expect(container.textContent).toContain("Misty Studio");
+    expect(container.textContent).not.toContain("Misty Community");
+    const conversationList = container.querySelector('[aria-label="Instagram conversations"]');
+    const accountsHeading = [...container.querySelectorAll("h2")].find(
+      (heading) => heading.textContent?.trim() === "Accounts",
+    );
+    expect(
+      Boolean(
+        conversationList &&
+        accountsHeading &&
+        conversationList.compareDocumentPosition(accountsHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    const instagramIcon = container.querySelector(
+      'a[href*="conversation=instagram-launch"] [data-social-provider-icon="instagram"]',
+    );
+    expect(instagramIcon?.querySelector("linearGradient")).not.toBeNull();
+    expect(container.querySelector('a[href="/spaces/space-1/social/discord"]')).toBeNull();
+    expect(
+      container
+        .querySelector('a[href="/spaces/space-1/social/instagram"]')
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Connect Instagram"]')?.click();
+    });
+    expect(onConnectAccount).toHaveBeenCalledWith("instagram");
+  });
+
+  it("offers only the current platform when no account is connected", async () => {
+    const onConnectAccount = vi.fn();
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceChatConversationList
+            activeSpaceId="space-1"
+            activeConversationId={null}
+            provider="discord"
+            conversations={[]}
+            onConnectAccount={onConnectAccount}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.textContent).toContain("Connect Discord");
+    expect(container.textContent).not.toContain("Connect Instagram");
+    expect(container.textContent).not.toContain("Instagram or Discord");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Connect Discord"]')?.click();
+    });
+    expect(onConnectAccount).toHaveBeenCalledWith("discord");
+  });
+
+  it.each([
+    ["instagram", "Conversations", "No conversations yet."],
+    ["messenger", "Conversations", "No conversations yet."],
+    ["discord", "Direct messages", "No direct messages yet."],
+    ["x", "Direct messages", "No direct messages yet."],
+  ] as const)("labels the %s sidebar by message type", async (provider, heading, emptyState) => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <SpaceChatConversationList
+            activeSpaceId="space-1"
+            activeConversationId={null}
+            provider={provider}
+            conversations={[]}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    expect(
+      [...container.querySelectorAll("h2, button")].some((item) =>
+        item.textContent?.includes(heading),
+      ),
+    ).toBe(true);
+    expect(container.textContent).toContain(emptyState);
+    expect(container.textContent).not.toContain(`${provider} -`);
   });
 
   it("keeps edit and delete inside the conversation context menu", async () => {
@@ -67,6 +167,7 @@ describe("SpaceChatConversationList", () => {
           <SpaceChatConversationList
             activeSpaceId="space-1"
             activeConversationId={null}
+            provider="misty"
             currentUserId="user-1"
             conversations={[conversation("group", "Launch", "misty", ["user-1", "user-2"])]}
             onEditConversation={onEdit}
@@ -102,6 +203,7 @@ describe("SpaceChatConversationList", () => {
           <SpaceChatConversationList
             activeSpaceId="space_misty_canonical"
             activeConversationId="support"
+            provider="misty"
             currentUserId="user-1"
             conversations={[conversation("support", "My support", "misty", ["user-1"])]}
             isMistySpace
@@ -118,7 +220,7 @@ describe("SpaceChatConversationList", () => {
 function conversation(
   id: string,
   title: string,
-  origin: "misty" | "discord" | "slack",
+  origin: "misty" | "discord" | "instagram" | "messenger" | "x",
   memberIds: string[],
 ): SpaceConversation {
   return {

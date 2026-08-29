@@ -23,6 +23,7 @@ import {
   useSpacesTabsStore,
 } from "../store/useSpacesTabsStore";
 import { SpacePageFrame } from "./SpacePageLayout";
+import { spacePanelSidebarAvailable } from "./spacePanel/SpacePanelSidebarContext";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
 import { SpacePanelContent } from "./SpacePanelContent";
 import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
@@ -96,6 +97,9 @@ export default function SpacesShell() {
   const routeParts = location.pathname.split("/").filter(Boolean);
   const detailRouteActive = routeParts[0] === "spaces" && routeParts.length >= 3;
   const spaceSurfaceActive = Boolean(activeInvitation || activeTab?.kind === "space");
+  const contextualPanelAvailable =
+    Boolean(activeInvitation) ||
+    (spaceSurfaceActive && spacePanelSidebarAvailable(panelRoute.section));
   const reconnect = useCallback(() => void load({ force: true, accountId }), [accountId, load]);
 
   const respondToActiveInvitation = async (accept: boolean) => {
@@ -150,17 +154,46 @@ export default function SpacesShell() {
     return () => setViewingSpace("");
   }, [activeSpace?.id, setViewingSpace, user?.id]);
 
-  // Push the space's name up to the workspace tab that hosts it so the tab
-  // bar (and the collapsed "Spaces" dropdown) shows real names instead of a
-  // stack of generic "Space" entries.
+  // Keep the Space name as context, while normalizing older persisted titles
+  // that combined context and tool (for example, "Family Journal").
   useEffect(() => {
     if (!activeSpace?.id || !activeSpace.name) return;
-    const groupKey = `space:${activeSpace.id}` as const;
+    const spaceName = activeSpace.name;
     const state = useWorkspaceStore.getState();
-    const tab = dockLeaves(state.layout.root)
+    const tabs = dockLeaves(state.layout.root)
       .flatMap((pane) => pane.tabs)
-      .find((entry) => entry.groupKey === groupKey);
-    if (tab) state.renameTab(tab.id, activeSpace.name);
+      .filter((entry) => entry.groupKey.startsWith(`space:${activeSpace.id}`));
+    for (const tab of tabs) {
+      let newTitle: string | null = null;
+      if (tab.groupKey === `space:${activeSpace.id}`) {
+        const section = tab.route.split(/[?#]/)[0].split("/").filter(Boolean)[2];
+        newTitle = section === "home" ? "Home" : spaceName;
+      } else {
+        const tool = tab.groupKey.split(":")[2];
+        const toolTitle =
+          tool === "journal"
+            ? "Journal"
+            : tool === "planner"
+              ? "Planner"
+              : tool === "social" || tool === "chat"
+                ? "Social"
+                : tool === "library"
+                  ? "Library"
+                  : null;
+        if (
+          toolTitle &&
+          (tab.title === toolTitle ||
+            tab.title === `${spaceName} ${toolTitle}` ||
+            tab.title === `${spaceName} · ${toolTitle}` ||
+            tab.title === `Space ${toolTitle}`)
+        ) {
+          newTitle = `${spaceName} ${toolTitle}`;
+        }
+      }
+      if (newTitle && tab.title !== newTitle) {
+        state.renameTab(tab.id, newTitle);
+      }
+    }
   }, [activeSpace?.id, activeSpace?.name]);
   useEffect(() => writePanelVisible(panelVisible), [panelVisible]);
   useEffect(() => {
@@ -245,18 +278,19 @@ export default function SpacesShell() {
       <div
         className={[
           "grid h-full min-h-0 bg-charcoal-bg",
-          "grid-rows-[minmax(0,1fr)_32px] overflow-hidden",
+          contextualPanelAvailable ? "grid-rows-[minmax(0,1fr)_32px]" : "grid-rows-[minmax(0,1fr)]",
+          "overflow-hidden",
           "transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
         ].join(" ")}
         style={{
           gridTemplateColumns:
-            panelVisible && spaceSurfaceActive
+            panelVisible && contextualPanelAvailable
               ? "clamp(248px, 18vw, 268px) minmax(0, 1fr)"
               : "0px minmax(0, 1fr)",
         }}
       >
         <AnimatePresence initial={false}>
-          {panelVisible && spaceSurfaceActive ? (
+          {panelVisible && contextualPanelAvailable ? (
             <motion.aside
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
@@ -299,21 +333,23 @@ export default function SpacesShell() {
           )}
         </main>
 
-        <footer className="col-span-full row-start-2 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
-          <SpacesBottomBarToggle
-            pressed={panelVisible}
-            onClick={() => setPanelVisible((visible) => !visible)}
-            title={panelVisible ? "Hide Spaces panel" : "Show Spaces panel"}
-          >
-            {panelVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-          </SpacesBottomBarToggle>
-          <div
-            id={spacesBottomBarActionsId}
-            className="ml-auto flex min-w-0 items-center justify-end gap-1"
-          />
-        </footer>
+        {contextualPanelAvailable ? (
+          <footer className="col-span-full row-start-2 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
+            <SpacesBottomBarToggle
+              pressed={panelVisible}
+              onClick={() => setPanelVisible((visible) => !visible)}
+              title={panelVisible ? "Hide Spaces panel" : "Show Spaces panel"}
+            >
+              {panelVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            </SpacesBottomBarToggle>
+            <div
+              id={spacesBottomBarActionsId}
+              className="ml-auto flex min-w-0 items-center justify-end gap-1"
+            />
+          </footer>
+        ) : null}
 
-        <CreateSpaceDialog dialog={dialog} error={error ?? ""} />
+        <CreateSpaceDialog dialog={dialog} />
       </div>
     </MotionConfig>
   );

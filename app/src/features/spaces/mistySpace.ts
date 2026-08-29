@@ -23,6 +23,9 @@ export function canOpenMistySpaceSection(space: Space, section: string): boolean
   if (space.kind !== "misty") return true;
 
   switch (section) {
+    case "home":
+      return true;
+    case "social":
     case "chat":
       return space.permissions?.["messages.read"] === true;
     case "planner":

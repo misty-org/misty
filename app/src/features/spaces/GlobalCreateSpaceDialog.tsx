@@ -8,13 +8,12 @@ export function GlobalCreateSpaceDialog(props: {
 }) {
   const createSpace = useSpacesStore((state) => state.createSpace);
   const clearError = useSpacesStore((state) => state.clearError);
-  const error = useSpacesStore((state) => state.error);
   const dialog = useCreateSpaceDialog({ createSpace, clearError });
 
   return (
     <>
       {props.children(dialog.start)}
-      <CreateSpaceDialog dialog={dialog} error={error ?? ""} />
+      <CreateSpaceDialog dialog={dialog} />
     </>
   );
 }

@@ -23,7 +23,7 @@ describe("Spaces landing route", () => {
     const teamSpace = spaceFixture({ id: "team-space" });
     const mistySpace = spaceFixture({ id: "misty", kind: "misty" });
 
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe("/spaces/misty/chat");
+    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe("/spaces/misty/home");
   });
 
   it("prefers the canonical kind even when its display name changes", () => {
@@ -31,7 +31,7 @@ describe("Spaces landing route", () => {
     const canonical = spaceFixture({ id: "space_misty_canonical", kind: "misty", name: "Support" });
 
     expect(resolveSpacesLandingRoute([teamSpace, canonical])).toBe(
-      "/spaces/space_misty_canonical/chat",
+      "/spaces/space_misty_canonical/home",
     );
   });
 

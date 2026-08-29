@@ -1,0 +1,13 @@
+**/.env
+**/.env/**
+**/.env.*
+**/.dev.vars
+**/.secrets
+**/.secrets/**
+**/.wrangler
+**/node_modules
+**/dist
+**/build
+**/target
+.git
+.github

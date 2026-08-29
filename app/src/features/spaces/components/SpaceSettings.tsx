@@ -1,6 +1,6 @@
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings";
+import { SystemErrorActivity } from "@/features/activity";
 import { SpaceMembers } from "@/features/spaces/members";
-import { NotionConnectionPanel } from "@/features/spaces/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import {
   AlertDialog,
@@ -22,19 +22,19 @@ import {
   Switch,
 } from "@/shared/ui";
 import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
-import { Lightbulb, Plug, Settings2, Trash2, UsersRound } from "lucide-react";
+import { Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { canManageSpaceLifecycle } from "../mistySpace";
+import { canManageSpaceLifecycle, preferredMistySpace } from "../mistySpace";
 import { useSpacesStore } from "../store/useSpacesStore";
+import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
 
-type SpaceSettingsSection = "general" | "members" | "connections" | "suggestions";
+type SpaceSettingsSection = "general" | "members" | "suggestions";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
-  { id: "connections", label: "Connections", icon: Plug },
   { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
@@ -64,7 +64,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const canDelete = isOwner && canManageSpaceLifecycle(space, "delete");
   const encodedSpaceId = encodeURIComponent(spaceId);
   const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
-  const fallbackReturnPath = `/spaces/${encodedSpaceId}/chat`;
+  const fallbackReturnPath = `/spaces/${encodedSpaceId}/social/misty`;
   const closeSettings = () => {
     const destination = locationState?.spaceSettingsReturnTo;
     navigate(
@@ -101,7 +101,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     clearError();
     try {
       await leaveSpace(spaceId);
-      navigate("/spaces", { replace: true });
+      const remainingSpaces = useSpacesStore.getState().spaces;
+      const fallback = preferredMistySpace(remainingSpaces);
+      navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
+        replace: true,
+        state: { mistySpaceSwitch: true },
+      });
     } catch {
       /* The shared store error remains visible in the dialog. */
     } finally {
@@ -114,7 +119,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     clearError();
     try {
       await deleteSpace(spaceId, deleteConfirmation);
-      navigate("/spaces", { replace: true });
+      const remainingSpaces = useSpacesStore.getState().spaces;
+      const fallback = preferredMistySpace(remainingSpaces);
+      navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
+        replace: true,
+        state: { mistySpaceSwitch: true },
+      });
     } catch {
       /* The shared store error remains visible in the dialog. */
     } finally {
@@ -147,21 +157,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
           presentation="overlay"
           title={settingsItems.find((item) => item.id === activeSection)?.label ?? "General"}
         >
-          {activeSection === "connections" ? (
-            <div className="grid gap-5">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Journal connections</CardTitle>
-                  <p className="mb-0 mt-1 text-xs text-cream-muted">
-                    Bring selected Notion pages into Journal. Connector sync runs automatically.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <NotionConnectionPanel spaceId={spaceId} canManage={isOwner} expandedByDefault />
-                </CardContent>
-              </Card>
-            </div>
-          ) : activeSection === "general" ? (
+          {activeSection === "general" ? (
             <div className="grid gap-5">
               <Card aria-labelledby="space-name-heading">
                 <CardHeader className="flex flex-row items-start justify-between gap-5">
@@ -198,18 +194,12 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     </p>
                   ) : null}
                   {error && !leaveOpen && !deleteOpen ? (
-                    <Button
-                      className={[
-                        "mt-4 h-auto w-full justify-start whitespace-normal rounded-lg border",
-                        "border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-left text-xs",
-                        "text-cream-bright hover:bg-charcoal-active hover:text-cream-bright",
-                      ].join(" ")}
-                      variant="ghost"
-                      type="button"
-                      onClick={clearError}
-                    >
-                      {error}
-                    </Button>
+                    <SystemErrorActivity
+                      error={error}
+                      scope={`spaces:settings:${spaceId}`}
+                      title="Space settings need attention"
+                      target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
+                    />
                   ) : null}
                   <Separator className="my-5" />
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -372,12 +362,11 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 function DangerError({ message }: { message: string }) {
   return (
-    <p
-      className="m-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-      role="alert"
-    >
-      {message}
-    </p>
+    <SystemErrorActivity
+      error={message}
+      scope="spaces:settings:danger"
+      title="Space action could not be completed"
+    />
   );
 }
 
@@ -457,9 +446,12 @@ function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwne
           </p>
         ) : null}
         {error ? (
-          <p className="mb-0 mt-4 text-xs text-cream-bright" role="alert">
-            {error}
-          </p>
+          <SystemErrorActivity
+            error={error}
+            scope={`spaces:suggestions:${spaceId}`}
+            title="Action suggestions could not be updated"
+            target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
+          />
         ) : null}
       </CardContent>
     </Card>

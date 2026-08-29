@@ -11,13 +11,7 @@ import {
 import type { MemberDialogsState } from "./useMemberDialogs";
 
 /** Confirms the two destructive member actions: transfer ownership and remove. */
-export function MemberActionDialog({
-  dialogs,
-  error,
-}: {
-  dialogs: MemberDialogsState;
-  error: string;
-}) {
+export function MemberActionDialog({ dialogs }: { dialogs: MemberDialogsState }) {
   const { memberAction, actionBusy } = dialogs;
   const isTransfer = memberAction?.kind === "transfer";
 
@@ -37,14 +31,6 @@ export function MemberActionDialog({
               : `${memberAction?.member.name ?? "This member"} will immediately lose access to this Space.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? (
-          <p
-            className="m-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={actionBusy}>Cancel</AlertDialogCancel>
           <AlertDialogAction

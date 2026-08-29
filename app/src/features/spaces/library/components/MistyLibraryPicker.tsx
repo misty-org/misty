@@ -1,5 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
-  ErrorState,
   Input,
   ScrollArea,
   Select,
@@ -175,7 +175,12 @@ export function MistyLibraryPicker({
               ))}
             </div>
           ) : error ? (
-            <ErrorState title="Library could not be loaded" description={error} />
+            <SystemErrorActivity
+              error={error}
+              scope={`library:picker:${spaceId}`}
+              title="Library could not be loaded"
+              target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}/library` }}
+            />
           ) : filteredItems.length === 0 ? (
             <EmptyState
               title={searching ? "No matching items" : "This Library is empty"}

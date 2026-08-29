@@ -14,9 +14,10 @@ npm run test:website
 npm run build:website
 ```
 
-Copy `.env.example` to `.env` for local development. Browser API requests use
-the same-origin `/api` path by default; the Vite development server can proxy
-that path to a local server through `VITE_API_PROXY_TARGET`.
+The ignored `.env` is the real local configuration. Browser API requests use
+the `/v1` path locally; the Vite development server can proxy that path to a
+local server through `VITE_API_PROXY_TARGET`. Keep this file limited to public
+browser configuration because every `VITE_*` value is bundled into the site.
 
 ## Cloudflare Workers
 
@@ -28,7 +29,5 @@ Configure Cloudflare Workers Builds with:
 - Root directory: `website`.
 - Build command: `npm run build`.
 - Deploy command: `npx wrangler deploy`.
+- Build environment variable: `VITE_API_BASE=https://api.mistysys.com/v1`.
 - Custom domain: `mistysys.com`.
-
-No production API URL is required while the website and API share
-`mistysys.com`; requests remain on the `/api` path.

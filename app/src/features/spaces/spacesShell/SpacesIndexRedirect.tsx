@@ -62,7 +62,5 @@ export function SpacesIndexRedirect() {
 export function resolveSpacesLandingRoute(spaces: Space[]): string | null {
   const fallback = preferredMistySpace(spaces);
   if (!fallback) return null;
-  return fallback.kind === "misty"
-    ? `/spaces/${encodeURIComponent(fallback.id)}/chat`
-    : defaultSpaceRoute(fallback.id);
+  return defaultSpaceRoute(fallback.id);
 }

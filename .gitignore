@@ -5,12 +5,11 @@
 **/target/
 **/.cache/
 **/.vite/
+**/.vercel/
 **/.wrangler/
 
 # Local configuration and operating-system files
 **/.env*
-!**/.env.example
-!**/.env.web.example
 **/.DS_Store
 
 # Generated native projects

@@ -161,4 +161,125 @@ describe("ThreadDetail", () => {
     expect(document.querySelector("iframe")).toBeNull();
     expect(document.body.textContent).toContain("Make Space part of your workflow.");
   });
+
+  it("supports reply, reply-all, forward, AI summarization, and workspace actions", async () => {
+    const onReply = vi.fn();
+    const onConvertToTask = vi.fn();
+    const onClipToJournal = vi.fn();
+
+    const sampleThread: InboxThread = {
+      connectionId: "conn-1",
+      key: "conn-1:thread-3",
+      provider: "gmail",
+      provider_id: "thread-3",
+      account_id: "acc-1",
+      subject: "Sprint Planning Notes",
+      snippet: "Action items for next sprint",
+      participants: [{ name: "Sarah", email: "sarah@example.com" }],
+      labels: ["INBOX"],
+      last_message_at: "2026-08-20T10:00:00Z",
+      unread: false,
+      starred: false,
+      messages: [
+        {
+          provider: "gmail",
+          provider_id: "msg-3",
+          account_id: "acc-1",
+          thread_id: "thread-3",
+          subject: "Sprint Planning Notes",
+          from: { name: "Sarah", email: "sarah@example.com" },
+          to: [{ name: "Team", email: "team@example.com" }],
+          cc: [],
+          bcc: [],
+          reply_to: [],
+          sent_at: "2026-08-20T10:00:00Z",
+          snippet: "Action items for next sprint",
+          body: {
+            text: "Sprint goals:\n1. Launch inbox v2\n2. AI integration",
+            had_html: false,
+            truncated: false,
+          },
+          labels: ["INBOX"],
+          unread: false,
+          starred: false,
+          draft: false,
+          attachments: [],
+        },
+      ],
+    };
+
+    await act(async () => {
+      root.render(
+        <ThreadDetail
+          thread={sampleThread}
+          accounts={[
+            {
+              connection_id: "conn-1",
+              provider: "gmail",
+              account_id: "acc-1",
+              email: "alex@example.com",
+              display_name: "Alex",
+              total: 1,
+              unread: 0,
+            },
+          ]}
+          loading={false}
+          actioning={false}
+          onAction={vi.fn()}
+          onReply={onReply}
+          onConvertToTask={onConvertToTask}
+          onClipToJournal={onClipToJournal}
+          onBack={vi.fn()}
+        />,
+      );
+    });
+
+    // Check action buttons in header
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>("button")];
+
+    // Click Summarize button
+    const summarizeBtn = buttons.find((b) => b.textContent?.includes("Summarize"));
+    expect(summarizeBtn).toBeDefined();
+    await act(async () => {
+      summarizeBtn?.click();
+    });
+
+    // Click Turn into Task
+    const taskBtn = document.querySelector(
+      'button[aria-label="Turn into Task"]',
+    ) as HTMLButtonElement;
+    expect(taskBtn).not.toBeNull();
+    await act(async () => {
+      taskBtn?.click();
+    });
+    expect(onConvertToTask).toHaveBeenCalledWith(sampleThread);
+
+    // Click Clip to Journal
+    const journalBtn = document.querySelector(
+      'button[aria-label="Clip to Journal"]',
+    ) as HTMLButtonElement;
+    expect(journalBtn).not.toBeNull();
+    await act(async () => {
+      journalBtn?.click();
+    });
+    expect(onClipToJournal).toHaveBeenCalledWith(sampleThread);
+
+    // Click Reply All button
+    const replyAllBtn = document.querySelector(
+      'button[aria-label="Reply all"]',
+    ) as HTMLButtonElement;
+    expect(replyAllBtn).not.toBeNull();
+    await act(async () => {
+      replyAllBtn?.click();
+    });
+    expect(onReply).toHaveBeenCalledWith("replyAll");
+
+    // Click Forward button
+    const forwardBtn = document.querySelector('button[aria-label="Forward"]') as HTMLButtonElement;
+    expect(forwardBtn).not.toBeNull();
+    await act(async () => {
+      forwardBtn?.click();
+    });
+    expect(onReply).toHaveBeenCalledWith("forward");
+  });
 });

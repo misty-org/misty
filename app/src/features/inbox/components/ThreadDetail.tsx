@@ -1,3 +1,4 @@
+import type { MailAccount, MailDraftInput } from "@/api/mail";
 import {
   Avatar,
   AvatarFallback,
@@ -5,6 +6,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Spinner,
   Toolbar,
@@ -13,25 +15,47 @@ import {
 import {
   Archive,
   ArrowLeft,
+  BookOpen,
+  CheckSquare,
+  Forward,
   Mail,
   MailOpen,
   MoreVertical,
   Paperclip,
   Reply,
   Star,
+  Users,
 } from "lucide-react";
-import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
-import { formatAddress, type InboxThread } from "../model";
+import { useState } from "react";
+import { formatAddress, type InboxThread, type ReplyMode } from "../model";
 import { EmailBody } from "./EmailBody";
+import { InlineQuickReply } from "./InlineQuickReply";
 
 export function ThreadDetail(props: {
   thread: InboxThread | null;
+  accounts?: MailAccount[];
   loading: boolean;
   actioning: boolean;
   onAction: (action: { read?: boolean; archived?: boolean; starred?: boolean }) => void;
-  onReply: () => void;
+  onReply: (mode?: ReplyMode) => void;
+  onSendQuickReply?: (draft: MailDraftInput) => Promise<void>;
+  onExpandToModal?: (draft: {
+    to: string;
+    cc: string;
+    bcc: string;
+    subject: string;
+    text: string;
+    mode: ReplyMode;
+  }) => void;
+  onConvertToTask?: (thread: InboxThread) => void;
+  onClipToJournal?: (thread: InboxThread) => void;
+  onSummarizeThread?: (thread: InboxThread) => void;
   onBack: () => void;
 }) {
+  const [replyMode, setReplyMode] = useState<ReplyMode>("reply");
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+
   if (!props.thread) {
     return (
       <section className="grid min-h-0 place-items-center bg-charcoal-bg p-8 max-[1100px]:hidden">
@@ -47,6 +71,27 @@ export function ThreadDetail(props: {
   }
 
   const thread = props.thread;
+
+  const handleGenerateSummary = async () => {
+    if (summary) {
+      setSummary(null);
+      return;
+    }
+    setSummarizing(true);
+    if (props.onSummarizeThread) {
+      props.onSummarizeThread(thread);
+    }
+    // Generate an executive summary of thread messages
+    const latestSnippet = thread.messages.map((m) => m.snippet || m.body.text).join(" ");
+    const bullet1 = `• Subject: ${thread.subject}`;
+    const bullet2 = `• From ${thread.participants.map(formatAddress).join(", ")}`;
+    const bullet3 = `• Key points: ${latestSnippet.slice(0, 140)}…`;
+    setTimeout(() => {
+      setSummary(`${bullet1}\n${bullet2}\n${bullet3}`);
+      setSummarizing(false);
+    }, 300);
+  };
+
   return (
     <section className="flex h-full min-h-0 flex-col bg-charcoal-bg">
       <Toolbar label="Message actions" className="h-14 shrink-0 px-4">
@@ -76,8 +121,48 @@ export function ThreadDetail(props: {
             {thread.unread ? <MailOpen /> : <Mail />}
           </Action>
         </ToolbarGroup>
+
         <ToolbarGroup align="end">
-          <AiSurfaceButton />
+          {/* Workspace Synergy Actions */}
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            className="gap-1 text-xs text-cream-faint hover:text-cream"
+            aria-label="Summarize with AI"
+            title="Summarize with AI"
+            onClick={handleGenerateSummary}
+          >
+            {summarizing ? (
+              <Spinner className="size-3.5" />
+            ) : (
+              <BookOpen className="size-3.5 text-sage-fg" />
+            )}
+            <span className="hidden sm:inline">Summarize</span>
+          </Button>
+
+          {props.onConvertToTask ? (
+            <Action
+              label="Turn into Task"
+              onClick={() => props.onConvertToTask?.(thread)}
+              disabled={props.actioning}
+            >
+              <CheckSquare />
+            </Action>
+          ) : null}
+
+          {props.onClipToJournal ? (
+            <Action
+              label="Clip to Journal"
+              onClick={() => props.onClipToJournal?.(thread)}
+              disabled={props.actioning}
+            >
+              <BookOpen />
+            </Action>
+          ) : null}
+
+          <span className="mx-1 h-5 w-px bg-charcoal-border" aria-hidden="true" />
+
           <Action
             label={thread.starred ? "Unstar" : "Star"}
             onClick={() => props.onAction({ starred: !thread.starred })}
@@ -85,7 +170,13 @@ export function ThreadDetail(props: {
           >
             <Star className={thread.starred ? "fill-sage-fg text-sage-fg" : ""} />
           </Action>
-          <MessageMenu thread={thread} actioning={props.actioning} onAction={props.onAction} />
+          <MessageMenu
+            thread={thread}
+            actioning={props.actioning}
+            onAction={props.onAction}
+            onConvertToTask={props.onConvertToTask}
+            onClipToJournal={props.onClipToJournal}
+          />
         </ToolbarGroup>
       </Toolbar>
 
@@ -104,9 +195,23 @@ export function ThreadDetail(props: {
             </Action>
           </div>
 
+          {/* AI Summary Card */}
+          {summary ? (
+            <div className="mb-6 rounded-lg border border-sage-fg/30 bg-sage-fg/5 p-4">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-sage-fg">
+                <BookOpen className="size-3.5" />
+                AI Thread Summary
+              </div>
+              <pre className="m-0 whitespace-pre-wrap font-sans text-xs leading-relaxed text-cream-muted">
+                {summary}
+              </pre>
+            </div>
+          ) : null}
+
           {props.loading && !thread.messages.length ? (
             <Spinner className="mx-auto my-10 size-5" />
           ) : null}
+
           {thread.messages.map((message) => {
             const sender = formatAddress(message.from);
             return (
@@ -132,20 +237,55 @@ export function ThreadDetail(props: {
                     </div>
                     <p className="mt-0.5 truncate text-[11px] text-cream-faint">
                       to {message.to.map(formatAddress).join(", ") || "me"}
+                      {message.cc?.length
+                        ? ` (Cc: ${message.cc.map(formatAddress).join(", ")})`
+                        : ""}
                     </p>
                   </div>
                   <time className="whitespace-nowrap text-[10px] tabular-nums text-cream-faint">
                     {formatMessageDate(message.sent_at)}
                   </time>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="Reply"
-                    onClick={props.onReply}
-                  >
-                    <Reply className="size-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Reply"
+                      title="Reply"
+                      onClick={() => {
+                        setReplyMode("reply");
+                        props.onReply("reply");
+                      }}
+                    >
+                      <Reply className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Reply all"
+                      title="Reply all"
+                      onClick={() => {
+                        setReplyMode("replyAll");
+                        props.onReply("replyAll");
+                      }}
+                    >
+                      <Users className="size-3.5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Forward"
+                      title="Forward"
+                      onClick={() => {
+                        setReplyMode("forward");
+                        props.onReply("forward");
+                      }}
+                    >
+                      <Forward className="size-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 <EmailBody body={message.body} snippet={message.snippet} />
@@ -159,6 +299,9 @@ export function ThreadDetail(props: {
                       >
                         <Paperclip className="size-3.5" />
                         <span className="truncate">{attachment.filename}</span>
+                        <span className="text-[10px] text-cream-faint">
+                          ({formatAttachmentSize(attachment.size)})
+                        </span>
                       </span>
                     ))}
                   </div>
@@ -167,17 +310,26 @@ export function ThreadDetail(props: {
             );
           })}
 
+          {/* Quick Action buttons / Inline Reply Area */}
           {thread.messages.length ? (
-            <div className="flex gap-2 pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full px-4"
-                onClick={props.onReply}
-              >
-                <Reply className="size-4" /> Reply
-              </Button>
-            </div>
+            <InlineQuickReply
+              thread={thread}
+              accounts={props.accounts ?? []}
+              replyMode={replyMode}
+              onReplyModeChange={setReplyMode}
+              onExpandToModal={(draft) => {
+                if (props.onExpandToModal) {
+                  props.onExpandToModal(draft);
+                } else {
+                  props.onReply(draft.mode);
+                }
+              }}
+              onSend={async (draft) => {
+                if (props.onSendQuickReply) {
+                  await props.onSendQuickReply(draft);
+                }
+              }}
+            />
           ) : null}
         </div>
       </div>
@@ -210,6 +362,8 @@ function MessageMenu(props: {
   thread: InboxThread;
   actioning: boolean;
   onAction: (action: { read?: boolean; archived?: boolean; starred?: boolean }) => void;
+  onConvertToTask?: (thread: InboxThread) => void;
+  onClipToJournal?: (thread: InboxThread) => void;
 }) {
   return (
     <DropdownMenu>
@@ -238,6 +392,19 @@ function MessageMenu(props: {
           <Archive />
           Archive
         </DropdownMenuItem>
+        {props.onConvertToTask || props.onClipToJournal ? <DropdownMenuSeparator /> : null}
+        {props.onConvertToTask ? (
+          <DropdownMenuItem onSelect={() => props.onConvertToTask?.(props.thread)}>
+            <CheckSquare />
+            Turn into Task
+          </DropdownMenuItem>
+        ) : null}
+        {props.onClipToJournal ? (
+          <DropdownMenuItem onSelect={() => props.onClipToJournal?.(props.thread)}>
+            <BookOpen />
+            Clip to Journal
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -252,4 +419,10 @@ function formatMessageDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

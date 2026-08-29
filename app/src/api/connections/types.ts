@@ -18,6 +18,7 @@ export interface AccountConnection {
 
 export interface AccountConnectionsResponse {
   connections: AccountConnection[];
+  providers?: Record<string, boolean>;
 }
 
 export interface AccountConnectionAuthorizationStart {

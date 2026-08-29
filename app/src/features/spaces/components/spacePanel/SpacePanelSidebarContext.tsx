@@ -1,113 +1,56 @@
-import { DrawingPanelSidebar } from "@/features/drawings";
-import { NotesPanelSidebar, spaceNotesEnabled } from "@/features/notes";
+import type { SocialProviderId } from "@/api/social";
 import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
-import { rememberedJournalRoute } from "../../spacesShell/spaceSubpageMemory";
+import type { AccountConnection } from "@/api/connections";
 import { SpaceChatConversationList } from "../SpaceChatConversationList";
-import { SpaceSidebarSection } from "../SpaceSidebarSection";
-import { librarySidebarItems } from "./librarySidebarItems";
-import { PlannerPanelSidebar } from "./PlannerPanelSidebar";
-import { SpaceSidebarLink } from "./SpaceSidebarLink";
 
 export interface SpacePanelSidebarContextProps {
   section: string;
-  plannerSection: "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
-  roadmapId: string;
   activeSpaceId: string;
-  activeSpaceName: string;
-  settingsSection: string;
-  libraryCollection: string;
+  socialProvider: SocialProviderId;
   conversations: SpaceConversation[];
   activeConversationId: string | null;
   currentUserId: string | undefined;
-  activeDrawingId: string;
   onCreateConversation?: () => void;
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
   isMistySpace?: boolean;
+  socialAccounts?: AccountConnection[];
+  socialAccountsLoading?: boolean;
+  socialAuthorizingProvider?: string | null;
+  onConnectSocialAccount?: (provider: Exclude<SocialProviderId, "misty">) => void;
+}
+
+export function spacePanelSidebarAvailable(section: string): boolean {
+  return section === "social";
 }
 
 /**
  * The contextual half of the Space panel, below the Space switcher.
  *
- * Journal and Planner expose their pages as independent dropdowns here; other
- * work surfaces keep a single contextual branch.
+ * Stable destinations live in the global navigator. This panel is reserved
+ * for the live objects inside the selected destination.
  */
 export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
-  const spacePath = `/spaces/${encodeURIComponent(props.activeSpaceId)}`;
-  if (props.section === "chat") {
-    return (
-      <div className="grid gap-3">
-        <SpaceChatConversationList
-          activeSpaceId={props.activeSpaceId}
-          conversations={props.conversations}
-          activeConversationId={props.activeConversationId}
-          currentUserId={props.currentUserId}
-          onCreateConversation={props.onCreateConversation}
-          onEditConversation={props.onEditConversation}
-          onDeleteConversation={props.onDeleteConversation}
-          isSpaceOwner={props.isSpaceOwner}
-          isMistySpace={props.isMistySpace}
-        />
-      </div>
-    );
-  }
-
-  if (props.section === "planner") {
-    return (
-      <PlannerPanelSidebar
-        spaceId={props.activeSpaceId}
-        section={props.plannerSection}
-        roadmapId={props.roadmapId}
+  if (!spacePanelSidebarAvailable(props.section)) return null;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <SpaceChatConversationList
+        activeSpaceId={props.activeSpaceId}
+        conversations={props.conversations}
+        activeConversationId={props.activeConversationId}
+        provider={props.socialProvider}
+        currentUserId={props.currentUserId}
+        onCreateConversation={props.onCreateConversation}
+        onEditConversation={props.onEditConversation}
+        onDeleteConversation={props.onDeleteConversation}
+        isSpaceOwner={props.isSpaceOwner}
+        isMistySpace={props.isMistySpace}
+        accounts={props.socialAccounts}
+        accountsLoading={props.socialAccountsLoading}
+        authorizingProvider={props.socialAuthorizingProvider}
+        onConnectAccount={props.onConnectSocialAccount}
       />
-    );
-  }
-
-  if ((props.section === "notes" && spaceNotesEnabled) || props.section === "drawings") {
-    const accountId = props.currentUserId ?? "";
-    return (
-      <div className="grid gap-2">
-        {spaceNotesEnabled ? (
-          <NotesPanelSidebar
-            spaceId={props.activeSpaceId}
-            spaceName={props.activeSpaceName}
-            section={{
-              active: props.section === "notes",
-              to: rememberedJournalRoute(accountId, props.activeSpaceId, "notes"),
-            }}
-          />
-        ) : null}
-        <DrawingPanelSidebar
-          spaceId={props.activeSpaceId}
-          activeDrawingId={props.activeDrawingId}
-          section={{
-            active: props.section === "drawings",
-            to: rememberedJournalRoute(accountId, props.activeSpaceId, "drawings"),
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (props.section === "library") {
-    return (
-      <div className="grid gap-3">
-        <SpaceSidebarSection title="Browse">
-          <nav className="grid gap-1" aria-label="Library collections">
-            {librarySidebarItems.map(({ collection, label, icon }) => (
-              <SpaceSidebarLink
-                key={collection}
-                active={props.libraryCollection === collection}
-                icon={icon}
-                label={label}
-                to={`${spacePath}/library?collection=${collection}`}
-              />
-            ))}
-          </nav>
-        </SpaceSidebarSection>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }

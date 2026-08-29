@@ -13,11 +13,9 @@ import type { MemberDialogsState } from "./useMemberDialogs";
 export function InviteMemberDialog({
   dialogs,
   spaceName,
-  error,
 }: {
   dialogs: MemberDialogsState;
   spaceName: string;
-  error: string;
 }) {
   return (
     <Dialog
@@ -44,14 +42,6 @@ export function InviteMemberDialog({
               onChange={(event) => dialogs.setInviteEmail(event.target.value)}
             />
           </label>
-          {error ? (
-            <p
-              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-              role="alert"
-            >
-              {error}
-            </p>
-          ) : null}
           <DialogFooter className="mt-5">
             <Button
               variant="outline"

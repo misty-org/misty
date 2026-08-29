@@ -4,15 +4,14 @@ import type {
   SpaceTask,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import { SystemErrorActivity } from "@/features/activity";
 import { avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
   AvatarFallback,
   Badge,
-  Button,
   cn,
   EmptyState,
-  ErrorState,
   Select,
   SelectContent,
   SelectItem,
@@ -148,19 +147,9 @@ export function TaskEmptyState({
   );
 }
 
-export function TaskErrorState({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+export function TaskErrorState({ message }: { message: string }) {
   return (
-    <ErrorState
-      className="mb-3 max-w-none rounded-lg border border-charcoal-active/30 bg-charcoal-active py-4"
-      compact
-      title="Tasks could not be loaded"
-      description={message}
-      action={
-        <Button size="sm" variant="outline" type="button" onClick={onDismiss}>
-          Dismiss
-        </Button>
-      }
-    />
+    <SystemErrorActivity error={message} scope="planner:tasks" title="Tasks could not be loaded" />
   );
 }
 

@@ -1,4 +1,5 @@
 import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { RotateCw } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
@@ -124,7 +125,11 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
       ) : null}
 
       {props.editError ? (
-        <p className="mb-0 mt-3 text-xs text-cream-bright">{props.editError}</p>
+        <SystemErrorActivity
+          error={props.editError}
+          scope="library:edit"
+          title="Library edit could not be applied"
+        />
       ) : null}
       <div className="mt-4 flex gap-2">
         <Button

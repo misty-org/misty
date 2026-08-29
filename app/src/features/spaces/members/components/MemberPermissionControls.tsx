@@ -1,4 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Badge,
   Button,
@@ -129,12 +130,12 @@ export function MemberPermissionControls({
 
         <div className="min-h-0 overflow-auto p-4 sm:p-5">
           {error ? (
-            <p
-              className="mb-4 mt-0 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-              role="alert"
-            >
-              {error}
-            </p>
+            <SystemErrorActivity
+              error={error}
+              scope={`spaces:permissions:${spaceId}`}
+              title="Member permissions could not be updated"
+              target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
+            />
           ) : null}
 
           {!loaded ? (
@@ -255,7 +256,7 @@ function permissionBlockedByParent(permissions: Record<string, boolean>, permiss
 
 const permissionGroups = [
   {
-    title: "Chat",
+    title: "Social",
     items: [
       {
         id: "messages.read",
