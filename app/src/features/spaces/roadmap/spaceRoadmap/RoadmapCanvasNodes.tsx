@@ -18,6 +18,7 @@ import {
 import {
   AlertTriangle,
   CalendarClock,
+  Check,
   ChevronDown,
   ChevronRight,
   Circle,
@@ -25,9 +26,12 @@ import {
   Gauge,
   Goal,
   ListTodo,
+  LockKeyhole,
   NotebookPen,
+  Play,
   Scale,
 } from "lucide-react";
+import { buildRoadmapExecutionPlan, type RoadmapExecutionState } from "./roadmapExecutionPlan";
 import { roadmapEdgeLabels, roadmapIcon, roadmapNodeColors } from "./roadmapNodeCatalog";
 
 export type RoadmapCanvasKind = "milestone" | "goal" | "support" | "task";
@@ -44,6 +48,11 @@ export type RoadmapNodeData = {
   taskId?: string;
   goalId?: string;
   taskCount?: number;
+  remainingTasks?: number;
+  sequence?: number;
+  executionState?: RoadmapExecutionState;
+  nextTaskTitle?: string;
+  blockerTitles?: string[];
   expanded?: boolean;
   targetDate?: string;
   onToggleGoal?: (goalId: string) => void;
@@ -86,25 +95,65 @@ function MilestoneNode({ data, selected }: NodeProps<RoadmapNode>) {
 }
 
 function GoalNode({ data, selected }: NodeProps<RoadmapNode>) {
+  const state = data.executionState ?? "ready";
   return (
     <div
       className={cn(
-        "w-56 rounded-xl border border-charcoal-border/80 border-l-[3px] border-l-sage-fg bg-charcoal-card p-3 shadow-sm",
-        selected && "ring-2 ring-sage-fg/50",
+        "w-64 rounded-xl border bg-charcoal-card p-3.5 shadow-sm",
+        state === "ready" ? "border-sage-fg/55" : "border-charcoal-border/80",
+        state === "done" && "opacity-80",
+        selected && "ring-2 ring-sage-fg/45",
       )}
     >
       <NodeHandles color="blue" />
-      <div className="flex items-start gap-2">
-        <Goal className="mt-0.5 size-4 shrink-0 text-sage-fg" />
+      <div className="flex items-start gap-2.5">
+        <span
+          className={cn(
+            "grid size-7 shrink-0 place-items-center rounded-lg border text-[10px] font-semibold tabular-nums",
+            state === "ready" && "border-sage-fg/50 bg-sage-fg/10 text-sage-fg",
+            state === "blocked" && "border-charcoal-border bg-charcoal-bg text-cream-muted",
+            state === "done" && "border-sage-fg/35 bg-charcoal-bg text-sage-fg",
+          )}
+        >
+          {state === "done" ? (
+            <Check className="size-3.5" />
+          ) : state === "blocked" ? (
+            <LockKeyhole className="size-3" />
+          ) : (
+            data.sequence
+          )}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold">{data.label}</div>
-          <div className="mt-1 text-[9px] uppercase text-cream-muted">
-            Goal · {data.status.replace(/_/g, " ")}
+          <div className="line-clamp-2 text-xs font-semibold leading-4 text-cream">
+            {data.label}
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-cream-muted">
+            {state === "ready" ? (
+              <Play className="size-2.5 fill-current" />
+            ) : state === "blocked" ? (
+              <LockKeyhole className="size-2.5" />
+            ) : (
+              <Check className="size-2.5" />
+            )}
+            {state === "ready" ? "Ready now" : state === "blocked" ? "Blocked" : "Complete"}
           </div>
         </div>
+        <Goal className="size-4 shrink-0 text-cream-muted" />
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded bg-charcoal-card">
-        <div className="h-full bg-status-green" style={{ width: `${data.progress}%` }} />
+      {state === "blocked" && data.blockerTitles?.length ? (
+        <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-cream-muted">
+          Waiting on {data.blockerTitles.join(", ")}
+        </p>
+      ) : data.nextTaskTitle ? (
+        <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-cream-muted">
+          Next: {data.nextTaskTitle}
+        </p>
+      ) : null}
+      <div className="mt-3 flex items-center gap-2">
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-charcoal-bg">
+          <div className="h-full rounded-full bg-sage-fg" style={{ width: `${data.progress}%` }} />
+        </div>
+        <span className="text-[10px] tabular-nums text-cream-muted">{data.progress}%</span>
       </div>
       <Button
         type="button"
@@ -117,7 +166,7 @@ function GoalNode({ data, selected }: NodeProps<RoadmapNode>) {
       >
         {data.expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         <ListTodo className="size-3" />
-        {data.taskCount ?? 0} tasks
+        {data.remainingTasks ?? data.taskCount ?? 0} left
       </Button>
     </div>
   );
@@ -138,8 +187,7 @@ function SupportNode({ data, selected }: NodeProps<RoadmapNode>) {
   return (
     <div
       className={cn(
-        "w-52 rounded-xl border border-charcoal-border/80 border-l-[3px] bg-charcoal-card p-3 shadow-sm",
-        colors.accent,
+        "w-52 rounded-xl border border-charcoal-border/80 bg-charcoal-card p-3 shadow-sm",
         selected && "ring-2 ring-current/40",
       )}
     >
@@ -150,7 +198,9 @@ function SupportNode({ data, selected }: NodeProps<RoadmapNode>) {
         </span>
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold text-cream">{data.label}</div>
-          <div className="mt-1 truncate text-[9px] uppercase text-cream-muted">{data.subtitle}</div>
+          <div className="mt-1 truncate text-[10px] first-letter:uppercase text-cream-muted">
+            {data.subtitle}
+          </div>
         </div>
       </div>
       {data.targetDate ? (
@@ -173,7 +223,7 @@ function TaskNode({ data }: NodeProps<RoadmapNode>) {
         </span>
         <div className="min-w-0">
           <div className="truncate text-[11px] font-medium">{data.label}</div>
-          <div className="mt-1 text-[9px] uppercase text-cream-muted">
+          <div className="mt-1 text-[10px] text-cream-muted">
             Task · {data.status.replace(/_/g, " ")}
           </div>
         </div>
@@ -198,6 +248,9 @@ export function snapshotRoadmapNodes(
   onToggleGoal: (goalId: string) => void,
 ): RoadmapNode[] {
   const definitions = new Map(snapshot.node_definitions.map((item) => [item.id, item]));
+  const executionByGoal = new Map(
+    buildRoadmapExecutionPlan(snapshot).items.map((item) => [item.id, item]),
+  );
   const milestones: RoadmapNode[] = snapshot.milestones.map((item) => ({
     id: item.id,
     type: "milestone",
@@ -216,27 +269,35 @@ export function snapshotRoadmapNodes(
       targetDate: item.target_date,
     },
   }));
-  const goals: RoadmapNode[] = snapshot.goals.map((item) => ({
-    id: item.id,
-    type: "goal",
-    parentId: item.milestone_id,
-    position: { x: item.position_x, y: item.position_y },
-    zIndex: 2,
-    data: {
-      canvasKind: "goal",
-      label: item.title,
-      subtitle: "Goal",
-      progress: item.progress_percentage,
-      status: item.status,
-      color: "blue",
-      icon: "goal",
-      endpoint: { kind: "goal", id: item.id },
-      taskCount: item.task_total,
-      expanded: expanded.has(item.id),
-      onToggleGoal,
-      targetDate: item.target_date,
-    },
-  }));
+  const goals: RoadmapNode[] = snapshot.goals.map((item) => {
+    const execution = executionByGoal.get(item.id);
+    return {
+      id: item.id,
+      type: "goal",
+      parentId: item.milestone_id,
+      position: { x: item.position_x, y: item.position_y },
+      zIndex: 2,
+      data: {
+        canvasKind: "goal",
+        label: item.title,
+        subtitle: "Goal",
+        progress: item.progress_percentage,
+        status: item.status,
+        color: "blue",
+        icon: "goal",
+        endpoint: { kind: "goal", id: item.id },
+        taskCount: item.task_total,
+        remainingTasks: execution?.remainingTasks,
+        sequence: execution?.sequence,
+        executionState: execution?.state,
+        nextTaskTitle: execution?.nextTask?.title,
+        blockerTitles: execution?.blockerTitles,
+        expanded: expanded.has(item.id),
+        onToggleGoal,
+        targetDate: item.target_date,
+      },
+    };
+  });
   const support: RoadmapNode[] = snapshot.nodes.map((item) => {
     const definition = item.definition_id ? definitions.get(item.definition_id) : undefined;
     return {
@@ -327,12 +388,18 @@ function edgeView(
     animated: false,
     style:
       type === "related" || type === "documents"
-        ? { strokeDasharray: "5 4" }
+        ? { strokeDasharray: "5 4", opacity: 0.55 }
         : type === "blocks"
-          ? { stroke: "#3E3E3E" }
-          : type === "measures"
-            ? { stroke: "#52825A" }
-            : undefined,
+          ? { stroke: "var(--color-sage-fg)", strokeWidth: 2 }
+          : type === "depends_on" || type === "enables"
+            ? { stroke: "var(--color-sage-fg)", strokeWidth: 2 }
+            : type === "measures"
+              ? { stroke: "var(--color-status-green)" }
+              : undefined,
+    labelStyle: { fill: "#A8A39A", fontSize: 10, fontWeight: 500 },
+    labelBgStyle: { fill: "#171717", fillOpacity: 0.92 },
+    labelBgPadding: [5, 3],
+    labelBgBorderRadius: 5,
     data: { type },
   };
 }
