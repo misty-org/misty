@@ -75,14 +75,14 @@ export const workspacePages: DocPage[] = [
         title: "How environment values are loaded",
         blocks: [
           p(
-            "After resolving the workspace, misty reads the ignored cli/.env file. Existing shell variables are never overwritten. This lets durable local defaults live in the ignored file while one-off terminal exports take priority.",
+            "After resolving the workspace, misty reads only the command-specific files under the ignored cli/.env directory. Existing shell variables are never overwritten, so one-off terminal exports take priority.",
           ),
           code(
-            "# Highest value precedence\nexport R2_BUCKET=temporary-test-bucket\nmisty server r2 configure-cors\n\n# Otherwise read from\n~/misty-org/misty/cli/.env",
+            "# Highest value precedence\nexport R2_BUCKET=temporary-test-bucket\nmisty server r2 configure-cors\n\n# Otherwise read from\n~/misty-org/misty/cli/.env/cloudflare.env",
           ),
           note(
             "Different from server environment files",
-            "The CLI’s .env supplies CLI and release workflows. Docker Compose independently reads server/.env.dev or server/.env.prod for the selected server stack.",
+            "The CLI’s scoped files supply CLI and release workflows. Docker Compose independently reads server/.env/dev or server/.env/prod for the selected server stack.",
           ),
         ],
       },
@@ -196,7 +196,7 @@ export const workspacePages: DocPage[] = [
           ),
           note(
             "Never commit secrets",
-            "cli/.env is ignored. .env.example only lists names. Keep signing keys, passwords, API tokens, and notary credentials out of Git and terminal transcripts.",
+            "cli/.env is ignored and private. Keep signing keys, passwords, API tokens, and notary credentials out of Git and terminal transcripts.",
             "warning",
           ),
         ],
@@ -343,7 +343,7 @@ export const workspacePages: DocPage[] = [
         title: "The test database connection",
         blocks: [
           p(
-            "Database-backed server tests read TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME, and TEST_DB_SSLMODE. Each one falls back to the matching DB_* value from server/.env.dev, so an ordinary development checkout needs no extra configuration.",
+            "Database-backed server tests read TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME, and TEST_DB_SSLMODE. Each one falls back to the matching DB_* value from server/.env/dev/database.env, so an ordinary development checkout needs no extra configuration.",
           ),
           list([
             "TEST_DB_NAME defaults to DB_NAME with a _test suffix, so tests never truncate the development database.",
