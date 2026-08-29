@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Trash2 } from "lucide-react";
 import {
   TaskEmptyState,
   TaskInlineSelect,
@@ -32,6 +32,7 @@ export function SpaceTaskList({
   canManage,
   onOpen,
   onUpdate,
+  onDelete,
 }: {
   tasks: SpaceTask[];
   members: SpaceMember[];
@@ -40,6 +41,7 @@ export function SpaceTaskList({
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
   onUpdate: (task: SpaceTask, patch: TaskPatch) => void;
+  onDelete: (task: SpaceTask) => void;
 }) {
   if (!tasks.length) return <TaskEmptyState />;
 
@@ -54,13 +56,16 @@ export function SpaceTaskList({
             <TableHead className="w-32">Priority</TableHead>
             <TableHead className="w-44">Assignee</TableHead>
             <TableHead className="w-48">Due</TableHead>
+            <TableHead className="w-12">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {tasks.map((task) => {
             const taskBusy = busy === task.id;
             return (
-              <TableRow key={task.id}>
+              <TableRow key={task.id} className="group/task-row">
                 <TableCell>
                   <Button
                     className="h-auto p-0 text-xs font-medium"
@@ -149,6 +154,22 @@ export function SpaceTaskList({
                       })
                     }
                   />
+                </TableCell>
+                <TableCell>
+                  {canManage ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      type="button"
+                      title="Delete task"
+                      aria-label={`Delete ${task.title}`}
+                      disabled={taskBusy}
+                      onClick={() => onDelete(task)}
+                      className="invisible size-7 text-cream-muted opacity-0 transition-opacity group-focus-within/task-row:visible group-focus-within/task-row:opacity-100 group-hover/task-row:visible group-hover/task-row:opacity-100 hover:bg-charcoal-card hover:text-notification-red"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  ) : null}
                 </TableCell>
               </TableRow>
             );

@@ -3,23 +3,26 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createTask, loadTasks, loadCalendarSources, loadIntegrations } = vi.hoisted(() => ({
-  createTask: vi.fn().mockResolvedValue({
-    id: "task-1",
-    task_key: "MST-1",
-    title: "Write notes",
-    notes: "",
-    status: "todo",
-    priority: "medium",
-    rank: 1024,
-    source_refs: [],
-    due_timezone: "UTC",
-    version: 1,
+const { archiveTask, createTask, loadTasks, loadCalendarSources, loadIntegrations } = vi.hoisted(
+  () => ({
+    archiveTask: vi.fn().mockResolvedValue(undefined),
+    createTask: vi.fn().mockResolvedValue({
+      id: "task-1",
+      task_key: "MST-1",
+      title: "Write notes",
+      notes: "",
+      status: "todo",
+      priority: "medium",
+      rank: 1024,
+      source_refs: [],
+      due_timezone: "UTC",
+      version: 1,
+    }),
+    loadTasks: vi.fn().mockResolvedValue({ tasks: [] }),
+    loadCalendarSources: vi.fn().mockResolvedValue({ sources: [] }),
+    loadIntegrations: vi.fn().mockResolvedValue({ integrations: [] }),
   }),
-  loadTasks: vi.fn().mockResolvedValue({ tasks: [] }),
-  loadCalendarSources: vi.fn().mockResolvedValue({ sources: [] }),
-  loadIntegrations: vi.fn().mockResolvedValue({ integrations: [] }),
-}));
+);
 
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
 vi.mock("@/api/spaces/api", () => ({
@@ -29,6 +32,7 @@ vi.mock("@/api/spaces/api", () => ({
     calendarSources: loadCalendarSources,
     integrations: loadIntegrations,
     createTask,
+    archiveTask,
   },
 }));
 
@@ -45,6 +49,7 @@ describe("SpacePlanner", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     useSpacesStore.setState({ membersBySpace: {} });
     createTask.mockClear();
+    archiveTask.mockReset().mockResolvedValue(undefined);
     loadTasks.mockReset().mockResolvedValue({ tasks: [] });
     loadCalendarSources.mockReset().mockResolvedValue({ sources: [] });
     loadIntegrations.mockReset().mockResolvedValue({ integrations: [] });
@@ -95,8 +100,9 @@ describe("SpacePlanner", () => {
       await Promise.resolve();
     });
 
-    expect(document.body.textContent).toContain("New task");
+    expect(document.body.textContent).toContain("Create task");
     expect(document.querySelector("#space-task-title")).not.toBeNull();
+    expect(document.querySelector('[data-slot="dialog-header"]')).toBeNull();
     expect(document.querySelector('[data-slot="dialog-content"]')?.className).toContain(
       "bg-charcoal-card",
     );
@@ -137,6 +143,114 @@ describe("SpacePlanner", () => {
     );
     expect(status).not.toBeNull();
     expect(status?.className).not.toContain("opacity-0");
+    const card = status?.closest('[data-slot="card"]');
+    expect(card?.className).toContain("min-h-36");
+    expect(card?.className).not.toMatch(/(?:^|\s)h-36(?:\s|$)/);
+    expect(card?.querySelector('[data-slot="card-title"]')?.className).toContain("text-sm");
+    expect(card?.querySelector("p")?.className).toContain("line-clamp-1");
+    expect(
+      card?.querySelector('[aria-label="Delete Finish taking screenshots for website"]'),
+    ).not.toBeNull();
+    const cardActions = card?.querySelector(
+      '[aria-label="Edit Finish taking screenshots for website"]',
+    )?.parentElement;
+    expect(cardActions?.className).toContain("opacity-0");
+    expect(cardActions?.className).toContain("group-hover:opacity-100");
+  });
+
+  it("deletes a task directly from its board card after confirmation", async () => {
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-delete",
+          task_key: "MST-6",
+          title: "Remove this task",
+          notes: "No longer needed.",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+        },
+      ],
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const deleteButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Delete Remove this task"]',
+    );
+    expect(deleteButton).not.toBeNull();
+    await act(async () => {
+      deleteButton?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.body.textContent).toContain("Delete task?");
+    expect(document.body.textContent).toContain(
+      "“Remove this task” will be removed from Tasks. This action cannot be undone.",
+    );
+    expect(archiveTask).not.toHaveBeenCalled();
+
+    const confirmDelete = document.querySelector<HTMLButtonElement>(
+      '[data-slot="alert-dialog-action"]',
+    );
+    await act(async () => {
+      confirmDelete?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(archiveTask).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toContain("Remove this task");
+  });
+
+  it("consumes a task deep link once without reopening it in a render loop", async () => {
+    loadTasks.mockResolvedValue({
+      tasks: [
+        {
+          id: "task-linked",
+          space_id: "space-new",
+          task_number: 5,
+          task_key: "MST-5",
+          title: "Open once",
+          notes: "No repeated history updates.",
+          status: "todo",
+          priority: "medium",
+          rank: 1024,
+          source_refs: [],
+          due_timezone: "UTC",
+          version: 1,
+          created_at: "2026-08-01T12:00:00Z",
+          updated_at: "2026-08-01T12:00:00Z",
+        },
+      ],
+      status_totals: { todo: 1 },
+    });
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/spaces/space-new/planner/tasks/board?task=task-linked"]}>
+          <SpacePlanner spaceId="space-new" canManage canManageIntegrations />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.querySelector<HTMLInputElement>("#space-task-title")?.value).toBe("Open once");
+    expect(loadTasks).toHaveBeenCalledOnce();
   });
 
   it("loads core tasks without requesting external calendar endpoints", async () => {

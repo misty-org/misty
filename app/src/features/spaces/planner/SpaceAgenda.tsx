@@ -1,17 +1,26 @@
 import { useAuth } from "@/features/auth";
-import {
-  AiSurfaceButton,
-  useAiSurfaceAdapter,
-  type AiSurfaceAdapter,
-} from "@/features/ai-surface/AiPaneHost";
-import { useSpaceAgendaPreferences } from "@/features/spaces";
+import { SystemErrorActivity } from "@/features/activity";
+import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
+import { useSpaceAgendaPreferences, useSpacesStore } from "@/features/spaces";
+import { useWorkspaceTabTitle } from "@/features/workspace";
 import { spacesApi } from "@/api/spaces/api";
+import { connectionsApi, type AccountConnection } from "@/api/connections";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type { SpaceCalendarEvent } from "@/api/spaces/dto/interfaces/types";
+import type {
+  GoogleCalendarChoice,
+  SpaceAgentMembership,
+  SpaceCalendarEvent,
+  SpaceCalendarSource,
+  SpaceIntegration,
+  SpaceMember,
+  SpaceTask,
+} from "@/api/spaces/dto/interfaces/types";
+import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
+import { confirmAction } from "@/shared/lib/confirmAction";
 import { errorText } from "@/shared/lib/format";
+import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
-  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -24,6 +33,7 @@ import {
 import {
   CalendarCheck2,
   CalendarDays,
+  CalendarPlus,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -32,9 +42,9 @@ import {
   Plus,
   RotateCw,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { SpaceTaskEventDrawer } from "./SpacePlannerViews";
+import { CalendarSourceDrawer, SpaceTaskDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
 import {
   AgendaMonthView,
   AgendaTimelineView,
@@ -48,15 +58,23 @@ import {
   moveAnchor,
   type AgendaView,
 } from "./spaceAgenda/agendaDates";
+import { emptyDraft, taskDraft, taskUpdateInput } from "./spaceTasks/taskDraft";
+
+const emptyMembers: SpaceMember[] = [];
+const emptyAgents: SpaceAgentMembership[] = [];
 
 export function SpaceAgenda({
   spaceId,
   view,
   canManage,
+  canManageIntegrations = false,
+  workspaceTabId,
 }: {
   spaceId: string;
   view: AgendaView;
   canManage: boolean;
+  canManageIntegrations?: boolean;
+  workspaceTabId?: string;
 }) {
   const { user } = useAuth();
   const location = useLocation();
@@ -66,35 +84,92 @@ export function SpaceAgenda({
     return value ? new Date(`${value}T12:00:00`) : new Date();
   });
   const [entries, setEntries] = useState<SpaceAgendaEntry[]>([]);
+  const [sources, setSources] = useState<SpaceCalendarSource[]>([]);
+  const [integrations, setIntegrations] = useState<SpaceIntegration[]>([]);
+  const [accounts, setAccounts] = useState<AccountConnection[]>([]);
+  const [choices, setChoices] = useState<GoogleCalendarChoice[]>([]);
+  const [selectedIntegration, setSelectedIntegration] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [connectionsUnavailable, setConnectionsUnavailable] = useState(false);
   const [busy, setBusy] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [eventOpen, setEventOpen] = useState<SpaceCalendarEvent>();
+  const [taskOpen, setTaskOpen] = useState<SpaceTask>();
+  const [agendaTasks, setAgendaTasks] = useState<Record<string, SpaceTask>>({});
+  const [openTaskDraft, setOpenTaskDraft] = useState<TaskDraft>(emptyDraft);
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [zoomMinutes, setZoomMinutes] = useState<AgendaZoomMinutes>(30);
-  const { visibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
+  const members = useSpacesStore((state) => state.membersBySpace[spaceId] ?? emptyMembers);
+  const agents = useSpacesStore((state) => state.agentMembershipsBySpace[spaceId] ?? emptyAgents);
+  const { visibility, setVisibility } = useSpaceAgendaPreferences(user?.id ?? "", spaceId);
   const range = useMemo(() => agendaRange(anchor, view), [anchor, view]);
+  useWorkspaceTabTitle(
+    workspaceTabId,
+    taskOpen?.title?.trim() ||
+      eventOpen?.title?.trim() ||
+      `${view[0].toUpperCase()}${view.slice(1)} agenda`,
+  );
+
+  const loadCalendarConnections = useCallback(async () => {
+    const [calendarSources, calendarIntegrations, accountConnections] = await Promise.allSettled([
+      spacesApi.calendarSources(spaceId),
+      spacesApi.integrations(spaceId),
+      connectionsApi.list(),
+    ]);
+    if (calendarSources.status === "fulfilled") setSources(calendarSources.value.sources);
+    if (calendarIntegrations.status === "fulfilled") {
+      setIntegrations(
+        calendarIntegrations.value.integrations.filter((item) => item.provider === "google"),
+      );
+    }
+    if (accountConnections.status === "fulfilled") {
+      setAccounts(
+        accountConnections.value.connections.filter((item) => item.provider === "google"),
+      );
+    }
+    setConnectionsUnavailable(
+      calendarSources.status === "rejected" ||
+        calendarIntegrations.status === "rejected" ||
+        accountConnections.status === "rejected",
+    );
+  }, [spaceId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const agenda = await spacesApi.agenda(
-        spaceId,
-        range.from.toISOString(),
-        range.to.toISOString(),
-      );
+      const [agenda, taskPage] = await Promise.all([
+        spacesApi.agenda(spaceId, range.from.toISOString(), range.to.toISOString()),
+        spacesApi
+          .tasks(spaceId, {
+            dueFrom: range.from.toISOString(),
+            dueTo: range.to.toISOString(),
+            limit: 200,
+          })
+          .catch(() => null),
+        loadCalendarConnections(),
+      ]);
       setEntries(agenda.entries);
+      setAgendaTasks(
+        Object.fromEntries((taskPage?.tasks ?? []).map((task) => [task.id, task] as const)),
+      );
       setError("");
     } catch (reason) {
       setError(errorText(reason));
     } finally {
       setLoading(false);
     }
-  }, [range.from, range.to, spaceId]);
+  }, [loadCalendarConnections, range.from, range.to, spaceId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const refresh = () => void loadCalendarConnections();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [drawerOpen, loadCalendarConnections]);
   useEffect(() => {
     const refresh = (event: Event) => {
       if ((event as CustomEvent<{ space_id?: string }>).detail?.space_id === spaceId) void load();
@@ -187,17 +262,110 @@ export function SpaceAgenda({
       return steps[next];
     });
   };
+
+  const run = async (key: string, action: () => Promise<void>) => {
+    setBusy(key);
+    setError("");
+    try {
+      await action();
+      setError("");
+    } catch (reason) {
+      setError(errorText(reason));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const openCalendarManager = () => {
+    setDrawerOpen(true);
+    const activeSelection = integrations.some(
+      (item) => item.id === selectedIntegration && item.status === "active",
+    );
+    if (activeSelection) return;
+
+    const firstActiveIntegration = integrations.find((item) => item.status === "active");
+    if (!firstActiveIntegration) return;
+    setSelectedIntegration(firstActiveIntegration.id);
+    setChoices([]);
+    void run("calendars", async () => {
+      setChoices((await spacesApi.googleCalendars(spaceId, firstActiveIntegration.id)).calendars);
+    });
+  };
+
+  const openTask = (taskId: string) => {
+    const cachedTask = agendaTasks[taskId];
+    if (cachedTask) {
+      setEventOpen(undefined);
+      setTaskOpen(cachedTask);
+      setOpenTaskDraft(taskDraft(cachedTask));
+      return;
+    }
+
+    void run(`open-task:${taskId}`, async () => {
+      const task = await findAgendaTask(spaceId, taskId);
+      setEventOpen(undefined);
+      setTaskOpen(task);
+      setOpenTaskDraft(taskDraft(task));
+    });
+  };
+
+  const closeTask = () => {
+    setTaskOpen(undefined);
+    setOpenTaskDraft(emptyDraft());
+  };
+
+  const saveTask = (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManage || !taskOpen || !openTaskDraft?.title.trim()) return;
+    void run(`task:${taskOpen.id}`, async () => {
+      await spacesApi.updateTask(spaceId, taskOpen, taskUpdateInput(openTaskDraft));
+      closeTask();
+      await load();
+    });
+  };
+
+  const archiveTask = async () => {
+    if (!taskOpen || !(await confirmAction(`Archive “${taskOpen.title}”?`))) return;
+    await run(`task:${taskOpen.id}`, async () => {
+      await spacesApi.archiveTask(spaceId, taskOpen);
+      closeTask();
+      await load();
+    });
+  };
+
+  const saveEvent = (event: SpaceCalendarEvent) => {
+    if (!canManage || event.provider !== "misty") return;
+    void run(`event:${event.id}`, async () => {
+      await spacesApi.updateCalendarEvent(spaceId, event);
+      setEventOpen(undefined);
+      await load();
+    });
+  };
+
+  const deleteEvent = async () => {
+    if (
+      !canManage ||
+      eventOpen?.provider !== "misty" ||
+      !(await confirmAction(`Delete “${eventOpen.title}”?`))
+    )
+      return;
+    await run(`event:${eventOpen.id}`, async () => {
+      await spacesApi.deleteCalendarEvent(spaceId, eventOpen);
+      setEventOpen(undefined);
+      await load();
+    });
+  };
+
   const openEntry = (entry: SpaceAgendaEntry) => {
-    if (entry.task_id)
-      navigate(
-        `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(entry.task_id)}`,
-      );
-    else if (entry.kind === "event")
+    if (entry.task_id) openTask(entry.task_id);
+    else if (entry.kind === "event") {
+      const source = sources.find((item) => item.id === entry.source_id);
+      closeTask();
       setEventOpen({
         id: entry.id.replace(/^event:/, ""),
         space_id: spaceId,
         source_id: entry.source_id ?? "",
-        provider: entry.source_id === "misty" ? "misty" : "google",
+        provider: source?.provider ?? (entry.external_event_id ? "google" : "misty"),
         external_event_id: entry.external_event_id ?? "",
         fingerprint: "",
         title: entry.title,
@@ -212,8 +380,9 @@ export function SpaceAgenda({
         status: entry.status === "tentative" ? "tentative" : "confirmed",
         created_at: entry.starts_at,
         updated_at: entry.starts_at,
+        version: entry.version,
       });
-    else if (entry.roadmap_id) {
+    } else if (entry.roadmap_id) {
       const selection = new URLSearchParams(
         entry.roadmap_node_id
           ? { node: entry.roadmap_node_id }
@@ -228,29 +397,32 @@ export function SpaceAgenda({
       );
     }
   };
-
-  const run = async (key: string, action: () => Promise<void>) => {
-    setBusy(key);
-    try {
-      await action();
-      setError("");
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setBusy("");
-    }
-  };
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       <header
         className={[
-          "misty-transient-scrollbar flex min-h-11 flex-wrap items-center gap-2",
+          "misty-transient-scrollbar flex min-h-11 flex-nowrap items-center",
           "overflow-x-auto border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5",
         ].join(" ")}
       >
-        <h1 className="m-0 shrink-0 text-sm font-semibold">Agenda</h1>
+        <div className="flex min-w-max flex-nowrap items-center gap-3">
+          {canManage ? (
+            <Button className="h-8 gap-1.5 text-xs" onClick={() => setCreateEventOpen(true)}>
+              <Plus className="size-3.5" />
+              New
+            </Button>
+          ) : null}
 
-        <div className="ml-auto flex min-w-max flex-wrap items-center gap-3">
+          <Button
+            variant="ghost"
+            className="h-8 gap-1.5 px-2.5 text-xs font-medium"
+            aria-label="Google Calendar"
+            onClick={openCalendarManager}
+          >
+            <CalendarPlus className="size-3.5" />
+            Calendars
+          </Button>
+
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
@@ -320,7 +492,7 @@ export function SpaceAgenda({
                 <ChevronDown className="size-3.5 text-cream-muted" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="start">
               {(["month", "week", "day"] as const).map((option) => (
                 <DropdownMenuItem
                   key={option}
@@ -369,7 +541,12 @@ export function SpaceAgenda({
             size="icon"
             className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
             aria-label="Refresh calendar"
-            onClick={() => void load()}
+            onClick={() =>
+              void run("sync", async () => {
+                await spacesApi.syncCalendarTasks(spaceId);
+                await load();
+              })
+            }
           >
             {loading ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -377,29 +554,20 @@ export function SpaceAgenda({
               <RotateCw className="size-4" />
             )}
           </Button>
-          <AiSurfaceButton />
-          {canManage ? (
-            <Button className="h-8 gap-1.5 text-xs" onClick={() => setCreateEventOpen(true)}>
-              <Plus className="size-3.5" />
-              New event
-            </Button>
-          ) : null}
         </div>
       </header>
       <main className="relative min-h-0 overflow-hidden" aria-label={`${view} agenda`}>
         {error ? (
-          <div
-            className={cn(
-              "absolute inset-x-3 top-3 z-40 flex items-center justify-between rounded-md",
-              "border border-charcoal-active/30 bg-charcoal-bg px-3 py-2 text-sm text-cream-bright",
-              "shadow-md ",
-            )}
-          >
-            <span>{error}</span>
-            <Button size="sm" variant="outline" onClick={() => void load()}>
-              Retry
-            </Button>
-          </div>
+          <SystemErrorActivity
+            accountId={user?.id}
+            error={error}
+            scope={`planner:agenda:${spaceId}`}
+            title="Agenda could not be refreshed"
+            target={{
+              kind: "route",
+              href: `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/${view}`,
+            }}
+          />
         ) : null}
         {view === "month" ? (
           <AgendaMonthView anchor={anchor} entries={visible} onOpen={openEntry} />
@@ -414,8 +582,91 @@ export function SpaceAgenda({
           />
         )}
       </main>
+      {drawerOpen ? (
+        <CalendarSourceDrawer
+          integrations={integrations}
+          accounts={accounts}
+          selectedIntegration={selectedIntegration}
+          choices={choices}
+          sources={sources}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+          canManage={canManageIntegrations}
+          connectionsUnavailable={connectionsUnavailable}
+          busy={busy}
+          onSelect={(id) => {
+            setSelectedIntegration(id);
+            setChoices([]);
+            if (id) {
+              void run("calendars", async () => {
+                setChoices((await spacesApi.googleCalendars(spaceId, id)).calendars);
+              });
+            }
+          }}
+          onConnect={() =>
+            void run("connect-google", async () => {
+              const authorization = await connectionsApi.authorize(
+                "google",
+                ["calendar_read", "calendar_write"],
+                location.pathname + location.search,
+              );
+              await openProviderAuthorizationLink(authorization.authorization_url);
+            })
+          }
+          onBind={(account) =>
+            void run(`bind:${account.id}`, async () => {
+              const result = await spacesApi.bindAccountConnection(
+                spaceId,
+                "google",
+                account.id,
+                "calendar_read",
+              );
+              setSelectedIntegration(result.integration.id);
+              await loadCalendarConnections();
+              setChoices(
+                (await spacesApi.googleCalendars(spaceId, result.integration.id)).calendars,
+              );
+            })
+          }
+          onPublish={(choice) =>
+            void run(choice.id, async () => {
+              await spacesApi.publishGoogleCalendar(spaceId, selectedIntegration, choice);
+              await load();
+            })
+          }
+          onDisable={(source) =>
+            void run(source.id, async () => {
+              await spacesApi.disableCalendarSource(spaceId, source.id);
+              await load();
+            })
+          }
+          onClose={() => setDrawerOpen(false)}
+        />
+      ) : null}
       {eventOpen ? (
-        <SpaceTaskEventDrawer event={eventOpen} onClose={() => setEventOpen(undefined)} />
+        <SpaceTaskEventDrawer
+          event={eventOpen}
+          busy={busy === `event:${eventOpen.id}`}
+          canManage={canManage}
+          error={error}
+          onClose={() => setEventOpen(undefined)}
+          onDelete={() => void deleteEvent()}
+          onSave={saveEvent}
+        />
+      ) : null}
+      {taskOpen ? (
+        <SpaceTaskDrawer
+          draft={openTaskDraft}
+          setDraft={setOpenTaskDraft}
+          editing={taskOpen}
+          members={members}
+          agents={agents}
+          busy={busy === `task:${taskOpen.id}`}
+          canManage={canManage}
+          onClose={closeTask}
+          onSave={saveTask}
+          onArchive={() => void archiveTask()}
+        />
       ) : null}
       <NewCalendarEventDialog
         open={createEventOpen}
@@ -432,4 +683,24 @@ export function SpaceAgenda({
       />
     </div>
   );
+}
+
+async function findAgendaTask(spaceId: string, taskId: string): Promise<SpaceTask> {
+  let cursor: string | undefined;
+  const seenCursors = new Set<string>();
+
+  do {
+    const page = await spacesApi.tasks(spaceId, {
+      cursor,
+      includeArchived: true,
+      limit: 200,
+    });
+    const task = page.tasks.find((item) => item.id === taskId);
+    if (task) return task;
+    cursor = page.next_cursor;
+    if (cursor && seenCursors.has(cursor)) break;
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+
+  throw new Error("This task is no longer available.");
 }

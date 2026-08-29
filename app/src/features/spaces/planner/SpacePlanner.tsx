@@ -5,10 +5,25 @@ import {
   type AiContextReference,
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
-import { SpaceRoadmapItemsWorkspace, SpaceRoadmapWorkspace } from "@/features/spaces/roadmap";
 import { useSpacePanelRoute, useSpacesStore } from "@/features/spaces";
-import type { SpaceAgentMembership, SpaceMember } from "@/api/spaces/dto/interfaces/types";
-import { useEffect, useMemo, useRef } from "react";
+import { SpaceRoadmapWorkspace } from "@/features/spaces/roadmap";
+import { useWorkspaceTabTitle } from "@/features/workspace";
+import type {
+  SpaceAgentMembership,
+  SpaceMember,
+  SpaceTask,
+} from "@/api/spaces/dto/interfaces/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SpaceAgenda } from "./SpaceAgenda";
 import { SpaceTaskDrawer } from "./SpacePlannerViews";
@@ -27,33 +42,54 @@ const emptyAgents: SpaceAgentMembership[] = [];
 export function SpacePlanner({
   spaceId,
   canManage,
+  canManageIntegrations,
+  workspaceTabId,
 }: {
   spaceId: string;
   canManage: boolean;
   canManageIntegrations: boolean;
+  workspaceTabId?: string;
 }) {
   const route = useSpacePanelRoute();
   if (route.plannerSection === "agenda") {
-    return <SpaceAgenda spaceId={spaceId} view={route.agendaView} canManage={canManage} />;
-  }
-  if (route.plannerSection === "roadmaps") {
     return (
-      <SpaceRoadmapWorkspace spaceId={spaceId} roadmapId={route.roadmapId} canManage={canManage} />
-    );
-  }
-  if (route.plannerSection === "goals" || route.plannerSection === "milestones") {
-    return (
-      <SpaceRoadmapItemsWorkspace
+      <SpaceAgenda
         spaceId={spaceId}
-        kind={route.plannerSection === "goals" ? "goal" : "milestone"}
+        view={route.agendaView}
         canManage={canManage}
+        canManageIntegrations={canManageIntegrations}
+        workspaceTabId={workspaceTabId}
       />
     );
   }
-  return <SpaceTasksPlanner spaceId={spaceId} canManage={canManage} />;
+  if (
+    route.plannerSection === "roadmaps" ||
+    route.plannerSection === "goals" ||
+    route.plannerSection === "milestones"
+  ) {
+    return (
+      <SpaceRoadmapWorkspace
+        spaceId={spaceId}
+        roadmapId={route.plannerSection === "roadmaps" ? route.roadmapId : ""}
+        canManage={canManage}
+        workspaceTabId={workspaceTabId}
+      />
+    );
+  }
+  return (
+    <SpaceTasksPlanner spaceId={spaceId} canManage={canManage} workspaceTabId={workspaceTabId} />
+  );
 }
 
-function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
+function SpaceTasksPlanner({
+  spaceId,
+  canManage,
+  workspaceTabId,
+}: {
+  spaceId: string;
+  canManage: boolean;
+  workspaceTabId?: string;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,6 +101,7 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
   const filters = useTaskFilterParams({ view, currentUserId: user?.id });
   const data = useSpaceTasksData({ spaceId, view, filters });
   const actions = useSpaceTaskActions({ spaceId, canManage, data });
+  const [deleteTarget, setDeleteTarget] = useState<SpaceTask | null>(null);
   const reloadTasks = data.load;
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const metadata: Record<string, string> = { sort: filters.sort };
@@ -149,6 +186,10 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
     spaceId,
   ]);
   useAiSurfaceAdapter(aiAdapter);
+  useWorkspaceTabTitle(
+    workspaceTabId,
+    actions.editing?.title?.trim() || (view === "list" ? "Task list" : "Task board"),
+  );
   const createQueryConsumedRef = useRef(false);
 
   const openCreate = actions.openCreate;
@@ -188,6 +229,13 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
       <SpacePlannerHeader
+        view={view}
+        onViewChange={(nextView) =>
+          navigate({
+            pathname: `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/${nextView}`,
+            search: location.search,
+          })
+        }
         query={filters.query}
         activeFilterCount={filters.activeFilterCount}
         loading={data.loading}
@@ -220,11 +268,11 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
         due={filters.due}
         data={data}
         actions={actions}
+        onDeleteRequest={setDeleteTarget}
       />
 
       {actions.editing !== undefined ? (
         <SpaceTaskDrawer
-          spaceId={spaceId}
           draft={actions.draft}
           setDraft={actions.setDraft}
           editing={actions.editing}
@@ -234,9 +282,79 @@ function SpaceTasksPlanner({ spaceId, canManage }: { spaceId: string; canManage:
           canManage={canManage}
           onClose={() => actions.setEditing(undefined)}
           onSave={actions.save}
-          onArchive={actions.editing ? () => void actions.archive(actions.editing!) : undefined}
+          onArchive={actions.editing ? () => setDeleteTarget(actions.editing!) : undefined}
         />
       ) : null}
+
+      <TaskDeleteDialog
+        task={deleteTarget}
+        busy={Boolean(deleteTarget && actions.busy === deleteTarget.id)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onConfirm={async () => {
+          if (!deleteTarget) return false;
+          return actions.archive(deleteTarget);
+        }}
+      />
     </div>
+  );
+}
+
+function TaskDeleteDialog(props: {
+  task: SpaceTask | null;
+  busy: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => Promise<boolean>;
+}) {
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setError("");
+  }, [props.task?.id]);
+
+  const remove = async () => {
+    if (props.busy) return;
+    setError("");
+    const removed = await props.onConfirm();
+    if (removed) props.onOpenChange(false);
+    else setError("This task could not be deleted. Try again.");
+  };
+
+  return (
+    <AlertDialog
+      open={Boolean(props.task)}
+      onOpenChange={(open) => {
+        if (!props.busy) props.onOpenChange(open);
+      }}
+    >
+      <AlertDialogContent className="max-w-sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete task?</AlertDialogTitle>
+          <AlertDialogDescription className="break-words">
+            “{props.task?.title || "Untitled task"}” will be removed from Tasks. This action cannot
+            be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {error ? (
+          <p className="m-0 text-sm text-notification-red" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={props.busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-notification-red text-white hover:bg-notification-red/90"
+            disabled={props.busy}
+            onClick={(event) => {
+              event.preventDefault();
+              void remove();
+            }}
+          >
+            {props.busy ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

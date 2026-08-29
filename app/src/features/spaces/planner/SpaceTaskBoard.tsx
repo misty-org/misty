@@ -7,7 +7,15 @@ import type {
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
-import { CheckSquare, GripVertical, LoaderCircle, Maximize2, Pencil, Plus } from "lucide-react";
+import {
+  CheckSquare,
+  GripVertical,
+  LoaderCircle,
+  Maximize2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -49,6 +57,7 @@ export function SpaceTaskBoard({
   canManage,
   onOpen,
   onMove,
+  onDelete,
   onCreate,
   onOpenFullCreate,
 }: {
@@ -60,6 +69,7 @@ export function SpaceTaskBoard({
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus, beforeTaskId?: string) => void;
+  onDelete: (task: SpaceTask) => void;
   onCreate: (title: string, status: SpaceTaskStatus) => void;
   onOpenFullCreate?: (status: SpaceTaskStatus, initialTitle?: string) => void;
 }) {
@@ -110,6 +120,7 @@ export function SpaceTaskBoard({
           }}
           onOpen={onOpen}
           onMove={onMove}
+          onDelete={onDelete}
           onMoveById={moveById}
         />
       ))}
@@ -134,6 +145,7 @@ function BoardColumn({
   onOpenFullCreate,
   onOpen,
   onMove,
+  onDelete,
   onMoveById,
 }: {
   column: { id: SpaceTaskStatus; label: string };
@@ -152,6 +164,7 @@ function BoardColumn({
   onOpenFullCreate: () => void;
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus) => void;
+  onDelete: (task: SpaceTask) => void;
   onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
 }) {
   const dropZone = useDropZone({
@@ -258,6 +271,7 @@ function BoardColumn({
             canManage={canManage}
             onOpen={onOpen}
             onMove={onMove}
+            onDelete={onDelete}
             onDropBefore={(payload) => onMoveById(payload.id, column.id, task.id)}
             key={task.id}
           />
@@ -293,6 +307,7 @@ function TaskCard({
   canManage,
   onOpen,
   onMove,
+  onDelete,
   onDropBefore,
 }: {
   task: SpaceTask;
@@ -302,6 +317,7 @@ function TaskCard({
   canManage: boolean;
   onOpen: (task: SpaceTask) => void;
   onMove: (task: SpaceTask, status: SpaceTaskStatus) => void;
+  onDelete: (task: SpaceTask) => void;
   onDropBefore: (payload: PointerDragPayload) => void;
 }) {
   const assignee = members.find((member) => member.user_id === task.assignee_user_id);
@@ -341,7 +357,7 @@ function TaskCard({
       data-misty-window-drag-block={canManage ? "true" : undefined}
       data-pointer-drag-source={canManage ? "true" : undefined}
       className={cn(
-        "group gap-0 rounded-xl border border-charcoal-border/70 bg-charcoal-card/80 py-0 shadow-sm transition-all",
+        "group min-h-36 gap-0 rounded-xl border border-charcoal-border/70 bg-charcoal-card/80 py-0 shadow-sm transition-all",
         "hover:border-charcoal-border hover:bg-charcoal-card hover:shadow-md",
         canManage ? "cursor-grab" : "cursor-default",
         dragging ? "opacity-40" : "",
@@ -349,39 +365,58 @@ function TaskCard({
       )}
       onPointerDown={beginDrag}
     >
-      <CardHeader className="p-3 pb-2">
+      <CardHeader className="min-h-0 flex-1 p-3 pb-2">
         <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-1.5 rounded-md text-left">
           <GripVertical className="mt-0.5 size-3.5 shrink-0 text-cream-muted opacity-0 transition-opacity group-hover:opacity-100" />
           <div className="min-w-0">
-            <CardTitle className="line-clamp-3 text-xs font-semibold leading-5 text-cream">
+            <CardTitle className="line-clamp-2 text-sm font-semibold leading-5 text-cream">
               {task.title}
             </CardTitle>
             {notes ? (
-              <p className="mb-0 mt-1 line-clamp-2 text-[11px] leading-4 text-cream-muted">
+              <p className="mb-0 mt-1 line-clamp-1 text-[11px] leading-4 text-cream-muted">
                 {notes.replace(/[-*#_`[\]]/g, " ").trim()}
               </p>
             ) : null}
           </div>
           <div className="flex items-center gap-0.5">
             {busy ? <LoaderCircle className="size-3.5 animate-spin text-cream-muted" /> : null}
-            <Button
-              size="icon"
-              variant="ghost"
-              type="button"
-              title="Edit task"
-              aria-label={`Edit ${task.title}`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen(task);
-              }}
-              className="size-6 rounded-md text-cream-muted opacity-0 transition-opacity hover:bg-charcoal-hover hover:text-cream group-hover:opacity-100"
-            >
-              <Pencil className="size-3" />
-            </Button>
+            <div className="invisible flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+              <Button
+                size="icon"
+                variant="ghost"
+                type="button"
+                title="Edit task"
+                aria-label={`Edit ${task.title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpen(task);
+                }}
+                className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream"
+              >
+                <Pencil className="size-3" />
+              </Button>
+              {canManage ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  type="button"
+                  title="Delete task"
+                  aria-label={`Delete ${task.title}`}
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDelete(task);
+                  }}
+                  className="size-6 rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-notification-red"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-3 pt-0">
+      <CardContent className="mt-auto shrink-0 p-3 pt-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-semibold text-cream-muted/80">{task.task_key}</span>
           <TaskPriorityBadge priority={task.priority} />
