@@ -1,6 +1,6 @@
 import type { SpaceRoadmapNodeDefinition } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import { Button, Input, cn } from "@/shared/ui";
-import { GripVertical, Search, Settings2, X } from "lucide-react";
+import { GripVertical, PanelLeftClose, Search, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { RoadmapNodeDefinitionManager } from "./RoadmapNodeDefinitionManager";
 import { roadmapNodeColors, roadmapPalette, type RoadmapPaletteItem } from "./roadmapNodeCatalog";
@@ -44,7 +44,7 @@ export function RoadmapNodeDrawer(props: {
           aria-label="Hide node tools"
           onClick={props.onClose}
         >
-          <X className="size-3.5" />
+          <PanelLeftClose className="size-4" />
         </Button>
       </header>
       <div className="relative m-2">
@@ -62,9 +62,7 @@ export function RoadmapNodeDrawer(props: {
           if (!categoryItems.length) return null;
           return (
             <section className="mb-3" key={category}>
-              <h3 className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
-                {category}
-              </h3>
+              <h3 className="mb-1 px-2 text-[10px] font-semibold text-cream-muted">{category}</h3>
               <div className="grid gap-0.5">
                 {categoryItems.map((item) => {
                   const Icon = item.icon;

@@ -1,5 +1,6 @@
 import { deploymentStorageKey } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
+import { useWorkspaceTabTitle } from "@/features/workspace";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
@@ -14,12 +15,12 @@ import type {
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import { errorText } from "@/shared/lib/format";
-import { Button, Input } from "@/shared/ui";
-import { GitFork, LoaderCircle, Plus, SquarePen } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { RoadmapNode } from "./spaceRoadmap/RoadmapCanvasNodes";
 import { ErrorBanner, RoadmapEditor } from "./spaceRoadmap/RoadmapEditor";
+import { RoadmapHome } from "./spaceRoadmap/RoadmapHome";
 import {
   applyRoadmapLayout,
   milestoneAt,
@@ -32,10 +33,12 @@ export function SpaceRoadmapWorkspace({
   spaceId,
   roadmapId,
   canManage,
+  workspaceTabId,
 }: {
   spaceId: string;
   roadmapId: string;
   canManage: boolean;
+  workspaceTabId?: string;
 }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -61,21 +64,41 @@ export function SpaceRoadmapWorkspace({
     new URLSearchParams(location.search).get("milestone") ??
     "";
   const [selectedId, setSelectedId] = useState(selectedFromQuery);
-  const [name, setName] = useState("");
-  const createRequested = new URLSearchParams(location.search).get("create") === "roadmap";
+  const creatingRef = useRef(false);
   const savingRef = useRef(false);
-  const conflictActionRef = useRef<((version: number) => Promise<unknown>) | undefined>(undefined);
+  const snapshotRef = useRef<SpaceRoadmapSnapshot | undefined>(undefined);
+  const serverVersionRef = useRef(0);
+  const pendingMutationCountRef = useRef(0);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const failedMutationRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  const updateSnapshot = useCallback(
+    (updater: (current: SpaceRoadmapSnapshot) => SpaceRoadmapSnapshot) => {
+      setSnapshot((current) => {
+        if (!current) return current;
+        const next = updater(current);
+        snapshotRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
+  useWorkspaceTabTitle(workspaceTabId, snapshot?.roadmap.name?.trim() || "Roadmaps");
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [list, taskPage, graph] = await Promise.all([
         spacesApi.roadmaps(spaceId),
-        spacesApi.tasks(spaceId, { limit: 200 }),
+        roadmapId
+          ? spacesApi.tasks(spaceId, { limit: 200 })
+          : Promise.resolve({ tasks: [] as SpaceTask[] }),
         roadmapId ? spacesApi.roadmap(spaceId, roadmapId) : Promise.resolve(undefined),
       ]);
       setRoadmaps(list.roadmaps);
       setTasks(taskPage.tasks.filter((task) => !task.archived_at && task.status !== "canceled"));
-      setSnapshot(graph ? normalizeRoadmapSnapshot(graph) : undefined);
+      const nextSnapshot = graph ? normalizeRoadmapSnapshot(graph) : undefined;
+      snapshotRef.current = nextSnapshot;
+      serverVersionRef.current = nextSnapshot?.roadmap.graph_version ?? 0;
+      setSnapshot(nextSnapshot);
       setError("");
       setSaveState("saved");
     } catch (reason) {
@@ -87,6 +110,10 @@ export function SpaceRoadmapWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+    if (snapshot && !savingRef.current) serverVersionRef.current = snapshot.roadmap.graph_version;
+  }, [snapshot]);
   useEffect(() => {
     setExpandedGoalIds(readExpandedGoals(expansionKey));
   }, [expansionKey]);
@@ -137,47 +164,67 @@ export function SpaceRoadmapWorkspace({
   const mutate = async <T,>(
     action: (version: number) => Promise<T>,
     apply?: (current: SpaceRoadmapSnapshot, result: T) => SpaceRoadmapSnapshot,
+    optimistic?: (current: SpaceRoadmapSnapshot) => SpaceRoadmapSnapshot,
   ) => {
-    if (!snapshot || savingRef.current) return;
+    const current = snapshotRef.current;
+    if (!current) return;
+    if (optimistic) updateSnapshot(optimistic);
+    pendingMutationCountRef.current += 1;
     savingRef.current = true;
     setSaveState("saving");
-    try {
-      const result = await action(snapshot.roadmap.graph_version);
-      conflictActionRef.current = undefined;
-      if (apply) setSnapshot((current) => (current ? apply(current, result) : current));
-      else await load();
-      setSaveState("saved");
-    } catch (reason) {
-      setError(errorText(reason));
-      if (reason instanceof SpaceRequestError && reason.status === 409) {
-        conflictActionRef.current = action;
-        setSaveState("conflict");
-      } else setSaveState("unsaved");
-    } finally {
-      savingRef.current = false;
-    }
+    setError("");
+
+    const run = async () => {
+      try {
+        let result: T;
+        try {
+          result = await action(serverVersionRef.current || current.roadmap.graph_version);
+        } catch (reason) {
+          if (!(reason instanceof SpaceRequestError) || reason.status !== 409) throw reason;
+          const latest = await spacesApi.roadmap(spaceId, current.roadmap.id);
+          serverVersionRef.current = latest.roadmap.graph_version;
+          result = await action(serverVersionRef.current);
+        }
+
+        const graphVersion = mutationGraphVersion(result);
+        if (graphVersion) serverVersionRef.current = graphVersion;
+        if (optimistic) {
+          if (graphVersion)
+            updateSnapshot((latest) => ({
+              ...latest,
+              roadmap: { ...latest.roadmap, graph_version: graphVersion },
+            }));
+        } else if (apply) updateSnapshot((latest) => apply(latest, result));
+        else await load();
+
+        failedMutationRef.current = undefined;
+        setError("");
+      } catch (reason) {
+        failedMutationRef.current = () => mutate(action, apply);
+        setError(errorText(reason));
+        setSaveState(
+          reason instanceof SpaceRequestError && reason.status === 409 ? "conflict" : "unsaved",
+        );
+      } finally {
+        pendingMutationCountRef.current = Math.max(0, pendingMutationCountRef.current - 1);
+        savingRef.current = pendingMutationCountRef.current > 0;
+        if (savingRef.current) setSaveState("saving");
+        else if (!failedMutationRef.current) setSaveState("saved");
+      }
+    };
+
+    const queued = mutationQueueRef.current.then(run);
+    mutationQueueRef.current = queued.catch(() => undefined);
+    await queued;
   };
-  const retryConflict = async () => {
-    const action = conflictActionRef.current;
-    if (!snapshot || !action || savingRef.current) return;
-    savingRef.current = true;
-    setSaveState("saving");
-    try {
-      const latest = await spacesApi.roadmap(spaceId, snapshot.roadmap.id);
-      setSnapshot(normalizeRoadmapSnapshot(latest));
-      await action(latest.roadmap.graph_version);
-      conflictActionRef.current = undefined;
+  const retrySave = async () => {
+    const retry = failedMutationRef.current;
+    if (!retry) {
       await load();
-      setSaveState("saved");
-      setError("");
-    } catch (reason) {
-      setError(errorText(reason));
-      setSaveState(
-        reason instanceof SpaceRequestError && reason.status === 409 ? "conflict" : "unsaved",
-      );
-    } finally {
-      savingRef.current = false;
+      return;
     }
+    failedMutationRef.current = undefined;
+    await retry();
   };
   const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
     if (!snapshot) return null;
@@ -343,16 +390,20 @@ export function SpaceRoadmapWorkspace({
   }, [canManage, load, snapshot, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
   const createRoadmap = async () => {
-    if (!name.trim()) return;
+    if (creatingRef.current) return;
+    creatingRef.current = true;
     setLoading(true);
+    setError("");
     try {
-      const graph = await spacesApi.createRoadmap(spaceId, name.trim());
+      const graph = await spacesApi.createRoadmap(spaceId, "Untitled roadmap");
       navigate(
         `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps/${encodeURIComponent(graph.roadmap.id)}`,
         { replace: true },
       );
     } catch (reason) {
       setError(errorText(reason));
+    } finally {
+      creatingRef.current = false;
       setLoading(false);
     }
   };
@@ -372,81 +423,23 @@ export function SpaceRoadmapWorkspace({
       savingRef.current = false;
     }
   };
+
   if (!roadmapId)
     return (
-      <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
-        <header className="flex min-h-11 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">
-          <h1 className="m-0 shrink-0 text-sm font-semibold">Views</h1>
-          {canManage && !(createRequested || !roadmaps.length) ? (
-            <div className="ml-auto flex items-center gap-3">
-              <Button
-                className="h-8 gap-1.5 text-xs"
-                onClick={() => navigate({ pathname: location.pathname, search: "?create=roadmap" })}
-              >
-                <Plus className="size-3.5" />
-                New roadmap
-              </Button>
-            </div>
-          ) : null}
-        </header>
-        <main className="min-h-0 overflow-auto p-6">
-          <div className="mx-auto max-w-4xl">
-            {error ? <ErrorBanner message={error} onRetry={() => void load()} /> : null}
-            {canManage && (createRequested || !roadmaps.length) ? (
-              <div className="mb-6 flex max-w-lg gap-2 rounded-xl border border-charcoal-border/70 bg-charcoal-card p-4">
-                <Input
-                  autoFocus
-                  placeholder="Roadmap name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && void createRoadmap()}
-                />
-                <Button disabled={!name.trim() || loading} onClick={() => void createRoadmap()}>
-                  {loading ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : (
-                    <Plus className="size-4" />
-                  )}
-                  Create
-                </Button>
-              </div>
-            ) : null}
-            <div className="overflow-hidden rounded-xl border border-charcoal-border/70 bg-charcoal-card">
-              {roadmaps.map((roadmap) => (
-                <article
-                  className="flex min-h-20 items-center gap-3 border-t border-charcoal-border/60 px-4 py-3 first:border-t-0"
-                  key={roadmap.id}
-                >
-                  <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted">
-                    <GitFork className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <strong className="block truncate text-sm font-medium">{roadmap.name}</strong>
-                    <span className="mt-0.5 block truncate text-xs text-cream-muted">
-                      {roadmap.description || "No description yet"}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      navigate(
-                        `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps/${encodeURIComponent(roadmap.id)}`,
-                      )
-                    }
-                  >
-                    <SquarePen className="size-4" />
-                    Open editor
-                  </Button>
-                </article>
-              ))}
-              {!roadmaps.length && !loading ? (
-                <div className="p-10 text-center text-sm text-cream-muted">No roadmaps yet.</div>
-              ) : null}
-            </div>
-          </div>
-        </main>
-      </div>
+      <RoadmapHome
+        spaceId={spaceId}
+        roadmaps={roadmaps}
+        canManage={canManage}
+        loading={loading}
+        error={error}
+        onCreate={() => void createRoadmap()}
+        onOpen={(id) =>
+          navigate(
+            `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps/${encodeURIComponent(id)}`,
+          )
+        }
+        onRetry={() => void load()}
+      />
     );
   if (loading && !snapshot)
     return (
@@ -527,54 +520,45 @@ export function SpaceRoadmapWorkspace({
       ),
     );
   };
-  const saveLayout = (nodes: RoadmapNode[]) =>
-    void mutate(
-      async (version) => {
-        const layout = {
-          milestones: snapshot.milestones.map((item) => {
-            const node = nodes.find((candidate) => candidate.id === item.id);
-            return {
-              id: item.id,
-              position_x: node?.position.x ?? item.position_x,
-              position_y: node?.position.y ?? item.position_y,
-              width: Number(node?.measured?.width ?? node?.style?.width ?? item.width),
-              height: Number(node?.measured?.height ?? node?.style?.height ?? item.height),
-            };
-          }),
-          goals: snapshot.goals.map((item) => {
-            const node = nodes.find((candidate) => candidate.id === item.id);
-            return {
-              id: item.id,
-              milestone_id: node?.parentId ?? item.milestone_id,
-              position_x: node?.position.x ?? item.position_x,
-              position_y: node?.position.y ?? item.position_y,
-            };
-          }),
-          nodes: snapshot.nodes.map((item) => {
-            const node = nodes.find((candidate) => candidate.id === item.id);
-            return {
-              id: item.id,
-              milestone_id: node?.parentId,
-              position_x: node?.position.x ?? item.position_x,
-              position_y: node?.position.y ?? item.position_y,
-            };
-          }),
+  const saveLayout = (nodes: RoadmapNode[]) => {
+    const layoutSnapshot = snapshotRef.current ?? snapshot;
+    const layout = {
+      milestones: layoutSnapshot.milestones.map((item) => {
+        const node = nodes.find((candidate) => candidate.id === item.id);
+        return {
+          id: item.id,
+          position_x: node?.position.x ?? item.position_x,
+          position_y: node?.position.y ?? item.position_y,
+          width: Number(node?.measured?.width ?? node?.style?.width ?? item.width),
+          height: Number(node?.measured?.height ?? node?.style?.height ?? item.height),
         };
-        try {
-          return await spacesApi.updateRoadmapLayout(spaceId, snapshot.roadmap.id, layout, version);
-        } catch (reason) {
-          if (!(reason instanceof SpaceRequestError) || reason.status !== 409) throw reason;
-          const latest = await spacesApi.roadmap(spaceId, snapshot.roadmap.id);
-          return spacesApi.updateRoadmapLayout(
-            spaceId,
-            snapshot.roadmap.id,
-            layout,
-            latest.roadmap.graph_version,
-          );
-        }
-      },
-      (current, result) => applyRoadmapLayout(current, nodes, result.graph_version),
+      }),
+      goals: layoutSnapshot.goals.map((item) => {
+        const node = nodes.find((candidate) => candidate.id === item.id);
+        return {
+          id: item.id,
+          milestone_id: node?.parentId ?? item.milestone_id,
+          position_x: node?.position.x ?? item.position_x,
+          position_y: node?.position.y ?? item.position_y,
+        };
+      }),
+      nodes: layoutSnapshot.nodes.map((item) => {
+        const node = nodes.find((candidate) => candidate.id === item.id);
+        return {
+          id: item.id,
+          milestone_id: node?.parentId,
+          position_x: node?.position.x ?? item.position_x,
+          position_y: node?.position.y ?? item.position_y,
+        };
+      }),
+    };
+    void mutate(
+      (version) =>
+        spacesApi.updateRoadmapLayout(spaceId, layoutSnapshot.roadmap.id, layout, version),
+      undefined,
+      (current) => applyRoadmapLayout(current, nodes, current.roadmap.graph_version),
     );
+  };
 
   return (
     <RoadmapEditor
@@ -592,7 +576,7 @@ export function SpaceRoadmapWorkspace({
       navigate={navigate}
       mutate={mutate}
       load={load}
-      retryConflict={retryConflict}
+      retrySave={retrySave}
       archiveRoadmap={archiveRoadmap}
       addPaletteItem={addPaletteItem}
       saveLayout={saveLayout}
@@ -603,4 +587,12 @@ export function SpaceRoadmapWorkspace({
       setPlacementRequest={setPlacementRequest}
     />
   );
+}
+
+function mutationGraphVersion(result: unknown): number | undefined {
+  if (!result || typeof result !== "object" || !("graph_version" in result)) return undefined;
+  const graphVersion = (result as { graph_version?: unknown }).graph_version;
+  return typeof graphVersion === "number" && Number.isFinite(graphVersion)
+    ? graphVersion
+    : undefined;
 }
