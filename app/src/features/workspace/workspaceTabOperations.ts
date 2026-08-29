@@ -44,3 +44,42 @@ export function nextWorkspaceFocusTimestamp(
     .reduce((maximum, tab) => Math.max(maximum, tab.lastFocusedAt), 0);
   return Math.max(Date.now(), latest + 1);
 }
+
+export function nextTabTitle(
+  tabs: WorkspaceTab[] | undefined,
+  surfaceId: WorkspaceTab["surfaceId"],
+  baseLabel: string,
+): string {
+  if (!tabs?.length) return baseLabel;
+  const existing = tabs.filter(
+    (t) =>
+      t.surfaceId === surfaceId && (t.title === baseLabel || t.title.startsWith(`${baseLabel} `)),
+  );
+  if (existing.length === 0) return baseLabel;
+  return `${baseLabel} ${existing.length + 1}`;
+}
+
+export function lastUsedUpdatesForTab(
+  tab: { groupKey: WorkspaceTab["groupKey"]; surfaceId: WorkspaceTab["surfaceId"] },
+  tabId: string,
+): Record<string, string> {
+  const updates: Record<string, string> = { [tab.groupKey]: tabId };
+  if (tab.surfaceId === "space") {
+    const spaceId = tab.groupKey.split(":")[1];
+    if (spaceId) updates[`space:${spaceId}`] = tabId;
+  }
+  return updates;
+}
+
+export function canCloseWorkspaceTab(_tab: WorkspaceTab, _scopedTabs: WorkspaceTab[]): boolean {
+  // Tabs are always individually closeable. WorkspaceCanvas restores Home only
+  // after the active scope actually becomes empty.
+  return true;
+}
+
+export function canCloseWorkspaceWindow(
+  _workspaceWindow: WorkspaceVirtualWindow,
+  _scopedWindows: WorkspaceVirtualWindow[],
+): boolean {
+  return true;
+}

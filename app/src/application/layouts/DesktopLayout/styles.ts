@@ -1,3 +1,4 @@
+import { cn } from "@/shared/ui";
 import type { FramePacingState } from "@/application/layouts/model/types";
 
 export const desktopFrameClass = [
@@ -70,13 +71,49 @@ export const profileDockClass = [
   "focus-visible:ring-2 focus-visible:ring-charcoal-active",
 ].join(" ");
 
+export const navigatorFocusRingClass = [
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted",
+  "focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-workspace",
+].join(" ");
+
+export const navigatorSubsectionIconClass =
+  "misty-navigator-subsection-icon grid size-6 shrink-0 place-items-center text-cream-bright [&_img]:!size-5 [&_svg]:!size-5";
+
+// The account controls stay visually separate from the scrolling app list so
+// they remain a stable, floating account island at the bottom of the rail.
+export const navigatorFloatingIslandClass = [
+  "flex items-center gap-1 rounded-xl border border-charcoal-border/60 bg-charcoal-card p-1",
+  "shadow-[0_12px_30px_rgba(0,0,0,0.5)]",
+].join(" ");
+
+export const navigatorIslandActionClass = [
+  "misty-navigator-icon-target grid size-9 shrink-0 place-items-center rounded-lg border-0 bg-transparent",
+  "text-cream-muted no-underline outline-none transition-colors",
+  "hover:bg-charcoal-active hover:text-cream-bright",
+  navigatorFocusRingClass,
+].join(" ");
+
+export function navigatorRowClass(active: boolean): string {
+  return cn(
+    "misty-navigator-row-target relative flex h-9 w-full items-center justify-start gap-2.5",
+    "rounded-md border-0 bg-transparent px-2.5 text-sm text-cream-muted no-underline",
+    "outline-none transition-colors",
+    "hover:bg-charcoal-card hover:text-cream-bright",
+    navigatorFocusRingClass,
+    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted",
+    active && "bg-charcoal-card text-cream-bright",
+    active && "before:absolute before:h-6 before:w-0.5 before:rounded-r before:bg-sage-fg",
+    active && "before:-left-3",
+  );
+}
+
 export const profilePopoverClass = [
-  "fixed z-[2147482900] grid max-h-[calc(100dvh-44px)] w-[286px] overflow-y-auto rounded-xl",
+  "pointer-events-auto fixed z-[2147482900] grid max-h-[calc(100dvh-44px)] w-[286px] overflow-y-auto rounded-xl",
   "border border-charcoal-border bg-charcoal-card p-2 text-cream shadow-2xl",
 ].join(" ");
 
 export const accountChooserPopoverClass = [
-  "fixed z-[2147482910] grid max-h-[calc(100dvh-44px)] w-[320px] overflow-y-auto rounded-xl",
+  "pointer-events-auto fixed z-[2147482910] grid max-h-[calc(100dvh-44px)] w-[320px] overflow-y-auto rounded-xl",
   "border border-charcoal-border bg-charcoal-card p-2 text-cream shadow-2xl",
 ].join(" ");
 
@@ -102,8 +139,21 @@ export const workStatusToastDurationMs = 3500;
 // Where the top band's controls stop: traffic lights plus the shell's own
 // buttons, with a gap. The dock header keeps its tabs to the right of this,
 // minus whatever width the navigator rail already covers.
-export const desktopTitlebarControlsEnd = 216;
+export const desktopTitlebarControlsEnd = 240;
 export const windowsTitlebarControlsEnd = 76;
+export const desktopTitlebarNavigationInset = 96;
+
+export function desktopTitlebarNavigationGeometry(appZoom: number): {
+  left: number;
+  scale: number;
+} {
+  const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
+  return {
+    left: desktopTitlebarNavigationInset / zoom,
+    scale: 1 / zoom,
+  };
+}
+
 // Breathing room around the dock header's tab row, on every edge that is not
 // already spoken for by the titlebar controls.
 export const dockHeaderPadding = 8;
@@ -122,12 +172,12 @@ export const navigatorTitlebarStripClass =
 export const desktopWallpaperLayerClass = "hidden";
 
 export const desktopTitlebarNavigationClass =
-  "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center pt-[3px] gap-1";
+  "pointer-events-auto absolute left-[96px] top-[2px] z-[55] flex h-[38px] items-center gap-1";
 export const desktopTitlebarNavigationButtonClass = [
   "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
-  "disabled:pointer-events-none disabled:text-cream-faint/35",
+  "disabled:pointer-events-none disabled:text-cream-muted/35",
 ].join(" ");
 export const windowsTitlebarControlsClass =
   "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
