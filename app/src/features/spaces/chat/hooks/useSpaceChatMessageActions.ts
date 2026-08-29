@@ -136,7 +136,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           optimisticMessage,
         );
       }
-    } catch (reason) {
+    } catch {
       if (conversationId) {
         setGroupMessages((current) =>
           current.map((message) =>
@@ -146,7 +146,9 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           ),
         );
       }
-      reportConversationError(reason, "The group message could not be sent.");
+      // Delivery failures belong to the optimistic row itself. Keeping them
+      // out of the conversation load error prevents a failed send from making
+      // the entire thread look unavailable.
     }
   };
 

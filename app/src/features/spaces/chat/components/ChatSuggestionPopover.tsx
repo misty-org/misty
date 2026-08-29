@@ -1,4 +1,5 @@
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Command,
   CommandEmpty,
@@ -9,6 +10,7 @@ import {
   PopoverContent,
 } from "@/shared/ui";
 import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
+import type { ComponentPropsWithoutRef } from "react";
 
 export interface ChatSuggestionPopoverProps {
   listId: string;
@@ -22,6 +24,7 @@ export interface ChatSuggestionPopoverProps {
   onSelect: (suggestion: ChatComposerSuggestion) => void;
   onBrowseLibrary: () => void;
   onUploadFiles: () => void;
+  onInteractOutside?: ComponentPropsWithoutRef<typeof PopoverContent>["onInteractOutside"];
 }
 
 /** The `@` menu: explicit add actions on top, matched Agents/people/items below. */
@@ -35,6 +38,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
       sideOffset={10}
       className="w-[min(480px,calc(100vw-32px))] p-0"
       onOpenAutoFocus={(event) => event.preventDefault()}
+      onInteractOutside={props.onInteractOutside}
     >
       <Command shouldFilter={false}>
         <CommandList id={props.listId}>
@@ -85,7 +89,11 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
           ) : null}
           {props.loading ? <p className="p-3 text-sm text-cream-muted">Loading Library…</p> : null}
           {props.error ? (
-            <p className="p-3 text-sm text-cream-bright">Library: {props.error}</p>
+            <SystemErrorActivity
+              error={props.error}
+              scope="social:composer:library"
+              title="Library suggestions could not be loaded"
+            />
           ) : null}
         </CommandList>
       </Command>

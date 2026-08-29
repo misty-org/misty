@@ -3,8 +3,9 @@ import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/shared/ui";
-import { Bot, CircleAlert, LoaderCircle, Sparkles } from "lucide-react";
+import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
+import { SiDiscord } from "react-icons/si";
 import { Link } from "react-router-dom";
 import { AgentRunInline } from "./AgentRunInline";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
@@ -14,8 +15,9 @@ import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
 import { SuggestedActionsCard } from "./SuggestedActionsCard";
-import { initials, isInFlightRun } from "./messageHelpers";
-import { MessageOriginBadge } from "../../components/MessageOriginBadge";
+import { initials, isAgentAuthoredMessage, isInFlightRun } from "./messageHelpers";
+import { InstagramBrandIcon } from "../../social/InstagramBrandIcon";
+import { MessengerBrandIcon, XBrandIcon } from "../../social/SocialProviderBrandIcons";
 
 export interface ChatMessageRowProps {
   message: SpaceMessage;
@@ -43,11 +45,7 @@ export function ChatMessageRow({
   props,
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
-  const publishProvider = props.canPublishToSlack?.(message)
-    ? "Slack"
-    : props.canPublishToDiscord?.(message)
-      ? "Discord"
-      : undefined;
+  const agentAuthored = isAgentAuthoredMessage(message);
 
   return (
     <Fragment>
@@ -85,12 +83,12 @@ export function ChatMessageRow({
               <AvatarFallback
                 className={cn(
                   "text-xs font-semibold",
-                  message.sender_kind === "agent"
+                  agentAuthored
                     ? cn(robotAvatarClass, avatarInkClass)
                     : cn(avatarColorClass(message.sender_name), avatarInkClass),
                 )}
               >
-                {message.sender_kind === "agent" ? (
+                {agentAuthored ? (
                   <Bot className="size-4" strokeWidth={2} />
                 ) : (
                   initials(message.sender_name)
@@ -101,7 +99,7 @@ export function ChatMessageRow({
         </div>
 
         <div className={`col-start-2 min-w-0 ${rowClass}`}>
-          {!compact ? <MessageHeader message={message} publishProvider={publishProvider} /> : null}
+          {!compact ? <MessageHeader message={message} /> : null}
 
           {props.editingMessageId === message.id ? (
             <MessageEditForm
@@ -115,7 +113,7 @@ export function ChatMessageRow({
           ) : (
             <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-6 text-cream/90">
               {message.content.map((span, index) => (
-                <MessageContent key={index} span={span} />
+                <MessageContent key={index} span={span} highlightPlainMentions={agentAuthored} />
               ))}
               {message.edited_at ? (
                 <span className="ml-1 text-[10px] text-cream-muted">(edited)</span>
@@ -123,20 +121,13 @@ export function ChatMessageRow({
             </p>
           )}
 
-          {message.local_delivery_state ? (
+          {message.local_delivery_state === "failed" ? (
             <div
-              className="mt-1 flex items-center gap-1.5 text-[11px] text-cream-muted"
-              role="status"
-              aria-live={message.local_delivery_state === "failed" ? "assertive" : "polite"}
+              className="mt-1 flex items-center gap-1.5 text-[11px] text-notification-red"
+              role="alert"
             >
-              {message.local_delivery_state === "sending" ? (
-                <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />
-              ) : (
-                <CircleAlert className="size-3" aria-hidden="true" />
-              )}
-              {message.local_delivery_state === "sending"
-                ? "Sending…"
-                : "Message couldn’t be sent."}
+              <CircleAlert className="size-3" aria-hidden="true" />
+              Message couldn’t be sent.
             </div>
           ) : null}
 
@@ -173,19 +164,6 @@ export function ChatMessageRow({
             onToggleReaction={props.onToggleReaction}
             onBeginEditing={props.onBeginEditing}
             onDelete={props.onDelete}
-            onPublish={
-              publishProvider === "Slack" && props.onPublishToSlack
-                ? () => props.onPublishToSlack?.(message)
-                : publishProvider === "Discord" && props.onPublishToDiscord
-                  ? () => props.onPublishToDiscord?.(message)
-                  : undefined
-            }
-            publishing={
-              publishProvider === "Slack"
-                ? props.publishingSlackMessageId === message.id
-                : props.publishingMessageId === message.id
-            }
-            publishProvider={publishProvider}
           />
         ) : null}
       </article>
@@ -203,26 +181,37 @@ export function ChatMessageRow({
   );
 }
 
-function MessageHeader({
-  message,
-  publishProvider,
-}: {
-  message: SpaceMessage;
-  publishProvider?: "Discord" | "Slack";
-}) {
+function MessageHeader({ message }: { message: SpaceMessage }) {
+  const agentAuthored = isAgentAuthoredMessage(message);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
       <strong className="text-[15px] font-semibold text-cream">{message.sender_name}</strong>
-      {message.sender_kind === "agent" ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px] uppercase">
-          <Sparkles />
+      {agentAuthored ? (
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+          <Bot />
           Agent
         </Badge>
       ) : null}
-      <MessageOriginBadge
-        origin={message.origin}
-        outboundProvider={publishProvider === "Slack" ? "slack" : "discord"}
-      />
+      {message.social_provider === "instagram" ? (
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+          <InstagramBrandIcon />
+          Instagram
+        </Badge>
+      ) : message.social_provider === "discord" ? (
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+          <SiDiscord />
+          Discord
+        </Badge>
+      ) : message.social_provider === "messenger" ? (
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+          <MessengerBrandIcon />
+          Messenger
+        </Badge>
+      ) : message.social_provider === "x" ? (
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+          <XBrandIcon />X
+        </Badge>
+      ) : null}
       <time className="text-[11px] tabular-nums text-cream-muted">
         {formatChatMessageTime(message.created_at)}
       </time>
@@ -230,8 +219,16 @@ function MessageHeader({
   );
 }
 
-function MessageContent({ span }: { span: MessageSpan }) {
-  if (span.type === "text") return <>{span.text}</>;
+function MessageContent({
+  span,
+  highlightPlainMentions,
+}: {
+  span: MessageSpan;
+  highlightPlainMentions: boolean;
+}) {
+  if (span.type === "text") {
+    return highlightPlainMentions ? <PlainTextWithMentions text={span.text} /> : <>{span.text}</>;
+  }
   if (span.type === "link") {
     return (
       <Link className="font-medium text-cream-bright underline underline-offset-2" to={span.url}>
@@ -239,9 +236,22 @@ function MessageContent({ span }: { span: MessageSpan }) {
       </Link>
     );
   }
-  return (
-    <span className="inline-flex items-center rounded-[3px] bg-mention-bg/35 px-1 py-0.5 font-medium text-cream-bright">
-      @{span.label}
-    </span>
+  return <span className={mentionClassName}>@{span.label}</span>;
+}
+
+const mentionClassName =
+  "inline-flex items-center rounded-[3px] bg-mention-bg/35 px-1 py-0.5 font-medium text-cream-bright";
+const plainMentionPattern = /(@[\p{L}\p{N}_.'’-]+(?:\s+[\p{Lu}][\p{L}\p{N}_.'’-]*){0,2})/gu;
+
+/** Keeps older Agent messages legible before mentions were stored as structured spans. */
+function PlainTextWithMentions({ text }: { text: string }) {
+  return text.split(plainMentionPattern).map((part, index) =>
+    part.startsWith("@") ? (
+      <span key={index} className={mentionClassName}>
+        {part}
+      </span>
+    ) : (
+      <Fragment key={index}>{part}</Fragment>
+    ),
   );
 }

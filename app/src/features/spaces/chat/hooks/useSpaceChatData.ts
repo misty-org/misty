@@ -18,6 +18,8 @@ export function useSpaceChatStore() {
   return useSpacesStore(
     useShallow((state) => ({
       messagesBySpace: state.messagesBySpace,
+      messageLoadingBySpace: state.messageLoadingBySpace,
+      messageErrorsBySpace: state.messageErrorsBySpace,
       membersBySpace: state.membersBySpace,
       nodesBySpace: state.nodesBySpace,
       agentsBySpace: state.agentsBySpace,

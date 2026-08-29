@@ -31,12 +31,7 @@ export interface SpaceChatThreadProps {
   pendingAgentRuns: PendingAgentRun[];
   actionSuggestions: SpaceActionSuggestionBatch[];
   onActionSuggestionsChanged: () => void;
-  onPublishToDiscord: (message: SpaceMessage) => void;
-  canPublishToDiscord: (message: SpaceMessage) => boolean;
-  publishingMessageId: string;
-  onPublishToSlack: (message: SpaceMessage) => void;
-  canPublishToSlack: (message: SpaceMessage) => boolean;
-  publishingSlackMessageId: string;
+  onReload: () => void;
 }
 
 /** The scrolling message list, wired to the Space's data and message actions. */
@@ -92,13 +87,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
           item,
         ])
       }
-      onReload={() => void store.loadMessages(spaceId)}
-      onPublishToDiscord={props.onPublishToDiscord}
-      canPublishToDiscord={props.canPublishToDiscord}
-      publishingMessageId={props.publishingMessageId}
-      onPublishToSlack={props.onPublishToSlack}
-      canPublishToSlack={props.canPublishToSlack}
-      publishingSlackMessageId={props.publishingSlackMessageId}
+      onReload={props.onReload}
     />
   );
 }
