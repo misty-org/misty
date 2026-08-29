@@ -4,6 +4,10 @@ import {
   shouldSuppressWindowDrag,
   windowRectsMatch,
 } from "@/application/layouts/DesktopLayout/useDesktopWindowChrome";
+import {
+  desktopTitlebarNavigationGeometry,
+  desktopTitlebarNavigationInset,
+} from "@/application/layouts/DesktopLayout/styles";
 
 describe("desktop window chrome drag suppression", () => {
   it("lets plain titlebar surfaces start a native window drag", () => {
@@ -59,5 +63,24 @@ describe("desktop window zoom geometry", () => {
 
   it("does not mistake a remembered smaller frame for an expanded window", () => {
     expect(windowRectsMatch({ x: 108, y: 59, width: 1280, height: 820 }, workArea)).toBe(false);
+  });
+});
+
+describe("desktop titlebar zoom geometry", () => {
+  it.each([0.8, 1, 1.4, 2])(
+    "keeps the titlebar controls fixed in window pixels at %sx zoom",
+    (zoom) => {
+      const geometry = desktopTitlebarNavigationGeometry(zoom);
+
+      expect(geometry.left * zoom).toBeCloseTo(desktopTitlebarNavigationInset);
+      expect(geometry.scale * zoom).toBeCloseTo(1);
+    },
+  );
+
+  it("falls back safely when the zoom is invalid", () => {
+    expect(desktopTitlebarNavigationGeometry(Number.NaN)).toEqual({
+      left: desktopTitlebarNavigationInset,
+      scale: 1,
+    });
   });
 });

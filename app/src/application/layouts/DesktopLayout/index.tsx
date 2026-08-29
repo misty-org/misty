@@ -1,16 +1,17 @@
 import type { DesktopNavItem } from "@/application/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
-import type { AppTab } from "@/features/app-shell";
-import { useAppStore } from "@/features/app-shell";
+import { useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { BrowserRuntimeBridge, setBrowserWebviewsSuspended } from "@/features/browser";
 import { MediaSearchViewer } from "@/features/files/explorer";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
-import { settingsBoolean, useSettingsStore, type SettingsSection } from "@/features/settings";
+import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import {
+  preferredMistySpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
+  socialProviderPath,
   SpacesRealtimeBridge,
   useSpacesStore,
 } from "@/features/spaces";
@@ -21,8 +22,9 @@ import {
 } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { cn } from "@/shared/ui";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet, useNavigationType } from "react-router-dom";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { ProfilePopover } from "./ProfilePopover";
@@ -44,6 +46,7 @@ import { useDesktopBootstrap } from "./useDesktopBootstrap";
 import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useDesktopNavigationHistory } from "./useDesktopNavigationHistory";
+import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { RestoreGlyph } from "./RestoreGlyph";
 export type {
   AppNoticeEntry,
@@ -61,6 +64,8 @@ export function DesktopLayout(props: {
   navItems: DesktopNavItem[];
 }) {
   const { user, refreshUser } = useAuth();
+  const spaces = useSpacesStore((state) => state.spaces);
+  const spacesSnapshotReady = useSpacesStore((state) => state.snapshotReady);
   const {
     location,
     navigate,
@@ -82,17 +87,10 @@ export function DesktopLayout(props: {
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
-  const { app: frameApp, mistyLogoSource } = useDesktopFrameStyle();
+  const { app: frameApp } = useDesktopFrameStyle();
   const navigationType = useNavigationType();
 
-  const framePacingOverlayEnabled = useSettingsStore((state) =>
-    settingsBoolean(
-      state.settings?.document ?? {},
-      "advanced",
-      "frame_pacing_overlay_enabled",
-      false,
-    ),
-  );
+  const framePacingOverlayEnabled = useDesktopShellStatus(navigate);
 
   const profileAnchorRef = useRef<HTMLButtonElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -128,7 +126,7 @@ export function DesktopLayout(props: {
   }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
-    void settingsLoad();
+    if (hasTauriInternals()) void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
     setSettingsOpen(false);
@@ -186,10 +184,28 @@ export function DesktopLayout(props: {
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
 
   useEffect(() => {
-    const surface = workspaceSurfaceFromRoute(location.pathname);
+    if (location.pathname === "/home") {
+      const homeSpace = preferredMistySpace(spaces);
+      if (homeSpace) {
+        navigate(`/spaces/${encodeURIComponent(homeSpace.id)}/home`, { replace: true });
+      } else if (spacesSnapshotReady) {
+        navigate("/spaces", { replace: true });
+      }
+      return;
+    }
+    // Provider and destination choices live in the query string. Keep the
+    // complete route on the workspace tab so opening Social cannot fall back
+    // to its default Misty destination.
+    const surface = workspaceSurfaceFromRoute(`${location.pathname}${location.search}`);
     if (surface) openWorkspaceSurface(surface);
-    else if (location.pathname === "/home") useWorkspaceStore.getState().setScope("global");
-  }, [location.pathname, openWorkspaceSurface]);
+  }, [
+    location.pathname,
+    location.search,
+    navigate,
+    openWorkspaceSurface,
+    spaces,
+    spacesSnapshotReady,
+  ]);
 
   useEffect(() => {
     if (location.pathname === "/") navigate("/home", { replace: true });
@@ -197,9 +213,12 @@ export function DesktopLayout(props: {
 
   const openLauncher = useCallback((commandsOnly = false) => {
     const launcher = useGlobalSearchStore.getState();
-    launcher.clear();
-    if (commandsOnly) launcher.setQuery(">");
-    launcher.activateLauncher();
+    if (commandsOnly) {
+      launcher.setQuery(">");
+      launcher.activateLauncher();
+    } else {
+      launcher.togglePanel();
+    }
     window.setTimeout(
       () => document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
       0,
@@ -229,17 +248,21 @@ export function DesktopLayout(props: {
   const focusTool = useCallback(
     (tool: string) => {
       let route = `/${tool}`;
-      if (["journal", "planner", "chat", "library"].includes(tool)) {
-        const spaces = useSpacesStore.getState().spaces;
+      if (["home", "journal", "planner", "social", "library"].includes(tool)) {
+        const availableSpaces = useSpacesStore.getState().spaces;
         const scope = useWorkspaceStore.getState().activeScopeKey;
-        const activeSpaceId = scope.startsWith("space:") ? scope.slice(6) : spaces[0]?.id;
+        const activeSpaceId = scope.startsWith("space:")
+          ? scope.slice(6)
+          : preferredMistySpace(availableSpaces)?.id;
         if (!activeSpaceId) {
           useAppStore.getState().setError(`Create or join a Space before opening ${tool}.`);
           return;
         }
         const encoded = encodeURIComponent(activeSpaceId);
-        if (tool === "journal") route = rememberedJournalRoute(user?.id ?? "", activeSpaceId);
+        if (tool === "home") route = `/spaces/${encoded}/home`;
+        else if (tool === "journal") route = rememberedJournalRoute(user?.id ?? "", activeSpaceId);
         else if (tool === "planner") route = rememberedPlannerRoute(user?.id ?? "", activeSpaceId);
+        else if (tool === "social") route = socialProviderPath(activeSpaceId, "misty");
         else route = `/spaces/${encoded}/${tool}`;
       }
       const request = workspaceSurfaceFromRoute(route);
@@ -258,7 +281,7 @@ export function DesktopLayout(props: {
       "home",
       "journal",
       "planner",
-      "chat",
+      "social",
       "inbox",
       "library",
       "browser",
@@ -285,6 +308,7 @@ export function DesktopLayout(props: {
   }, [profileOpen, remotesOpen, settingsOpen]);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
+  const standaloneRouteTitle = standaloneWorkspaceRouteTitle(location.pathname);
   const frameClass = usesNativeWindowChrome ? styles.desktopFrameClass : styles.tabletFrameClass;
   const navbarClass = usesNativeWindowChrome ? styles.desktopNavbarClass : styles.tabletNavbarClass;
   const routeShellClass = usesNativeWindowChrome
@@ -292,12 +316,15 @@ export function DesktopLayout(props: {
     : styles.tabletRouteShellClass;
   const navigatorContent = (
     <GlobalNavigator
-      collapsed={false}
-      mistyLogoSource={mistyLogoSource}
       profileAnchorRef={profileAnchorRef}
       profileOpen={profileOpen}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-      onProfileClick={() => setProfileOpen((open) => !open)}
+      suppressActiveTool={Boolean(standaloneRouteTitle)}
+      onProfileClick={() => {
+        setSettingsOpen(false);
+        setRemotesOpen(false);
+        setProfileOpen((open) => !open);
+      }}
       onSettingsClick={openSettingsOverlay}
       onStartWindowDrag={usesNativeWindowChrome ? startTitlebarDrag : undefined}
       onTitlebarPointerDown={usesNativeWindowChrome ? handleDesktopTitlebarPointerDown : undefined}
@@ -323,18 +350,13 @@ export function DesktopLayout(props: {
           onPointerDown={handleDesktopTitlebarPointerDown}
         >
           {!shouldShowWindowsControls ? (
-            <div
-              className={cn(
-                styles.desktopTitlebarNavigationClass,
-                "left-[74px] justify-start gap-1.5",
-              )}
-            >
+            <div className={cn(styles.desktopTitlebarNavigationClass, "justify-start gap-1")}>
               <NavigatorControls
                 visibility={navigatorLayout.visibility}
                 onToggleVisibility={toggleNavigatorVisibility}
               />
               <div
-                className="flex items-center gap-0.5"
+                className="flex items-center gap-1"
                 data-misty-window-drag-block="true"
                 data-misty-desktop-navigation-history="true"
               >
@@ -346,7 +368,7 @@ export function DesktopLayout(props: {
                   disabled={!navigationHistory.canGoBack}
                   onClick={navigationHistory.goBack}
                 >
-                  <ArrowLeft size={13} />
+                  <ArrowLeft size={18} />
                 </button>
                 <button
                   type="button"
@@ -356,7 +378,7 @@ export function DesktopLayout(props: {
                   disabled={!navigationHistory.canGoForward}
                   onClick={navigationHistory.goForward}
                 >
-                  <ArrowRight size={13} />
+                  <ArrowRight size={18} />
                 </button>
               </div>
             </div>
@@ -416,6 +438,7 @@ export function DesktopLayout(props: {
             : "translate-x-0 opacity-100 pointer-events-auto",
         )}
         aria-hidden={navigatorHidden}
+        inert={navigatorHidden ? true : undefined}
       >
         {navigatorContent}
       </div>
@@ -431,6 +454,8 @@ export function DesktopLayout(props: {
               ? "translate-x-0 opacity-100 shadow-[0_18px_44px_rgba(0,0,0,0.6)] pointer-events-auto"
               : "-translate-x-full opacity-0 pointer-events-none shadow-none",
           )}
+          aria-hidden={!navigatorRevealed}
+          inert={!navigatorRevealed ? true : undefined}
           onPointerLeave={() => setNavigatorRevealed(false)}
         >
           {navigatorContent}
@@ -449,29 +474,36 @@ export function DesktopLayout(props: {
         <AppNoticePublisher />
         <RouteNotice routeId={routeId} />
 
-        <WorkspaceCanvas
-          outlet={<Outlet />}
-          titlebarInsets={
-            usesNativeWindowChrome
-              ? {
-                  left: Math.max(
-                    0,
-                    (shouldShowWindowsControls
-                      ? styles.windowsTitlebarControlsEnd
-                      : styles.desktopTitlebarControlsEnd) -
-                      (navigatorHidden ? 0 : navigatorWidths[navigatorLayout.width]) -
-                      styles.dockHeaderPadding,
-                  ),
-                  right: shouldShowWindowsControls ? 140 : 0,
-                }
-              : undefined
-          }
-        />
+        {standaloneRouteTitle ? (
+          <StandaloneRouteSurface title={standaloneRouteTitle}>
+            <Outlet />
+          </StandaloneRouteSurface>
+        ) : (
+          <WorkspaceCanvas
+            outlet={<Outlet />}
+            titlebarInsets={
+              usesNativeWindowChrome
+                ? {
+                    left: Math.max(
+                      0,
+                      (shouldShowWindowsControls
+                        ? styles.windowsTitlebarControlsEnd
+                        : styles.desktopTitlebarControlsEnd) -
+                        (navigatorHidden ? 0 : navigatorWidths[navigatorLayout.width]) -
+                        styles.dockHeaderPadding,
+                    ),
+                    right: shouldShowWindowsControls ? 140 : 0,
+                  }
+                : undefined
+            }
+          />
+        )}
       </section>
 
       <WorkStatusPopup />
       <TransferCompletionNotifier />
       <FramePacingOverlay enabled={framePacingOverlayEnabled} />
+      <div id="misty-shell-overlays" className="pointer-events-none fixed inset-0 z-[2147482500]" />
       <ProfilePopover
         anchorRef={profileAnchorRef}
         currentPath={location.pathname}
@@ -499,7 +531,24 @@ export function DesktopLayout(props: {
   );
 }
 
-function navigatorGridClass(width: "full" | "hidden"): string {
-  if (width === "hidden") return "grid-cols-[0px_minmax(0,1fr)]";
-  return "grid-cols-[264px_minmax(0,1fr)]";
+const navigatorGridClass = (width: "full" | "hidden") =>
+  width === "hidden" ? "grid-cols-[0px_minmax(0,1fr)]" : "grid-cols-[264px_minmax(0,1fr)]";
+
+function standaloneWorkspaceRouteTitle(pathname: string): string | null {
+  if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
+  if (pathname === "/signin") return "Sign in";
+  if (pathname === "/register") return "Create account";
+  if (pathname.startsWith("/invite/")) return "Join Space";
+  return null;
+}
+
+function StandaloneRouteSurface(props: { title: string; children: ReactNode }) {
+  return (
+    <section className="grid h-full min-h-0 grid-rows-[38px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg">
+      <header className="flex h-[38px] items-center border-b border-charcoal-border bg-charcoal-workspace px-3">
+        <span className="text-sm font-medium text-cream-bright">{props.title}</span>
+      </header>
+      <div className="min-h-0 overflow-auto">{props.children}</div>
+    </section>
+  );
 }

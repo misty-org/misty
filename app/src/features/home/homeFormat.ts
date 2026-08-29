@@ -1,15 +1,16 @@
-/** Formatting shared by the Home cards. */
-
-export function dayPart(): string {
-  const hour = new Date().getHours();
-  return hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+export function firstName(name: string | undefined): string {
+  const value = name?.trim().split(/\s+/)[0];
+  return value || "there";
 }
 
-export function firstName(value: string): string {
-  return value.trim().split(/\s+/)[0] ?? "";
+export function greetingForDate(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
-export function formatFullDate(date: Date): string {
+export function formatLongDate(date: Date): string {
   return new Intl.DateTimeFormat(undefined, {
     weekday: "long",
     month: "long",
@@ -17,27 +18,42 @@ export function formatFullDate(date: Date): string {
   }).format(date);
 }
 
-export function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(
-    new Date(value),
+export function formatClockTime(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+export function formatAgendaTime(startsAt: string, allDay: boolean): string {
+  if (allDay) return "All day";
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatRelativeDate(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "Recently active";
+  const elapsedMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
+  if (elapsedMinutes < 1) return "Active now";
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+  const elapsedHours = Math.round(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours}h ago`;
+  const elapsedDays = Math.round(elapsedHours / 24);
+  if (elapsedDays < 7) return `${elapsedDays}d ago`;
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+    new Date(timestamp),
   );
 }
 
-export function formatRelative(value: string | number): string {
-  const parsed = typeof value === "number" ? value : Date.parse(value);
-  const elapsed = Math.max(0, Date.now() - parsed);
-  const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  const value = bytes / 1024 ** index;
-  return `${value >= 10 || index === 0 ? Math.round(value) : value.toFixed(1)} ${units[index]}`;
+export function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
