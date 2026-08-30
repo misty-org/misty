@@ -8,9 +8,9 @@ export default function Waitlist() {
   return (
     <div
       aria-labelledby="waitlist-title"
-      className="bg-background px-4 pb-20 pt-28 text-foreground sm:px-6 sm:pt-32"
+      className="bg-background pb-20 pt-28 text-foreground sm:pt-32"
     >
-      <div className="mx-auto grid w-full max-w-[1280px] gap-10 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
+      <div className="site-container grid gap-10 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
         <section className="pt-1" aria-label="Join Misty">
           <p className="mb-5 text-sm text-muted-foreground">Misty account</p>
           <h1

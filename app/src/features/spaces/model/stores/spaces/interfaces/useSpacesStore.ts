@@ -24,6 +24,8 @@ export interface SpacesStore {
   membersBySpace: Record<string, SpaceMember[]>;
   agentMembershipsBySpace: Record<string, SpaceAgentMembership[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
+  messageLoadingBySpace: Record<string, boolean>;
+  messageErrorsBySpace: Record<string, string>;
   nodesBySpace: Record<string, SpaceNode[]>;
   agentsBySpace: Record<string, SpaceStudioResource[]>;
   workflowsBySpace: Record<string, SpaceStudioResource[]>;

@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export const publicPageContainer =
-  "mx-auto w-full max-w-[1280px] px-8 sm:px-16 lg:px-28";
+export const publicPageContainer = "site-container";
 
 export function PublicPage({
   children,

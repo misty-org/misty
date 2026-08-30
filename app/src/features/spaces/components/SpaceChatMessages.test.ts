@@ -44,7 +44,7 @@ describe("Space chat display rows", () => {
     expect(mergeSpaceMessages([optimistic], [confirmed])).toEqual([confirmed]);
   });
 
-  it("renders local delivery progress and failure feedback inline", () => {
+  it("shows optimistic messages immediately and only reveals failed delivery", () => {
     const sending = {
       ...message("1", "alex", "2026-07-21T19:00:00.000Z"),
       local_delivery_state: "sending" as const,
@@ -55,8 +55,16 @@ describe("Space chat display rows", () => {
     };
     const markup = renderMessages([sending, failed]);
 
-    expect(markup).toContain("Sending…");
+    expect(markup).not.toContain("Sending…");
     expect(markup).toContain("Message couldn’t be sent.");
+  });
+
+  it("shows message loading failures with an inline retry action", () => {
+    const markup = renderMessages([], "network error");
+
+    expect(markup).toContain("Messages couldn’t be loaded");
+    expect(markup).toContain("Try again");
+    expect(markup).not.toContain("What should we work on");
   });
 
   it("wraps unbroken message text without widening the chat scroller", () => {
@@ -70,10 +78,24 @@ describe("Space chat display rows", () => {
     expect(markup).toContain("whitespace-pre-wrap");
   });
 
-  function renderMessages(messages: SpaceMessage[]) {
+  it("renders managed Misty messages with Agent identity and highlighted mentions", () => {
+    const misty = message("1", "owner", "2026-08-26T21:37:00.000Z");
+    misty.sender_name = "Misty";
+    misty.sender_kind = "system";
+    misty.origin = { kind: "misty_assistant", author_name: "Misty" };
+    misty.content = [{ type: "text", text: "@Melissa Chen, please finish the laundry." }];
+
+    const markup = renderMessages([misty]);
+
+    expect(markup).toContain("Agent");
+    expect(markup).toContain("@Melissa Chen");
+    expect(markup).toContain("bg-mention-bg/35");
+  });
+
+  function renderMessages(messages: SpaceMessage[], error = "") {
     return renderToStaticMarkup(
       createElement(SpaceChatMessages, {
-        error: "",
+        error,
         loading: false,
         messages,
         currentUserId: "sam",

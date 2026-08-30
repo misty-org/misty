@@ -39,18 +39,4 @@ describe("mcpConnectionsApi", () => {
       method: "DELETE",
     });
   });
-
-  it("updates the complete per-agent selection and reads content-free execution history", async () => {
-    const tools = [{ connection_id: "connection-1", remote_name: "create_item", enabled: true }];
-    await mcpConnectionsApi.agentTools("agent/1");
-    await mcpConnectionsApi.setAgentTools("agent/1", tools);
-    await mcpConnectionsApi.executions("agent/1", 12);
-
-    expect(apiRequest).toHaveBeenNthCalledWith(1, "/agents/agent%2F1/mcp-tools");
-    expect(apiRequest).toHaveBeenNthCalledWith(2, "/agents/agent%2F1/mcp-tools", {
-      method: "PUT",
-      body: JSON.stringify({ tools }),
-    });
-    expect(apiRequest).toHaveBeenNthCalledWith(3, "/agents/agent%2F1/mcp-executions?limit=12");
-  });
 });

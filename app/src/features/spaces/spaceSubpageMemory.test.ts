@@ -33,12 +33,6 @@ describe("Space subpage route memory", () => {
     expect(rememberedPlannerRoute("account-1", "space-1", "agenda")).toBe(
       "/spaces/space-1/planner/agenda/week?date=2026-08-17",
     );
-    expect(rememberedPlannerRoute("account-1", "space-1", "goals")).toBe(
-      "/spaces/space-1/planner/goals",
-    );
-    expect(rememberedPlannerRoute("account-1", "space-1", "milestones")).toBe(
-      "/spaces/space-1/planner/milestones",
-    );
     expect(rememberedPlannerRoute("account-1", "space-1", "roadmaps")).toBe(
       "/spaces/space-1/planner/roadmaps/map-1?node=risk-2",
     );
@@ -47,15 +41,35 @@ describe("Space subpage route memory", () => {
     );
   });
 
+  it("folds legacy Goals and Milestones pages into the Roadmaps home", () => {
+    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/planner/goals");
+    expect(rememberedPlannerRoute("account-1", "space-1", "roadmaps")).toBe(
+      "/spaces/space-1/planner/roadmaps",
+    );
+
+    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/planner/milestones");
+    expect(rememberedPlannerRoute("account-1", "space-1", "roadmaps")).toBe(
+      "/spaces/space-1/planner/roadmaps",
+    );
+  });
+
   it("remembers Journal pages independently and isolates accounts and Spaces", () => {
-    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/notes?note=note-4");
-    rememberSpaceSubpageRoute("account-1", "space-1", "/spaces/space-1/drawings/drawing-7");
+    rememberSpaceSubpageRoute(
+      "account-1",
+      "space-1",
+      "/spaces/space-1/notes?note=note-4&view=list",
+    );
+    rememberSpaceSubpageRoute(
+      "account-1",
+      "space-1",
+      "/spaces/space-1/drawings/drawing-7?view=list",
+    );
 
     expect(rememberedJournalRoute("account-1", "space-1", "notes")).toBe(
-      "/spaces/space-1/notes?note=note-4",
+      "/spaces/space-1/notes?note=note-4&view=list",
     );
     expect(rememberedJournalRoute("account-1", "space-1", "drawings")).toBe(
-      "/spaces/space-1/drawings/drawing-7",
+      "/spaces/space-1/drawings/drawing-7?view=list",
     );
     expect(rememberedJournalRoute("account-2", "space-1", "drawings")).toBe(
       "/spaces/space-1/drawings",

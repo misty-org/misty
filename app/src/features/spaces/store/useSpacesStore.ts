@@ -40,6 +40,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   membersBySpace: {},
   agentMembershipsBySpace: {},
   messagesBySpace: {},
+  messageLoadingBySpace: {},
+  messageErrorsBySpace: {},
   nodesBySpace: {},
   agentsBySpace: {},
   workflowsBySpace: {},
@@ -120,15 +122,21 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         const membersBySpace = { ...state.membersBySpace };
         const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
         const messagesBySpace = { ...state.messagesBySpace };
+        const messageLoadingBySpace = { ...state.messageLoadingBySpace };
+        const messageErrorsBySpace = { ...state.messageErrorsBySpace };
         const nodesBySpace = { ...state.nodesBySpace };
         delete membersBySpace[spaceId];
         delete agentMembershipsBySpace[spaceId];
         delete messagesBySpace[spaceId];
+        delete messageLoadingBySpace[spaceId];
+        delete messageErrorsBySpace[spaceId];
         delete nodesBySpace[spaceId];
         return {
           membersBySpace,
           agentMembershipsBySpace,
           messagesBySpace,
+          messageLoadingBySpace,
+          messageErrorsBySpace,
           nodesBySpace,
           loading: false,
         };
@@ -140,10 +148,14 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     if (!canReadMessages) {
       set((state) => {
         const messagesBySpace = { ...state.messagesBySpace };
+        const messageLoadingBySpace = { ...state.messageLoadingBySpace };
+        const messageErrorsBySpace = { ...state.messageErrorsBySpace };
         const nodesBySpace = { ...state.nodesBySpace };
         delete messagesBySpace[spaceId];
+        delete messageLoadingBySpace[spaceId];
+        delete messageErrorsBySpace[spaceId];
         delete nodesBySpace[spaceId];
-        return { messagesBySpace, nodesBySpace };
+        return { messagesBySpace, messageLoadingBySpace, messageErrorsBySpace, nodesBySpace };
       });
     }
     const tasks = [get().loadMembers(spaceId)];
@@ -161,6 +173,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
   loadMessages: async (spaceId) => {
     const generation = spacesAccountGeneration;
+    set((state) => ({
+      messageLoadingBySpace: { ...state.messageLoadingBySpace, [spaceId]: true },
+      messageErrorsBySpace: { ...state.messageErrorsBySpace, [spaceId]: "" },
+    }));
     try {
       const { messages } = await spacesApi.messages(spaceId);
       if (generation !== spacesAccountGeneration) return;
@@ -169,16 +185,25 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         messagesBySpace: {
           ...state.messagesBySpace,
           [spaceId]: mergeSpaceMessages(
-            (state.messagesBySpace[spaceId] ?? []).filter(
-              (message) => message.local_delivery_state === "sending",
+            (state.messagesBySpace[spaceId] ?? []).filter((message) =>
+              Boolean(message.local_delivery_state),
             ),
             ordered,
           ),
         },
+        messageLoadingBySpace: { ...state.messageLoadingBySpace, [spaceId]: false },
+        messageErrorsBySpace: { ...state.messageErrorsBySpace, [spaceId]: "" },
       }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
       if (await recoverInaccessibleSpace(error, spaceId, get)) return;
+      set((state) => ({
+        messageLoadingBySpace: { ...state.messageLoadingBySpace, [spaceId]: false },
+        messageErrorsBySpace: {
+          ...state.messageErrorsBySpace,
+          [spaceId]: errorText(error),
+        },
+      }));
       throw error;
     }
   },
@@ -327,6 +352,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.leave(spaceId);
+      set((state) => ({
+        spaces: state.spaces.filter((space) => space.id !== spaceId),
+      }));
       await get().load({ force: true });
     } catch (error) {
       set({ error: errorText(error) });
@@ -350,6 +378,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     try {
       await spacesApi.delete(spaceId, confirmation);
       set((state) => {
+        const spaces = state.spaces.filter((space) => space.id !== spaceId);
         const messagesBySpace = { ...state.messagesBySpace };
         delete messagesBySpace[spaceId];
         const nodesBySpace = { ...state.nodesBySpace };
@@ -358,7 +387,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         delete membersBySpace[spaceId];
         const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
         delete agentMembershipsBySpace[spaceId];
-        return { messagesBySpace, nodesBySpace, membersBySpace, agentMembershipsBySpace };
+        return { spaces, messagesBySpace, nodesBySpace, membersBySpace, agentMembershipsBySpace };
       });
       await get().load({ force: true });
     } catch (error) {
@@ -393,6 +422,8 @@ export function resetSpacesAccountState(): void {
     membersBySpace: {},
     agentMembershipsBySpace: {},
     messagesBySpace: {},
+    messageLoadingBySpace: {},
+    messageErrorsBySpace: {},
     nodesBySpace: {},
     agentsBySpace: {},
     workflowsBySpace: {},
@@ -421,12 +452,23 @@ async function recoverInaccessibleSpace(
     const membersBySpace = { ...state.membersBySpace };
     const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
     const messagesBySpace = { ...state.messagesBySpace };
+    const messageLoadingBySpace = { ...state.messageLoadingBySpace };
+    const messageErrorsBySpace = { ...state.messageErrorsBySpace };
     const nodesBySpace = { ...state.nodesBySpace };
     delete membersBySpace[spaceId];
     delete agentMembershipsBySpace[spaceId];
     delete messagesBySpace[spaceId];
+    delete messageLoadingBySpace[spaceId];
+    delete messageErrorsBySpace[spaceId];
     delete nodesBySpace[spaceId];
-    return { membersBySpace, agentMembershipsBySpace, messagesBySpace, nodesBySpace };
+    return {
+      membersBySpace,
+      agentMembershipsBySpace,
+      messagesBySpace,
+      messageLoadingBySpace,
+      messageErrorsBySpace,
+      nodesBySpace,
+    };
   });
   await get().load({ force: true });
   return true;

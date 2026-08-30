@@ -1,6 +1,5 @@
 import { useProvidersStore } from "@/features/providers";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -100,6 +99,25 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
   const providerSnapshot = useProvidersStore((state) => state.providers);
   const loadProviders = useProvidersStore((state) => state.load);
   const rows = useMemo(() => transfers?.rows ?? [], [transfers?.rows]);
+  const transferSummary = useMemo(() => {
+    let active = 0;
+    let completed = 0;
+    let attention = 0;
+    for (const row of rows) {
+      if (row.status === "queued" || row.status === "pending" || row.status === "in_progress") {
+        active += 1;
+      } else if (row.status === "completed") {
+        completed += 1;
+      } else if (
+        row.status === "failed" ||
+        row.status === "interrupted" ||
+        row.status === "waiting_for_resolution"
+      ) {
+        attention += 1;
+      }
+    }
+    return { active, completed, attention };
+  }, [rows]);
   const {
     actionFeedback,
     handleCancelBatchTransfer,
@@ -497,6 +515,19 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
 
   return (
     <div className={transferStyles.pane}>
+      <header className={transferStyles.pageHeader}>
+        <div className="min-w-0">
+          <h1 className={transferStyles.pageTitle}>Transfers</h1>
+          <p className={transferStyles.pageDescription}>
+            Track file activity across local drives, network devices, and connected storage.
+          </p>
+        </div>
+        <div className={transferStyles.summary} aria-label="Transfer summary">
+          <TransferSummaryMetric label="active" value={transferSummary.active} />
+          <TransferSummaryMetric label="completed" value={transferSummary.completed} />
+          <TransferSummaryMetric label="needs attention" value={transferSummary.attention} />
+        </div>
+      </header>
       <div className={transferStyles.panelsScroll}>
         <div className={transferStyles.threePanel} style={panelGridStyle}>
           {filtersVisible ? (
@@ -543,7 +574,6 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
                 </span>
               ) : null}
               <ToolbarGroup align="end">
-                <AiSurfaceButton />
                 <label className={transferStyles.searchBox}>
                   <span className="sr-only">Search transfers</span>
                   <Search aria-hidden="true" className="size-4" />
@@ -625,6 +655,15 @@ export const TransferWorkspacePane = memo(function TransferWorkspacePane(props: 
     </div>
   );
 });
+
+function TransferSummaryMetric(props: { label: string; value: number }) {
+  return (
+    <span className={transferStyles.summaryMetric}>
+      <strong className={transferStyles.summaryValue}>{props.value}</strong>
+      <span>{props.label}</span>
+    </span>
+  );
+}
 
 function transferAiHash(value: string) {
   let hash = 2166136261;

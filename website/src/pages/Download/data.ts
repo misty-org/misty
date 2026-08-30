@@ -4,6 +4,7 @@ export type ReleaseBuild = {
   platform: PlatformName;
   architecture: string;
   packageType: "ZIP";
+  size: string;
   href: string;
   note: string;
 };
@@ -22,6 +23,7 @@ export const currentRelease: Release = {
       platform: "macOS",
       architecture: "Apple Silicon",
       packageType: "ZIP",
+      size: "44 MB",
       href: "https://pub-6656b731eca949d8bf695989e0c862b8.r2.dev/misty-0.1.0-arm64.zip",
       note: "For Macs with Apple silicon.",
     },
@@ -29,6 +31,7 @@ export const currentRelease: Release = {
       platform: "Windows",
       architecture: "64-bit (x86_64)",
       packageType: "ZIP",
+      size: "70 MB",
       href: "https://pub-6656b731eca949d8bf695989e0c862b8.r2.dev/misty-v0.1.0-windows-x86_64.zip",
       note: "For 64-bit Windows PCs.",
     },
