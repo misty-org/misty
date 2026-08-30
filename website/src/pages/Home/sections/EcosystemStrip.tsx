@@ -223,7 +223,7 @@ export function EcosystemStrip() {
   return (
     <section
       aria-label="Misty ecosystem"
-      className="relative z-10 overflow-x-clip bg-background pb-6 pt-8 sm:pb-8 sm:pt-10 lg:-mt-[6svh] lg:pt-14"
+      className="relative z-10 overflow-x-clip bg-background pb-6 pt-8 sm:pb-8 sm:pt-10 lg:-mt-[2svh] lg:pt-14"
     >
       <div className="site-container min-w-0">
         <div>

@@ -191,19 +191,37 @@ export function HowItWorks() {
       : smoothstep(FADE_START, FADE_END, within);
   const visibleBeat = transition >= 0.5 ? incoming : active;
 
-  // The bar follows the same damped progress as the content. Fades happen only
-  // inside the named end-of-segment window above and settle before 100%.
+  // Hand the indicator to the incoming beat as soon as its crossfade starts.
+  // The first beat uses the shorter pre-transition interval; every following
+  // beat then owns one full segment, so the fill remains continuous across
+  // the underlying `within` reset at each beat boundary.
+  const narrativePosition = active + within;
+  const indicatorPosition =
+    narrativePosition <= FADE_START
+      ? narrativePosition / FADE_START
+      : 1 + narrativePosition - FADE_START;
+  const indicatorActive = Math.min(
+    beats.length - 1,
+    Math.floor(indicatorPosition),
+  );
+  const indicatorWithin = Math.min(
+    1,
+    Math.max(0, indicatorPosition - indicatorActive),
+  );
+
+  // The bar follows the same damped progress and transition boundary as the
+  // content, rather than letting one bar visually own two different beats.
   const fill = (index: number) =>
-    index < active
+    index < indicatorActive
       ? 1
-      : index === active
-        ? within
+      : index === indicatorActive
+        ? indicatorWithin
         : 0;
 
   return (
     <section
       aria-label="How Misty works"
-      className="marketing-dark my-3 overflow-x-clip sm:my-4 lg:-mt-[18svh] lg:-mb-[12svh]"
+      className="marketing-dark my-3 overflow-x-clip sm:my-4 lg:-mt-[14svh] lg:-mb-[8svh]"
     >
       {/* Track height sets the pace: one viewport of scroll per beat, plus one
           more to hold the last beat before the section releases. */}
