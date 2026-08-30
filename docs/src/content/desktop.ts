@@ -100,7 +100,7 @@ export const desktopPages: DocPage[] = [
             "The CLI starts at MISTY_DESKTOP_DEV_PORT or 5173 and probes up to 50 consecutive localhost ports.",
             "A temporary Tauri config points devUrl at http://127.0.0.1:<port><route>.",
             "Tauri runs npm run dev:desktop as its beforeDevCommand.",
-            "The CLI runs npm run tauri -- dev --config <temporary-config> from the monorepo.",
+            "The CLI runs npm run tauri -- dev --config <temporary-config> from the misty repository.",
             "The temporary configuration is deleted after the process exits.",
           ]),
         ],
@@ -163,7 +163,7 @@ export const desktopPages: DocPage[] = [
         blocks: [
           code("misty desktop build"),
           p(
-            "The CLI runs npm run tauri -- build in the monorepo. Tauri uses the repository’s normal configuration and produces native output under src-tauri/target.",
+            "The CLI runs npm run tauri -- build in the misty repository. Tauri uses the repository’s normal configuration and produces native output under src-tauri/target.",
           ),
         ],
       },
@@ -292,7 +292,7 @@ export const desktopPages: DocPage[] = [
           ]),
           note(
             "Install dependencies first",
-            "Icon synchronization uses the app workspace’s Tauri npm script. Run npm install at the monorepo root if dependencies are missing.",
+            "Icon synchronization uses the misty repository’s Tauri npm script. Run npm install there if dependencies are missing.",
           ),
         ],
       },

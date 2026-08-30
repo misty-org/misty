@@ -141,7 +141,7 @@ export const referencePages: DocPage[] = [
               [
                 "MISTY_ROOT",
                 "Workspace discovery",
-                "Falls back to saved config, then ~/misty-org/misty.",
+                "Falls back to saved config, then ~/misty-org.",
               ],
               [
                 "MISTY_DESKTOP_DEV_PORT",
@@ -311,7 +311,7 @@ export const referencePages: DocPage[] = [
         title: "Secret handling",
         blocks: [
           list([
-            "Only the command-specific files under the ignored cli/.env directory are loaded, without replacing exported shell values.",
+            "Only the command-specific files under the ignored misty-cli/.env directory are loaded, without replacing exported shell values.",
             "Doctor reports only whether release inputs exist.",
             "Worker secret files use restricted permissions on Unix.",
             "The collaboration private key is written to the server secret file and never printed.",
@@ -350,7 +350,7 @@ export const referencePages: DocPage[] = [
         title: "misty is not found",
         blocks: [
           code(
-            "cargo install --path ~/misty-org/misty/cli --locked --force\n~/.cargo/bin/misty --version",
+            "cargo install --path ~/misty-org/misty-cli --locked --force\n~/.cargo/bin/misty --version",
           ),
           p(
             "If the absolute command works, add ~/.cargo/bin to your shell PATH and open a new terminal.",
@@ -361,9 +361,9 @@ export const referencePages: DocPage[] = [
         id: "workspace",
         title: "A checkout was not found",
         blocks: [
-          code("misty configure --workspace ~/misty-org/misty\nmisty doctor"),
+          code("misty configure --workspace ~/misty-org\nmisty doctor"),
           p(
-            "Confirm the workspace directly contains app/, website/, server/, and cli/. Use --workspace to diagnose another root without changing saved configuration.",
+            "Confirm the workspace contains sibling misty/, misty-server/, misty-website/, and misty-cli/ repositories. Use --workspace to diagnose another root without changing saved configuration.",
           ),
         ],
       },
@@ -384,7 +384,7 @@ export const referencePages: DocPage[] = [
           list([
             "Run misty server logs and find the first failing dependency, not just repeated /health entries.",
             "Confirm Docker Desktop is running and the database container is healthy.",
-            "Run misty env check dev; Compose, not the Go binary, supplies values from server/.env/dev.",
+            "Run misty env check dev; Compose, not the Go binary, supplies values from misty-server/.env/dev.",
             "If the database schema is disposable and irreparably stale, stop with --volumes and recreate it—but only after accepting the data loss.",
           ]),
         ],
@@ -407,7 +407,7 @@ export const referencePages: DocPage[] = [
         title: "Release identity mismatch",
         blocks: [
           p(
-            "Do not work around an identity mismatch by editing a manifest. Check out the exact monorepo commit recorded in misty-release-manifest.json, ensure the working tree is clean, reinstall the matching CLI binary if needed, and retry.",
+            "Do not work around an identity mismatch by editing a manifest. Check out the exact Misty app commit recorded in misty-release-manifest.json, ensure the working tree is clean, reinstall the matching CLI binary if needed, and retry.",
           ),
           note(
             "Why it fails closed",
@@ -422,7 +422,7 @@ export const referencePages: DocPage[] = [
         blocks: [
           code("misty doctor"),
           p(
-            "Doctor prints missing variable names. Add release values to cli/.env/release.env or export them in the shell. It never prints their current values.",
+            "Doctor prints missing variable names. Add release values to misty-cli/.env/release.env or export them in the shell. It never prints their current values.",
           ),
         ],
       },

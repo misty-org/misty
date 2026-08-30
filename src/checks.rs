@@ -67,5 +67,12 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     for script in ["typecheck", "test", "test:runtime", "audit:production"] {
         CommandSpec::new(npm()).args(["run", script]).run(&worker)?;
     }
+    let runtime = workspace.server.join("agent-runtime");
+    CommandSpec::new(npm()).args(["ci"]).run(&runtime)?;
+    for script in ["typecheck", "test", "build"] {
+        CommandSpec::new(npm())
+            .args(["run", script])
+            .run(&runtime)?;
+    }
     Ok(())
 }
