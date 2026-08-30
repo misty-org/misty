@@ -6,9 +6,16 @@ import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 
 let shouldOpenLinksExternally = () => false;
+let openProviderAuthorizationInMisty: ((url: string) => void | Promise<void>) | null = null;
 
 export function configureExternalLinkPreference(getPreference: () => boolean): void {
   shouldOpenLinksExternally = getPreference;
+}
+
+export function configureProviderAuthorizationLinkOpener(
+  opener: ((url: string) => void | Promise<void>) | null,
+): void {
+  openProviderAuthorizationInMisty = opener;
 }
 
 export async function openExternalLink(url: string): Promise<void> {
@@ -85,14 +92,34 @@ export async function openProviderAuthorizationLink(
     }
   }
 
+  let mistyBrowserError: unknown;
+  if (openProviderAuthorizationInMisty) {
+    try {
+      await openProviderAuthorizationInMisty(href);
+      return {
+        strategy: "misty-browser",
+        platform: currentPlatform,
+        attemptedAt,
+      };
+    } catch (error) {
+      mistyBrowserError = error;
+    }
+  }
+
   try {
     await openSystemExternalLink(href);
     return {
       strategy: "system-browser",
       platform: currentPlatform,
       attemptedAt,
+      fallbackReason: mistyBrowserError ? errorTextForOpen(mistyBrowserError) : undefined,
     };
   } catch (error) {
+    if (mistyBrowserError) {
+      throw new Error(
+        `Misty Browser failed: ${errorTextForOpen(mistyBrowserError)}; system browser failed: ${errorTextForOpen(error)}`,
+      );
+    }
     throw new Error(`system browser failed: ${errorTextForOpen(error)}`);
   }
 }

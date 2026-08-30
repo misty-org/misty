@@ -17,7 +17,9 @@ const COMPACT_WIDTH_EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
 const EXPAND_WIDTH_EASING = "cubic-bezier(0.8, 0, 0.6, 1)";
 
 function useCompactNav(threshold = 60) {
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(
+    () => typeof window !== "undefined" && window.scrollY > threshold,
+  );
 
   useEffect(() => {
     function onScroll() {
@@ -54,24 +56,22 @@ export default function Navbar({
     <Collapsible open={mobileOpen} onOpenChange={setMobileOpen} asChild>
       <nav
         aria-label="Primary navigation"
-        className="fixed inset-x-0 top-0 z-50 flex justify-center px-5 py-3 sm:px-8 lg:px-12"
+        className="pointer-events-none sticky inset-x-0 top-0 z-50 flex justify-center px-[var(--site-gutter)] py-3"
       >
         {sessionReady ? (
           <div
-            className="w-full"
+            className="pointer-events-auto w-full will-change-[max-width]"
             style={{
-              // 1344px is the homepage's 1440px frame minus its 48px gutters.
-              // This keeps the navbar border aligned with every page panel.
-              maxWidth: compact ? "680px" : "1344px",
-              // Use the compaction curve in reverse when expanding so the
-              // navbar has the same duration and velocity in both directions.
+              // The expanded border follows the same content edges as every
+              // site container, while the compact state keeps its own width.
+              maxWidth: compact ? "820px" : "var(--site-content-max)",
               transition: `max-width 0.45s ${
                 compact ? COMPACT_WIDTH_EASING : EXPAND_WIDTH_EASING
               }`,
             }}
           >
             <div
-              className="rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] shadow-lg shadow-black/10 backdrop-blur-xl dark:shadow-black/30"
+              className="rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] backdrop-blur-xl"
             >
               <div
                 className="flex h-12 items-center justify-between px-5"

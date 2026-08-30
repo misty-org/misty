@@ -1,22 +1,27 @@
 import { AgentsPage } from "@/features/agents";
 import { BrowserWorkspace } from "@/features/browser";
 import { DeveloperWorkspace } from "@/features/developer-workspace";
-import { ExtensionsPage } from "@/features/extensions";
 import FilesPage from "@/features/files/explorer";
-import { HomeDashboard } from "@/features/home";
+import { MarketplacePage } from "@/features/marketplace";
 import { InboxWorkspace } from "@/features/inbox";
 import { TerminalWorkspace } from "@/features/terminal";
-import { SpaceSectionView } from "@/features/spaces";
-import { TransfersPage } from "@/features/transfers";
+import { TransfersWorkspacePanel } from "@/features/transfers";
+import { socialProviderFromRoute, SpaceSectionView } from "@/features/spaces";
 import type { WorkspaceTab } from "@/features/workspace";
-import { cn } from "@/shared/ui";
+import { isWebBuild } from "@/shared/platform/buildTarget";
+import { cn, ComingSoonSurface, DesktopAccessState } from "@/shared/ui";
 import { Plus } from "lucide-react";
 
 /** Static surface for a workspace tab that isn't the currently-routed one. */
 export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
+  if (isWebBuild) {
+    const desktopFeature = desktopFeatureForSurface(tab.surfaceId);
+    if (desktopFeature) return <DesktopAccessState feature={desktopFeature} />;
+  }
+
   switch (tab.surfaceId) {
     case "home":
-      return <HomeDashboard />;
+      return <ComingSoonSurface feature="Home" />;
     case "inbox":
       return <InboxWorkspace />;
     case "browser":
@@ -28,14 +33,23 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceTab }) {
     case "files":
       return <FilesPage embedded workspaceId={tab.id} workspaceTitle={tab.title} />;
     case "transfers":
-      return <TransfersPage />;
+      return <TransfersWorkspacePanel workspaceId={tab.id} />;
     case "agents":
       return <AgentsPage />;
-    case "extensions":
-      return <ExtensionsPage />;
+    case "marketplace":
+      return <MarketplacePage embedded />;
     case "space":
       return <SpacePane tab={tab} />;
   }
+}
+
+export function desktopFeatureForSurface(surfaceId: WorkspaceTab["surfaceId"]): string | null {
+  if (surfaceId === "browser") return "Browser";
+  if (surfaceId === "terminal") return "Terminal";
+  if (surfaceId === "code") return "Code";
+  if (surfaceId === "files") return "Files";
+  if (surfaceId === "transfers") return "Transfers";
+  return null;
 }
 
 /**
@@ -54,6 +68,7 @@ function SpacePane({ tab }: { tab: WorkspaceTab }) {
       spaceId={route.spaceId}
       section={route.section}
       studioKind={route.studioKind}
+      workspaceTabId={tab.id}
     />
   );
 }
@@ -64,10 +79,11 @@ export function parseSpaceTabRoute(
 ): { spaceId: string; section: string; studioKind: string } | null {
   const parts = route.split("?")[0].split("#")[0].split("/").filter(Boolean);
   if (parts[0] !== "spaces" || !parts[1]) return null;
+  const section = parts[2] ?? "";
   return {
     spaceId: safeDecode(parts[1]),
-    section: parts[2] ?? "",
-    studioKind: parts[3] ?? "",
+    section,
+    studioKind: section === "social" ? socialProviderFromRoute(route) : (parts[3] ?? ""),
   };
 }
 

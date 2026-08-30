@@ -1,11 +1,7 @@
-import type {
-  AppNoticeEntry,
-  AppNoticeKind,
-  AppNoticeSource,
-} from "@/application/layouts/model/types";
+import type { AppNoticeEntry, AppNoticeSource } from "@/application/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
-import type { ExplorerNotificationType } from "@/features/files/explorer";
+import { reportSystemError } from "@/features/activity";
 import { useExplorerStore } from "@/features/files/explorer";
 import { useProvidersStore } from "@/features/providers";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
@@ -53,15 +49,10 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
     return () => window.clearTimeout(timer);
   }, [notice.error, notice.message]);
 
-  if (!notice.error && !(showMessage && notice.message)) return null;
+  if (!(showMessage && notice.message)) return null;
 
   return (
     <div className={globalNoticeLayerClass}>
-      {notice.error ? (
-        <Banner variant="danger" onDismiss={dismissNotice} className={globalBannerClass}>
-          {notice.error}
-        </Banner>
-      ) : null}
       {showMessage && notice.message ? (
         <Banner variant="success" onDismiss={dismissNotice} className={globalBannerClass}>
           {notice.message}
@@ -106,12 +97,15 @@ export const AppNoticePublisher = memo(function AppNoticePublisher() {
       const signature = `${kind}:${message}`;
       if (lastPublished.current[key] === signature) continue;
       lastPublished.current[key] = signature;
-      pushNotification(
-        `${appNoticeSourceLabel(source)}: ${message}`,
-        appNoticeType(kind),
-        kind === "error" ? 5500 : 3500,
-        false,
-      );
+      if (kind === "error") {
+        reportSystemError({
+          title: `${appNoticeSourceLabel(source)} encountered a problem`,
+          error: message,
+          scope: `app-notice:${source}`,
+        });
+        continue;
+      }
+      pushNotification(`${appNoticeSourceLabel(source)}: ${message}`, "success", 3500, false);
     }
   }, [
     appError,
@@ -155,8 +149,4 @@ function appNoticeSourceLabel(source: AppNoticeSource): string {
     case "app":
       return "Misty";
   }
-}
-
-function appNoticeType(kind: AppNoticeKind): ExplorerNotificationType {
-  return kind === "error" ? "error" : "success";
 }

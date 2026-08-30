@@ -1,4 +1,5 @@
 import { readAccountSessionGeneration } from "@/features/auth";
+import { SystemErrorActivity } from "@/features/activity";
 import { useExplorerStore } from "@/features/files/explorer";
 import { useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
@@ -240,8 +241,15 @@ export function AddFilesToSpaceDialog({
                       {job.name}
                     </span>
                     <span className="block truncate text-[10px] text-cream-muted">
-                      {job.error || stageLabel(job.stage)}
+                      {stageLabel(job.stage)}
                     </span>
+                    {job.error ? (
+                      <SystemErrorActivity
+                        error={job.error}
+                        scope={`library:add-files:${job.id}`}
+                        title={`${job.name} could not be added to the Space`}
+                      />
+                    ) : null}
                   </span>
                   {job.stage === "ready" ? <Badge variant="outline">Added</Badge> : null}
                 </div>

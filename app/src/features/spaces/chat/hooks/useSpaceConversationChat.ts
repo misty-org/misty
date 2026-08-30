@@ -4,7 +4,7 @@ import type {
   SpaceEvent,
   SpaceMessage,
 } from "@/api/spaces/dto/interfaces/types";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { mergeSpaceMessages, messageFromSpaceEvent } from "../store/useSpaceMessageSpansStore";
 
 export function useSpaceConversationChat(
@@ -18,6 +18,9 @@ export function useSpaceConversationChat(
   const [loadedConversationId, setLoadedConversationId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [reloadRevision, setReloadRevision] = useState(0);
+  const activeConversationIdRef = useRef("");
+  const reloadMessages = useCallback(() => setReloadRevision((current) => current + 1), []);
   useEffect(() => {
     if (!canRead || (!conversationId && !loadConversationsWithoutSelection)) {
       setConversations([]);
@@ -30,7 +33,10 @@ export function useSpaceConversationChat(
     let active = true;
     setLoading(true);
     setError("");
-    setMessages([]);
+    if (activeConversationIdRef.current !== conversationId) {
+      activeConversationIdRef.current = conversationId;
+      setMessages([]);
+    }
     setLoadedConversationId("");
     const request = conversationId
       ? Promise.all([
@@ -42,7 +48,13 @@ export function useSpaceConversationChat(
       .then(([conversationResult, messageResult]) => {
         if (!active) return;
         setConversations(conversationResult.conversations);
-        setMessages([...messageResult.messages].reverse());
+        const ordered = [...messageResult.messages].reverse();
+        setMessages((current) =>
+          mergeSpaceMessages(
+            current.filter((message) => Boolean(message.local_delivery_state)),
+            ordered,
+          ),
+        );
         if (conversationId) setLoadedConversationId(conversationId);
       })
       .catch((reason) => {
@@ -68,9 +80,24 @@ export function useSpaceConversationChat(
         setMessages((current) => mergeSpaceMessages(current, [includedMessage]));
         return;
       }
-      void spacesApi.conversationMessages(spaceId, conversationId).then(({ messages: next }) => {
-        if (active) setMessages([...next].reverse());
-      });
+      void spacesApi
+        .conversationMessages(spaceId, conversationId)
+        .then(({ messages: next }) => {
+          if (!active) return;
+          setMessages((current) =>
+            mergeSpaceMessages(
+              current.filter((message) => Boolean(message.local_delivery_state)),
+              [...next].reverse(),
+            ),
+          );
+          setError("");
+        })
+        .catch((reason) => {
+          if (active)
+            setError(
+              reason instanceof Error ? reason.message : "This group chat could not be loaded.",
+            );
+        });
     };
     const updateAgentRun = (event: Event) => {
       const detail = (
@@ -114,7 +141,7 @@ export function useSpaceConversationChat(
       window.removeEventListener("misty:space-message-event", reload);
       window.removeEventListener("misty:space-agent-run-event", updateAgentRun);
     };
-  }, [canRead, conversationId, loadConversationsWithoutSelection, spaceId]);
+  }, [canRead, conversationId, loadConversationsWithoutSelection, reloadRevision, spaceId]);
   return {
     conversations,
     messages,
@@ -123,5 +150,6 @@ export function useSpaceConversationChat(
     loading,
     error,
     setError,
+    reload: reloadMessages,
   };
 }

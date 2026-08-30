@@ -1,3 +1,4 @@
+import { reportSystemError } from "@/features/activity";
 import {
   Button,
   Dialog,
@@ -17,26 +18,25 @@ export function NewDrawingDialog(props: {
 }) {
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!props.open) return;
     setTitle("");
     setSubmitting(false);
-    setError(null);
   }, [props.open]);
 
   const submit = async () => {
     if (submitting) return;
     setSubmitting(true);
-    setError(null);
     try {
       await props.onCreate(title);
       props.onOpenChange(false);
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message ? cause.message : "Could not create this drawing.",
-      );
+      reportSystemError({
+        error: cause,
+        scope: "drawings:create",
+        title: "Drawing could not be created",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -63,11 +63,6 @@ export function NewDrawingDialog(props: {
               if (event.key === "Enter") void submit();
             }}
           />
-          {error ? (
-            <p className="m-0 text-xs text-cream-bright" role="alert">
-              {error}
-            </p>
-          ) : null}
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>

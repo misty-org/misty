@@ -1,4 +1,5 @@
 import type { CloudConfigPaths, ProviderWorkflow, RemoteEditDraft } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import { iconAssets } from "@/shared/assets/icons";
 import {
   Alert,
@@ -7,7 +8,6 @@ import {
   AssetIcon,
   Button,
   EmptyState,
-  ErrorState,
   Skeleton,
   StatusBadge,
 } from "@/shared/ui";
@@ -97,20 +97,25 @@ export function RemoteEditPanel(props: RemoteEditPanelProps) {
               onDelete={() => props.onDelete(draft.originalName)}
               onTest={props.onTest}
             />
-            {props.feedbackError || props.feedbackMessage ? (
-              <Alert
-                className="mx-[18px] mb-[18px] max-w-[760px]"
-                variant={props.feedbackError ? "destructive" : "default"}
-              >
-                <AlertDescription>{props.feedbackError ?? props.feedbackMessage}</AlertDescription>
+            {props.feedbackError ? (
+              <SystemErrorActivity
+                error={props.feedbackError}
+                scope="files:remote-editor:operation"
+                title="Remote operation could not be completed"
+                target={{ kind: "workspace-tool", tool: "files" }}
+              />
+            ) : props.feedbackMessage ? (
+              <Alert className="mx-[18px] mb-[18px] max-w-[760px]">
+                <AlertDescription>{props.feedbackMessage}</AlertDescription>
               </Alert>
             ) : null}
           </>
         ) : props.serviceError ? (
-          <ErrorState
-            compact
-            title="Remote service unavailable"
-            description="Start the Misty remote service, then refresh Remotes."
+          <SystemErrorActivity
+            error={props.serviceError}
+            scope="files:remote-editor"
+            title="Remote service is unavailable"
+            target={{ kind: "workspace-tool", tool: "files" }}
           />
         ) : (
           <EmptyState

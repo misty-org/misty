@@ -1,6 +1,7 @@
 import { connectionsApi } from "@/api/connections";
 import { figmaDrawingsApi } from "@/api/integrations/figma";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
+import type * as OpenExternalLinkModule from "@/shared/platform/openExternalLink";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FigmaDrawingsSheet } from "./FigmaDrawingsSheet";
@@ -14,8 +15,9 @@ vi.mock("@/api/integrations/figma", () => ({
   figmaDrawingsApi: { bindings: vi.fn(), records: vi.fn() },
   parseFigmaFileKey: vi.fn(() => ""),
 }));
-vi.mock("@/shared/platform/openExternalLink", () => ({
-  openSystemExternalLink: vi.fn(),
+vi.mock("@/shared/platform/openExternalLink", async (importOriginal) => ({
+  ...(await importOriginal<typeof OpenExternalLinkModule>()),
+  openProviderAuthorizationLink: vi.fn(),
   openExternalLink: vi.fn(),
 }));
 
@@ -32,7 +34,7 @@ describe("FigmaDrawingsSheet", () => {
   });
   afterEach(cleanup);
 
-  it("mounts in Drawings and starts with least-privilege read consent in the system browser", async () => {
+  it("mounts in Drawings and starts with least-privilege read consent in Misty Browser", async () => {
     vi.mocked(connectionsApi.list).mockResolvedValue({ connections: [] });
     render(<FigmaDrawingsSheet spaceId="space-1" canManage open onOpenChange={vi.fn()} />);
 
@@ -47,7 +49,7 @@ describe("FigmaDrawingsSheet", () => {
         "/spaces/space-1/drawings",
       ),
     );
-    expect(openSystemExternalLink).toHaveBeenCalledWith("https://www.figma.com/oauth");
+    expect(openProviderAuthorizationLink).toHaveBeenCalledWith("https://www.figma.com/oauth");
   });
 
   it("requests comments and live sync only as explicit incremental permissions", async () => {

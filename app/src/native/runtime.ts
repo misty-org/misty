@@ -21,6 +21,10 @@ export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 5 });
 }
 
+export function repositionTrafficLights(window: unknown): Promise<void> {
+  return invoke("reposition_traffic_lights", { window, offsetX: -4, offsetY: 5 });
+}
+
 export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
   return invoke("set_native_wallpaper_video", { window, path });
 }

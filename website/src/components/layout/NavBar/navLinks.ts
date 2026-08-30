@@ -4,9 +4,8 @@ export interface NavLinkEntry {
 }
 
 export const navItems: NavLinkEntry[] = [
-  { to: "/features", label: "Features" },
-  { to: "/pricing", label: "Pricing" },
   { to: "/download", label: "Download" },
+  { to: "/pricing", label: "Pricing" },
 ];
 
 export const resourceLinks: NavLinkEntry[] = [

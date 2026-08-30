@@ -1,4 +1,5 @@
 import type { SmartLibraryAsset } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from "@/shared/ui";
 import { File, Loader2, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -276,9 +277,12 @@ export function LegacyLibraryAssetViewer(props: {
                 </form>
               ) : null}
               {tagMutationError ? (
-                <p className="m-0 mt-2 text-xs leading-5 text-cream-bright" role="alert">
-                  {tagMutationError}
-                </p>
+                <SystemErrorActivity
+                  error={tagMutationError}
+                  scope="files:library:tags"
+                  title="File tags could not be updated"
+                  target={{ kind: "workspace-tool", tool: "files" }}
+                />
               ) : null}
             </div>
           </div>

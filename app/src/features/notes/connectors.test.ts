@@ -11,10 +11,7 @@ vi.mock("@/api/spaces/api", () => ({
 }));
 
 import { createMistyNativeNotesConnector } from "./connectors/mistyNativeNotes";
-import { createNotionConnector } from "./connectors/notion";
 import { createDefaultNotesRegistry, NotesConnectorRegistry } from "./connectors/registry";
-import { createFakeNotionClient, notionPage } from "./fakeNotionClient.fixture";
-import { setNotionScope } from "./store/notionApi";
 
 const spaceInput = { spaceId: "space-product", spaceName: "Product" };
 
@@ -109,117 +106,15 @@ describe("MistyNativeNotesConnector", () => {
   });
 });
 
-describe("NotionConnector", () => {
-  it("exposes write methods now that Notion is read/write", () => {
-    const connector = createNotionConnector(createFakeNotionClient().client);
-    expect(connector.capabilities.read).toBe(true);
-    expect(connector.capabilities.create).toBe(true);
-    expect(connector.capabilities.delete).toBe(false);
-    expect(connector.createNote).toBeTypeOf("function");
-    expect(connector.updateNote).toBeTypeOf("function");
-    expect(connector.openInSource).toBeTypeOf("function");
-  });
-
-  it("starts disconnected until a connection is established", async () => {
-    const connector = createNotionConnector(createFakeNotionClient().client);
-    expect(connector.status()).toBe("disconnected");
-    expect(await connector.listNotes()).toEqual([]);
-    expect(connector.lastSyncedAt()).toBeUndefined();
-  });
-
-  it("reports connected once the provider confirms it", async () => {
-    const connector = createNotionConnector(createFakeNotionClient({ connected: true }).client);
-    await connector.connect();
-
-    expect(connector.status()).toBe("connected");
-    expect(connector.lastSyncedAt()).toBeDefined();
-  });
-});
-
 describe("NotesConnectorRegistry", () => {
-  it("registers native Misty notes and the Notion connector by default", () => {
+  it("registers native Misty notes by default", () => {
     const registry = createDefaultNotesRegistry("account-1");
     expect(registry.forSource("misty")?.providerId).toBe("misty");
-    expect(registry.forSource("notion")?.providerId).toBe("notion");
-    expect(registry.list().map((connector) => connector.providerId)).toEqual(["misty", "notion"]);
-  });
-
-  it("uses server-selected Notion resources instead of device-local source scope", async () => {
-    window.localStorage.setItem(
-      "misty.notes.notion.sources.account-1.space-product",
-      JSON.stringify(["local-only-page"]),
-    );
-    setNotionScope("account-1", "space-product");
-    spaceRequestMock.mockImplementation(async (path: string) => {
-      if (path.endsWith("/status")) return { connected: true };
-      if (path.endsWith("/sources")) {
-        return { sources: [{ id: "server-page", kind: "page", title: "Server page" }] };
-      }
-      if (path.includes("/databases/server-page/query")) throw new Error("not a database");
-      if (path.endsWith("/pages/server-page")) return notionPage("server-page", "Server page");
-      if (path.endsWith("/pages/server-page/blocks")) return { blocks: [] };
-      if (path.endsWith("/notes")) return { notes: [] };
-      throw new Error(`Unexpected request: ${path}`);
-    });
-
-    const connector = createDefaultNotesRegistry("account-1", "space-product", "Product").forSource(
-      "notion",
-    )!;
-    const notes = await connector.listNotes();
-
-    expect(notes.map((note) => note.sourceId)).toEqual(["server-page"]);
-    expect(
-      spaceRequestMock.mock.calls.some(([path]) => String(path).includes("local-only-page")),
-    ).toBe(false);
-  });
-
-  it("merges notes from every connector", async () => {
-    spaceRequestMock.mockResolvedValueOnce({
-      notes: [serverNote({ id: "note_misty", title: "Misty note" })],
-    });
-    const notion = createNotionConnector(
-      createFakeNotionClient({ pages: { "page-1": notionPage("page-1", "Roadmap") } }).client,
-      { initialStatus: "connected", selectedSourceIds: [] },
-    );
-    await notion.selectSources!(["page-1"]);
-    const registry = new NotesConnectorRegistry([
-      createMistyNativeNotesConnector("account", spaceInput.spaceId, spaceInput.spaceName),
-      notion,
-    ]);
-    const { notes, errors } = await registry.listAllNotes();
-
-    expect(errors).toEqual({});
-    expect(notes.some((note) => note.source === "misty")).toBe(true);
-    expect(notes.some((note) => note.source === "notion")).toBe(true);
-  });
-
-  it("isolates a failing connector instead of blanking the list", async () => {
-    spaceRequestMock.mockResolvedValueOnce({
-      notes: [serverNote({ id: "note_misty", title: "Misty note" })],
-    });
-    const healthy = createMistyNativeNotesConnector(
-      "account",
-      spaceInput.spaceId,
-      spaceInput.spaceName,
-    );
-    const broken = createNotionConnector(createFakeNotionClient().client);
-    broken.listNotes = async () => {
-      throw new Error("token expired");
-    };
-    const registry = new NotesConnectorRegistry([healthy, broken]);
-
-    const { notes, errors } = await registry.listAllNotes();
-    expect(notes.length).toBeGreaterThan(0);
-    expect(notes.every((note) => note.source === "misty")).toBe(true);
-    expect(errors[broken.id]).toBe("token expired");
+    expect(registry.list().map((connector) => connector.providerId)).toEqual(["misty"]);
   });
 
   it("resolves connectors by source", () => {
-    const registry = new NotesConnectorRegistry([
-      createMistyNativeNotesConnector(),
-      createNotionConnector(createFakeNotionClient().client),
-    ]);
-    expect(registry.forSource("notion")?.providerId).toBe("notion");
+    const registry = new NotesConnectorRegistry([createMistyNativeNotesConnector()]);
     expect(registry.forSource("misty")?.providerId).toBe("misty");
   });
 });

@@ -1,6 +1,14 @@
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 
-const validSpaceSections = new Set(["chat", "planner", "notes", "drawings", "library"]);
+const validSpaceSections = new Set([
+  "home",
+  "social",
+  "chat",
+  "planner",
+  "notes",
+  "drawings",
+  "library",
+]);
 
 export function spaceLandingRoute(
   spaceId: string,
@@ -32,7 +40,7 @@ export function spaceLandingRoute(
     }
   }
 
-  return base;
+  return `${base}/home`;
 }
 
 export function spaceDestination(pathname: string, spaceId: string, accountId?: string): string {

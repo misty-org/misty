@@ -1,92 +1,192 @@
-import { NavLink } from "react-router";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 
 import { MistyAppMockup } from "@/components/marketing/appchrome";
-import { Button } from "@/components/ui/button";
+import { ScreenshotSlot } from "@/components/marketing/previews";
 import type { MarketingCopy } from "@/content/marketingCopy";
 import { easeOut, useScrollProgress } from "@/hooks/useScrollProgress";
+import { HomeCtaButtons } from "../components/HomeCtaButtons";
 
-/** How small the window starts before scroll grows it to full width. */
-const START_SCALE = 0.8;
+const TYPE_DELAY_MS = 110;
+const DELETE_DELAY_MS = 70;
+const WORD_HOLD_MS = 2_200;
+const WORD_SWAP_MS = 320;
+
+function clamp(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
+type TypingPhase = "typing" | "holding" | "deleting";
+
+function useTypingRotation(words: readonly string[]) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [wordIndex, setWordIndex] = useState(0);
+  const [typedWord, setTypedWord] = useState(words[0] ?? "");
+  const [phase, setPhase] = useState<TypingPhase>("holding");
+  const [isInView, setIsInView] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(
+    () => typeof document === "undefined" || !document.hidden,
+  );
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleChange = (event: MediaQueryListEvent) =>
+      setPrefersReducedMotion(event.matches);
+
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  }, []);
+
+  useEffect(() => {
+    const heading = headingRef.current;
+    if (!heading) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsInView(entry.isIntersecting),
+      { rootMargin: "120px" },
+    );
+
+    observer.observe(heading);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => setIsPageVisible(!document.hidden);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    if (
+      prefersReducedMotion ||
+      !isInView ||
+      !isPageVisible ||
+      words.length < 2
+    ) {
+      return;
+    }
+
+    const word = words[wordIndex] ?? "";
+    let delay = TYPE_DELAY_MS;
+    let advance = () => setTypedWord(word.slice(0, typedWord.length + 1));
+
+    if (phase === "holding") {
+      delay = WORD_HOLD_MS;
+      advance = () => setPhase("deleting");
+    } else if (phase === "deleting" && typedWord.length > 0) {
+      delay = DELETE_DELAY_MS;
+      advance = () => setTypedWord(word.slice(0, typedWord.length - 1));
+    } else if (phase === "deleting") {
+      delay = WORD_SWAP_MS;
+      advance = () => {
+        setWordIndex((index) => (index + 1) % words.length);
+        setPhase("typing");
+      };
+    } else if (typedWord.length >= word.length) {
+      advance = () => setPhase("holding");
+    }
+
+    const timeout = window.setTimeout(advance, delay);
+    return () => window.clearTimeout(timeout);
+  }, [
+    isInView,
+    isPageVisible,
+    phase,
+    prefersReducedMotion,
+    typedWord,
+    wordIndex,
+    words,
+  ]);
+
+  return {
+    headingRef,
+    isWordComplete: prefersReducedMotion || phase === "holding",
+    typedWord: prefersReducedMotion ? (words[0] ?? "") : typedWord,
+  };
+}
 
 export function Hero({ copy }: { copy: MarketingCopy["home"] }) {
-  const { ref, progress } = useScrollProgress<HTMLDivElement>();
-  const scale = START_SCALE + (1 - START_SCALE) * easeOut(progress);
+  const { ref: scrollRef, progress } = useScrollProgress<HTMLDivElement>();
+  const { headingRef, isWordComplete, typedWord } = useTypingRotation(
+    copy.heroTitleWords,
+  );
+  const longestWord = copy.heroTitleWords.reduce(
+    (longest, word) => (word.length > longest.length ? word : longest),
+    "",
+  );
+  const copyProgress = easeOut(clamp(progress / 0.06));
+  // Finish the screenshot expansion before the sticky hero releases so the
+  // completed product view has a short, deliberate hold as scrolling continues.
+  const expansionProgress = clamp((progress - 0.02) / 0.78);
+  const copyOpacity = 1 - copyProgress;
+  const scrollStyle = {
+    "--hero-copy-column": `${38 * (1 - expansionProgress)}%`,
+    "--hero-copy-opacity": copyOpacity,
+    "--hero-copy-shift": `${-1.25 * copyProgress}rem`,
+    "--hero-grid-gap": `${3.5 * (1 - expansionProgress)}rem`,
+    "--hero-shot-width": `${112 - 12 * expansionProgress}%`,
+    "--hero-shot-scale": 0.98 + 0.02 * expansionProgress,
+  } as CSSProperties;
 
   return (
-    <section className="relative pt-10 sm:pt-16">
-      <div className="relative z-10 mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12">
-        <p className="hero-animate inline-flex items-center gap-2 rounded-full border border-[var(--marketing-border-strong)] px-3 py-1 text-[13px] text-[var(--marketing-muted)]">
-          <span className="size-1.5 rounded-full bg-[var(--marketing-foreground)]" />
-          {copy.eyebrow}
-        </p>
-
-        {/*
-          Two-tone headline: the claim in full contrast, the qualifier in
-          muted. It reads as one sentence but gives the eye a single place to
-          land, which is what keeps a long product name from feeling long.
-        */}
-        <h1 className="hero-animate hero-animate-delay-1 mt-7 max-w-3xl text-[clamp(2.25rem,5.2vw,3.75rem)] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--marketing-foreground)]">
-          {copy.heroTitleLead}
-          <br />
-          <span className="text-[var(--marketing-muted)]">
-            {copy.heroTitleTrail}
-          </span>
-        </h1>
-
-        <p className="hero-animate hero-animate-delay-3 mt-6 max-w-xl text-lg leading-[1.45] tracking-[-0.015em] text-[var(--marketing-muted)]">
-          {copy.heroDescription}
-        </p>
-
-        <div className="hero-animate hero-animate-delay-4 mt-8 flex flex-wrap items-center gap-3">
-          <Button
-            asChild
-            size="lg"
-            className="h-11 rounded-full bg-[var(--marketing-foreground)] px-6 text-sm text-[var(--marketing-surface)] hover:opacity-85"
+    <section className="home-content-rail relative overflow-x-clip">
+      <div ref={scrollRef} className="hero-scroll-track">
+        <div className="hero-scroll-stage">
+          <div
+            className="hero-scroll-layout site-container grid min-h-[calc(100svh-var(--site-nav-height))] items-center gap-10 py-4 md:grid-cols-[minmax(0,0.76fr)_minmax(0,1.24fr)] md:py-6 lg:gap-14"
+            style={scrollStyle}
           >
-            <NavLink to="/register">Get started</NavLink>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="h-11 rounded-full border-[var(--marketing-border-strong)] bg-transparent px-6 text-sm text-[var(--marketing-foreground)] hover:bg-[var(--secondary)]"
-          >
-            <NavLink to="/features">See how it works</NavLink>
-          </Button>
-        </div>
-
-        <p className="hero-animate hero-animate-delay-5 mt-20 text-center text-[13px] text-[var(--marketing-muted)]">
-          ▶ Private files stay on your device until you add them to a Space
-        </p>
-      </div>
-
-      {/*
-        The window pins and grows to full width as you scroll past it, so the
-        product arrives by being opened rather than by sliding into place. Two
-        viewports of track: one to grow through, one to hold it at full size
-        before the section releases.
-      */}
-      <div
-        ref={ref}
-        className="pin-track relative mt-5 hidden lg:block"
-        style={{ height: "200svh" }}
-      >
-        <div className="pin-stage">
-          <div className="mx-auto w-full max-w-[1440px] px-5 sm:px-8 lg:px-12">
             <div
-              className="origin-center will-change-transform"
-              style={{ transform: `scale(${scale})` }}
+              className="hero-scroll-copy relative z-10 flex min-w-0 flex-col items-start text-left"
+              aria-hidden={copyOpacity < 0.05}
+              inert={copyOpacity < 0.05 ? true : undefined}
             >
-              <MistyAppMockup view="space" bodyClass="h-[440px]" />
+              <h1
+                ref={headingRef}
+                aria-label={copy.heroTitle}
+                className="hero-animate w-fit max-w-full text-[clamp(2.25rem,5.2vw,3.75rem)] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--marketing-foreground)]"
+              >
+                <span aria-hidden="true">
+                  <span className="block text-[var(--marketing-muted)]">
+                    {copy.heroTitleLead}
+                  </span>
+                  <span className="mt-1 inline-grid max-w-full text-left text-[var(--marketing-foreground)] [grid-template-areas:'word']">
+                    <span
+                      className="invisible [grid-area:word]"
+                      aria-hidden="true"
+                    >
+                      {longestWord}
+                    </span>
+                    <span className="whitespace-nowrap [grid-area:word]">
+                      {typedWord}
+                      <span
+                        className={`typing-cursor${isWordComplete ? " typing-cursor-blinking" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </span>
+                </span>
+              </h1>
+
+              <HomeCtaButtons className="hero-animate hero-animate-delay-2 mt-8 justify-start" />
+            </div>
+
+            <div className="hero-scroll-shot pointer-events-none min-w-0">
+              <ScreenshotSlot slot="home-dashboard" eager>
+                <MistyAppMockup
+                  view="space"
+                  bodyClass="h-[300px] sm:h-[380px] lg:h-[440px]"
+                />
+              </ScreenshotSlot>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Small screens — and reduced motion at any width — get the window at
-          its natural size, with no scroll dependency. */}
-      <div className="pin-stacked mx-auto mt-5 max-w-[1440px] px-5 sm:px-8 lg:hidden lg:px-12">
-        <MistyAppMockup view="space" bodyClass="h-[300px] sm:h-[380px]" />
       </div>
     </section>
   );

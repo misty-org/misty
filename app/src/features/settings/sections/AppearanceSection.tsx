@@ -1,5 +1,14 @@
 import { publishNavigatorLayout, useNavigatorLayoutValue } from "@/features/app-shell";
 import {
+  appZoomDefault,
+  appZoomMax,
+  appZoomMin,
+  appZoomStep,
+  setAppZoom,
+  useAppZoomValue,
+} from "@/shared/hooks/useAppZoom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
@@ -18,6 +27,30 @@ const wallpaperFilters = [{ name: "Video", extensions: ["mp4", "mov", "m4v"] }];
 export function AppearanceSection(props: SettingsContentProps) {
   const wallpaperPath = stringSetting(props.document, "appearance", "wallpaper_path", "");
   const navigatorLayout = useNavigatorLayoutValue();
+  const appZoom = useAppZoomValue();
+  const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
+  const zoomFrameRef = useRef<number | null>(null);
+  const pendingZoomRef = useRef<number | null>(null);
+
+  const displayedAppZoom = appZoomDraft ?? appZoom;
+  const cancelPendingZoom = useCallback(() => {
+    if (zoomFrameRef.current !== null) window.cancelAnimationFrame(zoomFrameRef.current);
+    zoomFrameRef.current = null;
+    pendingZoomRef.current = null;
+  }, []);
+  const previewAppZoom = useCallback((value: number) => {
+    setAppZoomDraft(value);
+    pendingZoomRef.current = value;
+    if (zoomFrameRef.current !== null) return;
+    zoomFrameRef.current = window.requestAnimationFrame(() => {
+      zoomFrameRef.current = null;
+      const pendingZoom = pendingZoomRef.current;
+      pendingZoomRef.current = null;
+      if (pendingZoom !== null) setAppZoom(pendingZoom);
+    });
+  }, []);
+
+  useEffect(() => cancelPendingZoom, [cancelPendingZoom]);
 
   return (
     <>
@@ -56,17 +89,39 @@ export function AppearanceSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Layout">
         <SettingsRow
           label="App zoom"
-          description="Scales the whole interface. Also bound to Cmd +, Cmd -, and Cmd 0."
+          description="Scales the whole interface. Use Cmd/Ctrl +, Cmd/Ctrl −, or Cmd/Ctrl 0."
         >
-          <SliderControl
-            value={numberSetting(props.document, "appearance", "app_zoom", 1)}
-            min={0.5}
-            max={2}
-            step={0.1}
-            disabled={props.working}
-            format={(value) => `${Math.round(value * 100)}%`}
-            onCommit={(value) => props.onSettingChange("appearance", "app_zoom", value)}
-          />
+          <div className="flex min-w-0 items-center gap-3">
+            <SliderControl
+              value={displayedAppZoom}
+              min={appZoomMin}
+              max={appZoomMax}
+              step={appZoomStep}
+              disabled={props.working}
+              format={(value) => `${Math.round(value * 100)}%`}
+              onChange={previewAppZoom}
+              onCommit={(value) => {
+                cancelPendingZoom();
+                setAppZoom(value);
+                setAppZoomDraft(null);
+                props.onSettingChange("appearance", "app_zoom", value);
+              }}
+            />
+            <button
+              type="button"
+              className={`rounded-sm text-xs text-cream-muted underline-offset-4 hover:text-cream hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
+              disabled={props.working || displayedAppZoom === appZoomDefault}
+              aria-hidden={displayedAppZoom === appZoomDefault}
+              onClick={() => {
+                cancelPendingZoom();
+                setAppZoom(appZoomDefault);
+                setAppZoomDraft(null);
+                props.onSettingChange("appearance", "app_zoom", appZoomDefault);
+              }}
+            >
+              Reset
+            </button>
+          </div>
         </SettingsRow>
         <SettingsRow
           label="Compact mode"

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, release, server, website};
+use crate::{checks, config::Settings, desktop, environment, release, server, website};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -18,6 +18,8 @@ pub struct Cli {
 enum Command {
     Configure(Configure),
     Doctor,
+    /// Create and validate private runtime environments.
+    Env(Env),
     Check(Check),
     Desktop(Desktop),
     /// Run the public website.
@@ -36,6 +38,33 @@ struct Configure {
 struct Check {
     #[arg(value_enum)]
     target: CheckTarget,
+}
+
+#[derive(Debug, Args)]
+struct Env {
+    #[command(subcommand)]
+    command: EnvCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum EnvCommand {
+    /// Split legacy private files into the scoped layout.
+    Migrate,
+    /// Create missing private files without overwriting configured values.
+    Init {
+        #[arg(value_enum)]
+        target: environment::Target,
+    },
+    /// Validate ownership, duplicates, permissions, and required values.
+    Check {
+        #[arg(value_enum)]
+        target: environment::Target,
+    },
+    /// Show configured counts and missing names without displaying values.
+    Status {
+        #[arg(value_enum)]
+        target: environment::Target,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -124,6 +153,11 @@ enum ServerCommand {
         volumes: bool,
     },
     Logs,
+    /// Operate the production Compose stack explicitly.
+    Prod {
+        #[command(subcommand)]
+        command: ProdCommand,
+    },
     Image {
         #[command(subcommand)]
         command: ImageCommand,
@@ -136,6 +170,17 @@ enum ServerCommand {
         #[command(subcommand)]
         command: R2Command,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum ProdCommand {
+    Check,
+    Up,
+    Down {
+        #[arg(long)]
+        volumes: bool,
+    },
+    Logs,
 }
 
 #[derive(Debug, Subcommand)]
@@ -221,6 +266,7 @@ enum ReleaseCommand {
 }
 
 pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
+    load_command_environment(&arguments.command, &settings)?;
     match arguments.command {
         Command::Configure(command) => {
             let path = Settings::save_workspace(&command.workspace)?;
@@ -228,6 +274,18 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             Ok(())
         }
         Command::Doctor => doctor(&settings),
+        Command::Env(command) => match command.command {
+            EnvCommand::Migrate => environment::migrate(&settings.workspace),
+            EnvCommand::Init { target } => {
+                environment::init(&settings.workspace, target)?;
+                if target == environment::Target::Dev {
+                    server::initialize_development_secrets(&settings.workspace)?;
+                }
+                Ok(())
+            }
+            EnvCommand::Check { target } => environment::check(&settings.workspace, target),
+            EnvCommand::Status { target } => environment::status(&settings.workspace, target),
+        },
         Command::Check(command) => match command.target {
             CheckTarget::App => checks::app(&settings.workspace),
             CheckTarget::Server => checks::server(&settings.workspace),
@@ -268,6 +326,14 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             ServerCommand::Url => server::url(&settings.workspace),
             ServerCommand::Down { volumes } => server::down(&settings.workspace, volumes),
             ServerCommand::Logs => server::logs(&settings.workspace),
+            ServerCommand::Prod { command } => match command {
+                ProdCommand::Check => server::production_check(&settings.workspace),
+                ProdCommand::Up => server::production_up(&settings.workspace),
+                ProdCommand::Down { volumes } => {
+                    server::production_down(&settings.workspace, volumes)
+                }
+                ProdCommand::Logs => server::production_logs(&settings.workspace),
+            },
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
             },
@@ -315,6 +381,42 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             } => release::publish(&settings.workspace, &version, yes, dry_run),
         },
     }
+}
+
+fn load_command_environment(command: &Command, settings: &Settings) -> Result<()> {
+    let files: &[&str] = match command {
+        Command::Configure(_) | Command::Env(_) => &[],
+        Command::Doctor | Command::Release(_) => &["common.env", "release.env"],
+        Command::Desktop(desktop) => match desktop.command {
+            DesktopCommand::Build => &["common.env", "release.env"],
+            _ => &["common.env"],
+        },
+        Command::Server(server) => match &server.command {
+            ServerCommand::Worker { .. } | ServerCommand::R2 { .. } => {
+                &["common.env", "cloudflare.env"]
+            }
+            _ => &["common.env"],
+        },
+        Command::Check(_) | Command::Website(_) => &["common.env"],
+    };
+    crate::config::load_cli_environment(&settings.workspace, files)?;
+    if let Command::Server(server) = command {
+        let target = match &server.command {
+            ServerCommand::Prod { .. } => environment::Target::Prod,
+            ServerCommand::Worker {
+                command: WorkerCommand::GenerateSecrets { target },
+            } => match target {
+                WorkerSecretTarget::Development => environment::Target::Dev,
+                WorkerSecretTarget::Production => environment::Target::Prod,
+            },
+            ServerCommand::Worker {
+                command: WorkerCommand::Deploy { .. },
+            } => environment::Target::Prod,
+            _ => environment::Target::Dev,
+        };
+        environment::apply(&settings.workspace, target)?;
+    }
+    Ok(())
 }
 
 fn doctor(settings: &Settings) -> Result<()> {
@@ -430,6 +532,10 @@ mod tests {
     fn parses_the_stable_command_surface() {
         for arguments in [
             vec!["misty", "doctor"],
+            vec!["misty", "env", "init", "dev"],
+            vec!["misty", "env", "migrate"],
+            vec!["misty", "env", "check", "prod"],
+            vec!["misty", "env", "status", "dev"],
             vec!["misty", "check", "all"],
             vec!["misty", "check", "app"],
             vec!["misty", "desktop", "dev", "--profile", "owner"],
@@ -441,6 +547,10 @@ mod tests {
             vec!["misty", "server", "up", "--detach", "--no-build"],
             vec!["misty", "server", "url"],
             vec!["misty", "server", "down", "--volumes"],
+            vec!["misty", "server", "prod", "check"],
+            vec!["misty", "server", "prod", "up"],
+            vec!["misty", "server", "prod", "down", "--volumes"],
+            vec!["misty", "server", "prod", "logs"],
             vec!["misty", "server", "image", "build", "--tag", "local"],
             vec!["misty", "server", "worker", "generate-secrets"],
             vec![

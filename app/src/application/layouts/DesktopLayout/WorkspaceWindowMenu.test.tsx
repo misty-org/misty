@@ -39,4 +39,28 @@ describe("WorkspaceWindowMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Writing" }));
     expect(onClose).toHaveBeenCalledWith(first.id);
   });
+
+  it("hides a window close icon when that window is protected", () => {
+    const first = createWorkspaceVirtualWindow(undefined, "Home window");
+    const second = createWorkspaceVirtualWindow(undefined, "Research");
+    render(
+      <WorkspaceWindowMenu
+        windows={[first, second]}
+        activeWindowId={first.id}
+        canReopen={false}
+        canCloseWindow={(workspaceWindow) => workspaceWindow.id !== first.id}
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+        onReopen={vi.fn()}
+      />,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(screen.queryByRole("button", { name: "Close Home window" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close Research" })).toBeTruthy();
+  });
 });

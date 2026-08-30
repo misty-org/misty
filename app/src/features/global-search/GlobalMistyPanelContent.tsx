@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
   DropdownMenu,
@@ -24,14 +25,16 @@ import {
   MessageCircle,
   NotebookPen,
   Paintbrush,
+  Pencil,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   Workflow,
+  X,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 import type {
   GlobalAiActionProposal,
@@ -40,6 +43,8 @@ import type {
   GlobalSearchKind,
   GlobalSearchResult,
 } from "./types";
+import { MistyActivityStatus } from "./MistyActivityStatus";
+import { MistyMessageAttachments } from "./MistyMessageAttachments";
 
 export function SearchResults(props: {
   results: GlobalSearchResult[];
@@ -111,54 +116,108 @@ export function ConversationView(props: {
   working: boolean;
   onConfirm: (id: string) => void;
   onReject: (id: string) => void;
+  onCancel?: (id: string) => void;
 }) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const autoFollowRef = useRef(true);
+  const messages = props.conversation?.messages ?? [];
+  const latestMessage = messages[messages.length - 1];
+
+  useEffect(() => {
+    const content = contentRef.current;
+    const viewport = content?.closest<HTMLElement>("[data-radix-scroll-area-viewport]");
+    if (!viewport) return;
+    const onScroll = () => {
+      autoFollowRef.current =
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 56;
+    };
+    onScroll();
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!autoFollowRef.current) return;
+    const viewport = contentRef.current?.closest<HTMLElement>("[data-radix-scroll-area-viewport]");
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [latestMessage?.content, messages.length, props.working]);
+
   if (!props.conversation?.messages.length)
     return (
       <QuietState
-        icon={Sparkles}
+        icon={MessageCircle}
         title="Start with Misty"
         text="Ask a grounded question or describe the action you want completed."
       />
     );
   return (
-    <div className="space-y-4 p-4">
+    <div ref={contentRef} className="space-y-3 p-3" data-misty-conversation-content>
       {props.conversation.messages.map((message) => (
         <article
           key={message.id}
           className={cn(
-            "max-w-[88%] rounded-xl px-3.5 py-3 text-sm leading-relaxed",
+            "text-sm leading-relaxed",
             message.role === "user"
-              ? "ml-auto bg-cream text-charcoal-bg"
-              : "border border-charcoal-border bg-charcoal-bg text-cream",
+              ? "ml-auto w-fit max-w-[82%] rounded-xl border border-blue-300/15 bg-blue-500/15 px-3 py-2 text-blue-50"
+              : "w-full rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3.5 text-cream shadow-[0_12px_36px_rgba(0,0,0,0.14)]",
           )}
         >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          {message.role === "assistant" ? (
+            <>
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-cream-muted">
+                <MessageCircle className="size-3" /> Misty
+              </div>
+              {message.content ? (
+                <div className="misty-markdown-message">
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <MistyActivityStatus activity={message.activity} compact />
+              )}
+            </>
+          ) : (
+            <>
+              <MistyMessageAttachments attachments={message.attachments} />
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            </>
+          )}
           {message.citations?.length ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {message.citations.map((citation) => (
-                <Link
-                  key={citation.id}
-                  to={citation.href}
-                  className="rounded-full border border-charcoal-border bg-charcoal-card px-2 py-1 text-[10px] text-cream-muted hover:text-cream"
-                >
-                  {citation.title}
-                </Link>
-              ))}
-            </div>
+            <details className="group/sources mt-3 text-[11px] text-cream-muted">
+              <summary
+                className={cn(
+                  "flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full border",
+                  "border-white/10 bg-white/[0.025] px-2.5 py-1 hover:text-cream",
+                )}
+              >
+                <Library className="size-3" />
+                {message.citations.length} {message.citations.length === 1 ? "source" : "sources"}
+                <ChevronDown className="size-3 transition-transform group-open/sources:rotate-180" />
+              </summary>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {message.citations.map((citation) => (
+                  <Link
+                    key={citation.id}
+                    to={citation.href}
+                    className="max-w-full truncate rounded-full border border-white/10 bg-white/[0.025] px-2.5 py-1 hover:text-cream"
+                  >
+                    {citation.title}
+                  </Link>
+                ))}
+              </div>
+            </details>
           ) : null}
           {message.action ? (
             <ActionProposal
               proposal={message.action}
               onConfirm={() => props.onConfirm(message.action!.id)}
               onReject={() => props.onReject(message.action!.id)}
+              onCancel={() => props.onCancel?.(message.action!.id)}
             />
           ) : null}
         </article>
       ))}
       {props.working ? (
-        <div className="flex items-center gap-2 text-xs text-cream-muted">
-          <Loader2 className="size-3.5 animate-spin" /> Misty is working…
-        </div>
+        <p className="px-1 text-[11px] text-cream-muted">Answering with your context…</p>
       ) : null}
     </div>
   );
@@ -168,36 +227,57 @@ function ActionProposal(props: {
   proposal: GlobalAiActionProposal;
   onConfirm: () => void;
   onReject: () => void;
+  onCancel: () => void;
 }) {
   const proposal = props.proposal;
   return (
     <div className="mt-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3">
       <div className="flex items-center justify-between gap-3">
         <strong className="text-xs text-cream-bright">{proposal.title}</strong>
-        <span className="text-[10px] uppercase tracking-wide text-cream-muted">
-          {proposal.risk}
-        </span>
+        <span className="text-[10px] first-letter:uppercase text-cream-muted">{proposal.risk}</span>
       </div>
       {proposal.agentName ? (
         <p className="mt-1 text-[11px] text-cream-muted">
-          Delegated to {proposal.agentName}
+          Background work by {proposal.agentName}
           {proposal.spaceName ? ` in ${proposal.spaceName}` : ""}
         </p>
       ) : null}
-      {proposal.error ? <p className="mt-2 text-xs text-cream">{proposal.error}</p> : null}
-      {proposal.state === "proposed" && proposal.requiresConfirmation ? (
+      {proposal.error ? (
+        <SystemErrorActivity
+          error={proposal.error}
+          scope={`misty:proposal:${proposal.id}`}
+          title="Misty action could not be completed"
+        />
+      ) : null}
+      {(proposal.state === "proposed" && proposal.requiresConfirmation) ||
+      (proposal.state === "awaiting_approval" && proposal.approvalId) ? (
         <div className="mt-3 flex gap-2">
           <Button size="sm" className="h-7" onClick={props.onConfirm}>
-            <Check className="size-3.5" /> Confirm
+            <Check className="size-3.5" /> Approve
           </Button>
           <Button size="sm" variant="ghost" className="h-7" onClick={props.onReject}>
             Cancel
           </Button>
         </div>
       ) : (
-        <p className="mt-2 text-[11px] capitalize text-cream-muted">
-          {proposal.state.replace("_", " ")}
-        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <p className="text-[11px] capitalize text-cream-muted">
+            {proposal.state.replace("_", " ")}
+          </p>
+          {proposal.state === "running" || proposal.state === "awaiting_approval" ? (
+            <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={props.onCancel}>
+              Cancel
+            </Button>
+          ) : null}
+          {proposal.resultHref ? (
+            <Link
+              className="text-[11px] text-cream-muted hover:text-cream"
+              to={proposal.resultHref}
+            >
+              {proposal.resultHref.includes("/drawings/") ? "Open drawing" : "Open work log"}
+            </Link>
+          ) : null}
+        </div>
       )}
     </div>
   );
@@ -206,25 +286,41 @@ function ActionProposal(props: {
 export function ConversationMenu(props: {
   conversations: GlobalAiConversation[];
   activeId: string;
+  loading?: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
 }) {
   const active = props.conversations.find((item) => item.id === props.activeId);
   const [query, setQuery] = useState("");
+  const [renamingId, setRenamingId] = useState("");
+  const [draftTitle, setDraftTitle] = useState("");
   const visible = props.conversations
     .filter((item) => item.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
     .slice(0, 12);
+  const finishRename = () => {
+    const title = draftTitle.trim();
+    if (renamingId && title) props.onRename(renamingId, title);
+    setRenamingId("");
+    setDraftTitle("");
+  };
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 max-w-48 gap-1.5 text-xs text-cream-muted">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 max-w-48 gap-1.5 rounded-lg border border-white/10 bg-white/[0.035] text-xs text-cream-muted hover:bg-white/[0.07] hover:text-cream"
+        >
           <History className="size-3.5" />
-          <span className="truncate">{active?.title ?? "Conversations"}</span>
+          <span className="truncate">
+            {active?.title ?? (props.loading ? "Loading…" : "New conversation")}
+          </span>
           <ChevronDown className="size-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-72">
+      <DropdownMenuContent align="end" className="w-72" data-misty-layer-portal>
         <DropdownMenuItem onSelect={props.onNew}>
           <Plus className="size-4" /> New conversation
         </DropdownMenuItem>
@@ -245,23 +341,100 @@ export function ConversationMenu(props: {
             <DropdownMenuSeparator />
           </>
         ) : null}
-        {visible.map((conversation) => (
-          <DropdownMenuItem key={conversation.id} onSelect={() => props.onSelect(conversation.id)}>
-            <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
-            <button
-              type="button"
-              className="rounded p-1 text-cream-muted hover:text-cream"
-              aria-label={`Delete ${conversation.title}`}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                props.onDelete(conversation.id);
+        {visible.map((conversation) => {
+          const renaming = renamingId === conversation.id;
+          return (
+            <DropdownMenuItem
+              key={conversation.id}
+              onSelect={(event) => {
+                if (renaming) event.preventDefault();
+                else props.onSelect(conversation.id);
               }}
             >
-              <Trash2 className="size-3.5" />
-            </button>
-          </DropdownMenuItem>
-        ))}
+              {renaming ? (
+                <input
+                  autoFocus
+                  value={draftTitle}
+                  aria-label={`Rename ${conversation.title}`}
+                  className="h-7 min-w-0 flex-1 rounded-md border border-charcoal-border bg-charcoal-bg px-2 text-xs text-cream outline-none"
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onKeyDown={(event) => {
+                    event.stopPropagation();
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      finishRename();
+                    } else if (event.key === "Escape") {
+                      event.preventDefault();
+                      setRenamingId("");
+                    }
+                  }}
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate">{conversation.title}</span>
+              )}
+              {renaming ? (
+                <>
+                  <button
+                    type="button"
+                    className="rounded p-1 text-cream-muted hover:text-cream"
+                    aria-label={`Save ${conversation.title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      finishRename();
+                    }}
+                  >
+                    <Check className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded p-1 text-cream-muted hover:text-cream"
+                    aria-label={`Cancel renaming ${conversation.title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setRenamingId("");
+                    }}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="rounded p-1 text-cream-muted hover:text-cream"
+                    aria-label={`Rename ${conversation.title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setRenamingId(conversation.id);
+                      setDraftTitle(conversation.title);
+                    }}
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded p-1 text-cream-muted hover:text-red-300"
+                    aria-label={`Delete ${conversation.title}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      props.onDelete(conversation.id);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </>
+              )}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -281,7 +454,7 @@ function QuietState(props: { icon: LucideIcon; title: string; text: string }) {
 }
 
 export function ModeIcon({ mode, className }: { mode: GlobalAiMode; className?: string }) {
-  const Icon = mode === "search" ? Search : mode === "ask" ? Sparkles : CheckSquare2;
+  const Icon = mode === "search" ? Search : mode === "ask" ? MessageCircle : CheckSquare2;
   return <Icon className={cn("size-4 shrink-0 text-cream-muted", className)} />;
 }
 

@@ -1,4 +1,4 @@
-import type { McpConnection, McpExecution, McpToolDescriptor, McpToolRisk } from "./types";
+import type { McpConnection, McpToolDescriptor, McpToolRisk } from "./types";
 
 export interface McpToolWire {
   connection_id?: unknown;
@@ -72,6 +72,7 @@ export function publicMcpConnection(value: McpConnection): McpConnection {
     name: value.name,
     endpoint_url: value.endpoint_url,
     transport: "streamable_http",
+    provider: value.provider === "activepieces" ? "activepieces" : "custom",
     status: value.status,
     last_error_code: value.last_error_code,
     last_checked_at: value.last_checked_at,
@@ -80,11 +81,6 @@ export function publicMcpConnection(value: McpConnection): McpConnection {
     created_at: value.created_at,
     updated_at: value.updated_at,
   };
-}
-
-export function executionOutcome(execution: McpExecution): string {
-  if (!execution.approved) return "Denied";
-  return execution.success ? "Completed" : "Failed";
 }
 
 function text(value: unknown, limit: number): string {

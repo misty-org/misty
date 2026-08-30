@@ -33,6 +33,12 @@ misty check app
 misty check server
 misty check all
 
+misty env init dev
+misty env init prod
+misty env status dev
+misty env check dev
+misty env check prod
+
 misty desktop dev
 misty desktop dev --profile owner --route /spaces
 misty desktop build
@@ -47,6 +53,10 @@ misty server up --detach
 misty server url
 misty server logs
 misty server down
+misty server prod check
+misty server prod up
+misty server prod logs
+misty server prod down
 
 misty release start 0.2.0
 misty release build 0.2.0

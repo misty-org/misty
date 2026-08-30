@@ -2,11 +2,11 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
-const appZoomMin = 0.5;
-const appZoomMax = 2;
-const appZoomStep = 0.1;
+export const appZoomDefault = 1;
+export const appZoomMin = 0.8;
+export const appZoomMax = 2;
+export const appZoomStep = 0.1;
 
-let nativeZoomSupported: boolean | null = null;
 let zoomApplySequence = 0;
 let appliedAppZoom = loadStoredAppZoom();
 
@@ -25,7 +25,7 @@ export function setAppZoom(zoom: number): void {
   const clamped = clampAppZoom(zoom);
   if (clamped === appliedAppZoom) return;
   saveStoredAppZoom(clamped);
-  void applyAppZoom(clamped);
+  applyAppZoom(clamped);
 }
 
 /** Read-only view of the live zoom, for UI that displays but does not own it. */
@@ -62,11 +62,11 @@ export function useAppZoom() {
   }, []);
 
   const resetZoom = useCallback(() => {
-    setZoom(1);
+    setZoom(appZoomDefault);
   }, []);
 
   useEffect(() => {
-    void applyAppZoom(zoom);
+    applyAppZoom(zoom);
     saveStoredAppZoom(zoom);
 
     if (!didMountRef.current) {
@@ -106,42 +106,53 @@ export function useAppZoom() {
   };
 }
 
-async function applyAppZoom(zoom: number): Promise<void> {
+function applyAppZoom(zoom: number): void {
+  zoom = clampAppZoom(zoom);
   const applySequence = ++zoomApplySequence;
   document.documentElement.dataset.appZoom = String(Math.round(zoom * 100));
-
-  if (nativeZoomSupported !== false && hasTauriInternals()) {
-    try {
-      const { getCurrentWebview } = await import("@tauri-apps/api/webview");
-      await getCurrentWebview().setZoom(zoom);
-      if (applySequence !== zoomApplySequence) return;
-      nativeZoomSupported = true;
-      appliedAppZoom = zoom;
-      clearCssZoomFallback();
-      window.dispatchEvent(new Event(appZoomChangedEvent));
-      return;
-    } catch {
-      nativeZoomSupported = false;
-    }
-  }
-
-  if (applySequence !== zoomApplySequence) return;
-  applyCssZoomFallback(zoom);
   appliedAppZoom = zoom;
   window.dispatchEvent(new Event(appZoomChangedEvent));
+
+  if (hasTauriInternals()) {
+    // CSS zoom changes the renderer's layout coordinate system and breaks the
+    // shell/native-child-webview geometry. The desktop app must use WKWebView's
+    // page zoom API; clearing this first also repairs hot-reloaded sessions that
+    // previously received the CSS fallback.
+    clearCssZoom();
+    void applyNativeZoom(zoom, applySequence);
+    return;
+  }
+
+  // Keep web previews usable without pretending this is the desktop path.
+  applyCssZoom(zoom);
+}
+
+async function applyNativeZoom(zoom: number, applySequence: number): Promise<void> {
+  try {
+    const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+    await getCurrentWebview().setZoom(zoom);
+  } catch (error) {
+    if (applySequence === zoomApplySequence) {
+      console.error("Unable to apply native app zoom", error);
+    }
+  }
 }
 
 function loadStoredAppZoom(): number {
-  if (typeof window === "undefined") return 1;
-  const raw = window.localStorage.getItem(APP_ZOOM_STORAGE_KEY);
-  if (!raw) return 1;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? clampAppZoom(parsed) : 1;
+  if (typeof window === "undefined") return appZoomDefault;
+  try {
+    const raw = window.localStorage.getItem(APP_ZOOM_STORAGE_KEY);
+    if (!raw) return appZoomDefault;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? clampAppZoom(parsed) : appZoomDefault;
+  } catch {
+    return appZoomDefault;
+  }
 }
 
 function saveStoredAppZoom(zoom: number): void {
   try {
-    if (zoom === 1) window.localStorage.removeItem(APP_ZOOM_STORAGE_KEY);
+    if (zoom === appZoomDefault) window.localStorage.removeItem(APP_ZOOM_STORAGE_KEY);
     else window.localStorage.setItem(APP_ZOOM_STORAGE_KEY, String(zoom));
   } catch {
     // Browser privacy modes can disable localStorage; zoom still works for the session.
@@ -153,12 +164,12 @@ function clampAppZoom(zoom: number): number {
   return Math.min(appZoomMax, Math.max(appZoomMin, rounded));
 }
 
-function applyCssZoomFallback(zoom: number): void {
+function applyCssZoom(zoom: number): void {
   const bodyStyle = document.body.style as CSSStyleDeclaration & { zoom?: string };
   bodyStyle.zoom = String(zoom);
 }
 
-function clearCssZoomFallback(): void {
+function clearCssZoom(): void {
   const bodyStyle = document.body.style as CSSStyleDeclaration & { zoom?: string };
   bodyStyle.zoom = "";
 }

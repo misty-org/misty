@@ -1,17 +1,19 @@
 import { useAuth } from "@/features/auth";
 import { SpaceDrawings } from "@/features/drawings";
+import { HomeDashboard } from "@/features/home";
 import { SpaceNotes } from "@/features/notes";
 import { SpaceLibrary } from "@/features/spaces/library";
 import { SpacePlanner } from "@/features/spaces/planner";
 import { isWebBuild } from "@/shared/platform/buildTarget";
-import { Button, EmptyState, PermissionState } from "@/shared/ui";
+import { Button, DesktopAccessState, EmptyState, PermissionState } from "@/shared/ui";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { SpaceChat } from "./chat/SpaceChatEntry";
+import { SpaceSocial } from "./chat/SpaceChatEntry";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 import { canOpenMistySpaceSection } from "./mistySpace";
 import { useSpacesStore } from "./store/useSpacesStore";
+import { socialProvider } from "./social/socialRoute";
 
 /**
  * One Space section, rendered from props rather than the router.
@@ -22,8 +24,13 @@ import { useSpacesStore } from "./store/useSpacesStore";
  * on its own: a background pane that issued redirects would move the whole app
  * out from under the focused one. Route normalisation stays in `SpaceDetail`.
  */
-export function SpaceSectionView(props: { spaceId: string; section: string; studioKind?: string }) {
-  const { spaceId, section, studioKind = "" } = props;
+export function SpaceSectionView(props: {
+  spaceId: string;
+  section: string;
+  studioKind?: string;
+  workspaceTabId?: string;
+}) {
+  const { spaceId, section, studioKind = "", workspaceTabId } = props;
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -98,23 +105,22 @@ export function SpaceSectionView(props: { spaceId: string; section: string; stud
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      {section === "library" ? (
+      {section === "home" ? (
+        <HomeDashboard key={`home:${spaceId}`} spaceId={spaceId} />
+      ) : section === "library" ? (
         isWebBuild ? (
-          <PermissionState
-            className="h-full"
-            title="Space Library is available in the Misty desktop app"
-            description={
-              "This Library currently depends on local-device file indexing and transfers. " +
-              "Cloud-backed Space chat, planning, notes, and drawings are available on the web."
-            }
-          />
+          <DesktopAccessState feature="Space Library" />
         ) : space.permissions?.["library.view"] === false ? (
           <SpacePermissionDenied
             title="Library access required"
             detail="You do not have permission to view this Space's Library."
           />
         ) : (
-          <SpaceLibrary key={`library:${spaceId}`} spaceId={spaceId} />
+          <SpaceLibrary
+            key={`library:${spaceId}`}
+            spaceId={spaceId}
+            workspaceTabId={workspaceTabId}
+          />
         )
       ) : section === "planner" ? (
         space.permissions?.["tasks.view"] === false ? (
@@ -128,15 +134,22 @@ export function SpaceSectionView(props: { spaceId: string; section: string; stud
             spaceId={spaceId}
             canManage={!referenceOnly && space.permissions?.["tasks.manage"] !== false}
             canManageIntegrations={!referenceOnly && space.role === "owner"}
+            workspaceTabId={workspaceTabId}
           />
         )
       ) : section === "notes" ? (
-        <SpaceNotes key={`notes:${spaceId}`} spaceId={spaceId} spaceName={space.name} />
+        <SpaceNotes
+          key={`notes:${spaceId}`}
+          spaceId={spaceId}
+          spaceName={space.name}
+          workspaceTabId={workspaceTabId}
+        />
       ) : section === "drawings" ? (
         <SpaceDrawings
-          key={`drawings:${spaceId}:${studioKind}`}
+          key={`drawings:${spaceId}`}
           spaceId={spaceId}
           drawingId={studioKind}
+          workspaceTabId={workspaceTabId}
         />
       ) : section === "settings" ? (
         <SpaceSettings
@@ -146,11 +159,17 @@ export function SpaceSectionView(props: { spaceId: string; section: string; stud
         />
       ) : space.permissions?.["messages.read"] === false ? (
         <SpacePermissionDenied
-          title="Chat access required"
-          detail="You do not have permission to read this Space's messages."
+          title="Social access required"
+          detail="You do not have permission to read this Space's conversations."
         />
       ) : (
-        <SpaceChat key={`chat:${spaceId}`} spaceId={spaceId} />
+        <SpaceSocial
+          key={`social:${spaceId}:${socialProvider(studioKind) ?? "misty"}`}
+          spaceId={spaceId}
+          spaceName={space.name}
+          provider={socialProvider(studioKind) ?? "misty"}
+          workspaceTabId={workspaceTabId}
+        />
       )}
     </div>
   );

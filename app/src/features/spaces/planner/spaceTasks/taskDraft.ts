@@ -49,6 +49,13 @@ export function createTaskInput(
   draft: TaskDraft,
   sourceRefs: SpaceTask["source_refs"] = draft.source_refs,
 ) {
+  return taskUpdateInput(draft, sourceRefs);
+}
+
+export function taskUpdateInput(
+  draft: TaskDraft,
+  sourceRefs: SpaceTask["source_refs"] = draft.source_refs,
+) {
   const assigneeUserId = draft.assignee_user_id.trim();
   const assigneeAgentId = draft.assignee_agent_id.trim();
   const dueAt = dueAtForRequest(draft.due_at);

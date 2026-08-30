@@ -1,14 +1,23 @@
 import { closeBrowserRuntime } from "@/features/browser";
+import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
+import { useGlobalSearchStore } from "@/features/global-search";
+import { preferredMistySpace, useSpacesStore } from "@/features/spaces";
 import { killTerminalTab } from "@/features/terminal";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
+  canCloseWorkspaceTab,
+  canCloseWorkspaceWindow,
   dockLeaves,
   dockTabs,
   dockWidgetRegistry,
   findDockLeaf,
+  nextTabTitle,
   paneBoundsFromDocument,
   paneIdInDirection,
   parseCodeTabState,
+  toolIdFromSurfaceId,
+  toolIdFromTab,
+  useRecentToolsStore,
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
   type WorkspaceGroupKey,
@@ -26,6 +35,7 @@ export function WorkspaceCanvas(props: {
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const spaces = useSpacesStore((state) => state.spaces);
   const layout = useWorkspaceStore((state) => state.layout);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const activeVirtualWindowId = useWorkspaceStore((state) => state.activeVirtualWindowId);
@@ -47,6 +57,33 @@ export function WorkspaceCanvas(props: {
   const closePane = useWorkspaceStore((state) => state.closePane);
   const updateSplitRatio = useWorkspaceStore((state) => state.updateSplitRatio);
   const leaves = useMemo(() => dockLeaves(layout.root), [layout.root]);
+  const tabCount = useMemo(() => dockTabs(layout.root).length, [layout.root]);
+
+  useEffect(() => {
+    if (tabCount > 0 || spaces.length === 0) return;
+
+    // Give route synchronization a chance to open the requested app first.
+    // If the workspace is still empty, Home becomes the single fallback tab.
+    const timer = window.setTimeout(() => {
+      const workspace = useWorkspaceStore.getState();
+      if (dockTabs(workspace.layout.root).length > 0) return;
+      const scopedSpaceId = workspace.activeScopeKey.startsWith("space:")
+        ? workspace.activeScopeKey.slice(6)
+        : "";
+      const homeSpace =
+        spaces.find((space) => space.id === scopedSpaceId) ?? preferredMistySpace(spaces);
+      if (!homeSpace) return;
+      const route = `/spaces/${encodeURIComponent(homeSpace.id)}/home`;
+      const request = workspaceSurfaceFromRoute(route);
+      if (!request) return;
+      const homeTab = workspace.openSurface(request);
+      if (`${location.pathname}${location.search}` !== homeTab.route) {
+        navigate(homeTab.route, { replace: true });
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeScopeKey, location.pathname, location.search, navigate, spaces, tabCount]);
 
   const navigateToActiveLayoutTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
@@ -95,6 +132,7 @@ export function WorkspaceCanvas(props: {
   const openTab = useCallback(
     (tab: WorkspaceTab) => {
       focusTab(tab.id);
+      useRecentToolsStore.getState().recordToolUsage(toolIdFromTab(tab));
       if (`${location.pathname}${location.search}` !== tab.route) navigate(tab.route);
     },
     [focusTab, location.pathname, location.search, navigate],
@@ -121,41 +159,45 @@ export function WorkspaceCanvas(props: {
 
   const openNewTab = useCallback(
     (option: NewTabOption, paneId: string) => {
+      useRecentToolsStore
+        .getState()
+        .recordToolUsage(toolIdFromSurfaceId(option.surfaceId, option.label));
       if (option.surfaceId === "browser") return openTab(openBrowserTab({ paneId }));
+      const state = useWorkspaceStore.getState();
+      const targetPane =
+        findDockLeaf(state.layout.root, paneId) ??
+        findDockLeaf(state.layout.root, state.layout.focusedPaneId);
+      const tabTitle = nextTabTitle(targetPane?.tabs, option.surfaceId, option.label);
       if (option.surfaceId === "space") {
         const surfaceReq = workspaceSurfaceFromRoute(option.route);
         if (surfaceReq) {
-          openTab(
+          return openTab(
             openSurface({
               ...surfaceReq,
+              title: tabTitle,
               forceNew: true,
+              instancePolicy: "multiple",
               paneId,
               state: dockWidgetRegistry.get("space").create(),
             }),
           );
-          return;
         }
       }
       if (option.surfaceId === "code") {
-        const state = useWorkspaceStore.getState();
-        const focusedPane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-        const currentCode = focusedPane?.tabs.find(
-          (tab) => tab.id === focusedPane.activeTabId && tab.surfaceId === "code",
+        const currentCode = targetPane?.tabs.find(
+          (tab) => tab.id === targetPane.activeTabId && tab.surfaceId === "code",
         );
         const currentState = parseCodeTabState(currentCode?.state);
         return openTab(
           openSurface({
             surfaceId: "code",
             groupKey: "tool:code",
-            title: "Code",
+            title: tabTitle,
             route: option.route,
             instancePolicy: "multiple",
             forceNew: true,
             paneId,
-            state: {
-              ...currentState,
-              viewport: { kind: "file", activeFilePath: null },
-            },
+            state: { ...currentState, viewport: { kind: "file", activeFilePath: null } },
           }),
         );
       }
@@ -163,10 +205,10 @@ export function WorkspaceCanvas(props: {
         openSurface({
           surfaceId: option.surfaceId,
           groupKey: `tool:${option.surfaceId}` as WorkspaceGroupKey,
-          title: option.label,
+          title: tabTitle,
           route: option.route,
           instancePolicy: option.instancePolicy ?? "multiple",
-          forceNew: option.instancePolicy !== "single",
+          forceNew: true,
           paneId,
           state: dockWidgetRegistry.get(option.surfaceId).create(),
         }),
@@ -184,11 +226,13 @@ export function WorkspaceCanvas(props: {
 
   const canCloseActiveTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
-    return (
-      dockTabs(state.layout.root).length > 1 ||
-      (state.virtualWindowsByScope[state.activeScopeKey]?.length ?? 0) > 1
+    const focused = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
+    const active = focused?.tabs.find((tab) => tab.id === focused.activeTabId);
+    const scopedTabs = virtualWindows.flatMap((workspaceWindow) =>
+      dockTabs(workspaceWindow.layout.root),
     );
-  }, []);
+    return Boolean(active && canCloseWorkspaceTab(active, scopedTabs));
+  }, [virtualWindows]);
 
   const openSelectedTab = useCallback(
     (tab: WorkspaceTab | null) => {
@@ -198,6 +242,14 @@ export function WorkspaceCanvas(props: {
   );
 
   useShortcutHandler("workspace.close_tab", closeActiveTab, canCloseActiveTab);
+  useShortcutHandler(
+    "misty.contextual_companion",
+    useCallback(() => {
+      void toggleDesktopMistyPanel().then((openedNativePanel) => {
+        if (!openedNativePanel) useGlobalSearchStore.getState().togglePanel();
+      });
+    }, []),
+  );
   useShortcutHandler(
     "workspace.reopen_tab",
     useCallback(
@@ -308,10 +360,14 @@ export function WorkspaceCanvas(props: {
       registerShortcutHandler(
         "workspace.close_virtual_window",
         () => closeWorkspaceVirtualWindow(useWorkspaceStore.getState().activeVirtualWindowId),
-        () =>
-          (useWorkspaceStore.getState().virtualWindowsByScope[
-            useWorkspaceStore.getState().activeScopeKey
-          ]?.length ?? 0) > 1,
+        () => {
+          const state = useWorkspaceStore.getState();
+          const windows = state.virtualWindowsByScope[state.activeScopeKey] ?? [];
+          const active = windows.find(
+            (workspaceWindow) => workspaceWindow.id === state.activeVirtualWindowId,
+          );
+          return Boolean(active && windows.length > 1 && canCloseWorkspaceWindow(active, windows));
+        },
       ),
       registerShortcutHandler(
         "workspace.next_virtual_window",

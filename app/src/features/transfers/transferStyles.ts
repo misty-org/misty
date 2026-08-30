@@ -1,13 +1,22 @@
 export const transferStyles = {
   workspace: "bg-charcoal-bg text-cream",
-  pane: "grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)_36px] overflow-hidden bg-charcoal-bg",
-  panelsScroll: "min-h-0 min-w-0 overflow-hidden",
-  threePanel: "grid h-full min-h-0 w-full",
+  pane: "grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_32px] overflow-hidden bg-charcoal-bg",
+  pageHeader:
+    "flex min-w-0 items-end justify-between gap-5 px-5 pb-3 pt-4 max-[900px]:items-start max-[900px]:flex-col",
+  pageTitle: "text-xl font-semibold tracking-[-0.015em] text-cream",
+  pageDescription: "mt-1 text-[13px] text-cream-muted",
+  summary:
+    "flex shrink-0 items-center overflow-hidden rounded-xl border border-charcoal-border/65 bg-charcoal-card/55",
+  summaryMetric:
+    "flex min-w-[104px] items-baseline justify-center gap-1.5 border-l border-charcoal-border/60 px-3 py-2 text-xs text-cream-muted first:border-l-0",
+  summaryValue: "text-sm font-semibold tabular-nums text-cream-bright",
+  panelsScroll: "min-h-0 min-w-0 overflow-hidden px-3",
+  threePanel: "grid h-full min-h-0 w-full gap-3",
   panel:
-    "min-h-0 min-w-0 overflow-hidden border-r border-charcoal-border/70 bg-charcoal-card last:border-r-0",
+    "min-h-0 min-w-0 overflow-hidden rounded-xl border border-charcoal-border/65 bg-charcoal-card/45",
   listPanel:
-    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-r border-charcoal-border/70 bg-charcoal-bg",
-  listPanelNoRight: "border-r-0",
+    "grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-charcoal-border/65 bg-charcoal-bg",
+  listPanelNoRight: "",
   toolbar:
     "flex min-h-11 min-w-0 items-center gap-2 border-b border-charcoal-border/70 bg-charcoal-bg px-3 py-1.5",
   searchBox:
@@ -56,7 +65,7 @@ export const transferStyles = {
   filterHeading: "mb-3 flex min-h-8 items-center justify-between gap-2",
   filterTitle: "text-sm font-semibold text-cream",
   filterSection: "grid gap-2 border-t border-charcoal-border/60 py-3 first:border-t-0 first:pt-0",
-  filterSectionTitle: "m-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-cream-muted",
+  filterSectionTitle: "m-0 text-[11px] font-semibold text-cream-muted",
   filterOptions: "grid gap-0.5",
   filterOption:
     "grid min-h-8 min-w-0 cursor-default grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-1 text-sm leading-none text-cream hover:bg-charcoal-hover",
@@ -70,12 +79,11 @@ export const transferStyles = {
   detailTitle: "truncate text-base font-semibold text-cream",
   detailActions: "mt-3 flex flex-wrap gap-2 border-t border-charcoal-border/70 pt-3",
   detailRow: "grid gap-1 border-b border-charcoal-border/60 py-2.5 text-xs",
-  detailLabel: "text-[11px] font-medium uppercase tracking-[0.06em] text-cream-muted",
+  detailLabel: "text-[11px] font-medium text-cream-muted",
   detailValue: "min-w-0 font-medium text-cream [overflow-wrap:anywhere]",
   detailDangerValue: "min-w-0 font-medium text-cream-bright [overflow-wrap:anywhere]",
   progressMeta: "flex min-w-0 items-center justify-between gap-2 text-xs text-cream-muted",
   progressMetaStrong: "font-medium text-cream",
-  bottomBar:
-    "flex min-w-0 items-center justify-between border-t border-charcoal-border/60 bg-charcoal-card px-2",
+  bottomBar: "flex min-w-0 items-center justify-between bg-charcoal-bg px-3",
   bottomBarSide: "flex min-w-0 items-center gap-1",
 } as const;

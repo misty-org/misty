@@ -8,6 +8,7 @@ import {
   InputGroupTextarea,
   Popover,
   PopoverAnchor,
+  PopoverTrigger,
 } from "@/shared/ui";
 import { Plus, Send } from "lucide-react";
 import { useId, useMemo, useRef, type FormEvent, type KeyboardEvent } from "react";
@@ -46,6 +47,7 @@ export interface SpaceChatComposerProps {
 export function SpaceChatComposer(props: SpaceChatComposerProps) {
   const { draft, suggestions, input } = props;
   const listId = useId();
+  const composerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const mentionSegments = useMemo(
@@ -105,16 +107,19 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
   return (
     <div className="shrink-0 bg-charcoal-bg px-[clamp(16px,2.5vw,32px)] pb-5 pt-2">
       <form onSubmit={props.onSubmit}>
-        <InputGroup className="rounded-xl border border-charcoal-border bg-charcoal-card shadow-none">
-          {draft.replyToMessageId ? (
-            <ChatReplyBanner
-              senderName={props.replyToSenderName}
-              onCancel={() => draft.setReplyToMessageId("")}
-            />
-          ) : null}
+        <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
+          <PopoverAnchor asChild>
+            <InputGroup
+              ref={composerRef}
+              className="rounded-xl border border-charcoal-border bg-charcoal-card shadow-none"
+            >
+              {draft.replyToMessageId ? (
+                <ChatReplyBanner
+                  senderName={props.replyToSenderName}
+                  onCancel={() => draft.setReplyToMessageId("")}
+                />
+              ) : null}
 
-          <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
-            <PopoverAnchor asChild>
               <div className="relative">
                 {hasMention ? (
                   <div
@@ -170,90 +175,100 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                   }}
                 />
               </div>
-            </PopoverAnchor>
-            <ChatSuggestionPopover
-              listId={listId}
-              suggestions={suggestions.suggestions}
-              activeIndex={suggestions.activeIndex}
-              loading={suggestions.loading}
-              error={suggestions.error}
-              canBrowseLibrary={props.canBrowseLibrary}
-              canUploadAttachments={props.canUploadAttachments}
-              onHoverIndex={suggestions.setActiveIndex}
-              onSelect={(suggestion) => {
-                input.select(suggestion);
-                focusCaretToEnd();
-              }}
-              onBrowseLibrary={() => {
-                suggestions.setOpen(false);
-                props.onOpenPicker("library");
-              }}
-              onUploadFiles={() => {
-                suggestions.setOpen(false);
-                props.onOpenPicker("files");
-              }}
-            />
-          </Popover>
 
-          <ChatAttachmentChips
-            pendingAttachments={draft.pendingAttachments}
-            selectedLibraryIds={draft.selectedLibraryIds}
-            libraryItems={suggestions.libraryItems}
-            onRemoveAttachment={(id) =>
-              draft.setPendingAttachments((current) => current.filter((item) => item.id !== id))
-            }
-            onRemoveLibraryItem={(id) =>
-              draft.setSelectedLibraryIds((current) => current.filter((item) => item !== id))
-            }
-          />
+              <ChatAttachmentChips
+                pendingAttachments={draft.pendingAttachments}
+                selectedLibraryIds={draft.selectedLibraryIds}
+                libraryItems={suggestions.libraryItems}
+                onRemoveAttachment={(id) =>
+                  draft.setPendingAttachments((current) => current.filter((item) => item.id !== id))
+                }
+                onRemoveLibraryItem={(id) =>
+                  draft.setSelectedLibraryIds((current) => current.filter((item) => item !== id))
+                }
+              />
 
-          <InputGroupAddon
-            align="block-end"
-            className="min-h-11 border-t border-charcoal-border/60 px-3"
-          >
-            {props.canUploadAttachments || props.canBrowseLibrary ? (
-              <InputGroupButton
-                variant="ghost"
-                size="icon-xs"
-                type="button"
-                disabled={draft.attachmentUploading || draft.attachmentSlotsLeft === 0}
-                onClick={() => props.onOpenPicker(props.canUploadAttachments ? "files" : "library")}
-                aria-label="Add files or Library items"
+              <InputGroupAddon
+                align="block-end"
+                className="min-h-11 border-t border-charcoal-border/60 px-3"
               >
-                <Plus />
-              </InputGroupButton>
-            ) : null}
-            <InputGroupButton
-              variant="ghost"
-              size="icon-xs"
-              type="button"
-              onClick={() => {
-                input.beginMention();
-                focusCaretToEnd();
-              }}
-              aria-label="Mention someone"
-            >
-              <span aria-hidden="true">@</span>
-            </InputGroupButton>
-            {draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
-              <InputGroupText className="ml-auto tabular-nums">
-                {draft.text.length}/{MAX_MESSAGE_LENGTH}
-              </InputGroupText>
-            ) : null}
-            <InputGroupButton
-              className={cn(
-                "rounded-full bg-charcoal-active p-2 text-cream-bright transition-colors hover:bg-[#494949]",
-                draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
-              )}
-              size="icon-sm"
-              disabled={draft.isEmpty}
-              type="submit"
-              aria-label="Send message"
-            >
-              <Send />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+                {props.canUploadAttachments || props.canBrowseLibrary ? (
+                  <InputGroupButton
+                    variant="ghost"
+                    size="icon-xs"
+                    type="button"
+                    disabled={draft.attachmentUploading || draft.attachmentSlotsLeft === 0}
+                    onClick={() =>
+                      props.onOpenPicker(props.canUploadAttachments ? "files" : "library")
+                    }
+                    aria-label="Add files or Library items"
+                  >
+                    <Plus />
+                  </InputGroupButton>
+                ) : null}
+                <PopoverTrigger asChild>
+                  <InputGroupButton
+                    variant="ghost"
+                    size="icon-xs"
+                    type="button"
+                    onClick={() => {
+                      input.beginMention();
+                      focusCaretToEnd();
+                    }}
+                    aria-label="Mention someone"
+                  >
+                    <span aria-hidden="true">@</span>
+                  </InputGroupButton>
+                </PopoverTrigger>
+                {draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? (
+                  <InputGroupText className="ml-auto tabular-nums">
+                    {draft.text.length}/{MAX_MESSAGE_LENGTH}
+                  </InputGroupText>
+                ) : null}
+                <InputGroupButton
+                  className={cn(
+                    "rounded-full bg-charcoal-active p-2 text-cream-bright transition-colors hover:bg-[#494949]",
+                    draft.text.length >= MESSAGE_LENGTH_WARNING_THRESHOLD ? "ml-2" : "ml-auto",
+                  )}
+                  size="icon-sm"
+                  disabled={draft.isEmpty}
+                  type="submit"
+                  aria-label="Send message"
+                >
+                  <Send />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          </PopoverAnchor>
+          <ChatSuggestionPopover
+            listId={listId}
+            suggestions={suggestions.suggestions}
+            activeIndex={suggestions.activeIndex}
+            loading={suggestions.loading}
+            error={suggestions.error}
+            canBrowseLibrary={props.canBrowseLibrary}
+            canUploadAttachments={props.canUploadAttachments}
+            onHoverIndex={suggestions.setActiveIndex}
+            onSelect={(suggestion) => {
+              input.select(suggestion);
+              focusCaretToEnd();
+            }}
+            onBrowseLibrary={() => {
+              suggestions.setOpen(false);
+              props.onOpenPicker("library");
+            }}
+            onUploadFiles={() => {
+              suggestions.setOpen(false);
+              props.onOpenPicker("files");
+            }}
+            onInteractOutside={(event) => {
+              const target = event.target;
+              if (target instanceof Node && composerRef.current?.contains(target)) {
+                event.preventDefault();
+              }
+            }}
+          />
+        </Popover>
       </form>
     </div>
   );

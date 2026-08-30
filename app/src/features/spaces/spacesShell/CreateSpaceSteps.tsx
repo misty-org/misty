@@ -43,12 +43,10 @@ export function CreateSpaceNameStep({
 export function CreateSpaceTemplateStep({
   templates,
   templateId,
-  templateError,
   onTemplate,
 }: {
   templates: SpaceTemplate[];
   templateId: string;
-  templateError: string;
   onTemplate: (id: string) => void;
 }) {
   return (
@@ -73,7 +71,6 @@ export function CreateSpaceTemplateStep({
           </Button>
         ))}
       </div>
-      {templateError ? <p className="mb-0 mt-2 text-xs text-cream-muted">{templateError}</p> : null}
     </section>
   );
 }

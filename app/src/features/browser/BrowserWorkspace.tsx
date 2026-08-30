@@ -16,19 +16,25 @@ import {
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
 import { useShortcutHandler } from "@/features/shortcuts";
+import { SystemErrorActivity } from "@/features/activity";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { ArrowLeft, ArrowRight, MessageCirclePlus, Pencil, RotateCw, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  browserContentHash,
   browserRuntimeCreated,
   browserRuntimeId,
   browserScopeId,
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
+  type BrowserInspection,
+  type BrowserMistyPage,
 } from "./browserRuntime";
 import { BrowserMenu } from "./BrowserMenu";
 import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
+import { BrowserOfflinePage } from "./BrowserOfflinePage";
+import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import {
   browserViewportWidths,
   BrowserViewportMenu,
@@ -93,6 +99,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
   const compatibilityIssue = useBrowserRuntimeStore(
     (runtime) => runtime.compatibilityIssues[tab.id] ?? null,
+  );
+  const { isOffline, handleRetry, handleGoHome } = useBrowserOnlineStatus(
+    tab,
+    state.url,
+    nativeRuntime,
   );
   const lightChrome = false;
   const browserChromeBackground = "#18191c";
@@ -267,6 +278,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     tab,
     url: state.url,
     theme: browserTheme,
+    offline: isOffline,
   });
 
   useEffect(() => {
@@ -322,6 +334,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       title: browserTabTitle(url),
     });
     useBrowserRuntimeStore.getState().pushHistory(tab.id, url);
+    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
     if (nativeRuntime && browserRuntimeCreated(tab)) {
       void invoke("browser_webview_navigate", {
         request: { id: browserRuntimeId(tab), url },
@@ -387,6 +400,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       url,
       title: browserTabTitle(url),
     });
+    useBrowserRuntimeStore.getState().setLoading(tab.id, true);
     if (nativeRuntime) {
       void invoke(direction < 0 ? "browser_webview_back" : "browser_webview_forward", {
         request: { id: browserRuntimeId(tab) },
@@ -406,6 +420,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     "navigation.refresh",
     () => {
       if (!nativeRuntime) return;
+      useBrowserRuntimeStore.getState().setLoading(tab.id, true);
       void invoke("browser_webview_reload", {
         request: { id: browserRuntimeId(tab) },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
@@ -459,6 +474,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             aria-label="Reload"
             onClick={() => {
               if (nativeRuntime) {
+                useBrowserRuntimeStore.getState().setLoading(tab.id, true);
                 void invoke("browser_webview_reload", {
                   request: { id: browserRuntimeId(tab) },
                 }).catch((error: unknown) => setBrowserError(tab.id, error));
@@ -468,6 +484,20 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             <RotateCw size={20} strokeWidth={1.7} />
           </button>
         </div>
+
+        {state.agentOwned ? (
+          <span
+            className={cn(
+              "shrink-0 rounded-md border px-2 py-1 text-[10px] font-medium",
+              lightChrome
+                ? "border-black/10 bg-black/[0.035] text-black/60"
+                : "border-white/[0.08] bg-white/[0.045] text-cream-muted",
+            )}
+            title="This browser tab is scoped to Misty's current work"
+          >
+            Misty
+          </span>
+        ) : null}
 
         <BrowserOmnibox
           currentUrl={state.url}
@@ -566,23 +596,28 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         </div>
       </div>
 
-      {runtimeError || downloadNotice || compatibilityIssue ? (
+      {runtimeError ? (
+        <SystemErrorActivity
+          error={runtimeError}
+          scope={`browser:${tab.id}`}
+          title="Browser needs attention"
+          target={{ kind: "route", href: "/browser" }}
+        />
+      ) : null}
+
+      {downloadNotice || compatibilityIssue ? (
         <div
           className={cn(
             "border-b px-4 py-1.5 text-xs",
-            runtimeError
-              ? "border-notification-red/25 bg-notification-red/10 text-cream"
-              : compatibilityIssue
-                ? "border-amber-400/20 bg-amber-400/10 text-cream"
-                : "border-emerald-500/20 bg-emerald-500/10 text-cream",
+            compatibilityIssue
+              ? "border-amber-400/20 bg-amber-400/10 text-cream"
+              : "border-emerald-500/20 bg-emerald-500/10 text-cream",
           )}
-          role={runtimeError ? "alert" : "status"}
+          role="status"
         >
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate">
-              {runtimeError ??
-                downloadNotice ??
-                "This site rejected Misty’s embedded browser verification."}
+              {downloadNotice ?? "This site rejected Misty’s embedded browser verification."}
             </span>
             {compatibilityIssue ? (
               <button
@@ -638,7 +673,14 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           data-browser-page-host
           data-browser-viewport={viewport}
         >
-          {!nativeRuntime && state.url !== blankBrowserUrl ? (
+          {isOffline ? (
+            <BrowserOfflinePage
+              url={state.url}
+              onRetry={handleRetry}
+              onGoHome={handleGoHome}
+              lightChrome={lightChrome}
+            />
+          ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
             <iframe
               title={tab.title}
               src={state.url}
@@ -654,38 +696,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       </div>
     </section>
   );
-}
-
-interface BrowserInspection {
-  url?: string;
-  title?: string;
-  text?: string;
-  truncated?: boolean;
-  interactive?: BrowserInteractiveControl[];
-}
-
-interface BrowserInteractiveControl {
-  ref: string;
-  tag: string;
-  role: string;
-  name: string;
-}
-
-interface BrowserMistyPage {
-  title: string;
-  text: string;
-  truncated: boolean;
-  urlFingerprint: string;
-  interactive: BrowserInteractiveControl[];
-}
-
-function browserContentHash(value: string) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
 function setBrowserError(tabId: string, error: unknown) {

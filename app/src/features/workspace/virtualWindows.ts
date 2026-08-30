@@ -1,7 +1,6 @@
 import {
   capDockLeaves,
   createDockLeaf,
-  createHomeDockTab,
   dockLeaves,
   fillEmptyDockLeaves,
   findDockLeaf,
@@ -13,7 +12,6 @@ import {
   type WorkspaceLayout,
   type WorkspaceScopeKey,
   type WorkspaceVirtualWindow,
-  type WorkspaceTab,
 } from "./model";
 
 export interface VirtualWorkspaceState {
@@ -27,8 +25,8 @@ export interface VirtualWorkspaceState {
 
 export type VirtualWorkspaceUpdate = Partial<VirtualWorkspaceState>;
 
-export function initialWorkspaceLayout(scopeKey: WorkspaceScopeKey = "global"): WorkspaceLayout {
-  const pane = createDockLeaf([createScopeTab(scopeKey)]);
+export function initialWorkspaceLayout(_scopeKey: WorkspaceScopeKey = "global"): WorkspaceLayout {
+  const pane = createDockLeaf([]);
   return { root: pane, focusedPaneId: pane.id };
 }
 
@@ -221,9 +219,7 @@ export function extractPaneToVirtualWindow(state: VirtualWorkspaceState, paneId:
     { root: pane, focusedPaneId: pane.id },
     activeTab?.title || `Window ${windows.length + 1}`,
   );
-  const sourceRoot =
-    removeDockLeaf(state.layout.root, paneId) ??
-    createDockLeaf([createScopeTab(state.activeScopeKey)]);
+  const sourceRoot = removeDockLeaf(state.layout.root, paneId) ?? createDockLeaf([]);
   const sourceLayout = normalizeWorkspaceLayout({
     root: sourceRoot,
     focusedPaneId: dockLeaves(sourceRoot)[0].id,
@@ -274,9 +270,4 @@ function activateWindowUpdate(
     layout,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: layout },
   };
-}
-
-function createScopeTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
-  void scopeKey;
-  return createHomeDockTab();
 }

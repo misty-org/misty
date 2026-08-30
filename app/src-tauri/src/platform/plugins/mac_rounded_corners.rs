@@ -152,11 +152,11 @@ pub fn enable_modern_window_style<R: Runtime>(
                     // autoresizing mask. Reapplying them here creates a second
                     // resize owner and can stall its live-resize paint cycle.
 
-                    position_traffic_lights(
-                        ns_window,
-                        offset_x.unwrap_or(0.0),
-                        offset_y.unwrap_or(0.0),
-                    );
+                    let ox = offset_x.unwrap_or(0.0);
+                    let oy = offset_y.unwrap_or(0.0);
+                    if ox != 0.0 || oy != 0.0 {
+                        position_traffic_lights(ns_window, ox, oy);
+                    }
                 }
             })
             .map_err(|e| e.to_string())?;
@@ -428,8 +428,14 @@ unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
+pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
+    let style_mask = ns_window.styleMask();
+    if style_mask.contains(NSWindowStyleMask::NSFullScreenWindowMask) {
+        return;
+    }
+
     let default_x = 20.0;
+    let button_spacing = 23.0;
 
     let close_button: id = msg_send![ns_window, standardWindowButton: 0];
     let miniaturize_button: id = msg_send![ns_window, standardWindowButton: 1];
@@ -457,14 +463,16 @@ unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
     if !miniaturize_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![miniaturize_button, frame];
         let new_frame =
-            cocoa::foundation::NSRect::new(NSPoint::new(new_x + 20.0, new_y), frame.size);
+            cocoa::foundation::NSRect::new(NSPoint::new(new_x + button_spacing, new_y), frame.size);
         let _: () = msg_send![miniaturize_button, setFrame: new_frame];
     }
 
     if !zoom_button.is_null() {
         let frame: cocoa::foundation::NSRect = msg_send![zoom_button, frame];
-        let new_frame =
-            cocoa::foundation::NSRect::new(NSPoint::new(new_x + 40.0, new_y), frame.size);
+        let new_frame = cocoa::foundation::NSRect::new(
+            NSPoint::new(new_x + button_spacing * 2.0, new_y),
+            frame.size,
+        );
         let _: () = msg_send![zoom_button, setFrame: new_frame];
     }
 }
