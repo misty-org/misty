@@ -1,4 +1,6 @@
+import { SystemErrorActivity } from "@/features/activity";
 import { useAuth } from "@/features/auth";
+import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,22 +20,37 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/shared/ui";
-import { Cable, LoaderCircle, Plus, RefreshCw, Search, Server, Trash2 } from "lucide-react";
+import { Cable, LoaderCircle, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { mcpConnectionsApi } from "./api";
 import { publicMcpOrigin, validRemoteMcpEndpoint } from "./normalization";
 import type { McpConnection } from "./types";
 import { useMcpConnectionsStore } from "./useMcpConnectionsStore";
-import { McpAgentToolsPanel } from "./McpAgentToolsPanel";
 
 export function McpConnectionsSheet(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  agentId?: string;
+}) {
+  return (
+    <McpConnectionsManager
+      {...props}
+      showCustomConnections={publicBetaFeatureEnabled("mcpConnections")}
+    />
+  );
+}
+
+function McpConnectionsManager(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  showCustomConnections: boolean;
 }) {
   const { user } = useAuth();
   const store = useMcpConnectionsStore();
   const { load } = store;
   const [adding, setAdding] = useState(false);
+  const customConnections = store.connections.filter(
+    (connection) => connection.provider !== "activepieces",
+  );
 
   useEffect(() => {
     if (props.open && user?.id) void load(user.id, true);
@@ -45,62 +62,51 @@ export function McpConnectionsSheet(props: {
         <SheetHeader className="pr-8 text-left">
           <SheetTitle>Tool connections</SheetTitle>
           <SheetDescription>
-            Connect remote MCP tool servers, then choose exactly what each Agent may request.
+            Add custom tool servers for Misty agents. The built-in automation engine is managed by
+            your Misty server.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-5 flex items-start gap-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3">
-          <Server className="mt-0.5 size-4 shrink-0 text-cream-muted" aria-hidden />
-          <div>
-            <p className="m-0 text-xs font-medium text-cream">Remote connections only</p>
-            <p className="mt-1 text-xs text-cream-muted">
-              Tools run through Misty’s server. Access tokens are sent once and never returned or
-              saved on this device.
-            </p>
-          </div>
-        </div>
-
-        <section className="mt-5">
-          <header className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="m-0 text-sm font-medium text-cream-bright">Connections</h3>
-              <p className="mt-1 text-xs text-cream-muted">Every discovered tool starts off.</p>
-            </div>
-            <Button size="sm" onClick={() => setAdding((current) => !current)}>
-              <Plus className="size-4" /> Add connection
-            </Button>
-          </header>
-          {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
-          {store.loading ? (
-            <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
-              <LoaderCircle className="size-4 animate-spin" /> Loading connections…
-            </div>
-          ) : !store.connections.length ? (
-            <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
-              No remote tool servers are connected yet.
-            </p>
-          ) : (
-            <div className="mt-3 grid gap-3">
-              {store.connections.map((connection) => (
-                <ConnectionCard key={connection.id} connection={connection} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {props.agentId ? (
-          <div className="mt-6 border-t border-charcoal-border pt-5">
-            <McpAgentToolsPanel agentId={props.agentId} compact />
-          </div>
+        {props.showCustomConnections ? (
+          <section className="mt-6">
+            <header className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="m-0 text-sm font-medium text-cream-bright">Custom tool servers</h3>
+                <p className="mt-1 text-xs text-cream-muted">
+                  Valid tools become available to Misty. Sensitive calls still ask for approval.
+                </p>
+              </div>
+              <Button size="sm" onClick={() => setAdding((current) => !current)}>
+                <Plus className="size-4" /> Add connection
+              </Button>
+            </header>
+            {adding ? <AddConnectionForm onDone={() => setAdding(false)} /> : null}
+            {store.loading ? (
+              <div className="mt-3 flex items-center gap-2 text-sm text-cream-muted">
+                <LoaderCircle className="size-4 animate-spin" /> Loading connections…
+              </div>
+            ) : !customConnections.length ? (
+              <p className="mt-3 rounded-lg border border-dashed border-charcoal-border p-4 text-sm text-cream-muted">
+                No custom tool servers are connected yet.
+              </p>
+            ) : (
+              <div className="mt-3 grid gap-3">
+                {customConnections.map((connection) => (
+                  <ConnectionCard key={connection.id} connection={connection} />
+                ))}
+              </div>
+            )}
+          </section>
         ) : null}
 
         {store.error ? (
-          <p
-            className="mt-4 rounded-lg border border-[#d68b80]/30 bg-[#d68b80]/5 p-3 text-xs text-[#d68b80]"
-            role="alert"
-          >
-            {store.error}
-          </p>
+          <SystemErrorActivity
+            accountId={user?.id}
+            error={store.error}
+            scope="agents:mcp-connections"
+            title="Tool connections need attention"
+            target={{ kind: "workspace-tool", tool: "agents" }}
+          />
         ) : null}
       </SheetContent>
     </Sheet>

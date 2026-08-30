@@ -1,8 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mcpConnectionsApi } from "./api";
 import { McpConnectionsSheet } from "./McpConnectionsSheet";
-import type { McpConnection } from "./types";
 import { useMcpConnectionsStore } from "./useMcpConnectionsStore";
 
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account-1" } }) }));
@@ -28,47 +27,35 @@ describe("McpConnectionsSheet", () => {
   });
   afterEach(cleanup);
 
-  it("adds a remote server without retaining its bearer token or claiming unsupported modes", async () => {
-    vi.mocked(mcpConnectionsApi.add).mockResolvedValue({ connection });
-    vi.mocked(mcpConnectionsApi.discover).mockResolvedValue({
-      connection: { ...connection, tool_count: 1 },
-      snapshot: {},
-      tools: [],
-    });
+  it("keeps the built-in automation engine out of user-managed tool connections", async () => {
     render(<McpConnectionsSheet open onOpenChange={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Tool connections" })).toBeTruthy();
-    expect(screen.getByText("Remote connections only")).toBeTruthy();
-    expect(screen.queryByText(/OAuth/i)).toBeNull();
-    expect(screen.queryByText(/device-local|stdio/i)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Design tools" } });
-    fireEvent.change(screen.getByLabelText("Server URL"), {
-      target: { value: "https://tools.example.com/mcp" },
-    });
-    fireEvent.change(screen.getByLabelText("Access token (optional)"), {
-      target: { value: "secret-once" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    expect(
+      screen.getByText(/built-in automation engine is managed by your Misty server/i),
+    ).toBeTruthy();
+    expect(screen.queryByText("Activepieces")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+  });
 
-    await waitFor(() =>
-      expect(mcpConnectionsApi.add).toHaveBeenCalledWith({
-        name: "Design tools",
-        endpoint_url: "https://tools.example.com/mcp",
-        bearer_token: "secret-once",
-      }),
-    );
-    expect(JSON.stringify(useMcpConnectionsStore.getState())).not.toContain("secret-once");
+  it("does not expose a legacy Activepieces OAuth connection", async () => {
+    vi.mocked(mcpConnectionsApi.list).mockResolvedValue({
+      connections: [
+        {
+          id: "activepieces-1",
+          name: "Activepieces",
+          endpoint_url: "https://automations.example.com/mcp",
+          transport: "streamable_http",
+          provider: "activepieces",
+          status: "active",
+          tool_count: 8,
+          created_at: "2026-08-29T20:00:00Z",
+          updated_at: "2026-08-29T20:00:00Z",
+        },
+      ],
+    });
+    render(<McpConnectionsSheet open onOpenChange={vi.fn()} />);
+
+    expect(screen.queryByText("8 automation tools ready in Misty")).toBeNull();
   });
 });
-
-const connection: McpConnection = {
-  id: "connection-1",
-  name: "Design tools",
-  endpoint_url: "https://tools.example.com/mcp",
-  transport: "streamable_http",
-  status: "active",
-  tool_count: 0,
-  created_at: "2026-08-19T00:00:00Z",
-  updated_at: "2026-08-19T00:00:00Z",
-};

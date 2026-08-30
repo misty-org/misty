@@ -1,10 +1,13 @@
 import { useExplorerStore } from "@/features/files/explorer";
+import { useAuth } from "@/features/auth";
 import { useEffect, useRef } from "react";
-import { useAuth } from "../auth/AuthContext";
 import { useSpacesStore } from "./store/useSpacesStore";
+
+let pendingRealtimeDisconnectTimer: number | null = null;
 
 export function SpacesRealtimeBridge() {
   const { user, transitioning } = useAuth();
+  const accountId = user?.id ?? "";
   const load = useSpacesStore((state) => state.load);
   const loadInbox = useSpacesStore((state) => state.loadInbox);
   const connectRealtime = useSpacesStore((state) => state.connectRealtime);
@@ -16,14 +19,23 @@ export function SpacesRealtimeBridge() {
   const reportedErrorRef = useRef("");
 
   useEffect(() => {
-    if (!user || transitioning) {
+    if (pendingRealtimeDisconnectTimer != null) {
+      window.clearTimeout(pendingRealtimeDisconnectTimer);
+      pendingRealtimeDisconnectTimer = null;
+    }
+    if (!accountId || transitioning) {
       disconnectRealtime();
       return;
     }
-    void connectRealtime(user.id);
+    void connectRealtime(accountId);
     void Promise.all([load(), loadInbox()]);
-    return disconnectRealtime;
-  }, [connectRealtime, disconnectRealtime, load, loadInbox, transitioning, user]);
+    return () => {
+      pendingRealtimeDisconnectTimer = window.setTimeout(() => {
+        pendingRealtimeDisconnectTimer = null;
+        disconnectRealtime();
+      }, 0);
+    };
+  }, [accountId, connectRealtime, disconnectRealtime, load, loadInbox, transitioning]);
 
   useEffect(() => {
     if (!error) {

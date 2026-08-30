@@ -218,6 +218,36 @@ describe("Space loading access boundary", () => {
     expect(apiMocks.snapshot).toHaveBeenCalledTimes(1);
     expect(useSpacesStore.getState().loading).toBe(false);
   });
+
+  it("tracks message loading failures separately and clears them after retry", async () => {
+    apiMocks.messages.mockRejectedValueOnce(new Error("network unavailable"));
+
+    await expect(useSpacesStore.getState().loadMessages("space")).rejects.toThrow(
+      "network unavailable",
+    );
+    expect(useSpacesStore.getState().messageLoadingBySpace.space).toBe(false);
+    expect(useSpacesStore.getState().messageErrorsBySpace.space).toBe("network unavailable");
+
+    apiMocks.messages.mockResolvedValueOnce({ messages: [] });
+    await useSpacesStore.getState().loadMessages("space");
+
+    expect(useSpacesStore.getState().messageLoadingBySpace.space).toBe(false);
+    expect(useSpacesStore.getState().messageErrorsBySpace.space).toBe("");
+  });
+
+  it("keeps failed optimistic messages while refreshing confirmed history", async () => {
+    const failed = messageFixture({
+      space_id: "space",
+      id: "optimistic-client-failed",
+      local_delivery_state: "failed",
+    });
+    useSpacesStore.setState({ messagesBySpace: { space: [failed] } });
+    apiMocks.messages.mockResolvedValueOnce({ messages: [] });
+
+    await useSpacesStore.getState().loadMessages("space");
+
+    expect(useSpacesStore.getState().messagesBySpace.space).toEqual([failed]);
+  });
 });
 
 describe("Spaces mutations", () => {
@@ -399,6 +429,42 @@ describe("Spaces mutations", () => {
       expect(useSpacesStore.getState().error).toBe(`${name} failed`);
     },
   );
+
+  it("prunes the space from store state immediately upon deleteSpace", async () => {
+    const mistySpace = spaceFixture({ id: "space-misty", name: "Misty", kind: "misty" });
+    const customSpace = spaceFixture({ id: "space-custom", name: "Custom Project" });
+    useSpacesStore.setState({ spaces: [mistySpace, customSpace] });
+
+    apiMocks.delete.mockResolvedValueOnce(undefined);
+    apiMocks.snapshot.mockResolvedValueOnce({
+      spaces: [mistySpace],
+      invitations: [],
+      limits: null,
+    });
+
+    await useSpacesStore.getState().deleteSpace("space-custom", "Custom Project");
+
+    expect(apiMocks.delete).toHaveBeenCalledWith("space-custom", "Custom Project");
+    expect(useSpacesStore.getState().spaces).toEqual([mistySpace]);
+  });
+
+  it("prunes the space from store state immediately upon leaveSpace", async () => {
+    const mistySpace = spaceFixture({ id: "space-misty", name: "Misty", kind: "misty" });
+    const customSpace = spaceFixture({ id: "space-custom", name: "Custom Project" });
+    useSpacesStore.setState({ spaces: [mistySpace, customSpace] });
+
+    apiMocks.leave.mockResolvedValueOnce(undefined);
+    apiMocks.snapshot.mockResolvedValueOnce({
+      spaces: [mistySpace],
+      invitations: [],
+      limits: null,
+    });
+
+    await useSpacesStore.getState().leaveSpace("space-custom");
+
+    expect(apiMocks.leave).toHaveBeenCalledWith("space-custom");
+    expect(useSpacesStore.getState().spaces).toEqual([mistySpace]);
+  });
 
   it("does not leave a stale error from a previous failure once a call succeeds", async () => {
     apiMocks.leave.mockRejectedValueOnce(new Error("network blip"));

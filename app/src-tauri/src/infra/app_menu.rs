@@ -223,7 +223,10 @@ fn command_item<R: Runtime, M: Manager<R>>(
 }
 
 fn renderer_owned_accelerator(command_id: &str) -> bool {
-    matches!(command_id, "search.toggle" | "app.command_palette")
+    matches!(
+        command_id,
+        "search.toggle" | "app.command_palette" | "app.zoom_in" | "app.zoom_out" | "app.zoom_reset"
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -314,6 +317,9 @@ mod renderer_accelerator_tests {
     fn contextual_shortcuts_stay_owned_by_the_renderer() {
         assert!(renderer_owned_accelerator("search.toggle"));
         assert!(renderer_owned_accelerator("app.command_palette"));
+        assert!(renderer_owned_accelerator("app.zoom_in"));
+        assert!(renderer_owned_accelerator("app.zoom_out"));
+        assert!(renderer_owned_accelerator("app.zoom_reset"));
         assert!(!renderer_owned_accelerator("app.open_settings"));
     }
 }

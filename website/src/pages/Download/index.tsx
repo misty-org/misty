@@ -39,7 +39,9 @@ function BuildCard({ build }: { build: ReleaseBuild }) {
       </div>
 
       <div className="pt-3">
-        <p className="text-sm text-muted-foreground">{build.architecture}</p>
+        <p className="text-sm text-muted-foreground">
+          {build.architecture} · {build.size} · Browser included
+        </p>
       </div>
 
       <div className="pt-3">
@@ -67,10 +69,7 @@ export default function Download() {
         </h1>
       </header>
 
-      <section
-        aria-labelledby="releases-title"
-        className="mx-auto max-w-3xl"
-      >
+      <section aria-labelledby="releases-title" className="mx-auto max-w-3xl">
         <div className="flex items-center justify-between gap-5">
           <h2
             id="releases-title"

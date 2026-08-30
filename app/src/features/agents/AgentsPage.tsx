@@ -1,103 +1,53 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceStore } from "@/features/workspace";
-import { AgentConversationPanel } from "./components/AgentConversationPanel";
-import { AgentEditorPanel } from "./components/AgentEditorPanel";
-import { AgentEmptyState } from "./components/AgentEmptyState";
-import { PersonalAgentsSidebar } from "./components/PersonalAgentsSidebar";
-import { resolveAgentSpaceId } from "./agentSpaceSelection";
-import { usePersonalAgentsStore } from "./store/usePersonalAgentsStore";
-import { useAgentActivity } from "./useAgentActivity";
-import { useAgentEditor } from "./useAgentEditor";
+import { AutomationsWorkspace } from "./automations/AutomationsWorkspace";
+import { MistyWorkspace } from "./components/MistyWorkspace";
 import { McpConnectionsSheet } from "./mcp/McpConnectionsSheet";
 
 export default function DesktopAgentsPage() {
-  const editor = useAgentEditor();
   const [searchParams, setSearchParams] = useSearchParams();
-  const agents = usePersonalAgentsStore(useShallow((state) => state.agents));
-  const spaces = useSpacesStore((state) => state.spaces);
-  const loadSpaces = useSpacesStore((state) => state.load);
-  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const [selectedAgentId, setSelectedAgentId] = useState(() => searchParams.get("agent") ?? "");
-  const [spaceId, setSpaceId] = useState(() => searchParams.get("space") ?? "");
   const [connectionsOpen, setConnectionsOpen] = useState(false);
-  const selectedAgent = useMemo(
-    () => agents.find((agent) => agent.id === selectedAgentId) ?? null,
-    [agents, selectedAgentId],
-  );
-  const activity = useAgentActivity(selectedAgent?.id ?? "");
-  const loadActivityDetail = activity.loadDetail;
-  const editing = Boolean(editor.editing);
+  const view = searchParams.get("view") === "automations" ? "automations" : "chat";
+  const selectedAutomationId = searchParams.get("automation") ?? undefined;
 
-  useEffect(() => {
-    if (selectedAgentId && agents.some((agent) => agent.id === selectedAgentId)) return;
-    setSelectedAgentId(agents[0]?.id ?? "");
-  }, [agents, selectedAgentId]);
-
-  useEffect(() => {
-    void loadSpaces();
-  }, [loadSpaces]);
-
-  useEffect(() => {
-    if (spaceId && spaces.some((space) => space.id === spaceId)) return;
-    setSpaceId(resolveAgentSpaceId(spaces, activeScopeKey));
-  }, [activeScopeKey, spaceId, spaces]);
-
-  useEffect(() => {
+  const createWithMisty = (draft?: string) => {
     const next = new URLSearchParams(searchParams);
-    if (selectedAgentId) next.set("agent", selectedAgentId);
-    else next.delete("agent");
-    if (spaceId) next.set("space", spaceId);
-    else next.delete("space");
-    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-  }, [searchParams, selectedAgentId, setSearchParams, spaceId]);
+    next.delete("view");
+    next.delete("automation");
+    next.set(
+      "draft",
+      draft ??
+        "Help me create an automation. Ask what should trigger it and what should happen, then build and test it in Misty's automation workspace. Do not publish it until I approve.",
+    );
+    setSearchParams(next);
+  };
 
-  useEffect(() => {
-    const runId = searchParams.get("run") ?? "";
-    if (runId && selectedAgentId) void loadActivityDetail(runId);
-  }, [loadActivityDetail, searchParams, selectedAgentId]);
-
-  const gridClass =
-    "grid h-full min-h-0 grid-cols-[240px_minmax(0,1fr)] overflow-hidden max-[700px]:grid-cols-[190px_minmax(0,1fr)]";
+  const selectAutomation = (flowId?: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("view", "automations");
+    if (flowId) next.set("automation", flowId);
+    else next.delete("automation");
+    setSearchParams(next);
+  };
 
   return (
     <>
-      <main className={gridClass}>
-        <aside className="flex min-h-0 flex-col border-r border-charcoal-border bg-charcoal-sidebar p-3">
-          <PersonalAgentsSidebar
-            selectedAgentId={selectedAgentId}
-            onSelect={(agent) => {
-              editor.close();
-              setSelectedAgentId(agent.id);
-            }}
-            onEdit={editor.open}
-            onCreate={() => editor.open("new")}
-            onDelete={(agentId) => void editor.deleteAgent(agentId)}
-            onConnections={() => setConnectionsOpen(true)}
-          />
-        </aside>
-        {editing ? (
-          <AgentEditorPanel editor={editor} onManageConnections={() => setConnectionsOpen(true)} />
-        ) : selectedAgent && spaceId ? (
-          <AgentConversationPanel
-            agent={selectedAgent}
-            spaceId={spaceId}
-            spaces={spaces}
-            onSpaceChange={setSpaceId}
-            onEdit={() => editor.open(selectedAgent)}
-            controller={activity}
+      <div className="h-full min-h-0 overflow-hidden bg-charcoal-bg">
+        {view === "chat" ? (
+          <MistyWorkspace
+            requestedConversationId={searchParams.get("conversation") ?? undefined}
+            requestedDraft={searchParams.get("draft") ?? undefined}
+            onManageConnections={() => setConnectionsOpen(true)}
           />
         ) : (
-          <AgentEmptyState onCreate={() => editor.open("new")} />
+          <AutomationsWorkspace
+            selectedFlowId={selectedAutomationId}
+            onSelectedFlowChange={selectAutomation}
+            onCreateWithMisty={createWithMisty}
+          />
         )}
-      </main>
-      <McpConnectionsSheet
-        open={connectionsOpen}
-        onOpenChange={setConnectionsOpen}
-        agentId={selectedAgent?.id}
-      />
+      </div>
+      <McpConnectionsSheet open={connectionsOpen} onOpenChange={setConnectionsOpen} />
     </>
   );
 }

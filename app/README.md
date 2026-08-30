@@ -1,6 +1,6 @@
 # Misty
 
-Misty is a React product with a native Tauri shell for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Its browser build is a server-backed companion: it provides Spaces and account flows while clearly gating local-device features. Phone-sized iOS and Android devices are not supported.
+Misty is a React product with a native Tauri shell for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Its browser build uses the same navigation, split-panel workspace, and cloud-backed features as the desktop app. Surfaces that require Tauri, local files, or operating-system access remain visible and lead to the desktop download instead of mounting native functionality. Phone-sized iOS and Android devices are not supported.
 
 ## Repository layout
 
@@ -40,8 +40,8 @@ npm run build:web
 misty desktop windows stage-assets
 ```
 
-The web build requires `VITE_MISTY_PUBLIC_API_URL` to point at the public
-Misty API base (for example, `https://mistysys.com/api`). The browser sends
+The web build requires `MISTY_PUBLIC_API_URL` to point at the public
+Misty API base (for example, `https://api.mistysys.com/v1`). The browser sends
 the server's HttpOnly session cookie with credentialed API requests; it does
 not persist the desktop bearer token. The API must explicitly allow the web
 origin, such as `https://app.mistysys.com`.
@@ -56,11 +56,29 @@ routes. Connect this repository to Cloudflare Workers Builds, then configure:
 - Root directory: `app`.
 - Build command: `npm run build:web`.
 - Deploy command: `npx wrangler deploy`.
-- Build environment variable: `MISTY_PUBLIC_API_URL=https://mistysys.com/api`.
+- Build environment variable: `MISTY_PUBLIC_API_URL=https://api.mistysys.com/v1`.
 - Custom domain: `app.mistysys.com`.
+
+Once the Git repository is connected in Workers Builds, every push to the
+production branch builds and deploys the browser companion automatically.
+Preview branches can use the same build with a preview API endpoint when one
+is available.
+
+The separate `dev` Wrangler environment deploys as `misty-web-app-dev` on
+`dev-app.mistysys.com`. Build it against the development API and deploy it with:
+
+```sh
+MISTY_PUBLIC_API_URL=https://dev-api.mistysys.com/v1 npm run deploy:web:dev
+```
+
+For automatic development deployments, connect `misty-web-app-dev` to the
+development branch in Workers Builds with the same root and build command,
+set `MISTY_PUBLIC_API_URL=https://dev-api.mistysys.com/v1`, and use
+`npx wrangler deploy --env dev` as the deploy command.
 
 The production API must allow `https://app.mistysys.com` in
 `MISTY_ALLOWED_ORIGINS`; see the Misty Server production environment template.
+The development API must likewise allow `https://dev-app.mistysys.com`.
 
 Use the Tauri desktop runner when you need native app behavior:
 

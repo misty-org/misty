@@ -5,7 +5,6 @@ import {
   ArrowLeftToLine,
   ArrowRightToLine,
   ArrowUpToLine,
-  Blocks,
   Bot,
   PanelLeft,
   Pin,
@@ -77,7 +76,6 @@ interface Props {
   onToggleTerminal: (direction?: DockSplitDirection | "current") => void;
   onOpenDiagnostics?: () => void;
   onOpenAi: () => void;
-  onOpenExtensions: () => void;
 }
 
 export function CodeStatusBar(props: Props) {
@@ -107,8 +105,8 @@ export function CodeStatusBar(props: Props) {
   return (
     <div
       className={cn(
-        "code-theme-statusbar flex min-w-0 items-center gap-0.5 border-t",
-        "border-charcoal-border bg-charcoal-sidebar px-1 font-mono text-cream-muted",
+        "code-theme-statusbar flex min-w-0 items-center gap-1 border-t",
+        "border-charcoal-border bg-charcoal-sidebar px-1.5 font-mono text-cream-muted",
       )}
     >
       <RailButton
@@ -135,14 +133,10 @@ export function CodeStatusBar(props: Props) {
       </RailButton>
       <TerminalDockMenu open={props.terminalOpen} onToggle={props.onToggleTerminal} />
 
-      <span className="mx-1 h-4 w-px bg-charcoal-border" aria-hidden />
+      <span className="code-status-divider" aria-hidden />
       <RailButton label="AI and model settings" onClick={props.onOpenAi}>
         <Bot />
       </RailButton>
-      <RailButton label="Extensions" onClick={props.onOpenExtensions}>
-        <Blocks />
-      </RailButton>
-
       <span className="min-w-2 flex-1" />
       <StatusCount
         label="Errors"
@@ -176,9 +170,10 @@ export function CodeStatusBar(props: Props) {
             variant="ghost"
             aria-label="Code display size"
             title="Code display size"
-            className="code-rail-button text-cream-muted"
+            size="icon"
+            className="code-status-action text-cream-muted"
           >
-            <SlidersHorizontal className="code-rail-icon" />
+            <SlidersHorizontal />
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="end" className="code-theme-overlay w-72 space-y-4">
@@ -227,9 +222,10 @@ function TerminalDockMenu(props: {
           title={title}
           aria-pressed={props.open}
           className={cn(
-            "code-rail-button text-cream-muted [&_svg]:code-rail-icon",
+            "code-status-action text-cream-muted",
             props.open && "bg-charcoal-hover text-cream-bright",
           )}
+          size="icon"
         >
           <SquareTerminal />
         </Button>
@@ -279,9 +275,10 @@ function RailButton(props: {
       aria-pressed={props.active}
       onClick={props.onClick}
       className={cn(
-        "code-rail-button text-cream-muted [&_svg]:code-rail-icon",
+        "code-status-action text-cream-muted",
         props.active && "bg-charcoal-hover text-cream-bright",
       )}
+      size="icon"
     >
       {props.children}
     </Button>
@@ -296,7 +293,7 @@ function StatusCount(props: {
   children: React.ReactNode;
 }) {
   const className = cn(
-    "inline-flex h-7 items-center gap-1 rounded px-1 [&_svg]:code-status-icon",
+    "code-status-item inline-flex items-center gap-1 rounded px-1.5 tabular-nums",
     props.onClick && "hover:bg-charcoal-hover focus-visible:outline-none",
     props.value > 0 && (props.danger ? "code-danger" : "code-warning"),
   );

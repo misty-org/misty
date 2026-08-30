@@ -1,7 +1,7 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { spaceNotesEnabled } from "@/features/notes";
 
-type PlannerSubpage = "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
+type PlannerSubpage = "tasks" | "agenda" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";
 
 interface SpaceSubpageMemory {
@@ -15,10 +15,13 @@ export function rememberSpaceSubpageRoute(accountId: string, spaceId: string, ro
   if (!parsed) return;
   const current = readMemory(accountId, spaceId);
   if (parsed.section === "planner") {
+    const rememberedRoute = isLegacyRoadmapRoute(spaceId, route)
+      ? `/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`
+      : route;
     current.planner = {
       ...current.planner,
       active: parsed.subpage,
-      [parsed.subpage]: route,
+      [parsed.subpage]: rememberedRoute,
     };
   } else {
     current.journal = {
@@ -68,8 +71,6 @@ export function rememberedJournalRoute(
 function defaultPlannerRoute(spaceId: string, subpage: PlannerSubpage) {
   const base = `/spaces/${encodeURIComponent(spaceId)}/planner`;
   if (subpage === "agenda") return `${base}/agenda/month`;
-  if (subpage === "goals") return `${base}/goals`;
-  if (subpage === "milestones") return `${base}/milestones`;
   if (subpage === "roadmaps") return `${base}/roadmaps`;
   return `${base}/tasks/board`;
 }
@@ -87,15 +88,10 @@ function parseSpaceRoute(
     if (parts[0] !== "spaces" || decodeURIComponent(parts[1] ?? "") !== spaceId) return undefined;
     if (parts[2] === "planner") {
       const subpage = parts[3];
-      if (
-        subpage === "tasks" ||
-        subpage === "agenda" ||
-        subpage === "goals" ||
-        subpage === "milestones" ||
-        subpage === "roadmaps"
-      ) {
+      if (subpage === "tasks" || subpage === "agenda" || subpage === "roadmaps")
         return { section: "planner" as const, subpage };
-      }
+      if (subpage === "goals" || subpage === "milestones")
+        return { section: "planner" as const, subpage: "roadmaps" as const };
     }
     if (parts[2] === "notes" || parts[2] === "drawings") {
       return { section: "journal" as const, subpage: parts[2] };
@@ -104,6 +100,20 @@ function parseSpaceRoute(
     return undefined;
   }
   return undefined;
+}
+
+function isLegacyRoadmapRoute(spaceId: string, route: string) {
+  try {
+    const parts = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean);
+    return (
+      parts[0] === "spaces" &&
+      decodeURIComponent(parts[1] ?? "") === spaceId &&
+      parts[2] === "planner" &&
+      (parts[3] === "goals" || parts[3] === "milestones")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function validRememberedRoute(

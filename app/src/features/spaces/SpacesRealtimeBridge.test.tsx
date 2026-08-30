@@ -1,4 +1,4 @@
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
@@ -43,6 +43,7 @@ describe("SpacesRealtimeBridge", () => {
   let root: Root;
 
   beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
     mocks.auth.user = { id: "user-1" };
     mocks.auth.transitioning = false;
@@ -87,6 +88,34 @@ describe("SpacesRealtimeBridge", () => {
     expect(mocks.spaces.clearError).toHaveBeenCalled();
     await act(async () => vi.advanceTimersByTime(2_000));
     expect(mocks.explorer.recordActivity).not.toHaveBeenCalled();
+  });
+
+  it("does not reconnect when auth returns a new object for the same account", async () => {
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+    expect(mocks.spaces.connectRealtime).toHaveBeenCalledOnce();
+
+    mocks.auth.user = { id: "user-1" };
+    await act(async () => {
+      root.render(<SpacesRealtimeBridge />);
+    });
+
+    expect(mocks.spaces.connectRealtime).toHaveBeenCalledOnce();
+    expect(mocks.spaces.disconnectRealtime).not.toHaveBeenCalled();
+  });
+
+  it("cancels Strict Mode's transient socket cleanup", async () => {
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <SpacesRealtimeBridge />
+        </StrictMode>,
+      );
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+
+    expect(mocks.spaces.disconnectRealtime).not.toHaveBeenCalled();
   });
 
   it("silently clears account-switch handoff errors", async () => {

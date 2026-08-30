@@ -1,6 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { MessageAttachment } from "@/api/spaces/dto/interfaces/types";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 export const MAX_CHAT_ATTACHMENTS = 5;
 
@@ -30,42 +30,59 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     setSelectedAgentIdsByLabel({});
   }, []);
 
-  const uploadAttachments = async (paths: string[]) => {
-    if (paths.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;
-    setAttachmentUploading(true);
-    try {
-      const uploaded: MessageAttachment[] = [];
-      for (const path of paths.slice(0, attachmentSlotsLeft)) {
-        const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment", {
-          conversationId: conversationId || undefined,
-        });
-        if (result.attachment) uploaded.push(result.attachment);
+  const uploadAttachments = useCallback(
+    async (paths: string[]) => {
+      if (paths.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;
+      setAttachmentUploading(true);
+      try {
+        const uploaded: MessageAttachment[] = [];
+        for (const path of paths.slice(0, attachmentSlotsLeft)) {
+          const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment", {
+            conversationId: conversationId || undefined,
+          });
+          if (result.attachment) uploaded.push(result.attachment);
+        }
+        setPendingAttachments((current) => [...current, ...uploaded]);
+      } finally {
+        setAttachmentUploading(false);
       }
-      setPendingAttachments((current) => [...current, ...uploaded]);
-    } finally {
-      setAttachmentUploading(false);
-    }
-  };
+    },
+    [attachmentSlotsLeft, attachmentUploading, conversationId, spaceId],
+  );
 
-  return {
-    text,
-    setText,
-    selectedFileIds,
-    setSelectedFileIds,
-    selectedLibraryIds,
-    setSelectedLibraryIds,
-    pendingAttachments,
-    setPendingAttachments,
-    replyToMessageId,
-    setReplyToMessageId,
-    selectedAgentIdsByLabel,
-    setSelectedAgentIdsByLabel,
-    attachmentUploading,
-    attachmentSlotsLeft,
-    isEmpty: !text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0,
-    reset,
-    uploadAttachments,
-  };
+  return useMemo(
+    () => ({
+      text,
+      setText,
+      selectedFileIds,
+      setSelectedFileIds,
+      selectedLibraryIds,
+      setSelectedLibraryIds,
+      pendingAttachments,
+      setPendingAttachments,
+      replyToMessageId,
+      setReplyToMessageId,
+      selectedAgentIdsByLabel,
+      setSelectedAgentIdsByLabel,
+      attachmentUploading,
+      attachmentSlotsLeft,
+      isEmpty: !text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0,
+      reset,
+      uploadAttachments,
+    }),
+    [
+      attachmentSlotsLeft,
+      attachmentUploading,
+      pendingAttachments,
+      replyToMessageId,
+      reset,
+      selectedAgentIdsByLabel,
+      selectedFileIds,
+      selectedLibraryIds,
+      text,
+      uploadAttachments,
+    ],
+  );
 }
 
 export type SpaceChatDraft = ReturnType<typeof useSpaceChatDraft>;
