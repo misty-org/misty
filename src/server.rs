@@ -17,7 +17,12 @@ use rand::{rngs::OsRng, RngCore};
 use serde_json::json;
 use url::Url;
 
-use crate::{artifacts::write_private, process::CommandSpec, workspace::Workspace};
+use crate::{
+    artifacts::write_private,
+    environment::{self, Target},
+    process::CommandSpec,
+    workspace::Workspace,
+};
 
 const TICKET_PRIVATE_KEY: &str = "JOURNAL_COLLAB_TICKET_PRIVATE_KEY";
 const TICKET_PUBLIC_KEY: &str = "JOURNAL_COLLAB_TICKET_PUBLIC_KEY";
@@ -29,17 +34,39 @@ const DEVICE_TICKET_PRIVATE_KEY: &str = "MISTY_DEVICE_TICKET_PRIVATE_KEY";
 const DEVICE_PAIRING_PEPPER: &str = "MISTY_DEVICE_PAIRING_PEPPER";
 
 pub fn up(workspace: &Workspace, detach: bool, build: bool) -> Result<()> {
-    if ensure_connected_devices_development_config(&workspace.server.join(".env.dev"))? {
+    environment::check(workspace, Target::Dev)?;
+    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
     development_up_command(detach, build).run(&workspace.server)?;
     if detach {
+        wait_for_development_worker(workspace)?;
         println!(
             "Server running at {}",
             ensure_active_development_api_url(workspace)?
         );
     }
     Ok(())
+}
+
+pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
+    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    if ensure_connected_devices_development_config(&devices)? {
+        println!("Configured Connected Devices for local development.");
+    }
+    let worker = workspace.server.join("cloudflare/journal-collab");
+    let dev_vars = worker.join(".dev.vars");
+    let server_env = worker.join(".secrets/server.env");
+    match (dev_vars.is_file(), server_env.is_file()) {
+        (false, false) => generate_worker_secrets(workspace),
+        (true, true) => Ok(()),
+        _ => bail!(
+            "development Worker secrets are partially configured; remove both {} and {} before regenerating",
+            dev_vars.display(),
+            server_env.display()
+        ),
+    }
 }
 
 fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
@@ -158,6 +185,7 @@ fn development_up_command(detach: bool, build: bool) -> CommandSpec {
     if build {
         command = command.arg("--build");
     }
+    command = command.args(["--force-recreate", "--remove-orphans"]);
     if detach {
         command = command.arg("--detach");
     }
@@ -179,16 +207,53 @@ pub fn logs(workspace: &Workspace) -> Result<()> {
 }
 
 fn development_compose() -> CommandSpec {
-    CommandSpec::new("docker").args([
-        "compose",
-        "--env-file",
-        ".env.dev",
-        "--file",
-        "compose.dev.yml",
-    ])
+    compose(Target::Dev, "compose.dev.yml")
 }
 
-const DEFAULT_DEVELOPMENT_TUNNEL_HOSTNAME: &str = "dev.mistysys.com";
+fn compose(target: Target, file: &str) -> CommandSpec {
+    let mut command = CommandSpec::new("docker").arg("compose");
+    for path in environment::relative_paths(target) {
+        command = command.arg("--env-file").arg(path);
+    }
+    command.args(["--file", file])
+}
+
+fn production_compose() -> CommandSpec {
+    compose(Target::Prod, "compose.prod.yml")
+}
+
+pub fn production_check(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Prod)?;
+    production_compose()
+        .args(["config", "--quiet"])
+        .run(&workspace.server)
+}
+
+pub fn production_up(workspace: &Workspace) -> Result<()> {
+    production_check(workspace)?;
+    production_compose().arg("pull").run(&workspace.server)?;
+    production_compose()
+        .args(["up", "--detach"])
+        .run(&workspace.server)
+}
+
+pub fn production_down(workspace: &Workspace, volumes: bool) -> Result<()> {
+    environment::check(workspace, Target::Prod)?;
+    let mut command = production_compose().arg("down");
+    if volumes {
+        command = command.arg("--volumes");
+    }
+    command.arg("--remove-orphans").run(&workspace.server)
+}
+
+pub fn production_logs(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Prod)?;
+    production_compose()
+        .args(["logs", "--follow"])
+        .run(&workspace.server)
+}
+
+const DEFAULT_DEVELOPMENT_API_TUNNEL_HOSTNAME: &str = "dev-api.mistysys.com";
 
 fn development_tunnel_connection_command() -> CommandSpec {
     development_compose().args([
@@ -202,7 +267,7 @@ fn development_tunnel_connection_command() -> CommandSpec {
 }
 
 fn development_tunnel_refresh_command() -> CommandSpec {
-    development_compose().args(["up", "--detach", "--force-recreate", "--no-deps", "tunnel"])
+    development_compose().args(["up", "--detach", "--force-recreate", "tunnel"])
 }
 
 fn development_worker_refresh_command() -> CommandSpec {
@@ -215,15 +280,33 @@ fn development_worker_refresh_command() -> CommandSpec {
     ])
 }
 
+fn development_worker_wait_command() -> CommandSpec {
+    CommandSpec::new("docker").args(["wait", "misty-cloudflare-deploy"])
+}
+
+fn wait_for_development_worker(workspace: &Workspace) -> Result<()> {
+    let output = development_worker_wait_command().capture(&workspace.server)?;
+    let exit_code = output.trim().parse::<i32>().with_context(|| {
+        format!("Docker returned an invalid Worker deploy exit code: {output:?}")
+    })?;
+    if exit_code != 0 {
+        bail!(
+            "development collaboration Worker deployment failed with exit code {exit_code}; run `misty server logs` for details"
+        );
+    }
+    Ok(())
+}
+
 fn development_tunnel_hostname() -> String {
-    env::var("MISTY_DEV_TUNNEL_HOSTNAME")
+    env::var("MISTY_DEV_API_TUNNEL_HOSTNAME")
+        .or_else(|_| env::var("MISTY_DEV_TUNNEL_HOSTNAME"))
         .ok()
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| DEFAULT_DEVELOPMENT_TUNNEL_HOSTNAME.to_owned())
+        .unwrap_or_else(|| DEFAULT_DEVELOPMENT_API_TUNNEL_HOSTNAME.to_owned())
 }
 
 fn development_api_url() -> String {
-    format!("https://{}/api", development_tunnel_hostname())
+    format!("https://{}/v1", development_tunnel_hostname())
 }
 
 fn ensure_active_development_api_url(workspace: &Workspace) -> Result<String> {
@@ -301,7 +384,8 @@ pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
 
 pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
     let worker = workspace.server.join("cloudflare/journal-collab");
-    let development_environment = workspace.server.join(".env.dev");
+    let development_environment =
+        environment::root(workspace, Target::Dev).join("crypto/journal.env");
     let mut random = OsRng;
     let secrets = JournalSecrets::generate(&mut random)?;
     ensure_room_salt(&development_environment, &mut random)?;
@@ -325,7 +409,8 @@ pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
-    let production_environment = workspace.server.join(".env.prod");
+    let production_environment =
+        environment::root(workspace, Target::Prod).join("crypto/journal.env");
     let worker_environment = workspace
         .server
         .join("cloudflare/journal-collab/.secrets/worker.prod.env");
@@ -355,13 +440,14 @@ pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
 }
 
 pub fn deploy_production_worker(workspace: &Workspace, dry_run: bool) -> Result<()> {
-    let production_environment = workspace.server.join(".env.prod");
+    let production_environment =
+        environment::root(workspace, Target::Prod).join("crypto/journal.env");
     let worker = workspace.server.join("cloudflare/journal-collab");
     let worker_environment = worker.join(".secrets/worker.prod.env");
     require_private_file(&production_environment)?;
     require_private_file(&worker_environment)?;
 
-    let production = read_environment(&production_environment)?;
+    let production = environment::read(workspace, Target::Prod)?;
     let worker_secrets = read_environment(&worker_environment)?;
     validate_production_worker_bundle(
         &production,
@@ -872,38 +958,42 @@ mod tests {
 
     #[test]
     fn development_commands_select_the_explicit_compose_file() {
-        assert_eq!(
-            development_up_command(true, true).display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml up --build --detach"
-        );
-        assert_eq!(
-            development_down_command(true).display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml down --volumes --remove-orphans"
-        );
-        assert_eq!(
-            development_compose().args(["logs", "--follow"]).display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml logs --follow"
-        );
+        let up = development_up_command(true, true).display();
+        assert!(up.contains("--env-file .env/dev/runtime.env"));
+        assert!(up.contains("--env-file .env/dev/integrations/discord.env"));
+        assert!(up.ends_with(
+            "--file compose.dev.yml up --build --force-recreate --remove-orphans --detach"
+        ));
+        let up_without_build = development_up_command(true, false).display();
+        assert!(up_without_build
+            .ends_with("--file compose.dev.yml up --force-recreate --remove-orphans --detach"));
+        let down = development_down_command(true).display();
+        assert!(down.ends_with("--file compose.dev.yml down --volumes --remove-orphans"));
+        let logs = development_compose().args(["logs", "--follow"]).display();
+        assert!(logs.ends_with("--file compose.dev.yml logs --follow"));
         assert!(development_tunnel_connection_command()
             .display()
             .contains("cloudflared_tunnel_ha_connections"));
         assert!(!development_tunnel_connection_command()
             .display()
             .contains("tunnel-url"));
+        assert!(development_tunnel_refresh_command()
+            .display()
+            .ends_with("--file compose.dev.yml up --detach --force-recreate tunnel"));
+        assert!(development_worker_refresh_command().display().ends_with(
+            "--file compose.dev.yml up --detach --force-recreate --no-deps cloudflare-deploy"
+        ));
         assert_eq!(
-            development_tunnel_refresh_command().display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps tunnel"
-        );
-        assert_eq!(
-            development_worker_refresh_command().display(),
-            "docker compose --env-file .env.dev --file compose.dev.yml up --detach --force-recreate --no-deps cloudflare-deploy"
+            development_worker_wait_command().display(),
+            "docker wait misty-cloudflare-deploy"
         );
     }
 
     #[test]
     fn development_api_url_uses_the_static_tunnel_hostname_by_default() {
+        assert!(env::var("MISTY_DEV_API_TUNNEL_HOSTNAME").is_err());
         assert!(env::var("MISTY_DEV_TUNNEL_HOSTNAME").is_err());
-        assert_eq!(development_api_url(), "https://dev.mistysys.com/api");
+        assert_eq!(development_api_url(), "https://dev-api.mistysys.com/v1");
     }
 
     #[test]
@@ -1006,8 +1096,10 @@ mod tests {
         let server = temporary.path().join("misty-server");
         fs::create_dir_all(&server).unwrap();
         let room_salt = STANDARD.encode([9_u8; 32]);
+        let production_path = server.join(".env/prod/crypto/journal.env");
+        fs::create_dir_all(production_path.parent().unwrap()).unwrap();
         fs::write(
-            server.join(".env.prod"),
+            &production_path,
             format!(
                 "MISTY_ENVIRONMENT=production\n\
                  {ROOM_SALT}={room_salt}\n\
@@ -1027,7 +1119,7 @@ mod tests {
 
         generate_production_worker_secrets(&workspace).unwrap();
 
-        let production = fs::read_to_string(server.join(".env.prod")).unwrap();
+        let production = fs::read_to_string(&production_path).unwrap();
         let worker =
             fs::read_to_string(server.join("cloudflare/journal-collab/.secrets/worker.prod.env"))
                 .unwrap();
@@ -1042,12 +1134,12 @@ mod tests {
             );
         }
         assert!(generate_production_worker_secrets(&workspace).is_err());
-        let production_values = read_environment(&server.join(".env.prod")).unwrap();
+        let production_values = read_environment(&production_path).unwrap();
         let worker_path = server.join("cloudflare/journal-collab/.secrets/worker.prod.env");
         let worker_values = read_environment(&worker_path).unwrap();
         validate_production_worker_bundle(
             &production_values,
-            &server.join(".env.prod"),
+            &production_path,
             &worker_values,
             &worker_path,
         )
@@ -1057,11 +1149,7 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             assert_eq!(
-                fs::metadata(server.join(".env.prod"))
-                    .unwrap()
-                    .permissions()
-                    .mode()
-                    & 0o777,
+                fs::metadata(&production_path).unwrap().permissions().mode() & 0o777,
                 0o600
             );
             assert_eq!(
