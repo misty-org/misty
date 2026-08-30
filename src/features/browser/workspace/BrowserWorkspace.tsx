@@ -64,6 +64,8 @@ import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
 import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 import { useBrowserPageCommands } from "./useBrowserPageCommands";
+import { browserNavigateEvent, type BrowserNavigateDetail } from "./openFromChrome";
+import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 export { normalizeBrowserAddress } from "./browserAddress";
@@ -477,6 +479,16 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     focused,
     navigate: navigateActiveTab,
   });
+  // Links opened from workspace chrome (the bookmarks bar) for this tab.
+  const navigateFromChrome = useStableCallback(navigateActiveTab);
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<BrowserNavigateDetail>).detail;
+      if (detail?.viewId === tab.id) navigateFromChrome(detail.url);
+    };
+    window.addEventListener(browserNavigateEvent, onNavigate);
+    return () => window.removeEventListener(browserNavigateEvent, onNavigate);
+  }, [navigateFromChrome, tab.id]);
   const reload = () => {
     if (!nativeRuntime || internalPage) return;
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);

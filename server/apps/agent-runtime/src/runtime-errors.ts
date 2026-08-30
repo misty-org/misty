@@ -6,6 +6,9 @@ import { classifyMCPTransportError } from "./mcp-errors.js";
 export function rethrowStepError(error: unknown): never {
   if (error instanceof ControlPlaneError) {
     if (error.code === "agent_model_turn_limit" || error.code === "agent_execution_time_limit") throw new FatalError(error.code);
+    // Usage refusals keep their code, so the run fails with the reason the person
+    // can act on rather than a generic authorization error.
+    if (error.code === "billing_admission_denied" || error.code === "hosted_ai_limit_reached") throw new FatalError(error.code);
     if (error.transient) {
       throw new RetryableError("Misty's control plane is temporarily unavailable.", {
         retryAfter: error.status === 429 ? 5_000 : 1_000,
@@ -42,6 +45,9 @@ export function classifyRuntimeError(error: unknown): { code: string; message: s
   }
   if (normalized.includes("timeout") || normalized.includes("timed out") || normalized.includes("aborted")) {
     return { code: "agent_runtime_timeout", message: "Misty timed out before completing this request." };
+  }
+  if (normalized.includes("billing_admission_denied")) {
+    return { code: "billing_admission_denied", message: "Your account's AI usage is paused, so Misty couldn't run this. Check Account usage." };
   }
   if (normalized.includes("hosted_ai_limit_reached")) {
     return { code: "hosted_ai_limit_reached", message: "Your weekly AI agent allowance is fully used. Try again after it resets." };

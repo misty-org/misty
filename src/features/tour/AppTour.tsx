@@ -4,6 +4,8 @@ import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime"
 import { TOUR_TARGET_SELECTORS, type TourStepConfig } from "./types";
 import { useTourStore } from "./useTourStore";
 import { TourWelcomeModal } from "./TourWelcomeModal";
+import { TourImportModal } from "./TourImportModal";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { TourCompleteModal } from "./TourCompleteModal";
 import { TourOverlay } from "./TourOverlay";
 import { TourPopover } from "./TourPopover";
@@ -61,8 +63,13 @@ export function AppTour() {
   if (!visible) return null;
   if (currentStep === "welcome")
     return (
-      <TourWelcomeModal onStart={() => setStep("navigation")} onSkip={() => skipTour(user?.id)} />
+      <TourWelcomeModal
+        // Importing reads other browsers on this computer, so it needs the native app.
+        onStart={() => setStep(hasTauriInternals() ? "import" : "navigation")}
+        onSkip={() => skipTour(user?.id)}
+      />
     );
+  if (currentStep === "import") return <TourImportModal onContinue={() => setStep("navigation")} />;
   if (currentStep === "complete")
     return <TourCompleteModal onFinish={() => finishTour(user?.id)} />;
   const index = steps.findIndex((step) => step.id === currentStep);

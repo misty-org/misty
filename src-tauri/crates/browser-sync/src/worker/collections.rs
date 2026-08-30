@@ -234,6 +234,14 @@ where
         active.peek().is_some() && active.all(|d| d.uses_collections)
     }
 
+    /// Every active device understands nested bookmark folders (control
+    /// version 2); until then their tree fields are never written.
+    pub(super) fn nested_bookmarks(&self) -> bool {
+        let devices = self.devices.borrow();
+        let mut active = devices.iter().filter(|d| d.revoked_at.is_none()).peekable();
+        active.peek().is_some() && active.all(|d| d.uses_collections && d.control_version >= 2)
+    }
+
     /// Records that live in a collection (bookmarks, saved tab groups)
     /// are turned into whole-record writes there. Tab-group records wait for
     /// every device to understand them. Returns the remaining (workspace) changes.
@@ -259,6 +267,8 @@ where
     }
 
     fn write_records(&mut self, collection: &'static str, changes: Vec<Change>) -> Result<()> {
+        use crate::document::entities::{Kind, NESTED_BOOKMARK_FIELDS};
+        let nested = collection != BOOKMARKS || self.nested_bookmarks();
         let mut state = self.store.collection(&self.root, collection)?;
         let mut shown: BTreeMap<(crate::document::entities::Kind, String), ViewRecord> = self
             .collection_view(collection, &state)?
@@ -285,8 +295,17 @@ where
                 }
                 Change::Delete { kind, id } => (kind, id, None),
             };
-            if let Some(record) = &record {
+            let mut record = record;
+            if let Some(record) = &mut record {
+                if !nested {
+                    for field in NESTED_BOOKMARK_FIELDS {
+                        record.fields.remove(field);
+                    }
+                }
                 crate::document::entities::validate(kind, &record.fields)?;
+                if kind == Kind::Folder {
+                    folder_placement(&shown, &id, record)?;
+                }
                 shown.insert((kind, id.clone()), record.clone());
             } else {
                 shown.remove(&(kind, id.clone()));
@@ -406,5 +425,64 @@ where
             }
         }
         Ok(out)
+    }
+}
+
+/// A folder may not sit inside itself or below `MAX_FOLDER_DEPTH`. Parents
+/// that are not here (yet) end the walk: they arrive from another device or
+/// the folder shows in Other bookmarks.
+fn folder_placement(
+    shown: &BTreeMap<(crate::document::entities::Kind, String), ViewRecord>,
+    id: &str,
+    record: &ViewRecord,
+) -> Result<()> {
+    use crate::document::entities::{Kind, MAX_FOLDER_DEPTH};
+    let parent = |record: &ViewRecord| {
+        record
+            .fields
+            .get("parent_id")
+            .and_then(|value| value.as_str())
+            .map(str::to_owned)
+    };
+    let mut next = parent(record);
+    let mut depth = 0;
+    while let Some(current) = next {
+        depth += 1;
+        if current == id || depth > MAX_FOLDER_DEPTH {
+            return Err(Error::Invalid);
+        }
+        next = shown
+            .get(&(Kind::Folder, current))
+            .and_then(|folder| parent(folder));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod folder_placement_tests {
+    use super::*;
+    use crate::document::entities::Kind;
+
+    fn folder(id: &str, parent: Option<&str>) -> ViewRecord {
+        let mut fields = crate::document::entities::Fields::new();
+        if let Some(parent) = parent {
+            fields.insert("parent_id".into(), parent.into());
+        }
+        ViewRecord {
+            kind: Kind::Folder,
+            id: id.into(),
+            fields,
+        }
+    }
+
+    #[test]
+    fn rejects_folders_inside_themselves() {
+        let mut shown = BTreeMap::new();
+        shown.insert((Kind::Folder, "a".to_owned()), folder("a", None));
+        shown.insert((Kind::Folder, "b".to_owned()), folder("b", Some("a")));
+        assert!(folder_placement(&shown, "a", &folder("a", Some("b"))).is_err());
+        assert!(folder_placement(&shown, "c", &folder("c", Some("b"))).is_ok());
+        // A parent from another device that has not arrived yet ends the walk.
+        assert!(folder_placement(&shown, "d", &folder("d", Some("missing"))).is_ok());
     }
 }

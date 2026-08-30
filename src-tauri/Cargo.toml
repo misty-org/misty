@@ -26,6 +26,13 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 aes-gcm = "0.10"
+# Browser import: Chromium's AES-128-CBC cookie values, its PBKDF2-SHA1 key,
+# Firefox's LZ4 search settings and Safari's property-list bookmarks.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+sha1_smol = "1"
+lz4_flex = { version = "0.13", default-features = false, features = ["std", "safe-decode", "safe-encode"] }
+plist = { version = "1", default-features = false }
 # A small local HTTP server: routing, state/path extractors and raw responses.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
 async-stream = "0.3"
@@ -100,6 +107,8 @@ core-graphics = "0.24"
 core-foundation = "0.10"
 objc = "0.2.7"
 objc2 = "0.6.4"
+# Reads another browser's cookie key from its own Keychain item on import.
+security-framework = "3.7"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate"] }
 objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
@@ -112,7 +121,7 @@ tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
 
 [features]

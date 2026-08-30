@@ -425,5 +425,41 @@
     "url": "https://composio.dev/logos/composio-black.svg",
     "collection": "Composio",
     "adaptation": "Clip-path wrappers removed; BrandIcon paints the black mark white on dark surfaces."
+  },
+  "chrome": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/chrome.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "firefox": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/firefox.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "microsoft-edge": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/microsoft-edge.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "brave": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/brave.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "arc": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/arc.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "vivaldi": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/vivaldi.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "opera": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/opera.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "safari": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/safari.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "chromium": {
+    "url": "https://raw.githubusercontent.com/pheralb/svgl/main/static/library/chromium.svg",
+    "collection": "SVGL"
   }
 }

@@ -91,6 +91,7 @@ where
         let mut view = self.workspaces.optimistic_view(&self.store, &self.root)?;
         view.collections = self.collections_view()?;
         view.all_upgraded = self.all_upgraded();
+        view.nested_bookmarks = self.nested_bookmarks();
         self.sync_state.send_if_modified(|current| {
             if *current == view {
                 false
