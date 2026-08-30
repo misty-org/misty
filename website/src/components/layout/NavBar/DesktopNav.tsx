@@ -10,8 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { JOIN_HREF } from "@/lib/site";
 import AccountMenu from "./AccountMenu";
+import NavbarSocials from "./NavbarSocials";
 import { navItems, resourceLinks } from "./navLinks";
 
 function DesktopNavLink({ to, label }: { to: string; label: string }) {
@@ -122,7 +122,7 @@ export default function DesktopNav({
       </DropdownMenu>
 
       <div className="ml-3 flex items-center gap-2 border-l border-border pl-4">
-        <ModeToggle />
+        <NavbarSocials />
 
         {signedIn ? (
           <AccountMenu
@@ -133,19 +133,17 @@ export default function DesktopNav({
             onSignOut={onSignOut}
           />
         ) : (
-          <>
+          <Button asChild size="sm" className="rounded-full px-4">
             <NavLink
               to="/signin"
               state={{ from: currentPath }}
-              className="px-2 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Sign in
             </NavLink>
-            <Button asChild size="sm" className="rounded-full px-4">
-              <NavLink to={JOIN_HREF}>Join now</NavLink>
-            </Button>
-          </>
+          </Button>
         )}
+
+        <ModeToggle />
       </div>
     </div>
   );
