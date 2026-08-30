@@ -64,7 +64,7 @@ export const serverPages: DocPage[] = [
     title: "misty server up",
     eyebrow: "Server",
     description:
-      "Start the complete misty-server Docker Compose stack, rebuilding images by default.",
+      "Redeploy the complete misty-server Docker Compose stack, rebuilding images and recreating every container by default.",
     command: "misty server up [--detach] [--no-build]",
     sections: [
       {
@@ -79,7 +79,11 @@ export const serverPages: DocPage[] = [
                 "False",
                 "Start services in the background and return to the prompt.",
               ],
-              ["--no-build", "False", "Do not pass --build to Docker Compose."],
+              [
+                "--no-build",
+                "False",
+                "Reuse existing images while still recreating every container.",
+              ],
             ],
           ),
         ],
@@ -102,24 +106,27 @@ export const serverPages: DocPage[] = [
             [
               [
                 "server up",
-                "docker compose --env-file .env.dev -f compose.dev.yml up --build",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --build --force-recreate --remove-orphans",
               ],
               [
                 "server up --detach",
-                "docker compose --env-file .env.dev -f compose.dev.yml up --build --detach",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --build --force-recreate --remove-orphans --detach",
               ],
               [
                 "server up --no-build",
-                "docker compose --env-file .env.dev -f compose.dev.yml up",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --force-recreate --remove-orphans",
               ],
               [
                 "server up --detach --no-build",
-                "docker compose --env-file .env.dev -f compose.dev.yml up --detach",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --force-recreate --remove-orphans --detach",
               ],
             ],
           ),
           p(
-            "--build asks Compose to rebuild buildable service images before starting containers. Use it after changing Go code, Dockerfiles, dependencies, or build context. --no-build is faster when the existing image is already correct.",
+            "Every invocation force-recreates the full development stack and removes orphaned containers. --build also rebuilds buildable service images from the current source. --no-build is faster when the existing images are already correct, but it does not skip container recreation.",
+          ),
+          p(
+            "Detached startup waits for the collaboration Worker deployment to finish successfully before it prints the public dev-api.mistysys.com URL and returns to the shell.",
           ),
         ],
       },
@@ -128,11 +135,11 @@ export const serverPages: DocPage[] = [
         title: "Environment behavior",
         blocks: [
           p(
-            "The command runs from the server directory and explicitly selects compose.dev.yml with .env.dev. It starts the Space Agent workflow runtime and its isolated Postgres database along with the API, so no separate agent command is needed. On first use it also enables Connected Devices and creates persistent local pairing and ticket secrets. The Go server itself does not load an environment file.",
+            "The command runs from the server directory and explicitly selects compose.dev.yml with the files under server/.env/dev. It starts the Space Agent workflow runtime and its isolated Postgres database along with the API, so no separate agent command is needed. On first use it also enables Connected Devices and creates persistent local pairing and ticket secrets. The Go server itself does not load an environment file.",
           ),
           note(
             "Agent model access",
-            "Set AI_GATEWAY_API_KEY in server/.env.dev before assigning work to an agent. The stack can start without it, but agent runs will fail until the runtime can access AI Gateway.",
+            "Set AI_GATEWAY_API_KEY in server/.env/dev/integrations/ai.env before assigning work to an agent. The stack can start without it, but agent runs will fail until the runtime can access AI Gateway.",
           ),
           note(
             "Attached mode",
@@ -335,11 +342,11 @@ export const serverPages: DocPage[] = [
                 "Private signing key and matching control/projection secrets for the server.",
               ],
               [
-                ".env.dev",
+                ".env/dev/crypto/journal.env",
                 "The stable server-only room salt. An existing valid value is preserved across signing-key rotations.",
               ],
               [
-                ".env.prod",
+                ".env/prod/crypto/journal.env",
                 "For the production target, the three first-use placeholders are replaced while the existing room salt is preserved.",
               ],
               [
