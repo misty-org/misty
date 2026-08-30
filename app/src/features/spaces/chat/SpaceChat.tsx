@@ -1,12 +1,14 @@
 export type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
-import { Button } from "@/shared/ui";
-import { Lightbulb, LightbulbOff, PlugZap } from "lucide-react";
+import type { SocialProviderId } from "@/api/social";
+import { useConnectionsStore } from "@/features/integrations";
+import { openProviderAuthorizationLink } from "@/shared/platform/openExternalLink";
+import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
+import { Lightbulb, LightbulbOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-
+import { useShallow } from "zustand/react/shallow";
 import { useAuth } from "@/features/auth";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -14,13 +16,11 @@ import {
 import { useSetupStore } from "@/features/installer";
 import type { MistyPickerSource } from "@/features/picker";
 import { SpaceSetupCards } from "@/features/spaces";
-import { useDiscordPublish, useSlackPublish } from "@/features/spaces/integrations";
+import { useWorkspaceTabTitle } from "@/features/workspace";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { ChatPresencePill } from "./components/ChatPresencePill";
-import { ChatIntegrationsSheet } from "./components/ChatIntegrationsSheet";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./components/SpaceChatComposer";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
@@ -36,8 +36,23 @@ import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
+import {
+  socialConversationPath,
+  socialProvider as normalizeSocialProvider,
+  socialProviderPath,
+} from "../social/socialRoute";
 
-export function SpaceChat({ spaceId }: { spaceId: string }) {
+export function SpaceSocial({
+  spaceId,
+  spaceName,
+  provider,
+  workspaceTabId,
+}: {
+  spaceId: string;
+  spaceName: string;
+  provider: SocialProviderId;
+  workspaceTabId?: string;
+}) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -48,12 +63,14 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const lastReadReceiptRef = useRef("");
 
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
+  const resolvesProviderLanding =
+    provider !== "misty" || initialAccess.activeSpace?.kind === "misty";
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(
     spaceId,
     conversationId,
     initialAccess.canReadMessages,
-    initialAccess.activeSpace?.kind === "misty",
+    resolvesProviderLanding,
   );
   const scope = useSpaceChatScope({
     spaceId,
@@ -64,6 +81,41 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     store,
   });
   const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
+  useWorkspaceTabTitle(workspaceTabId, `${spaceName} Social`);
+  const {
+    accountId: connectionsAccountId,
+    connections: accountConnections,
+    loading: connectionsLoading,
+    authorizingProvider,
+    error: connectionsError,
+    setAccount: setConnectionsAccount,
+    load: loadConnections,
+    beginAuthorization,
+    clearError: clearConnectionsError,
+  } = useConnectionsStore(
+    useShallow((state) => ({
+      accountId: state.accountId,
+      connections: state.connections,
+      loading: state.loading,
+      authorizingProvider: state.authorizingProvider,
+      error: state.error,
+      setAccount: state.setAccount,
+      load: state.load,
+      beginAuthorization: state.beginAuthorization,
+      clearError: state.clearError,
+    })),
+  );
+  const landingConversation = socialLandingConversation(
+    provider,
+    initialAccess.activeSpace?.kind,
+    conversationChat.conversations,
+  );
+  const providerConnected =
+    provider !== "misty" &&
+    connectionsAccountId === user?.id &&
+    accountConnections.some(
+      (connection) => normalizeSocialProvider(connection.provider) === provider,
+    );
   const actionSuggestions = useSpaceActionSuggestions(
     spaceId,
     conversationId,
@@ -71,22 +123,30 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   );
 
   useEffect(() => {
-    if (initialAccess.activeSpace?.kind !== "misty" || conversationId) return;
-    const supportConversation = conversationChat.conversations.find(
-      (conversation) => conversation.kind === "misty_support",
-    );
-    if (!supportConversation) return;
-    navigate(
-      `/spaces/${encodeURIComponent(spaceId)}/chat?conversation=${encodeURIComponent(supportConversation.id)}`,
-      { replace: true },
-    );
-  }, [
-    conversationChat.conversations,
-    conversationId,
-    initialAccess.activeSpace?.kind,
-    navigate,
-    spaceId,
-  ]);
+    if (conversationId || !resolvesProviderLanding || !landingConversation) return;
+    navigate(socialConversationPath(spaceId, provider, landingConversation.id), { replace: true });
+  }, [conversationId, landingConversation, navigate, provider, resolvesProviderLanding, spaceId]);
+
+  useEffect(() => {
+    if (provider === "misty" || !user?.id) return;
+    setConnectionsAccount(user.id);
+    void loadConnections();
+  }, [loadConnections, provider, setConnectionsAccount, user?.id]);
+
+  const connectProvider = async () => {
+    if (provider === "misty") return;
+    clearConnectionsError();
+    try {
+      const authorizationUrl = await beginAuthorization(
+        provider,
+        ["social_read", "social_send", "social_automation"],
+        socialProviderPath(spaceId, provider),
+      );
+      await openProviderAuthorizationLink(authorizationUrl);
+    } catch {
+      // The connections store retains the user-safe failure message rendered below.
+    }
+  };
 
   const agentTurns = usePendingAgentRuns(spaceId, conversationId);
   const draft = useSpaceChatDraft(spaceId, conversationId);
@@ -105,7 +165,6 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const [messageToDelete, setMessageToDelete] = useState<SpaceMessage | null>(null);
   const [suggestionVeto, setSuggestionVeto] = useState(false);
-  const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const resetDraft = draft.reset;
   const resetEditing = editing.reset;
   const closeSuggestions = suggestions.setOpen;
@@ -172,24 +231,26 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     storeToggleReaction: store.toggleMessageReaction,
     onAgentRunsQueued: agentTurns.track,
   });
-  const discordPublish = useDiscordPublish(spaceId, conversationId, (published) => {
-    conversationChat.setMessages((current) =>
-      current.map((message) => (message.id === published.id ? published : message)),
-    );
-  });
-  const slackPublish = useSlackPublish(spaceId, conversationId, user?.id, (published) => {
-    conversationChat.setMessages((current) =>
-      current.map((message) => (message.id === published.id ? published : message)),
-    );
-  });
 
-  const [messagesLoading] = useMinimumSpin(
-    conversationId ? conversationChat.loading : store.loading && scope.defaultMessages.length === 0,
+  const messagesLoading = conversationId
+    ? conversationChat.loading && conversationChat.messages.length === 0
+    : (store.messageLoadingBySpace[spaceId] ?? store.loading) && scope.defaultMessages.length === 0;
+  const messagesError = conversationId
+    ? conversationChat.error
+    : (store.messageErrorsBySpace[spaceId] ?? "");
+  const activeProviderConversation = shouldShowSocialConversation(
+    provider,
+    conversationId,
+    scope.activeConversation?.origin,
   );
-  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
+  const draftText = draft.text;
+  const setDraftText = draft.setText;
+  const setDraftReplyToMessageId = draft.setReplyToMessageId;
+  const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
+    if (!activeProviderConversation) return null;
     const scopeId = conversationId || "everyone";
     const messageDraft = (artifact: AiArtifact) => {
-      if (artifact.kind !== "message_draft" || !access.canWriteMessages || draft.text.trim()) {
+      if (artifact.kind !== "message_draft" || !access.canWriteMessages || draftText.trim()) {
         return null;
       }
       const operations = artifact.operations as {
@@ -223,7 +284,9 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           title: scope.activeConversation?.title || "Everyone chat",
           privacy: "shared",
           spaceId,
-          href: `/spaces/${encodeURIComponent(spaceId)}/chat${conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : ""}`,
+          href: conversationId
+            ? socialConversationPath(spaceId, provider, conversationId)
+            : socialProviderPath(spaceId, provider),
           revision: scope.messages[scope.messages.length - 1]?.seq ?? 0,
         },
       ],
@@ -267,16 +330,20 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
             "The conversation or composer changed. Ask Misty to regenerate this draft.",
           );
         }
-        draft.setText(operations.text!.trim());
-        draft.setReplyToMessageId(operations.reply_to_message_id ?? "");
+        setDraftText(operations.text!.trim());
+        setDraftReplyToMessageId(operations.reply_to_message_id ?? "");
       },
     };
   }, [
     access.canWriteMessages,
+    activeProviderConversation,
     conversationId,
-    draft,
+    draftText,
+    provider,
     scope.activeConversation?.title,
     scope.messages,
+    setDraftReplyToMessageId,
+    setDraftText,
     spaceId,
   ]);
   useAiSurfaceAdapter(aiAdapter);
@@ -315,6 +382,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
   ]);
 
   useEffect(() => {
+    if (!activeProviderConversation) return;
     const last = scope.messages[scope.messages.length - 1];
     if (!last || store.referenceOnly) return;
     const receiptKey = `${spaceId}:${conversationId || "everyone"}:${last.seq}`;
@@ -326,13 +394,153 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
     void request.catch(() => {
       if (lastReadReceiptRef.current === receiptKey) lastReadReceiptRef.current = "";
     });
-  }, [conversationId, markRead, scope.messages, spaceId, store.referenceOnly]);
+  }, [
+    activeProviderConversation,
+    conversationId,
+    markRead,
+    scope.messages,
+    spaceId,
+    store.referenceOnly,
+  ]);
 
-  if (initialAccess.activeSpace?.kind === "misty" && !conversationId) {
+  if (!conversationId && resolvesProviderLanding) {
+    if (conversationChat.error) {
+      return (
+        <ErrorState
+          className="h-full bg-charcoal-bg"
+          title="Social couldn’t load"
+          description={conversationChat.error}
+          action={
+            <Button type="button" variant="outline" onClick={conversationChat.reload}>
+              Try again
+            </Button>
+          }
+        />
+      );
+    }
+    if (conversationChat.loading || landingConversation) {
+      return (
+        <LoadingState
+          className="h-full bg-charcoal-bg"
+          label={`Opening ${socialProviderLabel(provider)}`}
+          title={`Opening ${socialProviderLabel(provider)}`}
+        />
+      );
+    }
+    if (provider !== "misty" && connectionsError) {
+      return (
+        <ErrorState
+          className="h-full bg-charcoal-bg"
+          title={`${socialProviderLabel(provider)} needs attention`}
+          description={connectionsError}
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void loadConnections({ force: true })}
+            >
+              Try again
+            </Button>
+          }
+        />
+      );
+    }
+    if (
+      provider !== "misty" &&
+      user?.id &&
+      (connectionsAccountId !== user.id || connectionsLoading)
+    ) {
+      return (
+        <LoadingState
+          className="h-full bg-charcoal-bg"
+          label={`Checking ${socialProviderLabel(provider)}`}
+          title={`Checking ${socialProviderLabel(provider)}`}
+        />
+      );
+    }
     return (
-      <div className="grid h-full place-items-center bg-charcoal-bg text-sm text-cream-muted">
-        Opening your Misty conversation…
-      </div>
+      <EmptyState
+        className="h-full bg-charcoal-bg"
+        title={
+          provider === "misty"
+            ? "No Misty conversations yet"
+            : providerConnected
+              ? `No ${socialProviderLabel(provider)} conversations yet`
+              : `Connect ${socialProviderLabel(provider)}`
+        }
+        description={
+          provider === "misty"
+            ? "Private support conversations will appear here when they’re available."
+            : providerConnected
+              ? "New synced conversations will open here when they arrive."
+              : `Connect your ${socialProviderLabel(provider)} account to bring its conversations into Social.`
+        }
+        action={
+          provider === "misty" ? (
+            <Button type="button" variant="outline" onClick={conversationChat.reload}>
+              Refresh
+            </Button>
+          ) : providerConnected ? (
+            <Button type="button" variant="outline" onClick={conversationChat.reload}>
+              Refresh
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={authorizingProvider === provider}
+              onClick={() => void connectProvider()}
+            >
+              {authorizingProvider === provider
+                ? "Connecting…"
+                : `Connect ${socialProviderLabel(provider)}`}
+            </Button>
+          )
+        }
+      />
+    );
+  }
+
+  if (conversationId && conversationChat.error && !scope.activeConversation) {
+    return (
+      <ErrorState
+        className="h-full bg-charcoal-bg"
+        title="Conversation couldn’t load"
+        description={conversationChat.error}
+        action={
+          <Button type="button" variant="outline" onClick={conversationChat.reload}>
+            Try again
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (conversationId && conversationChat.loading && !scope.activeConversation) {
+    return (
+      <LoadingState
+        className="h-full bg-charcoal-bg"
+        label={`Opening ${socialProviderLabel(provider)} conversation`}
+        title={`Opening ${socialProviderLabel(provider)} conversation`}
+      />
+    );
+  }
+
+  if (!activeProviderConversation) {
+    return (
+      <EmptyState
+        className="h-full bg-charcoal-bg"
+        title={`Conversation isn’t available in ${socialProviderLabel(provider)}`}
+        description={`Choose a ${socialProviderLabel(provider)} conversation from Social instead.`}
+        action={
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate(socialProviderPath(spaceId, provider), { replace: true })}
+          >
+            Back to {socialProviderLabel(provider)}
+          </Button>
+        }
+      />
     );
   }
 
@@ -344,18 +552,6 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         </h1>
 
         <div className="ml-auto flex items-center gap-3">
-          <AiSurfaceButton />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 text-cream-muted"
-            aria-label="Manage chat integrations"
-            title="Chat integrations"
-            onClick={() => setIntegrationsOpen(true)}
-          >
-            <PlugZap className="size-4" />
-          </Button>
           {conversationId && !scope.activeConversation?.direct_agent_id ? (
             <Button
               type="button"
@@ -399,7 +595,7 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         actions={actions}
         suggestions={suggestions}
         currentUserId={user?.id}
-        error={conversationChat.error || discordPublish.error || slackPublish.error}
+        error={messagesError}
         setError={conversationChat.setError}
         loading={messagesLoading}
         endRef={endRef}
@@ -412,19 +608,10 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
         pendingAgentRuns={agentTurns.pending}
         actionSuggestions={actionSuggestions.items}
         onActionSuggestionsChanged={() => void actionSuggestions.refresh()}
-        onPublishToDiscord={(message) => void discordPublish.publish(message)}
-        canPublishToDiscord={discordPublish.canPublish}
-        publishingMessageId={discordPublish.publishingMessageId}
-        onPublishToSlack={(message) => {
-          const parent = scope.messages.find((item) => item.id === message.reply_to_message_id);
-          const threadTs =
-            parent?.origin?.system === "slack"
-              ? parent.origin.external_thread_id || parent.origin.external_id || ""
-              : "";
-          void slackPublish.publish(message, threadTs);
+        onReload={() => {
+          if (conversationId) conversationChat.reload();
+          else void store.loadMessages(spaceId);
         }}
-        canPublishToSlack={slackPublish.canPublish}
-        publishingSlackMessageId={slackPublish.publishingMessageId}
       />
 
       {access.canWriteMessages ? (
@@ -473,12 +660,51 @@ export function SpaceChat({ spaceId }: { spaceId: string }) {
           });
         }}
       />
-      <ChatIntegrationsSheet
-        spaceId={spaceId}
-        canManage={!store.referenceOnly && access.isOwner}
-        open={integrationsOpen}
-        onOpenChange={setIntegrationsOpen}
-      />
     </div>
   );
 }
+
+export function shouldShowSocialConversation(
+  provider: SocialProviderId,
+  conversationId: string,
+  conversationProvider: string | undefined,
+): boolean {
+  if (!conversationId) return provider === "misty";
+  return conversationProvider === provider;
+}
+
+export function shouldOpenMistySupportConversation(
+  spaceKind: string | undefined,
+  conversationId: string,
+  provider: SocialProviderId,
+): boolean {
+  return spaceKind === "misty" && !conversationId && provider === "misty";
+}
+
+export function socialLandingConversation(
+  provider: SocialProviderId,
+  spaceKind: string | undefined,
+  conversations: Array<{
+    id: string;
+    kind?: string;
+    origin?: string;
+    direct_agent_id?: string;
+  }>,
+) {
+  if (provider === "misty") {
+    if (spaceKind !== "misty") return undefined;
+    return conversations.find(
+      (conversation) => conversation.kind === "misty_support" && !conversation.direct_agent_id,
+    );
+  }
+  return conversations.find(
+    (conversation) => conversation.origin === provider && !conversation.direct_agent_id,
+  );
+}
+
+function socialProviderLabel(provider: SocialProviderId): string {
+  if (provider === "x") return "X";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+export const SpaceChat = SpaceSocial;
