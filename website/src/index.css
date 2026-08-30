@@ -256,6 +256,58 @@ body {
   --site-gutter: clamp(1.5rem, 4vw, 4rem);
 }
 
+.feature-gallery-track {
+  --feature-gallery-gutter: max(
+    var(--site-gutter),
+    calc((100vw - var(--site-container-max)) / 2 + var(--site-gutter))
+  );
+  position: relative;
+  display: flex;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  padding: 0.75rem var(--feature-gallery-gutter) 1.5rem;
+  scroll-padding-inline: var(--feature-gallery-gutter);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.feature-gallery-track::-webkit-scrollbar {
+  display: none;
+}
+
+.feature-gallery-track:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.feature-gallery-card {
+  height: clamp(32rem, 68svh, 43rem);
+  flex: 0 0 min(78vw, 72rem);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  transition:
+    opacity 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-gallery-card[data-active="false"] {
+  opacity: 0.68;
+  transform: scale(0.985);
+}
+
+@media (max-width: 639px) {
+  .feature-gallery-card {
+    flex-basis: 86vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-gallery-card {
+    transition: none;
+  }
+}
+
 .brand-marquee-panel {
   margin-top: 1rem;
   overflow: hidden;
