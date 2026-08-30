@@ -1,54 +1,57 @@
 import type { ReactNode } from "react";
 
-import { MistyAppMockup, type MockupView } from "@/components/marketing/appchrome";
+import {
+  MistyAppMockup,
+  type MockupView,
+} from "@/components/marketing/appchrome";
+import { ScreenshotSlot } from "@/components/marketing/previews";
+import type { ProductScreenshotSlotId } from "@/content/productScreenshotSlots";
 import { useReveal } from "@/hooks/useReveal";
 import { cn } from "@/lib/utils";
 
 type ShowcaseCard = {
-  index: string;
   title: string;
   description: string;
   view: MockupView;
+  slot: ProductScreenshotSlotId;
   className: string;
 };
 
 /*
- * Every card shows the surface it is describing. The showcase used to render
- * five dashed "Screenshot placeholder" boxes; each one is now the real
- * window, drawn in DOM, so the grid argues for the product instead of
- * promising that a picture of it will arrive later.
+ * Every card resolves through the shared screenshot inventory. Missing
+ * captures stay as responsive DOM previews until the matching file is added.
  */
 const cards: ShowcaseCard[] = [
   {
-    index: "01",
-    title: "One Space per group",
+    title: "Start with the apps you need",
     description:
-      "People, conversations, tasks, a shared Library, and Agents — all in the same place, all seeing the same state of the work.",
+      "Keep Misty focused with Notes or Planner, or open a complete set of apps around the work.",
     view: "space",
+    slot: "space-overview",
     className: "lg:col-span-2",
   },
   {
-    index: "02",
-    title: "Your files stay yours",
+    title: "Browser and Files, built in",
     description:
-      "Browse local and connected files privately. Nothing reaches the Space until you put it there.",
+      "Research, browse local and connected files, and keep private work beside the apps that need it.",
     view: "files",
+    slot: "private-files",
     className: "",
   },
   {
-    index: "03",
-    title: "Agents that read the Space",
+    title: "Agents work beside you",
     description:
-      "Custom Agents work from permitted context only, with model routing handled for you.",
+      "Add an Agent when you want help planning, researching, or executing across the workspace.",
     view: "agent",
+    slot: "agent-workspace",
     className: "",
   },
   {
-    index: "04",
-    title: "A Library the group builds",
+    title: "Share context when you want to",
     description:
-      "Collect the files, links, and notes the work depends on, without exposing everything on your device.",
+      "Spaces and Libraries bring people, Agents, and selected resources into the same working context.",
     view: "library",
+    slot: "space-library",
     className: "lg:col-span-2",
   },
 ];
@@ -67,10 +70,7 @@ function ShowcaseCard({
         card.className,
       )}
     >
-      <p className="text-[11px] font-medium tracking-[0.08em] text-[var(--marketing-muted)]">
-        {card.index}
-      </p>
-      <h3 className="mt-3 text-lg font-medium tracking-[-0.025em] text-[var(--marketing-foreground)] sm:text-xl">
+      <h3 className="text-lg font-medium tracking-[-0.025em] text-[var(--marketing-foreground)] sm:text-xl">
         {card.title}
       </h3>
       <p className="mt-2 max-w-lg text-sm leading-relaxed text-[var(--marketing-muted)]">
@@ -88,15 +88,24 @@ export function FeatureShowcase() {
 
   return (
     <section
+      id="features"
       ref={ref}
       aria-label="Misty product showcase"
-      className="reveal py-3 sm:py-4"
+      className="reveal relative z-10 scroll-mt-24 bg-background py-3 sm:py-4"
     >
-      <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12">
+      <div className="site-container">
         <div className="grid gap-3 lg:grid-cols-3 lg:grid-rows-[30rem_28rem]">
           {cards.map((card) => (
             <ShowcaseCard key={card.title} card={card}>
-              <MistyAppMockup view={card.view} fill shadow={false} />
+              <ScreenshotSlot
+                slot={card.slot}
+                fill
+                imageClassName={
+                  card.slot === "space-library" ? "object-top" : undefined
+                }
+              >
+                <MistyAppMockup view={card.view} fill shadow={false} />
+              </ScreenshotSlot>
             </ShowcaseCard>
           ))}
         </div>

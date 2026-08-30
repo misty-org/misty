@@ -1,7 +1,17 @@
 import {
+  type CSSProperties,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
   MistyAppMockup,
   type MockupView,
 } from "@/components/marketing/appchrome";
+import { ScreenshotSlot, VideoSlot } from "@/components/marketing/previews";
+import type { ProductScreenshotSlotId } from "@/content/productScreenshotSlots";
+import type { ProductVideoSlotId } from "@/content/productVideoSlots";
 import { beatPosition, useScrollProgress } from "@/hooks/useScrollProgress";
 import { cn } from "@/lib/utils";
 
@@ -9,52 +19,150 @@ type Beat = {
   title: string;
   description: string;
   view: MockupView;
+  fallbackSlot: ProductScreenshotSlotId;
+  videoSlot: ProductVideoSlotId;
 };
 
 const beats: Beat[] = [
   {
-    title: "Create a Space",
+    title: "Choose your favorite apps",
     description:
-      "A Space is one shared home for a group. The people, conversations, tasks, and files a project runs on live inside it instead of across a dozen tabs.",
+      "Add Notes, Planner, Browser, Files, Code, and more from one menu. Keep the apps you use close and leave the rest out of the way.",
     view: "space",
+    fallbackSlot: "space-overview",
+    videoSlot: "choose-apps",
   },
   {
-    title: "Your files stay private",
+    title: "Build layouts for flexible workspaces",
     description:
-      "Browse what's on your device and in your connected drives without any of it leaving. You choose, file by file, what the group gets to see.",
-    view: "files",
+      "Arrange apps into tabs, windows, and panels that fit the task. Move between focused and multi-app layouts without losing your place.",
+    view: "space",
+    fallbackSlot: "space-overview",
+    videoSlot: "workspace-layouts",
   },
   {
-    title: "Pool what the group needs",
+    title: "Talk to Agents to manage automations and workflows",
     description:
-      "The Library holds the material the work depends on. It's built by the people in the Space, not synced wholesale off someone's disk.",
-    view: "library",
-  },
-  {
-    title: "Put Agents on it",
-    description:
-      "Custom Agents answer from the Space's permitted context and nothing else. Your private files are never in the window.",
+      "Tell Misty what you want to happen in plain language. Agents can help coordinate automations, manage recurring work, and keep workflows moving.",
     view: "agent",
+    fallbackSlot: "agent-workspace",
+    videoSlot: "agent-workflows",
+  },
+  {
+    title: "Share your Space with others",
+    description:
+      "Invite people into a Space with the apps, files, conversations, and context already in place. Everyone can start contributing without rebuilding the setup.",
+    view: "library",
+    fallbackSlot: "space-library",
+    videoSlot: "share-space",
   },
 ];
 
 /* Beats stack in a single grid cell so the container sizes to the tallest one
    and nothing gets clipped when copy lengths differ. */
 const STACKED = "[grid-area:1/1]";
+const SCROLL_SMOOTHING_MS = 80;
+const FADE_START = 0.8;
+const FADE_END = 1;
 
-function BeatCopy({ beat, index }: { beat: Beat; index: number }) {
+function smoothstep(start: number, end: number, value: number) {
+  const progress = Math.min(1, Math.max(0, (value - start) / (end - start)));
+  return progress * progress * (3 - 2 * progress);
+}
+
+function useSmoothedProgress(target: number) {
+  const [value, setValue] = useState(target);
+  const valueRef = useRef(target);
+
+  useEffect(() => {
+    const start = valueRef.current;
+    const distance = target - start;
+
+    if (Math.abs(distance) < 0.0001) {
+      valueRef.current = target;
+      setValue(target);
+      return;
+    }
+
+    const startedAt = performance.now();
+    let frame = 0;
+
+    const update = (now: number) => {
+      const elapsed = Math.min(1, (now - startedAt) / SCROLL_SMOOTHING_MS);
+      const eased = 1 - Math.pow(1 - elapsed, 3);
+      const next = start + distance * eased;
+
+      valueRef.current = next;
+      setValue(next);
+
+      if (elapsed < 1) frame = window.requestAnimationFrame(update);
+    };
+
+    frame = window.requestAnimationFrame(update);
+    return () => window.cancelAnimationFrame(frame);
+  }, [target]);
+
+  return value;
+}
+
+function beatMotion(
+  index: number,
+  outgoing: number,
+  incoming: number,
+  transition: number,
+  media = false,
+): CSSProperties {
+  const isOutgoing = index === outgoing;
+  const isIncoming = index === incoming;
+  const isSettled = outgoing === incoming;
+  const opacity = isSettled
+    ? isIncoming
+      ? 1
+      : 0
+    : isOutgoing
+      ? 1 - transition
+      : isIncoming
+        ? transition
+        : 0;
+  const scale = media ? 0.992 + opacity * 0.008 : 1;
+
+  return {
+    opacity,
+    filter: `blur(${(1 - opacity) * 1.5}px)`,
+    pointerEvents: opacity < 0.5 ? "none" : undefined,
+    transform: `translate3d(0, 0, 0) scale(${scale})`,
+  };
+}
+
+function BeatCopy({ beat }: { beat: Beat }) {
   return (
     <>
-      <p className="text-[11px] font-medium tracking-[0.08em] text-[var(--marketing-muted)]">
-        {String(index + 1).padStart(2, "0")}
-      </p>
-      <h3 className="mt-4 text-[clamp(1.5rem,2.6vw,2.25rem)] font-medium leading-[1.15] tracking-[-0.03em] text-[var(--marketing-foreground)]">
+      <h3 className="text-[clamp(1.5rem,2.6vw,2.25rem)] font-medium leading-[1.15] tracking-[-0.03em] text-[var(--marketing-foreground)]">
         {beat.title}
       </h3>
       <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--marketing-muted)]">
         {beat.description}
       </p>
     </>
+  );
+}
+
+function BeatMedia({ beat, active }: { beat: Beat; active?: boolean }) {
+  return (
+    <VideoSlot slot={beat.videoSlot} active={active} fill>
+      <ScreenshotSlot
+        slot={beat.fallbackSlot}
+        fill
+        imageClassName="object-contain object-center"
+      >
+        <MistyAppMockup
+          view={beat.view}
+          fill
+          shadow={false}
+          className="ring-1 ring-white/[0.07]"
+        />
+      </ScreenshotSlot>
+    </VideoSlot>
   );
 }
 
@@ -71,27 +179,32 @@ function BeatCopy({ beat, index }: { beat: Beat; index: number }) {
  */
 export function HowItWorks() {
   const { ref, progress } = useScrollProgress<HTMLDivElement>();
-  const { index: active, within } = beatPosition(progress, beats.length);
+  const smoothedProgress = useSmoothedProgress(progress);
+  const { index: active, within } = beatPosition(
+    smoothedProgress,
+    beats.length,
+  );
+  const incoming = Math.min(beats.length - 1, active + 1);
+  const transition =
+    active === beats.length - 1
+      ? 0
+      : smoothstep(FADE_START, FADE_END, within);
+  const visibleBeat = transition >= 0.5 ? incoming : active;
 
-  // Segments behind the active beat read full; the active one fills with
-  // scroll, so the bar tracks position continuously instead of stepping.
+  // The bar follows the same damped progress as the content. Fades happen only
+  // inside the named end-of-segment window above and settle before 100%.
   const fill = (index: number) =>
-    index < active ? 1 : index === active ? within : 0;
+    index < active
+      ? 1
+      : index === active
+        ? within
+        : 0;
 
   return (
     <section
       aria-label="How Misty works"
-      className="marketing-dark my-3 overflow-clip rounded-xl sm:my-4"
+      className="marketing-dark my-3 overflow-x-clip sm:my-4 lg:-mt-[18svh] lg:-mb-[12svh]"
     >
-      <div className="mx-auto max-w-[1440px] px-5 pt-16 sm:px-8 sm:pt-24 lg:px-12">
-        <h2 className="max-w-2xl text-[clamp(1.75rem,3.4vw,2.75rem)] font-medium leading-[1.1] tracking-[-0.03em] text-[var(--marketing-foreground)]">
-          Everything the work touches, in one place.
-        </h2>
-        <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--marketing-muted)] sm:text-lg">
-          One Space holds the group's work. Your device holds everything else.
-        </p>
-      </div>
-
       {/* Track height sets the pace: one viewport of scroll per beat, plus one
           more to hold the last beat before the section releases. */}
       <div
@@ -100,57 +213,50 @@ export function HowItWorks() {
         style={{ height: `${(beats.length + 1) * 100}svh` }}
       >
         <div className="pin-stage">
-          <div className="mx-auto grid w-full max-w-[1440px] grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-center gap-12 px-5 sm:px-8 lg:px-12">
-            <div>
+          <div className="site-container grid grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] items-center gap-x-10 xl:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] xl:gap-x-12">
+            <div className="col-start-1 row-start-1">
               <div className="grid">
                 {beats.map((beat, index) => (
                   <div
                     key={beat.title}
-                    aria-hidden={index !== active}
-                    className={cn(
-                      "pin-beat",
-                      STACKED,
-                      index === active
-                        ? "translate-y-0 opacity-100 blur-0"
-                        : cn(
-                            "pointer-events-none opacity-0 blur-[2px]",
-                            index < active ? "-translate-y-4" : "translate-y-4",
-                          ),
+                    aria-hidden={index !== visibleBeat}
+                    className={cn("pin-beat", STACKED)}
+                    style={beatMotion(
+                      index,
+                      active,
+                      incoming,
+                      transition,
                     )}
                   >
-                    <BeatCopy beat={beat} index={index} />
+                    <BeatCopy beat={beat} />
                   </div>
                 ))}
               </div>
             </div>
 
-            <div>
-              <div className="grid">
+            <div className="relative col-start-2 row-start-1 w-full place-self-center">
+              <div className="grid aspect-[8/5] min-h-0 overflow-hidden rounded-xl">
                 {beats.map((beat, index) => (
                   <div
                     key={beat.title}
-                    className={cn(
-                      "pin-beat",
-                      STACKED,
-                      index === active
-                        ? "scale-100 opacity-100"
-                        : "pointer-events-none scale-[0.98] opacity-0",
+                    aria-hidden={index !== visibleBeat}
+                    className={cn("pin-beat h-full min-h-0", STACKED)}
+                    style={beatMotion(
+                      index,
+                      active,
+                      incoming,
+                      transition,
+                      true,
                     )}
                   >
-                    <MistyAppMockup
-                      view={beat.view}
-                      bodyClass="h-[400px]"
-                      shadow={false}
-                      className="ring-1 ring-white/[0.07]"
-                    />
+                    <BeatMedia beat={beat} active={index === visibleBeat} />
                   </div>
                 ))}
               </div>
 
-              {/* The indicator sits under the window rather than under the
-                  copy: it reports where the demo is, so it belongs with the
-                  demo. No transition — it is driven straight off scroll. */}
-              <div className="mt-8 flex gap-2.5">
+              {/* Keep the indicator visually attached without letting it
+                  shift the media frame away from the viewport center. */}
+              <div className="absolute inset-x-0 top-full mt-8 flex gap-2.5">
                 {beats.map((beat, index) => (
                   <span
                     key={beat.title}
@@ -170,17 +276,12 @@ export function HowItWorks() {
 
       {/* Small screens — and reduced motion at any width — get the same beats
           as an ordinary stacked list. */}
-      <div className="pin-stacked space-y-14 px-5 py-16 sm:px-8 lg:hidden">
-        {beats.map((beat, index) => (
+      <div className="site-container pin-stacked space-y-14 py-16 lg:hidden">
+        {beats.map((beat) => (
           <div key={beat.title}>
-            <BeatCopy beat={beat} index={index} />
-            <div className="mt-7">
-              <MistyAppMockup
-                view={beat.view}
-                bodyClass="h-[320px]"
-                shadow={false}
-                className="ring-1 ring-white/[0.07]"
-              />
+            <BeatCopy beat={beat} />
+            <div className="mt-7 aspect-[8/5] overflow-hidden rounded-xl">
+              <BeatMedia beat={beat} />
             </div>
           </div>
         ))}
