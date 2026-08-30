@@ -107,7 +107,7 @@ func TestAgentMemberRequestToolsAndBillingPostgres(t *testing.T) {
 	exec(`UPDATE space_runs SET state='running',runtime_run_id='runtime-1' WHERE id=$1`, request.ChildRunID)
 	child, _ := database.SpaceRun(ctx, bob.ID, request.ChildRunID)
 	// The run context freezes Bob's own model routes when the work starts.
-	if _, err := database.FreezeAIModelRoutes(ctx, bob.ID, child.ID, defaultAIRoutes("", "")); err != nil {
+	if _, err := database.FreezeAIModelRoutes(ctx, bob.ID, child.ID, defaultAIRoutes("", ""), nil); err != nil {
 		t.Fatal(err)
 	}
 	childToolbox, childInvocation, authorize, err := service.resolvePersonalAgentRuntimeToolbox(ctx, child)

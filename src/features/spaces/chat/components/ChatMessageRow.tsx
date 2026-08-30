@@ -3,7 +3,7 @@ import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 import { Avatar, AvatarFallback, AvatarImage, Badge, Button } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
-import { Fragment, type FormEvent } from "react";
+import { Fragment, memo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
@@ -29,7 +29,57 @@ export interface ChatMessageRowProps {
  * Consecutive messages from the same sender render `compact`, dropping the
  * avatar and header for a timestamp that only appears on hover.
  */
-export function ChatMessageRow({
+/** The list fields a row renders; anything else on the list props never reaches a row. */
+const rowFields = [
+  "canAddToLibrary",
+  "canCopyLibrary",
+  "canWrite",
+  "currentUserId",
+  "isOwner",
+  "libraryItems",
+  "nodes",
+  "spaceId",
+  "onRetry",
+  "onEditingText",
+  "onCancelEditing",
+  "onSaveEdited",
+  "onReply",
+  "onToggleReaction",
+  "onBeginEditing",
+  "onDelete",
+  "onOpenNode",
+  "onError",
+  "onLibraryItem",
+  "onReload",
+] as const satisfies readonly (keyof SpaceChatMessagesProps)[];
+
+/**
+ * Memoized so typing in the composer does not re-render the whole history. The edit draft
+ * only matters to the row being edited.
+ */
+export const ChatMessageRow = memo(ChatMessageRowView, (previous, next) => {
+  if (
+    previous.message !== next.message ||
+    previous.compact !== next.compact ||
+    previous.dateLabel !== next.dateLabel ||
+    previous.avatarUrl !== next.avatarUrl ||
+    previous.repliedToMessage !== next.repliedToMessage ||
+    previous.repliedToAvatarUrl !== next.repliedToAvatarUrl ||
+    rowFields.some((field) => previous.props[field] !== next.props[field])
+  )
+    return false;
+  const id = next.message.id;
+  const wasEditing = previous.props.editingMessageId === id;
+  const editing = next.props.editingMessageId === id;
+  return (
+    wasEditing === editing &&
+    (!editing ||
+      (previous.props.editingText === next.props.editingText &&
+        previous.props.editSaving === next.props.editSaving))
+  );
+});
+
+function ChatMessageRowView({
   message,
   compact,
   dateLabel,

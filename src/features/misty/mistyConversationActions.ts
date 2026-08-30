@@ -11,6 +11,7 @@ import {
   type GlobalSearchGet,
   type GlobalSearchSet,
 } from "@/features/global-search/globalSearchStoreHelpers";
+import { useCollaborationStore } from "@/features/agents/agentCollaboration";
 import { updateMistyDraftAttachments } from "./draftAttachments";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
@@ -128,6 +129,17 @@ export function createMistyConversationActions(
                 )
                   return;
                 applyGlobalInvocationEvent(set, get, conversation.id, message.id, event);
+                if (
+                  ["invocation.completed", "invocation.failed", "invocation.canceled"].includes(
+                    event.type,
+                  )
+                )
+                  // Goal continuations chain: attach to the next one when it starts.
+                  useCollaborationStore.getState().afterRunSettled(
+                    conversation.id,
+                    () => void get().loadConversations(true),
+                    () => get().working,
+                  );
                 if (event.type === "artifact.proposed" || event.type === "approval.required") {
                   patchConversationMessage(set, get, conversation.id, message.id, {
                     artifact: event.artifact,
@@ -196,6 +208,7 @@ export function createMistyConversationActions(
         handoff: undefined,
         targets: [],
         selectedSpaceId: "",
+        pendingModelOverride: undefined,
         activeConversationId,
         mode: "ask",
         panel: get().panel === "closed" ? "closed" : "answer",

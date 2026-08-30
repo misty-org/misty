@@ -1,34 +1,17 @@
 import { useState } from "react";
-import {
-  BookOpen,
-  CalendarClock,
-  Check,
-  CircleAlert,
-  Clock,
-  FileText,
-  FolderOpen,
-  Globe,
-  LoaderCircle,
-  Mail,
-  X,
-} from "lucide-react";
+import { BookOpen, CalendarClock, FileText, FolderOpen, Globe, Mail } from "lucide-react";
 import { chooseOrganizationFolder } from "@/features/misty/folderOrganization";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, SkeletonList } from "@/shared/ui";
 import { taskTemplates, templatePrompt } from "../workspace/taskTemplates";
-import { activityStateLabels, formatActivityTime, useAgentActivity } from "./useAgentActivity";
+import {
+  activityStateIcon,
+  activityStateLabels,
+  formatActivityTime,
+  useAgentActivity,
+} from "./useAgentActivity";
 import "./agentLanding.css";
 
-const stateIcon = (state: string) =>
-  state === "completed"
-    ? Check
-    : state === "running"
-      ? LoaderCircle
-      : state === "queued" || state === "awaiting_device"
-        ? Clock
-        : state === "canceled"
-          ? X
-          : CircleAlert;
 const appIcon = (app?: string) =>
   app === "Mail"
     ? Mail
@@ -75,7 +58,7 @@ export function AgentLanding({
           </Button>
         </header>
         {recent.map((entry) => {
-          const Icon = stateIcon(entry.state);
+          const Icon = activityStateIcon(entry.state);
           return (
             <Button
               key={entry.id}

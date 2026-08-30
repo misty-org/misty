@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { Button } from "@/shared/ui";
 
 export type AgentStep = {
@@ -37,7 +37,7 @@ export function AgentSteps({ steps }: { steps: AgentStep[] }) {
             <li key={step.id}>
               {step.content && (
                 <div className="agent-step-text">
-                  <ReactMarkdown>{step.content}</ReactMarkdown>
+                  <MistyMarkdown>{step.content}</MistyMarkdown>
                 </div>
               )}
             </li>

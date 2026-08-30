@@ -26,3 +26,8 @@ export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversat
 
 export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
+
+export { ModelPicker } from "./models/ModelPicker";
+export { describeNextRun } from "./workflows/scheduleSummary";
+export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
+export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";

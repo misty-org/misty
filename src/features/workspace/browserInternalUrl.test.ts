@@ -24,7 +24,7 @@ describe("browser internal pages", () => {
   });
 
   it("titles internal tabs by page name", () => {
-    expect(browserViewTitle("misty://scheduled")).toBe("Scheduled");
+    expect(browserViewTitle("misty://scheduled")).toBe("Workflows");
     expect(browserViewTitle("misty://extensions")).toBe("Extensions");
   });
 });

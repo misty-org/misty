@@ -27,6 +27,9 @@ func (s *AIService) SteerInvocation() http.HandlerFunc {
 			writeJSON(w, http.StatusConflict, map[string]string{"code": "steering_unavailable", "message": "This task is finishing or unavailable. Your draft is preserved; send it after the task finishes."})
 			return
 		}
+		// A message sent while the run waits on questions answers them by
+		// superseding them; the waiting call returns and the run reads it.
+		_ = s.database.SetAgentQuestionState(r.Context(), userID, "", chi.URLParam(r, "invocationID"), "superseded")
 		writeJSON(w, http.StatusAccepted, map[string]any{"sequence": event.Sequence, "state": "queued"})
 	}
 }

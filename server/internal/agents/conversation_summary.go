@@ -48,10 +48,7 @@ func (s *Service) SummarizeConversation(ctx context.Context, userID, previous, t
 			return "", "", err
 		}
 		if config != nil {
-			route, model, provider = modelruntime.For(config), config.Model, config.Provider
-			if provider == "gateway" {
-				provider = ProviderVercelAI
-			}
+			route, model, provider = modelruntime.For(config), config.Model, modelProviderName(config.Model)
 		}
 	}
 	prompt := "New turns to add (oldest first):\n" + transcript + "\n\nWrite the updated notes now."

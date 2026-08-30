@@ -32,7 +32,7 @@ export function BrowserSearchDialog() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { results, loading } = useScopedSearch(scope, query);
+  const { results, loading } = useScopedSearch(scope, query, open);
   const command = searchCommandFor(scope);
   const suggestions = scope === "browser" ? matchingSearchCommands(query) : [];
   const items: SearchListItem[] = suggestions.length

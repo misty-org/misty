@@ -78,16 +78,34 @@ const buttonVariants = cva(
           "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:cursor-wait",
         ],
       },
+      /*
+       * The control scale. Each height carries its own text size, so controls that share
+       * a row also share a type size:
+       *   xs   24px / 12px  inline closers inside rows and tabs
+       *   chip 28px / 12px  inline chips: reactions, tags, presence, citations, context
+       *   sm   32px / 13px  toolbar rows: section and filter chips (with variant="chip"),
+       *                     toolbar actions, row actions; matches 32px icon buttons
+       *   default 36px / 14px  page headings (beside the 36px search), forms, dialogs
+       *   lg   40px / 14px  large calls to action
+       * Sizes leave the corner radius to the variant, so a chip stays a pill at any size.
+       */
       size: {
         default:
           "h-9 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1 rounded-md px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
+        xs: [
+          "h-6 gap-1 px-2 text-xs in-data-[slot=button-group]:rounded-md",
+          "has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
+          "[&_svg:not([class*='size-'])]:size-3",
+        ],
+        sm: [
+          "h-8 gap-1 px-2.5 text-[13px] in-data-[slot=button-group]:rounded-md",
+          "has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
+        ],
         lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         icon: "size-9",
         "icon-xs":
-          "size-6 rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8 rounded-md in-data-[slot=button-group]:rounded-md",
+          "size-6 in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
+        "icon-sm": "size-8 in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-10",
         chip: "h-7 gap-1.5 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
         none: "",
@@ -114,6 +132,12 @@ const buttonVariants = cva(
           "!opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100",
       },
     },
+    // Chips keep a minimum width (about 1.75x their height) so a short label like "All"
+    // reads as a pill, not a bubble. The label stays centered within it.
+    compoundVariants: [
+      { variant: "chip", size: "chip", class: "min-w-12" },
+      { variant: "chip", size: "sm", class: "min-w-14" },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

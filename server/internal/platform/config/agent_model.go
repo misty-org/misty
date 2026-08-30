@@ -5,8 +5,7 @@ import (
 	"strings"
 )
 
-// AgentModelConfig is the instance's optional pinned AI Gateway model. Instance
-// AI always runs on the AI Gateway; accounts bring their own keys separately.
+// AgentModelConfig is the instance's optional pinned default model.
 type AgentModelConfig struct {
 	Model string
 }
@@ -21,3 +20,7 @@ func AgentModel() (AgentModelConfig, error) {
 	}
 	return c, nil
 }
+
+// OpenAIKey is the instance's own OpenAI key. When set, OpenAI models call
+// OpenAI directly instead of going through the AI Gateway.
+func OpenAIKey() string { return strings.TrimSpace(Getenv("OPENAI_API_KEY")) }

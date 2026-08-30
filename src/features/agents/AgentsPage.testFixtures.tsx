@@ -95,15 +95,6 @@ export function openAgentSettings(agent = "Communications") {
 }
 
 /** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */
-export async function chooseConversationAction(title: string, action: string) {
-  const trigger = screen
-    .getAllByRole("button", { name: `More actions for ${title}` })
-    .find((button) => button.closest(".agent-conversation-heading"));
-  if (!trigger) throw new Error(`No header actions for ${title}`);
-  fireEvent.keyDown(trigger, { key: "Enter" });
-  fireEvent.click(await screen.findByRole("menuitem", { name: action }));
-}
-
 export const composer = () => screen.getByLabelText("Message Misty") as HTMLTextAreaElement;
 
 export function typeDraft(value: string) {

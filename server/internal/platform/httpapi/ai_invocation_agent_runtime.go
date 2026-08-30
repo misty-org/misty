@@ -72,7 +72,7 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		writeAgentError(w, err)
 		return
 	}
-	routes, err := s.database.FreezeAIModelRoutes(r.Context(), record.UserID, record.ID, defaultAIRoutes(prepared.modelID, prepared.reasoning), prepared.reasoning)
+	routes, err := s.database.FreezeAIModelRoutes(r.Context(), record.UserID, record.ID, defaultAIRoutes(prepared.modelID, prepared.reasoning), nil)
 	if err != nil {
 		writeAIProviderError(w, err)
 		return

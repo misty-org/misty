@@ -1,5 +1,4 @@
 import {
-  chooseConversationAction,
   composer,
   conversation,
   fixture,
@@ -22,8 +21,8 @@ it("opens straight into the agent's New task conversation without a directory", 
   expect(screen.getByRole("button", { name: "Switch agent: Communications" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Agent settings" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Float conversation" })).toBeNull();
-  expect(screen.queryByRole("complementary", { name: "Task panel" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Task" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Show task panel" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Spaces" })).toBeNull();
 });
 
@@ -35,17 +34,34 @@ it("offers agent settings and new agents from the switcher, not a directory", ()
   expect(screen.queryByRole("option", { name: "Browse all agents" })).toBeNull();
 });
 
-it("toggles the task panel without losing the conversation draft", () => {
+it("opens Details on one section at a time without losing the conversation draft", () => {
   renderAgentsPage();
   typeDraft("Keep my draft");
-  const toggle = screen.getByRole("button", { name: "Show task panel" });
+  const toggle = screen.getByRole("button", { name: "Show details" });
   expect(toggle.getAttribute("aria-pressed")).toBe("false");
   fireEvent.click(toggle);
-  expect(toggle.getAttribute("aria-pressed")).toBe("true");
-  expect(screen.getByRole("complementary", { name: "Task panel" })).toBeTruthy();
-  fireEvent.click(toggle);
-  expect(toggle.getAttribute("aria-pressed")).toBe("false");
-  expect(screen.queryByRole("complementary", { name: "Task panel" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Hide details" }).getAttribute("aria-pressed")).toBe(
+    "true",
+  );
+  const details = within(screen.getByRole("complementary", { name: "Details" }));
+  const chips = within(details.getByRole("group", { name: "Details sections" }));
+  const task = chips.getByRole("button", { name: /^Task/ });
+  const files = chips.getByRole("button", { name: /^Files/ });
+  expect(chips.getByRole("button", { name: /^Sources/ })).toBeTruthy();
+  expect(chips.queryByRole("button", { name: /^Apps/ })).toBeNull();
+  expect(task.getAttribute("aria-pressed")).toBe("true");
+  expect(details.getByRole("region", { name: "Task" })).toBeTruthy();
+  expect(details.getByRole("separator", { name: "Resize details" })).toBeTruthy();
+  fireEvent.click(files);
+  expect(files.getAttribute("aria-pressed")).toBe("true");
+  expect(task.getAttribute("aria-pressed")).toBe("false");
+  expect(details.getByRole("region", { name: "Files" })).toBeTruthy();
+  expect(details.queryByRole("region", { name: "Task" })).toBeNull();
+  fireEvent.click(details.getByRole("button", { name: "Close details" }));
+  expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+  // Reopening returns to the section it was on.
+  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+  expect(screen.getByRole("region", { name: "Files" })).toBeTruthy();
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer().value).toBe("Keep my draft");
 });
@@ -65,16 +81,15 @@ it("protects unsaved profile edits when closing settings while preserving the co
   expect(composer().value).toBe("Unsent draft");
 });
 
-it("guards profile edits when toggling the task panel", () => {
+it("hides Details while agent settings are open", () => {
   renderAgentsPage();
+  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+  expect(screen.getByRole("complementary", { name: "Details" })).toBeTruthy();
   openAgentSettings();
   fireEvent.change(nameField(), { target: { value: "Keep this name" } });
-  const toggle = screen.getByRole("button", { name: "Show task panel" });
-  fireEvent.click(toggle);
-  expect(screen.getByRole("alertdialog")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+  expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Show details" })).toBeNull();
   expect(nameField().value).toBe("Keep this name");
-  expect(toggle.getAttribute("aria-pressed")).toBe("false");
 });
 
 it("keeps the requested new task when discarding profile edits", () => {
@@ -89,7 +104,7 @@ it("keeps the requested new task when discarding profile edits", () => {
   expect(composer().value).toBe("");
 });
 
-it("preserves one conversation draft across catalogs and floating presentation", async () => {
+it("preserves one conversation draft across catalogs", () => {
   useMistyStore.setState({
     conversations: [conversation("launch", "Launch plan")],
     activeConversationId: "launch",
@@ -97,14 +112,12 @@ it("preserves one conversation draft across catalogs and floating presentation",
   renderAgentsPage();
   const draft = composer();
   typeDraft("Keep this while I browse");
-  await chooseConversationAction("Launch plan", "Float conversation");
-  expect(composer()).toBe(draft);
   fireEvent.click(screen.getByRole("button", { name: "Templates" }));
-  expect(screen.getByRole("heading", { name: "Tasks" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Templates", level: 1 })).toBeTruthy();
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
-  fireEvent.click(screen.getByRole("button", { name: "Return to full conversation" }));
+  fireEvent.click(screen.getByRole("button", { name: "Launch plan" }));
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
   expect(fixture.submit).not.toHaveBeenCalled();
