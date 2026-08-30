@@ -8,7 +8,7 @@ export interface BlogPost {
 
 export const posts: BlogPost[] = [
   {
-    title: "Introducing Misty — One App for All Your Cloud Files",
+    title: "Introducing Misty — One app for All Your Cloud Files",
     date: "December 2025",
     summary:
       "We built Misty because managing files across Google Drive, OneDrive, and iCloud shouldn't require three different apps. Here's the story behind it.",

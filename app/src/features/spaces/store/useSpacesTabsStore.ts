@@ -1,4 +1,3 @@
-import { spaceNotesEnabled } from "@/features/notes";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -7,7 +6,7 @@ const maximumTabTitleLength = 60;
 const pendingSpaceId = "__pending__";
 
 export type WorkspaceTabKind =
-  "space" | "file-manager" | "agents" | "developer" | "extensions" | "transfers";
+  "space" | "file-manager" | "agents" | "developer" | "marketplace" | "transfers";
 
 interface WorkspaceTabBase {
   id: string;
@@ -25,8 +24,8 @@ export interface FileManagerWorkspaceTab extends WorkspaceTabBase {
   workspaceId: string;
 }
 
-export interface ExtensionsWorkspaceTab extends WorkspaceTabBase {
-  kind: "extensions";
+export interface MarketplaceWorkspaceTab extends WorkspaceTabBase {
+  kind: "marketplace";
 }
 
 export interface AgentsWorkspaceTab extends WorkspaceTabBase {
@@ -46,7 +45,7 @@ export type SpacesTab =
   | FileManagerWorkspaceTab
   | AgentsWorkspaceTab
   | DeveloperWorkspaceTab
-  | ExtensionsWorkspaceTab
+  | MarketplaceWorkspaceTab
   | TransfersWorkspaceTab;
 
 export interface SpacesTabsSession {
@@ -285,7 +284,7 @@ export function activeSpacesTab(session: SpacesTabsSession | undefined): SpacesT
 }
 
 export function defaultSpaceRoute(spaceId: string): string {
-  return `/spaces/${encodeURIComponent(spaceId)}/${spaceNotesEnabled ? "notes" : "drawings"}`;
+  return `/spaces/${encodeURIComponent(spaceId)}/home`;
 }
 
 export function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
@@ -298,10 +297,7 @@ export function normalizeSpacesTabRoute(route: string, spaceId?: string): string
     const pathParts = parsed.pathname.split("/");
     if (spaceId && pathParts[2] && decodeURIComponent(pathParts[2]) !== spaceId) return fallback;
     if (pathParts[1] === "spaces" && pathParts[2] && !pathParts[3]) {
-      pathParts[3] = spaceNotesEnabled ? "notes" : "drawings";
-    }
-    if (pathParts[1] === "spaces" && pathParts[3] === "home") {
-      pathParts[3] = spaceNotesEnabled ? "notes" : "drawings";
+      pathParts[3] = "home";
     }
     if (pathParts[1] === "spaces" && pathParts[3] === "tasks") pathParts[3] = "planner";
     if (pathParts[1] === "spaces" && pathParts[3] === "planner") {
@@ -406,7 +402,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
     "file-manager",
     "agents",
     "developer",
-    "extensions",
+    "marketplace",
     "transfers",
   ].includes(String(candidate.kind))
     ? (candidate.kind as WorkspaceTabKind)
@@ -434,7 +430,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
 function workspaceToolTitle(kind: Exclude<WorkspaceTabKind, "space" | "file-manager">): string {
   if (kind === "agents") return "Agents";
   if (kind === "developer") return "Code";
-  return kind === "extensions" ? "Extensions" : "Transfers";
+  return kind === "marketplace" ? "Marketplace" : "Transfers";
 }
 
 function migratePersistedTabs(

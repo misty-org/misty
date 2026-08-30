@@ -1,4 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
+import { SystemErrorActivity } from "@/features/activity";
 import type {
   SpaceActorRef,
   SpaceAgentMembership,
@@ -151,12 +152,12 @@ export function CreateEditConversationDialog({
             ))}
           </fieldset>
           {error ? (
-            <p
-              className="mb-0 mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-xs text-cream-bright"
-              role="alert"
-            >
-              {error}
-            </p>
+            <SystemErrorActivity
+              error={error}
+              scope={`social:conversation:${spaceId}`}
+              title="Conversation could not be saved"
+              target={{ kind: "space-chat", spaceId }}
+            />
           ) : null}
           <DialogFooter className="mt-5">
             <Button variant="outline" type="button" disabled={saving} onClick={close}>

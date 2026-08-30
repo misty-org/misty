@@ -1,4 +1,5 @@
 import { useTransfersStore } from "@/features/transfers";
+import { SystemErrorActivity } from "@/features/activity";
 import {
   duplicatesCancel,
   duplicatesHashRemoteCandidates,
@@ -233,9 +234,12 @@ export function DuplicateFinderDialog(props: {
               </Card>
             ) : null}
             {error ? (
-              <div className="mt-3 rounded-lg border border-charcoal-active/25 bg-charcoal-active px-3 py-2 text-sm text-cream-bright">
-                {error}
-              </div>
+              <SystemErrorActivity
+                error={error}
+                scope="files:duplicates"
+                title="Duplicate search could not be completed"
+                target={{ kind: "workspace-tool", tool: "files" }}
+              />
             ) : null}
             {result ? (
               <Card className="mt-3 grid gap-1 border-0 bg-charcoal-card p-3 text-sm text-cream-muted shadow-none">

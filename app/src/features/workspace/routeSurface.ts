@@ -10,23 +10,24 @@ import {
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   if (pathname.startsWith(routes.settings)) return null;
-  // Home is an ordinary, stackable tab. It is also what a pane falls back to
-  // when its last tab closes, so it must resolve to a surface like any other.
-  if (pathname === routes.home) return request("home", "tool:home", "Home", pathname);
+  // `/home` is a legacy entry point. The desktop shell resolves it to the
+  // active Space's Home so Home never becomes a global app tab.
+  if (pathname === routes.home) return null;
   if (pathname.startsWith(routes.inbox))
-    return request("inbox", "tool:inbox", "Inbox", pathname, undefined, "single");
+    return request("inbox", "tool:inbox", "Inbox", pathname, undefined, "multiple");
   if (pathname.startsWith(routes.spaces)) {
-    const parts = pathname.split("/").filter(Boolean);
+    const parts = pathname.split(/[?#]/)[0].split("/").filter(Boolean);
     const rawId = parts[1];
-    if (!rawId) return null;
+    if (!rawId || !parts[2]) return null;
     const spaceId = safeDecode(rawId);
-    const tool = spaceToolFromSection(parts[2]);
+    const section = parts[2];
+    const tool = spaceToolFromSection(section);
     const scopeKey = `space:${spaceId}` as const;
     return {
       ...request(
         "space",
         tool === "space" ? scopeKey : `space:${spaceId}:${tool}`,
-        spaceToolTitle(tool),
+        section === "home" ? "Home" : spaceToolTitle(tool),
         pathname,
         tool === "space" ? spaceId : `${spaceId}:${tool}`,
         "multiple",
@@ -41,24 +42,24 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     };
   }
   if (pathname.startsWith(routes.terminal))
-    return request("terminal", "tool:terminal", "Terminal", pathname, undefined, "single");
+    return request("terminal", "tool:terminal", "Terminal", pathname, undefined, "multiple");
   if (pathname.startsWith(routes.code))
     return request("code", "tool:code", "Code", pathname, undefined, "multiple");
   if (pathname.startsWith(routes.files))
-    return request("files", "tool:files", "Files", pathname, undefined, "single");
+    return request("files", "tool:files", "Files", pathname, undefined, "multiple");
   if (pathname.startsWith(routes.transfers))
     return request("transfers", "tool:transfers", "Transfers", pathname, undefined, "single");
   if (pathname.startsWith(routes.agents))
-    return request("agents", "tool:agents", "Agents", pathname, undefined, "single");
-  if (pathname.startsWith(routes.extensions))
-    return request("extensions", "tool:extensions", "Extensions", pathname, undefined, "single");
+    return request("agents", "tool:agents", "Agents", pathname, undefined, "multiple");
+  if (pathname.startsWith(routes.marketplace))
+    return request("marketplace", "tool:marketplace", "Marketplace", pathname, undefined, "single");
   return null;
 }
 
-export type SpaceWorkspaceTool = "journal" | "planner" | "chat" | "library" | "space";
+export type SpaceWorkspaceTool = "journal" | "planner" | "social" | "library" | "space";
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
-  return spaceToolFromSection(pathname.split("/").filter(Boolean)[2]);
+  return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
 }
 
 /** Whether a tab owns the route even when a nested route or redirect changed its exact URL. */
@@ -101,14 +102,15 @@ function safeDecode(value: string): string {
 
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "notes" || section === "drawings") return "journal";
-  if (section === "planner" || section === "chat" || section === "library") return section;
+  if (section === "chat" || section === "social") return "social";
+  if (section === "planner" || section === "library") return section;
   return "space";
 }
 
 function spaceToolTitle(tool: SpaceWorkspaceTool): string {
   if (tool === "journal") return "Journal";
   if (tool === "planner") return "Planner";
-  if (tool === "chat") return "Chat";
+  if (tool === "social") return "Social";
   if (tool === "library") return "Library";
   return "Space";
 }

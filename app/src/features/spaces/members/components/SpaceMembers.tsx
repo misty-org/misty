@@ -1,6 +1,7 @@
 export type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
 
 import { agentTeammatesV1Enabled } from "@/features/agents";
+import { SystemErrorActivity } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { Button } from "@/shared/ui";
@@ -23,8 +24,7 @@ export function SpaceMembers({
   const { user } = useAuth();
   const state = useSpaceMembers(spaceId);
   const dialogs = useMemberDialogs(spaceId, state);
-  const { space, members, agents, error, clearError } = state;
-  const bannerError = error && !dialogs.inviteOpen && !dialogs.memberAction ? error : "";
+  const { space, members, agents, error } = state;
   const teammatesEnabled = agentTeammatesV1Enabled();
 
   return (
@@ -57,15 +57,13 @@ export function SpaceMembers({
           </div>
         </div>
 
-        {bannerError ? (
-          <Button
-            className="mb-3 h-auto w-full justify-start whitespace-normal rounded-lg border border-charcoal-active/30 bg-charcoal-active px-3 py-2 text-left text-xs text-cream-bright hover:bg-charcoal-active hover:text-cream-bright"
-            variant="ghost"
-            type="button"
-            onClick={clearError}
-          >
-            {bannerError}
-          </Button>
+        {error ? (
+          <SystemErrorActivity
+            error={error}
+            scope={`spaces:members:${spaceId}`}
+            title="Space membership needs attention"
+            target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
+          />
         ) : null}
 
         {teammatesEnabled ? (
@@ -103,12 +101,8 @@ export function SpaceMembers({
         ) : null}
       </div>
 
-      <InviteMemberDialog
-        dialogs={dialogs}
-        spaceName={space?.name ?? "Space"}
-        error={error ?? ""}
-      />
-      <MemberActionDialog dialogs={dialogs} error={error ?? ""} />
+      <InviteMemberDialog dialogs={dialogs} spaceName={space?.name ?? "Space"} />
+      <MemberActionDialog dialogs={dialogs} />
     </div>
   );
 }

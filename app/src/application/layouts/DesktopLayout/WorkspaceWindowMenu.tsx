@@ -14,11 +14,18 @@ export function WorkspaceWindowMenu(props: {
   windows: WorkspaceVirtualWindow[];
   activeWindowId: string;
   canReopen: boolean;
+  canCloseWindow?: (workspaceWindow: WorkspaceVirtualWindow) => boolean;
   onSelect: (windowId: string) => void;
   onCreate: () => void;
   onClose: (windowId: string) => void;
   onReopen: () => void;
 }) {
+  const canClose = (workspaceWindow: WorkspaceVirtualWindow) =>
+    props.windows.length > 1 && (!props.canCloseWindow || props.canCloseWindow(workspaceWindow));
+  const activeWindow = props.windows.find(
+    (workspaceWindow) => workspaceWindow.id === props.activeWindowId,
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -28,7 +35,7 @@ export function WorkspaceWindowMenu(props: {
           aria-label="Manage virtual windows"
           title="Manage virtual windows"
         >
-          <AppWindow size={14} />
+          <AppWindow size={18} />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
@@ -47,23 +54,24 @@ export function WorkspaceWindowMenu(props: {
                 {index + 1}
               </span>
               <span className="min-w-0 flex-1 truncate">{workspaceWindow.title}</span>
-              <button
-                type="button"
-                disabled={props.windows.length <= 1}
-                className={cn(
-                  "grid size-5 shrink-0 place-items-center rounded text-cream-faint opacity-0",
-                  "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
-                  "focus:opacity-100 disabled:pointer-events-none disabled:opacity-0",
-                )}
-                aria-label={`Close ${workspaceWindow.title}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  props.onClose(workspaceWindow.id);
-                }}
-              >
-                <X size={11} />
-              </button>
+              {canClose(workspaceWindow) ? (
+                <button
+                  type="button"
+                  className={cn(
+                    "grid size-5 shrink-0 place-items-center rounded text-cream-muted opacity-0",
+                    "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
+                    "focus:opacity-100",
+                  )}
+                  aria-label={`Close ${workspaceWindow.title}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    props.onClose(workspaceWindow.id);
+                  }}
+                >
+                  <X size={11} />
+                </button>
+              ) : null}
             </DropdownMenuItem>
           );
         })}
@@ -78,7 +86,7 @@ export function WorkspaceWindowMenu(props: {
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          disabled={props.windows.length <= 1}
+          disabled={!activeWindow || !canClose(activeWindow)}
           onSelect={() => props.onClose(props.activeWindowId)}
         >
           <X size={14} /> Close

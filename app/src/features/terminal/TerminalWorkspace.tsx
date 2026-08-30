@@ -1,7 +1,7 @@
 import { dockLeaves, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { SystemErrorActivity } from "@/features/activity";
 import { registerShortcutHandler } from "@/features/shortcuts";
 import {
-  AiSurfaceButton,
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
@@ -256,6 +256,14 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#111312]">
       <header className="flex h-8 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-workspace px-2 text-[11px] text-cream-muted">
+        {environmentError ? (
+          <SystemErrorActivity
+            error={environmentError}
+            scope="terminal:environments"
+            title="Terminal environments could not be loaded"
+            target={{ kind: "route", href: "/terminal" }}
+          />
+        ) : null}
         <SquareTerminal size={12} className="shrink-0" />
         <span className="min-w-0 flex-1 truncate font-mono">
           {displayCwd || title || "Terminal"}
@@ -263,7 +271,6 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
         <span className="rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] capitalize">
           {sessionStatus.replace(/_/g, " ")}
         </span>
-        <AiSurfaceButton />
         {environment.kind === "ssh" ? (
           <span className="hidden rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] lg:inline">
             Agent tools · device-local
@@ -273,7 +280,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
           aria-label="Terminal environment"
           className="h-6 max-w-52 rounded border border-charcoal-border bg-charcoal-card px-1.5 text-[10px] text-cream outline-none"
           value={environment.kind === "ssh" ? `ssh:${environment.ssh.id}` : "local"}
-          title={environmentError || "Terminal environment (device-local)"}
+          title="Terminal environment (device-local)"
           onChange={(event) => {
             const value = event.currentTarget.value;
             if (value === "local") {

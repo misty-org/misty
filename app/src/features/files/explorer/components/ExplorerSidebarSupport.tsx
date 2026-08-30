@@ -1,6 +1,17 @@
 import type { MountedDevice, SavedSearch, SavedSearchRule } from "@/native/contracts";
-import { Button } from "@/shared/ui";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Button,
+  TreeBranch,
+  cn,
+  navigationDisclosureChevronClass,
+  navigationDisclosureLabelClass,
+  navigationTreeBranchClass,
+  navigationTreeContentInsetClass,
+  navigationTreeGroupClass,
+  navigationTreeRowClass,
+  navigationTreeSurfaceClass,
+} from "@/shared/ui";
+import { ChevronRight } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
 import type {
   DeviceCustomizationState,
@@ -34,51 +45,59 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-4 py-4 text-cream-muted [overscroll-behavior:contain] max-[980px]:hidden",
-  section: "[&+&]:mt-5",
-  sectionTitle: "group/section-title mb-2 flex min-w-0 items-center gap-2",
+  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-3 py-3 text-cream-muted [overscroll-behavior:contain] max-[980px]:hidden",
+  section: "grid gap-1 [&+&]:mt-3",
+  sectionTitle: "group/section-title flex h-9 min-w-0 items-center gap-1 px-2.5",
   sectionToggle:
-    "min-w-0 justify-start gap-2 px-0 text-left text-cream-muted shadow-none !bg-transparent hover:!bg-transparent hover:text-cream focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-muted aria-expanded:hover:!bg-transparent aria-expanded:hover:text-cream",
-  sectionToggleLabel:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold",
-  sectionChevron: "flex-none text-cream-muted",
+    "misty-navigator-row-target h-9 min-w-0 flex-1 justify-start gap-1 rounded-md px-0 text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright",
+  sectionToggleLabel: navigationDisclosureLabelClass,
+  sectionChevron: navigationDisclosureChevronClass,
   sectionActions: "ml-auto flex flex-none items-center gap-0",
   sectionActionsReveal:
     "opacity-0 transition-opacity group-hover/section-title:opacity-100 group-focus-within/section-title:opacity-100",
-  sectionActionButton: "size-8 text-cream-muted shadow-none",
+  sectionActionButton:
+    "misty-sidebar-icon-target size-6 text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright [&_svg]:!size-3.5",
   spinning: "[&>svg]:animate-spin",
-  itemIcon: "grid size-[34px] flex-none place-items-center [&_svg]:size-[31px]",
-  itemButton:
-    "h-10 w-full justify-start gap-2 px-2 text-left text-sm font-medium text-cream-muted shadow-none hover:bg-charcoal-hover hover:text-cream",
-  itemSelected: "bg-charcoal-card text-cream hover:bg-charcoal-hover hover:text-cream",
-  remoteIcon: "grid size-[34px] flex-none place-items-center",
+  treeRow: `${navigationTreeRowClass} mr-0 h-auto min-h-7`,
+  treeBranch: navigationTreeBranchClass,
+  treeSurface: `${navigationTreeSurfaceClass} h-auto min-h-7 gap-0 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card`,
+  quickAccessSurface:
+    "group-hover/tree-row:bg-charcoal-hover group-hover/tree-row:text-cream-bright",
+  itemIcon: "grid size-7 flex-none place-items-center text-cream-bright [&_svg]:!size-5",
+  itemButton: `h-7 min-w-0 flex-1 justify-start gap-2.5 rounded-md bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  itemSelected: "bg-charcoal-card/80 text-cream-bright",
+  remoteIcon:
+    "grid size-7 flex-none place-items-center text-cream-bright [&_img]:!size-5 [&_svg]:!size-5",
   pinnedRow:
-    "group/pin flex min-h-10 min-w-0 items-center rounded-md text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream",
-  pinnedButton:
-    "h-10 min-w-0 flex-1 justify-start gap-2 px-2 text-left text-sm font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-inherit active:translate-y-0 aria-expanded:!bg-transparent",
+    "group/pin flex min-h-7 min-w-0 items-center rounded-md text-cream-muted transition-colors",
+  pinnedButton: `h-7 min-w-0 flex-1 justify-start gap-2.5 text-left text-[13px] font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright active:translate-y-0 aria-expanded:!bg-transparent ${navigationTreeContentInsetClass}`,
   pinnedUnpinButton:
-    "mr-1 size-8 flex-none !bg-transparent text-inherit opacity-0 shadow-none hover:!bg-transparent hover:opacity-100 focus-visible:opacity-100 active:translate-y-0 aria-expanded:!bg-transparent",
+    "mr-0.5 size-7 flex-none !bg-transparent text-inherit opacity-0 shadow-none hover:!bg-transparent hover:text-cream-bright hover:opacity-100 focus-visible:opacity-100 active:translate-y-0 aria-expanded:!bg-transparent",
   workspaceSelect:
-    "h-10 w-full justify-start gap-2 border border-charcoal-border/55 bg-charcoal-active px-2 text-left text-sm font-medium shadow-none hover:border-charcoal-border/80 hover:bg-charcoal-active [&_svg]:size-4",
+    "h-10 w-full justify-start gap-2.5 border border-charcoal-border/55 bg-charcoal-active px-2.5 text-left text-sm font-medium shadow-none hover:border-charcoal-border/80 hover:bg-charcoal-active [&_svg]:!size-5",
   workspaceSelectLabel: "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
-  list: "grid gap-1",
-  muted: "px-3 py-1 text-sm text-cream-muted",
-  deviceButton:
-    "h-auto w-full items-start justify-start gap-2 px-2 py-2 text-left text-sm font-medium text-cream-muted shadow-none hover:bg-charcoal-hover",
-  deviceIcon: "grid size-[34px] flex-none place-items-center pt-[1px] [&_svg]:size-[31px]",
-  deviceRow: "grid min-w-0 grid-cols-[minmax(0,1fr)] items-stretch",
-  deviceCopy: "grid min-w-0 flex-1 gap-[3px]",
+  list: navigationTreeGroupClass,
+  muted: "ml-6 mr-2 px-2 py-1 text-[13px] text-cream-muted",
+  deviceButton: `h-auto min-h-12 min-w-0 flex-1 items-start justify-start gap-2.5 rounded-md bg-transparent py-1.5 text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  deviceIcon: "grid size-7 flex-none place-items-center pt-px text-cream-bright [&_svg]:!size-5",
+  deviceRow: "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] items-stretch",
+  deviceCopy: "grid min-w-0 flex-1 gap-0.5",
   deviceName:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-cream",
-  deviceMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium text-cream-bright",
+  deviceMeta:
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-cream-muted",
   deviceMeter: "mt-0.5 h-1 overflow-hidden rounded-full bg-charcoal-card",
-  deviceMeterFill: "block h-full bg-cream-muted",
+  deviceMeterFill: "block h-full bg-cream-bright/70",
   deviceGroup: "grid gap-1",
-  deviceGroupHeader: "flex h-7 min-w-0 items-center justify-between px-2",
+  deviceGroupTreeRow: `${navigationTreeRowClass} mr-0 h-7`,
+  deviceNestedTreeRow: `${navigationTreeRowClass} ml-12 mr-0 h-auto min-h-7`,
+  deviceGroupHeader: `${navigationTreeSurfaceClass} h-7 gap-1 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card`,
+  deviceGroupToggle: `h-7 min-w-0 flex-1 justify-start gap-1 bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-transparent hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
   deviceGroupLabel:
-    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-medium text-cream-muted/75",
-  deviceGroupAction: "size-7 text-cream-muted shadow-none",
-  deviceGroupEmpty: "px-2 py-1 text-xs text-cream-muted/70",
+    "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium",
+  deviceGroupAction:
+    "misty-sidebar-icon-target size-6 text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright [&_svg]:!size-3.5",
+  deviceGroupEmpty: "ml-12 mr-2 px-2 py-1 text-[11px] text-cream-muted",
   errorText: "m-0 text-sm text-cream-bright",
   smartMeta: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-cream-muted/70",
 } as const;
@@ -93,7 +112,6 @@ export function SidebarSectionHeader(props: {
   onToggle: () => void;
   onContextMenu?: (event: MouseEvent<HTMLDivElement>) => void;
 }) {
-  const Chevron = props.collapsed ? ChevronRight : ChevronDown;
   return (
     <div className={sidebarStyles.sectionTitle} onContextMenu={props.onContextMenu}>
       <Button
@@ -104,14 +122,61 @@ export function SidebarSectionHeader(props: {
         onClick={props.onToggle}
         aria-expanded={!props.collapsed}
       >
-        <span className={sidebarStyles.sectionToggleLabel}>{props.title}</span>
-        <Chevron className={sidebarStyles.sectionChevron} size={14} />
+        <span className={sidebarStyles.sectionToggleLabel}>
+          <span className="min-w-0 truncate">{props.title}</span>
+          <ChevronRight
+            className={cn(
+              sidebarStyles.sectionChevron,
+              "size-4 transition-transform duration-150 motion-reduce:transition-none",
+              !props.collapsed && "rotate-90",
+            )}
+            strokeWidth={2}
+            aria-hidden="true"
+            data-chevron-placement="inline"
+          />
+        </span>
       </Button>
       {props.actions ? (
         <div className={`${sidebarStyles.sectionActions} ${sidebarStyles.sectionActionsReveal}`}>
           {props.actions}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function SidebarDeviceGroupHeader(props: {
+  title: string;
+  collapsed: boolean;
+  first: boolean;
+  last: boolean;
+  actions?: ReactNode;
+  onToggle: () => void;
+}) {
+  return (
+    <div className={sidebarStyles.deviceGroupTreeRow}>
+      <TreeBranch className={sidebarStyles.treeBranch} first={props.first} last={props.last} />
+      <div className={sidebarStyles.deviceGroupHeader}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={sidebarStyles.deviceGroupToggle}
+          aria-expanded={!props.collapsed}
+          onClick={props.onToggle}
+        >
+          <span className={sidebarStyles.deviceGroupLabel}>{props.title}</span>
+          <ChevronRight
+            className={cn(
+              "size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+              !props.collapsed && "rotate-90",
+            )}
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+        </Button>
+        {props.actions}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import type { ProviderRemote, ProviderWorkflow } from "@/native/contracts";
+import { SystemErrorActivity } from "@/features/activity";
 import { Button } from "@/shared/ui";
-import { X } from "lucide-react";
+import { Cloud, Plus, X } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ProviderConnectionDialog } from "./components/ProviderConnectionDialog";
 import { ProviderDisconnectDialog } from "./components/ProviderDisconnectDialog";
 import { RemoteEditPanel } from "./components/RemoteEditPanel";
 import { RemoteListPanel } from "./components/RemoteListPanel";
+import { ProviderLogo } from "./components/ProviderLogo";
 import {
   createProvidersWorkspaceState,
   isProviderWorkspaceStale,
@@ -26,12 +28,15 @@ const providersShellClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] 
 const providersPageShellClass = "grid h-full min-h-0 grid-rows-[minmax(0,1fr)] bg-charcoal-bg";
 
 const providersOverlayHeaderClass =
-  "flex items-center justify-between gap-3 border-b border-charcoal-border px-4 py-2.5";
+  "flex items-center justify-between gap-3 border-b border-charcoal-border/70 px-5 py-3.5";
 
-const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-3";
+const providersPaneContainerClass = "min-h-0 min-w-0 overflow-hidden p-4";
 
 const providersPaneWorkspaceClass =
-  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(280px,0.42fr)_minmax(420px,0.58fr)] overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card max-[860px]:grid-cols-[minmax(0,1fr)]";
+  "grid h-full min-h-0 min-w-0 grid-cols-[minmax(300px,0.38fr)_minmax(420px,0.62fr)] overflow-hidden rounded-2xl border border-charcoal-border/70 bg-charcoal-card/55 max-[860px]:grid-cols-[minmax(0,1fr)]";
+
+const providersEmptyClass =
+  "grid h-full min-h-0 place-items-center overflow-auto rounded-2xl border border-charcoal-border/70 bg-charcoal-card/45 p-8";
 
 export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
   presentation?: "page" | "overlay";
@@ -49,7 +54,12 @@ export const ProvidersWorkspace = memo(function ProvidersWorkspace(props: {
     <div className={overlay ? providersShellClass : providersPageShellClass}>
       {overlay ? (
         <header className={providersOverlayHeaderClass}>
-          <h2 className="text-sm font-medium text-cream">Remotes</h2>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-cream">Connected storage</h2>
+            <p className="mt-0.5 text-xs text-cream-muted">
+              Bring cloud files into Explorer without leaving Misty.
+            </p>
+          </div>
           <Button variant="ghost" size="icon" aria-label="Close remotes" onClick={props.onClose}>
             <X size={16} />
           </Button>
@@ -147,6 +157,7 @@ const ProvidersDialogs = memo(function ProvidersDialogs() {
 const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }) {
   const {
     loading,
+    actionError,
     providers,
     remoteRevisions,
     remotes,
@@ -169,6 +180,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
   } = useProvidersStore(
     useShallow((state) => ({
       loading: state.loading,
+      actionError: state.error,
       providers: state.providers,
       remoteRevisions: state.remoteRevisions,
       remotes: state.providers?.remotes ?? EMPTY_PROVIDER_REMOTES,
@@ -203,6 +215,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     ? (providers?.workflows.find((workflow) => workflow.type === workspace.draft?.providerType) ??
       null)
     : null;
+  const providerWorkflows = providers?.workflows ?? EMPTY_PROVIDER_WORKFLOWS;
 
   useEffect(() => {
     ensureWorkspace(props.workspaceId);
@@ -229,6 +242,55 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
     workspace.draft,
     workspace.loadingRemoteName,
   ]);
+
+  if (!loading && remotes.length === 0 && !serviceError) {
+    return (
+      <section className={providersEmptyClass}>
+        <div className="grid w-full max-w-xl justify-items-center gap-5 text-center">
+          <span className="grid size-12 place-items-center rounded-2xl bg-charcoal-active text-cream-bright">
+            <Cloud size={21} strokeWidth={1.8} />
+          </span>
+          <div className="grid gap-1.5">
+            <h2 className="text-lg font-semibold text-cream">Connect your storage</h2>
+            <p className="max-w-md text-sm leading-6 text-cream-muted">
+              Add a provider once, then browse, copy, move, and search its files alongside your
+              local drives.
+            </p>
+          </div>
+          {providerWorkflows.length > 0 ? (
+            <div
+              className="flex flex-wrap items-center justify-center gap-2"
+              aria-label="Available providers"
+            >
+              {providerWorkflows.slice(0, 7).map((workflow) => (
+                <span
+                  key={workflow.type}
+                  className="grid size-9 place-items-center rounded-xl border border-charcoal-border/65 bg-charcoal-bg"
+                  title={workflow.name || workflow.type}
+                >
+                  <ProviderLogo type={workflow.type} size={19} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <Button type="button" onClick={() => void openAddRemote()} disabled={working}>
+            <Plus size={15} /> Connect provider
+          </Button>
+          {actionError ? (
+            <SystemErrorActivity
+              error={actionError}
+              scope="files:remotes:connect"
+              title="Storage provider could not be connected"
+              target={{ kind: "workspace-tool", tool: "files" }}
+            />
+          ) : null}
+          <p className="text-xs text-cream-muted">
+            Credentials stay in your system keychain and can be removed at any time.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={providersPaneWorkspaceClass}>

@@ -1,6 +1,4 @@
 **/.env*
-!**/.env.example
-!**/.env.web.example
 **/.venv
 scripts/.signing.env
 .windows-test/
@@ -52,6 +50,7 @@ proxy/dist/
 *.gif
 *.webp
 !src/assets/bots/cloud-folder/mika.webp
+!src/shared/assets/mail-providers/*.webp
 *.avif
 *.ico
 *.icns
@@ -61,6 +60,7 @@ proxy/dist/
 *.heic
 *.heif
 *.svg
+!src/shared/assets/mail-providers/*.svg
 *.psd
 *.ai
 *.xcf

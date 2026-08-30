@@ -3,16 +3,25 @@ import { command } from "./factory";
 import { filesShortcutCommands } from "./filesCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
-
 const shellCommands: ShortcutCommandDefinition[] = [
-  command("search.toggle", "Open Misty", {
-    description: "Search Misty, open tools, or ask a question.",
-    category: "Misty",
-    aliases: ["launcher", "search", "ask"],
+  command("search.toggle", "Open Search", {
+    description: "Search objects, files, and navigation destinations.",
+    category: "Navigation",
+    aliases: ["launcher", "search"],
     mac: "Cmd+K",
     windows: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
+    allowShadowing: true,
+  }),
+  command("misty.contextual_companion", "Open Misty desktop panel", {
+    description: "Open the floating Misty panel from the desktop pet.",
+    category: "Misty",
+    aliases: ["desktop pet", "floating ai", "ask misty"],
+    mac: "Cmd+Shift+K",
+    windows: "Ctrl+Shift+K",
+    allowInEditable: true,
+    nativeMenu: false,
     allowShadowing: true,
   }),
   command("app.command_palette", "Open command palette", {
@@ -47,6 +56,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     description: "Increase the app interface scale.",
     category: "View",
     mac: "Cmd+Plus",
+    macAlternate: "Ctrl+Plus",
     windows: "Ctrl+Plus",
     allowInEditable: true,
     repeatable: true,
@@ -56,6 +66,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     description: "Decrease the app interface scale.",
     category: "View",
     mac: "Cmd+Minus",
+    macAlternate: "Ctrl+Minus",
     windows: "Ctrl+Minus",
     allowInEditable: true,
     repeatable: true,
@@ -65,6 +76,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     description: "Return the app interface to its default scale.",
     category: "View",
     mac: "Cmd+0",
+    macAlternate: "Ctrl+0",
     windows: "Ctrl+0",
     allowInEditable: true,
     nativeMenu: true,
@@ -282,7 +294,7 @@ const toolSlots = [
   ["home", "Home"],
   ["journal", "Journal"],
   ["planner", "Planner"],
-  ["chat", "Chat"],
+  ["social", "Social"],
   ["inbox", "Inbox"],
   ["library", "Library"],
   ["browser", "Browser"],

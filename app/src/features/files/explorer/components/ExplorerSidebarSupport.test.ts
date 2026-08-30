@@ -1,6 +1,10 @@
 import type { MountedDevice } from "@/native/contracts";
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildDeviceEntries, loadDeviceCustomization } from "../components/ExplorerSidebarSupport";
+import {
+  buildDeviceEntries,
+  loadDeviceCustomization,
+  sidebarStyles,
+} from "../components/ExplorerSidebarSupport";
 
 const startupDisk: MountedDevice = {
   id: "startup",
@@ -38,5 +42,27 @@ describe("Explorer sidebar devices", () => {
     );
 
     expect(loadDeviceCustomization().hiddenPaths).toEqual([]);
+  });
+});
+
+describe("Explorer sidebar interaction styles", () => {
+  it("uses a clearly elevated Quick access hover surface", () => {
+    expect(sidebarStyles.quickAccessSurface).toContain("group-hover/tree-row:bg-charcoal-hover");
+    expect(sidebarStyles.quickAccessSurface).toContain("group-hover/tree-row:text-cream-bright");
+  });
+
+  it("keeps branch content close to the connector line", () => {
+    expect(sidebarStyles.treeSurface).toContain("ml-1");
+    expect(sidebarStyles.itemButton).toContain("pl-1");
+    expect(sidebarStyles.pinnedButton).toContain("pl-1");
+    expect(sidebarStyles.deviceButton).toContain("pl-1");
+    expect(sidebarStyles.deviceGroupToggle).toContain("pl-1");
+  });
+
+  it("uses prominent icons throughout sidebar item rows", () => {
+    expect(sidebarStyles.itemIcon).toContain("size-7");
+    expect(sidebarStyles.itemIcon).toContain("[&_svg]:!size-5");
+    expect(sidebarStyles.remoteIcon).toContain("[&_img]:!size-5");
+    expect(sidebarStyles.deviceIcon).toContain("[&_svg]:!size-5");
   });
 });

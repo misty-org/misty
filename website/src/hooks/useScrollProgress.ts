@@ -43,11 +43,17 @@ export function useScrollProgress<T extends HTMLElement = HTMLElement>() {
     };
 
     measure();
-    window.addEventListener("scroll", onScroll, { passive: true });
+    // Capture scroll events from nested page scrollers as well as the window.
+    // This keeps the pinned story responsive if its surrounding layout changes
+    // which element owns vertical scrolling.
+    document.addEventListener("scroll", onScroll, {
+      passive: true,
+      capture: true,
+    });
     window.addEventListener("resize", onScroll);
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("scroll", onScroll, { capture: true });
       window.removeEventListener("resize", onScroll);
     };
   }, []);

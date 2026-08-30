@@ -20,11 +20,6 @@ const publicRoutes = [
     title: "Pricing — Basic, Pro, and Max plans | Misty",
   },
   {
-    name: "features",
-    path: "/features",
-    title: "Features — Work together in one Space | Misty",
-  },
-  {
     name: "changelog",
     path: "/changelog",
     title: "Changelog — Misty beta updates",
@@ -141,4 +136,45 @@ test("settings redirects signed-out visitors without an API server", async ({
   await expect(
     page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
+});
+
+test("public pages share the footer's horizontal alignment rail", async ({
+  page,
+}) => {
+  await prepareApiLessPage(page, "dark");
+
+  for (const path of ["/", "/download", "/waitlist", "/signin"]) {
+    await page.goto(path);
+
+    const pageRail = page.locator("main .site-container").first();
+    const footerRail = page.locator("footer .site-container");
+    await expect(pageRail).toBeVisible();
+    await expect(footerRail).toBeVisible();
+
+    const [pageBox, footerBox] = await Promise.all([
+      pageRail.boundingBox(),
+      footerRail.boundingBox(),
+    ]);
+
+    expect(pageBox?.x).toBeCloseTo(footerBox?.x ?? Number.NaN, 1);
+    expect(pageBox?.width).toBeCloseTo(footerBox?.width ?? Number.NaN, 1);
+  }
+});
+
+test("the home hero headline and supporting copy share one text measure", async ({
+  page,
+}) => {
+  await prepareApiLessPage(page, "dark");
+  await page.goto("/");
+
+  const [headlineBox, descriptionBox] = await Promise.all([
+    page.locator("main h1").boundingBox(),
+    page.locator("main h1 + p").boundingBox(),
+  ]);
+
+  expect(headlineBox?.x).toBeCloseTo(descriptionBox?.x ?? Number.NaN, 1);
+  expect(headlineBox?.width).toBeCloseTo(
+    descriptionBox?.width ?? Number.NaN,
+    1,
+  );
 });

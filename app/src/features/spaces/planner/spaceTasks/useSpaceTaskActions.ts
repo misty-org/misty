@@ -1,11 +1,10 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
-import { confirmAction } from "@/shared/lib/confirmAction";
 import { errorText } from "@/shared/lib/format";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import type { TaskDraft } from "../SpacePlannerViews";
-import { createTaskInput, dueAtForRequest, emptyDraft, taskDraft } from "./taskDraft";
+import { createTaskInput, emptyDraft, taskDraft, taskUpdateInput } from "./taskDraft";
 import { mergeTasks, optimisticMove } from "./taskOrdering";
 import type { SpaceTasksData } from "./useSpaceTasksData";
 
@@ -42,32 +41,22 @@ export function useSpaceTaskActions(options: {
 
   const failWith = (reason: unknown) => data.setError(errorText(reason));
 
-  const openCreate = (initialStatus: SpaceTaskStatus = "todo", initialTitle = "") => {
+  const openCreate = useCallback((initialStatus: SpaceTaskStatus = "todo", initialTitle = "") => {
     setDraft({ ...emptyDraft(), status: initialStatus, title: initialTitle });
     setEditing(null);
-  };
+  }, []);
 
-  const openEdit = (task: SpaceTask) => {
+  const openEdit = useCallback((task: SpaceTask) => {
     setDraft(taskDraft(task));
     setEditing(task);
-  };
+  }, []);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     if (!canManage || !draft.title.trim()) return;
     setBusy("task");
     try {
-      const patch = {
-        status: draft.status,
-        priority: draft.priority,
-        assignee_user_id: draft.assignee_user_id || undefined,
-        assignee_agent_id: draft.assignee_agent_id || undefined,
-        title: draft.title.trim(),
-        notes: draft.notes.trim(),
-        due_at: dueAtForRequest(draft.due_at),
-        due_timezone: draft.due_timezone.trim() || "UTC",
-        source_refs: draft.source_refs,
-      };
+      const patch = taskUpdateInput(draft);
       const saved = editing
         ? await spacesApi.updateTask(spaceId, editing, patch)
         : await spacesApi.createTask(spaceId, createTaskInput(draft));
@@ -131,14 +120,15 @@ export function useSpaceTaskActions(options: {
   };
 
   const archive = async (task: SpaceTask) => {
-    if (!(await confirmAction(`Archive “${task.title}”?`))) return;
     setBusy(task.id);
     try {
       await spacesApi.archiveTask(spaceId, task);
       data.setTasks((current) => current.filter((item) => item.id !== task.id));
       setEditing(undefined);
+      return true;
     } catch (reason) {
       failWith(reason);
+      return false;
     } finally {
       setBusy("");
     }

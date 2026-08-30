@@ -44,7 +44,7 @@ describe("SpaceSectionNavigation", () => {
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Journal",
       "Planner",
-      "Chat",
+      "Social",
       "Library",
     ]);
     expect(container.querySelector("nav")?.className).toContain("grid");
@@ -124,7 +124,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect(container.querySelector('[aria-label="1 new"]')?.closest("a")?.textContent).toContain(
-      "Chat",
+      "Social",
     );
     expect(
       [...container.querySelectorAll("a")]
@@ -151,7 +151,7 @@ describe("SpaceSectionNavigation", () => {
     expect(labels).not.toContain("Library");
   });
 
-  it("shows only private Chat in the canonical Misty Space", async () => {
+  it("shows only private Social in the canonical Misty Space", async () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture({
@@ -175,7 +175,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Chat",
+      "Social",
     ]);
   });
 
@@ -206,7 +206,7 @@ describe("SpaceSectionNavigation", () => {
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
       "Journal",
       "Planner",
-      "Chat",
+      "Social",
       "Library",
     ]);
   });

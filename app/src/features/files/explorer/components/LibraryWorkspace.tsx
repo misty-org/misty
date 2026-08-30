@@ -1,8 +1,19 @@
+import { MistyFilePicker } from "@/features/picker";
+import { SystemErrorActivity } from "@/features/activity";
 import { useSmartLibraryStore } from "@/features/spaces/library";
 import type { SearchResult } from "@/native/contracts";
 import { Button, Input } from "@/shared/ui";
-import { open } from "@tauri-apps/plugin-dialog";
-import { Film, FolderSearch, Images, Loader2, Plus, Search, Sparkles, Tag, X } from "lucide-react";
+import {
+  BrainCircuit,
+  Film,
+  FolderSearch,
+  Images,
+  Loader2,
+  Plus,
+  Search,
+  Tag,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DEFAULT_LIBRARY_TAG_LIMIT } from "../utils/libraryTags";
@@ -102,15 +113,10 @@ export function LibraryWorkspace(props: {
   );
   const pendingAnalysisCount = library?.preflight.pilotCappedImages ?? 0;
   const analysisBusy = phase === "uploading" || phase === "processing";
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  const selectFiles = async () => {
-    const selection = await open({
-      multiple: true,
-      directory: false,
-      title: "Add files to Library",
-    });
-    const paths = typeof selection === "string" ? [selection] : (selection ?? []);
-    if (paths.length > 0) await addFiles(paths);
+  const selectFiles = () => {
+    setPickerOpen(true);
   };
 
   return (
@@ -130,7 +136,7 @@ export function LibraryWorkspace(props: {
               type="button"
               onClick={() => void analyzeFolder()}
             >
-              <Sparkles size={16} />
+              <BrainCircuit size={16} />
               {analysisBusy
                 ? "Analyzing…"
                 : `Analyze ${pendingAnalysisCount.toLocaleString()} ready`}
@@ -206,11 +212,21 @@ export function LibraryWorkspace(props: {
               </div>
             </div>
             {semanticError ? (
-              <p className="text-sm text-sage-fg">
-                Semantic search is unavailable; showing local metadata matches. {semanticError}
-              </p>
+              <SystemErrorActivity
+                error={semanticError}
+                scope="files:library:semantic-search"
+                title="Semantic search is unavailable"
+                target={{ kind: "workspace-tool", tool: "files" }}
+              />
             ) : null}
-            {error ? <p className="text-sm text-cream-bright">{error}</p> : null}
+            {error ? (
+              <SystemErrorActivity
+                error={error}
+                scope="files:library"
+                title="Library needs attention"
+                target={{ kind: "workspace-tool", tool: "files" }}
+              />
+            ) : null}
             {query.trim() && !semanticSearching && visibleAssets.length === 0 ? (
               <LibraryEmpty
                 title="No matching files"
@@ -354,7 +370,14 @@ export function LibraryWorkspace(props: {
                 </div>
               ))}
             </div>
-            {folderError ? <p className="text-sm text-cream-bright">{folderError}</p> : null}
+            {folderError ? (
+              <SystemErrorActivity
+                error={folderError}
+                scope="files:library:collections"
+                title="Library collection needs attention"
+                target={{ kind: "workspace-tool", tool: "files" }}
+              />
+            ) : null}
             {folderSearching ? <p className="text-sm text-cream-muted">Evaluating rules…</p> : null}
             {folderResults.length > 0 ? (
               <div className="mt-6 grid gap-1">
@@ -397,7 +420,7 @@ export function LibraryWorkspace(props: {
       {folderDialog ? (
         <SmartFolderDialog
           state={folderDialog}
-          error={folderError}
+          error={null}
           onSave={saveFolder}
           onDelete={deleteFolder}
           onCancel={() => setFolderDialog(null)}
@@ -417,6 +440,22 @@ export function LibraryWorkspace(props: {
           busy={phase === "uploading" || phase === "processing"}
           onCancel={cancelDroppedFiles}
           onConfirm={() => void confirmDroppedFiles()}
+        />
+      ) : null}
+      {pickerOpen ? (
+        <MistyFilePicker
+          mode="file"
+          multiple
+          title="Add files to Library"
+          onCancel={() => setPickerOpen(false)}
+          onSelect={(path) => {
+            setPickerOpen(false);
+            void addFiles([path]);
+          }}
+          onSelectMany={(paths) => {
+            setPickerOpen(false);
+            void addFiles(paths);
+          }}
         />
       ) : null}
     </section>

@@ -53,19 +53,30 @@ export function useConnectedDevices() {
   const [snapshot, setSnapshot] = useState<ConnectedDevicesSnapshot | null>(null);
   const [peers, setPeers] = useState<ServerConnectedPeer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pairing, setPairing] = useState<PairingView | null>(null);
   const localRef = useRef<{ localId: string; serverId: string } | null>(null);
   const refreshInFlight = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!hasTauriInternals() || refreshInFlight.current) return;
+    if (refreshInFlight.current) return;
+    if (!hasTauriInternals()) {
+      setReady(false);
+      setLoading(false);
+      setError("Network devices are available in the Misty desktop app.");
+      return;
+    }
     refreshInFlight.current = true;
     try {
       const account = readActiveSavedAccountSession();
       const localSnapshot = await agentsDeviceSnapshot();
       const local = localSnapshot.device;
-      if (!account || !local) throw new Error("Sign in to connect this device.");
+      if (!account || !local) {
+        localRef.current = null;
+        setReady(false);
+        throw new Error("Sign in to connect this device.");
+      }
 
       const keyResponse = await devicesApi.peerTicketKeys<{
         algorithm: "Ed25519";
@@ -78,6 +89,8 @@ export function useConnectedDevices() {
         developmentTicketKeys: keyResponse.keys,
       });
       if (!native.enabled || !native.endpointId || !native.addressing) {
+        setSnapshot(native);
+        setReady(false);
         throw new Error(native.unavailableReason || "Connected Devices is unavailable.");
       }
       const server = await ensureServerAgentDevice(local, {
@@ -85,6 +98,11 @@ export function useConnectedDevices() {
         platform: connectedDevicePlatform(),
       });
       localRef.current = { localId: local.id, serverId: server.id };
+      // Pairing only needs the initialized native endpoint and registered server
+      // device. Do not keep it blocked behind presence or peer discovery, which
+      // may be temporarily unavailable while a user is trying to add a device.
+      setSnapshot(native);
+      setReady(true);
       await devicesApi.presence(signedAgentDeviceRequest, local.id, server.id, {
         endpointId: native.endpointId,
         protocolVersion: "misty-device/1",
@@ -253,6 +271,7 @@ export function useConnectedDevices() {
     snapshot,
     peers,
     loading,
+    ready,
     error,
     pairing,
     setPairing,

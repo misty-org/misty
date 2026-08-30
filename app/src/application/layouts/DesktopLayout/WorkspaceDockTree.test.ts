@@ -3,25 +3,97 @@ import { describe, expect, it } from "vitest";
 import { groupTabs } from "./WorkspaceDockTree";
 
 describe("workspace tab groups", () => {
-  it("shows Space tools as independent Journal, Planner, Chat, and Library tabs", () => {
+  it("keeps each Space tool in its own tab group", () => {
     const tabs = [
       spaceTab("journal", "Journal", "/spaces/one/notes"),
       spaceTab("planner", "Planner", "/spaces/one/planner/tasks/board"),
-      spaceTab("chat", "Chat", "/spaces/one/chat"),
+      spaceTab("social", "Social", "/spaces/one/social"),
       spaceTab("library", "Library", "/spaces/one/library"),
     ];
 
     expect(groupTabs(tabs)).toMatchObject([
-      { key: "space:one:journal", label: "Journal", tabs: [{ id: "tab:journal" }] },
-      { key: "space:one:planner", label: "Planner", tabs: [{ id: "tab:planner" }] },
-      { key: "space:one:chat", label: "Chat", tabs: [{ id: "tab:chat" }] },
-      { key: "space:one:library", label: "Library", tabs: [{ id: "tab:library" }] },
+      {
+        key: "space:one:journal",
+        surfaceId: "space",
+        label: "Journal",
+        contextLabel: "Space · Journal",
+        tabs: [{ id: "tab:journal", title: "Journal" }],
+      },
+      {
+        key: "space:one:planner",
+        surfaceId: "space",
+        label: "Planner",
+        contextLabel: "Space · Planner",
+        tabs: [{ id: "tab:planner", title: "Planner" }],
+      },
+      {
+        key: "space:one:social",
+        surfaceId: "space",
+        label: "Social",
+        contextLabel: "Space · Social",
+        tabs: [{ id: "tab:social", title: "Social" }],
+      },
+      {
+        key: "space:one:library",
+        surfaceId: "space",
+        label: "Library",
+        contextLabel: "Space · Library",
+        tabs: [{ id: "tab:library", title: "Library" }],
+      },
+    ]);
+  });
+
+  it("separates legacy Space tabs that shared one persisted group key", () => {
+    const tabs = [
+      spaceTab("journal", "Journal", "/spaces/one/notes"),
+      spaceTab("planner", "Planner", "/spaces/one/planner/tasks/board"),
+      spaceTab("social", "Social", "/spaces/one/social"),
+      spaceTab("library", "Library", "/spaces/one/library"),
+    ].map((tab) => ({ ...tab, groupKey: "space:one" as const }));
+
+    expect(groupTabs(tabs).map((group) => group.key)).toEqual([
+      "space:one:journal",
+      "space:one:planner",
+      "space:one:social",
+      "space:one:library",
+    ]);
+  });
+
+  it("groups multiple browser tabs together into a single tab group", () => {
+    const tabs: WorkspaceTab[] = [
+      browserTab("tab-1", "Google", "https://google.com"),
+      browserTab("tab-2", "GitHub", "https://github.com"),
+      browserTab("tab-3", "Misty", "https://misty.com"),
+    ];
+
+    expect(groupTabs(tabs)).toMatchObject([
+      {
+        key: "tool:browser",
+        surfaceId: "browser",
+        label: "Browser",
+        tabs: [{ id: "tab-1" }, { id: "tab-2" }, { id: "tab-3" }],
+      },
     ]);
   });
 });
 
+function browserTab(id: string, title: string, url: string): WorkspaceTab {
+  return {
+    id,
+    surfaceId: "browser",
+    groupKey: "tool:browser",
+    instanceKey: id,
+    title,
+    route: "/browser",
+    sidebarVisible: true,
+    state: { url },
+    createdAt: 1,
+    lastFocusedAt: 1,
+  };
+}
+
 function spaceTab(
-  tool: "journal" | "planner" | "chat" | "library",
+  tool: "journal" | "planner" | "social" | "library",
   title: string,
   route: string,
 ): WorkspaceTab {

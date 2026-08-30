@@ -1,3 +1,4 @@
+import { SystemErrorActivity } from "@/features/activity";
 import {
   Button,
   Card,
@@ -22,8 +23,7 @@ export type {
   NotesIntegrationsDialogProps,
 } from "../model/interfaces/components/NotesIntegrationsDialog";
 
-const sectionTitleClass =
-  "mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-cream-muted/70";
+const sectionTitleClass = "mb-2 text-[10px] font-semibold text-cream-muted/70";
 
 export function NotesIntegrationsDialog(props: NotesIntegrationsDialogProps) {
   const connected = props.adjacent.filter((entry) => entry.availability === "connected");
@@ -113,7 +113,11 @@ function ConnectorCard(props: ConnectorCardProps) {
               : "Misty reads selected pages and writes only when you explicitly publish."}
           </p>
           {props.error ? (
-            <p className="mt-1 text-[11px] text-sage-fg">{props.error}</p>
+            <SystemErrorActivity
+              error={props.error}
+              scope={`notes:connector:${connector.id}`}
+              title={`${connector.name} could not be refreshed`}
+            />
           ) : lastSynced ? (
             <p className="mt-1 text-[11px] text-cream-muted/60">
               Last synced {relativeTime(lastSynced)}

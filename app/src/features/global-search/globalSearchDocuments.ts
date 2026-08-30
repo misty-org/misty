@@ -1,6 +1,6 @@
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
-import { useSpacesStore } from "@/features/spaces";
+import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
 import type { SearchResult } from "@/native/contracts";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchContextItem, GlobalSearchDocument, GlobalSearchResult } from "./types";
@@ -48,8 +48,12 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
         kind: "message",
         title: message.sender_name || "Message",
         body,
-        keywords: [space.name, "chat", "message"],
-        href: `/spaces/${encodeURIComponent(spaceId)}/chat?message=${encodeURIComponent(message.id)}`,
+        keywords: [space.name, "social", "message", "instagram", "discord", "messenger", "x"],
+        href: socialProviderPath(
+          spaceId,
+          socialProvider(message.social_provider) ?? "misty",
+          new URLSearchParams({ message: message.id }),
+        ),
         spaceId,
         spaceName: space.name,
         updatedAt: message.created_at,
@@ -233,12 +237,18 @@ function scoreDocument(document: GlobalSearchDocument, terms: string[]): number 
   const keywords = normalize(document.keywords.join(" "));
   let score = 0;
   for (const term of terms) {
-    if (!title.includes(term) && !keywords.includes(term) && !body.includes(term)) return 0;
+    const titleFuzzy = fuzzyFieldScore(title, term);
+    const keywordFuzzy = fuzzyFieldScore(keywords, term);
+    const bodyFuzzy = fuzzyFieldScore(body, term);
+    if (!titleFuzzy && !keywordFuzzy && !bodyFuzzy) return 0;
     if (title === term) score += 12;
     else if (title.startsWith(term)) score += 8;
     else if (title.includes(term)) score += 6;
+    else score += titleFuzzy * 4;
     if (keywords.includes(term)) score += 3;
+    else score += keywordFuzzy * 2;
     if (body.includes(term)) score += 1;
+    else score += bodyFuzzy;
   }
   return score + Math.max(0, 1 - (Date.now() - recency(document.updatedAt)) / 2.592e9);
 }
@@ -255,6 +265,75 @@ export function mergeResults(
     if (!existing || result.score > existing.score) merged.set(key, result);
   }
   return [...merged.values()].sort((left, right) => right.score - left.score).slice(0, limit);
+}
+
+/**
+ * Reciprocal-rank fusion keeps lexical, semantic, device, and cloud scores in
+ * their native domains. Raw similarity scores from those systems are not
+ * comparable, but their rank positions are stable and useful.
+ */
+export function fuseRankedResults(lists: GlobalSearchResult[][], limit: number) {
+  const fused = new Map<string, { result: GlobalSearchResult; score: number }>();
+  lists.forEach((list, listIndex) => {
+    const weight = listIndex === 0 ? 1.15 : 1;
+    list.forEach((result, rank) => {
+      const key = result.canonicalId ?? canonicalResultKey(result);
+      const contribution = weight / (40 + rank + 1);
+      const current = fused.get(key);
+      if (!current) fused.set(key, { result, score: contribution });
+      else {
+        current.score += contribution;
+        if ((result.body?.length ?? 0) > (current.result.body?.length ?? 0)) {
+          current.result = { ...current.result, ...result };
+        }
+      }
+    });
+  });
+  return [...fused.values()]
+    .map(({ result, score }) => ({ ...result, score: score * 1_000 }))
+    .sort(
+      (left, right) =>
+        right.score - left.score || recency(right.updatedAt) - recency(left.updatedAt),
+    )
+    .slice(0, limit);
+}
+
+function canonicalResultKey(result: GlobalSearchResult) {
+  return `${result.kind}:${result.id.replace(/^(activity|file|task|space|message|library|note|calendar|roadmap|provider):/, "")}`;
+}
+
+function fuzzyFieldScore(field: string, term: string) {
+  if (term.length < 3) return 0;
+  const tokens = field.split(" ").filter(Boolean);
+  let best = 0;
+  for (const token of tokens) {
+    if (token.startsWith(term) || term.startsWith(token)) best = Math.max(best, 0.9);
+    else if (Math.abs(token.length - term.length) <= 2 && editDistanceWithin(token, term, 2)) {
+      best = Math.max(best, 0.68);
+    }
+  }
+  return best;
+}
+
+function editDistanceWithin(left: string, right: string, maximum: number) {
+  if (Math.abs(left.length - right.length) > maximum) return false;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    const current = [i];
+    let rowMinimum = i;
+    for (let j = 1; j <= right.length; j += 1) {
+      const value = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1),
+      );
+      current[j] = value;
+      rowMinimum = Math.min(rowMinimum, value);
+    }
+    if (rowMinimum > maximum) return false;
+    previous = current;
+  }
+  return previous[right.length] <= maximum;
 }
 
 function normalize(value: string): string {

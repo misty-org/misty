@@ -1,4 +1,5 @@
 import { fetchPreviewBytes } from "@/api/preview/api";
+import { SystemErrorActivity } from "@/features/activity";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion, Loader2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -54,12 +55,20 @@ export function EmbeddedUniversalPreview(props: {
     );
   if (props.error || documentError)
     return (
-      <PreviewMessage
-        icon={<FileQuestion size={34} />}
-        title="Preview needs attention"
-        detail={props.error || documentError || "The file could not be read."}
-        action={props.fallbackAction}
-      />
+      <>
+        <SystemErrorActivity
+          error={props.error || documentError}
+          scope="files:embedded-preview"
+          title="File preview could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+        <PreviewMessage
+          icon={<FileQuestion size={34} />}
+          title="Preview needs attention"
+          detail="Open Activity for details."
+          action={props.fallbackAction}
+        />
+      </>
     );
   if (isImage && props.url)
     return (

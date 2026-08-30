@@ -1,6 +1,12 @@
 import { mailApi, type MailAccount, type MailThread } from "@/api/mail";
+import { ApiRequestError } from "@/api/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resetInboxAccountState, selectUnifiedThreads, useInboxStore } from "./useInboxStore";
+import {
+  resetInboxAccountState,
+  selectUnifiedThreads,
+  selectVisibleInboxThreads,
+  useInboxStore,
+} from "./useInboxStore";
 
 vi.mock("@/api/mail", () => ({
   mailApi: {
@@ -105,6 +111,25 @@ describe("Inbox store", () => {
     expect(useInboxStore.getState().error).toBeNull();
   });
 
+  it("retains a live provider authorization code for account recovery", async () => {
+    vi.mocked(mailApi.accounts).mockResolvedValue({ accounts: [accounts[0]] });
+    vi.mocked(mailApi.threads).mockRejectedValue(
+      new ApiRequestError(
+        "Reconnect this email account.",
+        424,
+        "mail_provider_authorization_failed",
+      ),
+    );
+    useInboxStore.getState().setAccount("misty-account");
+
+    await useInboxStore.getState().load();
+
+    expect(useInboxStore.getState().accounts[0]?.status).toBeUndefined();
+    expect(useInboxStore.getState().accountErrorCodes.good).toBe(
+      "mail_provider_authorization_failed",
+    );
+  });
+
   it("clears removed-account content during a force refresh", async () => {
     vi.mocked(mailApi.accounts).mockResolvedValue({ accounts: [accounts[0]] });
     vi.mocked(mailApi.threads).mockResolvedValue({ threads: [thread("thread-1")] });
@@ -193,7 +218,46 @@ describe("Inbox store", () => {
     );
   });
 
-  it("prefetches message bodies after returning the thread summaries", async () => {
+  it("scopes visible accounts and threads to the selected provider", () => {
+    const gmailThread = { ...thread("gmail-thread"), connectionId: "good", key: "good:gmail" };
+    const outlookThread = {
+      ...thread("outlook-thread"),
+      provider: "outlook",
+      connectionId: "outlook",
+      key: "outlook:thread",
+    };
+    const state = {
+      accounts: [
+        accounts[0],
+        {
+          ...accounts[1],
+          connection_id: "outlook",
+          provider: "microsoft",
+        },
+      ],
+      selectedConnectionId: "",
+      selectedProvider: "google",
+      threadsByConnection: { good: [gmailThread], outlook: [outlookThread] },
+    };
+
+    expect(selectVisibleInboxThreads(state).map((item) => item.provider_id)).toEqual([
+      "gmail-thread",
+    ]);
+  });
+
+  it("keeps the navbar provider selected while initializing an account", () => {
+    useInboxStore.setState({ selectedProvider: "google" });
+
+    useInboxStore.getState().setAccount("misty-account");
+
+    expect(useInboxStore.getState()).toMatchObject({
+      accountId: "misty-account",
+      selectedProvider: "google",
+      selectedConnectionId: "",
+    });
+  });
+
+  it("loads thread details only after the user opens a summary", async () => {
     vi.mocked(mailApi.accounts).mockResolvedValue({ accounts: [accounts[0]] });
     vi.mocked(mailApi.threads).mockResolvedValue({ threads: [thread("thread-1")] });
     vi.mocked(mailApi.thread).mockResolvedValue({ thread: detailedThread("thread-1") });
@@ -201,9 +265,13 @@ describe("Inbox store", () => {
 
     await useInboxStore.getState().load();
 
-    await vi.waitFor(() =>
-      expect(selectUnifiedThreads(useInboxStore.getState())[0]?.messages).toHaveLength(1),
-    );
+    const summary = selectUnifiedThreads(useInboxStore.getState())[0];
+    expect(summary?.messages).toHaveLength(0);
+    expect(mailApi.thread).not.toHaveBeenCalled();
+
+    await useInboxStore.getState().openThread(summary!);
+
+    expect(useInboxStore.getState().selectedThread?.messages).toHaveLength(1);
     expect(mailApi.thread).toHaveBeenCalledWith("good", "thread-1");
   });
 
@@ -223,5 +291,43 @@ describe("Inbox store", () => {
 
     expect(useInboxStore.getState().selectedThread?.messages[0]?.body.text).toBe("Prefetched body");
     expect(mailApi.thread).not.toHaveBeenCalled();
+  });
+
+  it("updates local thread state when acting on a thread (read, archived, starred, trashed)", async () => {
+    const activeThread = {
+      ...thread("thread-act"),
+      connectionId: "good",
+      key: "good:thread-act",
+      unread: true,
+      starred: false,
+      labels: ["INBOX"],
+    };
+    vi.mocked(mailApi.actOnThread).mockResolvedValue({
+      thread_id: "thread-act",
+      added_labels: [],
+      removed_labels: [],
+    });
+    useInboxStore.getState().setAccount("misty-account");
+    useInboxStore.setState({
+      threadsByConnection: { good: [activeThread] },
+      selectedThread: activeThread,
+      selectedThreadKey: activeThread.key,
+    });
+
+    // Mark as read
+    await useInboxStore.getState().actOnThread(activeThread, { read: true });
+    expect(useInboxStore.getState().selectedThread?.unread).toBe(false);
+
+    // Star
+    await useInboxStore.getState().actOnThread(activeThread, { starred: true });
+    expect(useInboxStore.getState().selectedThread?.starred).toBe(true);
+
+    // Archive
+    await useInboxStore.getState().actOnThread(activeThread, { archived: true });
+    expect(useInboxStore.getState().selectedThread?.labels).not.toContain("INBOX");
+
+    // Trash / Delete
+    await useInboxStore.getState().actOnThread(activeThread, { trashed: true });
+    expect(useInboxStore.getState().selectedThread?.labels).toContain("TRASH");
   });
 });

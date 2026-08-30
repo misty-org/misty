@@ -13,6 +13,9 @@ export type IntegrationCapability =
   | "drawings_projects"
   | "drawings_comments"
   | "drawings_webhooks"
+  | "social_read"
+  | "social_send"
+  | "social_automation"
   | "agent_tools";
 
 export type IntegrationConnectionStatus =

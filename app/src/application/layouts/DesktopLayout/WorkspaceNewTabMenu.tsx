@@ -1,32 +1,35 @@
+import { routes } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
-import { rememberedJournalRoute, rememberedPlannerRoute, useSpacesStore } from "@/features/spaces";
-import { useWorkspaceStore, type WorkspaceSurfaceId } from "@/features/workspace";
+import {
+  preferredMistySpace,
+  rememberedJournalRoute,
+  rememberedPlannerRoute,
+  socialProviderPath,
+  useSpacesStore,
+} from "@/features/spaces";
+import {
+  NAVIGATOR_APP_IDS,
+  WORKSPACE_TOOLS_META,
+  WorkspaceAppIcon,
+  navigatorAppIdsForAccount,
+  useNavigatorAppsStore,
+  useWorkspaceStore,
+  type NavigatorAppId,
+  type WorkspaceSurfaceId,
+} from "@/features/workspace";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/shared/ui";
-import {
-  ArrowLeftRight,
-  Blocks,
-  BookOpenText,
-  Bot,
-  CheckSquare2,
-  Code2,
-  FolderOpen,
-  Globe2,
-  House,
-  Inbox,
-  MessagesSquare,
-  Notebook,
-  Plus,
-  SquareTerminal,
-  type LucideIcon,
-} from "lucide-react";
+import { Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface NewTabOption {
+  appId: NavigatorAppId;
   surfaceId: WorkspaceSurfaceId;
   label: string;
   route: string;
@@ -34,49 +37,28 @@ export interface NewTabOption {
   instancePolicy?: "single" | "multiple";
 }
 
-export const GENERAL_TAB_OPTIONS: NewTabOption[] = [
-  { surfaceId: "home", label: "Home", route: "/home", icon: House },
-  {
-    surfaceId: "inbox",
-    label: "Inbox",
-    route: "/inbox",
-    icon: Inbox,
-    instancePolicy: "single",
-  },
-  { surfaceId: "browser", label: "Browser", route: "/browser", icon: Globe2 },
-  {
-    surfaceId: "code",
-    label: "Code",
-    route: "/code",
-    icon: Code2,
-    instancePolicy: "multiple",
-  },
-  { surfaceId: "files", label: "Files", route: "/files", icon: FolderOpen },
-  {
-    surfaceId: "transfers",
-    label: "Transfers",
-    route: "/transfers",
-    icon: ArrowLeftRight,
-    instancePolicy: "single",
-  },
-  { surfaceId: "terminal", label: "Terminal", route: "/terminal", icon: SquareTerminal },
-  {
-    surfaceId: "agents",
-    label: "Agents",
-    route: "/agents",
-    icon: Bot,
-    instancePolicy: "single",
-  },
-  {
-    surfaceId: "extensions",
-    label: "Extensions",
-    route: "/extensions",
-    icon: Blocks,
-    instancePolicy: "single",
-  },
-];
+export function createNewTabOptions({
+  spaceId,
+  accountId = "",
+}: {
+  spaceId?: string;
+  accountId?: string;
+} = {}): NewTabOption[] {
+  return NAVIGATOR_APP_IDS.map((appId) => {
+    const app = WORKSPACE_TOOLS_META[appId];
+    return {
+      appId,
+      surfaceId: app.surfaceId,
+      label: app.label,
+      route: newTabRoute(appId, spaceId, accountId),
+      icon: app.icon,
+      instancePolicy: "multiple" as const,
+    };
+  });
+}
 
-export const NEW_TAB_OPTIONS: NewTabOption[] = GENERAL_TAB_OPTIONS;
+export const NEW_TAB_OPTIONS: NewTabOption[] = createNewTabOptions();
+export const GENERAL_TAB_OPTIONS = NEW_TAB_OPTIONS;
 
 interface Props {
   paneId: string;
@@ -84,10 +66,29 @@ interface Props {
 }
 
 export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
+  const [open, setOpen] = useState(false);
   const { user } = useAuth();
+  const accountId = user?.id ?? "";
+  const enabledAppIds = useNavigatorAppsStore((state) =>
+    navigatorAppIdsForAccount(state, accountId),
+  );
   const spaces = useSpacesStore((state) => state.spaces);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const [open, setOpen] = useState(false);
+  const scopedSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
+  const activeSpaceId =
+    spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredMistySpace(spaces)?.id;
+  const options = useMemo(() => {
+    const optionsById = new Map(
+      createNewTabOptions({ spaceId: activeSpaceId, accountId }).map((option) => [
+        option.appId,
+        option,
+      ]),
+    );
+    return enabledAppIds.flatMap((appId) => {
+      const option = optionsById.get(appId);
+      return option ? [option] : [];
+    });
+  }, [accountId, activeSpaceId, enabledAppIds]);
 
   useEffect(() => {
     const openPicker = (event: Event) => {
@@ -96,50 +97,6 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
     window.addEventListener("misty:open-new-tab-picker", openPicker);
     return () => window.removeEventListener("misty:open-new-tab-picker", openPicker);
   }, [paneId]);
-
-  const activeSpace = useMemo(() => {
-    const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
-    return spaces.find((s) => s.id === activeSpaceId) ?? spaces[0];
-  }, [activeScopeKey, spaces]);
-
-  const spaceTabOptions = useMemo<NewTabOption[]>(() => {
-    const accountId = user?.id ?? "";
-    if (!activeSpace) {
-      return [
-        { surfaceId: "space", label: "Journal", route: "/spaces", icon: Notebook },
-        { surfaceId: "space", label: "Planner", route: "/spaces", icon: CheckSquare2 },
-        { surfaceId: "space", label: "Chat", route: "/spaces", icon: MessagesSquare },
-        { surfaceId: "space", label: "Library", route: "/spaces", icon: BookOpenText },
-      ];
-    }
-    const encodedId = encodeURIComponent(activeSpace.id);
-    return [
-      {
-        surfaceId: "space",
-        label: "Journal",
-        route: rememberedJournalRoute(accountId, activeSpace.id),
-        icon: Notebook,
-      },
-      {
-        surfaceId: "space",
-        label: "Planner",
-        route: rememberedPlannerRoute(accountId, activeSpace.id),
-        icon: CheckSquare2,
-      },
-      {
-        surfaceId: "space",
-        label: "Chat",
-        route: `/spaces/${encodedId}/chat`,
-        icon: MessagesSquare,
-      },
-      {
-        surfaceId: "space",
-        label: "Library",
-        route: `/spaces/${encodedId}/library`,
-        icon: BookOpenText,
-      },
-    ];
-  }, [activeSpace, user?.id]);
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -153,21 +110,51 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
           <Plus size={15} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[200px]">
-        {[...GENERAL_TAB_OPTIONS, ...spaceTabOptions].map((option) => {
-          const Icon = option.icon;
-          return (
-            <DropdownMenuItem
-              key={`${option.surfaceId}:${option.label}`}
-              onSelect={() => onOpenNewTab(option, paneId)}
-              className="flex items-center gap-2"
-            >
-              <Icon size={14} className="text-cream-muted" />
-              <span>{option.label}</span>
-            </DropdownMenuItem>
-          );
-        })}
+      <DropdownMenuContent
+        align="end"
+        collisionPadding={8}
+        className="w-[min(360px,calc(100vw-16px))] p-1.5"
+        style={{ maxHeight: "none", overflow: "visible" }}
+      >
+        <DropdownMenuGroup aria-label="Apps">
+          <DropdownMenuLabel className="px-2 pb-1 pt-1 text-[11px]">Apps</DropdownMenuLabel>
+          {options.length ? (
+            <div className="grid grid-cols-2 gap-0.5">
+              {options.map((option) => (
+                <NewTabMenuItem
+                  key={`${option.surfaceId}:${option.label}`}
+                  option={option}
+                  onSelect={() => onOpenNewTab(option, paneId)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="px-2 py-4 text-center text-xs text-cream-muted">
+              No apps enabled. Add apps from the sidebar.
+            </p>
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function NewTabMenuItem(props: { option: NewTabOption; onSelect: () => void }) {
+  return (
+    <DropdownMenuItem onSelect={props.onSelect} className="h-8 min-w-0 gap-2 px-2 text-[13px]">
+      <WorkspaceAppIcon appId={props.option.appId} size="picker" />
+      <span className="truncate">{props.option.label}</span>
+    </DropdownMenuItem>
+  );
+}
+
+function newTabRoute(appId: NavigatorAppId, spaceId: string | undefined, accountId: string) {
+  if (appId === "social") return spaceId ? socialProviderPath(spaceId, "misty") : routes.spaces;
+  if (appId === "journal")
+    return spaceId ? rememberedJournalRoute(accountId, spaceId) : routes.spaces;
+  if (appId === "planner")
+    return spaceId ? rememberedPlannerRoute(accountId, spaceId) : routes.spaces;
+  if (appId === "library")
+    return spaceId ? `/spaces/${encodeURIComponent(spaceId)}/library` : routes.spaces;
+  return routes[appId];
 }

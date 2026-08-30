@@ -46,6 +46,7 @@ export function RoadmapCanvas(props: {
   selectedId: string;
   canManage: boolean;
   expandedGoalIds: Set<string>;
+  focusRequest?: { id: string; token: string };
   placementRequest?: { paletteId: string; token: string };
   onPlacementHandled: () => void;
   onToggleGoal: (goalId: string) => void;
@@ -88,21 +89,9 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const placedRequestRef = useRef("");
   const fittedRef = useRef(Boolean(savedViewport));
-  const graphVersionRef = useRef(props.snapshot.roadmap.graph_version);
   const history = useGraphHistory<RoadmapNode>();
   const nodesInitialized = useNodesInitialized();
 
-  useEffect(() => {
-    if (graphVersionRef.current === props.snapshot.roadmap.graph_version) return;
-    graphVersionRef.current = props.snapshot.roadmap.graph_version;
-    const nextNodes = snapshotRoadmapNodes(
-      props.snapshot,
-      props.expandedGoalIds,
-      props.onToggleGoal,
-    );
-    setNodes(nextNodes);
-    setEdges(snapshotRoadmapEdges(props.snapshot, nextNodes));
-  }, [props.expandedGoalIds, props.onToggleGoal, props.snapshot, setEdges, setNodes]);
   useEffect(() => {
     const nextNodes = snapshotRoadmapNodes(
       props.snapshot,
@@ -119,10 +108,24 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
     if (!nodesInitialized || fittedRef.current || !nodes.length) return;
     fittedRef.current = true;
     const frame = window.requestAnimationFrame(
-      () => void fitView({ padding: 0.18, maxZoom: 1, duration: 260 }),
+      () => void fitView({ padding: 0.1, maxZoom: 1.08, duration: 260 }),
     );
     return () => window.cancelAnimationFrame(frame);
   }, [fitView, nodes.length, nodesInitialized]);
+  useEffect(() => {
+    if (!props.focusRequest || !nodesInitialized) return;
+    const frame = window.requestAnimationFrame(
+      () =>
+        void fitView({
+          nodes: [{ id: props.focusRequest!.id }],
+          padding: 1.25,
+          minZoom: 0.72,
+          maxZoom: 1.08,
+          duration: 320,
+        }),
+    );
+    return () => window.cancelAnimationFrame(frame);
+  }, [fitView, nodesInitialized, props.focusRequest]);
   useEffect(() => {
     const request = props.placementRequest;
     const canvas = canvasRef.current;
@@ -244,7 +247,7 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
         onPaste={pasteSelection}
         onDuplicate={duplicateSelection}
         onDelete={deleteSelection}
-        onFit={() => void fitView({ padding: 0.18, maxZoom: 1, duration: 260 })}
+        onFit={() => void fitView({ padding: 0.1, maxZoom: 1.08, duration: 260 })}
       />
       <ReactFlow<RoadmapNode, Edge>
         colorMode={resolvedTheme}
@@ -307,9 +310,7 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
             aria-label="Choose connection type"
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-cream-muted">
-              Connection type
-            </p>
+            <p className="mb-1 px-2 text-[10px] font-semibold text-cream-muted">Connection type</p>
             {pendingConnection.types.map((type) => (
               <Button
                 key={type}
@@ -317,7 +318,6 @@ function RoadmapFlow(props: Parameters<typeof RoadmapCanvas>[0]) {
                 className="h-9 w-full justify-start text-xs"
                 onClick={() => {
                   props.onConnect(pendingConnection.connection, type);
-                  setEdges((current) => current.filter((edge) => !edge.id.startsWith("pending:")));
                   setPendingConnection(undefined);
                 }}
               >

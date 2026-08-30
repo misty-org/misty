@@ -13,7 +13,7 @@ const identityState = {
 };
 
 const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
-  home: descriptor("home", "multiple", "unmount", 360, 240),
+  home: descriptor("home", "singleton", "suspend", 360, 240),
   inbox: descriptor("inbox", "singleton", "suspend", 520, 280),
   space: descriptor("space", "per-space", "suspend", 360, 240),
   browser: {
@@ -32,7 +32,7 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   files: descriptor("files", "multiple", "suspend", 360, 240),
   transfers: descriptor("transfers", "singleton", "suspend", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
-  extensions: descriptor("extensions", "singleton", "suspend", 360, 240),
+  marketplace: descriptor("marketplace", "singleton", "suspend", 360, 240),
 };
 
 function descriptor(

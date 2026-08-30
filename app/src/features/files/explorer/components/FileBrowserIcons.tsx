@@ -17,7 +17,7 @@ const materialIconUrls = Object.fromEntries(
 );
 
 export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "table" | "grid" }) {
-  const size = props.size ?? (props.variant === "table" ? 22 : 18);
+  const size = props.size ?? 20;
   const iconUrl = materialIconUrlForEntry(props.entry);
 
   if (iconUrl) {
@@ -29,6 +29,7 @@ export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "ta
         draggable={false}
         height={size}
         src={iconUrl}
+        style={{ width: size, height: size }}
         width={size}
       />
     );
@@ -49,7 +50,7 @@ export function FileNameIcon(props: {
   className?: string;
 }) {
   const kind = props.kind ?? "file";
-  const size = props.size ?? 18;
+  const size = props.size ?? 20;
   const iconUrl = materialIconUrlForName(props.name, kind, props.open ?? false);
   if (iconUrl) {
     return (
@@ -73,7 +74,7 @@ export function FileNameIcon(props: {
 }
 
 export function GenericFileIcon(props: { kind: "file" | "folder"; size?: number }) {
-  const size = props.size ?? 18;
+  const size = props.size ?? 20;
   const iconUrl = materialIconUrl(
     props.kind === "folder" ? materialTheme.folder : materialTheme.file,
   );
@@ -86,6 +87,7 @@ export function GenericFileIcon(props: { kind: "file" | "folder"; size?: number 
         draggable={false}
         height={size}
         src={iconUrl}
+        style={{ width: size, height: size }}
         width={size}
       />
     );

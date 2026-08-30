@@ -1,7 +1,4 @@
-import type { ScheduleField } from "../types/connections/calendarTasks";
 import type { WorkflowVersion } from "./agentArchitectureTypes";
-import type { TaskCalendarLink, TaskSchedule } from "./connections/calendarTasks";
-import type { MessageOrigin } from "./connections/discord";
 
 import type {
   InboxKind,
@@ -47,7 +44,7 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "google" | "discord" | "slack" | "notion" | "github";
+export type SpaceIntegrationProvider = "github";
 
 export interface SpaceTemplateSeedSummary {
   task_count: number;
@@ -109,15 +106,6 @@ export interface SpaceTask {
   version: number;
   completed_at?: string;
   archived_at?: string;
-  /**
-   * Schedule fields Google Calendar owns, present on calendar-backed tasks and
-   * local drafts. Misty-only tasks leave this unset.
-   */
-  schedule?: TaskSchedule;
-  /** Binding to a Google calendar. Absent on Misty-only tasks. */
-  calendar?: TaskCalendarLink;
-  /** Set by a sync pass when local edits collide with a Google update. */
-  conflicted_fields?: ScheduleField[];
   created_at: string;
   updated_at: string;
 }
@@ -138,7 +126,7 @@ export interface SpaceCalendarSource {
   space_id: string;
   integration_id: string;
   connected_by_user_id: string;
-  provider: "google" | "misty";
+  provider: string;
   external_calendar_id: string;
   display_name: string;
   timezone: string;
@@ -151,11 +139,19 @@ export interface SpaceCalendarSource {
   updated_at: string;
 }
 
+export interface GoogleCalendarChoice {
+  id: string;
+  summary: string;
+  timeZone: string;
+  primary?: boolean;
+  accessRole: string;
+}
+
 export interface SpaceCalendarEvent {
   id: string;
   space_id: string;
   source_id: string;
-  provider: "google" | "misty";
+  provider: string;
   external_event_id: string;
   fingerprint: string;
   title: string;
@@ -176,14 +172,6 @@ export interface SpaceCalendarEvent {
   version?: number;
   audience_kind?: "space" | "conversation";
   audience_conversation_id?: string;
-}
-
-export interface GoogleCalendarChoice {
-  id: string;
-  summary: string;
-  timeZone: string;
-  primary?: boolean;
-  accessRole: string;
 }
 
 export interface SpaceMessage {
@@ -208,12 +196,18 @@ export interface SpaceMessage {
   reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
   edited_at?: string;
-  /**
-   * Set only on mirrored messages. Absent means Misty-native chat, so every
-   * existing caller stays valid and the UI can treat "no origin" as "ours".
-   */
-  origin?: MessageOrigin;
   triggered_runs?: SpaceMessageAgentRun[];
+  origin?: {
+    kind?: string;
+    author_name?: string;
+    author_avatar_url?: string;
+    [key: string]: unknown;
+  };
+  social_provider?: "misty" | "instagram" | "discord" | "messenger" | "x";
+  social_external_id?: string;
+  social_direction?: "inbound" | "outbound";
+  social_delivery_state?:
+    "queued" | "sending" | "sent" | "delivered" | "read" | "failed" | "cancelled";
   created_at: string;
 }
 export interface SpaceMessageReaction {

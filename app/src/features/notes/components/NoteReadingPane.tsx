@@ -1,50 +1,30 @@
-import {
-  AgentAvatar,
-  AgentConversationPanel,
-  useAgentActivity,
-  usePersonalAgentsStore,
-} from "@/features/agents";
 import { notesApi } from "@/api/notes/api";
-import { AiSurfaceButton } from "@/features/ai-surface/AiPaneHost";
-import { useSpacesStore } from "@/features/spaces";
 import {
   Button,
   EmptyState,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
   cn,
 } from "@/shared/ui";
 import {
-  Bot,
+  ChevronLeft,
   ChevronRight,
-  ExternalLink,
   FileText,
   Link2,
-  LoaderCircle,
   PanelRightClose,
-  Send,
-  Sparkles,
 } from "lucide-react";
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { Text as YText } from "yjs";
-import { useShallow } from "zustand/react/shallow";
 import { useNoteCollaborationRoom } from "../hooks/useNoteCollaborationRoom";
 import type { NoteBodyFormat, UnifiedNote } from "../model/types/types";
-import { relativeTime } from "../noteFilters";
-import { NoteSourceBadge, NoteSyncIndicator } from "./NoteSourceBadge";
 
 const NoteBlockEditor = lazy(() => import("./NoteBlockEditor"));
 const paneClass = "grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg";
 const headerClass =
-  "flex min-h-[58px] shrink-0 items-center gap-3 border-b border-charcoal-border bg-charcoal-bg px-4 py-2";
+  "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3";
 
 export function NoteReadingPane(props: NoteReadingPaneProps) {
   const { note } = props;
-  const [inspector, setInspector] = useState<"backlinks" | "agent" | null>(null);
+  const [inspector, setInspector] = useState<"backlinks" | null>(null);
   useEffect(() => setInspector(null), [note?.id]);
 
   if (props.loading) return <ReadingPaneSkeleton />;
@@ -82,10 +62,20 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
   return (
     <article className={paneClass} aria-label={note.title}>
       <header className={headerClass}>
-        <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-charcoal-card text-cream-muted ring-1 ring-cream/10">
-          <FileText size={16} />
-        </div>
-        <div className="min-w-0 flex-1">
+        {props.onBack ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-cream-muted hover:text-cream-bright"
+            onClick={props.onBack}
+            aria-label="Back to notes"
+          >
+            <ChevronLeft size={16} />
+            <span className="text-xs font-medium">Notes</span>
+          </Button>
+        ) : null}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {collaborative && note.spaceId ? (
             <CollaborativeTitleInput
               spaceId={note.spaceId}
@@ -93,56 +83,18 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
               initialTitle={note.title}
             />
           ) : (
-            <h1 className="m-0 truncate text-[15px] font-semibold leading-tight text-cream-bright">
+            <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">
               {note.title}
             </h1>
           )}
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-cream-muted">
-            <span className="truncate">{note.spaceName}</span>
-            <span aria-hidden="true">·</span>
-            <span className="shrink-0">Updated {relativeTime(note.updatedAt)}</span>
-            <NoteSourceBadge source={note.source} />
-            <NoteSyncIndicator status={note.syncStatus} />
-          </div>
         </div>
-        <div className="ml-auto flex items-center gap-1">
-          <AiSurfaceButton />
-          {note.source === "notion" && props.onOpenInSource ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 gap-1.5"
-              onClick={() => props.onOpenInSource?.(note.id)}
-            >
-              <ExternalLink size={14} />
-              <span className="hidden 2xl:inline">Open in Notion</span>
-            </Button>
-          ) : null}
-          {note.source === "misty" && props.onPublish ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 gap-1.5"
-              disabled={props.publishing}
-              onClick={() => props.onPublish?.(note.id)}
-            >
-              {props.publishing ? (
-                <LoaderCircle className="animate-spin" size={14} />
-              ) : (
-                <Send size={14} />
-              )}
-              <span className="hidden 2xl:inline">
-                {props.publishing ? "Publishing" : "Publish to Notion"}
-              </span>
-            </Button>
-          ) : null}
+        <div className="ml-auto flex items-center gap-1.5">
           <Button
             type="button"
             size="sm"
             variant={inspector === "backlinks" ? "secondary" : "ghost"}
             className="h-8 gap-1.5"
+            aria-label="Backlinks"
             onClick={() =>
               setInspector((current) => (current === "backlinks" ? null : "backlinks"))
             }
@@ -154,16 +106,6 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
                 {note.backlinkCount}
               </span>
             ) : null}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={inspector === "agent" ? "secondary" : "ghost"}
-            className="h-8 gap-1.5"
-            onClick={() => setInspector((current) => (current === "agent" ? null : "agent"))}
-          >
-            <Sparkles size={14} />
-            <span>Agent</span>
           </Button>
         </div>
       </header>
@@ -213,7 +155,6 @@ export function NoteReadingPane(props: NoteReadingPaneProps) {
         </div>
         {inspector ? (
           <JournalInspector
-            mode={inspector}
             note={note}
             onClose={() => setInspector(null)}
             onSelectNote={props.onSelectNote}
@@ -250,8 +191,9 @@ function CollaborativeTitleInput(props: { spaceId: string; noteId: string; initi
     <input
       ref={inputRef}
       className={cn(
-        "block h-6 w-full min-w-0 border-0 bg-transparent p-0 text-[15px] font-semibold",
-        "leading-tight text-cream-bright outline-none placeholder:text-cream-muted",
+        "block h-8 w-full max-w-md min-w-0 rounded-md border border-charcoal-active bg-charcoal-card px-2 text-sm font-semibold",
+        "text-cream-bright shadow-none outline-none placeholder:text-cream-muted",
+        "focus-visible:border-sage-fg/70 focus-visible:ring-2 focus-visible:ring-sage-fg/15",
       )}
       value={title}
       maxLength={500}
@@ -268,22 +210,17 @@ function CollaborativeTitleInput(props: { spaceId: string; noteId: string; initi
 }
 
 function JournalInspector(props: {
-  mode: "backlinks" | "agent";
   note: UnifiedNote;
   onClose: () => void;
   onSelectNote?: (noteId: string) => void;
 }) {
   return (
     <aside className="flex min-h-0 flex-col border-l border-charcoal-border bg-charcoal-sidebar/55">
-      {props.mode === "backlinks" ? (
-        <BacklinksInspector
-          note={props.note}
-          onClose={props.onClose}
-          onSelectNote={props.onSelectNote}
-        />
-      ) : (
-        <AgentInspector note={props.note} onClose={props.onClose} />
-      )}
+      <BacklinksInspector
+        note={props.note}
+        onClose={props.onClose}
+        onSelectNote={props.onSelectNote}
+      />
     </aside>
   );
 }
@@ -379,105 +316,6 @@ function BacklinksInspector(props: {
   );
 }
 
-function AgentInspector(props: { note: UnifiedNote; onClose: () => void }) {
-  const { agents, loaded, load } = usePersonalAgentsStore(
-    useShallow((state) => ({
-      agents: state.agents.filter((agent) => agent.enabled),
-      loaded: state.loaded,
-      load: state.load,
-    })),
-  );
-  const spaces = useSpacesStore((state) => state.spaces);
-  const storageKey = `misty:journal-agent:${props.note.spaceId ?? "default"}`;
-  const [agentId, setAgentId] = useState(() => localStorage.getItem(storageKey) ?? "");
-  useEffect(() => {
-    if (!loaded) void load();
-  }, [load, loaded]);
-  useEffect(() => {
-    if (!agents.some((agent) => agent.id === agentId)) setAgentId(agents[0]?.id ?? "");
-  }, [agentId, agents]);
-  useEffect(() => {
-    if (agentId) localStorage.setItem(storageKey, agentId);
-  }, [agentId, storageKey]);
-  const agent = useMemo(
-    () => agents.find((candidate) => candidate.id === agentId),
-    [agentId, agents],
-  );
-  return (
-    <AgentInspectorConversation
-      key={agent?.id ?? "empty"}
-      note={props.note}
-      agent={agent}
-      agents={agents}
-      spaces={spaces}
-      agentId={agentId}
-      onAgentChange={setAgentId}
-      onClose={props.onClose}
-    />
-  );
-}
-
-function AgentInspectorConversation(props: {
-  note: UnifiedNote;
-  agent?: ReturnType<typeof usePersonalAgentsStore.getState>["agents"][number];
-  agents: ReturnType<typeof usePersonalAgentsStore.getState>["agents"];
-  spaces: ReturnType<typeof useSpacesStore.getState>["spaces"];
-  agentId: string;
-  onAgentChange: (id: string) => void;
-  onClose: () => void;
-}) {
-  const activity = useAgentActivity(props.agent?.id ?? "");
-  if (!props.agent || !props.note.spaceId)
-    return (
-      <>
-        <InspectorHeader title="Agent" icon={<Bot size={16} />} onClose={props.onClose} />
-        <div className="grid flex-1 place-items-center p-6 text-center text-sm text-cream-muted">
-          Create or enable an Agent to work with this note.
-        </div>
-      </>
-    );
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <InspectorHeader
-        title="Agent"
-        icon={
-          <AgentAvatar
-            agentId={props.agent.id}
-            avatar={props.agent.avatar}
-            legacyIcon={props.agent.icon}
-            name={props.agent.name}
-            className="size-6"
-          />
-        }
-        onClose={props.onClose}
-      >
-        <Select value={props.agentId} onValueChange={props.onAgentChange}>
-          <SelectTrigger className="h-8 w-36 border-charcoal-border bg-charcoal-card text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {props.agents.map((agent) => (
-              <SelectItem key={agent.id} value={agent.id}>
-                {agent.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </InspectorHeader>
-      <AgentConversationPanel
-        agent={props.agent}
-        spaceId={props.note.spaceId}
-        spaces={props.spaces}
-        onSpaceChange={() => undefined}
-        onEdit={() => undefined}
-        controller={activity}
-        compact
-        contextNoteId={props.note.sourceId}
-      />
-    </div>
-  );
-}
-
 function replaceYText(text: YText, value: string) {
   if (text.toString() === value) return;
   text.doc?.transact(() => {
@@ -516,15 +354,12 @@ export interface NoteReadingPaneProps {
   loading: boolean;
   editingNoteId?: string;
   referenceOnly?: boolean;
+  onBack?: () => void;
   onEditingNoteChange?: (noteId: string | undefined) => void;
   onSaveBody?: (noteId: string, body: string) => void;
   onSaveContent?: (noteId: string, content: NoteContentDraft) => void;
   onDelete?: (noteId: string) => Promise<void>;
   onNewNote: () => void;
-  onOpenInSource?: (noteId: string) => void;
-  onPublish?: (noteId: string) => void;
-  publishing?: boolean;
-  publishError?: string;
   linkableNotes?: UnifiedNote[];
   onSelectNote?: (noteId: string) => void;
 }

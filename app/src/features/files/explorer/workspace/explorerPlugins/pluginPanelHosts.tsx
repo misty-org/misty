@@ -1,4 +1,5 @@
 import { extensionCommandRun, pluginPanelRender } from "@/features/files/native";
+import { SystemErrorActivity } from "@/features/activity";
 import type { PluginPanelEntry, PluginPanelRenderResult } from "@/native/contracts";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { errorText } from "@/shared/lib/format";
@@ -85,7 +86,14 @@ export function ExplorerNativePluginPanelHost(props: {
           Refresh
         </Button>
       </header>
-      {renderError ? <div className={pluginTabHostStyles.error}>{renderError}</div> : null}
+      {renderError ? (
+        <SystemErrorActivity
+          error={renderError}
+          scope={`files:plugin-panel:${props.panel.id}`}
+          title="File extension panel could not be loaded"
+          target={{ kind: "workspace-tool", tool: "files" }}
+        />
+      ) : null}
       {rendered && rendered.runtimeStatus !== "native_rendered" ? (
         <div className={pluginTabHostStyles.notice}>
           <Puzzle size={20} />
