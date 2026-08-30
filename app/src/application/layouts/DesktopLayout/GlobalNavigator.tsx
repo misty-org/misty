@@ -420,18 +420,22 @@ function NavigatorSection(props: {
 }) {
   return (
     <section
-      className={cn("flex min-h-0 flex-col overflow-hidden px-3 pt-1", props.className)}
+      className={cn("flex min-h-0 flex-col overflow-hidden pt-1", props.className)}
       aria-label={props.label}
     >
       <div
         className={cn(
-          "misty-transient-scrollbar grid min-h-0 flex-1 content-start gap-3 overflow-x-hidden overflow-y-auto",
-          "overscroll-contain pr-1",
-          props.last && "pb-16",
+          "misty-transient-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto",
+          "overscroll-contain",
         )}
         data-navigator-section-scroll={props.label.toLowerCase()}
       >
-        {props.children}
+        <div
+          className={cn("grid content-start gap-3 px-3", props.last && "pb-16")}
+          data-navigator-section-content={props.label.toLowerCase()}
+        >
+          {props.children}
+        </div>
       </div>
     </section>
   );
