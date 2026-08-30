@@ -1,4 +1,5 @@
 {
+  "buildPath": "comp",
   "detector": {
     "ignoreRules": [],
     "ignoreFiles": [],
@@ -7,46 +8,37 @@
         "rule": "design-system-color",
         "value": "*",
         "files": [
-          "app/src/features/agents/components/ModelProviderLogo.tsx"
+          "src/features/agents/components/ModelProviderLogo.tsx"
         ],
-        "createdAt": "2026-08-26T08:48:15.945Z",
+        "createdAt": "2026-08-26T08:47:51.438Z",
         "reason": "User context: provider logos retain their official third-party brand colors"
       },
       {
         "rule": "design-system-color",
         "value": "*",
         "files": [
-          "app/src/features/providers/components/ProviderLogo.tsx"
+          "src/features/providers/components/ProviderLogo.tsx"
         ],
-        "createdAt": "2026-08-26T08:48:16.008Z",
+        "createdAt": "2026-08-26T08:47:51.499Z",
         "reason": "User context: provider logos retain their official third-party brand colors"
       },
       {
         "rule": "design-system-color",
         "value": "*",
         "files": [
-          "app/**/*.test.tsx"
+          "**/*.test.tsx"
         ],
-        "createdAt": "2026-08-26T08:48:16.072Z",
+        "createdAt": "2026-08-26T08:47:51.560Z",
         "reason": "Agent: test fixture colors are evidence data, not shipped Misty design tokens"
       },
       {
         "rule": "design-system-color",
         "value": "*",
         "files": [
-          "app/src/features/inbox/components/EmailBody.tsx"
+          "src/features/inbox/components/EmailBody.tsx"
         ],
-        "createdAt": "2026-08-26T08:48:16.138Z",
+        "createdAt": "2026-08-26T08:47:51.629Z",
         "reason": "Agent: the sandboxed renderer preserves externally-authored email document colors"
-      },
-      {
-        "rule": "layout-transition",
-        "value": "*",
-        "files": [
-          "/Users/mtccool668/misty-org/misty/website/src/components/layout/NavBar/index.tsx"
-        ],
-        "createdAt": "2026-08-29T23:30:39.074Z",
-        "reason": "user confirmed: keep the butter-smooth navbar width animation and do not remove it for the Impeccable layout-transition finding"
       }
     ]
   }
