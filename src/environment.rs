@@ -334,13 +334,6 @@ pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
     workspace.server.join(".env").join(target.label())
 }
 
-pub fn paths(workspace: &Workspace, target: Target) -> Vec<PathBuf> {
-    FILES
-        .iter()
-        .map(|spec| root(workspace, target).join(spec.path))
-        .collect()
-}
-
 pub fn relative_paths(target: Target) -> Vec<String> {
     FILES
         .iter()
@@ -657,7 +650,7 @@ fn migrate_cli_file(workspace: &Workspace) -> Result<()> {
     secure_directories(&next)?;
     fs::remove_file(&legacy)?;
     fs::rename(&next, &legacy)?;
-    println!("Migrated CLI configuration into cli/.env/.");
+    println!("Migrated CLI configuration into misty-cli/.env/.");
     Ok(())
 }
 
@@ -696,7 +689,7 @@ fn read_cli_files(workspace: &Workspace) -> Result<BTreeMap<String, String>> {
                 item.with_context(|| format!("could not parse {}", path.display()))?;
             let expected = cli_owner(&name)?;
             if expected != file {
-                bail!("{name} belongs in cli/.env/{expected}, not cli/.env/{file}");
+                bail!("{name} belongs in misty-cli/.env/{expected}, not misty-cli/.env/{file}");
             }
             if values.insert(name.clone(), value).is_some() {
                 bail!("{name} is defined more than once in the CLI environment");

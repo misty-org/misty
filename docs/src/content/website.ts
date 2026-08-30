@@ -6,7 +6,7 @@ export const websitePages: DocPage[] = [
     path: "/website",
     title: "misty website",
     eyebrow: "Website",
-    description: "Run the public Misty website from the monorepo.",
+    description: "Run the public Misty website from its repository.",
     sections: [
       {
         id: "commands",
@@ -33,7 +33,7 @@ export const websitePages: DocPage[] = [
         blocks: [
           code("misty website dev"),
           p(
-            "The command validates the monorepo, runs the website workspace’s dev script, and leaves Vite running until you press Control+C.",
+            "The command validates the sibling repositories, runs misty-website’s dev script, and leaves Vite running until you press Control+C.",
           ),
         ],
       },

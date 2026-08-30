@@ -61,17 +61,17 @@ pub(super) fn verify_versions(workspace: &Workspace, expected: &str) -> Result<(
 
 pub(super) fn require_release_checkout(workspace: &Workspace, fetch: bool) -> Result<()> {
     if fetch {
-        git(workspace, &workspace.root, ["fetch", "origin", "main"])?;
+        git(workspace, &workspace.misty, ["fetch", "origin", "main"])?;
     }
-    let branch = git(workspace, &workspace.root, ["branch", "--show-current"])?;
+    let branch = git(workspace, &workspace.misty, ["branch", "--show-current"])?;
     if branch != "main" {
         bail!("release start requires the main branch, found {branch}");
     }
-    if !git(workspace, &workspace.root, ["status", "--porcelain"])?.is_empty() {
-        bail!("release start requires a clean monorepo checkout");
+    if !git(workspace, &workspace.misty, ["status", "--porcelain"])?.is_empty() {
+        bail!("release start requires a clean Misty app checkout");
     }
-    let head = git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
-    let origin = git(workspace, &workspace.root, ["rev-parse", "origin/main"])?;
+    let head = git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
+    let origin = git(workspace, &workspace.misty, ["rev-parse", "origin/main"])?;
     if head != origin {
         bail!("local main is not synchronized with origin/main");
     }
@@ -79,7 +79,7 @@ pub(super) fn require_release_checkout(workspace: &Workspace, fetch: bool) -> Re
 }
 
 pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifest) -> Result<()> {
-    let existing = source_tag_commit(&workspace.root, &manifest.tag);
+    let existing = source_tag_commit(&workspace.misty, &manifest.tag);
     if let Some(existing) = existing {
         if existing != manifest.source_commit {
             bail!("{} already points to another commit", manifest.tag);
@@ -93,11 +93,11 @@ pub(super) fn ensure_source_tag(workspace: &Workspace, manifest: &ReleaseManifes
                 "-m",
                 &format!("Misty {}", manifest.version),
             ])
-            .run(&workspace.root)?;
+            .run(&workspace.misty)?;
     }
     CommandSpec::new("git")
         .args(["push", "origin", &manifest.tag])
-        .run(&workspace.root)
+        .run(&workspace.misty)
 }
 
 fn source_tag_commit(repository: &Path, tag: &str) -> Option<String> {
@@ -125,7 +125,7 @@ pub(super) fn create_or_update_draft(
             "--repo",
             PUBLIC_REPOSITORY,
         ])
-        .capture(&workspace.root)
+        .capture(&workspace.misty)
         .is_ok();
     if exists {
         gh_upload(workspace, &manifest.tag, &[manifest_path.to_path_buf()])
@@ -147,7 +147,7 @@ pub(super) fn create_or_update_draft(
                 "Public-beta desktop build. Add customer-facing release notes before publishing.",
             ])
             .arg(manifest_path.as_os_str())
-            .run(&workspace.root)
+            .run(&workspace.misty)
     }
 }
 
@@ -171,7 +171,7 @@ pub(super) fn load_manifest(
                 "--dir",
             ])
             .arg(path.parent().unwrap().as_os_str())
-            .run(&workspace.root)?;
+            .run(&workspace.misty)?;
     }
     let manifest = ReleaseManifest::read(&path)?;
     validate_release_platforms(&manifest)?;
@@ -198,12 +198,12 @@ pub(super) fn verify_build_identity(
     manifest: &ReleaseManifest,
 ) -> Result<()> {
     verify_versions(workspace, &manifest.version)?;
-    let source = git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
+    let source = git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
     if source != manifest.source_commit {
-        bail!("monorepo checkout does not match the release source commit");
+        bail!("Misty app checkout does not match the release source commit");
     }
-    if !git(workspace, &workspace.root, ["status", "--porcelain"])?.is_empty() {
-        bail!("release builds require a clean monorepo checkout");
+    if !git(workspace, &workspace.misty, ["status", "--porcelain"])?.is_empty() {
+        bail!("release builds require a clean Misty app checkout");
     }
     Ok(())
 }
@@ -237,7 +237,7 @@ pub(super) fn gh_upload(workspace: &Workspace, tag: &str, files: &[PathBuf]) -> 
     for file in files {
         command = command.arg(file.as_os_str());
     }
-    command.run(&workspace.root)
+    command.run(&workspace.misty)
 }
 
 pub(super) fn gh_delete_asset(workspace: &Workspace, tag: &str, name: &str) -> Result<()> {
@@ -251,7 +251,7 @@ pub(super) fn gh_delete_asset(workspace: &Workspace, tag: &str, name: &str) -> R
             PUBLIC_REPOSITORY,
             "--yes",
         ])
-        .run(&workspace.root)
+        .run(&workspace.misty)
 }
 
 pub(super) fn release_root(workspace: &Workspace, version: &str) -> PathBuf {

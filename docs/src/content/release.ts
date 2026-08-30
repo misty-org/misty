@@ -54,12 +54,12 @@ export const releasePages: DocPage[] = [
         title: "Release identity",
         blocks: [
           p(
-            "release start records the exact monorepo commit, CLI version, normalized app version, and release configuration hash. Later stages refuse to proceed when the checkout or generated configuration differs.",
+            "release start records the exact Misty app commit, CLI version, normalized app version, and release configuration hash. Later stages refuse to proceed when the checkout or generated configuration differs.",
           ),
           list([
             "The application commit must match on macOS and Windows.",
             "The CLI commit must match on macOS and Windows.",
-            "The monorepo working tree must be clean.",
+            "The Misty app working tree must be clean.",
             "package.json, Cargo.toml, and tauri.conf.json must share the release version.",
             "Platform manifests must point to the release tag and approved platform.",
             "Every artifact record contains its filename, SHA-256 digest, and byte length.",
@@ -103,7 +103,7 @@ export const releasePages: DocPage[] = [
             "Run misty doctor and resolve every release input.",
             "Make all three application version files match the intended semantic version.",
             "Merge the release source to misty/main and synchronize it with origin/main.",
-            "Ensure the monorepo is clean and synchronized with origin/main.",
+            "Ensure the Misty app repository is clean and synchronized with origin/main.",
             "Authenticate GitHub CLI for the private source and misty-org/misty-public release repository.",
             "On macOS, configure Developer ID signing and an Apple Keychain notarytool profile.",
           ]),
@@ -159,7 +159,7 @@ export const releasePages: DocPage[] = [
             "misty/package.json has the requested version.",
             "app/src-tauri/Cargo.toml has the requested version.",
             "app/src-tauri/tauri.conf.json has the requested version.",
-            "The monorepo is on main and clean.",
+            "The Misty app repository is on main and clean.",
             "For a real start, local main equals the freshly fetched origin/main.",
             "Every required release configuration value is valid.",
           ]),
@@ -230,13 +230,13 @@ export const releasePages: DocPage[] = [
           list([
             "Loads the local release manifest, downloading it from the draft when necessary for a real build.",
             "Verifies all three Misty version files.",
-            "Requires the current monorepo HEAD to match source_commit.",
+            "Requires the current Misty app HEAD to match source_commit.",
             "Requires the Misty checkout to be clean.",
             "Rebuilds the release Tauri configuration and requires its SHA-256 to match config_sha256.",
           ]),
           note(
             "CLI checkout cleanliness",
-            "The recorded CLI commit must match the monorepo and the working tree must be clean. Commit and reinstall misty before starting the release.",
+            "The recorded CLI version must match and the Misty app working tree must be clean. Commit and reinstall misty before starting the release.",
             "warning",
           ),
         ],

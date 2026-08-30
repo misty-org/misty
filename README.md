@@ -1,15 +1,14 @@
 # misty
 
-`misty` is the development and release interface for the Misty monorepo.
+`misty` is the development and release interface for the Misty repositories.
 Desktop commands use Tauri's operating-system WebView and do not prepare or bundle a separate browser runtime.
 
 ## Install and start Misty
 
-From the monorepo root:
+From the CLI repository:
 
 ```sh
-npm install
-cargo install --path cli --locked --force
+cargo install --path . --locked --force
 misty desktop dev
 ```
 
@@ -19,10 +18,12 @@ Start the website with:
 misty website dev
 ```
 
-The default checkout is `~/misty-org/misty`. Configure another location with:
+The default workspace is `~/misty-org`, containing sibling `misty`,
+`misty-server`, `misty-website`, and `misty-cli` repositories. Configure
+another location with:
 
 ```sh
-misty configure --workspace /path/to/misty
+misty configure --workspace /path/to/misty-org
 ```
 
 ## Commands

@@ -510,17 +510,24 @@ fn report_release_inputs() {
 }
 
 fn report_repository_status(settings: &Settings) -> Result<()> {
-    let status = crate::process::CommandSpec::new("git")
-        .args(["status", "--porcelain"])
-        .capture(&settings.workspace.root)?;
-    println!(
-        "repository         {}",
-        if status.trim().is_empty() {
-            "clean"
-        } else {
-            "has local changes"
-        }
-    );
+    for (name, repository) in [
+        ("misty", &settings.workspace.misty),
+        ("misty-server", &settings.workspace.server),
+        ("misty-website", &settings.workspace.website),
+        ("misty-cli", &settings.workspace.cli),
+    ] {
+        let status = crate::process::CommandSpec::new("git")
+            .args(["status", "--porcelain"])
+            .capture(repository)?;
+        println!(
+            "{name:<18} {}",
+            if status.trim().is_empty() {
+                "clean"
+            } else {
+                "has local changes"
+            }
+        );
+    }
     Ok(())
 }
 

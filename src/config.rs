@@ -130,7 +130,6 @@ fn default_workspace() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("misty-org")
-        .join("misty")
 }
 
 fn select_workspace(

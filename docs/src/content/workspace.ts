@@ -6,21 +6,21 @@ export const workspacePages: DocPage[] = [
     path: "/configure",
     title: "misty configure",
     eyebrow: "Workspace",
-    description: "Save the root directory of the Misty monorepo.",
+    description: "Save the directory containing the Misty repositories.",
     command: "misty configure --workspace <PATH>",
     sections: [
       {
         id: "usage",
         title: "Usage",
         blocks: [
-          code("misty configure --workspace ~/misty-org/misty"),
+          code("misty configure --workspace ~/misty-org"),
           table(
             ["Option", "Required", "Description"],
             [
               [
                 "--workspace <PATH>",
                 "Yes",
-                "Directory containing app/, website/, server/, and cli/.",
+                "Directory containing the sibling Misty repositories.",
               ],
             ],
           ),
@@ -36,10 +36,10 @@ export const workspacePages: DocPage[] = [
           table(
             ["Priority", "Source", "Example"],
             [
-              ["1", "Command option", "--workspace /Volumes/code/misty"],
-              ["2", "Shell environment", "MISTY_ROOT=/Volumes/code/misty"],
+              ["1", "Command option", "--workspace /Volumes/code/misty-org"],
+              ["2", "Shell environment", "MISTY_ROOT=/Volumes/code/misty-org"],
               ["3", "Saved configuration", "cli.toml written by configure"],
-              ["4", "Default", "~/misty-org/misty"],
+              ["4", "Default", "~/misty-org"],
             ],
           ),
           note(
@@ -53,11 +53,11 @@ export const workspacePages: DocPage[] = [
         title: "Expected directory layout",
         blocks: [
           code(
-            "~/misty-org/misty/\n├── app/      # desktop application\n├── website/  # public website\n├── server/   # Go server and Docker stack\n└── cli/      # misty source",
+            "~/misty-org/\n├── misty/          # desktop application\n├── misty-server/   # backend and Docker stack\n├── misty-website/  # public website\n└── misty-cli/      # developer CLI",
             "Filesystem",
           ),
           p(
-            "The repository root and each project marker are validated before a workflow runs.",
+            "The workspace root and each repository marker are validated before a workflow runs. Archived monorepo checkouts remain supported.",
           ),
         ],
       },
@@ -75,14 +75,14 @@ export const workspacePages: DocPage[] = [
         title: "How environment values are loaded",
         blocks: [
           p(
-            "After resolving the workspace, misty reads only the command-specific files under the ignored cli/.env directory. Existing shell variables are never overwritten, so one-off terminal exports take priority.",
+            "After resolving the workspace, misty reads only the command-specific files under the ignored misty-cli/.env directory. Existing shell variables are never overwritten, so one-off terminal exports take priority.",
           ),
           code(
-            "# Highest value precedence\nexport R2_BUCKET=temporary-test-bucket\nmisty server r2 configure-cors\n\n# Otherwise read from\n~/misty-org/misty/cli/.env/cloudflare.env",
+            "# Highest value precedence\nexport R2_BUCKET=temporary-test-bucket\nmisty server r2 configure-cors\n\n# Otherwise read from\n~/misty-org/misty-cli/.env/cloudflare.env",
           ),
           note(
             "Different from server environment files",
-            "The CLI’s scoped files supply CLI and release workflows. Docker Compose independently reads server/.env/dev or server/.env/prod for the selected server stack.",
+            "The CLI’s scoped files supply CLI and release workflows. Docker Compose independently reads misty-server/.env/dev or misty-server/.env/prod for the selected server stack.",
           ),
         ],
       },
@@ -196,7 +196,7 @@ export const workspacePages: DocPage[] = [
           ),
           note(
             "Never commit secrets",
-            "cli/.env is ignored and private. Keep signing keys, passwords, API tokens, and notary credentials out of Git and terminal transcripts.",
+            "misty-cli/.env is ignored and private. Keep signing keys, passwords, API tokens, and notary credentials out of Git and terminal transcripts.",
             "warning",
           ),
         ],
@@ -244,7 +244,7 @@ export const workspacePages: DocPage[] = [
                 "Release inputs",
                 "Required variable presence, without exposing values",
               ],
-              ["Repository", "Clean or has local changes for the monorepo"],
+              ["Repositories", "Clean or has local changes for each checkout"],
             ],
           ),
         ],
@@ -254,7 +254,7 @@ export const workspacePages: DocPage[] = [
         title: "When to run it",
         blocks: [
           code(
-            "misty doctor\n\n# Diagnose another workspace without changing your default\nmisty --workspace /Volumes/code/misty doctor",
+            "misty doctor\n\n# Diagnose another workspace without changing your default\nmisty --workspace /Volumes/code/misty-org doctor",
           ),
           list([
             "After installing the CLI on a new computer.",
@@ -273,7 +273,7 @@ export const workspacePages: DocPage[] = [
           ),
           note(
             "Repository changes are reported, not removed",
-            "Doctor never cleans, stashes, resets, or commits the repository. It only reports whether the monorepo has local changes.",
+            "Doctor never cleans, stashes, resets, or commits a repository. It only reports which checkout has local changes.",
             "success",
           ),
         ],
@@ -314,7 +314,7 @@ export const workspacePages: DocPage[] = [
         id: "misty-checks",
         title: "Desktop checks",
         blocks: [
-          p("check app executes the following from app/:"),
+          p("check app executes the following from misty/:"),
           list([
             "npm run check: frontend formatting, type checking, Vitest, architecture contracts, and reviewed production dependency audit.",
             "cargo fmt --all -- --check against src-tauri/Cargo.toml.",
@@ -327,7 +327,7 @@ export const workspacePages: DocPage[] = [
         id: "server-checks",
         title: "Server checks",
         blocks: [
-          p("check server executes the following from server/:"),
+          p("check server executes the following from misty-server/:"),
           list([
             "gofmt -l . and fails when any Go file needs formatting.",
             "go vet ./... for static analysis.",
@@ -335,6 +335,7 @@ export const workspacePages: DocPage[] = [
             "scripts/check-container-contract.sh when present.",
             "npm ci in cloudflare/journal-collab.",
             "Worker typecheck, Vitest, runtime integration tests, and production dependency audit.",
+            "Agent runtime clean install, typecheck, tests, and production build.",
           ]),
         ],
       },
@@ -343,7 +344,7 @@ export const workspacePages: DocPage[] = [
         title: "The test database connection",
         blocks: [
           p(
-            "Database-backed server tests read TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME, and TEST_DB_SSLMODE. Each one falls back to the matching DB_* value from server/.env/dev/database.env, so an ordinary development checkout needs no extra configuration.",
+            "Database-backed server tests read TEST_DB_HOST, TEST_DB_PORT, TEST_DB_USER, TEST_DB_PASSWORD, TEST_DB_NAME, and TEST_DB_SSLMODE. Each one falls back to the matching DB_* value from misty-server/.env/dev/database.env, so an ordinary development checkout needs no extra configuration.",
           ),
           list([
             "TEST_DB_NAME defaults to DB_NAME with a _test suffix, so tests never truncate the development database.",
@@ -352,7 +353,7 @@ export const workspacePages: DocPage[] = [
             "Set any TEST_DB_* value explicitly to point the suite at a different PostgreSQL instance.",
           ]),
           p(
-            "./test.sh bootstraps the container and recreates the test database before running the suite. Once it has run, targeted go test reruns from server/ resolve the same connection.",
+            "./test.sh bootstraps the container and recreates the test database before running the suite. Once it has run, targeted go test reruns from misty-server/ resolve the same connection.",
           ),
           note(
             "Windows",

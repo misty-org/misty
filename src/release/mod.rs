@@ -40,7 +40,7 @@ pub fn start(
     }
     let config = config::build()?;
     let config_bytes = serde_json::to_vec_pretty(&config)?;
-    let source_commit = state::git(workspace, &workspace.root, ["rev-parse", "HEAD"])?;
+    let source_commit = state::git(workspace, &workspace.misty, ["rev-parse", "HEAD"])?;
     let tag = format!("misty-v{version}");
     let root = state::release_root(workspace, &version);
     fs::create_dir_all(&root)?;
@@ -89,7 +89,7 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
         return Ok(());
     }
 
-    CommandSpec::new(npm()).args(["ci"]).run(&workspace.root)?;
+    CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)?;
     CommandSpec::new(npm())
         .args(["run", "build:desktop"])
         .run(&workspace.misty)?;
@@ -157,7 +157,7 @@ pub fn verify(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result
             "--dir",
         ])
         .arg(verification_root.as_os_str())
-        .run(&workspace.root)?;
+        .run(&workspace.misty)?;
     let mut platform_manifests = Vec::new();
     for platform in &manifest.platforms {
         let platform_manifest =
@@ -214,7 +214,7 @@ pub fn publish(workspace: &Workspace, raw_version: &str, yes: bool, dry_run: boo
             "--draft=false",
             "--prerelease",
         ])
-        .run(&workspace.root)?;
+        .run(&workspace.misty)?;
     println!("Published Misty {version}.");
     Ok(())
 }
@@ -261,7 +261,7 @@ fn finalize_public_release(workspace: &Workspace, version: &str) -> Result<()> {
             "--dir",
         ])
         .arg(public_verification_root.as_os_str())
-        .run(&workspace.root)?;
+        .run(&workspace.misty)?;
     verification::public_release(
         &public_verification_root,
         &platform_manifests,
