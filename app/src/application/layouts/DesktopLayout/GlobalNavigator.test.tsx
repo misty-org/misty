@@ -397,6 +397,9 @@ describe("GlobalNavigator Space tools", () => {
     const tools = container.querySelector('[data-navigator-section-scroll="primary navigation"]');
     expect(tools?.className).toContain("overflow-y-auto");
     expect(tools?.className).toContain("misty-transient-scrollbar");
+    expect(tools?.className).not.toContain("pr-1");
+    expect(tools?.parentElement?.className).not.toContain("px-3");
+    expect(tools?.firstElementChild?.className).toContain("px-3");
 
     const menu = await openSpaceMenu();
     expect(menu?.querySelector(".max-h-\\[320px\\]")).not.toBeNull();
