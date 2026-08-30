@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useLocation, useMatches, ScrollRestoration, useNavigate } from "react-router";
+import {
+  Outlet,
+  useLocation,
+  useMatches,
+  ScrollRestoration,
+  useNavigate,
+} from "react-router";
 import { AuthProvider } from "./AuthContext";
 import Navbar from "./components/layout/NavBar";
 import Footer from "./components/layout/Footer";
@@ -14,7 +20,12 @@ import { SITE_URL } from "./lib/site";
 
 type Handle = { title?: string; description?: string };
 
-function setMeta(selector: string, attribute: "name" | "property", key: string, content: string) {
+function setMeta(
+  selector: string,
+  attribute: "name" | "property",
+  key: string,
+  content: string,
+) {
   let element = document.head.querySelector<HTMLMetaElement>(selector);
   if (!element) {
     element = document.createElement("meta");
@@ -23,7 +34,6 @@ function setMeta(selector: string, attribute: "name" | "property", key: string, 
   }
   element.content = content;
 }
-
 
 export default function App() {
   const matches = useMatches();
@@ -46,22 +56,34 @@ export default function App() {
       new URLSearchParams(location.search).get("checkout") === "success";
     const title = checkoutSucceeded
       ? "Plan upgraded — Misty"
-      : (handle?.title ?? "Misty — One shared Space for everyone");
+      : (handle?.title ?? "Misty — Organize, create, and collaborate");
     const description = checkoutSucceeded
       ? "Your Misty plan and billing details have been updated."
       : (handle?.description ??
-        "Misty combines members, chat, tasks, a shared Library, and AI Agents in one shared Space. Private Files stay private until shared.");
+        "Misty is a fast, lightweight workspace with built-in apps for organizing, creating, and collaborating.");
     const canonicalUrl = new URL(location.pathname, SITE_URL).toString();
 
     document.title = title;
     setMeta('meta[name="description"]', "name", "description", description);
     setMeta('meta[property="og:title"]', "property", "og:title", title);
-    setMeta('meta[property="og:description"]', "property", "og:description", description);
+    setMeta(
+      'meta[property="og:description"]',
+      "property",
+      "og:description",
+      description,
+    );
     setMeta('meta[property="og:url"]', "property", "og:url", canonicalUrl);
     setMeta('meta[name="twitter:title"]', "name", "twitter:title", title);
-    setMeta('meta[name="twitter:description"]', "name", "twitter:description", description);
+    setMeta(
+      'meta[name="twitter:description"]',
+      "name",
+      "twitter:description",
+      description,
+    );
 
-    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    let canonical = document.head.querySelector<HTMLLinkElement>(
+      'link[rel="canonical"]',
+    );
     if (!canonical) {
       canonical = document.createElement("link");
       canonical.rel = "canonical";
@@ -70,7 +92,7 @@ export default function App() {
     canonical.href = canonicalUrl;
   }, [location.pathname, location.search, matches]);
 
-  // Cross-page anchors (e.g. "/features#spaces" from the home hero). Router
+  // Cross-page anchors (e.g. "/#features" from another page). Router
   // navigation does not scroll to the hash on its own, so do it once the target
   // route has rendered.
   useEffect(() => {
@@ -144,17 +166,17 @@ export default function App() {
           Skip to content
         </a>
         <Navbar onOpenSettings={() => setSettingsOpen(true)} />
-        
+
         <main
           id="main-content"
           ref={mainRef}
           tabIndex={-1}
-          className="relative z-10 min-h-[100svh] flex-1 outline-none"
+          className="relative z-10 min-h-[100svh] w-full min-w-0 flex-1 outline-none"
         >
           <div
             key={location.pathname}
             data-page-transition={location.pathname}
-            className="page-transition"
+            className="page-transition w-full min-w-0"
           >
             <Outlet />
           </div>
@@ -171,7 +193,6 @@ export default function App() {
               : undefined
           }
         />
-
       </div>
     </AuthProvider>
   );

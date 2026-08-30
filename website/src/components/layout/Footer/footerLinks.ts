@@ -18,7 +18,7 @@ export const columns: FooterColumn[] = [
   {
     label: "Explore",
     links: [
-      { to: "/features", text: "Features" },
+      { to: "/#features", text: "Features" },
       { to: "/pricing", text: "Pricing" },
       { to: "/download", text: "Download" },
       { to: JOIN_HREF, text: "Join now" },
