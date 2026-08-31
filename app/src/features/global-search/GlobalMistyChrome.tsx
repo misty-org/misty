@@ -1,5 +1,5 @@
 import { VoiceInputMenu, type useAiVoiceRecorder } from "@/features/ai-surface";
-import mistyCompanion from "@/shared/assets/mist-orb-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { Button, cn } from "@/shared/ui";
 import { GripHorizontal, Mic, Square, X } from "lucide-react";
 import type { KeyboardEvent, PointerEvent, RefObject } from "react";
@@ -31,7 +31,8 @@ export function GlobalMistyComposerBar(props: {
   voice: VoiceRecorder;
   onError: (message: string) => void;
   onClose: () => void;
-  onRequestDrag?: () => void;
+  onRequestDrag?: (event: PointerEvent) => void;
+  onSwitchToPet?: () => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onModelChange: (settings: {
     modelId: string;
@@ -40,14 +41,15 @@ export function GlobalMistyComposerBar(props: {
 }) {
   return (
     <div
-      data-misty-panel-drag-handle={
-        !props.conversationActive && props.onRequestDrag ? "true" : undefined
-      }
       onPointerDown={!props.conversationActive ? props.onPointerDown : undefined}
       className={cn(
+        "relative",
         !props.conversationActive && props.onRequestDrag && "cursor-grab active:cursor-grabbing",
       )}
     >
+      {!props.conversationActive ? (
+        <MistyPanelDragHandle inset onRequestDrag={props.onRequestDrag} />
+      ) : null}
       <MistyComposer
         value={props.query}
         onChange={props.onQuery}
@@ -80,16 +82,36 @@ export function GlobalMistyComposerBar(props: {
         voiceControl={<ComposerVoiceControls voice={props.voice} />}
         trailingControl={
           props.conversationActive ? undefined : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-7 text-cream-muted"
-              aria-label="Close Misty"
-              onClick={props.onClose}
-            >
-              <X className="size-4" />
-            </Button>
+            <div className="flex items-center gap-0.5">
+              {props.onSwitchToPet ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 rounded-lg text-cream-muted"
+                  aria-label="Switch to Misty pet"
+                  title="Switch to Misty pet"
+                  onClick={props.onSwitchToPet}
+                >
+                  <img
+                    src={mistyCompanion}
+                    alt=""
+                    className="size-5 object-contain"
+                    draggable={false}
+                  />
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 text-cream-muted"
+                aria-label="Close Misty"
+                onClick={props.onClose}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           )
         }
       />
@@ -135,7 +157,8 @@ export function GlobalMistyVoiceIsland(props: {
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onClose: () => void;
-  onRequestDrag?: () => void;
+  onRequestDrag?: (event: PointerEvent) => void;
+  onSwitchToPet?: () => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
 }) {
   return (
@@ -148,27 +171,7 @@ export function GlobalMistyVoiceIsland(props: {
       data-misty-voice-island
       onPointerDown={props.onPointerDown}
     >
-      {props.onRequestDrag ? (
-        <button
-          type="button"
-          aria-label="Move Misty window"
-          data-misty-panel-drag-handle="true"
-          className={cn(
-            "absolute left-1/2 top-0 z-10 flex h-4 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full",
-            "cursor-grab border border-white/10 bg-[#25252a]/95 text-white/60 shadow-sm backdrop-blur-md active:cursor-grabbing",
-            "opacity-0 transition-[opacity,color,background-color] duration-150 group-hover/misty-island:opacity-100",
-            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-          )}
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            event.stopPropagation();
-            props.onRequestDrag?.();
-          }}
-        >
-          <GripHorizontal className="size-3.5" aria-hidden />
-        </button>
-      ) : null}
+      <MistyPanelDragHandle onRequestDrag={props.onRequestDrag} />
       <button
         type="button"
         className={cn(
@@ -176,9 +179,19 @@ export function GlobalMistyVoiceIsland(props: {
           "outline-none ring-offset-1 ring-offset-[#17171a] focus-visible:ring-2 focus-visible:ring-blue-400",
           props.voice.recording && "ring-2 ring-red-400/70",
         )}
-        aria-label={props.voice.recording ? "Stop voice recording" : "Start voice recording"}
-        disabled={props.voice.requesting || props.voice.transcribing}
-        onClick={props.voice.recording ? props.voice.stop : () => void props.voice.start()}
+        aria-label={
+          props.onSwitchToPet
+            ? "Switch to Misty pet"
+            : props.voice.recording
+              ? "Stop voice recording"
+              : "Start voice recording"
+        }
+        title={props.onSwitchToPet ? "Switch to Misty pet" : undefined}
+        disabled={props.onSwitchToPet ? false : props.voice.requesting || props.voice.transcribing}
+        onClick={
+          props.onSwitchToPet ??
+          (props.voice.recording ? props.voice.stop : () => void props.voice.start())
+        }
       >
         <img src={mistyCompanion} alt="" className="size-7 object-contain" draggable={false} />
         {props.voice.recording ? (
@@ -214,5 +227,35 @@ export function GlobalMistyVoiceIsland(props: {
         <X className="size-4" />
       </Button>
     </div>
+  );
+}
+
+function MistyPanelDragHandle(props: {
+  onRequestDrag?: (event: PointerEvent) => void;
+  inset?: boolean;
+}) {
+  if (!props.onRequestDrag) return null;
+  return (
+    <button
+      type="button"
+      aria-label="Move Misty window"
+      title="Drag to move Misty"
+      data-misty-panel-drag-handle="true"
+      className={cn(
+        "absolute left-1/2 z-20 flex h-4 w-11 -translate-x-1/2 items-center justify-center rounded-full",
+        props.inset ? "top-1" : "top-0 -translate-y-1/2",
+        "pointer-events-auto touch-none select-none cursor-grab border border-white/10 bg-[#25252a]/95 text-white/65 shadow-[0_3px_10px_rgba(0,0,0,0.32)] active:cursor-grabbing",
+        "opacity-100 transition-[color,background-color] duration-150 hover:bg-[#303036] hover:text-white/85",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+      )}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        props.onRequestDrag?.(event);
+      }}
+    >
+      <GripHorizontal className="size-3.5" aria-hidden />
+    </button>
   );
 }

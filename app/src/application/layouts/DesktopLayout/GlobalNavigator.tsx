@@ -29,7 +29,11 @@ import { InboxNavigatorDisclosure } from "./InboxNavigatorDisclosure";
 import { JournalNavigatorDisclosure } from "./JournalNavigatorDisclosure";
 import { LibraryNavigatorDisclosure } from "./LibraryNavigatorDisclosure";
 import { NavigatorAppsSection } from "./NavigatorAppsSection";
-import { NavigatorHeaderHomeButton, NavigatorHeaderSearchButton } from "./NavigatorUtilityIsland";
+import {
+  NavigatorHeaderHomeButton,
+  NavigatorHeaderStoreButton,
+  NavigatorHeaderSearchButton,
+} from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { PlannerNavigatorDisclosure } from "./PlannerNavigatorDisclosure";
 import { SocialNavigatorDisclosure } from "./SocialNavigatorDisclosure";
@@ -124,6 +128,7 @@ export function GlobalNavigator(props: {
   const homeActive = Boolean(
     scopedSpace && routeSpaceId === scopedSpace.id && activeSpaceSection === "home",
   );
+  const marketplaceActive = activeGroupKey === "tool:marketplace";
   const spaceToolContext = scopedSpace ?? (routeSpaceId ? { id: routeSpaceId } : undefined);
   const contextualTools: NavigatorToolItem[] = spaceToolContext
     ? spaceToolItems(spaceToolContext, user?.id ?? "")
@@ -167,11 +172,8 @@ export function GlobalNavigator(props: {
         />
       ) : null}
 
-      <div
-        className="flex h-16 shrink-0 select-none items-center justify-between gap-1 px-3"
-        data-navigator-header="true"
-      >
-        <div className="flex min-w-0 flex-1 items-center">
+      <div className="grid shrink-0 select-none gap-1 px-3 py-2" data-navigator-header="true">
+        <div className="flex h-9 w-full min-w-0 items-center" data-navigator-space-row="true">
           <GlobalSpaceSwitcher
             activeSpace={scopedSpace}
             activeSpaceId={activeSpaceId}
@@ -180,8 +182,13 @@ export function GlobalNavigator(props: {
             userId={user?.id ?? ""}
           />
         </div>
-        <div className="flex h-full items-center gap-1" aria-label="Workspace actions">
+        <div
+          className="grid w-full gap-1"
+          aria-label="Workspace actions"
+          data-navigator-actions-row="true"
+        >
           <NavigatorHeaderHomeButton path={homePath} active={homeActive} />
+          <NavigatorHeaderStoreButton path={routes.store} active={marketplaceActive} />
           <NavigatorHeaderSearchButton />
         </div>
       </div>

@@ -20,10 +20,12 @@ export interface MultiPanelWorkspaceProps {
   renderNavigationAside?: ReactNode;
   navigationAsideWidth?: number;
   onNavigationAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
+  onNavigationAsideResizeBy?: (delta: number) => void;
   navigationAsideResizing?: boolean;
   renderAside?: ReactNode;
   asideWidth?: number;
   onAsideResizeStart?: (event: PointerEvent<HTMLDivElement>) => void;
+  onAsideResizeBy?: (delta: number) => void;
   asideResizing?: boolean;
   canCloseTab?: (tab: MultiPanelTab) => boolean;
   onDidCloseTab?: (tab: MultiPanelTab) => void;

@@ -44,11 +44,15 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     else if (/^Digit[0-9]$/.test(key)) key = key.slice(5);
     else key = ({
       Backquote: 'Grave', Backslash: 'Backslash', BracketLeft: 'LeftBracket',
-      BracketRight: 'RightBracket', Comma: 'Comma', Equal: 'Plus', Minus: 'Minus',
+      BracketRight: 'RightBracket', Comma: 'Comma', Period: 'Period',
+      Equal: 'Plus', Minus: 'Minus', NumpadAdd: 'Plus', NumpadSubtract: 'Minus',
       ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp',
       ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown'
     })[key] || event.key;
-    return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift',
+    // `+` already implies Shift on the main keyboard. Match the renderer's
+    // canonical form (Cmd+Plus rather than Cmd+Shift+Plus).
+    return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt',
+      event.shiftKey && key !== 'Plus' && 'Shift',
       event.metaKey && 'Cmd', key].filter(Boolean).join('+');
   };
   document.addEventListener('keydown', (event) => {
@@ -67,6 +71,15 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     window.location.href = `misty-shortcut:event?${params}`;
     event.preventDefault();
     event.stopImmediatePropagation();
+  }, true);
+
+  // A native child WebView sits outside the renderer's DOM event tree. Send
+  // one trusted focus signal on pointer-down so the owning split becomes the
+  // active workspace pane before shell shortcuts are evaluated.
+  document.addEventListener('pointerdown', (event) => {
+    if (!event.isTrusted) return;
+    const params = new URLSearchParams({ token: shortcutToken });
+    window.location.href = `misty-focus:event?${params}`;
   }, true);
 
   const reportPointer = (event) => {
@@ -274,6 +287,7 @@ mod tests {
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
         assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:move"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("misty-focus:event"));
     }
 
     #[test]
@@ -307,6 +321,13 @@ mod tests {
         assert!(!script.contains("__MISTY_COMPANION_TOKEN_PLACEHOLDER__"));
         assert!(!script.contains("window.__MISTY_SHORTCUT_TOKEN"));
         assert!(BROWSER_COMPANION_SCRIPT.contains("window.__MISTY_SET_COMPANION__"));
+    }
+
+    #[test]
+    fn forwarded_shortcuts_use_the_renderer_canonical_key_names() {
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("Period: 'Period'"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("NumpadAdd: 'Plus'"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("event.shiftKey && key !== 'Plus'"));
     }
 
     #[test]

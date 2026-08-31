@@ -2,25 +2,41 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Charcoal/cream palette. `inline` so utilities compile to literal colours
-   rather than var() lookups. */
+/* Semantic charcoal/cream palette. Utilities resolve through these variables
+   so the Themes extension can preview and persist one coherent app palette. */
+:root {
+  --misty-theme-workspace: #0f0f0f;
+  --misty-theme-bg: #131313;
+  --misty-theme-sidebar: #161616;
+  --misty-theme-card: #191919;
+  --misty-theme-border: #262626;
+  --misty-theme-hover: #2b2b2b;
+  --misty-theme-active: #3e3e3e;
+  --misty-theme-text: #e0e0e0;
+  --misty-theme-text-bright: #f1f1f1;
+  --misty-theme-text-muted: #8c8c8c;
+  --misty-theme-danger: #c94747;
+  --misty-theme-sage: #a3bfab;
+  --misty-theme-sage-bg: #28312b;
+}
+
 @theme inline {
-  --color-charcoal-workspace: #0f0f0f;
-  --color-charcoal-bg: #131313;
-  --color-charcoal-sidebar: #161616;
-  --color-charcoal-card: #191919;
-  --color-charcoal-border: #262626;
-  --color-charcoal-hover: #2b2b2b;
-  --color-charcoal-active: #3e3e3e;
+  --color-charcoal-workspace: var(--misty-theme-workspace);
+  --color-charcoal-bg: var(--misty-theme-bg);
+  --color-charcoal-sidebar: var(--misty-theme-sidebar);
+  --color-charcoal-card: var(--misty-theme-card);
+  --color-charcoal-border: var(--misty-theme-border);
+  --color-charcoal-hover: var(--misty-theme-hover);
+  --color-charcoal-active: var(--misty-theme-active);
 
-  --color-cream: #e0e0e0;
-  --color-cream-bright: #f1f1f1;
-  --color-cream-muted: #8c8c8c;
-  --color-notification-red: #c94747;
+  --color-cream: var(--misty-theme-text);
+  --color-cream-bright: var(--misty-theme-text-bright);
+  --color-cream-muted: var(--misty-theme-text-muted);
+  --color-notification-red: var(--misty-theme-danger);
 
-  --color-sage-fg: #a3bfab;
-  --color-sage-bg: #28312b;
-  --color-status-green: #a3bfab;
+  --color-sage-fg: var(--misty-theme-sage);
+  --color-sage-bg: var(--misty-theme-sage-bg);
+  --color-status-green: var(--misty-theme-sage);
 
   /* Gruvbox-inspired pastels, deterministically assigned per person so the
      app doesn't read as entirely monochrome. Kept soft (no neon) — these are
@@ -84,8 +100,8 @@
   body {
     margin: 0;
     overflow: hidden;
-    background-color: #131313;
-    color: #e0e0e0;
+    background-color: var(--misty-theme-bg);
+    color: var(--misty-theme-text);
     font-family:
       system-ui,
       -apple-system,
@@ -98,7 +114,7 @@
 
   #root {
     overflow: hidden;
-    background-color: #131313;
+    background-color: var(--misty-theme-bg);
   }
 
   /* Panel opacity only means something when there is something behind the app
@@ -107,7 +123,11 @@
      wallpaper set these rules are inert and the app stays fully opaque. */
   html[data-wallpaper-active="true"] body,
   html[data-wallpaper-active="true"] #root {
-    background-color: rgb(19 19 19 / var(--misty-panel-opacity, 1));
+    background-color: color-mix(
+      in srgb,
+      var(--misty-theme-bg) calc(var(--misty-panel-opacity, 1) * 100%),
+      transparent
+    );
   }
 
   html[data-wallpaper-active="true"] [data-misty-desktop-frame] {
@@ -197,8 +217,8 @@
   }
 
   ::selection {
-    background-color: #3e3e3e;
-    color: #f1f1f1;
+    background-color: var(--misty-theme-active);
+    color: var(--misty-theme-text-bright);
   }
 }
 

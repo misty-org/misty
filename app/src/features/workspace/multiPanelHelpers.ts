@@ -73,15 +73,11 @@ export function normalizeSnapshot(snapshot: {
 }
 
 export function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
-  let panes = tab.panes
+  const panes = tab.panes
     .filter(validPane)
     .slice(0, maxPanesPerTab)
     .map((pane) => ({ ...pane, path: normalizeExplorerPath(pane.path) }));
   if (panes.length === 0) return null;
-  if (panes.length > 1) {
-    const preferredPane = panes.find((pane) => pane.id === tab.activePaneId) ?? panes[0];
-    panes = [preferredPane];
-  }
 
   const paneIdSet = new Set(panes.map((pane) => pane.id));
   const lanes = normalizedLanes(tab.layout, panes);

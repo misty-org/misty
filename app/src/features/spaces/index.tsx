@@ -7,6 +7,7 @@ export { SpaceRowActions } from "./components/SpaceRowActions";
 export { spaceDestination, spaceLandingRoute } from "./navigation";
 export { canOpenMistySpaceSection, preferredMistySpace } from "./mistySpace";
 export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
+export { canonicalSpaceRoute } from "./spaceRouteNormalization";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";

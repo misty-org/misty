@@ -130,5 +130,8 @@ describe("WorkspaceNewTabMenu", () => {
     expect(options.find((option) => option.appId === "library")?.route).toBe(
       "/spaces/space%20one/library",
     );
+    expect(options.find((option) => option.appId === "inbox")?.instancePolicy).toBe("single");
+    expect(options.find((option) => option.appId === "agents")?.instancePolicy).toBe("single");
+    expect(options.find((option) => option.appId === "browser")?.instancePolicy).toBe("multiple");
   });
 });

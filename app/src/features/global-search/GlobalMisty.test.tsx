@@ -40,6 +40,7 @@ describe("GlobalMisty", () => {
 
   it("keeps one stable input while search results expand beneath it", async () => {
     const requestDrag = vi.fn();
+    const switchToPet = vi.fn();
     const contentVisibilityChanged = vi.fn();
     await act(async () => {
       root.render(
@@ -50,6 +51,7 @@ describe("GlobalMisty", () => {
             activePaneId=""
             activePanePath=""
             onRequestDrag={requestDrag}
+            onSwitchToPet={switchToPet}
             onContentVisibilityChange={contentVisibilityChanged}
           />
         </MemoryRouter>,
@@ -75,10 +77,20 @@ describe("GlobalMisty", () => {
     expect(contentVisibilityChanged).toHaveBeenLastCalledWith(false);
 
     const dragHandle = container.querySelector<HTMLElement>("[data-misty-panel-drag-handle]");
+    expect(dragHandle?.className).toContain("opacity-100");
+    expect(dragHandle?.className).toContain("pointer-events-auto");
+    expect(dragHandle?.className).toContain("touch-none");
+    expect(dragHandle?.className).not.toContain("opacity-0");
     await act(async () => {
       dragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
     expect(requestDrag).toHaveBeenCalledTimes(1);
+    const petSwitch = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Switch to Misty pet"]',
+    );
+    expect(petSwitch).not.toBeNull();
+    await act(async () => petSwitch?.click());
+    expect(switchToPet).toHaveBeenCalledTimes(1);
     await act(async () => {
       input?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
@@ -134,6 +146,10 @@ describe("GlobalMisty", () => {
       islandDragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
     expect(requestDrag).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Switch to Misty pet"]')?.click();
+    });
+    expect(switchToPet).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       container.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
@@ -200,6 +216,41 @@ describe("GlobalMisty", () => {
     expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
     expect(container.querySelector('[data-misty-composer="follow-up"]')).not.toBeNull();
     expect(container.textContent).toContain("Arcadia will be warm this afternoon.");
+
+    const panel = container.querySelector<HTMLElement>("[data-html2canvas-ignore]");
+    vi.spyOn(panel!, "getBoundingClientRect").mockReturnValue({
+      x: 100,
+      y: 50,
+      top: 50,
+      right: 900,
+      bottom: 700,
+      left: 100,
+      width: 800,
+      height: 650,
+      toJSON: () => ({}),
+    });
+    const dragHandle = container.querySelector<HTMLButtonElement>(
+      '[data-misty-voice-island] [aria-label="Move Misty window"]',
+    );
+    expect(dragHandle).not.toBeNull();
+    await act(async () => {
+      dragHandle?.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          button: 0,
+          clientX: 500,
+          clientY: 100,
+        }),
+      );
+      window.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 548,
+          clientY: 132,
+        }),
+      );
+    });
+    expect(panel?.style.translate).toBe("48px 32px");
 
     const input = container.querySelector<HTMLTextAreaElement>(
       "[data-global-misty-launcher-input]",

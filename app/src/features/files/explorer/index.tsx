@@ -25,6 +25,11 @@ export * from "./utils/fileFormat";
 export * from "./utils/globalSearch";
 export * from "./utils/librarySearch";
 export * from "./utils/searchNavigation";
+export {
+  filesMultiPanelStore,
+  releaseFilesMultiPanelStore,
+} from "./workspace/explorerWorkspace/filesDockStores";
+export { ExplorerPluginPanelHost } from "./workspace/explorerPlugins/pluginPanelHosts";
 
 const loadDesktopFilesPage = () => import("./workspace");
 const DesktopFilesPage = lazy(loadDesktopFilesPage);

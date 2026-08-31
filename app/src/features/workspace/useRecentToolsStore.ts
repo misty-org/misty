@@ -3,7 +3,6 @@ import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
 import {
   ArrowLeftRight,
-  Blocks,
   BookOpenText,
   Bot,
   CheckSquare2,
@@ -15,6 +14,7 @@ import {
   MessagesSquare,
   Notebook,
   SquareTerminal,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 import type { WorkspaceSurfaceId, WorkspaceTab } from "./model";
@@ -57,9 +57,9 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
   agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: Bot },
   marketplace: {
     id: "marketplace",
-    label: "Marketplace",
+    label: "Store",
     surfaceId: "marketplace",
-    icon: Blocks,
+    icon: Store,
   },
 };
 

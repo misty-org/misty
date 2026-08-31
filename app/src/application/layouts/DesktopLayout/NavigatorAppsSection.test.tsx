@@ -58,7 +58,7 @@ describe("NavigatorAppsSection", () => {
     });
     expect(document.body.textContent).toContain("Run commands locally");
     expect(document.body.textContent).not.toContain("Browse the web in Misty");
-    expect(document.body.querySelector('a[href="/marketplace"]')?.textContent).toBe("Browse apps");
+    expect(document.body.querySelector('a[href="/store"]')?.textContent).toBe("Browse apps");
   });
 
   it("collapses the app list and preserves the choice", async () => {

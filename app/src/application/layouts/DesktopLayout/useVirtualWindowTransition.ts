@@ -1,3 +1,4 @@
+import { setBrowserWebviewsSuspended } from "@/features/browser";
 import { useLayoutEffect, useRef } from "react";
 
 const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
@@ -17,12 +18,20 @@ export function useVirtualWindowTransition(activeVirtualWindowId: string) {
     if (previousWindowId === activeVirtualWindowId) return;
 
     const element = elementRef.current;
-    if (
-      !element ||
-      typeof element.animate !== "function" ||
-      window.matchMedia?.(reducedMotionQuery).matches
-    )
-      return;
+    const reducedMotion = window.matchMedia?.(reducedMotionQuery).matches;
+    const suspensionReason = "virtual-window-transition";
+    setBrowserWebviewsSuspended(true, suspensionReason);
+    const resumeTimer = window.setTimeout(
+      () => setBrowserWebviewsSuspended(false, suspensionReason),
+      reducedMotion ? 32 : virtualWindowTransition.duration + 32,
+    );
+
+    if (!element || typeof element.animate !== "function" || reducedMotion) {
+      return () => {
+        window.clearTimeout(resumeTimer);
+        setBrowserWebviewsSuspended(false, suspensionReason);
+      };
+    }
 
     const animation = element.animate(
       [
@@ -39,7 +48,11 @@ export function useVirtualWindowTransition(activeVirtualWindowId: string) {
       ],
       virtualWindowTransition,
     );
-    return () => animation.cancel();
+    return () => {
+      window.clearTimeout(resumeTimer);
+      animation.cancel();
+      setBrowserWebviewsSuspended(false, suspensionReason);
+    };
   }, [activeVirtualWindowId]);
 
   return elementRef;

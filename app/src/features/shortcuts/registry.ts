@@ -4,10 +4,10 @@ import { filesShortcutCommands } from "./filesCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
-  command("search.toggle", "Open Search", {
-    description: "Search objects, files, and navigation destinations.",
+  command("search.toggle", "Open Misty", {
+    description: "Open or close the floating Search and Ask window.",
     category: "Navigation",
-    aliases: ["launcher", "search"],
+    aliases: ["launcher", "search", "ask", "ai"],
     mac: "Cmd+K",
     windows: "Ctrl+K",
     allowInEditable: true,
