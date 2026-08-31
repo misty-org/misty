@@ -41,6 +41,32 @@ describe("shortcut dispatcher", () => {
     removeTerminal();
   });
 
+  it("uses explicit handler priority and falls through when a handler declines", () => {
+    const calls: string[] = [];
+    const removeFallback = registerShortcutHandler("search.toggle", () => {
+      calls.push("fallback");
+      return true;
+    });
+    const removeFocused = registerShortcutHandler(
+      "search.toggle",
+      () => {
+        calls.push("focused");
+        return false;
+      },
+      () => true,
+      100,
+    );
+
+    expect(
+      dispatchShortcutEvent(
+        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+      ),
+    ).toBe(true);
+    expect(calls).toEqual(["focused", "fallback"]);
+    removeFocused();
+    removeFallback();
+  });
+
   it("protects typing targets unless a command opts in", () => {
     useWorkspaceStore.getState().openSurface({
       surfaceId: "files",
@@ -142,6 +168,35 @@ describe("shortcut dispatcher", () => {
     ).toBe(true);
     expect(handler).toHaveBeenCalledOnce();
     remove();
+  });
+
+  it("keeps canonical Space task routes in their focused shortcut scopes", () => {
+    const store = useWorkspaceStore.getState();
+    const planner = store.openSurface({
+      surfaceId: "space",
+      groupKey: "space:alpha:planner",
+      title: "Planner",
+      route: "/spaces/alpha/tasks/agenda",
+      instancePolicy: "multiple",
+    });
+    const plannerHandler = vi.fn();
+    const removePlanner = registerShortcutHandler("planner.create", plannerHandler);
+
+    expect(dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC" }))).toBe(
+      true,
+    );
+    expect(plannerHandler).toHaveBeenCalledOnce();
+
+    store.updateTabRoute(planner.id, "/spaces/alpha/tasks/roadmaps");
+    const roadmapHandler = vi.fn();
+    const removeRoadmap = registerShortcutHandler("roadmap.create", roadmapHandler);
+    expect(dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "n", code: "KeyN" }))).toBe(
+      true,
+    );
+    expect(roadmapHandler).toHaveBeenCalledOnce();
+
+    removePlanner();
+    removeRoadmap();
   });
 
   it("does not rerender shortcut consumers when handlers register", () => {

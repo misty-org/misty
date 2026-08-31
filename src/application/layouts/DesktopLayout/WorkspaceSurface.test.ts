@@ -16,8 +16,8 @@ describe("space pane route", () => {
   it("reads the Space and section a pane should render", () => {
     expect(parseSpaceTabRoute("/spaces/family/chat")).toEqual({
       spaceId: "family",
-      section: "chat",
-      studioKind: "",
+      section: "social",
+      studioKind: "misty",
     });
   });
 

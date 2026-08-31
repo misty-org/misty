@@ -44,7 +44,14 @@ fn sample_environment() -> SshEnvironment {
 
 #[test]
 fn ssh_argv_is_strict_and_never_invokes_a_shell() {
-    let argv = ssh_argv(&sample_environment(), Path::new("/device/.ssh/known_hosts"));
+    let connection = SshConnectionRequest::Configured {
+        id: "production".to_owned(),
+    };
+    let argv = ssh_argv(
+        &connection,
+        &sample_environment(),
+        Path::new("/device/.ssh/known_hosts"),
+    );
     assert_eq!(argv.last().map(String::as_str), Some("production"));
     assert!(argv.contains(&"StrictHostKeyChecking=yes".to_owned()));
     assert!(argv.contains(&"UpdateHostKeys=no".to_owned()));
@@ -53,6 +60,39 @@ fn ssh_argv_is_strict_and_never_invokes_a_shell() {
         .any(|argument| argument == "sh" || argument == "-c"));
     assert!(!safe_ssh_alias("prod; rm -rf x"));
     assert!(!safe_ssh_alias("-oProxyCommand=bad"));
+}
+
+#[test]
+fn direct_ssh_argv_uses_structured_host_user_and_port() {
+    let connection = SshConnectionRequest::Direct {
+        host: "prod.example.com".to_owned(),
+        user: Some("deploy".to_owned()),
+        port: 2222,
+    };
+    let environment = resolve_connection(&connection).expect("valid direct connection");
+    let argv = ssh_argv(
+        &connection,
+        &environment,
+        Path::new("/device/.ssh/known_hosts"),
+    );
+    assert!(argv.windows(2).any(|args| args == ["-p", "2222"]));
+    assert_eq!(
+        argv.last().map(String::as_str),
+        Some("deploy@prod.example.com")
+    );
+    assert!(!argv
+        .iter()
+        .any(|argument| argument == "sh" || argument == "-c"));
+}
+
+#[test]
+fn direct_ssh_connection_rejects_option_injection() {
+    let connection = SshConnectionRequest::Direct {
+        host: "-oProxyCommand=bad".to_owned(),
+        user: None,
+        port: 22,
+    };
+    assert!(resolve_connection(&connection).is_err());
 }
 
 #[test]

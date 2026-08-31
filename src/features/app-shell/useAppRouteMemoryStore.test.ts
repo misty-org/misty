@@ -42,13 +42,19 @@ describe("app route memory", () => {
 
   it("remembers global navbar pages without changing the last Space", () => {
     useAppRouteMemoryStore.getState().rememberAppRoute("/spaces/space-2/library");
-    for (const route of ["/files", "/agents", "/marketplace", "/code", "/transfers"])
+    for (const route of ["/files", "/agents", "/store", "/code", "/transfers"])
       useAppRouteMemoryStore.getState().rememberAppRoute(route);
 
     expect(useAppRouteMemoryStore.getState()).toMatchObject({
       lastAppRoute: "/code",
       lastSpacesRoute: "/spaces/space-2/library",
     });
+  });
+
+  it("migrates the legacy catalog route to Store", () => {
+    useAppRouteMemoryStore.getState().rememberAppRoute("/marketplace");
+
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/store");
   });
 
   it("updates valid Spaces subsections and discards non-route fragments", () => {

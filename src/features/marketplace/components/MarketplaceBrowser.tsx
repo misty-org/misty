@@ -1,22 +1,15 @@
 import { SystemErrorActivity } from "@/features/activity";
+import { cn } from "@/shared/ui";
 import { Button } from "@/shared/ui/button";
-import { Card } from "@/shared/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/shared/ui/dropdown-menu";
 import { Input } from "@/shared/ui/input";
-import { Skeleton } from "@/shared/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
-import { ChevronDown, ChevronLeft, ChevronRight, Funnel, RefreshCcw } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { PanelLeftClose, PanelLeftOpen, RefreshCcw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { filterPlugins } from "./helpers";
-import { MarketplaceCard } from "./MarketplaceCard";
+import { MarketplaceCatalog } from "./MarketplaceCatalog";
 import { MarketplaceDetailDialog } from "./MarketplaceDetailDialog";
-import type { MarketplaceEntry, MarketplaceView } from "./types";
+import { MarketplaceHome } from "./MarketplaceHome";
+import { MarketplaceStoreNav, type MarketplaceSection } from "./MarketplaceStoreNav";
+import type { MarketplaceEntry } from "./types";
 
 type MarketplaceBrowserProps = {
   marketplacePlugins: MarketplaceEntry[];
@@ -36,41 +29,12 @@ type MarketplaceBrowserProps = {
   onPrimaryAction?: (plugin: MarketplaceEntry) => void;
 };
 
-type MarketplaceCategory = "all" | "misty" | "extensions";
+const defaultStoreSidebarWidth = 240;
+const minStoreSidebarWidth = 220;
+const maxStoreSidebarWidth = 360;
 
-const categoryLabels: Record<MarketplaceCategory, string> = {
-  all: "All",
-  misty: "Apps",
-  extensions: "Extensions",
-};
-
-const marketplacePageSize = 50;
-
-const gridClass = "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
-
-function PluginGridSkeleton() {
-  return (
-    <div aria-hidden="true" className={gridClass}>
-      {[0, 1, 2, 3, 4, 5].map((index) => (
-        <Card className="gap-3" key={index} size="sm">
-          <div className="flex items-center gap-3 px-6">
-            <Skeleton className="size-10 shrink-0 rounded-lg" />
-            <span className="grid min-w-0 flex-1 gap-1.5">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-3 w-20" />
-            </span>
-          </div>
-          <div className="grid gap-1.5 px-6">
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-4/5" />
-          </div>
-          <div className="flex justify-end px-6">
-            <Skeleton className="h-8 w-20 rounded-lg" />
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
+function clampStoreSidebarWidth(width: number) {
+  return Math.min(maxStoreSidebarWidth, Math.max(minStoreSidebarWidth, width));
 }
 
 export function MarketplaceBrowser({
@@ -90,199 +54,290 @@ export function MarketplaceBrowser({
   primaryActionLabel,
   onPrimaryAction,
 }: MarketplaceBrowserProps) {
-  const [browserTab, setBrowserTab] = useState<MarketplaceView>("marketplace");
-  const [category, setCategory] = useState<MarketplaceCategory>("all");
-  const [page, setPage] = useState(0);
-  const resultsRef = useRef<HTMLDivElement>(null);
-  const activePlugins = browserTab === "installed" ? installedPlugins : marketplacePlugins;
-  const showSkeleton = loading && activePlugins.length === 0;
-
-  const filteredPlugins = useMemo(
-    () =>
-      filterPlugins(activePlugins, query, browserTab).filter((plugin) => {
-        if (category === "all") return true;
-        if (category === "misty") return plugin.kind === "builtin";
-        return plugin.kind !== "builtin";
-      }),
-    [activePlugins, browserTab, category, query],
+  const [section, setSection] = useState<MarketplaceSection>("featured");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(defaultStoreSidebarWidth);
+  const [resizingSidebar, setResizingSidebar] = useState(false);
+  const storeLayoutRef = useRef<HTMLDivElement>(null);
+  const pendingResizeXRef = useRef(0);
+  const resizeFrameRef = useRef<number | null>(null);
+  const apps = useMemo(
+    () => marketplacePlugins.filter((plugin) => plugin.kind !== "extension"),
+    [marketplacePlugins],
   );
-  const lastPage = Math.max(0, Math.ceil(filteredPlugins.length / marketplacePageSize) - 1);
-  const currentPage = Math.min(page, lastPage);
-  const rangeStart = filteredPlugins.length ? currentPage * marketplacePageSize + 1 : 0;
-  const rangeEnd = Math.min((currentPage + 1) * marketplacePageSize, filteredPlugins.length);
-  const visiblePlugins = filteredPlugins.slice(
-    currentPage * marketplacePageSize,
-    (currentPage + 1) * marketplacePageSize,
+  const extensions = useMemo(
+    () => marketplacePlugins.filter((plugin) => plugin.kind === "extension"),
+    [marketplacePlugins],
   );
-  const changePage = (nextPage: number) => {
-    setPage(Math.max(0, Math.min(nextPage, lastPage)));
-    resultsRef.current?.scrollTo?.({ top: 0 });
-  };
-  const resetPage = () => changePage(0);
-  // Only an explicit card click or a `?plugin=` deep link opens the detail
-  // dialog, so an empty selection has to stay empty here.
+  const installedItems = useMemo(
+    () => installedPlugins.filter((plugin) => plugin.kind !== "builtin" && plugin.installed),
+    [installedPlugins],
+  );
+  const searching = query.trim().length > 0;
+  const searchedApps = useMemo(() => filterPlugins(apps, query, "marketplace"), [apps, query]);
+  const searchedExtensions = useMemo(
+    () => filterPlugins(extensions, query, "marketplace"),
+    [extensions, query],
+  );
   const selectedPlugin = selectedPluginId
     ? ([...marketplacePlugins, ...installedPlugins].find(
         (plugin) => plugin.id === selectedPluginId,
       ) ?? undefined)
     : undefined;
+  const actions = {
+    onInstall,
+    onToggle,
+    onPrimaryAction,
+    primaryActionLabel,
+  };
+
+  useEffect(() => {
+    if (!resizingSidebar) return;
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const applyResize = () => {
+      resizeFrameRef.current = null;
+      const rect = storeLayoutRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setSidebarWidth(clampStoreSidebarWidth(pendingResizeXRef.current - rect.left));
+    };
+    const onPointerMove = (event: globalThis.PointerEvent) => {
+      pendingResizeXRef.current = event.clientX;
+      if (resizeFrameRef.current === null) {
+        resizeFrameRef.current = window.requestAnimationFrame(applyResize);
+      }
+    };
+    const stopResize = () => setResizingSidebar(false);
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", stopResize, { once: true });
+    window.addEventListener("pointercancel", stopResize, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      if (resizeFrameRef.current !== null) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
+      }
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [resizingSidebar]);
+
+  const changeSection = (next: MarketplaceSection) => {
+    setSection(next);
+    if (query) onQueryChange("");
+  };
+
+  const resizeSidebarFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    const increments: Record<string, number> = { ArrowLeft: -16, ArrowRight: 16 };
+    if (event.key === "Home") {
+      event.preventDefault();
+      setSidebarWidth(minStoreSidebarWidth);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setSidebarWidth(maxStoreSidebarWidth);
+    } else if (event.key in increments) {
+      event.preventDefault();
+      setSidebarWidth((width) => clampStoreSidebarWidth(width + increments[event.key]));
+    }
+  };
+
+  const startSidebarResize = (event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    pendingResizeXRef.current = event.clientX;
+    setResizingSidebar(true);
+  };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden px-8 py-5 max-[720px]:px-4 max-[720px]:py-4">
-      <div>
-        <h1 className="text-lg font-semibold text-cream-bright">Marketplace</h1>
-        <p className="mt-1 text-sm text-cream-muted">
-          Discover built-in Misty apps and extensions for your workspace.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Input
-          aria-label="Search apps"
-          className="h-9 w-full max-w-xs"
-          disabled={showSkeleton}
-          onChange={(event) => {
-            resetPage();
-            onQueryChange(event.target.value);
-          }}
-          placeholder="Search apps..."
-          value={query}
-        />
-
-        <Tabs
-          value={browserTab}
-          onValueChange={(value) => {
-            resetPage();
-            setBrowserTab(value as MarketplaceView);
-          }}
-        >
-          <TabsList variant="line">
-            <TabsTrigger value="marketplace">Discover</TabsTrigger>
-            <TabsTrigger value="installed">Installed</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              aria-label={`Filter by app type: ${categoryLabels[category]}`}
-              className="h-9 gap-2 px-3 text-cream-muted shadow-none hover:text-cream-bright"
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <Funnel aria-hidden="true" size={15} strokeWidth={1.9} />
-              <span>{categoryLabels[category]}</span>
-              <ChevronDown aria-hidden="true" className="text-cream-muted" size={14} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuRadioGroup
-              onValueChange={(value) => {
-                resetPage();
-                setCategory(value as MarketplaceCategory);
-              }}
-              value={category}
-            >
-              <DropdownMenuRadioItem indicator="check" value="all">
-                All
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem indicator="check" value="misty">
-                Apps
-              </DropdownMenuRadioItem>
-              <DropdownMenuRadioItem indicator="check" value="extensions">
-                Extensions
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {onRefresh ? (
-          <Button
-            aria-label="Reload extensions"
-            className="size-8 text-cream-muted/70 shadow-none hover:text-cream"
-            disabled={loading}
-            onClick={onRefresh}
-            size="icon"
-            title="Reload extensions"
-            type="button"
-            variant="ghost"
+    <div
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg"
+      data-store-layout="true"
+      ref={storeLayoutRef}
+    >
+      <div className="flex min-h-0 flex-1 overflow-hidden max-[860px]:flex-col">
+        {sidebarOpen ? (
+          <div
+            className="relative h-full shrink-0 max-[860px]:h-auto max-[860px]:w-full"
+            data-store-sidebar-shell="true"
+            style={{ width: sidebarWidth }}
           >
-            <RefreshCcw className={loading ? "animate-spin" : undefined} size={15} />
-          </Button>
+            <MarketplaceStoreNav
+              active={section}
+              installedCount={installedItems.length}
+              onChange={changeSection}
+            />
+            <div
+              aria-label="Resize Store sidebar"
+              aria-orientation="vertical"
+              aria-valuemax={maxStoreSidebarWidth}
+              aria-valuemin={minStoreSidebarWidth}
+              aria-valuenow={sidebarWidth}
+              className={cn(
+                "group absolute right-0 top-0 z-20 h-full w-2 translate-x-1/2 cursor-col-resize outline-none",
+                "max-[860px]:hidden",
+                "after:absolute after:inset-y-2 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:content-['']",
+                "hover:after:bg-charcoal-active focus-visible:after:bg-cream-muted",
+                resizingSidebar && "after:bg-cream-muted",
+              )}
+              data-store-sidebar-resizer="true"
+              onDoubleClick={() => setSidebarWidth(defaultStoreSidebarWidth)}
+              onKeyDown={resizeSidebarFromKeyboard}
+              onPointerDown={startSidebarResize}
+              role="separator"
+              tabIndex={0}
+            />
+          </div>
         ) : null}
 
-        <div aria-label="Marketplace pages" className="ml-auto flex shrink-0 items-center gap-1">
-          <span aria-live="polite" className="mr-1 text-xs tabular-nums text-cream-muted">
-            {showSkeleton
-              ? "Loading"
-              : filteredPlugins.length
-                ? `${rangeStart.toLocaleString()}–${rangeEnd.toLocaleString()} of ${filteredPlugins.length.toLocaleString()}`
-                : "0 of 0"}
-          </span>
-          <Button
-            aria-label="Previous page"
-            className="size-8 text-cream-muted shadow-none hover:text-cream-bright"
-            disabled={showSkeleton || currentPage === 0}
-            onClick={() => changePage(currentPage - 1)}
-            size="icon"
-            title="Previous page"
-            type="button"
-            variant="ghost"
-          >
-            <ChevronLeft aria-hidden="true" size={17} strokeWidth={1.9} />
-          </Button>
-          <Button
-            aria-label="Next page"
-            className="size-8 text-cream-muted shadow-none hover:text-cream-bright"
-            disabled={showSkeleton || currentPage === lastPage}
-            onClick={() => changePage(currentPage + 1)}
-            size="icon"
-            title="Next page"
-            type="button"
-            variant="ghost"
-          >
-            <ChevronRight aria-hidden="true" size={17} strokeWidth={1.9} />
-          </Button>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="shrink-0 border-b border-charcoal-border px-6 py-5 max-[640px]:px-4 max-[640px]:py-4">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+              <div className="min-w-[220px] flex-1">
+                <h1 className="text-lg font-semibold text-cream-bright">Store</h1>
+                <p className="mt-1 text-xs text-cream-muted">
+                  Discover tools for the way you work.
+                </p>
+              </div>
+              <div className="flex w-full max-w-xl items-center gap-1.5">
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cream-muted"
+                    size={16}
+                  />
+                  <Input
+                    aria-label="Search Store"
+                    className="h-10 w-full pl-9"
+                    disabled={loading && marketplacePlugins.length === 0}
+                    onChange={(event) => onQueryChange(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape" && query) onQueryChange("");
+                    }}
+                    placeholder="Search Store"
+                    value={query}
+                  />
+                </div>
+                {onRefresh ? (
+                  <Button
+                    aria-label="Reload Store"
+                    className="size-9 text-cream-muted shadow-none hover:text-cream max-[860px]:size-11"
+                    disabled={loading}
+                    onClick={onRefresh}
+                    size="icon"
+                    title="Reload Store"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <RefreshCcw className={loading ? "animate-spin" : undefined} size={15} />
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {notice ? <p className="mt-3 text-xs text-cream-muted">{notice}</p> : null}
+            {error ? (
+              <div className="mt-3">
+                <SystemErrorActivity
+                  error={error}
+                  scope="marketplace"
+                  title="Store could not be refreshed"
+                  target={{ kind: "workspace-tool", tool: "marketplace" }}
+                />
+              </div>
+            ) : null}
+          </header>
+
+          <main className="misty-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 max-[640px]:px-4 max-[640px]:py-4">
+            {searching ? (
+              <div className="grid gap-8">
+                <MarketplaceCatalog
+                  description="Built-in and installable apps that match your search."
+                  empty="No apps match this search."
+                  entries={searchedApps}
+                  loading={loading}
+                  onSelect={onSelect}
+                  title="Apps"
+                  {...actions}
+                />
+                <MarketplaceCatalog
+                  description="Installable capabilities that match your search. Review details and permissions before installing."
+                  empty="No extensions match this search."
+                  entries={searchedExtensions}
+                  loading={loading}
+                  onSelect={onSelect}
+                  title="Extensions"
+                  {...actions}
+                />
+              </div>
+            ) : section === "featured" ? (
+              <MarketplaceHome
+                apps={apps}
+                busy={loading}
+                onNavigate={changeSection}
+                onSelect={onSelect}
+                {...actions}
+              />
+            ) : section === "apps" ? (
+              <MarketplaceCatalog
+                description="Built-in and installable apps open as full workspace tabs."
+                empty="No apps are available."
+                entries={apps}
+                loading={loading}
+                onSelect={onSelect}
+                title="Apps"
+                {...actions}
+              />
+            ) : section === "extensions" ? (
+              <MarketplaceCatalog
+                description="Extensions enhance an existing app at runtime, such as annotations inside Browser."
+                empty="No app extensions are available yet."
+                entries={extensions}
+                loading={loading}
+                onSelect={onSelect}
+                title="Extensions"
+                {...actions}
+              />
+            ) : (
+              <MarketplaceCatalog
+                description="Manage the apps installed on this device. Built-in apps are always available."
+                empty="You have not installed any apps yet."
+                entries={installedItems}
+                loading={loading}
+                onSelect={onSelect}
+                title="Installed apps"
+                {...actions}
+              />
+            )}
+          </main>
         </div>
       </div>
 
-      {notice ? <p className="text-xs text-cream-muted">{notice}</p> : null}
-      {error ? (
-        <SystemErrorActivity
-          error={error}
-          scope="marketplace"
-          title="Marketplace could not be refreshed"
-          target={{ kind: "workspace-tool", tool: "marketplace" }}
-        />
-      ) : null}
-
-      <div
-        ref={resultsRef}
-        className="misty-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      <footer
+        className="flex h-10 shrink-0 items-center border-t border-charcoal-border bg-charcoal-workspace px-2"
+        data-store-bottom-bar="true"
       >
-        {showSkeleton ? (
-          <PluginGridSkeleton />
-        ) : visiblePlugins.length ? (
-          <div className={gridClass}>
-            {visiblePlugins.map((plugin) => (
-              <MarketplaceCard
-                busy={loading}
-                key={plugin.id}
-                onInstall={onInstall}
-                onOpenDetails={() => onSelect(plugin.id)}
-                onPrimaryAction={onPrimaryAction}
-                onToggle={onToggle}
-                plugin={plugin}
-                primaryActionLabel={primaryActionLabel}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed px-5 py-10 text-center text-sm text-cream-muted">
-            No apps match the current filter.
-          </div>
-        )}
-      </div>
+        <Button
+          aria-expanded={sidebarOpen}
+          aria-label={sidebarOpen ? "Hide Store sidebar" : "Show Store sidebar"}
+          className="size-8 text-cream-muted shadow-none hover:text-cream-bright"
+          onClick={() => setSidebarOpen((open) => !open)}
+          size="icon"
+          title={sidebarOpen ? "Hide Store sidebar" : "Show Store sidebar"}
+          type="button"
+          variant="ghost"
+        >
+          {sidebarOpen ? (
+            <PanelLeftClose aria-hidden="true" size={16} />
+          ) : (
+            <PanelLeftOpen aria-hidden="true" size={16} />
+          )}
+        </Button>
+      </footer>
 
       <MarketplaceDetailDialog
         busy={loading}

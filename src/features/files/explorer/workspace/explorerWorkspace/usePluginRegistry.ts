@@ -1,3 +1,4 @@
+import { pluginCatalogChangedEvent } from "@/features/extensions";
 import { pluginCommandsSnapshot } from "@/features/files/native";
 import type { PluginCommandEntry, PluginPanelEntry } from "@/native/contracts";
 import {
@@ -14,9 +15,10 @@ import { pluginCommandsEqual, pluginPanelsEqual } from "../ExplorerWorkspaceUtil
 /**
  * Plugin commands and panels, plus the shortcut map they extend.
  *
- * Extensions can be installed while Misty is running, so this reloads on window
- * focus. A plugin's `defaultShortcut` only applies where the user has not bound
- * that command themselves.
+ * Extensions can be installed or toggled while Misty is running, so this
+ * reloads when the catalog changes and when the window regains focus. A
+ * plugin's `defaultShortcut` only applies where the user has not bound that
+ * command themselves.
  */
 export function usePluginRegistry(options: { extensionsEnabled: boolean }) {
   const { extensionsEnabled } = options;
@@ -70,9 +72,11 @@ export function usePluginRegistry(options: { extensionsEnabled: boolean }) {
     };
     void loadCommandMetadata();
     window.addEventListener("focus", loadCommandMetadata);
+    window.addEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
     return () => {
       disposed = true;
       window.removeEventListener("focus", loadCommandMetadata);
+      window.removeEventListener(pluginCatalogChangedEvent, loadCommandMetadata);
       unregisterPluginDefinitionsRef.current.forEach((remove) => remove());
       unregisterPluginDefinitionsRef.current = [];
     };

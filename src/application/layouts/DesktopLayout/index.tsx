@@ -4,10 +4,13 @@ import { ActivityBridge } from "@/features/activity";
 import { useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { BrowserRuntimeBridge, setBrowserWebviewsSuspended } from "@/features/browser";
+import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
 import { MediaSearchViewer } from "@/features/files/explorer";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import {
+  canonicalSpaceRoute,
+  defaultSpaceRoute,
   preferredMistySpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
@@ -20,7 +23,13 @@ import {
   useShortcutHandler,
   useShortcutTitle,
 } from "@/features/shortcuts";
-import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
+import {
+  canNavigateWorkspaceTabRoute,
+  dockLeaves,
+  navigateWorkspaceTabRoute,
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+} from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
@@ -73,6 +82,7 @@ export function DesktopLayout(props: {
     settingsLoad,
     activePaneId,
     activePanePath,
+    activeWorkspacePaneId,
     lastAppRoute,
     lastNonSettingsRouteRef,
     routeId,
@@ -102,6 +112,43 @@ export function DesktopLayout(props: {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
   const navigationHistory = useDesktopNavigationHistory({ location, navigate, navigationType });
+  const focusedTab = useWorkspaceStore((workspace) => {
+    const pane = dockLeaves(workspace.layout.root).find(
+      (candidate) => candidate.id === workspace.layout.focusedPaneId,
+    );
+    return pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
+  });
+  const canGoBack = Boolean(
+    (focusedTab && canNavigateWorkspaceTabRoute(focusedTab.id, -1)) || navigationHistory.canGoBack,
+  );
+  const canGoForward = Boolean(
+    (focusedTab && canNavigateWorkspaceTabRoute(focusedTab.id, 1)) ||
+    navigationHistory.canGoForward,
+  );
+  const navigateFocusedTabRoute = useCallback(
+    (delta: -1 | 1): boolean => {
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find(
+        (candidate) => candidate.id === workspace.layout.focusedPaneId,
+      );
+      const tab =
+        pane?.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane?.tabs[0];
+      if (!tab) return false;
+      const route = navigateWorkspaceTabRoute(tab.id, delta);
+      if (!route) return false;
+      workspace.updateTabRoute(tab.id, route);
+      navigate(route, { replace: true });
+      return true;
+    },
+    [navigate],
+  );
+  const goBack = useCallback(() => {
+    if (!navigateFocusedTabRoute(-1) && navigationHistory.canGoBack) navigationHistory.goBack();
+  }, [navigateFocusedTabRoute, navigationHistory]);
+  const goForward = useCallback(() => {
+    if (!navigateFocusedTabRoute(1) && navigationHistory.canGoForward)
+      navigationHistory.goForward();
+  }, [navigateFocusedTabRoute, navigationHistory]);
   const backTitle = useShortcutTitle("Back", "navigation.back");
   const forwardTitle = useShortcutTitle("Forward", "navigation.forward");
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
@@ -193,14 +240,30 @@ export function DesktopLayout(props: {
       }
       return;
     }
+    if (location.pathname === "/spaces") {
+      const homeSpace = preferredMistySpace(spaces);
+      if (homeSpace && spacesSnapshotReady) {
+        navigate(defaultSpaceRoute(homeSpace.id), { replace: true });
+      }
+      return;
+    }
+    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
+    if (location.pathname.startsWith("/spaces/")) {
+      const canonicalRoute = canonicalSpaceRoute(currentRoute);
+      if (canonicalRoute !== currentRoute) {
+        navigate(canonicalRoute, { replace: true });
+        return;
+      }
+    }
     // Provider and destination choices live in the query string. Keep the
     // complete route on the workspace tab so opening Social cannot fall back
     // to its default Misty destination.
-    const surface = workspaceSurfaceFromRoute(`${location.pathname}${location.search}`);
+    const surface = workspaceSurfaceFromRoute(currentRoute);
     if (surface) openWorkspaceSurface(surface);
   }, [
     location.pathname,
     location.search,
+    location.hash,
     navigate,
     openWorkspaceSurface,
     spaces,
@@ -224,22 +287,22 @@ export function DesktopLayout(props: {
       0,
     );
   }, []);
-  useShortcutHandler(
-    "search.toggle",
-    useCallback(() => openLauncher(false), [openLauncher]),
-  );
+  const toggleFloatingMisty = useCallback(() => {
+    void toggleDesktopMistyPanel()
+      .then((openedNativePanel) => {
+        if (!openedNativePanel) openLauncher(false);
+      })
+      .catch(() => openLauncher(false));
+  }, [openLauncher]);
+  useShortcutHandler("search.toggle", toggleFloatingMisty);
   useShortcutHandler(
     "app.command_palette",
     useCallback(() => openLauncher(true), [openLauncher]),
   );
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler("app.toggle_navigator", toggleNavigatorVisibility);
-  useShortcutHandler("navigation.back", navigationHistory.goBack, navigationHistory.canGoBack);
-  useShortcutHandler(
-    "navigation.forward",
-    navigationHistory.goForward,
-    navigationHistory.canGoForward,
-  );
+  useShortcutHandler("navigation.back", goBack, canGoBack);
+  useShortcutHandler("navigation.forward", goForward, canGoForward);
   useShortcutHandler(
     "navigation.refresh",
     useCallback(() => window.dispatchEvent(new Event("misty:refresh-focused-tool")), []),
@@ -365,8 +428,8 @@ export function DesktopLayout(props: {
                   className={styles.desktopTitlebarNavigationButtonClass}
                   aria-label="Go back"
                   title={backTitle}
-                  disabled={!navigationHistory.canGoBack}
-                  onClick={navigationHistory.goBack}
+                  disabled={!canGoBack}
+                  onClick={goBack}
                 >
                   <ArrowLeft size={18} />
                 </button>
@@ -375,8 +438,8 @@ export function DesktopLayout(props: {
                   className={styles.desktopTitlebarNavigationButtonClass}
                   aria-label="Go forward"
                   title={forwardTitle}
-                  disabled={!navigationHistory.canGoForward}
-                  onClick={navigationHistory.goForward}
+                  disabled={!canGoForward}
+                  onClick={goForward}
                 >
                   <ArrowRight size={18} />
                 </button>
@@ -480,7 +543,6 @@ export function DesktopLayout(props: {
           </StandaloneRouteSurface>
         ) : (
           <WorkspaceCanvas
-            outlet={<Outlet />}
             titlebarInsets={
               usesNativeWindowChrome
                 ? {
@@ -518,6 +580,7 @@ export function DesktopLayout(props: {
           accountId={user.id}
           currentPath={`${location.pathname}${location.search}`}
           activePaneId={activePaneId}
+          activeWorkspacePaneId={activeWorkspacePaneId}
           activePanePath={
             activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
           }
@@ -539,6 +602,7 @@ function standaloneWorkspaceRouteTitle(pathname: string): string | null {
   if (pathname === "/signin") return "Sign in";
   if (pathname === "/register") return "Create account";
   if (pathname.startsWith("/invite/")) return "Join Space";
+  if (pathname === "/spaces") return "Spaces";
   return null;
 }
 

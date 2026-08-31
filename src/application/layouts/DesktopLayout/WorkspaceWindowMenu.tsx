@@ -60,7 +60,7 @@ export function WorkspaceWindowMenu(props: {
                   className={cn(
                     "grid size-5 shrink-0 place-items-center rounded text-cream-muted opacity-0",
                     "hover:bg-charcoal-active hover:text-cream group-hover/window:opacity-100",
-                    "focus:opacity-100",
+                    "focus:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
                   )}
                   aria-label={`Close ${workspaceWindow.title}`}
                   onClick={(event) => {
@@ -99,5 +99,5 @@ export function WorkspaceWindowMenu(props: {
 
 const dockActionClass = [
   "grid size-7 place-items-center rounded text-cream-muted outline-none",
-  "hover:bg-charcoal-card hover:text-cream focus:outline-none",
+  "hover:bg-charcoal-card hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
 ].join(" ");

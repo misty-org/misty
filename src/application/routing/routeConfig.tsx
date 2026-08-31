@@ -59,8 +59,10 @@ export const router = createBrowserRouter([
               { path: "terminal", element: desktopOnlyRoute("Terminal") ?? <TerminalWorkspace /> },
               { path: "files", element: desktopOnlyRoute("Files") ?? <FilesPage /> },
               { path: "agents", element: <AgentsPage /> },
+              { path: "apps/:appId", element: null },
               { path: "code", element: desktopOnlyRoute("Code") ?? <DeveloperWorkspace /> },
-              { path: "marketplace", element: <MarketplacePage /> },
+              { path: "store", element: <MarketplacePage /> },
+              { path: "marketplace", element: <Navigate to={routes.store} replace /> },
               {
                 path: "roadmap-preview",
                 element: import.meta.env.DEV ? (

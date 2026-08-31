@@ -19,6 +19,7 @@ const supportedWorkspaceSurfaces = new Set<WorkspaceSurfaceId>([
   "files",
   "transfers",
   "agents",
+  "extension",
   "marketplace",
 ]);
 

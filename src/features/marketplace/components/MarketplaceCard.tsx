@@ -32,7 +32,9 @@ export function MarketplaceCard({
         />
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-sm font-medium text-cream">{plugin.name}</p>
+            <p className="truncate text-sm font-medium text-cream" data-marketplace-entry-name>
+              {plugin.name}
+            </p>
             <Badge className="shrink-0 text-[10px]" variant={statusBadgeVariant(plugin)}>
               {pluginStatus(plugin)}
             </Badge>
@@ -62,7 +64,7 @@ export function MarketplaceCard({
       {/* Full-card click target for the detail dialog. It sits above the text but
           below the primary action so both stay reachable by mouse and keyboard. */}
       <Button
-        className="absolute inset-0 z-10 h-full w-full rounded-xl opacity-0"
+        className="absolute inset-0 z-10 h-full w-full rounded-xl bg-transparent text-transparent hover:bg-transparent focus-visible:border-charcoal-active"
         onClick={onOpenDetails}
         type="button"
         variant="ghost"

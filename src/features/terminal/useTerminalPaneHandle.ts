@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { SearchAddon } from "@xterm/addon-search";
 import type { Terminal } from "@xterm/xterm";
 import { useImperativeHandle, type Dispatch, type ForwardedRef, type SetStateAction } from "react";
 import { hasTerminalControlCharacters } from "./terminalInputSafety";
+import { MISTY_TERMINAL_SEARCH_DECORATIONS } from "./terminalTheme";
 
 const MIN_FONT_SCALE = 0.6;
 const MAX_FONT_SCALE = 2;
@@ -12,7 +14,8 @@ export interface TerminalPaneHandle {
   bumpFontScale: (delta: number | "reset") => void;
   copySelection: () => Promise<void>;
   paste: () => Promise<void>;
-  toggleSearch: () => void;
+  search: (query: string, direction?: "next" | "previous") => boolean;
+  clearSearch: () => void;
   aiSnapshot: () => string;
   stageAiCommand: (command: string) => Promise<void>;
 }
@@ -20,13 +23,13 @@ export interface TerminalPaneHandle {
 interface TerminalPaneHandleOptions {
   handleRef: ForwardedRef<TerminalPaneHandle>;
   terminalRef: { current: Terminal | null };
+  searchRef: { current: SearchAddon | null };
   sessionIdRef: { current: string };
   setFontScale: Dispatch<SetStateAction<number>>;
-  setSearchOpen: Dispatch<SetStateAction<boolean>>;
 }
 
 export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
-  const { handleRef, terminalRef, sessionIdRef, setFontScale, setSearchOpen } = options;
+  const { handleRef, terminalRef, searchRef, sessionIdRef, setFontScale } = options;
   useImperativeHandle(
     handleRef,
     () => ({
@@ -63,7 +66,21 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
           // Clipboard access can be unavailable outside a focused desktop window.
         }
       },
-      toggleSearch: () => setSearchOpen((current) => !current),
+      search: (query, direction = "next") => {
+        const search = searchRef.current;
+        if (!search || !query) {
+          search?.clearDecorations();
+          return false;
+        }
+        const searchOptions = {
+          decorations: MISTY_TERMINAL_SEARCH_DECORATIONS,
+          incremental: direction === "next",
+        };
+        return direction === "previous"
+          ? search.findPrevious(query, searchOptions)
+          : search.findNext(query, searchOptions);
+      },
+      clearSearch: () => searchRef.current?.clearDecorations(),
       aiSnapshot: () => {
         const term = terminalRef.current;
         if (!term) return "";
@@ -90,6 +107,6 @@ export function useTerminalPaneHandle(options: TerminalPaneHandleOptions) {
         terminalRef.current?.focus();
       },
     }),
-    [sessionIdRef, setFontScale, setSearchOpen, terminalRef],
+    [searchRef, sessionIdRef, setFontScale, terminalRef],
   );
 }

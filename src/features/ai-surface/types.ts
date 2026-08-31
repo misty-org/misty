@@ -18,6 +18,7 @@ export type AiSurfaceId =
   | "terminal"
   | "transfers"
   | "marketplace"
+  | "extension"
   | "photo-editor"
   | "agents"
   | "settings";

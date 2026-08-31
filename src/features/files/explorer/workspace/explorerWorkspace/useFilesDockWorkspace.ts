@@ -1,4 +1,4 @@
-import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore, type MultiPanelStoreHook } from "@/features/workspace";
 import { useCallback, useEffect, useRef } from "react";
 import type { NavigateFunction } from "react-router-dom";
 import { useExplorerStore } from "../../store";
@@ -9,6 +9,8 @@ interface FilesDockWorkspaceOptions {
   activePath: string;
   initialized: boolean;
   embedded?: boolean;
+  homePath: string;
+  multiPanelStore: MultiPanelStoreHook;
   navigate: NavigateFunction;
 }
 
@@ -27,19 +29,17 @@ export function useFilesDockWorkspace(options: FilesDockWorkspaceOptions) {
 
   useEffect(() => {
     if (!options.embedded) return;
-    const multi = useMultiPanelStore.getState();
-    const active = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
-    if (active && multi.tabs.length > 1) {
-      useMultiPanelStore.setState({
-        tabs: [active],
-        activeTabId: active.id,
-        activePaneId: active.activePaneId,
-        closedTabs: [],
-        closedPanes: [],
-      });
+    const multi = options.multiPanelStore.getState();
+    if (multi.tabs.length === 0) {
+      multi.initialize(dockTabPath || options.homePath, "Files");
     }
-    useMultiPanelStore.getState().collapseDuplicateBrowsePanes();
-  }, [options.embedded, options.initialized]);
+  }, [
+    dockTabPath,
+    options.embedded,
+    options.homePath,
+    options.initialized,
+    options.multiPanelStore,
+  ]);
 
   // Initial seed from dock tab state on mount or when switching tabs
   useEffect(() => {
