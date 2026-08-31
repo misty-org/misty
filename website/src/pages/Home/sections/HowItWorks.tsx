@@ -134,13 +134,24 @@ function beatMotion(
   };
 }
 
-function BeatCopy({ beat }: { beat: Beat }) {
+function BeatCopy({
+  beat,
+  centered = false,
+}: {
+  beat: Beat;
+  centered?: boolean;
+}) {
   return (
     <>
       <h3 className="text-[clamp(1.5rem,2.6vw,2.25rem)] font-medium leading-[1.15] tracking-[-0.03em] text-[var(--marketing-foreground)]">
         {beat.title}
       </h3>
-      <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--marketing-muted)]">
+      <p
+        className={cn(
+          "mt-5 max-w-md text-base leading-relaxed text-[var(--marketing-muted)]",
+          centered && "mx-auto",
+        )}
+      >
         {beat.description}
       </p>
     </>
@@ -232,8 +243,8 @@ export function HowItWorks() {
       >
         <div className="pin-stage">
           <div className="site-container grid grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] items-center gap-x-10 xl:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] xl:gap-x-12">
-            <div className="col-start-1 row-start-1">
-              <div className="grid">
+            <div className="col-start-1 row-start-1 flex h-full items-center justify-center">
+              <div className="grid w-full max-w-lg text-center">
                 {beats.map((beat, index) => (
                   <div
                     key={beat.title}
@@ -246,7 +257,7 @@ export function HowItWorks() {
                       transition,
                     )}
                   >
-                    <BeatCopy beat={beat} />
+                    <BeatCopy beat={beat} centered />
                   </div>
                 ))}
               </div>
