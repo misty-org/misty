@@ -4,6 +4,7 @@ mod cli;
 mod config;
 mod desktop;
 mod environment;
+mod home;
 mod process;
 mod release;
 mod server;

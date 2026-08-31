@@ -33,6 +33,11 @@ export const referencePages: DocPage[] = [
                 "Run Go, database, container, and Worker checks.",
               ],
               ["check all", "Run Misty checks followed by server checks."],
+              [
+                "home generate",
+                "Initialize ~/.misty; optionally copy a portable payload with --source and --destination.",
+              ],
+              ["home check", "Validate a Misty home with optional --path."],
             ],
           ),
         ],

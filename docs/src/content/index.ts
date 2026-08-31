@@ -1,4 +1,5 @@
 import { desktopPages } from "./desktop";
+import { homePages } from "./home";
 import { referencePages } from "./reference";
 import { releasePages } from "./release";
 import { serverPages } from "./server";
@@ -10,6 +11,7 @@ import { workspacePages } from "./workspace";
 export const pages = [
   ...startPages,
   ...workspacePages,
+  ...homePages,
   ...desktopPages,
   ...websitePages,
   ...serverPages,
@@ -34,6 +36,9 @@ export const navGroups: NavGroup[] = [
       { label: "Configuration & environment", path: "/configuration" },
       { label: "doctor", path: "/doctor", command: true },
       { label: "check", path: "/check", command: true },
+      { label: "Misty home", path: "/home" },
+      { label: "home generate", path: "/home/generate", command: true },
+      { label: "home check", path: "/home/check", command: true },
     ],
   },
   {
