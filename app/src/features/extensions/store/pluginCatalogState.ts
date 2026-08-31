@@ -222,7 +222,7 @@ export async function refreshPlugins(
       loading: false,
     });
   } catch (error) {
-    // The marketplace is remote, but installed extensions are local. Keep
+    // The Store catalog is remote, but installed extensions are local. Keep
     // both the last good catalog and every locally installed extension usable
     // while surfacing the refresh failure.
     await rebuildCatalogState(set, get, {

@@ -40,10 +40,12 @@ const AiPaneContext = createContext<AiPaneContextValue | null>(null);
 export function AiPaneHost({
   paneId,
   defaultAdapter = null,
+  active = true,
   children,
 }: {
   paneId: string;
   defaultAdapter?: AiSurfaceAdapter | null;
+  active?: boolean;
   children: ReactNode;
 }) {
   const { user } = useAuth();
@@ -94,16 +96,16 @@ export function AiPaneHost({
   useEffect(() => {
     const element = hostRef.current;
     const currentAdapter = adapterRef.current;
-    if (!accountId || !currentAdapter || !element) return;
+    if (!active || !accountId || !currentAdapter || !element) return;
     setContextBoundary(accountId, paneId, aiContextBoundary(currentAdapter));
     return registerPane({ accountId, paneId, adapter: currentAdapter, element });
-  }, [accountId, adapter, paneId, registerPane, setContextBoundary]);
+  }, [accountId, active, adapter, paneId, registerPane, setContextBoundary]);
 
   return (
     <AiPaneContext.Provider value={context}>
       <div ref={hostRef} className="misty-ai-pane-host">
         <div className="misty-ai-pane-content">{children}</div>
-        {proactive && adapter ? (
+        {active && proactive && adapter ? (
           <AiProactiveNudge
             accountId={accountId}
             paneId={paneId}

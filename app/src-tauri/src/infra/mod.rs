@@ -62,6 +62,8 @@ pub mod peer_files;
 pub mod peer_identity;
 #[cfg(desktop)]
 pub mod plugin_commands;
+#[cfg(desktop)]
+mod plugin_routes;
 pub mod power_pack;
 pub mod providers;
 pub mod search;

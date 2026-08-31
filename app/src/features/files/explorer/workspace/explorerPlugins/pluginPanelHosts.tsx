@@ -1,5 +1,11 @@
 import { extensionCommandRun, pluginPanelRender } from "@/features/files/native";
 import { SystemErrorActivity } from "@/features/activity";
+import {
+  extensionThemeChangedEvent,
+  extensionThemeSnapshot,
+  revertExtensionThemePreview,
+  runExtensionThemeCommand,
+} from "@/features/settings";
 import type { PluginPanelEntry, PluginPanelRenderResult } from "@/native/contracts";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { errorText } from "@/shared/lib/format";
@@ -13,15 +19,32 @@ import { pluginTabHostStyles } from "../ExplorerDesktopPluginStyles";
 import { PluginPanelElementView } from "./PluginPanelElementView";
 import { monitorExtensionJob } from "./extensionJobs";
 
-export function ExplorerPluginPanelHost(props: { panel: PluginPanelEntry; selectedPath: string }) {
+export function ExplorerPluginPanelHost(props: {
+  panel: PluginPanelEntry;
+  selectedPath: string;
+  mode?: "embedded" | "app";
+}) {
   if (props.panel.webEntry)
-    return <ExplorerWebPluginPanelHost panel={props.panel} selectedPath={props.selectedPath} />;
-  return <ExplorerNativePluginPanelHost panel={props.panel} selectedPath={props.selectedPath} />;
+    return (
+      <ExplorerWebPluginPanelHost
+        mode={props.mode}
+        panel={props.panel}
+        selectedPath={props.selectedPath}
+      />
+    );
+  return (
+    <ExplorerNativePluginPanelHost
+      mode={props.mode}
+      panel={props.panel}
+      selectedPath={props.selectedPath}
+    />
+  );
 }
 
 export function ExplorerNativePluginPanelHost(props: {
   panel: PluginPanelEntry;
   selectedPath: string;
+  mode?: "embedded" | "app";
 }) {
   const [rendered, setRendered] = useState<PluginPanelRenderResult | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -67,7 +90,13 @@ export function ExplorerNativePluginPanelHost(props: {
   }, [props.panel.id, props.panel.pluginId, props.selectedPath]);
 
   return (
-    <section className={pluginTabHostStyles.panel}>
+    <section
+      className={
+        props.mode === "app"
+          ? `${pluginTabHostStyles.body} h-full min-h-0`
+          : pluginTabHostStyles.panel
+      }
+    >
       <header className={pluginTabHostStyles.panelHeader}>
         <div>
           <h3>{rendered?.title ?? props.panel.title}</h3>
@@ -90,18 +119,24 @@ export function ExplorerNativePluginPanelHost(props: {
         <SystemErrorActivity
           error={renderError}
           scope={`files:plugin-panel:${props.panel.id}`}
-          title="File extension panel could not be loaded"
+          title={
+            props.mode === "app" ? "App could not be loaded" : "File panel could not be loaded"
+          }
           target={{ kind: "workspace-tool", tool: "files" }}
         />
       ) : null}
       {rendered && rendered.runtimeStatus !== "native_rendered" ? (
         <div className={pluginTabHostStyles.notice}>
           <Puzzle size={20} />
-          <span>{rendered.message || "Extension panel unavailable."}</span>
+          <span>
+            {rendered.message || (props.mode === "app" ? "App unavailable." : "Panel unavailable.")}
+          </span>
         </div>
       ) : null}
       {!rendered && !renderError ? (
-        <div className={pluginTabHostStyles.loading}>Loading extension panel...</div>
+        <div className={pluginTabHostStyles.loading}>
+          {props.mode === "app" ? "Loading app…" : "Loading panel…"}
+        </div>
       ) : null}
       {rendered?.runtimeStatus === "native_rendered" ? (
         <div className={pluginTabHostStyles.elements}>
@@ -152,10 +187,12 @@ export function webPanelUrl(panel: PluginPanelEntry): string {
 export function ExplorerWebPluginPanelHost(props: {
   panel: PluginPanelEntry;
   selectedPath: string;
+  mode?: "embedded" | "app";
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [hostState, setHostState] = useState<"loading" | "ready" | "failed">("loading");
+  const [theme, setTheme] = useState(extensionThemeSnapshot);
   const timeoutRef = useRef<number | null>(null);
   const source = useMemo(() => webPanelUrl(props.panel), [props.panel]);
   const currentSelection = useCallback(() => {
@@ -173,10 +210,11 @@ export function ExplorerWebPluginPanelHost(props: {
         kind: "context",
         pluginId: props.panel.pluginId,
         selectedPaths: currentSelection(),
+        theme,
       },
       "*",
     );
-  }, [currentSelection, hostState, props.panel.pluginId]);
+  }, [currentSelection, hostState, props.panel.pluginId, theme]);
 
   const beginHandshake = useCallback(() => {
     setHostState("loading");
@@ -258,6 +296,10 @@ export function ExplorerWebPluginPanelHost(props: {
         respond(true, { ok: true });
         return;
       }
+      if (props.panel.pluginId === "themes" && request.command.startsWith("themes.")) {
+        respond(true, runExtensionThemeCommand(request.command, payload));
+        return;
+      }
       void extensionCommandRun({ pluginId: props.panel.pluginId, command, payload })
         .then((result) => {
           const started = result as { jobId?: string };
@@ -274,24 +316,40 @@ export function ExplorerWebPluginPanelHost(props: {
 
   useEffect(postContext, [postContext]);
   useEffect(() => {
+    const handleThemeChange = () => setTheme(extensionThemeSnapshot());
+    window.addEventListener(extensionThemeChangedEvent, handleThemeChange);
+    return () => {
+      window.removeEventListener(extensionThemeChangedEvent, handleThemeChange);
+      if (props.panel.pluginId === "themes") revertExtensionThemePreview();
+    };
+  }, [props.panel.pluginId]);
+  useEffect(() => {
     beginHandshake();
     return () => {
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
     };
   }, [beginHandshake, reloadKey]);
   return (
-    <section className={`${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`}>
+    <section
+      className={
+        props.mode === "app"
+          ? "relative h-full min-h-0 overflow-hidden bg-charcoal-bg"
+          : `${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`
+      }
+    >
       {hostState !== "ready" ? (
         <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-charcoal-bg p-5 text-center text-sm text-cream-muted">
           {hostState === "loading" ? (
             <>
               <RefreshCcw className="animate-spin" size={20} />
-              <span>Loading extension…</span>
+              <span>{props.mode === "app" ? "Loading app…" : "Loading extension…"}</span>
             </>
           ) : (
             <>
               <Puzzle size={24} />
-              <strong className="text-cream">Extension did not start</strong>
+              <strong className="text-cream">
+                {props.mode === "app" ? "App did not start" : "Extension did not start"}
+              </strong>
               <span>
                 The panel bundle may be missing, outdated, or incompatible with this Misty version.
               </span>
@@ -315,9 +373,13 @@ export function ExplorerWebPluginPanelHost(props: {
       <iframe
         key={reloadKey}
         ref={iframeRef}
-        className="h-full min-h-[420px] w-full border-0 bg-charcoal-bg"
+        className={
+          props.mode === "app"
+            ? "h-full min-h-0 w-full border-0 bg-charcoal-bg"
+            : "h-full min-h-[420px] w-full border-0 bg-charcoal-bg"
+        }
         src={source}
-        title={`${props.panel.title} extension`}
+        title={`${props.panel.title} app`}
         sandbox="allow-scripts allow-same-origin"
         onLoad={beginHandshake}
       />

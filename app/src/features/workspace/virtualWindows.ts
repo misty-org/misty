@@ -6,12 +6,14 @@ import {
   findDockLeaf,
   normalizeDockNode,
   removeDockLeaf,
+  mapDockTabs,
 } from "./dockTree";
 import {
   maxWorkspacePanels,
   type WorkspaceLayout,
   type WorkspaceScopeKey,
   type WorkspaceVirtualWindow,
+  type WorkspaceTab,
 } from "./model";
 
 export interface VirtualWorkspaceState {
@@ -97,6 +99,32 @@ export function withActiveVirtualWindowLayout(
         window.id === state.activeVirtualWindowId ? { ...window, layout: normalized } : window,
       ),
     },
+  };
+}
+
+/** Applies tab-owned async state even when its virtual window or scope is inactive. */
+export function mapAllVirtualWorkspaceTabs(
+  state: VirtualWorkspaceState,
+  update: (tab: WorkspaceTab) => WorkspaceTab,
+): Pick<VirtualWorkspaceState, "layout" | "layoutsByScope" | "virtualWindowsByScope"> {
+  const mapLayout = (layout: WorkspaceLayout): WorkspaceLayout => {
+    const root = mapDockTabs(layout.root, update);
+    return root === layout.root ? layout : { ...layout, root };
+  };
+  return {
+    layout: mapLayout(state.layout),
+    layoutsByScope: Object.fromEntries(
+      Object.entries(state.layoutsByScope).map(([scope, layout]) => [
+        scope,
+        layout ? mapLayout(layout) : layout,
+      ]),
+    ) as VirtualWorkspaceState["layoutsByScope"],
+    virtualWindowsByScope: Object.fromEntries(
+      Object.entries(state.virtualWindowsByScope).map(([scope, windows]) => [
+        scope,
+        windows?.map((window) => ({ ...window, layout: mapLayout(window.layout) })),
+      ]),
+    ) as VirtualWorkspaceState["virtualWindowsByScope"],
   };
 }
 

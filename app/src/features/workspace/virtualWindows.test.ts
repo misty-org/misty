@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, dockTabs, findDockLeaf, insertDockSplit } from "./dockTree";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { canCloseWorkspaceWindow } from "./workspaceTabOperations";
 
 describe("workspace virtual windows", () => {
   beforeEach(() => {
     useWorkspaceStore.persist.clearStorage();
     useWorkspaceStore.getState().reset();
+  });
+
+  it("does not offer closing the final virtual window", () => {
+    const windows = useWorkspaceStore.getState().virtualWindowsByScope.global ?? [];
+    expect(windows).toHaveLength(1);
+    expect(canCloseWorkspaceWindow(windows[0], windows)).toBe(false);
   });
 
   it("gives each Space independently switchable virtual windows", () => {
@@ -53,6 +60,27 @@ describe("workspace virtual windows", () => {
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(0);
     expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
     expect(useWorkspaceStore.getState().switchVirtualWindow(second.id)).toBe(true);
+  });
+
+  it("applies async tab updates while the owning virtual window is inactive", () => {
+    const store = useWorkspaceStore.getState();
+    const firstWindowId = store.activeVirtualWindowId;
+    const browser = store.openBrowserTab({ url: "https://example.com" });
+    const second = store.createVirtualWindow("Second");
+
+    useWorkspaceStore.getState().updateBrowserTab(browser.id, {
+      url: "https://updated.example.com/path",
+      title: "Updated in background",
+    });
+    expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(second.id);
+    expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toContainEqual(
+      expect.objectContaining({
+        id: browser.id,
+        title: "Updated in background",
+        state: expect.objectContaining({ url: "https://updated.example.com/path" }),
+      }),
+    );
   });
 
   it("reopens the most recently closed virtual window in the same Space", () => {

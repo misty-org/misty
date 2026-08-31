@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useWorkspaceTabFocused } from "@/features/workspace";
 
 const TEXT_ENTRY_SELECTOR = "input, textarea, select, [contenteditable='true']";
 
@@ -17,9 +18,10 @@ export function useLibraryViewerKeyboard(options: {
   onNext: () => void;
 }) {
   const { enabled, index, itemCount, onClose, onPrevious, onNext } = options;
+  const workspaceFocused = useWorkspaceTabFocused();
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !workspaceFocused) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
@@ -32,5 +34,5 @@ export function useLibraryViewerKeyboard(options: {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [enabled, index, itemCount, onClose, onNext, onPrevious]);
+  }, [enabled, index, itemCount, onClose, onNext, onPrevious, workspaceFocused]);
 }

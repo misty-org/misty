@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 export * from "./components/DesktopSettingsUI";
 export * from "./hooks/useDocumentAppAppearance";
+export * from "./store/extensionTheme";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";
 export type { SettingsSection } from "./settingsTypes";
