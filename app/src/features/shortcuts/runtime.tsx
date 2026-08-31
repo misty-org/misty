@@ -31,8 +31,6 @@ interface HandlerRegistration {
   token: symbol;
   handler: ShortcutHandler;
   enabled: () => boolean;
-  priority: number;
-  order: number;
 }
 
 interface ForwardedShortcutEvent {
@@ -48,20 +46,12 @@ interface ForwardedShortcutEvent {
 }
 
 const handlers = new Map<string, HandlerRegistration[]>();
-let nextHandlerOrder = 0;
 export function registerShortcutHandler(
   commandId: string,
   handler: ShortcutHandler,
   enabled: () => boolean = () => true,
-  priority = 0,
 ): () => void {
-  const registration = {
-    token: Symbol(commandId),
-    handler,
-    enabled,
-    priority,
-    order: nextHandlerOrder++,
-  };
+  const registration = { token: Symbol(commandId), handler, enabled };
   handlers.set(commandId, [...(handlers.get(commandId) ?? []), registration]);
   return () => {
     const next = (handlers.get(commandId) ?? []).filter(
@@ -76,7 +66,6 @@ export function useShortcutHandler(
   commandId: string,
   handler: ShortcutHandler,
   enabled: boolean | (() => boolean) = true,
-  priority = 0,
 ): void {
   const handlerRef = useRef(handler);
   const enabledRef = useRef(enabled);
@@ -91,9 +80,8 @@ export function useShortcutHandler(
           const current = enabledRef.current;
           return typeof current === "function" ? current() : current;
         },
-        priority,
       ),
-    [commandId, priority],
+    [commandId],
   );
 }
 
@@ -178,13 +166,12 @@ export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: b
     );
 
   for (const definition of candidates) {
-    const registrations = orderedRegistrations(definition.id);
+    const registrations = [...(handlers.get(definition.id) ?? [])].reverse();
     for (const registration of registrations) {
       if (!registration.enabled()) continue;
-      const handled = registration.handler({ command: definition, event, scope: activeScope });
-      if (handled === false) continue;
       event.preventDefault();
       event.stopPropagation();
+      registration.handler({ command: definition, event, scope: activeScope });
       return true;
     }
   }
@@ -204,19 +191,12 @@ export function invokeShortcutCommand(commandId: string): boolean {
   )
     return false;
   const event = new KeyboardEvent("keydown", { cancelable: true });
-  for (const registration of orderedRegistrations(commandId)) {
+  for (const registration of [...(handlers.get(commandId) ?? [])].reverse()) {
     if (!registration.enabled()) continue;
-    const handled = registration.handler({ command: definition, event, scope: activeScope });
-    if (handled === false) continue;
+    registration.handler({ command: definition, event, scope: activeScope });
     return true;
   }
   return false;
-}
-
-function orderedRegistrations(commandId: string): HandlerRegistration[] {
-  return [...(handlers.get(commandId) ?? [])].sort(
-    (left, right) => right.priority - left.priority || right.order - left.order,
-  );
 }
 
 function agentChatBlocksSearch(commandId: string, target: EventTarget | null, editable: boolean) {
@@ -310,8 +290,8 @@ function focusedShortcutScope(): ShortcutScope {
       return "tool:terminal";
     case "space": {
       const route = tab.route.toLowerCase();
-      if (route.includes("/tasks/roadmaps") || route.includes("/roadmap")) return "tool:roadmap";
-      if (route.includes("/tasks") || route.includes("/planner")) return "tool:planner";
+      if (route.includes("/planner")) return "tool:planner";
+      if (route.includes("/roadmap")) return "tool:roadmap";
       if (route.includes("/library")) return "tool:library";
       return "workspace";
     }

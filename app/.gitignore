@@ -50,7 +50,6 @@ proxy/dist/
 *.gif
 *.webp
 !src/assets/bots/cloud-folder/mika.webp
-!src/shared/assets/misty-cloud-expression-cycle.webp
 !src/shared/assets/mail-providers/*.webp
 *.avif
 *.ico

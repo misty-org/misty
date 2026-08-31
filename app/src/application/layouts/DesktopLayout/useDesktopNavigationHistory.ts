@@ -25,11 +25,6 @@ export function updateDesktopNavigationHistory(
   };
 }
 
-export function relativeDesktopHistoryIndex(baseIndex: number, browserIndex: number): number {
-  if (!Number.isFinite(baseIndex) || !Number.isFinite(browserIndex)) return 0;
-  return Math.max(0, browserIndex - baseIndex);
-}
-
 export function useDesktopNavigationHistory(params: {
   location: Location;
   navigate: NavigateFunction;
@@ -37,18 +32,16 @@ export function useDesktopNavigationHistory(params: {
 }) {
   const initialIndex = useMemo(browserHistoryIndex, []);
   const [history, setHistory] = useState<DesktopNavigationHistoryState>({
-    currentIndex: 0,
-    furthestIndex: 0,
+    currentIndex: initialIndex,
+    furthestIndex: initialIndex,
   });
 
   useEffect(() => {
-    // React Router's history index belongs to the whole browser session. Treat
-    // the entry Misty mounted on as zero so Back never escapes the application.
-    const nextIndex = relativeDesktopHistoryIndex(initialIndex, browserHistoryIndex());
+    const nextIndex = browserHistoryIndex();
     setHistory((current) =>
       updateDesktopNavigationHistory(current, nextIndex, params.navigationType),
     );
-  }, [initialIndex, params.location.key, params.navigationType]);
+  }, [params.location.key, params.navigationType]);
 
   const canGoBack = history.currentIndex > 0;
   const canGoForward = history.currentIndex < history.furthestIndex;

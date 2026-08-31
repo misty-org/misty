@@ -4,7 +4,14 @@ import { persist } from "zustand/middleware";
 const defaultAppRoute = "/home";
 const defaultSpacesRoute = "/spaces";
 const socialProviders = new Set(["misty", "instagram", "discord", "messenger", "x"]);
-const desktopRememberableRoutes = ["/home", "/files", "/agents", "/code", "/store", "/spaces"];
+const desktopRememberableRoutes = [
+  "/home",
+  "/files",
+  "/agents",
+  "/code",
+  "/marketplace",
+  "/spaces",
+];
 const validSpaceSections = new Set([
   "social",
   "chat",
@@ -68,7 +75,6 @@ export function isRememberableAppRoute(path: string): boolean {
   const pathname = pathnameFromRoute(path);
   return (
     pathname === "/account" ||
-    pathname === "/marketplace" ||
     desktopRememberableRoutes.includes(pathname) ||
     pathname.startsWith("/spaces/")
   );
@@ -77,7 +83,6 @@ export function isRememberableAppRoute(path: string): boolean {
 function normalizeRememberedRoute(path: string): string | null {
   const pathname = pathnameFromRoute(path);
   if (!isRememberableAppRoute(pathname)) return null;
-  if (pathname === "/marketplace") return "/store";
   if (pathname === "/library") return "/files";
   if (pathname.startsWith("/spaces/")) {
     const spacesRoute = normalizeRememberedSpacesRoute(path);

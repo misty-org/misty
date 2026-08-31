@@ -1,5 +1,4 @@
 import {
-  filesMultiPanelStore,
   revealSearchResultInPane,
   searchResultNavigationTarget,
   useExplorerStore,
@@ -22,7 +21,6 @@ export function useGlobalMistyResults(input: {
 }) {
   const navigate = useNavigate();
   const openResult = async (result: GlobalSearchResult) => {
-    let targetFilesWorkspaceId = "";
     if (input.onNavigate) {
       input.closePanel();
       input.onNavigate(result.href);
@@ -75,16 +73,13 @@ export function useGlobalMistyResults(input: {
         ...surface,
         state: { version: 1, path: target.path },
       });
-      targetFilesWorkspaceId = tab.id;
       useWorkspaceStore.getState().focusTab(tab.id);
     }
     navigate("/files");
 
     const reveal = async (): Promise<boolean> => {
       const paneId =
-        (targetFilesWorkspaceId
-          ? filesMultiPanelStore(targetFilesWorkspaceId).getState().activePaneId
-          : input.activePaneId) ||
+        input.activePaneId ||
         useMultiPanelStore.getState().activePaneId ||
         Object.keys(useExplorerStore.getState().panes)[0] ||
         useMultiPanelStore.getState().tabs[0]?.activePaneId ||

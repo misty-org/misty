@@ -1,7 +1,7 @@
 export { newestUndoableTransfer, transferTypeLabel } from "./explorerCommands/transferLabels";
 import { routes } from "@/features/app-shell";
 import { useTransfersStore } from "@/features/transfers";
-import { dockLeaves, multiPanelStoreForPane, useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
 import {
   operationQueueRedo,
   operationQueueUndo,
@@ -13,7 +13,6 @@ import { errorText } from "@/shared/lib/format";
 import { selectedPathsForPane, useExplorerStore, useOperationQueueStore } from "../store";
 import { openCompareWith } from "./ExplorerContextMenu";
 import { useSearchStore } from "@/features/files/search";
-import { invokeShortcutCommand } from "@/features/shortcuts";
 import { openTransfersTab, toggleActiveTabPanelVisibility } from "./ExplorerDesktopPlugins";
 import { applySharedClipboardToSystem } from "./explorerCommands/clipboardPayloads";
 import {
@@ -52,8 +51,7 @@ export function runExplorerCommand(
   navigateRoute: (path: string) => void,
 ): void {
   const explorer = useExplorerStore.getState();
-  const multiPanelStore = multiPanelStoreForPane(paneId);
-  const multi = multiPanelStore.getState();
+  const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   const workspace = useWorkspaceStore.getState();
   const dockPane = dockLeaves(workspace.layout.root).find(
@@ -92,7 +90,7 @@ export function runExplorerCommand(
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute(routes.store);
+      navigateRoute(routes.marketplace);
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();
@@ -110,21 +108,18 @@ export function runExplorerCommand(
       openDockedFiles();
       break;
     case "explorer.restore_tab":
-      if (dockTab) invokeShortcutCommand("workspace.reopen_tab");
-      else multi.restoreTab();
+      multi.restoreTab();
       break;
     case "explorer.close_pane":
-      if (activeTab && activeTab.panes.length > 1) multi.closePane(paneId);
-      else if (dockTab) invokeShortcutCommand("workspace.close_tab");
+      if (dockTab) workspace.closeTab(dockTab.id);
       break;
     case "explorer.restore_pane":
-      multi.restorePane();
       break;
     case "explorer.split_vertical":
-      multi.splitPane(paneId, "vertical");
+      openDockedFiles("right");
       break;
     case "explorer.split_horizontal":
-      multi.splitPane(paneId, "horizontal");
+      openDockedFiles("down");
       break;
     case "explorer.refresh":
       void explorer.refreshPane(paneId);
@@ -174,26 +169,12 @@ export function runExplorerCommand(
       void redoLatestTransferOperation();
       break;
     case "explorer.preview.toggle":
-      toggleActiveTabPanelVisibility("preview", multiPanelStore);
+      toggleActiveTabPanelVisibility("preview");
       break;
     case "explorer.sidebar.toggle":
-      toggleActiveTabPanelVisibility("sidebar", multiPanelStore);
+      toggleActiveTabPanelVisibility("sidebar");
       break;
     case "explorer.next_workspace": {
-      if (dockPane && dockTab) {
-        const filesTabs = dockPane.tabs.filter((tab) => tab.surfaceId === "files");
-        if (filesTabs.length <= 1) break;
-        const activeIndex = Math.max(
-          0,
-          filesTabs.findIndex((tab) => tab.id === dockTab.id),
-        );
-        const next = filesTabs[(activeIndex + 1) % filesTabs.length];
-        if (next) {
-          workspace.focusTab(next.id);
-          navigateRoute(next.route);
-        }
-        break;
-      }
       if (multi.tabs.length <= 1) break;
       const activeIndex = Math.max(
         0,
@@ -213,14 +194,6 @@ export function runExplorerCommand(
     case "explorer.tab_8":
     case "explorer.tab_9": {
       const index = Number(commandId.slice("explorer.tab_".length)) - 1;
-      if (dockPane && dockTab) {
-        const tab = dockPane.tabs.filter((candidate) => candidate.surfaceId === "files")[index];
-        if (tab) {
-          workspace.focusTab(tab.id);
-          navigateRoute(tab.route);
-        }
-        break;
-      }
       const tab = multi.tabs[index];
       if (tab) multi.selectTab(tab.id);
       break;

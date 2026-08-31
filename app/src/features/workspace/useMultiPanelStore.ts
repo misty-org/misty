@@ -7,7 +7,6 @@ import type {
   MultiPanelStoreOptions,
   MultiPanelTab,
 } from "./model/interfaces";
-import type { MultiPanelStoreHook } from "./model/types/useMultiPanelStore";
 import {
   capClosedPanesPerTab,
   chooseActivePaneAfterRemoval,
@@ -31,7 +30,6 @@ export type { MultiPanelStore, MultiPanelStoreOptions } from "./model/interfaces
 export type { MultiPanelStoreHook } from "./model/types/useMultiPanelStore";
 
 const maxPanesPerTab = 4;
-const registeredMultiPanelStores = new Set<MultiPanelStoreHook>();
 
 export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
   const idPrefix = normalizedIdPrefix(options.idPrefix ?? "explorer");
@@ -39,7 +37,7 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
   const tabIdFor = (index: number) => `${idPrefix}-tab-${index}`;
   const paneIdFor = (index: number) => `${idPrefix}-pane-${index}`;
 
-  const store = create<MultiPanelStore>((set, get) => ({
+  return create<MultiPanelStore>((set, get) => ({
     tabs: [],
     activeTabId: "",
     closedTabs: [],
@@ -399,30 +397,12 @@ export function createMultiPanelStore(options: MultiPanelStoreOptions = {}) {
       }));
     },
   }));
-  registeredMultiPanelStores.add(store);
-  return store;
 }
 
 export const useMultiPanelStore = createMultiPanelStore({
   idPrefix: "explorer",
   defaultTitle: "Home",
 });
-
-/** Remove a scoped store from pane ownership lookup once its outer tab closes. */
-export function destroyMultiPanelStore(store: MultiPanelStoreHook): void {
-  if (store === useMultiPanelStore) return;
-  registeredMultiPanelStores.delete(store);
-}
-
-/** Resolve the inner workspace that owns a concrete pane. */
-export function multiPanelStoreForPane(paneId: string): MultiPanelStoreHook {
-  for (const store of registeredMultiPanelStores) {
-    if (store.getState().tabs.some((tab) => tab.panes.some((pane) => pane.id === paneId))) {
-      return store;
-    }
-  }
-  return useMultiPanelStore;
-}
 
 export function activeMultiPanelTab(state: {
   tabs: MultiPanelTab[];

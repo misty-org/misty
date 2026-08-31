@@ -26,7 +26,7 @@
     "Adjust token hex values and press Apply Edits to save your custom palette."
   ],
   "changelog": [
-    "v0.3.0 - Added workspace-tab launch behavior, bridge readiness, and preserved editor state across tab changes.",
+    "v0.3.0 - Added popup-first launch behavior, bridge readiness, and preserved editor state across dismissal.",
     "v0.2.0 - Added non-destructive preview, apply and revert flows, persistent custom tokens, accessible color controls, and Misty-native presets.",
     "v0.1.0 - Added the first theme builder."
   ],
@@ -46,6 +46,6 @@
     "views": ["settings", "plugins"],
     "show_in_launcher": true,
     "requires_selected_file": false,
-    "open_mode": "tab"
+    "open_mode": "popup"
   }
 }

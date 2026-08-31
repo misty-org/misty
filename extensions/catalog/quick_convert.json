@@ -10,7 +10,9 @@
     "Choose output format, quality, and destination before exporting"
   ],
   "where_it_appears": [
-    "Workspace app tab from Files"
+    "Files panel",
+    "Selected file actions",
+    "Batch actions"
   ],
   "permissions": [
     "Read access to selected files",
@@ -23,7 +25,7 @@
     "Choose an output format and destination, then start the conversion."
   ],
   "changelog": [
-    "v0.3.0 - Moved Quick Convert into the workspace app tab with resumable job status.",
+    "v0.3.0 - Moved Quick Convert into the self-contained Files extension popup with resumable job status.",
     "v0.2.0 - Added secure conversion jobs, quality and destination controls, cancellation, and output reveal.",
     "v0.1.0 - Initial plugin template for media conversion workflows."
   ],
@@ -47,7 +49,7 @@
     ],
     "show_in_launcher": true,
     "requires_selected_file": true,
-    "open_mode": "tab"
+    "open_mode": "popup"
   },
   "install": {
     "root": "private",

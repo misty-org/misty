@@ -25,22 +25,9 @@ pub struct SshEnvironment {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum SshConnectionRequest {
-    Configured {
-        id: String,
-    },
-    Direct {
-        host: String,
-        user: Option<String>,
-        port: u16,
-    },
-}
-
-#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshTrustRequest {
-    pub connection: SshConnectionRequest,
+    pub environment_id: String,
     pub fingerprint: String,
 }
 
@@ -60,10 +47,8 @@ pub async fn terminal_ssh_environments() -> Result<Vec<SshEnvironment>, String> 
 }
 
 #[tauri::command]
-pub async fn terminal_ssh_preflight(
-    connection: SshConnectionRequest,
-) -> Result<SshHostKeyStatus, String> {
-    tauri::async_runtime::spawn_blocking(move || ssh_preflight(&connection))
+pub async fn terminal_ssh_preflight(environment_id: String) -> Result<SshHostKeyStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || ssh_preflight(&environment_id))
         .await
         .map_err(|error| error.to_string())?
 }
@@ -159,14 +144,12 @@ fn parse_ssh_config(content: &str, config_path: &Path) -> Vec<SshEnvironment> {
     output
 }
 
-pub fn ssh_command_for_connection(
-    connection: &SshConnectionRequest,
-) -> Result<CommandBuilder, String> {
-    let environment = resolve_connection(connection)?;
+pub fn ssh_command_for_environment(environment_id: &str) -> Result<CommandBuilder, String> {
+    let environment = resolve_environment(environment_id)?;
     require_known_host(&environment)?;
     let known_hosts = known_hosts_path()?;
     let mut command = CommandBuilder::new("ssh");
-    for argument in ssh_argv(connection, &environment, &known_hosts) {
+    for argument in ssh_argv(&environment, &known_hosts) {
         command.arg(argument);
     }
     command.env("TERM", "xterm-256color");
@@ -174,12 +157,8 @@ pub fn ssh_command_for_connection(
     Ok(command)
 }
 
-fn ssh_argv(
-    connection: &SshConnectionRequest,
-    environment: &SshEnvironment,
-    known_hosts: &Path,
-) -> Vec<String> {
-    let mut arguments = vec![
+fn ssh_argv(environment: &SshEnvironment, known_hosts: &Path) -> Vec<String> {
+    vec![
         "-o".to_owned(),
         "StrictHostKeyChecking=yes".to_owned(),
         "-o".to_owned(),
@@ -187,23 +166,12 @@ fn ssh_argv(
         "-o".to_owned(),
         "UpdateHostKeys=no".to_owned(),
         "-tt".to_owned(),
-    ];
-    match connection {
-        SshConnectionRequest::Configured { id } => arguments.push(id.clone()),
-        SshConnectionRequest::Direct { .. } => {
-            arguments.push("-p".to_owned());
-            arguments.push(environment.port.to_string());
-            arguments.push(match environment.user.as_deref() {
-                Some(user) => format!("{user}@{}", environment.host),
-                None => environment.host.clone(),
-            });
-        }
-    }
-    arguments
+        environment.id.clone(),
+    ]
 }
 
-fn ssh_preflight(connection: &SshConnectionRequest) -> Result<SshHostKeyStatus, String> {
-    let environment = resolve_connection(connection)?;
+fn ssh_preflight(environment_id: &str) -> Result<SshHostKeyStatus, String> {
+    let environment = resolve_environment(environment_id)?;
     let known = known_host_keys(&environment)?;
     let scanned = scan_host_keys(&environment)?;
     let known_fingerprints = fingerprints_for_lines(&known)?;
@@ -250,7 +218,7 @@ fn ssh_preflight(connection: &SshConnectionRequest) -> Result<SshHostKeyStatus, 
 }
 
 fn trust_ssh_host(request: &SshTrustRequest) -> Result<SshHostKeyStatus, String> {
-    let environment = resolve_connection(&request.connection)?;
+    let environment = resolve_environment(&request.environment_id)?;
     let scanned = scan_host_keys(&environment)?;
     let wanted = request.fingerprint.trim();
     let selected = scanned
@@ -270,35 +238,7 @@ fn trust_ssh_host(request: &SshTrustRequest) -> Result<SshHostKeyStatus, String>
     writeln!(file, "{selected}")
         .map_err(|_| "Misty could not update ~/.ssh/known_hosts.".to_owned())?;
     set_private_file_permissions(&path)?;
-    ssh_preflight(&request.connection)
-}
-
-fn resolve_connection(connection: &SshConnectionRequest) -> Result<SshEnvironment, String> {
-    match connection {
-        SshConnectionRequest::Configured { id } => resolve_environment(id),
-        SshConnectionRequest::Direct { host, user, port } => {
-            if !safe_ssh_host(host)
-                || user.as_deref().is_some_and(|value| !safe_ssh_user(value))
-                || *port == 0
-            {
-                return Err("The SSH connection is invalid.".to_owned());
-            }
-            let label = match user.as_deref() {
-                Some(user) => format!("{user}@{host}"),
-                None => host.clone(),
-            };
-            Ok(SshEnvironment {
-                id: format!("direct:{label}:{port}"),
-                label,
-                host: host.clone(),
-                user: user.clone(),
-                port: *port,
-                config_path: String::new(),
-                device_local: true,
-                agent_tools: "device_local".to_owned(),
-            })
-        }
-    }
+    ssh_preflight(&request.environment_id)
 }
 
 fn resolve_environment(environment_id: &str) -> Result<SshEnvironment, String> {

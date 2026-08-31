@@ -73,18 +73,6 @@ export function usePanelResize(options: {
 
   return {
     resizeTarget,
-    resizeSidebarBy: useCallback((delta: number) => {
-      const explorer = useExplorerStore.getState();
-      explorer.setSidebarWidth(
-        clamp(explorer.sidebarWidth + delta, minSidebarWidth, maxSidebarWidth),
-      );
-    }, []),
-    resizePreviewBy: useCallback((delta: number) => {
-      const explorer = useExplorerStore.getState();
-      explorer.setPreviewWidth(
-        clamp(explorer.previewWidth + delta, minPreviewWidth, maxPreviewWidth),
-      );
-    }, []),
     startSidebarResize: useCallback((event: PointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       setResizeTarget("sidebar");

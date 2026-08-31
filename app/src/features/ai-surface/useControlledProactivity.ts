@@ -125,7 +125,7 @@ export function proactiveSuggestionReason(surfaceId: string) {
       notes: "Notes",
       drawings: "Drawings",
       library: "Library",
-      marketplace: "Store",
+      marketplace: "Marketplace",
       transfers: "Transfers",
       "space.chat": "Space chat",
       "planner.tasks": "Tasks",

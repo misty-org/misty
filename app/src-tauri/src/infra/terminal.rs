@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use uuid::Uuid;
 
-use super::ssh_terminal::{ssh_command_for_connection, SshConnectionRequest};
+use super::ssh_terminal::ssh_command_for_environment;
 
 struct TerminalSession {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
@@ -42,7 +42,7 @@ pub struct TerminalCreateRequest {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum TerminalEnvironmentRequest {
     Local,
-    Ssh { connection: SshConnectionRequest },
+    Ssh { id: String },
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -88,9 +88,7 @@ fn terminal_create_blocking(
         Some(TerminalEnvironmentRequest::Ssh { .. })
     );
     let mut command = match request.environment.as_ref() {
-        Some(TerminalEnvironmentRequest::Ssh { connection }) => {
-            ssh_command_for_connection(connection)?
-        }
+        Some(TerminalEnvironmentRequest::Ssh { id }) => ssh_command_for_environment(id)?,
         _ => {
             let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_owned());
             let mut local = CommandBuilder::new(&shell);

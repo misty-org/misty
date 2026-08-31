@@ -34,7 +34,6 @@ import {
   currentVirtualWindows,
   extractPaneToVirtualWindow,
   initialVirtualWorkspace,
-  mapAllVirtualWorkspaceTabs,
   normalizeWorkspaceLayout,
   renameVirtualWindow,
   switchVirtualWindow,
@@ -91,7 +90,6 @@ export interface WorkspaceStore extends VirtualWorkspaceState {
   renameTab: (tabId: string, title: string) => void;
   updateTabRoute: (tabId: string, route: string) => void;
   updateTabState: (tabId: string, state: unknown, title?: string) => void;
-  focusPane: (paneId: string) => boolean;
   focusTab: (tabId: string) => boolean;
   closeTab: (tabId: string) => boolean;
   reopenClosedTab: () => WorkspaceTab | null;
@@ -151,27 +149,31 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const state = get();
         const now = nextWorkspaceFocusTimestamp(state.virtualWindowsByScope);
         const panes = dockLeaves(state.layout.root);
-        const pane =
-          panes.find((candidate) => candidate.id === request.paneId) ??
-          panes.find((candidate) => candidate.id === state.layout.focusedPaneId) ??
-          panes[0];
-        const paneTabs = pane.tabs;
+        const allTabs = currentVirtualWindows(state).flatMap((window) =>
+          dockTabs(window.layout.root),
+        );
         const singleton = request.instancePolicy === "single";
         const preferredId = state.lastUsedTabByGroup[request.groupKey];
         const existingPreferred = preferredId
-          ? paneTabs.find((tab) => tab.id === preferredId && tab.groupKey === request.groupKey)
+          ? allTabs.find((tab) => tab.id === preferredId)
           : undefined;
         let existing = singleton
-          ? (existingPreferred ?? paneTabs.find((tab) => tab.surfaceId === request.surfaceId))
+          ? (existingPreferred ?? allTabs.find((tab) => tab.surfaceId === request.surfaceId))
           : !request.forceNew
-            ? (existingPreferred ?? paneTabs.find((tab) => tab.groupKey === request.groupKey))
+            ? (existingPreferred ??
+              allTabs.find(
+                (tab) =>
+                  tab.groupKey === request.groupKey ||
+                  (tab.surfaceId === request.surfaceId &&
+                    (request.groupKey as string).startsWith(`tool:${tab.surfaceId}`)),
+              ))
             : undefined;
         // A bare or legacy Space tab is provisional. Reuse it for the first
         // concrete Space tool instead of leaving an extra generic tab behind
         // after the /spaces/:id redirect resolves.
         if (!existing && request.surfaceId === "space") {
           const scopeKey = request.scopeKey ?? request.groupKey;
-          existing = paneTabs.find(
+          existing = allTabs.find(
             (tab) =>
               tab.surfaceId === "space" &&
               (tab.groupKey === scopeKey ||
@@ -222,6 +224,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           }
           return dockTabs(get().layout.root).find((tab) => tab.id === existing.id) ?? existing;
         }
+        const pane =
+          panes.find((candidate) => candidate.id === request.paneId) ??
+          panes.find((candidate) => candidate.id === state.layout.focusedPaneId) ??
+          panes[0];
         const tab: WorkspaceTab = {
           id: createDockId("tab"),
           surfaceId: request.surfaceId,
@@ -258,14 +264,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
       openBrowserTab: (request = {}) => {
         const url = request.url?.trim() || browserHomeUrl();
-        const sourcePane = request.sourceTabId
-          ? dockLeaves(get().layout.root).find((candidate) =>
-              candidate.tabs.some((candidateTab) => candidateTab.id === request.sourceTabId),
-            )
-          : undefined;
-        const sourceIndex = sourcePane?.tabs.findIndex(
-          (candidate) => candidate.id === request.sourceTabId,
-        );
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
@@ -274,35 +272,46 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           state: createBrowserTabState(url),
           instancePolicy: "multiple",
           forceNew: true,
-          paneId: request.paneId ?? sourcePane?.id,
+          paneId: request.paneId,
         });
-        if (sourcePane && sourceIndex !== undefined && sourceIndex >= 0)
-          get().moveTab(tab.id, sourcePane.id, sourceIndex + 1);
+        if (request.sourceTabId) {
+          const pane = dockLeaves(get().layout.root).find((candidate) =>
+            candidate.tabs.some((candidateTab) => candidateTab.id === request.sourceTabId),
+          );
+          const sourceIndex = pane?.tabs.findIndex(
+            (candidate) => candidate.id === request.sourceTabId,
+          );
+          if (pane && sourceIndex !== undefined && sourceIndex >= 0)
+            get().moveTab(tab.id, pane.id, sourceIndex + 1);
+        }
         get().focusTab(tab.id);
         return tab;
       },
       updateBrowserTab: (tabId, patch) => {
         set((current) =>
-          mapAllVirtualWorkspaceTabs(current, (tab) => {
-            if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
-            const { title, ...statePatch } = patch;
-            const existing = parseBrowserTabState(tab.state);
-            const nextUrl = statePatch.url ?? existing.url;
-            const defaults =
-              statePatch.url && statePatch.url !== existing.url
-                ? { ...createBrowserTabState(statePatch.url), agentOwned: existing.agentOwned }
-                : existing;
-            const resolvedTitle =
-              title !== undefined
-                ? sanitizeBrowserTitle(title, nextUrl)
-                : statePatch.url && statePatch.url !== existing.url
-                  ? browserTabTitle(statePatch.url)
-                  : tab.title;
-            return {
-              ...tab,
-              title: resolvedTitle,
-              state: { ...defaults, ...statePatch } satisfies BrowserTabState,
-            };
+          withLayout(current, {
+            ...current.layout,
+            root: mapDockTabs(current.layout.root, (tab) => {
+              if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
+              const { title, ...statePatch } = patch;
+              const existing = parseBrowserTabState(tab.state);
+              const nextUrl = statePatch.url ?? existing.url;
+              const defaults =
+                statePatch.url && statePatch.url !== existing.url
+                  ? { ...createBrowserTabState(statePatch.url), agentOwned: existing.agentOwned }
+                  : existing;
+              const resolvedTitle =
+                title !== undefined
+                  ? sanitizeBrowserTitle(title, nextUrl)
+                  : statePatch.url && statePatch.url !== existing.url
+                    ? browserTabTitle(statePatch.url)
+                    : tab.title;
+              return {
+                ...tab,
+                title: resolvedTitle,
+                state: { ...defaults, ...statePatch } satisfies BrowserTabState,
+              };
+            }),
           }),
         );
       },
@@ -310,40 +319,33 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const trimmed = title.trim();
         if (!trimmed) return;
         set((current) =>
-          mapAllVirtualWorkspaceTabs(current, (tab) =>
-            tab.id === tabId && tab.title !== trimmed ? { ...tab, title: trimmed } : tab,
-          ),
+          withLayout(current, {
+            ...current.layout,
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId && tab.title !== trimmed ? { ...tab, title: trimmed } : tab,
+            ),
+          }),
         );
       },
       updateTabRoute: (tabId, route) => {
         set((current) =>
-          mapAllVirtualWorkspaceTabs(current, (tab) =>
-            tab.id === tabId ? { ...tab, route } : tab,
-          ),
+          withLayout(current, {
+            ...current.layout,
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId ? { ...tab, route } : tab,
+            ),
+          }),
         );
       },
       updateTabState: (tabId, state, title) => {
         set((current) =>
-          mapAllVirtualWorkspaceTabs(current, (tab) =>
-            tab.id === tabId ? { ...tab, state, title: title?.trim() || tab.title } : tab,
-          ),
-        );
-      },
-      focusPane: (paneId) => {
-        const current = get();
-        const pane = findDockLeaf(current.layout.root, paneId);
-        if (!pane) return false;
-        const tab =
-          pane.tabs.find((candidate) => candidate.id === pane.activeTabId) ?? pane.tabs[0];
-        if (tab) return get().focusTab(tab.id);
-        if (current.layout.focusedPaneId === paneId) return true;
-        set(
           withLayout(current, {
             ...current.layout,
-            focusedPaneId: paneId,
+            root: mapDockTabs(current.layout.root, (tab) =>
+              tab.id === tabId ? { ...tab, state, title: title?.trim() || tab.title } : tab,
+            ),
           }),
         );
-        return true;
       },
       focusTab: (tabId) => {
         let current = get();
@@ -557,12 +559,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const current = get();
         const pane = findDockLeaf(current.layout.root, paneId);
         if (!pane) return;
-        const originalPanes = dockLeaves(current.layout.root);
-        const closedIndex = originalPanes.findIndex((candidate) => candidate.id === paneId);
         let root = removeDockLeaf(current.layout.root, paneId) ?? createDockLeaf();
-        const remainingPanes = dockLeaves(root);
-        const target =
-          remainingPanes[Math.min(Math.max(closedIndex, 0), remainingPanes.length - 1)];
+        const target = dockLeaves(root)[0];
         const movableTabs = pane.tabs;
         if (movableTabs.length)
           root = mapDockLeaf(root, target.id, (leaf) => ({

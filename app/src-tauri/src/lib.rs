@@ -240,7 +240,9 @@ pub fn run() {
                         unsafe {
                             let ns_window = ns_window as cocoa::base::id;
                             platform::plugins::mac_rounded_corners::position_traffic_lights(
-                                ns_window, -4.0, 5.0,
+                                ns_window,
+                                -4.0,
+                                5.0,
                             );
                         }
                     }

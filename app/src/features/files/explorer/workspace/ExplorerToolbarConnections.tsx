@@ -1,10 +1,6 @@
 import { useTransfersStore } from "@/features/transfers";
-import {
-  maxMultiPanelPanes,
-  useMultiPanelStore,
-  type MultiPanelStoreHook,
-} from "@/features/workspace";
-import type { FileEntry, PluginCommandEntry, PluginPanelEntry } from "@/native/contracts";
+import { maxMultiPanelPanes, useMultiPanelStore } from "@/features/workspace";
+import type { FileEntry, PluginCommandEntry } from "@/native/contracts";
 import { Button } from "@/shared/ui";
 import { Columns2, PanelTopClose, Rows2 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
@@ -30,7 +26,6 @@ import {
   undoLatestTransferOperation,
 } from "./ExplorerCommands";
 import { explorerShellStyles } from "./ExplorerShellStyles";
-import { ExplorerPluginTabMenu } from "./explorerPlugins/ExplorerPluginTabMenu";
 
 export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(props: {
   paneId: string;
@@ -249,23 +244,11 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
 
 export const ExplorerPaneHeaderActions = memo(function ExplorerPaneHeaderActions(props: {
   paneId: string;
-  multiPanelStore?: MultiPanelStoreHook;
-  extensionsEnabled: boolean;
-  pluginCommands: PluginCommandEntry[];
-  pluginPanels: PluginPanelEntry[];
-  selectedPath: string;
 }) {
   return (
     <div className={explorerShellStyles.paneHeaderActions}>
       <div className={explorerShellStyles.paneHeaderActionSection}>
-        {props.extensionsEnabled ? (
-          <ExplorerPluginTabMenu
-            commands={props.pluginCommands}
-            panels={props.pluginPanels}
-            selectedPath={props.selectedPath}
-          />
-        ) : null}
-        <ExplorerPaneControls paneId={props.paneId} multiPanelStore={props.multiPanelStore} />
+        <ExplorerPaneControls paneId={props.paneId} />
       </div>
       <ConnectedExplorerPaneToolbarActions paneId={props.paneId} />
     </div>
@@ -351,12 +334,8 @@ const ConnectedExplorerPaneToolbarActions = memo(
   },
 );
 
-const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
-  paneId: string;
-  multiPanelStore?: MultiPanelStoreHook;
-}) {
-  const store = props.multiPanelStore ?? useMultiPanelStore;
-  const { tabs, activeTabId, splitPane, closePane } = store(
+const ExplorerPaneControls = memo(function ExplorerPaneControls(props: { paneId: string }) {
+  const { tabs, activeTabId, splitPane, closePane } = useMultiPanelStore(
     useShallow((state) => ({
       tabs: state.tabs,
       activeTabId: state.activeTabId,
@@ -378,7 +357,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
         variant="ghost"
         size="icon-sm"
         title="Split vertically"
-        aria-label="Split file pane vertically"
         onClick={() => splitPane(props.paneId, "vertical")}
         disabled={!canSplit}
       >
@@ -390,7 +368,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
         variant="ghost"
         size="icon-sm"
         title="Split horizontally"
-        aria-label="Split file pane horizontally"
         onClick={() => splitPane(props.paneId, "horizontal")}
         disabled={!canSplit}
       >
@@ -402,7 +379,6 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
         variant="ghost"
         size="icon-sm"
         title="Close pane"
-        aria-label="Close file pane"
         onClick={() => closePane(props.paneId)}
         disabled={!canClose}
       >
@@ -412,11 +388,8 @@ const ExplorerPaneControls = memo(function ExplorerPaneControls(props: {
   );
 });
 
-export const ConnectedFileInspector = memo(function ConnectedFileInspector(props: {
-  paneId?: string;
-}) {
-  const fallbackPaneId = useMultiPanelStore((state) => state.activePaneId);
-  const activePaneId = props.paneId ?? fallbackPaneId;
+export const ConnectedFileInspector = memo(function ConnectedFileInspector() {
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const { directorySizes, listing, selectedEntry, selectedCount } = useExplorerStore(
     useShallow((state) => {
       const pane = state.panes[activePaneId];

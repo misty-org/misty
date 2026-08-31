@@ -1,6 +1,6 @@
 {
   "schema_version": 3, "id": "backups", "name": "Backups", "version": "0.3.0", "description": "Create encrypted Restic snapshots on local volumes or connected cloud remotes.", "author": "Misty", "enabled": true, "platforms": ["web"],
-  "runtime": { "type": "web", "entry": "web/index.html?plugin=backups" }, "launcher": { "views": ["all"], "show_in_launcher": true, "requires_selected_file": false, "open_mode": "tab" }, "plugin": { "runtime": "web", "entry": "web/index.html?plugin=backups" },
+  "runtime": { "type": "web", "entry": "web/index.html?plugin=backups" }, "launcher": { "views": ["all"], "show_in_launcher": true, "requires_selected_file": false, "open_mode": "popup" }, "plugin": { "runtime": "web", "entry": "web/index.html?plugin=backups" },
   "panels": [{ "id": "backups.panel", "title": "Backups", "window_type": "panel", "default_width": 720, "default_height": 620, "entry": "web/index.html?plugin=backups", "launcher": { "views": ["all"] } }],
   "tools": [
     {"id":"restic","version":"0.18.0","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/restic"},{"id":"rclone","version":"1.70.3","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/rclone"},

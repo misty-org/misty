@@ -1,15 +1,11 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import {
-  filesMultiPanelStore,
-  preloadDesktopFilesPage,
-  useExplorerStore,
-} from "@/features/files/explorer";
+import { preloadDesktopFilesPage, useExplorerStore } from "@/features/files/explorer";
 import { useMediaSearchStore, useSearchStore } from "@/features/files/search";
 import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 import { useTransfersStore } from "@/features/transfers";
-import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
+import { useMultiPanelStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,24 +24,7 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     () => selectSearchMaintenancePreferences(settings?.document),
     [settings?.document],
   );
-  const workspaceLayout = useWorkspaceStore((state) => state.layout);
-  const activeWorkspacePane = useMemo(
-    () =>
-      dockLeaves(workspaceLayout.root).find((pane) => pane.id === workspaceLayout.focusedPaneId) ??
-      dockLeaves(workspaceLayout.root)[0],
-    [workspaceLayout],
-  );
-  const activeWorkspaceTab = activeWorkspacePane?.tabs.find(
-    (tab) => tab.id === activeWorkspacePane.activeTabId,
-  );
-  const explorerPanelStore = useMemo(
-    () =>
-      activeWorkspaceTab?.surfaceId === "files"
-        ? filesMultiPanelStore(activeWorkspaceTab.id)
-        : useMultiPanelStore,
-    [activeWorkspaceTab?.id, activeWorkspaceTab?.surfaceId],
-  );
-  const activePaneId = explorerPanelStore((state) => state.activePaneId);
+  const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const activePanePath = useExplorerStore(
     (state) => state.panes[activePaneId]?.listing?.path ?? "",
   );
@@ -154,7 +133,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     settingsLoad,
     activePaneId,
     activePanePath,
-    activeWorkspacePaneId: activeWorkspacePane?.id ?? "",
     lastAppRoute,
     lastNonSettingsRouteRef,
     routeId,

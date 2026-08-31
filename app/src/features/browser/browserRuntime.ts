@@ -419,10 +419,6 @@ export async function closeBrowserRuntime(tab: WorkspaceTab): Promise<void> {
   const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
   await Promise.allSettled(grants.map((grant) => revokeBrowserAgentGrant(id, grant)));
   await enqueue(id, async () => {
-    // Reopening a just-closed tab can request this same stable runtime while
-    // grant cleanup is still in flight. The new request owns the child now;
-    // do not let the stale close tear it down or delete its id mapping.
-    if (desiredVisibleRuntimeIds.has(id)) return;
     if (createdRuntimeIds.has(id)) {
       await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
     }

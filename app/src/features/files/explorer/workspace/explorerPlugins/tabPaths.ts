@@ -76,11 +76,8 @@ function titleForBrowsePath(path: string): string {
   return segments[segments.length - 1] || "Home";
 }
 
-export function toggleActiveTabPanelVisibility(
-  panel: "sidebar" | "preview",
-  store: MultiPanelStoreHook = useMultiPanelStore,
-): void {
-  const multi = store.getState();
+export function toggleActiveTabPanelVisibility(panel: "sidebar" | "preview"): void {
+  const multi = useMultiPanelStore.getState();
   const activeTab = multi.tabs.find((tab) => tab.id === multi.activeTabId) ?? multi.tabs[0];
   if (!activeTab || isChromeTabPath(activeTab.path)) return;
   if (panel === "sidebar") {

@@ -1,26 +1,19 @@
 import { dockLeaves, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
 import { SystemErrorActivity } from "@/features/activity";
-import {
-  detectShortcutPlatform,
-  formatShortcutLabel,
-  registerShortcutHandler,
-  useEffectiveShortcut,
-} from "@/features/shortcuts";
+import { registerShortcutHandler } from "@/features/shortcuts";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
-import { SquareTerminal } from "lucide-react";
+import { SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TerminalConnectionMenu } from "./TerminalConnectionMenu";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import type { TerminalSessionStatus } from "./TerminalPane";
-import { TerminalSearchField, type TerminalSearchResult } from "./TerminalSearchField";
 import {
   listSshEnvironments,
   localTerminalEnvironment,
-  terminalEnvironmentIdentity,
+  sshEnvironmentSummary,
   type SshEnvironment,
   type TerminalEnvironment,
 } from "./sshEnvironments";
@@ -29,6 +22,7 @@ import {
   killTerminalSlot,
   killTerminalTab as killRegisteredTerminalTab,
   titleBySlot,
+  unregisterSlot,
 } from "./terminalRegistry";
 import { hasTerminalControlCharacters } from "./terminalInputSafety";
 
@@ -36,7 +30,6 @@ import { hasTerminalControlCharacters } from "./terminalInputSafety";
  * while the tab is inactive or its React surface is temporarily detached. */
 const slotByTab = new Map<string, string | null>();
 const environmentByTab = new Map<string, TerminalEnvironment>();
-const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0 };
 
 export function killTerminalTab(tabId: string): void {
   slotByTab.delete(tabId);
@@ -48,7 +41,7 @@ function makeSlotId(): string {
   return `term-${crypto.randomUUID()}`;
 }
 
-export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean }) {
+export function TerminalWorkspace(props: { tab?: WorkspaceTab }) {
   const fallbackTab = useWorkspaceStore((state) => {
     const leaves = dockLeaves(state.layout.root);
     const focused = leaves.find((leaf) => leaf.id === state.layout.focusedPaneId) ?? leaves[0];
@@ -57,14 +50,6 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
   });
   const tab = props.tab ?? fallbackTab;
   const tabId = tab?.id ?? null;
-  const active = props.active ?? true;
-  const workspaceFocused = useWorkspaceStore((state) => {
-    if (!tabId) return false;
-    const pane = dockLeaves(state.layout.root).find(
-      (candidate) => candidate.id === state.layout.focusedPaneId,
-    );
-    return pane?.activeTabId === tabId;
-  });
   const renameWorkspaceTab = useWorkspaceStore((state) => state.renameTab);
   const [slotId, setSlotId] = useState<string | null>(() => {
     if (!tabId) return null;
@@ -81,13 +66,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
   const [sshEnvironments, setSshEnvironments] = useState<SshEnvironment[]>([]);
   const [environmentError, setEnvironmentError] = useState("");
   const [sessionStatus, setSessionStatus] = useState<TerminalSessionStatus>("starting");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResult, setSearchResult] = useState<TerminalSearchResult>(EMPTY_SEARCH_RESULT);
   const paneRef = useRef<TerminalPaneHandle | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const searchBinding = useEffectiveShortcut("terminal.search");
-  const searchShortcutLabel =
-    formatShortcutLabel(searchBinding.primary, detectShortcutPlatform()) || "⌘F";
 
   useEffect(() => {
     if (!tabId) return;
@@ -118,28 +97,29 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
     renameWorkspaceTab(tabId, label);
   }, [cwd, renameWorkspaceTab, tabId, title]);
 
-  const clearTerminalSearch = useCallback((focusTerminal = false) => {
-    setSearchQuery("");
-    setSearchResult(EMPTY_SEARCH_RESULT);
-    paneRef.current?.clearSearch();
-    if (focusTerminal) paneRef.current?.focus();
-  }, []);
-
-  const searchTerminal = useCallback((query: string, direction: "next" | "previous" = "next") => {
-    setSearchQuery(query);
-    if (!query) {
-      setSearchResult(EMPTY_SEARCH_RESULT);
-      paneRef.current?.clearSearch();
-      return;
+  const closeShell = useCallback(() => {
+    if (slotId) killTerminalSlot(slotId);
+    if (tabId) {
+      if (slotId) unregisterSlot(tabId, slotId);
+      slotByTab.set(tabId, null);
     }
-    paneRef.current?.search(query, direction);
-  }, []);
+    setSlotId(null);
+    setCwd("");
+    setTitle("");
+  }, [slotId, tabId]);
+
+  const newShell = useCallback(() => {
+    if (!tabId) return;
+    const created = makeSlotId();
+    slotByTab.set(tabId, created);
+    setSlotId(created);
+    setTitle("zsh");
+    setCwd("");
+  }, [tabId]);
 
   const chooseEnvironment = useCallback(
     (next: TerminalEnvironment) => {
       if (!tabId) return;
-      if (terminalEnvironmentIdentity(next) === terminalEnvironmentIdentity(environment)) return;
-      clearTerminalSearch();
       if (slotId) killTerminalSlot(slotId);
       const created = makeSlotId();
       slotByTab.set(tabId, created);
@@ -150,7 +130,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
       setCwd("");
       setSessionStatus("starting");
     },
-    [clearTerminalSearch, environment, slotId, tabId],
+    [slotId, tabId],
   );
 
   useEffect(() => {
@@ -164,10 +144,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
     };
     const actions: Record<string, () => void> = {
       "terminal.clear": () => paneRef.current?.clear(),
-      "terminal.search": () => {
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
-      },
+      "terminal.search": () => paneRef.current?.toggleSearch(),
       "terminal.zoom_in": () => paneRef.current?.bumpFontScale(0.1),
       "terminal.zoom_out": () => paneRef.current?.bumpFontScale(-0.1),
       "terminal.zoom_reset": () => paneRef.current?.bumpFontScale("reset"),
@@ -181,11 +158,12 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
   }, [tabId]);
 
   useEffect(() => {
-    if (!slotId || !active || !workspaceFocused) return;
+    if (!slotId) return;
     const frame = requestAnimationFrame(() => paneRef.current?.focus());
     return () => cancelAnimationFrame(frame);
-  }, [active, slotId, workspaceFocused]);
+  }, [slotId]);
 
+  const displayCwd = useMemo(() => (cwd ? shortenHome(cwd) : ""), [cwd]);
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const scopeId = slotId || tabId || "terminal";
     const stagedCommand = (artifact: AiArtifact) => {
@@ -273,7 +251,7 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
     };
   }, [environment.kind, sessionStatus, slotId, tabId, title]);
   useAiSurfaceAdapter(aiAdapter);
-  if (!tabId) return <TerminalEmptyState />;
+  if (!tabId) return <TerminalEmptyState onNewShell={() => undefined} disabled />;
 
   return (
     <section className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#111312]">
@@ -286,28 +264,50 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
             target={{ kind: "route", href: "/terminal" }}
           />
         ) : null}
-        <TerminalSearchField
-          ref={searchInputRef}
-          value={searchQuery}
-          result={searchResult}
-          shortcutLabel={searchShortcutLabel}
-          disabled={!slotId}
-          onChange={(query) => searchTerminal(query)}
-          onNavigate={(direction) => searchTerminal(searchQuery, direction)}
-          onDismiss={() => clearTerminalSearch(true)}
-        />
-        <span className="min-w-0 flex-1" aria-hidden="true" />
-        <TerminalConnectionMenu
-          environment={environment}
-          environments={sshEnvironments}
-          loadError={environmentError}
-          disabled={!slotId}
-          onSelect={chooseEnvironment}
-        />
-        {environmentError ? (
-          <span id="terminal-environment-error" className="sr-only" role="status">
-            {environmentError}
+        <SquareTerminal size={12} className="shrink-0" />
+        <span className="min-w-0 flex-1 truncate font-mono">
+          {displayCwd || title || "Terminal"}
+        </span>
+        <span className="rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] capitalize">
+          {sessionStatus.replace(/_/g, " ")}
+        </span>
+        {environment.kind === "ssh" ? (
+          <span className="hidden rounded bg-charcoal-card px-1.5 py-0.5 text-[10px] lg:inline">
+            Agent tools · device-local
           </span>
+        ) : null}
+        <select
+          aria-label="Terminal environment"
+          className="h-6 max-w-52 rounded border border-charcoal-border bg-charcoal-card px-1.5 text-[10px] text-cream outline-none"
+          value={environment.kind === "ssh" ? `ssh:${environment.ssh.id}` : "local"}
+          title="Terminal environment (device-local)"
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            if (value === "local") {
+              chooseEnvironment(localTerminalEnvironment);
+              return;
+            }
+            const selected = sshEnvironments.find((item) => `ssh:${item.id}` === value);
+            if (selected) chooseEnvironment({ kind: "ssh", ssh: selected });
+          }}
+        >
+          <option value="local">Local shell</option>
+          {sshEnvironments.map((item) => (
+            <option key={item.id} value={`ssh:${item.id}`}>
+              {item.label} · {sshEnvironmentSummary(item)}
+            </option>
+          ))}
+        </select>
+        {slotId ? (
+          <button
+            type="button"
+            className="grid size-6 place-items-center rounded hover:bg-charcoal-hover hover:text-cream"
+            onClick={closeShell}
+            aria-label="Close shell session"
+            title="Close shell session"
+          >
+            <X size={12} />
+          </button>
         ) : null}
       </header>
       <div className="min-h-0 flex-1">
@@ -317,27 +317,18 @@ export function TerminalWorkspace(props: { tab?: WorkspaceTab; active?: boolean 
             ref={paneRef}
             slotId={slotId}
             tabId={tabId}
-            visible={active}
-            focused={active && workspaceFocused}
+            visible
+            focused
             onTitleChange={setTitle}
             onCwdChange={setCwd}
             environment={environment}
             onSessionStatusChange={setSessionStatus}
-            onSearchResultsChange={setSearchResult}
             onCancelSsh={() => chooseEnvironment(localTerminalEnvironment)}
           />
         ) : (
-          <TerminalEmptyState />
+          <TerminalEmptyState onNewShell={newShell} />
         )}
       </div>
-      <footer
-        className="flex h-6 shrink-0 items-center border-t border-charcoal-border bg-charcoal-workspace px-3 font-mono text-[10px] text-cream-muted"
-        aria-label="Terminal information"
-      >
-        <span>{environment.kind === "ssh" ? "ssh" : "zsh"}</span>
-        <span className="mx-3 h-3 w-px bg-charcoal-border" aria-hidden="true" />
-        <span>UTF-8</span>
-      </footer>
     </section>
   );
 }
@@ -358,12 +349,20 @@ function terminalAiHash(value: string) {
   return `fnv1a-${(hash >>> 0).toString(16)}`;
 }
 
-function TerminalEmptyState() {
+function TerminalEmptyState(props: { onNewShell: () => void; disabled?: boolean }) {
   return (
     <div className="grid h-full place-items-center bg-[#111312] p-6">
       <div className="text-center">
         <SquareTerminal size={28} className="mx-auto mb-3 text-cream-muted" />
-        <p className="text-sm text-cream-muted">No shell is available in this workspace.</p>
+        <p className="mb-4 text-sm text-cream-muted">No shell is running.</p>
+        <button
+          type="button"
+          disabled={props.disabled}
+          onClick={props.onNewShell}
+          className="rounded-md border border-charcoal-border bg-charcoal-card px-3 py-1.5 text-xs text-cream hover:bg-charcoal-hover disabled:opacity-50"
+        >
+          New Shell
+        </button>
       </div>
     </div>
   );
@@ -372,4 +371,8 @@ function TerminalEmptyState() {
 function basename(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? path;
+}
+
+function shortenHome(path: string): string {
+  return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
 }

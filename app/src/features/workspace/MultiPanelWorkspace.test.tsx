@@ -53,69 +53,6 @@ describe("MultiPanelWorkspace", () => {
     expect(container.querySelector('[role="tablist"]')).not.toBeNull();
   });
 
-  it("keeps intentionally split panes mounted", async () => {
-    const store = createMultiPanelStore({ idPrefix: "split-files" });
-    store.getState().initialize("/Users/demo", "demo");
-    const firstPaneId = store.getState().activePaneId;
-    store.getState().splitPane(firstPaneId, "vertical");
-
-    await act(async () => {
-      root.render(
-        <MultiPanelWorkspace
-          store={store}
-          renderPane={(paneId) => <output data-pane={paneId}>{paneId}</output>}
-        />,
-      );
-    });
-
-    expect(container.querySelectorAll("output")).toHaveLength(2);
-    expect(store.getState().tabs[0]?.panes).toHaveLength(2);
-  });
-
-  it("makes the file pane containing keyboard focus active", async () => {
-    const store = createMultiPanelStore({ idPrefix: "focused-files" });
-    store.getState().initialize("/Users/demo", "demo");
-    const firstPaneId = store.getState().activePaneId;
-    store.getState().splitPane(firstPaneId, "vertical");
-
-    await act(async () => {
-      root.render(
-        <MultiPanelWorkspace
-          store={store}
-          renderPane={(paneId) => <button type="button">Focus {paneId}</button>}
-        />,
-      );
-    });
-
-    await act(async () => {
-      container
-        .querySelector<HTMLElement>(`[data-multi-panel-pane="${firstPaneId}"] button`)
-        ?.focus();
-    });
-
-    expect(store.getState().activePaneId).toBe(firstPaneId);
-  });
-
-  it("resizes a split with the keyboard", async () => {
-    const store = createMultiPanelStore({ idPrefix: "keyboard-resize-files" });
-    store.getState().initialize("/Users/demo", "demo");
-    store.getState().splitPane(store.getState().activePaneId, "vertical");
-
-    await act(async () => {
-      root.render(
-        <MultiPanelWorkspace store={store} renderPane={(_, path) => <output>{path}</output>} />,
-      );
-    });
-
-    await act(async () => {
-      container
-        .querySelector<HTMLElement>('[aria-label="Resize side-by-side file panes"]')
-        ?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
-    });
-
-    expect(store.getState().tabs[0]?.layout.gridSplitRatio).toBe(0.45);
-  });
-
   it("lets a workspace provide its own new-tab control", async () => {
     const store = createMultiPanelStore({ idPrefix: "custom-add-tab" });
     store.getState().initialize("/Users/demo/Documents", "Documents");

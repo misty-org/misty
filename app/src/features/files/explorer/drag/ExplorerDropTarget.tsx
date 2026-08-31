@@ -1,9 +1,5 @@
 import { useSmartLibraryStore } from "@/features/spaces/library";
-import {
-  useMultiPanelStore,
-  useMultiPanelStoreContext,
-  type MultiPanelStoreHook,
-} from "@/features/workspace";
+import { useMultiPanelStore } from "@/features/workspace";
 import {
   explorerPathIsDirectory,
   explorerPrepareDragItems,
@@ -30,7 +26,6 @@ export function ExplorerDropTarget(props: {
   onSpringLoad?: () => void;
   children: ReactNode;
 }) {
-  const multiPanelStore = useMultiPanelStoreContext();
   const kind = props.kind ?? dropKindForPath(props.path);
   const zone = useMemo<ExplorerDropZoneSpec>(
     () =>
@@ -42,7 +37,6 @@ export function ExplorerDropTarget(props: {
         remoteName: props.remoteName,
         onSpringLoad: props.onSpringLoad,
         springLoad: props.springLoad,
-        multiPanelStore: multiPanelStore ?? undefined,
       }),
     [
       kind,
@@ -52,7 +46,6 @@ export function ExplorerDropTarget(props: {
       props.path,
       props.remoteName,
       props.springLoad,
-      multiPanelStore,
     ],
   );
   return (
@@ -70,7 +63,6 @@ export function createExplorerDropTargetSpec(options: {
   remoteName?: string | null;
   springLoad?: boolean;
   onSpringLoad?: () => void;
-  multiPanelStore?: MultiPanelStoreHook;
 }): ExplorerDropZoneSpec {
   const kind = options.kind ?? dropKindForPath(options.path);
   return {
@@ -78,15 +70,7 @@ export function createExplorerDropTargetSpec(options: {
     priority: 10,
     accepts: (payload) => acceptanceForTarget(kind, payload, options.path),
     onDrop: (payload, modifiers) =>
-      dropOnTarget(
-        kind,
-        payload,
-        options.path,
-        options.remoteName,
-        options.paneId,
-        modifiers,
-        options.multiPanelStore,
-      ),
+      dropOnTarget(kind, payload, options.path, options.remoteName, options.paneId, modifiers),
     onSpringLoad: options.onSpringLoad,
     springLoad: options.springLoad,
   };
@@ -120,10 +104,9 @@ async function dropOnTarget(
   remoteName: string | null | undefined,
   paneId: string | undefined,
   modifiers: ExplorerDragModifiers,
-  multiPanelStore?: MultiPanelStoreHook,
 ) {
   const explorer = useExplorerStore.getState();
-  const targetPaneId = paneId ?? (multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
+  const targetPaneId = paneId ?? useMultiPanelStore.getState().activePaneId;
   if (kind === "trash") {
     await explorerQueueDeleteItems({
       paths: payload.items.map((item) => item.path),

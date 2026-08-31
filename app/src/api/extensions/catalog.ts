@@ -2,7 +2,7 @@ import { httpRequest } from "@/api/client/http";
 
 // The catalog is fetched unauthenticated, so it has to live in a public
 // repository. misty-org/misty is private: raw.githubusercontent.com answers
-// 404 there for anyone without a token, which reads as an empty Store.
+// 404 there for anyone without a token, which reads as an empty marketplace.
 // The monorepo copy under extensions/catalog is the source; this is where it
 // is published.
 export const DEFAULT_CATALOG_BASE_URL =

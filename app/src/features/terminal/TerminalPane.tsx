@@ -3,7 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
-import { SearchAddon, type ISearchResultChangeEvent } from "@xterm/addon-search";
+import { SearchAddon } from "@xterm/addon-search";
 import { SerializeAddon } from "@xterm/addon-serialize";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebLinksAddon } from "@xterm/addon-web-links";
@@ -12,6 +12,7 @@ import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { TerminalSearchOverlay } from "./TerminalSearchOverlay";
 import { TerminalPaneOverlays, type TerminalSessionStatus } from "./TerminalPaneOverlays";
 import {
   localTerminalEnvironment,
@@ -54,7 +55,6 @@ interface TerminalPaneProps {
   onFocus?: () => void;
   environment?: TerminalEnvironment;
   onSessionStatusChange?: (status: TerminalSessionStatus) => void;
-  onSearchResultsChange?: (result: ISearchResultChangeEvent) => void;
   onCancelSsh?: () => void;
 }
 
@@ -72,7 +72,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       onExit,
       onFocus,
       onSessionStatusChange,
-      onSearchResultsChange,
       onCancelSsh,
     } = props;
     const environment = props.environment ?? localTerminalEnvironment;
@@ -96,6 +95,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     const [status, setStatus] = useState<TerminalSessionStatus>("starting");
     const [error, setError] = useState("");
     const [hostKey, setHostKey] = useState<SshHostKeyStatus | null>(null);
+    const [searchOpen, setSearchOpen] = useState(false);
     const [restartToken, setRestartToken] = useState(0);
 
     // Ref-based callback stores so remounts don't blow away the shell.
@@ -103,14 +103,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     const onCwdRef = useRef(onCwdChange);
     const onExitRef = useRef(onExit);
     const onFocusRef = useRef(onFocus);
-    const onSearchResultsRef = useRef(onSearchResultsChange);
     useEffect(() => {
       onTitleRef.current = onTitleChange;
       onCwdRef.current = onCwdChange;
       onExitRef.current = onExit;
       onFocusRef.current = onFocus;
-      onSearchResultsRef.current = onSearchResultsChange;
-    }, [onTitleChange, onCwdChange, onExit, onFocus, onSearchResultsChange]);
+    }, [onTitleChange, onCwdChange, onExit, onFocus]);
 
     useEffect(() => onSessionStatusChange?.(status), [onSessionStatusChange, status]);
 
@@ -283,9 +281,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           });
 
           const focusDisposable = term.onSelectionChange(() => onFocusRef.current?.());
-          const searchResultsDisposable = search.onDidChangeResults((result) =>
-            onSearchResultsRef.current?.(result),
-          );
           const domFocusHandler = () => onFocusRef.current?.();
           host.addEventListener("focusin", domFocusHandler);
 
@@ -349,7 +344,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
               } else {
                 if (environment.kind === "ssh") {
                   setStatus("connecting");
-                  const preflight = await preflightSshEnvironment(environment.ssh);
+                  const preflight = await preflightSshEnvironment(environment.ssh.id);
                   if (preflight.state === "confirmation_required") {
                     setHostKey(preflight);
                     setStatus("awaiting_fingerprint");
@@ -392,7 +387,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
             observer.disconnect();
             inputDisposable.dispose();
             focusDisposable.dispose();
-            searchResultsDisposable.dispose();
             host.removeEventListener("focusin", domFocusHandler);
             unlistens.forEach((fn) => fn());
             // Save scrollback only while the PTY still belongs to this slot.
@@ -437,7 +431,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       setStatus("connecting");
       setError("");
       try {
-        const result = await trustSshHost(environment.ssh, hostKey.fingerprints[0]);
+        const result = await trustSshHost(environment.ssh.id, hostKey.fingerprints[0]);
         if (result.state !== "trusted") throw new Error(result.message);
         setHostKey(null);
         setRestartToken((token) => token + 1);
@@ -487,9 +481,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     useTerminalPaneHandle({
       handleRef,
       terminalRef,
-      searchRef,
       sessionIdRef,
       setFontScale,
+      setSearchOpen,
     });
 
     return (
@@ -497,7 +491,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
         className="relative h-full min-h-0 w-full bg-[#111312]"
         onClick={() => terminalRef.current?.focus()}
       >
-        <div ref={hostRef} className="h-full w-full px-0.5" />
+        <div ref={hostRef} className="h-full w-full" />
+        {searchOpen && searchRef.current ? (
+          <TerminalSearchOverlay search={searchRef.current} onClose={() => setSearchOpen(false)} />
+        ) : null}
         <TerminalPaneOverlays
           status={status}
           error={error}

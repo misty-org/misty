@@ -6,7 +6,7 @@ import { invokeShortcutCommand } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace";
 import { ScrollArea, cn } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { GlobalMistyComposerBar, GlobalMistyVoiceIsland } from "./GlobalMistyChrome";
 import { ConversationView } from "./GlobalMistyPanelContent";
@@ -31,30 +31,11 @@ const panelClass = [
   "border border-white/10 bg-charcoal-card/95 text-cream backdrop-blur-2xl",
 ].join(" ");
 const panelShadowClass = "shadow-[0_28px_90px_rgba(0,0,0,0.62)]";
-const panelViewportMargin = 16;
-
-type PanelOffset = { x: number; y: number };
-type PanelDragState = {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  origin: PanelOffset;
-  minDeltaX: number;
-  maxDeltaX: number;
-  minDeltaY: number;
-  maxDeltaY: number;
-};
-
-function clamp(value: number, minimum: number, maximum: number) {
-  if (maximum < minimum) return minimum;
-  return Math.max(minimum, Math.min(maximum, value));
-}
 
 export function GlobalMisty(props: {
   accountId: string;
   currentPath: string;
   activePaneId: string;
-  activeWorkspacePaneId?: string;
   activePanePath: string;
   includeCurrentContext?: boolean;
   allowCapture?: boolean;
@@ -64,7 +45,6 @@ export function GlobalMisty(props: {
   onClosed?: () => void;
   showShadow?: boolean;
   onRequestDrag?: () => void;
-  onSwitchToPet?: () => void;
   onContentVisibilityChange?: (visible: boolean) => void;
   onVoiceActivityChange?: (active: boolean) => void;
 }) {
@@ -77,15 +57,11 @@ export function GlobalMisty(props: {
     onClosed,
     showShadow = true,
     onRequestDrag,
-    onSwitchToPet,
     onContentVisibilityChange,
     onVoiceActivityChange,
   } = props;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const panelDragRef = useRef<PanelDragState | null>(null);
-  const panelOffsetRef = useRef<PanelOffset>({ x: 0, y: 0 });
-  const [panelOffset, setPanelOffset] = useState<PanelOffset>({ x: 0, y: 0 });
   const [capturingRegion, setCapturingRegion] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const {
@@ -160,9 +136,10 @@ export function GlobalMisty(props: {
     })),
   );
   const pane = useExplorerStore((state) => state.panes[props.activePaneId]);
-  const aiPaneId = props.activeWorkspacePaneId ?? props.activePaneId;
   const aiRegistration = useAiSurfaceStore((state) =>
-    Object.values(state.registrations).find((registration) => registration.paneId === aiPaneId),
+    Object.values(state.registrations).find(
+      (registration) => registration.paneId === props.activePaneId,
+    ),
   );
   const registeredAiContext = useMemo(
     () => aiRegistration?.adapter.getContext() ?? [],
@@ -271,52 +248,6 @@ export function GlobalMisty(props: {
   useEffect(() => {
     if (open) onContentVisibilityChange?.(contentVisible);
   }, [contentVisible, onContentVisibilityChange, open]);
-  useEffect(() => {
-    panelOffsetRef.current = panelOffset;
-  }, [panelOffset]);
-  useEffect(() => {
-    const onPointerMove = (event: PointerEvent) => {
-      const drag = panelDragRef.current;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      const deltaX = clamp(event.clientX - drag.startX, drag.minDeltaX, drag.maxDeltaX);
-      const deltaY = clamp(event.clientY - drag.startY, drag.minDeltaY, drag.maxDeltaY);
-      setPanelOffset({ x: drag.origin.x + deltaX, y: drag.origin.y + deltaY });
-    };
-    const endPointerDrag = (event: PointerEvent) => {
-      if (panelDragRef.current?.pointerId === event.pointerId) panelDragRef.current = null;
-    };
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", endPointerDrag);
-    window.addEventListener("pointercancel", endPointerDrag);
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endPointerDrag);
-      window.removeEventListener("pointercancel", endPointerDrag);
-    };
-  }, []);
-
-  const requestPanelDrag = useCallback(
-    (event: React.PointerEvent) => {
-      if (onRequestDrag) {
-        onRequestDrag();
-        return;
-      }
-      const panel = panelRef.current;
-      if (event.button !== 0 || !panel) return;
-      const bounds = panel.getBoundingClientRect();
-      panelDragRef.current = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        origin: panelOffsetRef.current,
-        minDeltaX: panelViewportMargin - bounds.left,
-        maxDeltaX: window.innerWidth - panelViewportMargin - bounds.right,
-        minDeltaY: panelViewportMargin - bounds.top,
-        maxDeltaY: window.innerHeight - panelViewportMargin - bounds.bottom,
-      };
-    },
-    [onRequestDrag],
-  );
 
   const activateCandidate = (candidate?: UnifiedMistyCandidate) => {
     if (!candidate || working) return;
@@ -333,7 +264,7 @@ export function GlobalMisty(props: {
       return;
     }
     if (candidate.type === "agent_task") {
-      void submitAgentTask(candidate.prompt, aiPaneId);
+      void submitAgentTask(candidate.prompt, props.activePaneId);
       return;
     }
     if (candidate.type === "command") {
@@ -372,11 +303,11 @@ export function GlobalMisty(props: {
   };
 
   const onHeaderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    if (!onRequestDrag || event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest("input, textarea, button, a, [role='button']")) return;
     event.preventDefault();
-    requestPanelDrag(event);
+    onRequestDrag();
   };
 
   const composer = (
@@ -404,8 +335,7 @@ export function GlobalMisty(props: {
       voice={voice}
       onError={setVoiceError}
       onClose={closePanel}
-      onRequestDrag={requestPanelDrag}
-      onSwitchToPet={onSwitchToPet}
+      onRequestDrag={onRequestDrag}
       onPointerDown={onHeaderPointerDown}
       onModelChange={(settings) =>
         useGlobalSearchStore.setState((state) => ({
@@ -440,8 +370,7 @@ export function GlobalMisty(props: {
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              style={{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
-              className="group/misty-window pointer-events-none flex origin-center flex-col items-center gap-2"
+              className="pointer-events-none flex origin-center flex-col items-center gap-2"
               data-html2canvas-ignore="true"
             >
               {conversationActive ? (
@@ -457,8 +386,7 @@ export function GlobalMisty(props: {
                   onDelete={(id) => void deleteConversation(id)}
                   onRename={(id, title) => void renameConversation(id, title)}
                   onClose={closePanel}
-                  onRequestDrag={requestPanelDrag}
-                  onSwitchToPet={onSwitchToPet}
+                  onRequestDrag={onRequestDrag}
                   onPointerDown={onHeaderPointerDown}
                 />
               ) : null}
@@ -470,7 +398,6 @@ export function GlobalMisty(props: {
                 )}
                 aria-label="Misty Search"
                 data-misty-conversation={conversationActive ? "true" : undefined}
-                data-misty-content={contentVisible ? "true" : "false"}
               >
                 {conversationActive ? (
                   <>
@@ -509,11 +436,8 @@ export function GlobalMisty(props: {
                       />
                     ) : null}
                     {contentVisible ? (
-                      <div className="min-h-0 flex-1 border-t border-charcoal-border/70">
-                        <ScrollArea
-                          className="h-[min(500px,calc(100dvh-270px))]"
-                          data-misty-results-scroll
-                        >
+                      <div className="min-h-0 border-t border-charcoal-border/70">
+                        <ScrollArea className="h-[min(500px,calc(100dvh-270px))]">
                           <CandidateList
                             candidates={candidates}
                             selectedId={selectedCandidateId}

@@ -243,7 +243,6 @@ impl ExtensionRuntimeService {
 
     fn start_ytdlp(&self, plugin_id: &str, payload: &Value) -> ApiResult<Value> {
         let executable = self.tools.resolve(plugin_id, "yt-dlp")?;
-        let ffmpeg = self.tools.resolve(plugin_id, "ffmpeg")?;
         let url = required_string(payload, "url", 4096)?;
         validate_http_url(&url)?;
         let format = allowed_string(payload, "format", &["mp3", "m4a", "mp4", "webm"])?;
@@ -296,7 +295,6 @@ impl ExtensionRuntimeService {
                     output_dir,
                     output_log,
                     executable,
-                    ffmpeg_location: ffmpeg.parent().unwrap_or(ffmpeg.as_path()).to_path_buf(),
                 },
             )
         });
@@ -826,7 +824,6 @@ struct MediaDownloadJob {
     output_dir: PathBuf,
     output_log: PathBuf,
     executable: PathBuf,
-    ffmpeg_location: PathBuf,
 }
 
 fn run_quick_convert_job(execution: ExtensionJobExecution, request: QuickConvertJob) {
@@ -1160,7 +1157,6 @@ fn run_ytdlp_job(execution: ExtensionJobExecution, request: MediaDownloadJob) {
         output_dir,
         output_log,
         executable,
-        ffmpeg_location,
     } = request;
     update_job(&jobs, &id, |job| {
         job.status = "running".to_owned();
@@ -1184,7 +1180,6 @@ fn run_ytdlp_job(execution: ExtensionJobExecution, request: MediaDownloadJob) {
             "after_move:filepath",
         ])
         .arg(&output_log);
-    command.arg("--ffmpeg-location").arg(ffmpeg_location);
     if playlist {
         command.args(["--yes-playlist", "--playlist-end", "100"]);
     } else {

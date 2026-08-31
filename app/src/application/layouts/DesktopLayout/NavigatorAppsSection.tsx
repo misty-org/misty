@@ -1,11 +1,9 @@
 import { routes } from "@/features/app-shell";
-import { extensionAppRoute, useInstalledApps } from "@/features/extensions";
 import {
   NAVIGATOR_APP_DESCRIPTIONS,
   NAVIGATOR_APP_IDS,
   WORKSPACE_TOOLS_META,
   WorkspaceAppIcon,
-  dockLeaves,
   navigatorAppsCollapsedForAccount,
   navigatorAppIdsForAccount,
   useNavigatorAppsStore,
@@ -24,25 +22,15 @@ import {
   navigationDisclosureChevronClass,
   navigationDisclosureLabelClass,
 } from "@/shared/ui";
-import { Blocks, Check, ChevronRight, Plus, Search } from "lucide-react";
+import { Check, ChevronRight, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { navigatorFocusRingClass, navigatorRowClass } from "./styles";
+import { navigatorFocusRingClass } from "./styles";
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const installedApps = useInstalledApps();
-  const activeAppId = useWorkspaceStore((state) => {
-    const activePane = dockLeaves(state.layout.root).find(
-      (pane) => pane.id === state.layout.focusedPaneId,
-    );
-    const tab = activePane?.tabs.find((candidate) => candidate.id === activePane.activeTabId);
-    return tab?.surfaceId === "extension" && tab.groupKey.startsWith("app:")
-      ? tab.groupKey.slice(4)
-      : undefined;
-  });
   const collapsed = useNavigatorAppsStore((state) =>
     navigatorAppsCollapsedForAccount(state, props.accountId),
   );
@@ -191,7 +179,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
 
             <div className="border-t border-charcoal-border p-1.5">
               <Link
-                to={routes.store}
+                to={routes.marketplace}
                 className={cn(
                   "flex h-9 items-center rounded-md px-2.5 text-sm text-cream-muted no-underline",
                   "outline-none transition-colors hover:bg-charcoal-hover hover:text-cream-bright",
@@ -199,7 +187,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                 )}
                 onClick={() => {
                   setPickerOpen(false);
-                  const surface = workspaceSurfaceFromRoute(routes.store);
+                  const surface = workspaceSurfaceFromRoute(routes.marketplace);
                   if (surface) useWorkspaceStore.getState().openSurface(surface);
                 }}
               >
@@ -211,32 +199,8 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
       </div>
 
       <CollapsibleContent className="grid gap-1">
-        {selectedAppIds.length || installedApps.length ? (
-          <>
-            {props.children}
-            {installedApps.map((app) => {
-              const path = extensionAppRoute(app.id, { title: app.name });
-              const active = activeAppId === app.id;
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  aria-label={app.name}
-                  className={navigatorRowClass(active)}
-                  key={app.id}
-                  onClick={() => {
-                    const surface = workspaceSurfaceFromRoute(path);
-                    if (surface) useWorkspaceStore.getState().openSurface(surface);
-                  }}
-                  to={path}
-                >
-                  <span className="grid size-7 shrink-0 place-items-center">
-                    <Blocks aria-hidden="true" size={18} strokeWidth={1.8} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{app.name}</span>
-                </Link>
-              );
-            })}
-          </>
+        {selectedAppIds.length ? (
+          props.children
         ) : (
           <button
             type="button"

@@ -161,7 +161,7 @@ describe("GlobalNavigator disclosures", () => {
 
     await act(async () => useInboxStore.setState({ selectedProvider: "" }));
 
-    expect(useInboxStore.getState().selectedProvider).toBe("");
+    expect(useInboxStore.getState().selectedProvider).toBe("microsoft");
   });
 
   it("shows Chat and Automations as destinations under Agents", async () => {
@@ -404,11 +404,6 @@ describe("GlobalNavigator disclosures", () => {
         .find((item) => item.textContent?.trim() === "Discord")
         ?.querySelector("svg")
         ?.classList.contains("!size-5"),
-    ).toBe(true);
-    expect(
-      socialItems
-        .filter((item) => item.textContent?.trim() !== "Misty")
-        .every((item) => item.querySelector("svg")?.classList.contains("overflow-visible")),
     ).toBe(true);
     await act(async () => {
       socialItems.find((item) => item.textContent?.trim() === "X")?.click();

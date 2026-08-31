@@ -356,7 +356,7 @@ describe("Inbox workspace", () => {
     ).toBe(true);
   });
 
-  it("shows only accounts from the provider owned by this tab's route", async () => {
+  it("shows only accounts from the provider selected in the navbar", async () => {
     useInboxStore.setState({
       selectedProvider: "google",
       accounts: [
@@ -381,12 +381,12 @@ describe("Inbox workspace", () => {
       ],
     });
 
-    await act(async () => root.render(inboxSurface("/inbox?provider=microsoft")));
+    await act(async () => root.render(inboxSurface()));
 
-    expect(container.textContent).not.toContain("personal@example.com");
-    expect(container.textContent).toContain("work@example.com");
+    expect(container.textContent).toContain("personal@example.com");
+    expect(container.textContent).not.toContain("work@example.com");
     expect(container.textContent).toContain("All inboxes");
-    expect(container.querySelector('[data-mail-provider-icon="outlook"]')).not.toBeNull();
+    expect(container.querySelector('[data-mail-provider-icon="gmail"]')).not.toBeNull();
   });
 
   it("lists Important and Trash as first-class folders", async () => {

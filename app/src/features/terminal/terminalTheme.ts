@@ -1,4 +1,3 @@
-import type { ISearchOptions } from "@xterm/addon-search";
 import type { ITheme } from "@xterm/xterm";
 
 // Misty charcoal/cream mapped to xterm's 16-color palette + defaults. Kept in
@@ -27,15 +26,4 @@ export const MISTY_TERMINAL_THEME: ITheme = {
   brightCyan: "#a9d9de",
   white: "#e0e0e0",
   brightWhite: "#f1f1f1",
-};
-
-/** xterm search decorations require literal colors, so keep them beside the
- * terminal palette instead of introducing one-off values in the component. */
-export const MISTY_TERMINAL_SEARCH_DECORATIONS: NonNullable<ISearchOptions["decorations"]> = {
-  matchBackground: "#3e3e3e",
-  matchBorder: "#8c8c8c",
-  matchOverviewRuler: "#8c8c8c",
-  activeMatchBackground: "#d4b880",
-  activeMatchBorder: "#f1f1f1",
-  activeMatchColorOverviewRuler: "#d4b880",
 };

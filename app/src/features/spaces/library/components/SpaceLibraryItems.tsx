@@ -21,17 +21,10 @@ const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;
 const LIST_THUMBNAIL_WIDTHS = [96, 132, 176] as const;
 const LIBRARY_ITEM_DRAG_KIND = "library-item";
 
-function clampMenuPosition(left: number, top: number, anchor?: Element) {
-  const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");
-  const bounds = pane?.getBoundingClientRect() ?? {
-    left: 0,
-    top: 0,
-    right: window.innerWidth,
-    bottom: window.innerHeight,
-  };
+function clampMenuPosition(left: number, top: number) {
   return {
-    left: Math.max(bounds.left + 8, Math.min(left, bounds.right - ITEM_ACTION_MENU_WIDTH - 8)),
-    top: Math.max(bounds.top + 8, Math.min(top, bounds.bottom - ITEM_ACTION_MENU_HEIGHT - 8)),
+    left: Math.max(8, Math.min(left, window.innerWidth - ITEM_ACTION_MENU_WIDTH - 8)),
+    top: Math.max(8, Math.min(top, window.innerHeight - ITEM_ACTION_MENU_HEIGHT - 8)),
   };
 }
 
@@ -57,17 +50,17 @@ export function SpaceLibraryItems() {
     itemActions: { loadMore },
   } = useSpaceLibraryContext();
 
-  const showItemMenu = (itemId: string, left: number, top: number, anchor?: Element) => {
+  const showItemMenu = (itemId: string, left: number, top: number) => {
     setItemMenu({
       itemId,
-      ...clampMenuPosition(left, top, anchor),
+      ...clampMenuPosition(left, top),
     });
   };
 
   const openItemContextMenu = (event: ReactMouseEvent, itemId: string) => {
     event.preventDefault();
     event.stopPropagation();
-    showItemMenu(itemId, event.clientX, event.clientY, event.currentTarget);
+    showItemMenu(itemId, event.clientX, event.clientY);
   };
 
   const itemScale = normalizeLibraryItemScale(libraryItemScale);
@@ -138,7 +131,7 @@ function LibraryItemCard({
   itemScale: number;
   listLayout: boolean;
   onContextMenu: (event: ReactMouseEvent, itemId: string) => void;
-  onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
+  onShowMenu: (itemId: string, left: number, top: number) => void;
   selected: boolean;
 }) {
   const {
@@ -297,7 +290,7 @@ function LibraryItemActions({
 }: {
   item: SpaceLibraryItem;
   menuOpen: boolean;
-  onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
+  onShowMenu: (itemId: string, left: number, top: number) => void;
   updateItem: (
     item: SpaceLibraryItem,
     patch: Partial<Pick<SpaceLibraryItem, "favorite">>,
@@ -330,12 +323,7 @@ function LibraryItemActions({
         type="button"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
-          onShowMenu(
-            item.id,
-            rect.right - ITEM_ACTION_MENU_WIDTH,
-            rect.bottom + 4,
-            event.currentTarget,
-          );
+          onShowMenu(item.id, rect.right - ITEM_ACTION_MENU_WIDTH, rect.bottom + 4);
         }}
         aria-label={`More actions for ${item.display_name}`}
         aria-haspopup="menu"

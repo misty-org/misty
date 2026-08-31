@@ -98,15 +98,7 @@ export function GlobalSpaceSwitcher(props: {
                         "max-w-[calc(100%_-_2.375rem)]",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "min-w-0 overflow-hidden whitespace-nowrap text-base font-semibold text-cream",
-                          "[mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                          "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                        )}
-                        data-active-space-name="true"
-                        title={activeName}
-                      >
+                      <span className="min-w-0 truncate text-base font-semibold text-cream">
                         {activeName}
                       </span>
                       <ChevronDown
@@ -128,7 +120,7 @@ export function GlobalSpaceSwitcher(props: {
             </Tooltip>
           </TooltipProvider>
 
-          <DropdownMenuContent align="start" sideOffset={6} className="w-[304px]">
+          <DropdownMenuContent align="start" sideOffset={6} className="w-[276px]">
             <DropdownMenuLabel>Spaces</DropdownMenuLabel>
             <div className="misty-transient-scrollbar grid max-h-[320px] gap-1 overflow-y-auto">
               {props.spaces.map((space) => {
@@ -138,8 +130,7 @@ export function GlobalSpaceSwitcher(props: {
                   <div className="group/space-menu-row relative" key={space.id}>
                     <DropdownMenuItem
                       className={cn(
-                        "h-8 gap-2.5 overflow-hidden pr-[94px]",
-                        "group-hover/space-menu-row:bg-charcoal-hover",
+                        "h-8 gap-2.5 pr-[92px]",
                         active && "bg-charcoal-hover text-cream",
                       )}
                       aria-current={active ? "page" : undefined}
@@ -157,21 +148,15 @@ export function GlobalSpaceSwitcher(props: {
                           />
                         ) : null}
                       </span>
-                      <span
-                        className={cn(
-                          "block min-w-0 flex-1 overflow-hidden whitespace-nowrap",
-                          "[mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                          "[-webkit-mask-image:linear-gradient(to_right,black_calc(100%-18px),transparent)]",
-                        )}
-                        data-space-name={space.id}
-                        title={space.name}
-                      >
-                        {space.name}
-                      </span>
+                      <span className="min-w-0 flex-1 truncate">{space.name}</span>
                       {unread > 0 ? <span className="sr-only">{unread} unread</span> : null}
                     </DropdownMenuItem>
                     <div
-                      className="pointer-events-auto absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end opacity-100"
+                      className={cn(
+                        "pointer-events-none absolute inset-y-0 right-1 z-10 flex items-center opacity-0 transition-opacity",
+                        "group-hover/space-menu-row:pointer-events-auto group-hover/space-menu-row:opacity-100",
+                        "group-focus-within/space-menu-row:pointer-events-auto group-focus-within/space-menu-row:opacity-100",
+                      )}
                       data-space-row-actions={space.id}
                     >
                       <SpaceRowActions space={space} />

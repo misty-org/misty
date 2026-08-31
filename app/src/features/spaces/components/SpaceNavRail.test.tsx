@@ -83,7 +83,7 @@ describe("SpaceNavRail", () => {
   });
 
   it("opens a Space from File Manager at its default surface", () => {
-    expect(spaceDestination("/files", "space/three")).toBe("/spaces/space%2Fthree/home");
+    expect(spaceDestination("/files", "space/three")).toBe("/spaces/space%2Fthree");
   });
 
   it("shows an invited Space in the rail before it is accepted", async () => {
