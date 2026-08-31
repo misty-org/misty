@@ -44,7 +44,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     render(
       <MemoryRouter initialEntries={["/spaces/family"]}>
         <ShortcutRuntime />
-        <WorkspaceCanvas outlet={<div />} />
+        <WorkspaceCanvas />
       </MemoryRouter>,
     );
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
@@ -73,7 +73,7 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
 
     render(
       <MemoryRouter initialEntries={["/spaces/family/home"]}>
-        <WorkspaceCanvas outlet={<div />} />
+        <WorkspaceCanvas />
       </MemoryRouter>,
     );
 

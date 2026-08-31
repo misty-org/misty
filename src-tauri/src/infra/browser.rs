@@ -171,6 +171,12 @@ struct BrowserCompanionEvent {
     height: f64,
 }
 
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct BrowserFocusEvent {
+    id: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserAgentGrantRequest {
@@ -572,6 +578,8 @@ pub fn browser_webview_create(
             if let Some(pointer) = browser_pointer_navigation(url) {
                 emit_browser_pointer(&navigation_app, &navigation_id, pointer);
                 false
+            } else if forward_focus_navigation(&navigation_app, &navigation_id, url) {
+                false
             } else if forward_companion_navigation(&navigation_app, &navigation_id, url) {
                 false
             } else if forward_navigation(&navigation_app, &navigation_id, url) {
@@ -647,6 +655,28 @@ pub fn browser_webview_create(
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
+}
+
+fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
+    if url.scheme() != "misty-focus" {
+        return false;
+    }
+    let token = url
+        .query_pairs()
+        .find_map(|(key, value)| (key == "token").then(|| value.into_owned()))
+        .unwrap_or_default();
+    let trusted = app
+        .try_state::<BrowserSessionState>()
+        .map(|state| shortcut_token_matches(&state, id, &token))
+        .unwrap_or(false);
+    if trusted {
+        let _ = app.emit_to(
+            "main",
+            "misty://browser-focus",
+            BrowserFocusEvent { id: id.to_owned() },
+        );
+    }
+    true
 }
 
 fn forward_companion_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {

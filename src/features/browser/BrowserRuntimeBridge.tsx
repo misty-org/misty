@@ -77,6 +77,17 @@ interface BrowserPointerEvent {
   inside: boolean;
 }
 
+interface BrowserFocusEvent {
+  id: string;
+}
+
+export function focusBrowserRuntimeTab(runtimeId: string): boolean {
+  const tabId = browserTabIdForRuntime(runtimeId);
+  if (!tabId || !useWorkspaceStore.getState().focusTab(tabId)) return false;
+  window.dispatchEvent(new CustomEvent("misty:focus-workspace-tab", { detail: { tabId } }));
+  return true;
+}
+
 interface BrowserDownloadEvent {
   tabId: string;
   path: string;
@@ -229,6 +240,9 @@ export function BrowserRuntimeBridge() {
             detail: { x, y, paneId: pane.id },
           }),
         );
+      }),
+      listen<BrowserFocusEvent>("misty://browser-focus", ({ payload }) => {
+        if (!disposed) focusBrowserRuntimeTab(payload.id);
       }),
       listen<BrowserCompanionEvent>("misty://browser-companion", ({ payload }) => {
         if (disposed) return;

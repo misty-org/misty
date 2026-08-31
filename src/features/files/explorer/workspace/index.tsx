@@ -6,14 +6,14 @@ import {
   selectGeneralPreferences,
   useSettingsStore,
 } from "@/features/settings";
-import { useMultiPanelStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
   type AiSurfaceAdapter,
 } from "@/features/ai-surface/AiPaneHost";
 import { useTransientScrollbars } from "@/shared/hooks/useTransientScrollbars";
-import { isAndroidBuild } from "@/shared/platform/buildTarget";
+import { isAndroidBuild, isNativeMobileBuild, isWebBuild } from "@/shared/platform/buildTarget";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -24,7 +24,7 @@ import { ExplorerSidebar } from "../components/ExplorerSidebar";
 import { libraryWorkspacePath } from "../components/LibraryWorkspace";
 import { ComingSoonSurface } from "@/shared/ui";
 import { ExplorerDragProvider } from "../drag/ExplorerDragContext";
-import { useExplorerStore } from "../store";
+import { selectedPathsForPane, useExplorerStore } from "../store";
 import { useExplorerAgentDock } from "./ExplorerAgentDockIntegration";
 import { ExplorerDialog } from "./ExplorerBatchRenameDialog";
 import { CompareDialog } from "./ExplorerCompareDialog";
@@ -53,6 +53,7 @@ import {
 } from "./ExplorerToolbarConnections";
 import { useExplorerDialogEvents } from "./explorerWorkspace/useExplorerDialogEvents";
 import { useFilesDockWorkspace } from "./explorerWorkspace/useFilesDockWorkspace";
+import { filesMultiPanelStore } from "./explorerWorkspace/filesDockStores";
 import { useConnectedDeviceDirectoryInvalidation } from "./explorerWorkspace/useConnectedDeviceDirectoryInvalidation";
 import {
   useAndroidLocalFolderGrant,
@@ -78,6 +79,17 @@ import { useExplorerDevices } from "./useExplorerDevices";
 export type { ResizeTarget } from "../model/types/workspace/index";
 export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: ExplorerWorkspaceProps) {
   const navigate = useNavigate();
+  const multiPanelStore = useMemo(
+    () => filesMultiPanelStore(props.workspaceId),
+    [props.workspaceId],
+  );
+  const workspaceFocused = useWorkspaceStore((state) => {
+    if (!props.workspaceId) return true;
+    const pane = dockLeaves(state.layout.root).find(
+      (candidate) => candidate.id === state.layout.focusedPaneId,
+    );
+    return pane?.activeTabId === props.workspaceId;
+  });
   const app = useAppStore((state) => state.app);
   const {
     sidebarWidth,
@@ -86,6 +98,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     library,
     operationError,
     inlineEdit,
+    explorerDialogPaneId,
+    contextMenuPaneId,
     notifications,
     pushNotification,
     dismissNotification,
@@ -97,6 +111,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       library: state.library,
       operationError: state.operationError,
       inlineEdit: state.inlineEdit,
+      explorerDialogPaneId: state.dialog?.paneId ?? "",
+      contextMenuPaneId: state.contextMenu.paneId,
       notifications: state.notifications,
       pushNotification: state.pushNotification,
       dismissNotification: state.dismissNotification,
@@ -115,7 +131,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     activeTabSidebarVisible,
     hasExplorerTabs,
     workspacePathSignature,
-  } = useMultiPanelStore(
+  } = multiPanelStore(
     useShallow((state) => {
       const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
       return {
@@ -176,6 +192,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   );
   const activePath = useExplorerStore(
     (state) => state.panes[activePaneId]?.listing?.path ?? homePath,
+  );
+  const activeSelectedPath = useExplorerStore(
+    (state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? "",
   );
   const activePane = useExplorerStore((state) => state.panes[activePaneId]);
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
@@ -325,25 +344,39 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     activePath,
     initialized: explorerInitialized,
     embedded: props.embedded,
+    homePath,
+    multiPanelStore,
     navigate,
   });
 
-  // Extension execution is outside the first public-beta surface. Keeping the
-  // registry hook disabled also retires plugin tabs restored from older builds.
-  const extensionsEnabled = false;
-  useLegacyPluginTabMigration({ extensionsEnabled, homePath, navigate, workspacePathSignature });
+  // Extension execution depends on Misty's desktop-native runtime. Keep the
+  // launcher active on desktop while leaving unsupported mobile/web builds out.
+  const extensionsEnabled = !isNativeMobileBuild && !isWebBuild;
+  useLegacyPluginTabMigration({
+    extensionsEnabled,
+    homePath,
+    navigate,
+    workspacePathSignature,
+    multiPanelStore,
+  });
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
   const { pluginCommands, pluginPanels, executableCommandIdsRef, pluginCommandsRef } =
     usePluginRegistry({ extensionsEnabled });
+  const ownsPane = useCallback(
+    (paneId: string) =>
+      multiPanelStore.getState().tabs.some((tab) => tab.panes.some((pane) => pane.id === paneId)),
+    [multiPanelStore],
+  );
   const { duplicateFinderPaneId, setDuplicateFinderPaneId, compareDialog, setCompareDialog } =
-    useExplorerDialogEvents(activePaneIdRef);
+    useExplorerDialogEvents(activePaneIdRef, ownsPane);
   useTransferRefreshPolling(mountRoot);
   useConnectedDeviceDirectoryInvalidation();
-  const { resizeTarget, startSidebarResize, startPreviewResize } = usePanelResize({
-    workspaceRef,
-    mainRef,
-  });
+  const { resizeTarget, resizeSidebarBy, resizePreviewBy, startSidebarResize, startPreviewResize } =
+    usePanelResize({
+      workspaceRef,
+      mainRef,
+    });
   const workspacePaths = useMemo(
     () => workspacePathSignature.split("\n").filter(Boolean),
     [workspacePathSignature],
@@ -365,8 +398,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const sidebarVisible = activeTabSupportsSidePanels && activeTabSidebarVisible;
   const previewVisible = activeTabSupportsSidePanels && activeTabPreviewVisible;
   useEffect(() => {
-    ensureFilesBrowseTab(homePath);
-  }, [homePath, workspacePathSignature]);
+    ensureFilesBrowseTab(homePath, multiPanelStore);
+  }, [homePath, multiPanelStore, workspacePathSignature]);
   useEffect(() => {
     activePaneIdRef.current = activePaneId;
     activePathRef.current = activePath;
@@ -381,12 +414,17 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     executableCommandIdsRef,
     pluginCommands,
     pluginCommandsRef,
+    multiPanelStore,
+    workspaceId: props.workspaceId,
   });
 
-  const navigateSidebar = useCallback((path: string) => {
-    const paneId = useMultiPanelStore.getState().activePaneId;
-    if (paneId) void useExplorerStore.getState().navigatePane(paneId, path);
-  }, []);
+  const navigateSidebar = useCallback(
+    (path: string) => {
+      const paneId = multiPanelStore.getState().activePaneId;
+      if (paneId) void useExplorerStore.getState().navigatePane(paneId, path);
+    },
+    [multiPanelStore],
+  );
 
   const renderToolbar = useCallback(
     (paneId: string, path: string) => {
@@ -420,7 +458,14 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       const paneActions =
         activePaneId === paneId ? (
           <div className="flex items-center gap-1">
-            <ExplorerPaneHeaderActions paneId={paneId} />
+            <ExplorerPaneHeaderActions
+              paneId={paneId}
+              multiPanelStore={multiPanelStore}
+              extensionsEnabled={extensionsEnabled}
+              pluginCommands={pluginCommands}
+              pluginPanels={pluginPanels}
+              selectedPath={activeSelectedPath}
+            />
           </div>
         ) : undefined;
       if (isRemotesTabPath(path)) {
@@ -452,12 +497,23 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         />
       );
     },
-    [activePaneId, extensionsEnabled, homePath, pluginCommands, pluginPanels, props.embedded],
+    [
+      activePaneId,
+      activeSelectedPath,
+      extensionsEnabled,
+      homePath,
+      multiPanelStore,
+      pluginCommands,
+      pluginPanels,
+      props.embedded,
+    ],
   );
   const { inspector } = useExplorerAgentDock({
     activePaneId,
     activePath,
-    fallbackInspector: previewVisible ? <ConnectedFileInspector /> : undefined,
+    fallbackInspector: previewVisible ? (
+      <ConnectedFileInspector paneId={activePaneId} />
+    ) : undefined,
   });
   // Remotes is presented as an overlay. Navigating to /providers is the shared
   // entry point: DesktopLayout turns it into "open the overlay and restore the
@@ -471,6 +527,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   }, [navigate]);
   const handleGrantLocalFolder = useAndroidLocalFolderGrant({
     homePath,
+    multiPanelStore,
     refreshAndroidAllFilesAccess,
     refreshAndroidGrantedFolders,
   });
@@ -550,8 +607,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       >
         <main ref={mainRef} className={explorerShellStyles.main}>
           <ExplorerMultiPanelWorkspace
+            store={multiPanelStore}
             className="explorer-multipanel"
-            canCloseTab={(tab) => canCloseExplorerTab(tab, useMultiPanelStore.getState().tabs)}
+            canCloseTab={(tab) => canCloseExplorerTab(tab, multiPanelStore.getState().tabs)}
             renderBottomBar={resolveExplorerBottomBarRenderer(props.embedded)}
             renderAddTabControl={renderAddTabControl}
             renderTabActions={renderTabActions}
@@ -561,16 +619,22 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
             renderNavigationAside={explorerSidebar}
             navigationAsideWidth={sidebarWidth}
             onNavigationAsideResizeStart={startSidebarResize}
+            onNavigationAsideResizeBy={resizeSidebarBy}
             navigationAsideResizing={resizeTarget === "sidebar"}
             renderAside={inspector}
             asideWidth={previewWidth}
             onAsideResizeStart={startPreviewResize}
+            onAsideResizeBy={resizePreviewBy}
             asideResizing={resizeTarget === "preview"}
             renderPane={renderPane}
           />
         </main>
-        <ExplorerRenameStatus edit={inlineEdit} />
-        <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
+        {inlineEdit && ownsPane(inlineEdit.paneId) ? (
+          <ExplorerRenameStatus edit={inlineEdit} />
+        ) : null}
+        {workspaceFocused ? (
+          <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
+        ) : null}
         {duplicateFinderPaneId ? (
           <DuplicateFinderDialog
             paneId={duplicateFinderPaneId}
@@ -583,8 +647,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         {compareDialog ? (
           <CompareDialog seed={compareDialog} onClose={() => setCompareDialog(null)} />
         ) : null}
-        <ExplorerContextMenu />
-        <ExplorerDialog />
+        {ownsPane(contextMenuPaneId) ? <ExplorerContextMenu /> : null}
+        {explorerDialogPaneId && ownsPane(explorerDialogPaneId) ? <ExplorerDialog /> : null}
       </section>
     </ExplorerDragProvider>
   );

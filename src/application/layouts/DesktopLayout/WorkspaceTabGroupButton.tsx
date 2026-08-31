@@ -50,6 +50,7 @@ interface Props {
   onOpen: (tab: WorkspaceTab) => void;
   onClose: (tab: WorkspaceTab) => void;
   onMoveTab: (tabId: string, dropIndex: number) => void;
+  paneTabs?: WorkspaceTab[];
 }
 
 function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
@@ -135,6 +136,7 @@ export function WorkspaceTabGroupButton({
   onOpen,
   onClose,
   onMoveTab,
+  paneTabs,
 }: Props) {
   // Persisted workspace tabs can outlive the surface that originally created
   // them. Never let missing presentation metadata crash the entire workspace.
@@ -170,6 +172,7 @@ export function WorkspaceTabGroupButton({
         "group/tab flex h-7 min-w-[36px] max-w-[200px] flex-1 items-center",
         "rounded-md border text-xs",
         "transition-colors duration-150 select-none",
+        "focus-within:ring-1 focus-within:ring-cream-muted/50",
         containsActive
           ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
           : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
@@ -193,12 +196,18 @@ export function WorkspaceTabGroupButton({
         event.preventDefault();
         event.stopPropagation();
         const tabId = event.dataTransfer.getData("application/x-misty-workspace-tab");
-        if (tabId && displayTab) onMoveTab(tabId, group.tabs.indexOf(displayTab));
+        if (tabId && displayTab)
+          onMoveTab(tabId, workspaceTabDropIndex(paneTabs ?? group.tabs, tabId, displayTab.id));
       }}
     >
       <button
         type="button"
-        className="flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden pl-2 pr-1 text-left outline-none focus:outline-none"
+        className={cn(
+          "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden pl-2 pr-1",
+          "text-left outline-none focus:outline-none focus-visible:ring-1",
+          "focus-visible:ring-inset focus-visible:ring-cream-muted",
+        )}
+        aria-pressed={containsActive}
         onClick={(event) => {
           event.stopPropagation();
           if (!containsActive) {
@@ -236,7 +245,7 @@ export function WorkspaceTabGroupButton({
               type="button"
               className={cn(
                 "mr-0.5 grid size-5 shrink-0 place-items-center rounded text-cream-muted outline-none",
-                "hover:bg-charcoal-active hover:text-cream focus:outline-none",
+                "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
               )}
               aria-label={`Show ${contextLabel} tabs`}
               onClick={(event) => event.stopPropagation()}
@@ -269,7 +278,11 @@ export function WorkspaceTabGroupButton({
                   {canClose && (!canCloseTab || canCloseTab(tab)) ? (
                     <button
                       type="button"
-                      className="grid size-5 shrink-0 place-items-center rounded text-cream-muted/70 hover:bg-charcoal-active hover:text-cream"
+                      className={cn(
+                        "grid size-5 shrink-0 place-items-center rounded text-cream-muted/70",
+                        "hover:bg-charcoal-active hover:text-cream focus-visible:outline-none",
+                        "focus-visible:ring-1 focus-visible:ring-cream-muted",
+                      )}
                       aria-label={`Close ${tabTitle}`}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -290,7 +303,8 @@ export function WorkspaceTabGroupButton({
           aria-label={`Close ${displayTab?.title ?? group.label}`}
           className={cn(
             "mr-1 grid size-5 shrink-0 place-items-center rounded text-cream-muted opacity-0 outline-none",
-            "hover:bg-charcoal-active hover:text-cream focus:outline-none group-hover/tab:opacity-100",
+            "hover:bg-charcoal-active hover:text-cream focus:outline-none focus-visible:opacity-100",
+            "focus-visible:ring-1 focus-visible:ring-cream-muted group-hover/tab:opacity-100",
           )}
           onClick={(event) => {
             event.stopPropagation();
@@ -302,6 +316,17 @@ export function WorkspaceTabGroupButton({
       ) : null}
     </div>
   );
+}
+
+export function workspaceTabDropIndex(
+  paneTabs: WorkspaceTab[],
+  movingTabId: string,
+  targetTabId: string,
+): number {
+  const targetIndex = paneTabs.findIndex((tab) => tab.id === targetTabId);
+  if (targetIndex < 0) return paneTabs.length;
+  const sourceIndex = paneTabs.findIndex((tab) => tab.id === movingTabId);
+  return sourceIndex >= 0 && sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
 }
 
 export function workspaceTabDisplayTitle(

@@ -1,6 +1,9 @@
 import { createBrowserTabState, type WorkspaceTab } from "@/features/workspace";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  browserTabIdForRuntime,
+  browserRuntimeId,
+  closeBrowserRuntime,
   hideAllBrowserWebviews,
   hideBrowserWebview,
   setBrowserPointerTrackingEnabled,
@@ -236,6 +239,29 @@ describe("browser native view synchronization", () => {
     const commands = invoke.mock.calls.map(([command]) => command);
     expect(commands[commands.length - 1]).toBe("browser_webview_hide");
     expect(commands.filter((command) => command === "browser_webview_hide")).toHaveLength(2);
+  });
+
+  it("does not let a stale close destroy a tab reopened with the same runtime", async () => {
+    const tab = browserTab("close-reopen-race");
+    await syncBrowserWebview({
+      tab,
+      url: "https://example.com",
+      bounds: { x: 10, y: 20, width: 800, height: 600 },
+      theme: "dark",
+    });
+    invoke.mockClear();
+
+    const closing = closeBrowserRuntime(tab);
+    const reopening = syncBrowserWebview({
+      tab,
+      url: "https://example.com",
+      bounds: { x: 10, y: 20, width: 800, height: 600 },
+      theme: "dark",
+    });
+    await Promise.all([closing, reopening]);
+
+    expect(invoke.mock.calls.some(([command]) => command === "browser_webview_close")).toBe(false);
+    expect(browserTabIdForRuntime(browserRuntimeId(tab))).toBe(tab.id);
   });
 
   it("recreates a native child when frontend state is stale", async () => {

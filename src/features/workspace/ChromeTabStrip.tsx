@@ -18,11 +18,23 @@ const chromeTabShellClass = [
 
 const tabCloseButtonClass = [
   "mr-1.5 grid size-6 flex-none place-items-center rounded-full border-0",
-  "bg-transparent text-current transition-colors hover:text-cream-bright",
+  "bg-transparent text-current transition-colors hover:text-cream-bright focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
 ].join(" ");
 
 const chromeTabTrayClass = [
   "mt-1.5 mr-2 flex h-8 flex-none items-center justify-end gap-0.5 rounded-lg p-0.5",
+].join(" ");
+
+const tabSelectButtonClass = [
+  "flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden border-0",
+  "bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit focus-visible:outline-none",
+  "focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
+].join(" ");
+
+const addTabButtonClass = [
+  "grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted",
+  "hover:text-cream-bright focus-visible:outline-none focus-visible:ring-1",
+  "focus-visible:ring-cream-muted",
 ].join(" ");
 
 export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStripProps) {
@@ -261,15 +273,31 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
               ) : (
                 <button
                   type="button"
-                  className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-hidden border-0 bg-transparent py-0 pl-3 pr-1.5 text-left text-inherit"
+                  className={tabSelectButtonClass}
                   role="tab"
                   aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                   title={tab.path}
                   onClick={() => {
                     if (!suppressSelectionRef.current) props.onSelectTab(tab.id);
                   }}
                   onDoubleClick={() => {
                     if (canRename) setRenamingTabId(tab.id);
+                  }}
+                  onKeyDown={(event) => {
+                    const nextIndex = tabIndexFromKey(event.key, props.tabs, tab.id);
+                    if (nextIndex === null) return;
+                    event.preventDefault();
+                    const next = props.tabs[nextIndex];
+                    if (!next) return;
+                    props.onSelectTab(next.id);
+                    window.requestAnimationFrame(() => {
+                      shellRef.current
+                        ?.querySelector<HTMLElement>(
+                          `.chrome-tab[data-tab-id="${CSS.escape(next.id)}"] [role="tab"]`,
+                        )
+                        ?.focus();
+                    });
                   }}
                 >
                   {tab.leading ? (
@@ -284,6 +312,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
                 <button
                   type="button"
                   className={tabCloseButtonClass}
+                  tabIndex={active ? 0 : -1}
                   aria-label={`Close ${tab.title}`}
                   title={`Close ${tab.title}`}
                   onClick={(event) => {
@@ -316,8 +345,9 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
             {props.addTabControl ?? (
               <Button
                 type="button"
-                className="grid size-7 place-items-center rounded-full border-0 bg-transparent p-0 text-cream-muted hover:text-cream-bright"
+                className={addTabButtonClass}
                 title="New tab"
+                aria-label="New tab"
                 onClick={props.onAddTab}
               >
                 <Plus size={17} strokeWidth={2.4} />
@@ -332,6 +362,22 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
 });
 
 const chromeTabMime = "application/x-misty-chrome-tab";
+
+function tabIndexFromKey(
+  key: string,
+  tabs: ChromeTabStripProps["tabs"],
+  activeId: string,
+): number | null {
+  if (!tabs.length) return null;
+  if (key === "Home") return 0;
+  if (key === "End") return tabs.length - 1;
+  if (!["ArrowLeft", "ArrowRight"].includes(key)) return null;
+  const current = Math.max(
+    0,
+    tabs.findIndex((tab) => tab.id === activeId),
+  );
+  return (current + (key === "ArrowLeft" ? -1 : 1) + tabs.length) % tabs.length;
+}
 
 interface ChromeTabDragPayload {
   id: string;

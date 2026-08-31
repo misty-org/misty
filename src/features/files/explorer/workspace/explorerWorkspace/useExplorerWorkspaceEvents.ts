@@ -2,6 +2,7 @@ import {
   dockLeaves,
   useMultiPanelStore,
   useWorkspaceStore,
+  type MultiPanelStoreHook,
   type MultiPanelTab,
 } from "@/features/workspace";
 import {
@@ -23,11 +24,12 @@ export function useLegacyPluginTabMigration(options: {
   homePath: string;
   navigate: NavigateFunction;
   workspacePathSignature: string;
+  multiPanelStore?: MultiPanelStoreHook;
 }): void {
   const { extensionsEnabled, homePath, navigate, workspacePathSignature } = options;
   useEffect(() => {
     if (!extensionsEnabled) return;
-    const multi = useMultiPanelStore.getState();
+    const multi = (options.multiPanelStore ?? useMultiPanelStore).getState();
     const legacyTabs = multi.tabs
       .map((tab) => ({ tab, plugin: parsePluginTabPath(tab.path) }))
       .filter(
@@ -48,7 +50,7 @@ export function useLegacyPluginTabMigration(options: {
     const params = new URLSearchParams({ extension: activeLegacy.plugin.pluginId });
     if (activeLegacy.plugin.selectedPath) params.set("selected", activeLegacy.plugin.selectedPath);
     navigate(`/files?${params.toString()}`, { replace: true });
-  }, [extensionsEnabled, homePath, navigate, workspacePathSignature]);
+  }, [extensionsEnabled, homePath, navigate, options.multiPanelStore, workspacePathSignature]);
 }
 
 export function useOperationErrorNotification(
@@ -75,14 +77,26 @@ export function useExplorerKeyboardShortcuts(options: {
   executableCommandIdsRef: RefObject<readonly string[]>;
   pluginCommands: PluginCommandEntry[];
   pluginCommandsRef: RefObject<PluginCommandEntry[]>;
+  multiPanelStore?: MultiPanelStoreHook;
+  workspaceId?: string;
 }): void {
   const { navigate, executableCommandIdsRef, pluginCommands, pluginCommandsRef } = options;
   useEffect(() => {
+    const multiPanelStore = options.multiPanelStore ?? useMultiPanelStore;
+    const enabled = () => {
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find(
+        (candidate) => candidate.id === workspace.layout.focusedPaneId,
+      );
+      const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId);
+      return options.workspaceId ? tab?.id === options.workspaceId : tab?.surfaceId === "files";
+    };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!enabled()) return;
       const target = event.target as HTMLElement | null;
       const editing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
       const explorerState = useExplorerStore.getState();
-      const paneId = useMultiPanelStore.getState().activePaneId;
+      const paneId = multiPanelStore.getState().activePaneId;
       if (!paneId) return;
       if (event.key === "Escape") {
         explorerState.cancelInlineEdit();
@@ -92,15 +106,8 @@ export function useExplorerKeyboardShortcuts(options: {
       if (editing) return;
     };
     window.addEventListener("keydown", onKeyDown);
-    const enabled = () => {
-      const workspace = useWorkspaceStore.getState();
-      const pane = dockLeaves(workspace.layout.root).find(
-        (candidate) => candidate.id === workspace.layout.focusedPaneId,
-      );
-      return pane?.tabs.find((tab) => tab.id === pane.activeTabId)?.surfaceId === "files";
-    };
     const run = (commandId: string) => {
-      const paneId = useMultiPanelStore.getState().activePaneId;
+      const paneId = multiPanelStore.getState().activePaneId;
       if (!paneId) return;
       const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
       if (pluginCommand) void runPluginCommand(pluginCommand, paneId, navigate);
@@ -117,29 +124,45 @@ export function useExplorerKeyboardShortcuts(options: {
       registerShortcutHandler(
         "navigation.back",
         () => {
-          const paneId = useMultiPanelStore.getState().activePaneId;
-          if (paneId) void useExplorerStore.getState().navigateBack(paneId);
+          const paneId = multiPanelStore.getState().activePaneId;
+          if (!paneId || !useExplorerStore.getState().panes[paneId]?.backHistory.length)
+            return false;
+          void useExplorerStore.getState().navigateBack(paneId);
+          return true;
         },
         enabled,
+        100,
       ),
       registerShortcutHandler(
         "navigation.forward",
         () => {
-          const paneId = useMultiPanelStore.getState().activePaneId;
-          if (paneId) void useExplorerStore.getState().navigateForward(paneId);
+          const paneId = multiPanelStore.getState().activePaneId;
+          if (!paneId || !useExplorerStore.getState().panes[paneId]?.forwardHistory.length)
+            return false;
+          void useExplorerStore.getState().navigateForward(paneId);
+          return true;
         },
         enabled,
+        100,
       ),
     );
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       unregister.forEach((remove) => remove());
     };
-  }, [executableCommandIdsRef, navigate, pluginCommands, pluginCommandsRef]);
+  }, [
+    executableCommandIdsRef,
+    navigate,
+    options.multiPanelStore,
+    options.workspaceId,
+    pluginCommands,
+    pluginCommandsRef,
+  ]);
 }
 
 export function useAndroidLocalFolderGrant(options: {
   homePath: string;
+  multiPanelStore?: MultiPanelStoreHook;
   refreshAndroidAllFilesAccess: () => Promise<{
     granted: boolean;
     storageRoot?: string | null;
@@ -172,7 +195,7 @@ export function useAndroidLocalFolderGrant(options: {
         }
         const storageRoot = currentStatus.storageRoot?.replace(/\/+$/, "");
         if (storageRoot) {
-          const paneId = useMultiPanelStore.getState().activePaneId;
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
           const targetPath = request?.initialDirectory
             ? `${storageRoot}/${request.initialDirectory.replace(/^\/+|\/+$/g, "")}`
             : storageRoot;
@@ -180,7 +203,7 @@ export function useAndroidLocalFolderGrant(options: {
           return;
         }
         if (request?.grantedPath) {
-          const paneId = useMultiPanelStore.getState().activePaneId;
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
           if (paneId) await useExplorerStore.getState().navigatePane(paneId, request.grantedPath);
           return;
         }
@@ -189,7 +212,7 @@ export function useAndroidLocalFolderGrant(options: {
             initialDirectory: request?.initialDirectory,
           });
           await refreshAndroidGrantedFolders();
-          const paneId = useMultiPanelStore.getState().activePaneId;
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
           if (paneId)
             await useExplorerStore.getState().navigatePane(paneId, folder.path || homePath);
           useExplorerStore
@@ -205,6 +228,6 @@ export function useAndroidLocalFolderGrant(options: {
         }
       })();
     },
-    [homePath, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders],
+    [homePath, options.multiPanelStore, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders],
   );
 }

@@ -393,9 +393,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     }
   };
 
-  const travel = (direction: -1 | 1) => {
+  const travel = (direction: -1 | 1): boolean => {
     const url = useBrowserRuntimeStore.getState().moveHistory(tab.id, direction);
-    if (!url) return;
+    if (!url) return false;
     useWorkspaceStore.getState().updateBrowserTab(tab.id, {
       url,
       title: browserTabTitle(url),
@@ -406,6 +406,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         request: { id: browserRuntimeId(tab) },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
     }
+    return true;
   };
   const focused = () => {
     const workspace = useWorkspaceStore.getState();
@@ -414,18 +415,20 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     );
     return pane?.activeTabId === tab.id;
   };
-  useShortcutHandler("navigation.back", () => travel(-1), focused);
-  useShortcutHandler("navigation.forward", () => travel(1), focused);
+  useShortcutHandler("navigation.back", () => travel(-1), focused, 100);
+  useShortcutHandler("navigation.forward", () => travel(1), focused, 100);
   useShortcutHandler(
     "navigation.refresh",
     () => {
-      if (!nativeRuntime) return;
+      if (!nativeRuntime) return false;
       useBrowserRuntimeStore.getState().setLoading(tab.id, true);
       void invoke("browser_webview_reload", {
         request: { id: browserRuntimeId(tab) },
       }).catch((error: unknown) => setBrowserError(tab.id, error));
+      return true;
     },
     focused,
+    100,
   );
 
   return (

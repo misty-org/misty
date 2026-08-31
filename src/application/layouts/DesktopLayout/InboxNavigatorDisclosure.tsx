@@ -1,7 +1,6 @@
 import type { MailAccount } from "@/api/mail";
 import { useInboxStore } from "@/features/inbox";
 import { MailProviderIcon } from "@/shared/ui";
-import { useEffect } from "react";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
 type InboxProvider = "google" | "microsoft";
@@ -21,12 +20,6 @@ export function InboxNavigatorDisclosure(props: {
     : null;
   const rootProvider = activeProvider ?? fallbackProvider;
 
-  useEffect(() => {
-    if (!props.active || !activeProvider) return;
-    const inbox = useInboxStore.getState();
-    if (inbox.selectedProvider !== activeProvider) void inbox.selectProvider(activeProvider);
-  }, [activeProvider, props.active, rememberedProvider]);
-
   return (
     <NavigatorToolDisclosure
       accountId={props.accountId}
@@ -41,14 +34,12 @@ export function InboxNavigatorDisclosure(props: {
           label: "Gmail",
           icon: GmailNavigatorIcon,
           path: `${props.path}?provider=google`,
-          onSelect: () => void useInboxStore.getState().selectProvider("google"),
         },
         {
           id: "microsoft",
           label: "Outlook",
           icon: OutlookNavigatorIcon,
           path: `${props.path}?provider=microsoft`,
-          onSelect: () => void useInboxStore.getState().selectProvider("microsoft"),
         },
       ]}
     />

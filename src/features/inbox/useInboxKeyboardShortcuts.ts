@@ -15,6 +15,7 @@ export function useInboxKeyboardShortcuts(params: {
     action: { read?: boolean; archived?: boolean; starred?: boolean },
   ) => void;
   onFocusSearch: () => void;
+  enabled?: () => boolean;
 }) {
   const {
     threads,
@@ -27,10 +28,12 @@ export function useInboxKeyboardShortcuts(params: {
     onOpenCompose,
     onAction,
     onFocusSearch,
+    enabled,
   } = params;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (enabled && !enabled()) return;
       // Ignore shortcuts if inside input, textarea, or contentEditable
       const target = event.target as HTMLElement | null;
       if (
@@ -176,5 +179,6 @@ export function useInboxKeyboardShortcuts(params: {
     onOpenCompose,
     onAction,
     onFocusSearch,
+    enabled,
   ]);
 }

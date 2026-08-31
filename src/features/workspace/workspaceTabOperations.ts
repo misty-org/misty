@@ -79,7 +79,7 @@ export function canCloseWorkspaceTab(_tab: WorkspaceTab, _scopedTabs: WorkspaceT
 
 export function canCloseWorkspaceWindow(
   _workspaceWindow: WorkspaceVirtualWindow,
-  _scopedWindows: WorkspaceVirtualWindow[],
+  scopedWindows: WorkspaceVirtualWindow[],
 ): boolean {
-  return true;
+  return scopedWindows.length > 1;
 }

@@ -2,6 +2,7 @@ import { mailApi, type MailAccount, type MailThread } from "@/api/mail";
 import { ApiRequestError } from "@/api/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createInboxStore,
   resetInboxAccountState,
   selectUnifiedThreads,
   selectVisibleInboxThreads,
@@ -41,6 +42,27 @@ const accounts: MailAccount[] = [
     unread: 1,
   },
 ];
+
+it("keeps provider, folder, query, and selection state isolated per Inbox workspace", async () => {
+  const first = createInboxStore();
+  const second = createInboxStore();
+
+  await first.getState().selectProvider("google");
+  await first.getState().selectFolderKind("sent");
+  await first.getState().search("project alpha");
+  await second.getState().selectProvider("microsoft");
+
+  expect(first.getState()).toMatchObject({
+    selectedProvider: "google",
+    selectedFolderKind: "sent",
+    query: "project alpha",
+  });
+  expect(second.getState()).toMatchObject({
+    selectedProvider: "microsoft",
+    selectedFolderKind: "",
+    query: "",
+  });
+});
 
 function thread(id: string): MailThread {
   return {

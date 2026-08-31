@@ -2,7 +2,7 @@ export type MarketplaceView = "marketplace" | "installed";
 
 export type MarketplaceEntry = {
   id: string;
-  kind?: "extension" | "builtin";
+  kind?: "app" | "extension" | "builtin";
   name: string;
   version: string;
   author: string;

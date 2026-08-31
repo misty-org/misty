@@ -15,6 +15,7 @@ function ShortcutHarness(props: {
   onOpenCompose: (mode?: any) => void;
   onAction: (thread: InboxThread, action: any) => void;
   onFocusSearch: () => void;
+  enabled?: () => boolean;
 }) {
   useInboxKeyboardShortcuts(props);
   return <div>Shortcut test harness</div>;
@@ -95,6 +96,37 @@ describe("useInboxKeyboardShortcuts", () => {
     // Press k to go back
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "k" }));
     expect(onOpenThread).toHaveBeenCalledWith(thread2);
+  });
+
+  it("ignores every shortcut when its Inbox pane is not focused", async () => {
+    const onOpenThread = vi.fn();
+    const onOpenCompose = vi.fn();
+    const onFocusSearch = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ShortcutHarness
+          threads={[thread1, thread2]}
+          selectedThread={thread1}
+          selectedThreadKey={thread1.key}
+          isComposerOpen={false}
+          messageVisible={false}
+          onOpenThread={onOpenThread}
+          onCloseThread={vi.fn()}
+          onOpenCompose={onOpenCompose}
+          onAction={vi.fn()}
+          onFocusSearch={onFocusSearch}
+          enabled={() => false}
+        />,
+      );
+    });
+
+    for (const key of ["j", "c", "/"]) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    }
+    expect(onOpenThread).not.toHaveBeenCalled();
+    expect(onOpenCompose).not.toHaveBeenCalled();
+    expect(onFocusSearch).not.toHaveBeenCalled();
   });
 
   it("triggers archive, star, mark read, and compose shortcuts", async () => {

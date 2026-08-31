@@ -1,6 +1,7 @@
 import type { Monitor } from "@tauri-apps/api/window";
 
 const savedPetPositionKey = "misty.desktop-pet.position.v2";
+const savedPanelSizeKey = "misty.desktop-panel.size.v1";
 export const petSize = 164;
 
 export type PetPosition = { x: number; y: number };
@@ -24,6 +25,23 @@ export function readSavedPetPosition(): PetPosition | null {
 
 export function savePetPosition(position: PetPosition) {
   window.localStorage.setItem(savedPetPositionKey, JSON.stringify(position));
+}
+
+export function readSavedPanelSize(): SurfaceSize | null {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(savedPanelSizeKey) ?? "null") as {
+      width?: number;
+      height?: number;
+    } | null;
+    if (!parsed || !Number.isFinite(parsed.width) || !Number.isFinite(parsed.height)) return null;
+    return { width: parsed.width!, height: parsed.height! };
+  } catch {
+    return null;
+  }
+}
+
+export function savePanelSize(size: SurfaceSize) {
+  window.localStorage.setItem(savedPanelSizeKey, JSON.stringify(size));
 }
 
 export function safePetPosition(

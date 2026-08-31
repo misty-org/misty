@@ -1,5 +1,6 @@
 import { routes } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
+import { extensionAppRoute, useInstalledApps } from "@/features/extensions";
 import {
   preferredMistySpace,
   rememberedJournalRoute,
@@ -14,7 +15,9 @@ import {
   navigatorAppIdsForAccount,
   useNavigatorAppsStore,
   useWorkspaceStore,
+  dockWidgetRegistry,
   type NavigatorAppId,
+  type WorkspaceGroupKey,
   type WorkspaceSurfaceId,
 } from "@/features/workspace";
 import {
@@ -24,16 +27,18 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  cn,
 } from "@/shared/ui";
-import { Plus, type LucideIcon } from "lucide-react";
+import { Blocks, Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface NewTabOption {
-  appId: NavigatorAppId;
+  appId?: NavigatorAppId;
   surfaceId: WorkspaceSurfaceId;
   label: string;
   route: string;
   icon: LucideIcon;
+  groupKey?: WorkspaceGroupKey;
   instancePolicy?: "single" | "multiple";
 }
 
@@ -46,13 +51,17 @@ export function createNewTabOptions({
 } = {}): NewTabOption[] {
   return NAVIGATOR_APP_IDS.map((appId) => {
     const app = WORKSPACE_TOOLS_META[appId];
+    const route = newTabRoute(appId, spaceId, accountId);
     return {
       appId,
       surfaceId: app.surfaceId,
       label: app.label,
-      route: newTabRoute(appId, spaceId, accountId),
+      route,
       icon: app.icon,
-      instancePolicy: "multiple" as const,
+      instancePolicy:
+        dockWidgetRegistry.get(app.surfaceId).instancePolicy === "singleton"
+          ? "single"
+          : "multiple",
     };
   });
 }
@@ -74,6 +83,7 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   );
   const spaces = useSpacesStore((state) => state.spaces);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+  const installedApps = useInstalledApps();
   const scopedSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
   const activeSpaceId =
     spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredMistySpace(spaces)?.id;
@@ -84,11 +94,20 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
         option,
       ]),
     );
-    return enabledAppIds.flatMap((appId) => {
+    const enabledApps = enabledAppIds.flatMap((appId) => {
       const option = optionsById.get(appId);
       return option ? [option] : [];
     });
-  }, [accountId, activeSpaceId, enabledAppIds]);
+    const installed = installedApps.map((app): NewTabOption => ({
+      surfaceId: "extension",
+      label: app.name,
+      route: extensionAppRoute(app.id, { title: app.name }),
+      icon: Blocks,
+      groupKey: `app:${app.id}`,
+      instancePolicy: "multiple",
+    }));
+    return [...enabledApps, ...installed];
+  }, [accountId, activeSpaceId, enabledAppIds, installedApps]);
 
   useEffect(() => {
     const openPicker = (event: Event) => {
@@ -103,7 +122,11 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="grid size-7 place-items-center rounded text-cream-muted outline-none hover:bg-charcoal-card hover:text-cream focus:outline-none"
+          className={cn(
+            "grid size-7 place-items-center rounded text-cream-muted outline-none",
+            "hover:bg-charcoal-card hover:text-cream focus:outline-none",
+            "focus-visible:ring-1 focus-visible:ring-cream-muted",
+          )}
           aria-label="New tab"
           title="New tab"
         >
@@ -140,9 +163,14 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
 }
 
 function NewTabMenuItem(props: { option: NewTabOption; onSelect: () => void }) {
+  const Icon = props.option.icon;
   return (
     <DropdownMenuItem onSelect={props.onSelect} className="h-8 min-w-0 gap-2 px-2 text-[13px]">
-      <WorkspaceAppIcon appId={props.option.appId} size="picker" />
+      {props.option.appId ? (
+        <WorkspaceAppIcon appId={props.option.appId} size="picker" />
+      ) : (
+        <Icon aria-hidden="true" className="size-[18px] shrink-0" strokeWidth={1.8} />
+      )}
       <span className="truncate">{props.option.label}</span>
     </DropdownMenuItem>
   );

@@ -11,7 +11,7 @@ const appPageTitles = new Map<string, string>([
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],
   [routes.transfers, "Misty - Transfers"],
-  [routes.marketplace, "Misty - Marketplace"],
+  [routes.store, "Misty - Store"],
   [routes.changelog, "Misty - Changelog"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
