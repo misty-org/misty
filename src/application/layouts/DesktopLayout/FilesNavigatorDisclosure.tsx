@@ -22,7 +22,11 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ExplorerDestinationIcon, TransfersDestinationIcon } from "./NavigatorDestinationIcons";
-import { navigatorFocusRingClass, navigatorSubsectionIconClass } from "./styles";
+import {
+  navigatorFocusRingClass,
+  navigatorPrimaryRowLayoutClass,
+  navigatorSubsectionIconClass,
+} from "./styles";
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 type FilesDestinationId = "explorer" | "transfers";
@@ -61,14 +65,15 @@ export function FilesNavigatorDisclosure(props: {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="grid gap-1"
+      className="grid w-full min-w-0 gap-1"
       data-files-disclosure="true"
     >
       <CollapsibleTrigger asChild>
         <button
           type="button"
           className={cn(
-            "misty-navigator-row-target group/toggle flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
+            "misty-navigator-row-target group/toggle box-border h-9 w-full rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
+            navigatorPrimaryRowLayoutClass,
             "hover:bg-charcoal-card hover:text-cream-bright",
             navigatorFocusRingClass,
           )}

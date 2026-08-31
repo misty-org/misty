@@ -71,8 +71,6 @@ export const extensionCatalogApi = {
     }
     throw new Error(`Could not load ${label}: ${lastStatus}`);
   },
-  checksumText: (artifactUrl: string) =>
-    readText(`${artifactUrl}.sha256`, "published extension checksum"),
 };
 
 async function readText(url: string, label: string): Promise<string> {

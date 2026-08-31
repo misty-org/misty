@@ -24,6 +24,7 @@ export * from "./label";
 export * from "./mail-provider-icon";
 export { IconButton } from "./outlined-icon-button";
 export type { IconButtonProps } from "./outlined-icon-button";
+export * from "./overflow-fade-text";
 export * from "./popover";
 export * from "./portal";
 export * from "./progress";

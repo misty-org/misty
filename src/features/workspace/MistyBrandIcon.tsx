@@ -1,7 +1,5 @@
-import { runtimeAssetReference } from "@/shared/platform/runtimeAsset";
+import mistyLogo from "@/assets/branding/misty-white.png";
 import { AssetIcon, cn } from "@/shared/ui";
-
-const mistyLogo = runtimeAssetReference("logos/misty-white.png");
 
 export function MistyBrandIcon(props: {
   className?: string;

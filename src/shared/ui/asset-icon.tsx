@@ -1,4 +1,3 @@
-import { resolveRuntimeAssetReference, runtimeAssetPath } from "@/shared/platform/runtimeAsset";
 import {
   BadgeCheck,
   CheckCircle2,
@@ -18,37 +17,17 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 const assetIconBaseClass = "inline-block shrink-0 align-[-0.125em]";
 
-const emptyAssetEnvironment: AssetEnvironment = {
-  getSnapshot: () => undefined,
-  subscribe: () => () => undefined,
-};
-let assetEnvironment = emptyAssetEnvironment;
-
-export function configureAssetIconEnvironment(environment: AssetEnvironment): void {
-  assetEnvironment = environment;
-}
-
 export function AssetIcon(props: AssetIconProps) {
   const size = props.size ?? 16;
-  const assetsDir = useSyncExternalStore(
-    assetEnvironment.subscribe,
-    assetEnvironment.getSnapshot,
-    assetEnvironment.getSnapshot,
-  );
-  const source = resolveRuntimeAssetReference(props.src, assetsDir);
-  const runtimePath = runtimeAssetPath(props.src);
-  const [available, setAvailable] = useState(() => runtimePath === null && Boolean(source));
-  const Fallback = fallbackIcon(runtimePath);
+  const source = props.src;
+  const [available, setAvailable] = useState(Boolean(source));
+  const Fallback = fallbackIcon(source);
 
   useEffect(() => {
-    if (runtimePath === null) {
-      setAvailable(Boolean(source));
-      return;
-    }
     if (!source) {
       setAvailable(false);
       return;
@@ -61,7 +40,7 @@ export function AssetIcon(props: AssetIconProps) {
     return () => {
       active = false;
     };
-  }, [runtimePath, source]);
+  }, [source]);
 
   const className = `${assetIconBaseClass}${props.className ? ` ${props.className}` : ""}`;
   if (!available) {
@@ -138,9 +117,4 @@ export interface AssetIconProps {
 export interface MaskIconStyle extends CSSProperties {
   WebkitMask: string;
   mask: string;
-}
-
-export interface AssetEnvironment {
-  subscribe: (listener: () => void) => () => void;
-  getSnapshot: () => string | undefined;
 }

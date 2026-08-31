@@ -215,7 +215,8 @@ describe("GlobalNavigator Space tools", () => {
     expect(switcher?.className).toContain("w-full");
     const activeSpaceName = switcher?.querySelector('[data-active-space-name="true"]');
     expect(activeSpaceName?.className).toContain("overflow-hidden");
-    expect(activeSpaceName?.className).toContain("mask-image");
+    expect(activeSpaceName?.className).not.toContain("mask-image");
+    expect(activeSpaceName?.getAttribute("data-text-overflowing")).toBe("false");
     expect(activeSpaceName?.className).not.toContain("truncate");
     expect(activeSpaceName?.getAttribute("title")).toBe("Family");
     expect(
@@ -428,7 +429,8 @@ describe("GlobalNavigator Space tools", () => {
     expect(actions?.className).not.toContain("opacity-0");
     const spaceName = menu?.querySelector('[data-space-name="space-1"]');
     expect(spaceName?.className).toContain("overflow-hidden");
-    expect(spaceName?.className).toContain("mask-image");
+    expect(spaceName?.className).not.toContain("mask-image");
+    expect(spaceName?.getAttribute("data-text-overflowing")).toBe("false");
     expect(spaceName?.getAttribute("title")).toBe("Family");
     expect(spaceName?.closest('[role="menuitem"]')?.className).toContain("pr-[94px]");
     expect(menu?.className).toContain("w-[304px]");

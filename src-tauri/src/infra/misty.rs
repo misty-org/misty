@@ -546,6 +546,51 @@ pub fn scan_local_plugins() -> Result<Vec<LocalPluginRecord>, String> {
 
 #[cfg(desktop)]
 #[tauri::command]
+pub async fn fetch_plugin_bundle_checksum(url: String) -> Result<String, String> {
+    validate_plugin_bundle_url(&url)?;
+
+    let checksum_url = format!("{url}.sha256");
+    let client = reqwest::Client::new();
+    let text = authed_get(&client, &checksum_url)
+        .send()
+        .await
+        .map_err(|error| format!("Could not download app checksum: {error}"))?
+        .error_for_status()
+        .map_err(|error| format!("App checksum download failed: {error}"))?
+        .text()
+        .await
+        .map_err(|error| format!("Could not read app checksum: {error}"))?;
+
+    parse_plugin_bundle_checksum(&text)
+}
+
+fn validate_plugin_bundle_url(url: &str) -> Result<(), String> {
+    if url.trim().is_empty() {
+        return Err("App artifact URL is required.".to_string());
+    }
+    if !url.starts_with("https://") {
+        return Err("App artifact URL must use HTTPS.".to_string());
+    }
+    if !url.to_ascii_lowercase().ends_with(".zip") {
+        return Err("App install currently expects a .zip bundle.".to_string());
+    }
+    Ok(())
+}
+
+fn parse_plugin_bundle_checksum(text: &str) -> Result<String, String> {
+    let checksum = text
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if checksum.len() != 64 || !checksum.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("Published app checksum is invalid.".to_string());
+    }
+    Ok(checksum)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 pub async fn install_plugin_bundle(
     plugin_id: String,
     root: String,
@@ -564,15 +609,7 @@ pub async fn install_plugin_bundle(
     if !matches!(root.as_str(), "public" | "private") {
         return Err(format!("Unsupported app root: {root}"));
     }
-    if url.trim().is_empty() {
-        return Err("App artifact URL is required.".to_string());
-    }
-    if !url.starts_with("https://") {
-        return Err("App artifact URL must use HTTPS.".to_string());
-    }
-    if !url.to_ascii_lowercase().ends_with(".zip") {
-        return Err("App install currently expects a .zip bundle.".to_string());
-    }
+    validate_plugin_bundle_url(&url)?;
     if platform
         .as_deref()
         .is_some_and(|value| value.trim().is_empty())
@@ -1957,6 +1994,23 @@ mod tests {
             .unwrap(),
         )
         .expect("manifest should be written");
+    }
+
+    #[test]
+    fn plugin_bundle_checksum_parses_standard_sidecar_format() {
+        let checksum = "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
+
+        assert_eq!(
+            parse_plugin_bundle_checksum(&format!("{checksum}  storage_report.zip\n")),
+            Ok(checksum.to_ascii_lowercase())
+        );
+    }
+
+    #[test]
+    fn plugin_bundle_checksum_rejects_missing_or_malformed_digests() {
+        assert!(parse_plugin_bundle_checksum("").is_err());
+        assert!(parse_plugin_bundle_checksum("abc  storage_report.zip").is_err());
+        assert!(parse_plugin_bundle_checksum(&"g".repeat(64)).is_err());
     }
 
     #[test]

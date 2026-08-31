@@ -5,7 +5,7 @@ export const navigationTreeRowClass =
   "group/tree-row relative ml-6 mr-2 flex h-7 items-center text-[13px]";
 export const navigationTreeBranchClass = "-left-2";
 export const navigationTreeContentInsetClass = "pl-1 pr-2.5";
-export const navigationTreeSurfaceClass = `ml-1 flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-md transition-colors ${navigationTreeContentInsetClass}`;
+export const navigationTreeSurfaceClass = `ml-1 grid h-full min-w-0 flex-1 grid-cols-[24px_minmax(0,1fr)] items-center gap-2.5 rounded-md transition-colors ${navigationTreeContentInsetClass}`;
 export const navigationTreeIconClass = "grid size-6 shrink-0 place-items-center";
 export const navigationTreeItemIconClass = "!size-5 overflow-visible";
 export const navigationDisclosureLabelClass = "flex min-w-0 items-center gap-1";

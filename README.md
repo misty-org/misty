@@ -94,7 +94,7 @@ misty desktop dev --profile owner
 misty desktop dev --profile collaborator
 ```
 
-Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/.profiles/<profile>` for profile-scoped session metadata, while Misty's normal files, assets, remotes, cache, and database stay rooted in `~/.misty`.
+Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/cli/profiles/<profile>` for development-only session metadata, while Misty's normal files, notes, cache, and database stay rooted in `~/.misty`.
 
 The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
 

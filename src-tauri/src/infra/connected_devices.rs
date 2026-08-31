@@ -204,15 +204,6 @@ impl ConnectedDevicesService {
         &self,
         request: InitializeConnectedDevicesRequest,
     ) -> ApiResult<ConnectedDevicesSnapshot> {
-        if !connected_devices_feature_enabled() {
-            return Ok(ConnectedDevicesSnapshot {
-                unavailable_reason: Some(
-                    "Connected Devices is not enabled for this build.".to_owned(),
-                ),
-                relay_policy: "disabled".to_owned(),
-                ..Default::default()
-            });
-        }
         if self.state.read().map_err(lock_error)?.is_some() {
             return self.snapshot();
         }
@@ -1845,12 +1836,6 @@ fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
             "A managed Connected Devices relay is required in production.".to_owned(),
         ))
     }
-}
-
-fn connected_devices_feature_enabled() -> bool {
-    cfg!(debug_assertions)
-        || option_env!("MISTY_CONNECTED_DEVICES_ENABLED")
-            .is_some_and(|value| value == "true" || value == "1")
 }
 
 fn peer_error(error: PeerError) -> ApiError {

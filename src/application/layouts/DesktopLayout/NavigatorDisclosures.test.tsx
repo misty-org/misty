@@ -357,6 +357,9 @@ describe("GlobalNavigator disclosures", () => {
     const socialDestinations = container.querySelector(
       '[role="group"][aria-label="Social destinations"]',
     );
+    const socialDisclosure = socialDestinations?.closest('[data-navigator-disclosure="social"]');
+    expect(socialDisclosure?.className).toContain("w-full");
+    expect(socialDisclosure?.className).toContain("min-w-0");
     const socialItems = [...(socialDestinations?.querySelectorAll<HTMLAnchorElement>("a") ?? [])];
     expect(socialItems.map((item) => item.textContent?.trim())).toEqual([
       "Misty",
@@ -371,6 +374,13 @@ describe("GlobalNavigator disclosures", () => {
     expect(
       socialItems.every((item) =>
         item.querySelector('[data-tree-row-surface="true"]')?.className.includes("ml-1"),
+      ),
+    ).toBe(true);
+    expect(
+      socialItems.every((item) =>
+        item
+          .querySelector('[data-tree-row-surface="true"]')
+          ?.className.includes("grid-cols-[24px_minmax(0,1fr)]"),
       ),
     ).toBe(true);
     expect(
@@ -498,6 +508,8 @@ describe("GlobalNavigator disclosures", () => {
     );
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     const triggerClasses = trigger?.className.split(/\s+/) ?? [];
+    expect(triggerClasses).toContain("box-border");
+    expect(triggerClasses).toContain("grid-cols-[28px_minmax(0,1fr)]");
     expect(triggerClasses).not.toContain("hover:bg-charcoal-active");
     expect(triggerClasses).not.toContain("hover:text-cream");
 

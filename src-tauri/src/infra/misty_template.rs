@@ -79,17 +79,6 @@ impl MistyTemplatePlan {
         self
     }
 
-    fn optional_file(mut self, home: &Path, relative_path: &str) -> Self {
-        let relative_path = normalize_template_path(relative_path);
-        self.entries.push(MistyTemplateEntry {
-            source_path: Some(home.join(&relative_path)),
-            relative_path,
-            kind: MistyTemplateEntryKind::File,
-            required: false,
-        });
-        self
-    }
-
     fn tree(mut self, home: &Path, relative_path: &str) -> Self {
         let relative_path = normalize_template_path(relative_path);
         let root = home.join(&relative_path);
@@ -325,20 +314,15 @@ fn misty_template_plan(home: &Path) -> MistyTemplatePlan {
         .dir(".local")
         .dir(".local/bin")
         .file(home, ".local/bin/misty")
-        .dir("local")
-        .dir("local/bin")
-        .dir("local/plugins")
-        .tree(home, "assets")
-        .tree(home, "scripts")
+        .dir("notes")
         .tree(home, "plugins/public")
         .dir("plugins/private")
-        .dir("public")
-        .dir("public/plugins")
-        .dir("public/keys")
+        .dir("cloud")
         .dir("config")
+        .dir("config/automations")
+        .dir("config/automations/v1")
         .dir("config/sessions")
         .dir("db")
-        .dir("forms")
         .dir("restic")
         .dir("restic/passwords")
         .dir("tmp")
@@ -566,22 +550,36 @@ mod tests {
     }
 
     #[test]
-    fn template_plan_discovers_assets_from_tree_calls() {
+    fn template_plan_excludes_legacy_runtime_assets() {
         let home = temp_home();
         fs::create_dir_all(home.join("assets/themes")).unwrap();
         fs::write(home.join("assets/themes/default.css"), "theme").unwrap();
+        fs::create_dir_all(home.join("assets/notes/account/note")).unwrap();
+        fs::write(
+            home.join("assets/notes/account/note/private.png"),
+            "private",
+        )
+        .unwrap();
+        fs::create_dir_all(home.join("assets/logos/old")).unwrap();
+        fs::write(home.join("assets/logos/old/retired.png"), "old").unwrap();
         fs::create_dir_all(home.join(".local/bin")).unwrap();
         fs::write(home.join(".local/bin/misty"), "bin").unwrap();
 
         let entries = misty_template_plan(&home).entries;
 
-        assert!(entries.iter().any(|entry| entry.relative_path == "assets"));
-        assert!(entries
+        assert!(entries.iter().any(|entry| entry.relative_path == "notes"));
+        assert!(!entries
             .iter()
-            .any(|entry| entry.relative_path == "assets/themes/default.css"));
+            .any(|entry| entry.relative_path.starts_with("assets")));
         assert!(entries
             .iter()
             .any(|entry| entry.relative_path == ".local/bin/misty"));
+        assert!(!entries
+            .iter()
+            .any(|entry| entry.relative_path.contains("private.png")));
+        assert!(!entries
+            .iter()
+            .any(|entry| entry.relative_path.contains("retired.png")));
 
         fs::remove_dir_all(home).ok();
     }
@@ -591,12 +589,12 @@ mod tests {
         let home = temp_home();
         fs::create_dir_all(home.join(".local/bin")).unwrap();
         fs::write(home.join(".local/bin/misty"), "misty-bin").unwrap();
-        fs::create_dir_all(home.join("assets/themes")).unwrap();
-        fs::write(home.join("assets/themes/default.css"), "theme").unwrap();
+        fs::create_dir_all(home.join("plugins/public/example")).unwrap();
+        fs::write(home.join("plugins/public/example/plugin.json"), "{}").unwrap();
 
         build_template_archive(&home).expect("template archive should build");
         fs::remove_file(home.join(".local/bin/misty")).unwrap();
-        fs::remove_file(home.join("assets/themes/default.css")).unwrap();
+        fs::remove_file(home.join("plugins/public/example/plugin.json")).unwrap();
 
         let extracted = extract_template_archive(&home, &template_archive_path(&home))
             .expect("template should extract");
@@ -607,8 +605,8 @@ mod tests {
             "misty-bin"
         );
         assert_eq!(
-            fs::read_to_string(home.join("assets/themes/default.css")).unwrap(),
-            "theme"
+            fs::read_to_string(home.join("plugins/public/example/plugin.json")).unwrap(),
+            "{}"
         );
 
         fs::remove_dir_all(home).ok();

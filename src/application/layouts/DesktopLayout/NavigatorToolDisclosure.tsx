@@ -21,7 +21,11 @@ import {
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, type ComponentType } from "react";
 import { Link } from "react-router-dom";
-import { navigatorFocusRingClass, navigatorSubsectionIconClass } from "./styles";
+import {
+  navigatorFocusRingClass,
+  navigatorPrimaryRowLayoutClass,
+  navigatorSubsectionIconClass,
+} from "./styles";
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 type DestinationIcon = LucideIcon | ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -56,14 +60,15 @@ export function NavigatorToolDisclosure(props: {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="grid gap-1"
+      className="grid w-full min-w-0 gap-1"
       data-navigator-disclosure={props.appId}
     >
       <CollapsibleTrigger asChild>
         <button
           type="button"
           className={cn(
-            "misty-navigator-row-target group/toggle flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
+            "misty-navigator-row-target group/toggle box-border h-9 w-full rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
+            navigatorPrimaryRowLayoutClass,
             "hover:bg-charcoal-card hover:text-cream-bright",
             navigatorFocusRingClass,
           )}
