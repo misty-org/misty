@@ -23,7 +23,7 @@
     "Apply a preset or adjust token colors."
   ],
   "changelog": [
-    "v0.3.0 - Moved Themes into the self-contained Files extension popup with preserved editor state.",
+    "v0.3.0 - Moved Themes into the workspace app tab with preserved editor state.",
     "v0.2.0 - Added preview, apply and revert flows, persistent custom tokens, and accessible color controls.",
     "v0.1.0 - Added the first theme builder with curated presets."
   ],
@@ -47,7 +47,7 @@
     ],
     "show_in_launcher": true,
     "requires_selected_file": false,
-    "open_mode": "popup"
+    "open_mode": "tab"
   },
   "install": {
     "root": "private",

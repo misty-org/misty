@@ -54,7 +54,7 @@ export function QuickConvertPlugin({ context }: PluginPanelProps) {
   const canConvert = compatible && ffmpegAvailable === true && !jobs.running;
   const tone = jobs.job?.status === "completed" ? "success" : jobs.job?.status === "failed" ? "error" : "neutral";
   const status = jobs.job?.error ?? jobs.job?.message ?? (dependencyError || (ffmpegAvailable === false
-    ? "The bundled FFmpeg is missing or failed verification. Reinstall this extension."
+    ? "FFmpeg is unavailable. Reinstall this app or configure FFmpeg in Settings."
       : compatible ? (outputPreview ? `Ready to create ${outputPreview}.` : `Ready to convert ${context.selectedPaths.length} files.`)
       : context.selectedPaths.length ? "Select files of one supported media type." : "Select image, audio, or video files in Misty Files."));
 
@@ -70,7 +70,7 @@ export function QuickConvertPlugin({ context }: PluginPanelProps) {
   return (
     <div className="panel-stack">
       <div className="panel-title"><h2>Quick Convert</h2><p>Make compatible media copies without leaving Files.</p></div>
-      <div className="selection-card"><div><span>Selection</span><strong title={context.selectedPaths.join("\n")}>{selectionLabel}</strong></div><span className={`dependency-pill ${ffmpegAvailable ? "ready" : ""}`}>{ffmpegAvailable === null ? "Verifying FFmpeg…" : ffmpegAvailable ? "FFmpeg verified" : "Bundle unavailable"}</span></div>
+      <div className="selection-card"><div><span>Selection</span><strong title={context.selectedPaths.join("\n")}>{selectionLabel}</strong></div><span className={`dependency-pill ${ffmpegAvailable ? "ready" : ""}`}>{ffmpegAvailable === null ? "Checking FFmpeg…" : ffmpegAvailable ? "FFmpeg ready" : "FFmpeg unavailable"}</span></div>
       <div className="control-grid">
         <Field label="Output format"><select className="select-input" value={effectiveFormat} onChange={(event) => setFormat(event.target.value)} disabled={!compatible || jobs.running}>{availablePresets.length ? availablePresets.map((item) => <option key={item} value={item}>{item.toUpperCase()}</option>) : <option value="">No compatible formats</option>}</select></Field>
         <Field label="Quality"><select className="select-input" value={quality} onChange={(event) => setQuality(event.target.value)} disabled={!compatible || jobs.running}><option value="small">Smaller file</option><option value="balanced">Balanced</option><option value="high">High quality</option></select></Field>
