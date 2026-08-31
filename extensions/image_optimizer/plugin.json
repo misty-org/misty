@@ -1,10 +1,10 @@
 {
   "schema_version": 1, "id": "image_optimizer", "name": "Image Optimizer", "version": "0.3.0", "author": "Misty", "status": "installed",
   "overview": "Image Optimizer makes collision-safe optimized copies of up to 64 JPEG, PNG, or WebP images with approachable quality and size presets.",
-  "capabilities": ["Optimize up to 64 images at once", "Limit output dimensions with quality-focused presets", "Show per-file outcomes and total space saved"], "where_it_appears": ["Files extension popup"],
-  "permissions": ["Read access to selected images", "Write access beside originals or in Downloads", "Execute the verified extension-bundled FFmpeg"],
+  "capabilities": ["Optimize up to 64 images at once", "Limit output dimensions with quality-focused presets", "Show per-file outcomes and total space saved"], "where_it_appears": ["Workspace app tab from Files"],
+  "permissions": ["Read access to selected images", "Write access beside originals or in Downloads", "Execute the verified app-bundled FFmpeg"],
   "getting_started": ["Select JPEG, PNG, or WebP files in Files.", "Choose quality, maximum dimension, and destination.", "Optimize copies and reveal the outputs."],
   "changelog": ["v0.3.0 - Initial production release with source preservation, cancellation cleanup, collision-safe naming, and bundled FFmpeg."],
   "included_tools": [{"name":"FFmpeg","version":"7.1.1"},{"name":"FFprobe","version":"7.1.1"}], "links": [{"label":"Documentation","url":"https://mistysys.com/docs/extensions/image-optimizer"}], "actions": [{"label":"Open","kind":"open"}],
-  "launcher": { "views": ["Files"], "show_in_launcher": true, "requires_selected_file": true, "open_mode": "popup" }
+  "launcher": { "views": ["Files"], "show_in_launcher": true, "requires_selected_file": true, "open_mode": "tab" }
 }
