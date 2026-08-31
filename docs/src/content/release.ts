@@ -155,10 +155,10 @@ export const releasePages: DocPage[] = [
         title: "Preconditions",
         blocks: [
           list([
-            "The workspace contains all three Git repositories.",
+            "The workspace contains all five Git repositories.",
             "misty/package.json has the requested version.",
-            "app/src-tauri/Cargo.toml has the requested version.",
-            "app/src-tauri/tauri.conf.json has the requested version.",
+            "misty/src-tauri/Cargo.toml has the requested version.",
+            "misty/src-tauri/tauri.conf.json has the requested version.",
             "The Misty app repository is on main and clean.",
             "For a real start, local main equals the freshly fetched origin/main.",
             "Every required release configuration value is valid.",

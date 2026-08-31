@@ -2,7 +2,7 @@
 name = "misty"
 version = "0.1.0"
 edition = "2021"
-description = "Monorepo development and release tooling for Misty"
+description = "Multi-repository development and release tooling for Misty"
 license = "MIT"
 
 [dependencies]

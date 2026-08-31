@@ -71,6 +71,9 @@ enum EnvCommand {
 enum CheckTarget {
     App,
     Server,
+    Website,
+    Extensions,
+    Cli,
     All,
 }
 
@@ -289,9 +292,15 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         Command::Check(command) => match command.target {
             CheckTarget::App => checks::app(&settings.workspace),
             CheckTarget::Server => checks::server(&settings.workspace),
+            CheckTarget::Website => checks::website(&settings.workspace),
+            CheckTarget::Extensions => checks::extensions(&settings.workspace),
+            CheckTarget::Cli => checks::cli(&settings.workspace),
             CheckTarget::All => {
                 checks::app(&settings.workspace)?;
-                checks::server(&settings.workspace)
+                checks::server(&settings.workspace)?;
+                checks::website(&settings.workspace)?;
+                checks::extensions(&settings.workspace)?;
+                checks::cli(&settings.workspace)
             }
         },
         Command::Desktop(command) => match command.command {
@@ -514,6 +523,7 @@ fn report_repository_status(settings: &Settings) -> Result<()> {
         ("misty", &settings.workspace.misty),
         ("misty-server", &settings.workspace.server),
         ("misty-website", &settings.workspace.website),
+        ("misty-extensions", &settings.workspace.extensions),
         ("misty-cli", &settings.workspace.cli),
     ] {
         let status = crate::process::CommandSpec::new("git")
@@ -545,6 +555,10 @@ mod tests {
             vec!["misty", "env", "status", "dev"],
             vec!["misty", "check", "all"],
             vec!["misty", "check", "app"],
+            vec!["misty", "check", "server"],
+            vec!["misty", "check", "website"],
+            vec!["misty", "check", "extensions"],
+            vec!["misty", "check", "cli"],
             vec!["misty", "desktop", "dev", "--profile", "owner"],
             vec!["misty", "desktop", "build"],
             vec!["misty", "desktop", "clean", "--apply"],

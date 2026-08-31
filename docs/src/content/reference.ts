@@ -363,7 +363,7 @@ export const referencePages: DocPage[] = [
         blocks: [
           code("misty configure --workspace ~/misty-org\nmisty doctor"),
           p(
-            "Confirm the workspace contains sibling misty/, misty-server/, misty-website/, and misty-cli/ repositories. Use --workspace to diagnose another root without changing saved configuration.",
+            "Confirm the workspace contains sibling misty/, misty-server/, misty-website/, misty-extensions/, and misty-cli/ repositories. Use --workspace to diagnose another root without changing saved configuration.",
           ),
         ],
       },

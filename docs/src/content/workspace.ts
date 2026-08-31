@@ -53,7 +53,7 @@ export const workspacePages: DocPage[] = [
         title: "Expected directory layout",
         blocks: [
           code(
-            "~/misty-org/\n├── misty/          # desktop application\n├── misty-server/   # backend and Docker stack\n├── misty-website/  # public website\n└── misty-cli/      # developer CLI",
+            "~/misty-org/\n├── misty/             # desktop application\n├── misty-server/      # backend and Docker stack\n├── misty-website/     # public website\n├── misty-extensions/  # first-party extensions\n└── misty-cli/         # developer CLI",
             "Filesystem",
           ),
           p(
@@ -286,7 +286,7 @@ export const workspacePages: DocPage[] = [
     eyebrow: "Workspace",
     description:
       "Run repository-native verification locally with the same intent as lean CI.",
-    command: "misty check <app|server|all>",
+    command: "misty check <app|server|website|extensions|cli|all>",
     sections: [
       {
         id: "targets",
@@ -305,7 +305,26 @@ export const workspacePages: DocPage[] = [
                 "misty check server",
                 "Go, database, container, and Worker checks.",
               ],
-              ["Everything", "misty check all", "Runs app first, then server."],
+              [
+                "Website",
+                "misty check website",
+                "TypeScript, lint, unit tests, and production build.",
+              ],
+              [
+                "Extensions",
+                "misty check extensions",
+                "Catalog validation, tests, and production build.",
+              ],
+              [
+                "CLI",
+                "misty check cli",
+                "Rust formatting, Clippy, and locked tests.",
+              ],
+              [
+                "Everything",
+                "misty check all",
+                "Runs all five repositories in order.",
+              ],
             ],
           ),
         ],
@@ -336,6 +355,17 @@ export const workspacePages: DocPage[] = [
             "npm ci in cloudflare/journal-collab.",
             "Worker typecheck, Vitest, runtime integration tests, and production dependency audit.",
             "Agent runtime clean install, typecheck, tests, and production build.",
+          ]),
+        ],
+      },
+      {
+        id: "standalone-checks",
+        title: "Website, extensions, and CLI checks",
+        blocks: [
+          list([
+            "check website runs typecheck, lint, unit tests, and the production build from misty-website/.",
+            "check extensions validates the catalog, runs tests, and builds from misty-extensions/.",
+            "check cli runs rustfmt, Clippy with warnings denied, and locked tests from misty-cli/.",
           ]),
         ],
       },

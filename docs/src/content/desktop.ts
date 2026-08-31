@@ -288,7 +288,7 @@ export const desktopPages: DocPage[] = [
             "The command validates the ICNS header.",
             "It selects the largest supported embedded PNG variant.",
             "The local Tauri binary generates the platform icon set.",
-            "The source ICNS is copied to app/src-tauri/icons/icon.icns.",
+            "The source ICNS is copied to misty/src-tauri/icons/icon.icns.",
           ]),
           note(
             "Install dependencies first",
