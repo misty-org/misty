@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"strings"
 
@@ -11,23 +9,6 @@ import (
 	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
-
-func agentNoteWriteResult(note *db.SpaceNote, title, markdown, operation string) json.RawMessage {
-	digest := sha256.Sum256([]byte(markdown))
-	return TestingMustAPIRawJSON(struct {
-		*db.SpaceNote
-		ContentReceipt map[string]any `json:"content_receipt"`
-	}{
-		SpaceNote: note,
-		ContentReceipt: map[string]any{
-			"operation":           operation,
-			"title":               title,
-			"markdown_characters": len([]rune(markdown)),
-			"markdown_sha256":     hex.EncodeToString(digest[:]),
-			"state":               "queued_for_collaboration",
-		},
-	})
-}
 
 const (
 	toolboxNotesSearch = "notes.search"
@@ -105,7 +86,7 @@ func executeAgentNoteTool(ctx context.Context, database *db.Database, actor spac
 			return nil, true, serveragent.ErrInvalidRequest("note title and markdown are required")
 		}
 		note, err := database.CreateSpaceNoteWithAudience(ctx, actor.userID, actor.spaceID, input.Title, db.SpaceResourceAudience{Kind: db.SpaceAudienceSpace}, input.Markdown)
-		return agentNoteWriteResult(note, input.Title, input.Markdown, "create"), true, err
+		return TestingMustAPIRawJSON(note), true, err
 	case toolboxNotesUpdate:
 		var input struct {
 			ID       string `json:"id"`
@@ -132,7 +113,7 @@ func executeAgentNoteTool(ctx context.Context, database *db.Database, actor spac
 			input.Markdown = current.PlainTextProjection
 		}
 		note, err := database.UpdateSpaceNoteContent(ctx, actor.userID, input.ID, input.Title, input.Markdown)
-		return agentNoteWriteResult(note, input.Title, input.Markdown, "update"), true, err
+		return TestingMustAPIRawJSON(note), true, err
 	default:
 		return nil, false, nil
 	}
