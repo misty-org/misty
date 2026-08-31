@@ -1114,6 +1114,7 @@ mod tests {
             misty: temporary.path().join("app"),
             server: server.clone(),
             website: temporary.path().join("website"),
+            extensions: temporary.path().join("extensions"),
             cli: temporary.path().join("cli"),
         };
 

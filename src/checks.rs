@@ -76,3 +76,36 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     }
     Ok(())
 }
+
+pub fn website(workspace: &Workspace) -> Result<()> {
+    workspace.validate()?;
+    for script in ["typecheck", "lint", "test", "build"] {
+        CommandSpec::new(npm())
+            .args(["run", script])
+            .run(&workspace.website)?;
+    }
+    Ok(())
+}
+
+pub fn extensions(workspace: &Workspace) -> Result<()> {
+    workspace.validate()?;
+    for script in ["validate", "test", "build"] {
+        CommandSpec::new(npm())
+            .args(["run", script])
+            .run(&workspace.extensions)?;
+    }
+    Ok(())
+}
+
+pub fn cli(workspace: &Workspace) -> Result<()> {
+    workspace.validate()?;
+    CommandSpec::new("cargo")
+        .args(["fmt", "--all", "--", "--check"])
+        .run(&workspace.cli)?;
+    CommandSpec::new("cargo")
+        .args(["clippy", "--all-targets", "--", "-D", "warnings"])
+        .run(&workspace.cli)?;
+    CommandSpec::new("cargo")
+        .args(["test", "--all-targets", "--locked"])
+        .run(&workspace.cli)
+}

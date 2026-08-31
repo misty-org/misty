@@ -19,8 +19,8 @@ misty website dev
 ```
 
 The default workspace is `~/misty-org`, containing sibling `misty`,
-`misty-server`, `misty-website`, and `misty-cli` repositories. Configure
-another location with:
+`misty-server`, `misty-website`, `misty-extensions`, and `misty-cli`
+repositories. Configure another location with:
 
 ```sh
 misty configure --workspace /path/to/misty-org
@@ -32,6 +32,9 @@ misty configure --workspace /path/to/misty-org
 misty doctor
 misty check app
 misty check server
+misty check website
+misty check extensions
+misty check cli
 misty check all
 
 misty env init dev
