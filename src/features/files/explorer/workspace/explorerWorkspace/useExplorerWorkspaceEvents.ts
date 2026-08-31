@@ -1,0 +1,233 @@
+import {
+  dockLeaves,
+  useMultiPanelStore,
+  useWorkspaceStore,
+  type MultiPanelStoreHook,
+  type MultiPanelTab,
+} from "@/features/workspace";
+import {
+  androidGrantLocalFolder,
+  androidOpenAllFilesAccessSettings,
+} from "@/features/files/native";
+import type { PluginCommandEntry } from "@/native/contracts";
+import { registerShortcutHandler, shortcutCommandsById } from "@/features/shortcuts";
+import { errorText } from "@/shared/lib/format";
+import { useCallback, useEffect, type RefObject } from "react";
+import type { NavigateFunction } from "react-router-dom";
+import type { AndroidLocalGrantRequest } from "../../model/interfaces/components/ExplorerSidebar";
+import { useExplorerStore } from "../../store";
+import { runExplorerCommand, runPluginCommand } from "../ExplorerCommands";
+import { parsePluginTabPath } from "../ExplorerDesktopPlugins";
+
+export function useLegacyPluginTabMigration(options: {
+  extensionsEnabled: boolean;
+  homePath: string;
+  navigate: NavigateFunction;
+  workspacePathSignature: string;
+  multiPanelStore?: MultiPanelStoreHook;
+}): void {
+  const { extensionsEnabled, homePath, navigate, workspacePathSignature } = options;
+  useEffect(() => {
+    if (!extensionsEnabled) return;
+    const multi = (options.multiPanelStore ?? useMultiPanelStore).getState();
+    const legacyTabs = multi.tabs
+      .map((tab) => ({ tab, plugin: parsePluginTabPath(tab.path) }))
+      .filter(
+        (
+          entry,
+        ): entry is {
+          tab: MultiPanelTab;
+          plugin: NonNullable<ReturnType<typeof parsePluginTabPath>>;
+        } => Boolean(entry.plugin),
+      );
+    if (legacyTabs.length === 0) return;
+    const activeLegacy =
+      legacyTabs.find(({ tab }) => tab.id === multi.activeTabId) ?? legacyTabs[0];
+    for (const { tab } of legacyTabs) {
+      multi.updateActiveTabPath(tab.activePaneId, homePath, "Files");
+      multi.setTabPanelVisibility(tab.id, { sidebarVisible: true, previewVisible: true });
+    }
+    const params = new URLSearchParams({ extension: activeLegacy.plugin.pluginId });
+    if (activeLegacy.plugin.selectedPath) params.set("selected", activeLegacy.plugin.selectedPath);
+    navigate(`/files?${params.toString()}`, { replace: true });
+  }, [extensionsEnabled, homePath, navigate, options.multiPanelStore, workspacePathSignature]);
+}
+
+export function useOperationErrorNotification(
+  operationError: string | null,
+  pushNotification: (
+    message: string,
+    type?: "info" | "error" | "success",
+    duration?: number,
+  ) => void,
+): void {
+  useEffect(() => {
+    if (!operationError) return;
+    const message = useExplorerStore.getState().consumeOperationError();
+    if (!message) return;
+    const recoveredWorkspace =
+      message.startsWith("Misty reset a damaged Explorer profile") ||
+      message.startsWith("Profile could not be restored");
+    pushNotification(message, recoveredWorkspace ? "info" : "error", 4500);
+  }, [operationError, pushNotification]);
+}
+
+export function useExplorerKeyboardShortcuts(options: {
+  navigate: NavigateFunction;
+  executableCommandIdsRef: RefObject<readonly string[]>;
+  pluginCommands: PluginCommandEntry[];
+  pluginCommandsRef: RefObject<PluginCommandEntry[]>;
+  multiPanelStore?: MultiPanelStoreHook;
+  workspaceId?: string;
+}): void {
+  const { navigate, executableCommandIdsRef, pluginCommands, pluginCommandsRef } = options;
+  useEffect(() => {
+    const multiPanelStore = options.multiPanelStore ?? useMultiPanelStore;
+    const enabled = () => {
+      const workspace = useWorkspaceStore.getState();
+      const pane = dockLeaves(workspace.layout.root).find(
+        (candidate) => candidate.id === workspace.layout.focusedPaneId,
+      );
+      const tab = pane?.tabs.find((candidate) => candidate.id === pane.activeTabId);
+      return options.workspaceId ? tab?.id === options.workspaceId : tab?.surfaceId === "files";
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!enabled()) return;
+      const target = event.target as HTMLElement | null;
+      const editing = target?.matches("input, textarea, select, [contenteditable='true']") ?? false;
+      const explorerState = useExplorerStore.getState();
+      const paneId = multiPanelStore.getState().activePaneId;
+      if (!paneId) return;
+      if (event.key === "Escape") {
+        explorerState.cancelInlineEdit();
+        explorerState.closeContextMenu();
+        return;
+      }
+      if (editing) return;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    const run = (commandId: string) => {
+      const paneId = multiPanelStore.getState().activePaneId;
+      if (!paneId) return;
+      const pluginCommand = pluginCommandsRef.current.find((command) => command.id === commandId);
+      if (pluginCommand) void runPluginCommand(pluginCommand, paneId, navigate);
+      else runExplorerCommand(commandId, paneId, navigate);
+    };
+    const commandIds = [
+      ...executableCommandIdsRef.current,
+      ...pluginCommands.map((command) => command.id),
+    ].filter((commandId) => shortcutCommandsById.has(commandId));
+    const unregister = commandIds.map((commandId) =>
+      registerShortcutHandler(commandId, () => run(commandId), enabled),
+    );
+    unregister.push(
+      registerShortcutHandler(
+        "navigation.back",
+        () => {
+          const paneId = multiPanelStore.getState().activePaneId;
+          if (!paneId || !useExplorerStore.getState().panes[paneId]?.backHistory.length)
+            return false;
+          void useExplorerStore.getState().navigateBack(paneId);
+          return true;
+        },
+        enabled,
+        100,
+      ),
+      registerShortcutHandler(
+        "navigation.forward",
+        () => {
+          const paneId = multiPanelStore.getState().activePaneId;
+          if (!paneId || !useExplorerStore.getState().panes[paneId]?.forwardHistory.length)
+            return false;
+          void useExplorerStore.getState().navigateForward(paneId);
+          return true;
+        },
+        enabled,
+        100,
+      ),
+    );
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      unregister.forEach((remove) => remove());
+    };
+  }, [
+    executableCommandIdsRef,
+    navigate,
+    options.multiPanelStore,
+    options.workspaceId,
+    pluginCommands,
+    pluginCommandsRef,
+  ]);
+}
+
+export function useAndroidLocalFolderGrant(options: {
+  homePath: string;
+  multiPanelStore?: MultiPanelStoreHook;
+  refreshAndroidAllFilesAccess: () => Promise<{
+    granted: boolean;
+    storageRoot?: string | null;
+  } | null>;
+  refreshAndroidGrantedFolders: () => Promise<unknown>;
+}): (request?: AndroidLocalGrantRequest) => void {
+  const { homePath, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders } = options;
+  return useCallback(
+    (request?: AndroidLocalGrantRequest) => {
+      void (async () => {
+        const currentStatus = await refreshAndroidAllFilesAccess();
+        if (!currentStatus?.granted) {
+          try {
+            await androidOpenAllFilesAccessSettings();
+            useExplorerStore
+              .getState()
+              .pushNotification(
+                "Enable All files access for Misty, then return to continue browsing local files.",
+                "info",
+              );
+          } catch (error) {
+            useExplorerStore
+              .getState()
+              .pushNotification(
+                `Could not open Android storage settings: ${errorText(error)}`,
+                "error",
+              );
+          }
+          return;
+        }
+        const storageRoot = currentStatus.storageRoot?.replace(/\/+$/, "");
+        if (storageRoot) {
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
+          const targetPath = request?.initialDirectory
+            ? `${storageRoot}/${request.initialDirectory.replace(/^\/+|\/+$/g, "")}`
+            : storageRoot;
+          if (paneId) await useExplorerStore.getState().navigatePane(paneId, targetPath);
+          return;
+        }
+        if (request?.grantedPath) {
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
+          if (paneId) await useExplorerStore.getState().navigatePane(paneId, request.grantedPath);
+          return;
+        }
+        try {
+          const folder = await androidGrantLocalFolder({
+            initialDirectory: request?.initialDirectory,
+          });
+          await refreshAndroidGrantedFolders();
+          const paneId = (options.multiPanelStore ?? useMultiPanelStore).getState().activePaneId;
+          if (paneId)
+            await useExplorerStore.getState().navigatePane(paneId, folder.path || homePath);
+          useExplorerStore
+            .getState()
+            .pushNotification(`Added local folder ${folder.name}`, "success");
+        } catch (error) {
+          const message = errorText(error);
+          if (!/cancel/i.test(message)) {
+            useExplorerStore
+              .getState()
+              .pushNotification(`Could not add local folder: ${message}`, "error");
+          }
+        }
+      })();
+    },
+    [homePath, options.multiPanelStore, refreshAndroidAllFilesAccess, refreshAndroidGrantedFolders],
+  );
+}

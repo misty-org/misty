@@ -51,13 +51,13 @@ jobs:
         run: npm ci
 
       - name: Check browser frontend
-        run: npm run typecheck --workspace @misty/app
+        run: npm run typecheck
 
       - name: Test browser frontend
-        run: npm test --workspace @misty/app -- src/features/browser/BrowserWorkspace.test.ts src/features/agents/worker.test.ts
+        run: npm test -- src/features/browser/BrowserWorkspace.test.ts src/features/agents/worker.test.ts
 
       - name: Compile native desktop
-        run: cargo check --manifest-path app/src-tauri/Cargo.toml --lib
+        run: cargo check --manifest-path src-tauri/Cargo.toml --lib
 
       - name: Test native desktop
-        run: cargo test --manifest-path app/src-tauri/Cargo.toml --lib
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
