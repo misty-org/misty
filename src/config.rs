@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::workspace::Workspace;
+use crate::{artifacts::write_private, workspace::Workspace};
 
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -39,12 +39,17 @@ impl Settings {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)
                 .with_context(|| format!("could not create {}", parent.display()))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                    .with_context(|| format!("could not secure {}", parent.display()))?;
+            }
         }
         let contents = toml::to_string_pretty(&StoredSettings {
             workspace_root: Some(root.to_path_buf()),
         })?;
-        fs::write(&path, contents)
-            .with_context(|| format!("could not write {}", path.display()))?;
+        write_private(&path, contents.as_bytes())?;
         Ok(path)
     }
 }
@@ -94,36 +99,53 @@ fn copy_legacy_value(old_name: &str, new_name: &str) {
 }
 
 fn read_stored_settings() -> Result<StoredSettings> {
+    let current = settings_path()?;
     for path in settings_paths()? {
         if !path.is_file() {
             continue;
         }
         let contents = fs::read_to_string(&path)
             .with_context(|| format!("could not read {}", path.display()))?;
-        return toml::from_str(&contents)
-            .with_context(|| format!("could not parse {}", path.display()));
+        let settings = toml::from_str(&contents)
+            .with_context(|| format!("could not parse {}", path.display()))?;
+        if path != current && !current.exists() {
+            if let Some(parent) = current.parent() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("could not create {}", parent.display()))?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                        .with_context(|| format!("could not secure {}", parent.display()))?;
+                }
+            }
+            write_private(&current, contents.as_bytes())?;
+        }
+        return Ok(settings);
     }
     Ok(StoredSettings::default())
 }
 
 fn settings_path() -> Result<PathBuf> {
-    let root =
-        dirs::config_dir().context("could not locate the platform configuration directory")?;
-    Ok(root.join("misty").join("cli.toml"))
+    Ok(settings_path_for(&crate::home::default_root()?))
 }
 
-fn settings_paths() -> Result<[PathBuf; 3]> {
+fn settings_path_for(home: &Path) -> PathBuf {
+    home.join("cli").join("config.toml")
+}
+
+fn settings_paths() -> Result<Vec<PathBuf>> {
     let current = settings_path()?;
-    let root = current
-        .parent()
-        .and_then(Path::parent)
-        .context("could not locate the platform configuration directory")?
-        .to_path_buf();
-    Ok([
-        current,
-        root.join("mcli").join("config.toml"),
-        root.join("misty-cli").join("config.toml"),
-    ])
+    let mut paths = vec![current];
+    if let Some(root) = dirs::config_dir() {
+        paths.extend([
+            root.join("misty").join("cli.toml"),
+            root.join("mcli").join("config.toml"),
+            root.join("misty-cli").join("config.toml"),
+        ]);
+    }
+    paths.dedup();
+    Ok(paths)
 }
 
 fn default_workspace() -> PathBuf {
@@ -163,6 +185,15 @@ mod tests {
         assert_eq!(
             select_workspace(None, None, None, "home".into()),
             PathBuf::from("home")
+        );
+    }
+
+    #[test]
+    fn cli_configuration_lives_in_the_misty_home() {
+        let root = Path::new("/Users/misty/.misty");
+        assert_eq!(
+            settings_path_for(root),
+            PathBuf::from("/Users/misty/.misty/cli/config.toml")
         );
     }
 }

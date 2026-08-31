@@ -43,6 +43,10 @@ misty env status dev
 misty env check dev
 misty env check prod
 
+misty home generate
+misty home generate --destination ./portable/.misty --source ~/.misty
+misty home check
+
 misty desktop dev
 misty desktop dev --profile owner --route /spaces
 misty desktop build
@@ -71,3 +75,32 @@ misty release publish 0.2.0
 
 Run `misty --help` or add `--help` after any command group for the complete
 option reference.
+
+## Misty home
+
+Desktop Misty uses `~/.misty` on macOS, Linux, and Windows instead of Library
+or AppData. Create the current layout on a device with:
+
+```sh
+misty home generate
+misty home check
+```
+
+Generation is idempotent and never replaces existing files. To prepare a
+portable seed from an existing installation, generate into a separate path:
+
+```sh
+misty home generate \
+  --source ~/.misty \
+  --destination ./portable/.misty
+```
+
+Only cross-platform static assets and plugin web files are copied. Databases,
+credentials, note attachments, mounts, caches, logs, platform binaries, and
+release keys stay device-local. Install the platform's Misty application
+separately, then place the generated `.misty` directory in the user's home.
+
+The CLI stores its own workspace selection in `~/.misty/cli/config.toml` and
+continues to read older platform-specific config locations during migration.
+Development-only desktop profiles live under `~/.misty/cli/profiles` so they
+cannot be mistaken for production application state.

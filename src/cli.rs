@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use crate::{checks, config::Settings, desktop, environment, release, server, website};
+use crate::{checks, config::Settings, desktop, environment, home, release, server, website};
 
 #[derive(Debug, Parser)]
 #[command(name = "misty", version, about)]
@@ -20,6 +20,8 @@ enum Command {
     Doctor,
     /// Create and validate private runtime environments.
     Env(Env),
+    /// Generate and validate the cross-platform ~/.misty home.
+    Home(Home),
     Check(Check),
     Desktop(Desktop),
     /// Run the public website.
@@ -44,6 +46,31 @@ struct Check {
 struct Env {
     #[command(subcommand)]
     command: EnvCommand,
+}
+
+#[derive(Debug, Args)]
+struct Home {
+    #[command(subcommand)]
+    command: HomeCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum HomeCommand {
+    /// Create a deterministic, non-destructive Misty home directory.
+    Generate {
+        /// Exact output directory. Defaults to ~/.misty.
+        #[arg(long)]
+        destination: Option<PathBuf>,
+        /// Existing Misty home whose portable assets and plugins should be copied.
+        #[arg(long)]
+        source: Option<PathBuf>,
+    },
+    /// Validate layout, permissions, and retired paths without displaying values.
+    Check {
+        /// Exact Misty home to validate. Defaults to ~/.misty.
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -289,6 +316,13 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             EnvCommand::Check { target } => environment::check(&settings.workspace, target),
             EnvCommand::Status { target } => environment::status(&settings.workspace, target),
         },
+        Command::Home(command) => match command.command {
+            HomeCommand::Generate {
+                destination,
+                source,
+            } => home::generate(destination.as_deref(), source.as_deref()),
+            HomeCommand::Check { path } => home::check(path.as_deref()),
+        },
         Command::Check(command) => match command.target {
             CheckTarget::App => checks::app(&settings.workspace),
             CheckTarget::Server => checks::server(&settings.workspace),
@@ -394,7 +428,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
 
 fn load_command_environment(command: &Command, settings: &Settings) -> Result<()> {
     let files: &[&str] = match command {
-        Command::Configure(_) | Command::Env(_) => &[],
+        Command::Configure(_) | Command::Env(_) | Command::Home(_) => &[],
         Command::Doctor | Command::Release(_) => &["common.env", "release.env"],
         Command::Desktop(desktop) => match desktop.command {
             DesktopCommand::Build => &["common.env", "release.env"],
@@ -553,6 +587,17 @@ mod tests {
             vec!["misty", "env", "migrate"],
             vec!["misty", "env", "check", "prod"],
             vec!["misty", "env", "status", "dev"],
+            vec!["misty", "home", "generate"],
+            vec![
+                "misty",
+                "home",
+                "generate",
+                "--destination",
+                "/tmp/.misty",
+                "--source",
+                "/tmp/source/.misty",
+            ],
+            vec!["misty", "home", "check"],
             vec!["misty", "check", "all"],
             vec!["misty", "check", "app"],
             vec!["misty", "check", "server"],

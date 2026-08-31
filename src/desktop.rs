@@ -50,9 +50,8 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
     if let Some(profile) = profile {
-        let profile_root = dirs::home_dir()
-            .context("could not locate home directory")?
-            .join(".misty/.profiles")
+        let profile_root = crate::home::default_root()?
+            .join("cli/profiles")
             .join(profile);
         fs::create_dir_all(&profile_root)?;
         command = command

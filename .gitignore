@@ -1,5 +1,28 @@
 .DS_Store
+
+# Local environment files, secrets, and deployment state
 .env
+.env/
+.env.*
+*.env
+.dev.vars
+.prod.vars
+.secrets/
+.wrangler/
+
+# Safe templates may be versioned intentionally.
+!.env.example
+!.env.*.example
+!*.env.example
+!*.example.env
+!example.env
+!*.env.sample
+!*.sample.env
+!sample.env
+!*.env.template
+!*.template.env
+!template.env
+
 /target/
 /docs/dist/
 /docs/node_modules/

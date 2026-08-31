@@ -258,7 +258,6 @@ const FILES: &[FileSpec] = &[
     FileSpec {
         path: "crypto/devices.env",
         names: &[
-            "MISTY_CONNECTED_DEVICES_ENABLED",
             "MISTY_DEVICE_PAIRING_PEPPER",
             "MISTY_DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS",
             "MISTY_DEVICE_TICKET_PRIVATE_KEY",
@@ -281,6 +280,8 @@ const FILES: &[FileSpec] = &[
     },
 ];
 
+const DEPRECATED_NAMES: &[&str] = &["MISTY_CONNECTED_DEVICES_ENABLED"];
+
 const PROD_REQUIRED: &[&str] = &[
     "ACTIVEPIECES_ENCRYPTION_KEY",
     "ACTIVEPIECES_JWT_SECRET",
@@ -296,6 +297,8 @@ const PROD_REQUIRED: &[&str] = &[
     "DB_PASSWORD",
     "DB_USER",
     "MISTY_API_IMAGE",
+    "MISTY_DEVICE_PAIRING_PEPPER",
+    "MISTY_DEVICE_TICKET_PRIVATE_KEY",
     "MISTY_ENVIRONMENT",
     "MISTY_OPERATOR_USER_ID",
     "MISTY_PUBLIC_API_URL",
@@ -514,6 +517,9 @@ pub fn read(workspace: &Workspace, target: Target) -> Result<BTreeMap<String, St
         for item in dotenvy::from_read_iter(contents.as_bytes()) {
             let (name, value) =
                 item.with_context(|| format!("could not parse {}", path.display()))?;
+            if DEPRECATED_NAMES.contains(&name.as_str()) {
+                continue;
+            }
             let expected = ownership
                 .get(name.as_str())
                 .with_context(|| format!("unknown environment variable {name}"))?;
@@ -575,6 +581,9 @@ fn migrate_server_file(workspace: &Workspace, target: Target) -> Result<()> {
             .trim()
             .strip_prefix("export ")
             .unwrap_or(raw_name.trim());
+        if DEPRECATED_NAMES.contains(&name) {
+            continue;
+        }
         if !seen.insert(name.to_owned()) {
             bail!("{name} is defined more than once in {}", legacy.display());
         }
