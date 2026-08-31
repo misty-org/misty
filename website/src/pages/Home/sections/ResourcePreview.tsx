@@ -50,7 +50,7 @@ function BlogPreview() {
     <section
       ref={ref}
       aria-labelledby="blog-preview-title"
-      className="reveal py-2"
+      className="reveal"
       data-resource-preview="blog"
     >
       <div className="site-container">
@@ -97,7 +97,7 @@ function ChangelogPreview() {
     <section
       ref={ref}
       aria-labelledby="changelog-preview-title"
-      className="reveal py-2"
+      className="reveal"
       data-resource-preview="changelog"
     >
       <div className="site-container">
@@ -150,7 +150,7 @@ function RoadmapPreview() {
     <section
       ref={ref}
       aria-labelledby="roadmap-preview-title"
-      className="reveal py-2"
+      className="reveal"
       data-resource-preview="roadmap"
     >
       <div className="site-container">
@@ -196,10 +196,10 @@ function RoadmapPreview() {
 
 export function ResourcePreview() {
   return (
-    <>
+    <div className="grid gap-8 py-8">
       <BlogPreview />
       <ChangelogPreview />
       <RoadmapPreview />
-    </>
+    </div>
   );
 }
