@@ -1,17 +1,10 @@
-import { useAppStore } from "@/features/app-shell";
 import { analytics } from "@/telemetry/client";
 import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
 import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { configureProviderAuthorizationLinkOpener } from "@/shared/platform/openExternalLink";
-import { configureAssetIconEnvironment } from "@/shared/ui/asset-icon";
 import ReactDOM from "react-dom/client";
 import { mistyDesktopSurface } from "@/features/desktop-pet/desktopPet";
-
-configureAssetIconEnvironment({
-  subscribe: useAppStore.subscribe,
-  getSnapshot: () => useAppStore.getState().app?.environment.assetsDir,
-});
 
 configureProviderAuthorizationLinkOpener(async (url) => {
   const { useWorkspaceStore } = await import("@/features/workspace");

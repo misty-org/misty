@@ -1,4 +1,26 @@
-**/.env*
+# Local environment files, secrets, and deployment state
+.env
+.env/
+.env.*
+*.env
+.dev.vars
+.prod.vars
+.secrets/
+.wrangler/
+
+# Safe templates may be versioned intentionally.
+!.env.example
+!.env.*.example
+!*.env.example
+!*.example.env
+!example.env
+!*.env.sample
+!*.sample.env
+!sample.env
+!*.env.template
+!*.template.env
+!template.env
+
 **/.venv
 scripts/.signing.env
 .windows-test/
@@ -44,6 +66,7 @@ proxy/dist/
 
 # Images and large binary artifacts
 *.png
+!src/assets/branding/*.png
 !src/assets/bots/cloud-folder/*.png
 *.jpg
 *.jpeg
@@ -62,6 +85,7 @@ proxy/dist/
 *.heic
 *.heif
 *.svg
+!src/assets/icons/*.svg
 !src/shared/assets/mail-providers/*.svg
 *.psd
 *.ai

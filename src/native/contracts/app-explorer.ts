@@ -33,7 +33,7 @@ export interface AppEnvironmentSnapshot {
   dbDir: string;
   cacheDir: string;
   tmpDir: string;
-  assetsDir: string;
+  notesDir: string;
   pluginsPublicDir: string;
   pluginsPrivateDir: string;
   settingsPath: string;

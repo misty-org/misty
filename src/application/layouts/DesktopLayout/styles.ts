@@ -76,6 +76,9 @@ export const navigatorFocusRingClass = [
   "focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-workspace",
 ].join(" ");
 
+export const navigatorPrimaryRowLayoutClass =
+  "grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2.5";
+
 export const navigatorSubsectionIconClass =
   "misty-navigator-subsection-icon grid size-6 shrink-0 place-items-center text-cream-bright [&_img]:!size-5 [&_svg]:!size-5";
 
@@ -95,7 +98,8 @@ export const navigatorIslandActionClass = [
 
 export function navigatorRowClass(active: boolean): string {
   return cn(
-    "misty-navigator-row-target relative flex h-9 w-full items-center justify-start gap-2.5",
+    "misty-navigator-row-target relative h-9 w-full",
+    navigatorPrimaryRowLayoutClass,
     "rounded-md border-0 bg-transparent px-2.5 text-sm text-cream-muted no-underline",
     "outline-none transition-colors",
     "hover:bg-charcoal-card hover:text-cream-bright",

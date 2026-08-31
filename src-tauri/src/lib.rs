@@ -101,6 +101,8 @@ use infra::code_workspace::{
     code_create_file, code_create_folder, code_delete_path, code_find_in_files,
     code_read_text_file, code_rename_path, code_walk_files, code_write_text_file,
 };
+#[cfg(desktop)]
+use infra::misty::fetch_plugin_bundle_checksum;
 use infra::misty::{
     check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
     install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
@@ -308,6 +310,8 @@ pub fn run() {
             stop_misty,
             #[cfg(desktop)]
             scan_local_plugins,
+            #[cfg(desktop)]
+            fetch_plugin_bundle_checksum,
             #[cfg(desktop)]
             install_plugin_bundle,
             #[cfg(desktop)]

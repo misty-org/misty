@@ -5,6 +5,7 @@ import {
   normalizeCatalogBaseUrl,
 } from "@/api/extensions/catalog";
 import { hasTauriInternals, safeTauriAssetUrl } from "@/shared/platform/tauri";
+import { invoke } from "@tauri-apps/api/core";
 import type {
   LocalPluginRecord,
   PluginArtifact,
@@ -213,13 +214,14 @@ export function defaultArtifact(
 export async function resolveArtifactChecksum(plugin: PluginEntry): Promise<string | undefined> {
   if (plugin.artifact?.sha256) return plugin.artifact.sha256;
   if (!plugin.verified || !plugin.artifact?.url) return undefined;
-  let text: string;
+  let checksum: string;
   try {
-    text = await extensionCatalogApi.checksumText(plugin.artifact.url);
+    checksum = await invoke<string>("fetch_plugin_bundle_checksum", {
+      url: plugin.artifact.url,
+    });
   } catch {
     throw new Error(`The published checksum for ${plugin.name} is unavailable.`);
   }
-  const checksum = text.trim().split(/\s+/)[0]?.toLowerCase();
   if (!/^[a-f0-9]{64}$/.test(checksum))
     throw new Error(`The published checksum for ${plugin.name} is invalid.`);
   return checksum;

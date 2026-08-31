@@ -497,8 +497,7 @@ pub async fn notes_store_asset(
     let file_name = format!("{stem}-{timestamp}{extension}");
     let directory = state
         .environment
-        .assets_dir()
-        .join("notes")
+        .notes_dir()
         .join(safe_path_segment(&request.account_id, "account"))
         .join(safe_path_segment(&request.space_id, "space"))
         .join(safe_path_segment(&request.note_id, "note"));
