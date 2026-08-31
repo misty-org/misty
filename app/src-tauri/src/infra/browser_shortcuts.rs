@@ -27,12 +27,6 @@ struct BrowserShortcutEvent {
     editable: bool,
 }
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct BrowserShortcutFocusEvent {
-    id: String,
-}
-
 pub(super) fn shortcut_token_for(state: &BrowserSessionState, id: &str) -> Result<String, String> {
     let mut tokens = state
         .shortcut_tokens
@@ -76,14 +70,6 @@ pub(super) fn forward_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
     if !trusted {
         return true;
     }
-    // The native child WebView is outside the renderer's focus tree. Focus its
-    // owning dock tab before dispatching so a shortcut can never act on a
-    // different split while native focus is still catching up.
-    let _ = app.emit_to(
-        "main",
-        "misty://browser-focus",
-        BrowserShortcutFocusEvent { id: id.to_owned() },
-    );
     let flag = |key: &str| value(key) == "true";
     let _ = app.emit_to(
         "main",

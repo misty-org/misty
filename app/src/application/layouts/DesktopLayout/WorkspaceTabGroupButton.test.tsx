@@ -3,18 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Code2, Inbox } from "lucide-react";
-import {
-  workspaceTabDropIndex,
-  WorkspaceTabGroupButton,
-  type TabGroup,
-} from "./WorkspaceTabGroupButton";
-
-it("computes grouped drop positions in pane order and adjusts for same-pane removal", () => {
-  const paneTabs = ["one", "two", "three", "four"].map((id) => ({ id }) as WorkspaceTab);
-  expect(workspaceTabDropIndex(paneTabs, "one", "four")).toBe(2);
-  expect(workspaceTabDropIndex(paneTabs, "four", "two")).toBe(1);
-  expect(workspaceTabDropIndex(paneTabs, "external", "three")).toBe(2);
-});
+import { WorkspaceTabGroupButton, type TabGroup } from "./WorkspaceTabGroupButton";
 
 describe("WorkspaceTabGroupButton", () => {
   let container: HTMLDivElement;

@@ -14,7 +14,6 @@ use serde_json::Value;
 
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
-use crate::infra::plugin_routes::plugin_app_route;
 use crate::infra::system_dependencies::resolve_executable;
 
 const REMOVED_EXTENSION_IDS: &[&str] = &["git", "preview-panel", "preview_panel", "vault"];
@@ -595,7 +594,7 @@ fn run_result_for_command(
             plugin_name: command.plugin_name.clone(),
             label: command.label,
             handled: true,
-            target_route: plugin_app_route(&command.plugin_id, &command.plugin_name, selected_path),
+            target_route: plugin_popup_route(&command.plugin_id, selected_path),
             message: format!(
                 "Opened {}{}.",
                 command.plugin_name,
@@ -717,7 +716,7 @@ fn run_native_plugin_command(
         .map(String::as_str)
         .filter(|path| !path.trim().is_empty());
     let target_route = opened_panel
-        .map(|_| plugin_app_route(&command.plugin_id, &command.plugin_name, selected_path))
+        .map(|_| plugin_popup_route(&command.plugin_id, selected_path))
         .unwrap_or_default();
     let message = notification_message.unwrap_or_else(|| {
         if let Some(panel) = opened_panel {
@@ -1022,7 +1021,10 @@ fn plugin_metadata(
     let status = plugin_metadata_field(detail, manifest, "status")
         .unwrap_or_default()
         .to_ascii_lowercase();
-    let enabled = true;
+    let enabled = manifest
+        .and_then(|value| value.get("enabled"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
     let launcher_enabled = launcher_field(detail, manifest, "show_in_launcher")
         .and_then(Value::as_bool)
         .unwrap_or(false);
@@ -2011,6 +2013,28 @@ fn plugin_panel_key(panel: &PluginPanelEntry) -> String {
     format!("{}::{}", panel.plugin_id, panel.id)
 }
 
+fn route_encode(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        let ch = byte as char;
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '~') {
+            encoded.push(ch);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
+fn plugin_popup_route(plugin_id: &str, selected_path: Option<&str>) -> String {
+    let mut route = format!("/files?extension={}", route_encode(plugin_id));
+    if let Some(selected_path) = selected_path.filter(|path| !path.trim().is_empty()) {
+        route.push_str("&selected=");
+        route.push_str(&route_encode(selected_path));
+    }
+    route
+}
+
 fn removed_extension_id(plugin_id: &str) -> bool {
     REMOVED_EXTENSION_IDS
         .iter()
@@ -2733,7 +2757,7 @@ mod tests {
     }
 
     #[test]
-    fn treats_legacy_disabled_flags_as_enabled_for_apps() {
+    fn skips_disabled_or_uninstalled_plugins() {
         let detail = serde_json::json!({
             "id": "candidate",
             "name": "Candidate",
@@ -2743,7 +2767,7 @@ mod tests {
         let manifest = serde_json::json!({ "enabled": false });
         let metadata = plugin_metadata(Path::new("/tmp/candidate"), Some(&detail), Some(&manifest));
 
-        assert!(metadata.enabled);
+        assert!(!metadata.enabled);
         assert!(!metadata.installed);
     }
 
@@ -3288,10 +3312,7 @@ mod tests {
         let result = run_result_for_command(command, Vec::new());
 
         assert!(result.handled);
-        assert_eq!(
-            result.target_route,
-            "/apps/theme%20tools?name=Theme%20Tools"
-        );
+        assert_eq!(result.target_route, "/files?extension=theme%20tools");
         assert_eq!(result.runtime_status, "opened");
     }
 
@@ -3318,7 +3339,7 @@ mod tests {
         assert!(result.handled);
         assert_eq!(
             result.target_route,
-            "/apps/theme%20tools?name=Theme%20Tools&selected=%2Ftmp%2FMy%20File.mov"
+            "/files?extension=theme%20tools&selected=%2Ftmp%2FMy%20File.mov"
         );
         assert_eq!(result.runtime_status, "opened");
     }
@@ -3471,7 +3492,7 @@ mod tests {
         let result = run_result_for_command(command, Vec::new());
 
         assert!(result.handled);
-        assert_eq!(result.target_route, "/apps/convert?name=Convert");
+        assert_eq!(result.target_route, "/files?extension=convert");
         assert_eq!(result.runtime_status, "opened");
     }
 

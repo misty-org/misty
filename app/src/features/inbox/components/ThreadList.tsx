@@ -24,7 +24,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type Ref } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { InboxThread } from "../model";
 import { ThreadRow } from "./ThreadRow";
 
@@ -72,7 +72,6 @@ export function ThreadList(props: {
   totalCount: number;
   selectedKey: string;
   query?: string;
-  searchInputRef?: Ref<HTMLInputElement>;
   loading: boolean;
   loadingMore: boolean;
   canLoadMore: boolean;
@@ -300,7 +299,6 @@ export function ThreadList(props: {
         >
           <Search className="pointer-events-none absolute left-2.5 size-3.5 text-cream-faint" />
           <Input
-            ref={props.searchInputRef}
             type="text"
             aria-label="Search mail"
             placeholder="Search mail (e.g. from:, has:attachment)..."

@@ -7,7 +7,7 @@ export const navigationTreeBranchClass = "-left-2";
 export const navigationTreeContentInsetClass = "pl-1 pr-2.5";
 export const navigationTreeSurfaceClass = `ml-1 flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-md transition-colors ${navigationTreeContentInsetClass}`;
 export const navigationTreeIconClass = "grid size-6 shrink-0 place-items-center";
-export const navigationTreeItemIconClass = "!size-5 overflow-visible";
+export const navigationTreeItemIconClass = "!size-5";
 export const navigationDisclosureLabelClass = "flex min-w-0 items-center gap-1";
 export const navigationDisclosureChevronClass = "shrink-0";
 

@@ -1,4 +1,4 @@
-import { createMultiPanelStore, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import { useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { NavigateFunction } from "react-router-dom";
@@ -8,7 +8,6 @@ import { useFilesDockWorkspace } from "./useFilesDockWorkspace";
 describe("useFilesDockWorkspace", () => {
   let container: HTMLDivElement;
   let root: Root;
-  const multiPanelStore = createMultiPanelStore({ idPrefix: "files-dock-hook-test" });
 
   beforeEach(() => {
     (
@@ -50,8 +49,6 @@ describe("useFilesDockWorkspace", () => {
         activePath: "/Users/misty/Documents",
         initialized: false,
         embedded: false,
-        homePath: "/Users/misty",
-        multiPanelStore,
         navigate,
       });
       return null;
@@ -72,8 +69,6 @@ describe("useFilesDockWorkspace", () => {
         activePath: props.activePath,
         initialized: true,
         embedded: true,
-        homePath: "/Users/misty",
-        multiPanelStore,
         navigate,
       });
       return null;

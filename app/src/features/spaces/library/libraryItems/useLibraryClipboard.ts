@@ -1,6 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceTabFocused } from "@/features/workspace";
 import type { LibrarySharedReference, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useCallback } from "react";
 import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../libraryClipboard";
@@ -9,7 +8,6 @@ import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
 /** Copying, duplicating and pasting edits across the current selection. */
 export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promise<void>) {
-  const workspaceFocused = useWorkspaceTabFocused();
   const { spaceId, canEditLibrary, canCopyLibrary, selectedItems, selectedItemId } = data;
   const { setSelectedItemIds, bulkSaving, setBulkSaving, setLocalError } = data;
   const { copiedEditDefinition, sensitiveCollectionToken } = data;
@@ -95,7 +93,7 @@ export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promis
       () => void copyItemsToClipboard(selectedItems),
       [copyItemsToClipboard, selectedItems],
     ),
-    workspaceFocused && canCopyLibrary && selectedItems.length > 0 && !selectedItemId,
+    canCopyLibrary && selectedItems.length > 0 && !selectedItemId,
   );
 
   return { copyItemsToClipboard, copySharedReferenceToClipboard, duplicateItems, pasteEdits };

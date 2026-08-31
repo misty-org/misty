@@ -1,4 +1,4 @@
-import { multiPanelStoreForPane, useMultiPanelStore } from "@/features/workspace";
+import { useMultiPanelStore } from "@/features/workspace";
 import {
   connectedDevicesSubscribeDirectory,
   explorerCalculateDirectorySizes,
@@ -51,7 +51,7 @@ export function createNavigationActions(
       const loadRequest = (async () => {
         set((state) => {
           const pane = state.panes[paneId] ?? H.emptyPaneState();
-          const multi = multiPanelStoreForPane(paneId).getState();
+          const multi = useMultiPanelStore.getState();
           const tab = multi.tabs.find((candidate) =>
             candidate.panes.some((candidatePane) => candidatePane.id === paneId),
           );
@@ -133,7 +133,7 @@ export function createNavigationActions(
             void connectedDevicesSubscribeDirectory(listing.path);
           }
           if (mode !== "replace") void get().recordLastOpenedPath(listing.path);
-          const multi = multiPanelStoreForPane(paneId).getState();
+          const multi = useMultiPanelStore.getState();
           const tab = multi.tabs.find((candidate) =>
             candidate.panes.some((pane) => pane.id === paneId),
           );

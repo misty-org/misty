@@ -1,5 +1,4 @@
 import { Button } from "@/shared/ui/button";
-import { cn } from "@/shared/ui/utils";
 import { actionLabel } from "./helpers";
 import type { MarketplaceEntry } from "./types";
 
@@ -27,7 +26,7 @@ export function MarketplacePrimaryAction({
 }) {
   return (
     <Button
-      className={cn("max-[860px]:h-11", className)}
+      className={className}
       disabled={
         busy ||
         (plugin.kind === "builtin" && !onPrimaryAction) ||

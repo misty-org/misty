@@ -38,7 +38,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   },
   installPlugin: async (plugin) => {
     if (!hasTauriInternals()) {
-      set({ error: "Installing apps is only available in the Misty app." });
+      set({ error: "Installing extensions is only available in the Misty app." });
       return;
     }
     if (!plugin.artifact?.url) {
@@ -67,7 +67,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   selectPlugin: (selectedPluginId) => set({ selectedPluginId }),
   setPluginEnabled: async (plugin, enabled) => {
     if (!hasTauriInternals()) {
-      set({ error: "Managing installed apps is only available in the Misty app." });
+      set({ error: "Managing installed extensions is only available in the Misty app." });
       return;
     }
     set({ actionPluginId: plugin.id, error: "", notice: "" });
@@ -91,7 +91,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
   },
   uninstallPlugin: async (plugin) => {
     if (!hasTauriInternals()) {
-      set({ error: "Uninstalling apps is only available in the Misty app." });
+      set({ error: "Uninstalling extensions is only available in the Misty app." });
       return;
     }
     set({ actionPluginId: plugin.id, error: "", notice: "" });

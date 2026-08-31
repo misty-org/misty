@@ -370,15 +370,14 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
   }, [activeBuffer, openFile, project]);
 
   const navigateHistory = useCallback(
-    (direction: -1 | 1): boolean => {
-      if (!codeTab || !rootPath) return false;
+    (direction: -1 | 1) => {
+      if (!codeTab || !rootPath) return;
       const target = useCodingWorkspaceStore.getState().navigateViewHistory(codeTab.id, direction);
-      if (!target) return false;
-      patchCodeState(
-        { viewport: { kind: "file", activeFilePath: target } },
-        displayFileTitle(target, rootPath, codeTab.id),
-      );
-      return true;
+      if (target)
+        patchCodeState(
+          { viewport: { kind: "file", activeFilePath: target } },
+          displayFileTitle(target, rootPath, codeTab.id),
+        );
     },
     [codeTab, patchCodeState, rootPath],
   );
@@ -582,8 +581,8 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
   );
   const displayedCommands = [...commands, ...editorCommands];
   useEffect(() => {
-    const runShortcut = (commandId: string): boolean | void => {
-      if (!codeTab) return false;
+    const runShortcut = (commandId: string) => {
+      if (!codeTab) return;
       const workspace = useWorkspaceStore.getState();
       if (commandId === "code.quick_open") setCommandMode("files");
       else if (commandId === "code.command_palette") setCommandMode("commands");
@@ -593,8 +592,8 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
       else if (commandId === "code.previous_file") previousFile();
       else if (commandId === "code.toggle_explorer") workspace.toggleSidebar(codeTab.id);
       else if (commandId === "code.toggle_terminal") toggleTerminal();
-      else if (commandId === "navigation.back") return navigateHistory(-1);
-      else if (commandId === "navigation.forward") return navigateHistory(1);
+      else if (commandId === "navigation.back") navigateHistory(-1);
+      else if (commandId === "navigation.forward") navigateHistory(1);
       else if (commandId === "code.references") openReferences();
       else if (commandId === "code.rename") startRename();
       else if (commandId === "code.code_actions") openCodeActions();
@@ -648,7 +647,7 @@ export function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
       "code.mark_4",
     ];
     const unregister = commandIds.map((commandId) =>
-      registerShortcutHandler(commandId, () => runShortcut(commandId), enabled, 100),
+      registerShortcutHandler(commandId, () => runShortcut(commandId), enabled),
     );
     return () => unregister.forEach((remove) => remove());
   }, [

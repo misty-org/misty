@@ -5,14 +5,15 @@
   "version": "0.3.0",
   "author": "Misty",
   "status": "installed",
-  "overview": "Quick Convert creates collision-safe media copies without leaving Misty. It runs only the verified FFmpeg shipped with the installed app.",
+  "overview": "Quick Convert creates collision-safe media copies without leaving Misty. It runs only the verified FFmpeg shipped with the installed extension.",
   "capabilities": [
     "Convert the currently selected file into common image, audio, and video formats",
     "Write converted copies beside the source file with predictable names",
-    "Use the pinned, app-bundled FFmpeg and FFprobe executables"
+    "Use the pinned, extension-bundled FFmpeg and FFprobe executables"
   ],
   "where_it_appears": [
-    "Workspace app tab from Files"
+    "Files panel",
+    "Quick Convert floating panel"
   ],
   "permissions": [
     "Read access to selected files",
@@ -22,10 +23,10 @@
   "getting_started": [
     "Install Quick Convert from Misty's marketplace.",
     "Select an image, audio, or video file in Files.",
-    "Open Quick Convert in a workspace tab and choose an output format."
+    "Use the Quick Convert panel to choose an output format."
   ],
   "changelog": [
-    "v0.3.0 - Added workspace-tab launch behavior, bridge readiness, and automatic job recovery.",
+    "v0.3.0 - Added popup-first launch behavior, bridge readiness, and automatic job recovery.",
     "v0.2.0 - Added secure hosted conversion jobs with quality and destination controls, cancellation, collision-safe output names, and output reveal.",
     "v0.1.0 - Added a selected-file conversion panel backed by system FFmpeg."
   ],
@@ -50,6 +51,6 @@
     "views": ["Files"],
     "show_in_launcher": true,
     "requires_selected_file": true,
-    "open_mode": "tab"
+    "open_mode": "popup"
   }
 }

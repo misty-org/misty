@@ -9,7 +9,9 @@
     "Save media into sensible local destinations"
   ],
   "where_it_appears": [
-    "Workspace app tab"
+    "Plugins panel",
+    "Global plugin launcher",
+    "Files tabs when launched from Files"
   ],
   "permissions": [
     "Network access through the verified bundled yt-dlp",
@@ -17,12 +19,12 @@
     "Shell access to invoke yt-dlp and FFmpeg"
   ],
   "getting_started": [
-    "Install the yt-dlp app from the Store. Its media tools are included.",
-    "Open it from Apps in a workspace tab.",
-    "Paste a supported media URL and review the download."
+    "Install yt-dlp and FFmpeg on the host machine.",
+    "Install the plugin from Hub.",
+    "Open it in Misty and paste a YouTube URL."
   ],
   "changelog": [
-    "v0.3.0 - Moved yt-dlp into the workspace app tab with resumable job status.",
+    "v0.3.0 - Moved yt-dlp into the self-contained Files extension popup with resumable job status.",
     "v0.2.0 - Added media inspection, playlist safeguards, cancellable download jobs, and output reveal.",
     "v0.1.0 - Added the initial yt-dlp panel."
   ],
@@ -49,7 +51,7 @@
     ],
     "show_in_launcher": true,
     "requires_selected_file": false,
-    "open_mode": "tab"
+    "open_mode": "popup"
   },
   "install": {
     "root": "private",

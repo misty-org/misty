@@ -6,7 +6,6 @@ import { SpaceLibrary } from "@/features/spaces/library";
 import { SpacePlanner } from "@/features/spaces/planner";
 import { isWebBuild } from "@/shared/platform/buildTarget";
 import { Button, DesktopAccessState, EmptyState, PermissionState } from "@/shared/ui";
-import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { SpaceSocial } from "./chat/SpaceChatEntry";
@@ -47,10 +46,6 @@ export function SpaceSectionView(props: {
     })),
   );
   const space = spaces.find((item) => item.id === spaceId);
-
-  useEffect(() => {
-    if (spaceId && user) void loadSpace(spaceId);
-  }, [loadSpace, spaceId, user]);
 
   if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
 
