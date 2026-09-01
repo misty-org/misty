@@ -79,4 +79,20 @@ describe("apiRequest", () => {
       }),
     );
   });
+
+  it("invalidates the active account when an authenticated request returns 401", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ code: "not_authenticated" }), { status: 401 }),
+    );
+    const invalidSession = vi.fn();
+    window.addEventListener("misty:account-session-invalid", invalidSession);
+
+    await expect(apiRequest("/agents")).rejects.toMatchObject({
+      name: "ApiRequestError",
+      status: 401,
+    });
+
+    expect(invalidSession).toHaveBeenCalledOnce();
+    window.removeEventListener("misty:account-session-invalid", invalidSession);
+  });
 });

@@ -32,6 +32,7 @@ import {
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { ArrowLeft, ArrowRight, Minus, Square, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet, useNavigationType } from "react-router-dom";
@@ -93,10 +94,11 @@ export function DesktopLayout(props: {
     isWindowMaximized,
     startTitlebarDrag,
     handleDesktopTitlebarPointerDown,
-    togglePseudoMaximize,
+    toggleTitlebarMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
+  const appZoom = useAppZoomValue();
   const { app: frameApp } = useDesktopFrameStyle();
   const navigationType = useNavigationType();
 
@@ -371,6 +373,12 @@ export function DesktopLayout(props: {
   }, [profileOpen, remotesOpen, settingsOpen]);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
+  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+    appZoom,
+    shouldShowWindowsControls
+      ? styles.windowsTitlebarNavigationInset
+      : styles.desktopTitlebarNavigationInset,
+  );
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(location.pathname);
   const frameClass = usesNativeWindowChrome ? styles.desktopFrameClass : styles.tabletFrameClass;
   const navbarClass = usesNativeWindowChrome ? styles.desktopNavbarClass : styles.tabletNavbarClass;
@@ -412,44 +420,63 @@ export function DesktopLayout(props: {
           className={styles.desktopTitlebarClass}
           onPointerDown={handleDesktopTitlebarPointerDown}
         >
-          {!shouldShowWindowsControls ? (
-            <div className={cn(styles.desktopTitlebarNavigationClass, "justify-start gap-1")}>
-              <NavigatorControls
-                visibility={navigatorLayout.visibility}
-                onToggleVisibility={toggleNavigatorVisibility}
-              />
-              <div
-                className="flex items-center gap-1"
-                data-misty-window-drag-block="true"
-                data-misty-desktop-navigation-history="true"
+          <div
+            className={cn(styles.desktopTitlebarNavigationClass, "justify-start gap-1")}
+            style={{
+              left: titlebarNavigationGeometry.left,
+              width: shouldShowWindowsControls
+                ? navigatorWidths[navigatorLayout.width] - styles.windowsTitlebarNavigationInset * 2
+                : undefined,
+              transform: `scale(${titlebarNavigationGeometry.scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            <NavigatorControls
+              visibility={navigatorLayout.visibility}
+              onToggleVisibility={toggleNavigatorVisibility}
+            />
+            <div
+              className="flex items-center gap-1"
+              data-misty-window-drag-block="true"
+              data-misty-desktop-navigation-history="true"
+            >
+              <button
+                type="button"
+                className={styles.desktopTitlebarNavigationButtonClass}
+                aria-label="Go back"
+                title={backTitle}
+                disabled={!canGoBack}
+                onClick={goBack}
               >
-                <button
-                  type="button"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go back"
-                  title={backTitle}
-                  disabled={!canGoBack}
-                  onClick={goBack}
-                >
-                  <ArrowLeft size={18} />
-                </button>
-                <button
-                  type="button"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go forward"
-                  title={forwardTitle}
-                  disabled={!canGoForward}
-                  onClick={goForward}
-                >
-                  <ArrowRight size={18} />
-                </button>
-              </div>
+                <ArrowLeft size={18} />
+              </button>
+              <button
+                type="button"
+                className={styles.desktopTitlebarNavigationButtonClass}
+                aria-label="Go forward"
+                title={forwardTitle}
+                disabled={!canGoForward}
+                onClick={goForward}
+              >
+                <ArrowRight size={18} />
+              </button>
             </div>
-          ) : null}
+            {shouldShowWindowsControls ? (
+              <div
+                id="misty-windows-workspace-controls"
+                className={styles.windowsWorkspaceControlsClass}
+                data-misty-window-drag-block="true"
+              />
+            ) : null}
+          </div>
           {shouldShowWindowsControls ? (
             <div
               className={styles.windowsTitlebarControlsClass}
               data-misty-window-drag-block="true"
+              style={{
+                transform: `scale(${titlebarNavigationGeometry.scale})`,
+                transformOrigin: "top right",
+              }}
             >
               <button
                 type="button"
@@ -458,16 +485,16 @@ export function DesktopLayout(props: {
                 title="Minimize"
                 onClick={minimizeTitlebarWindow}
               >
-                <Minus size={13} />
+                <Minus size={16} strokeWidth={1.5} />
               </button>
               <button
                 type="button"
                 className={styles.windowsTitlebarControlButtonClass}
                 aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                 title={isWindowMaximized ? "Restore" : "Maximize"}
-                onClick={() => void togglePseudoMaximize().catch(() => undefined)}
+                onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
               >
-                {isWindowMaximized ? <RestoreGlyph /> : <Square size={12} />}
+                {isWindowMaximized ? <RestoreGlyph /> : <Square size={13} strokeWidth={1.5} />}
               </button>
               <button
                 type="button"
@@ -476,7 +503,7 @@ export function DesktopLayout(props: {
                 title="Close"
                 onClick={closeTitlebarWindow}
               >
-                <X size={13} />
+                <X size={18} strokeWidth={1.65} />
               </button>
             </div>
           ) : null}
@@ -543,6 +570,7 @@ export function DesktopLayout(props: {
           </StandaloneRouteSurface>
         ) : (
           <WorkspaceCanvas
+            windowsTitlebarControls={shouldShowWindowsControls}
             titlebarInsets={
               usesNativeWindowChrome
                 ? {

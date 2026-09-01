@@ -110,6 +110,7 @@ const runtimeTabIds = new Map<string, string>();
 const runtimeQueues = new Map<string, Promise<void>>();
 const browserSyncStates = new Map<string, BrowserSyncState>();
 const browserWebviewSuspensions = new Set<string>();
+let browserParkGeneration = 0;
 let browserOverlayQueue = Promise.resolve();
 let browserPointerGestureActive = false;
 let browserOverlayResumeGeneration = 0;
@@ -199,6 +200,7 @@ export function requestBrowserWebviewLayoutByRuntimeId(runtimeId: string): void 
 
 export function syncBrowserWebview(input: BrowserSyncInput): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
+  browserParkGeneration += 1;
   desiredVisibleRuntimeIds.add(id);
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   const existingState = browserSyncStates.get(id);
@@ -452,6 +454,24 @@ export function hideAllBrowserWebviews(): Promise<void[]> {
     trackedHides.then(() => undefined),
     invoke<void>("browser_webviews_hide_all").catch(() => undefined),
   ]);
+}
+
+export async function parkAllBrowserWebviews(): Promise<void> {
+  const generation = ++browserParkGeneration;
+  desiredVisibleRuntimeIds.clear();
+  visibleRuntimeIds.clear();
+  createdRuntimeIds.forEach((id) => lastBounds.delete(id));
+
+  // Browser workspace cleanup may already have queued an individual hide.
+  // Let that settle, then revive each child underneath the renderer so a
+  // later Browser tab switch has no native hide/show gap.
+  await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
+  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
+  await invoke<void>("browser_webviews_park_all").catch(() => undefined);
+  if (desiredVisibleRuntimeIds.size > 0 && typeof window !== "undefined") {
+    desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
+    window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+  }
 }
 
 function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): string {

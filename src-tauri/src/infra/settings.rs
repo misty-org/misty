@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use super::settings_migration::{
-    migrate_code_workspace_settings, prune_retired_settings, SETTINGS_SCHEMA_VERSION,
+    migrate_code_workspace_settings, migrate_external_link_default, prune_retired_settings,
+    SETTINGS_SCHEMA_VERSION,
 };
 
 use crate::error::{ApiError, ApiResult};
@@ -173,6 +174,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         .and_then(Value::as_i64)
         .unwrap_or(0);
     changed |= migrate_code_workspace_settings(root, stored_version);
+    changed |= migrate_external_link_default(root, stored_version);
     if stored_version < SETTINGS_SCHEMA_VERSION {
         // Prune before backfilling, or the defaults pass would re-add keys this
         // pass is about to remove. The return value is ignored because bumping
@@ -194,7 +196,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
             ("auto_update_enabled", json!(true)),
             ("confirm_destructive_actions", json!(true)),
             ("default_file_action_index", json!(0)),
-            ("open_links_externally", json!(true)),
+            ("open_links_externally", json!(false)),
             ("preferred_workspace_root", json!("")),
             ("preferred_terminal_app", json!("System Default")),
             ("default_transfer_behavior_index", json!(0)),
@@ -639,7 +641,7 @@ mod tests {
                 .and_then(Value::as_object)
                 .and_then(|general| general.get("open_links_externally"))
                 .and_then(Value::as_bool),
-            Some(true),
+            Some(false),
         );
         assert_eq!(
             document

@@ -4,17 +4,7 @@ import materialIconTheme from "material-icon-theme/dist/material-icons.json";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const materialTheme = materialIconTheme as MaterialIconTheme;
-// Keyed by bare file name so the lookup does not depend on how Vite spells the
-// glob keys for an aliased pattern.
-const materialIconUrls = Object.fromEntries(
-  Object.entries(
-    import.meta.glob("#material-icon-theme/icons/*.svg", {
-      eager: true,
-      import: "default",
-      query: "?url",
-    }) as Record<string, string>,
-  ).map(([iconPath, url]) => [iconPath.split("/").pop() ?? iconPath, url]),
-);
+const materialIconBaseUrl = `${import.meta.env.BASE_URL}assets/material-icon-theme/`;
 
 export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "table" | "grid" }) {
   const size = props.size ?? 20;
@@ -156,7 +146,7 @@ function materialIconUrl(iconName: string | undefined): string | null {
   const definition = materialTheme.iconDefinitions[iconName];
   const fileName = definition?.iconPath?.split("/").pop();
   if (!fileName) return null;
-  return materialIconUrls[fileName] ?? null;
+  return `${materialIconBaseUrl}${encodeURIComponent(fileName)}`;
 }
 
 export type MaterialIconTheme = {

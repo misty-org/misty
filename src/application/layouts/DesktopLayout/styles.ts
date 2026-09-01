@@ -144,16 +144,20 @@ export const workStatusToastDurationMs = 3500;
 // buttons, with a gap. The dock header keeps its tabs to the right of this,
 // minus whatever width the navigator rail already covers.
 export const desktopTitlebarControlsEnd = 240;
-export const windowsTitlebarControlsEnd = 76;
+export const windowsTitlebarControlsEnd = 264;
 export const desktopTitlebarNavigationInset = 96;
+export const windowsTitlebarNavigationInset = 8;
 
-export function desktopTitlebarNavigationGeometry(appZoom: number): {
+export function desktopTitlebarNavigationGeometry(
+  appZoom: number,
+  inset = desktopTitlebarNavigationInset,
+): {
   left: number;
   scale: number;
 } {
   const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
   return {
-    left: desktopTitlebarNavigationInset / zoom,
+    left: inset / zoom,
     scale: 1 / zoom,
   };
 }
@@ -176,7 +180,7 @@ export const navigatorTitlebarStripClass =
 export const desktopWallpaperLayerClass = "hidden";
 
 export const desktopTitlebarNavigationClass =
-  "pointer-events-auto absolute left-[96px] top-[2px] z-[55] flex h-[38px] items-center gap-1";
+  "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center gap-1";
 export const desktopTitlebarNavigationButtonClass = [
   "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
@@ -185,6 +189,8 @@ export const desktopTitlebarNavigationButtonClass = [
 ].join(" ");
 export const windowsTitlebarControlsClass =
   "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
+
+export const windowsWorkspaceControlsClass = "ml-auto flex h-7 shrink-0 items-center gap-0.5";
 
 export const windowsTitlebarControlButtonClass =
   "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";

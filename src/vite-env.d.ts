@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_MISTY_DEMO_ACCOUNT?: string;
   /** Complete API base, including /api or a versioned path such as /api/v2. */
   readonly VITE_MISTY_PUBLIC_API_URL?: string;
+  /** Public Misty website origin used for product, download, and roadmap links. */
+  readonly VITE_MISTY_PUBLIC_URL?: string;
   /** Legacy alias; accepts the same complete API-base semantics. */
   readonly VITE_MISTY_SERVER_URL?: string;
   /** Legacy alias; accepts the same complete API-base semantics. */
