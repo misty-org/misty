@@ -29,10 +29,6 @@ export const desktopPages: DocPage[] = [
                 "desktop icons sync",
                 "Regenerate platform icons from the canonical ICNS.",
               ],
-              [
-                "desktop windows stage-assets",
-                "Copy local Misty assets into a Windows test directory.",
-              ],
             ],
           ),
         ],
@@ -273,7 +269,7 @@ export const desktopPages: DocPage[] = [
             [
               [
                 "--source <PATH>",
-                "~/.misty/assets/icons/misty-logo.icns",
+                "misty/src-tauri/icons/icon.icns",
                 "Source ICNS containing PNG variants.",
               ],
             ],
@@ -288,61 +284,11 @@ export const desktopPages: DocPage[] = [
             "The command validates the ICNS header.",
             "It selects the largest supported embedded PNG variant.",
             "The local Tauri binary generates the platform icon set.",
-            "The source ICNS is copied to misty/src-tauri/icons/icon.icns.",
+            "A custom source ICNS becomes misty/src-tauri/icons/icon.icns.",
           ]),
           note(
             "Install dependencies first",
             "Icon synchronization uses the misty repository’s Tauri npm script. Run npm install there if dependencies are missing.",
-          ),
-        ],
-      },
-    ],
-  },
-  {
-    path: "/desktop/windows",
-    title: "misty desktop windows stage-assets",
-    eyebrow: "Desktop",
-    description:
-      "Copy local Misty assets into a Windows-friendly test destination.",
-    command:
-      "misty desktop windows stage-assets [--source <PATH>] [--destination <PATH>]",
-    sections: [
-      {
-        id: "options",
-        title: "Options",
-        blocks: [
-          table(
-            ["Option", "Default", "Description"],
-            [
-              ["--source <PATH>", "~/.misty/assets", "Asset tree to copy."],
-              [
-                "--destination <PATH>",
-                "misty/.windows-test/.misty/assets",
-                "Staging directory.",
-              ],
-            ],
-          ),
-          code(
-            "misty desktop windows stage-assets\nmisty desktop windows stage-assets \\\n  --source D:\\MistyAssets \\\n  --destination D:\\MistyTest\\.misty\\assets",
-          ),
-        ],
-      },
-      {
-        id: "copy-behavior",
-        title: "Copy behavior",
-        blocks: [
-          list([
-            "The source must exist and be a directory.",
-            "An existing destination is cleared before copying.",
-            ".DS_Store, Thumbs.db, and desktop.ini are omitted.",
-            "Directories are recreated and regular files are copied recursively.",
-            "If source and destination are the same path, nothing is rewritten.",
-            "The final message reports the number of asset files staged.",
-          ]),
-          note(
-            "Destination replacement",
-            "A custom destination is deleted and recreated when it already exists. Point it only at a disposable staging directory.",
-            "warning",
           ),
         ],
       },

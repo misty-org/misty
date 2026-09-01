@@ -53,10 +53,6 @@ export const referencePages: DocPage[] = [
               ["desktop build", "None"],
               ["desktop clean", "--apply"],
               ["desktop icons sync", "--source <PATH>"],
-              [
-                "desktop windows stage-assets",
-                "--source <PATH>, --destination <PATH>",
-              ],
             ],
           ),
         ],
@@ -281,7 +277,7 @@ export const referencePages: DocPage[] = [
               ],
               [
                 "Local mutation",
-                "configure, desktop build, desktop clean --apply, icons sync, Windows stage-assets, server up/down, image build, Worker secrets, release build",
+                "configure, desktop build, desktop clean --apply, icons sync, server up/down, image build, Worker secrets, release build",
                 "Writes config/artifacts, starts services, or removes bounded local data.",
               ],
               [

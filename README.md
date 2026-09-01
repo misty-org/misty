@@ -53,7 +53,6 @@ misty desktop build
 misty desktop clean
 misty desktop clean --apply
 misty desktop icons sync
-misty desktop windows stage-assets
 
 misty website dev
 
@@ -95,10 +94,11 @@ misty home generate \
   --destination ./portable/.misty
 ```
 
-Only cross-platform static assets and plugin web files are copied. Databases,
-credentials, note attachments, mounts, caches, logs, platform binaries, and
-release keys stay device-local. Install the platform's Misty application
-separately, then place the generated `.misty` directory in the user's home.
+Only portable plugin web files are copied. Product assets ship inside the app.
+Databases, credentials, note attachments, mounts, caches, logs, platform
+binaries, and release keys stay device-local. Install the platform's Misty
+application separately, then place the generated `.misty` directory in the
+user's home.
 
 The CLI stores its own workspace selection in `~/.misty/cli/config.toml` and
 continues to read older platform-specific config locations during migration.
