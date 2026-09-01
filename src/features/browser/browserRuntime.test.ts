@@ -6,6 +6,7 @@ import {
   closeBrowserRuntime,
   hideAllBrowserWebviews,
   hideBrowserWebview,
+  parkAllBrowserWebviews,
   setBrowserPointerTrackingEnabled,
   setNativeBrowserCompanionState,
   setBrowserPointerGestureActive,
@@ -296,6 +297,12 @@ describe("browser native view synchronization", () => {
     await hideAllBrowserWebviews();
 
     expect(invoke).toHaveBeenCalledWith("browser_webviews_hide_all");
+  });
+
+  it("parks native children for a gapless return from another workspace tab", async () => {
+    await parkAllBrowserWebviews();
+
+    expect(invoke).toHaveBeenCalledWith("browser_webviews_park_all");
   });
 
   it("keeps the native page live underneath app overlays", async () => {

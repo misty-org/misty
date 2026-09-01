@@ -9,9 +9,13 @@
         "minWidth": 1040,
         "minHeight": 720,
         "backgroundThrottling": "disabled",
+        "backgroundColor": "#131313",
         "decorations": false,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
         "transparent": false,
-        "shadow": false,
+        "shadow": true,
         "dragDropEnabled": true
       }
     ]

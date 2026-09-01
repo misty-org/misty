@@ -47,6 +47,7 @@ describe("ChromeTabStrip", () => {
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.style.position).toBe("");
     expect(tabs[0]?.style.transform).toBe("");
+    expect(tabs[0]?.className).toContain("flex-[0_1_180px]");
 
     act(() => secondTab?.click());
     expect(onSelectTab).toHaveBeenCalledWith("tab-2");

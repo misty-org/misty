@@ -1,9 +1,9 @@
 import {
-  filesMultiPanelStore,
   revealSearchResultInPane,
   searchResultNavigationTarget,
   useExplorerStore,
 } from "@/features/files/explorer";
+import { filesMultiPanelStore } from "@/features/files/dockStores";
 import {
   useMultiPanelStore,
   useWorkspaceStore,

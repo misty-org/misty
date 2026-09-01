@@ -4,6 +4,8 @@ export interface ApiSessionProvider {
   readToken: () => Promise<string | null>;
 }
 
+export const apiSessionInvalidEvent = "misty:account-session-invalid";
+
 let provider: ApiSessionProvider = {
   isTransitioning: () => false,
   readGeneration: () => 0,
@@ -24,4 +26,9 @@ export function readApiSessionGeneration(): number {
 
 export function readApiAuthToken(): Promise<string | null> {
   return provider.readToken();
+}
+
+export function notifyApiSessionInvalid(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(apiSessionInvalidEvent));
 }
