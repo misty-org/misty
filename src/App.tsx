@@ -95,10 +95,10 @@ function CodeBlock({ code, filename, language, className }: Extract<ContentBlock
       <Highlight theme={themes.vsDark} code={code.trimEnd()} language={normalizeLanguage(language)}>
         {({ tokens, getLineProps, getTokenProps }) => (
           <pre>{tokens.map((line, index) => {
-            const { key: lineKey, ...lineProps } = getLineProps({ line });
-            return <div key={lineKey ?? index} {...lineProps} className="code-line">{line.map((token, tokenIndex) => {
-              const { key: tokenKey, ...tokenProps } = getTokenProps({ token });
-              return <span key={tokenKey ?? tokenIndex} {...tokenProps} />;
+            const lineProps = getLineProps({ line });
+            return <div key={index} className={cn("code-line", lineProps.className)} style={lineProps.style}>{line.map((token, tokenIndex) => {
+              const tokenProps = getTokenProps({ token });
+              return <span key={tokenIndex} className={tokenProps.className} style={tokenProps.style}>{tokenProps.children}</span>;
             })}</div>;
           })}</pre>
         )}
@@ -158,7 +158,7 @@ function PageNavigationDock({ page }: { page: DocsPage }) {
   const previous = index > 0 ? pages[index - 1] : undefined;
   const next = index < pages.length - 1 ? pages[index + 1] : undefined;
   if (!previous && !next) return null;
-  return <nav className="page-navigation-dock" aria-label="Documentation pagination">{previous ? <Link to={previous.path} className="previous"><ArrowLeft /><span><small>Previous</small>{previous.title}</span></Link> : <span />}{next ? <Link to={next.path} className="next"><span><small>Next</small>{next.title}</span><ArrowRight /></Link> : <span />}</nav>;
+  return <nav className={cn("page-navigation-dock", (!previous || !next) && "single")} aria-label="Documentation pagination">{previous && <Link to={previous.path} className="previous"><ArrowLeft /><span><small>Previous</small>{previous.title}</span></Link>}{next && <Link to={next.path} className="next"><span><small>Next</small>{next.title}</span><ArrowRight /></Link>}</nav>;
 }
 
 function DocumentPage({ page }: { page: DocsPage }) {
@@ -187,7 +187,7 @@ const landingGroups: Array<{ title: string; description: string; cards: Array<{ 
 ];
 
 function LandingPage({ page }: { page: DocsPage }) {
-  const [example, setExample] = useState(landingExamples[0]);
+  const [example, setExample] = useState<(typeof landingExamples)[number]>(landingExamples[0]);
   return <><div className="landing-page"><section className="landing-hero"><div className="landing-copy"><span className="landing-kicker">Misty developer documentation</span><h1>Build, extend, and operate Misty.</h1><p>{page.description} Set up the workspace, create extensions, and run the services behind the product.</p><div className="landing-actions"><Link className="primary" to="/start">Get started <ArrowRight /></Link><Link to="/extensions/build">Build an extension</Link><Link to="/server/overview">Explore the server</Link></div></div><div className="landing-example"><div className="code-tabs" role="tablist" aria-label="Quick start example">{landingExamples.map((item) => <button key={item.label} role="tab" aria-selected={example.label === item.label} onClick={() => setExample(item)}>{item.label}</button>)}</div><CodeBlock type="code" code={example.code} filename={example.filename} language={example.language} className="hero-code" /></div></section><p className="landing-intro">Misty keeps the desktop app, CLI, extensions, and public server contract in one workspace so contributors can move from an idea to a verified change without stitching together separate toolchains.</p>{landingGroups.map((group) => <section className="landing-group" key={group.title}><div className="landing-group-heading"><h2>{group.title}</h2><p>{group.description}</p></div><div className="landing-card-grid">{group.cards.map(({ icon: Icon, ...card }) => <Link className="landing-card" to={card.path} key={card.path}><div><Icon aria-hidden="true" /><span>{card.eyebrow}</span></div><h3>{card.title}</h3><p>{card.description}</p><ArrowUpRight className="card-arrow" aria-hidden="true" /></Link>)}</div></section>)}</div><PageNavigationDock page={page} /></>;
 }
 
