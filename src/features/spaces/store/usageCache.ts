@@ -1,5 +1,9 @@
 import { spacesApi } from "@/api/spaces/api";
-import type { AgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import {
+  personalAgentUsage,
+  type AgentUsage,
+  type BillingUsage,
+} from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import type { SpaceStorageUsage } from "@/api/spaces/dto/interfaces/types";
 
 export const USAGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -10,7 +14,7 @@ interface CacheEntry<T> {
   promise?: Promise<T | null>;
 }
 
-let agentUsageCache: CacheEntry<AgentUsage> | null = null;
+let billingUsageCache: CacheEntry<BillingUsage> | null = null;
 const storageUsageCache = new Map<string, CacheEntry<SpaceStorageUsage>>();
 
 const listeners = new Set<() => void>();
@@ -31,46 +35,53 @@ export function subscribeUsageCache(listener: () => void): () => void {
 }
 
 export function getCachedAgentUsage(): AgentUsage | null {
-  return agentUsageCache?.data ?? null;
+  return personalAgentUsage(billingUsageCache?.data ?? null);
+}
+
+export function getCachedBillingUsage(): BillingUsage | null {
+  return billingUsageCache?.data ?? null;
 }
 
 export function isAgentUsageStale(): boolean {
-  if (!agentUsageCache) return true;
-  return Date.now() - agentUsageCache.fetchedAt >= USAGE_CACHE_TTL_MS;
+  if (!billingUsageCache) return true;
+  return Date.now() - billingUsageCache.fetchedAt >= USAGE_CACHE_TTL_MS;
 }
 
-export async function fetchAgentUsage(force = false): Promise<AgentUsage | null> {
+export async function fetchBillingUsage(force = false): Promise<BillingUsage | null> {
   const now = Date.now();
-  if (!force && agentUsageCache && now - agentUsageCache.fetchedAt < USAGE_CACHE_TTL_MS) {
-    return agentUsageCache.data;
+  if (!force && billingUsageCache && now - billingUsageCache.fetchedAt < USAGE_CACHE_TTL_MS) {
+    return billingUsageCache.data;
   }
-  if (agentUsageCache?.promise) {
-    return agentUsageCache.promise;
+  if (billingUsageCache?.promise) {
+    return billingUsageCache.promise;
   }
 
   const promise = spacesApi
     .agentUsage()
     .then((result) => {
-      const data = result.agent_usage ?? null;
-      agentUsageCache = { data, fetchedAt: Date.now() };
+      billingUsageCache = { data: result, fetchedAt: Date.now() };
       notifyListeners();
-      return data;
+      return result;
     })
     .catch(() => {
-      if (!agentUsageCache?.data) {
-        agentUsageCache = { data: null, fetchedAt: Date.now() };
+      if (!billingUsageCache?.data) {
+        billingUsageCache = { data: null, fetchedAt: Date.now() };
       }
       notifyListeners();
-      return agentUsageCache?.data ?? null;
+      return billingUsageCache?.data ?? null;
     });
 
-  if (agentUsageCache) {
-    agentUsageCache.promise = promise;
+  if (billingUsageCache) {
+    billingUsageCache.promise = promise;
   } else {
-    agentUsageCache = { data: null, fetchedAt: 0, promise };
+    billingUsageCache = { data: null, fetchedAt: 0, promise };
   }
 
   return promise;
+}
+
+export async function fetchAgentUsage(force = false): Promise<AgentUsage | null> {
+  return personalAgentUsage(await fetchBillingUsage(force));
 }
 
 export function getCachedSpaceStorageUsage(spaceId: string): SpaceStorageUsage | null {
@@ -126,7 +137,7 @@ export async function fetchSpaceStorageUsage(
 }
 
 export function clearUsageCache(): void {
-  agentUsageCache = null;
+  billingUsageCache = null;
   storageUsageCache.clear();
   notifyListeners();
 }

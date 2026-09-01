@@ -9,6 +9,7 @@ import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 
 interface ManagedAiErrorPayload {
   code?: string;
+  reason?: string;
   message?: string;
   reset_at?: string;
   retry_after_seconds?: number;
@@ -58,11 +59,11 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     const payload = parseManagedAiError(text);
     if (payload?.code === "hosted_ai_limit_reached") {
       const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "Monday";
-      throw new ManagedAiRequestError(
-        `Weekly hosted AI usage is fully used. Try again after the reset on ${reset}, or upgrade to Pro from Account settings.`,
-        response.status,
-        payload.code,
-      );
+      const message =
+        payload.reason === "space_ai_limit_reached"
+          ? `This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or try again after the reset on ${reset}.`
+          : `Your personal weekly hosted AI allowance is used. Try again after the reset on ${reset}, or upgrade your plan from Account settings.`;
+      throw new ManagedAiRequestError(message, response.status, payload.code);
     }
     if (payload?.code === "rate_limited") {
       const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);

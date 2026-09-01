@@ -8,7 +8,7 @@ import type {
   SpaceTaskStatus,
 } from "../types/types";
 import type { SpaceTaskSourceRef } from "./agentTaskTypes";
-import type { MessageAttachment } from "./library";
+import type { MessageAttachment, StorageQuotaDimension } from "./library";
 import type { SpaceMessageAgentRun, SpaceMessageSender } from "./conversationTypes";
 export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
@@ -282,7 +282,13 @@ export interface SpacesSnapshot {
   spaces: Space[];
   invitations: SpaceInvitation[];
   entitlements: {
+    plan?: string;
     space_limit: number;
+    max_owned_spaces?: number;
+    personal_storage_limit_bytes?: number;
+    space_storage_limit_bytes?: number;
+    personal_ai_limit?: number;
+    space_ai_limit?: number;
     unlimited_spaces: boolean;
     unlimited_collaborators: boolean;
   };
@@ -293,6 +299,7 @@ export interface SpacesSnapshot {
     remaining_bytes: number;
     over_quota_since?: string;
     cleanup_notice_until?: string;
+    personal?: StorageQuotaDimension;
     spaces: Array<{
       space_id: string;
       name: string;

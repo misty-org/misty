@@ -108,6 +108,18 @@ export function assertStableSpaceAccount(generation: number): void {
 }
 
 export function spaceErrorMessage(code: string | undefined, fallback: string): string {
+  const reason = quotaReason(fallback) ?? code;
+  const quotaMessages: Record<string, string> = {
+    personal_storage_limit_reached:
+      "Your personal storage is full. Free some of your contributions or upgrade your plan. Existing files remain available.",
+    space_storage_limit_reached:
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+    personal_ai_limit_reached:
+      "Your personal weekly hosted AI allowance is used. Wait for it to reset or upgrade your plan.",
+    space_ai_limit_reached:
+      "This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or wait for the allowance to reset.",
+  };
+  if (reason && quotaMessages[reason]) return quotaMessages[reason];
   const messages: Record<string, string> = {
     not_authenticated:
       "Your Misty session is unavailable. Sign out, then sign in again before creating a Space.",
@@ -115,11 +127,15 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     not_found: "That Space item no longer exists.",
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
-      "You already own three Spaces. Delete one permanently before creating another.",
+      "You have reached your plan’s owned Space limit. Delete an owned Space permanently or upgrade your plan before creating another.",
     owner_storage_quota_exceeded:
-      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
     space_storage_quota_exceeded:
-      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+    storage_limit_reached:
+      "Storage is full. Free capacity or review your personal and Space limits before trying again.",
+    hosted_ai_limit_reached:
+      "Weekly hosted AI is unavailable. Review your personal and Space allowances before trying again.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     self_host_entitlement_required:
@@ -165,6 +181,15 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     internal_error: "Misty could not load this Space right now. Try again in a moment.",
   };
   return code && messages[code] ? messages[code] : fallback.trim() || "The Space request failed.";
+}
+
+function quotaReason(responseText: string): string | undefined {
+  try {
+    const value = JSON.parse(responseText) as { reason?: unknown };
+    return typeof value.reason === "string" ? value.reason : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export const spacesApi = {

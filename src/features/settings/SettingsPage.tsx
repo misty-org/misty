@@ -22,6 +22,7 @@ import {
   MessagesSquare,
   Notebook,
   Rows3,
+  UserRound,
   Search,
   Server,
   Settings2,
@@ -32,6 +33,7 @@ import { ComingSoonSurface } from "@/shared/ui";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
 import { AdvancedSection } from "./sections/AdvancedSection";
+import { AccountSection } from "./sections/AccountSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { BrowserSection } from "./sections/BrowserSection";
 import { CodeSection } from "./sections/CodeSection";
@@ -102,6 +104,14 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     iconClassName: "text-avatar-aqua",
     group: "preferences",
     Component: GeneralSection,
+  },
+  {
+    id: "account",
+    label: "Account",
+    icon: UserRound,
+    iconClassName: "text-avatar-green",
+    group: "preferences",
+    Component: AccountSection,
   },
   {
     id: "appearance",

@@ -48,7 +48,9 @@ function UsageProbe({ spaceId, space }: { spaceId: string; space: Space }) {
   });
   return (
     <div data-testid="usage">
-      {usage ? `${usage.space_id}:${usage.used_bytes}/${usage.limit_bytes}` : "null"}
+      {usage
+        ? `${usage.space_id}:${usage.personal?.used_bytes}/${usage.personal?.limit_bytes}:${usage.space?.used_bytes}/${usage.space?.limit_bytes}`
+        : "null"}
     </div>
   );
 }
@@ -87,7 +89,7 @@ describe("useSpaceLibraryUsage", () => {
 
     expect(spy).toHaveBeenCalledWith("space-1");
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-1:500000/1000000000",
+      "space-1:3000000/1000000000:500000/1000000000",
     );
   });
 
@@ -116,7 +118,7 @@ describe("useSpaceLibraryUsage", () => {
     });
 
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-2:2500000/1000000000",
+      "space-2:3000000/1000000000:2500000/1000000000",
     );
   });
 
@@ -139,7 +141,25 @@ describe("useSpaceLibraryUsage", () => {
     });
 
     expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
-      "space-2:2500000/1000000000",
+      "space-2:3000000/1000000000:2500000/1000000000",
+    );
+  });
+
+  it("prefers explicit personal and Space dimensions from current servers", async () => {
+    useSpacesStore.setState({ ownerStorage: null });
+    vi.spyOn(spacesApi, "libraryUsage").mockResolvedValue({
+      space_id: "space-1",
+      used_bytes: 900,
+      limit_bytes: 1000,
+      personal: { used_bytes: 900, reserved_bytes: 0, limit_bytes: 1000, remaining_bytes: 100 },
+      space: { used_bytes: 200, reserved_bytes: 0, limit_bytes: 5000, remaining_bytes: 4800 },
+    });
+
+    await act(async () => root.render(<UsageProbe spaceId="space-1" space={dummySpace1} />));
+    await act(async () => await Promise.resolve());
+
+    expect(container.querySelector("[data-testid='usage']")?.textContent).toBe(
+      "space-1:900/1000:200/5000",
     );
   });
 });

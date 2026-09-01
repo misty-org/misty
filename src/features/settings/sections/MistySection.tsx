@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { personalAgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { SystemErrorActivity } from "@/features/activity";
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
@@ -86,7 +87,7 @@ export function MistySection(_props: SettingsContentProps) {
     }
     void aiSurfaceApi
       .usage()
-      .then((result) => active && setUsage(result.agent_usage ?? null))
+      .then((result) => active && setUsage(personalAgentUsage(result)))
       .catch(() => undefined);
     return () => {
       active = false;
@@ -247,7 +248,7 @@ export function MistySection(_props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Weekly hosted AI"
-          description="All embedded surfaces use the same account-level weekly pool; higher plans receive a larger pool."
+          description="Your personal weekly allowance follows you across every Space; higher plans receive a larger allowance."
         >
           <span className="text-sm text-cream-muted">
             {usage
