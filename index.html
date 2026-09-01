@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#18181b" />
+    <link rel="icon" type="image/png" href="/misty-white.png" />
+    <meta name="description" content="Guides and reference for the Misty CLI, extensions, and server." />
+    <link rel="canonical" href="https://docs.mistysys.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Misty Docs" />
+    <meta property="og:title" content="Misty Docs" />
+    <meta property="og:description" content="Guides and reference for the Misty CLI, extensions, and server." />
+    <meta property="og:url" content="https://docs.mistysys.com/" />
+    <meta property="og:image" content="https://docs.mistysys.com/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Misty Docs" />
+    <meta name="twitter:description" content="Guides and reference for the Misty CLI, extensions, and server." />
+    <meta name="twitter:image" content="https://docs.mistysys.com/og.png" />
+    <title>Misty Docs</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("misty-ui-theme");
+          const theme = stored === "light" ? "light" : "dark";
+          document.documentElement.className = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch {
+          document.documentElement.className = "dark";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>
