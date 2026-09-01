@@ -17,14 +17,13 @@ const REQUIRED_DIRECTORIES: &[&str] = &[
     ".cache/sessions",
     ".cache/trash",
     ".local/bin",
-    "assets",
-    "assets/notes",
     "cloud",
     "config",
     "config/automations/v1",
     "config/sessions",
     "db",
     "mnt",
+    "notes",
     "plugins/private",
     "plugins/public",
     "restic/passwords",
@@ -32,15 +31,12 @@ const REQUIRED_DIRECTORIES: &[&str] = &[
     "tmp/transfers",
 ];
 
-const PORTABLE_ASSET_TREES: &[&str] =
-    &["animations", "claude", "fonts", "icons", "logos", "themes"];
-
 const LEGACY_PATHS: &[&str] = &[
     ".local/bin/misty-proxy",
     ".profiles",
     ".release",
     ".template",
-    "assets/logos/old",
+    "assets",
     "config/file_sidebar.json",
     "config/imgui.ini",
     "db/misty.db",
@@ -162,17 +158,6 @@ pub fn check(path: Option<&Path>) -> Result<()> {
 fn copy_portable_payload(source: &Path, destination: &Path, report: &mut CopyReport) -> Result<()> {
     if !source.is_dir() {
         bail!("Misty home source does not exist: {}", source.display());
-    }
-    for tree in PORTABLE_ASSET_TREES {
-        let source_tree = source.join("assets").join(tree);
-        if source_tree.is_dir() {
-            copy_missing_tree(
-                &source_tree,
-                &destination.join("assets").join(tree),
-                false,
-                report,
-            )?;
-        }
     }
     for tree in ["plugins/public", "plugins/private"] {
         let source_tree = source.join(tree);
@@ -363,8 +348,7 @@ mod tests {
         let source = temporary.path().join("source/.misty");
         let destination = temporary.path().join("output/.misty");
         for (path, contents) in [
-            ("assets/icons/cloud.svg", "icon"),
-            ("assets/logos/old/retired.png", "old"),
+            ("assets/icons/cloud.svg", "legacy"),
             ("assets/notes/account/note/private.png", "private"),
             ("plugins/private/themes/plugin.json", "{}"),
             ("plugins/private/themes/variants/plugin.dylib", "native"),
@@ -379,12 +363,11 @@ mod tests {
         generate(Some(&destination), Some(&source)).unwrap();
         generate(Some(&destination), Some(&source)).unwrap();
 
-        assert!(destination.join("assets/icons/cloud.svg").is_file());
         assert!(destination
             .join("plugins/private/themes/plugin.json")
             .is_file());
-        assert!(!destination.join("assets/logos/old").exists());
-        assert!(!destination.join("assets/notes/account").exists());
+        assert!(!destination.join("assets").exists());
+        assert!(destination.join("notes").is_dir());
         assert!(!destination.join("plugins/private/themes/variants").exists());
         assert!(!destination.join("db/data.db").exists());
         assert!(!destination.join("config/jwt.secret").exists());

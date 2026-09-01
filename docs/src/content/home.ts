@@ -7,18 +7,18 @@ export const homePages: DocPage[] = [
     title: "Misty home",
     eyebrow: "Workspace",
     description:
-      "Use one predictable ~/.misty directory on macOS, Linux, and Windows without mixing portable files with device state.",
+      "Use one predictable ~/.misty directory on macOS, Linux, and Windows without mixing portable plugin files with device state.",
     sections: [
       {
         id: "layout",
         title: "The boundary",
         blocks: [
           p(
-            "The application always uses the .misty directory beneath the user home. Static assets and portable plugin web files can move between devices; databases, credentials, notes, mounts, caches, logs, and platform binaries cannot.",
+            "The application always uses the .misty directory beneath the user home. Product assets ship inside the application; portable plugin web files can move between devices, while databases, credentials, notes, mounts, caches, logs, and platform binaries cannot.",
           ),
           list([
-            "cloud, config, db, assets/notes, mnt, cache, and tmp hold device or account state.",
-            "Portable generation copies only approved static asset trees and portable plugin files.",
+            "cloud, config, db, notes, mnt, cache, and tmp hold device or account state.",
+            "Portable generation copies only approved plugin files.",
             "The desktop application is installed separately for each operating system and architecture.",
             "The CLI stores its own settings and development profiles beneath ~/.misty/cli.",
           ]),
@@ -63,7 +63,7 @@ export const homePages: DocPage[] = [
               [
                 "--source <PATH>",
                 "None",
-                "Existing Misty home supplying approved portable assets and plugins.",
+                "Existing Misty home supplying approved portable plugins.",
               ],
             ],
           ),
@@ -92,7 +92,7 @@ export const homePages: DocPage[] = [
           list([
             "Required directories and home.json layout version.",
             "User-only permissions on the home and known private files.",
-            "Retired rclone, proxy, ImGui, legacy database, profile, release, and template paths.",
+            "Retired runtime assets, rclone, proxy, ImGui, legacy database, profile, release, and template paths.",
           ]),
         ],
       },

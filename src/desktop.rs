@@ -9,7 +9,6 @@ use serde_json::json;
 use walkdir::WalkDir;
 
 use crate::{
-    artifacts,
     process::{npm, CommandSpec},
     workspace::Workspace,
 };
@@ -117,26 +116,12 @@ pub fn clean(workspace: &Workspace, apply: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn stage_windows_assets(
-    workspace: &Workspace,
-    source: Option<&Path>,
-    destination: Option<&Path>,
-) -> Result<()> {
-    let source = source
-        .map(Path::to_path_buf)
-        .unwrap_or(default_asset_root()?);
-    let destination = destination
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| workspace.misty.join(".windows-test/.misty/assets"));
-    let copied = artifacts::copy_tree(&source, &destination)?;
-    println!("Staged {copied} asset files at {}", destination.display());
-    Ok(())
-}
-
 pub fn sync_icons(workspace: &Workspace, source: Option<&Path>) -> Result<()> {
+    let canonical = workspace.misty.join("src-tauri/icons/icon.icns");
     let source = source
         .map(Path::to_path_buf)
-        .unwrap_or(default_asset_root()?.join("icons/misty-logo.icns"));
+        .unwrap_or_else(|| canonical.clone());
+    let source_is_canonical = source.canonicalize()? == canonical.canonicalize()?;
     let contents = fs::read(&source)
         .with_context(|| format!("could not read app icon {}", source.display()))?;
     let png = largest_png_variant(&contents)?;
@@ -147,15 +132,13 @@ pub fn sync_icons(workspace: &Workspace, source: Option<&Path>) -> Result<()> {
         .args(["run", "tauri", "--", "icon"])
         .arg(master.as_os_str())
         .run(&workspace.misty)?;
-    fs::copy(&source, workspace.misty.join("src-tauri/icons/icon.icns"))?;
+    if source_is_canonical {
+        fs::write(&canonical, &contents)?;
+    } else {
+        fs::copy(&source, &canonical)?;
+    }
     println!("Desktop icons are synchronized.");
     Ok(())
-}
-
-fn default_asset_root() -> Result<PathBuf> {
-    Ok(dirs::home_dir()
-        .context("could not locate home directory")?
-        .join(".misty/assets"))
 }
 
 fn validate_profile(profile: Option<&str>) -> Result<()> {

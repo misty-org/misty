@@ -61,7 +61,7 @@ enum HomeCommand {
         /// Exact output directory. Defaults to ~/.misty.
         #[arg(long)]
         destination: Option<PathBuf>,
-        /// Existing Misty home whose portable assets and plugins should be copied.
+        /// Existing Misty home whose portable plugins should be copied.
         #[arg(long)]
         source: Option<PathBuf>,
     },
@@ -139,10 +139,6 @@ enum DesktopCommand {
         #[command(subcommand)]
         command: IconCommand,
     },
-    Windows {
-        #[command(subcommand)]
-        command: WindowsCommand,
-    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -150,16 +146,6 @@ enum IconCommand {
     Sync {
         #[arg(long)]
         source: Option<PathBuf>,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum WindowsCommand {
-    StageAssets {
-        #[arg(long)]
-        source: Option<PathBuf>,
-        #[arg(long)]
-        destination: Option<PathBuf>,
     },
 }
 
@@ -347,16 +333,6 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 IconCommand::Sync { source } => {
                     desktop::sync_icons(&settings.workspace, source.as_deref())
                 }
-            },
-            DesktopCommand::Windows { command } => match command {
-                WindowsCommand::StageAssets {
-                    source,
-                    destination,
-                } => desktop::stage_windows_assets(
-                    &settings.workspace,
-                    source.as_deref(),
-                    destination.as_deref(),
-                ),
             },
         },
         Command::Website(command) => match command.command {
@@ -608,7 +584,6 @@ mod tests {
             vec!["misty", "desktop", "build"],
             vec!["misty", "desktop", "clean", "--apply"],
             vec!["misty", "desktop", "icons", "sync"],
-            vec!["misty", "desktop", "windows", "stage-assets"],
             vec!["misty", "website", "dev"],
             vec!["misty", "server", "up", "--detach", "--no-build"],
             vec!["misty", "server", "url"],

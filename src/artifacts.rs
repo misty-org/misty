@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 
@@ -54,38 +54,6 @@ pub fn write_checksums(root: &Path) -> Result<PathBuf> {
     Ok(output)
 }
 
-pub fn copy_tree(source: &Path, destination: &Path) -> Result<usize> {
-    if !source.is_dir() {
-        bail!("source directory does not exist: {}", source.display());
-    }
-    if same_path(source, destination) {
-        return Ok(files_under(source)?.len());
-    }
-    if destination.exists() {
-        fs::remove_dir_all(destination)
-            .with_context(|| format!("could not clear {}", destination.display()))?;
-    }
-    let mut copied = 0;
-    for entry in WalkDir::new(source).follow_links(false) {
-        let entry = entry?;
-        let relative = entry.path().strip_prefix(source)?;
-        if ignored_asset(entry.file_name().to_string_lossy().as_ref()) {
-            continue;
-        }
-        let target = destination.join(relative);
-        if entry.file_type().is_dir() {
-            fs::create_dir_all(&target)?;
-        } else if entry.file_type().is_file() {
-            if let Some(parent) = target.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::copy(entry.path(), &target)?;
-            copied += 1;
-        }
-    }
-    Ok(copied)
-}
-
 pub fn write_private(path: &Path, contents: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -108,20 +76,6 @@ pub fn write_private(path: &Path, contents: &[u8]) -> Result<()> {
             .with_context(|| format!("could not secure {}", path.display()))?;
     }
     Ok(())
-}
-
-fn ignored_asset(name: &str) -> bool {
-    matches!(name, ".DS_Store" | "Thumbs.db" | "desktop.ini")
-}
-
-fn same_path(left: &Path, right: &Path) -> bool {
-    let left = left.to_string_lossy();
-    let right = right.to_string_lossy();
-    if cfg!(windows) {
-        left.eq_ignore_ascii_case(&right)
-    } else {
-        left == right
-    }
 }
 
 #[cfg(test)]

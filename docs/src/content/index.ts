@@ -49,11 +49,6 @@ export const navGroups: NavGroup[] = [
       { label: "desktop build", path: "/desktop/build", command: true },
       { label: "desktop clean", path: "/desktop/clean", command: true },
       { label: "icons sync", path: "/desktop/icons", command: true },
-      {
-        label: "windows stage-assets",
-        path: "/desktop/windows",
-        command: true,
-      },
     ],
   },
   {
