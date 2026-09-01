@@ -223,7 +223,7 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
             <div
               key={tab.id}
               className={[
-                "chrome-tab group relative flex h-9 min-w-[92px] max-w-60 flex-[1_1_180px]",
+                "chrome-tab group relative flex h-9 min-w-[92px] max-w-60 flex-[0_1_180px]",
                 "items-center overflow-hidden rounded-t-lg border border-charcoal-border",
                 "text-cream-muted transition-colors",
                 // The selected tab takes the colour of the pane it opens onto,

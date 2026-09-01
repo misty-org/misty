@@ -57,7 +57,7 @@ export function BrowserSection(props: SettingsContentProps) {
         last
       >
         <SwitchControl
-          checked={booleanSetting(props.document, "general", "open_links_externally", true)}
+          checked={booleanSetting(props.document, "general", "open_links_externally", false)}
           disabled={props.working}
           onChange={(value) => props.onSettingChange("general", "open_links_externally", value)}
         />

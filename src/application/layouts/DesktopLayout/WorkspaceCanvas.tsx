@@ -1,6 +1,6 @@
 import { closeBrowserRuntime } from "@/features/browser";
 import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
-import { releaseFilesMultiPanelStore } from "@/features/files/explorer";
+import { releaseFilesMultiPanelStore } from "@/features/files/dockStores";
 import { useGlobalSearchStore } from "@/features/global-search";
 import { releaseInboxWorkspaceStore } from "@/features/inbox";
 import { preferredMistySpace, useSpacesStore } from "@/features/spaces";
@@ -38,7 +38,10 @@ import {
 import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
-export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right: number } }) {
+export function WorkspaceCanvas(props: {
+  titlebarInsets?: { left: number; right: number };
+  windowsTitlebarControls?: boolean;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -483,6 +486,7 @@ export function WorkspaceCanvas(props: { titlebarInsets?: { left: number; right:
         node={layout.root}
         dockEdge={{ top: true, left: true, right: true }}
         titlebarInsets={props.titlebarInsets}
+        windowsTitlebarControls={props.windowsTitlebarControls}
         focusedPaneId={layout.focusedPaneId}
         lastUsedTabByGroup={lastUsedTabByGroup}
         onOpen={openTab}

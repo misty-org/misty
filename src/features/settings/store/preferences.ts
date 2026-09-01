@@ -144,7 +144,7 @@ export function selectGeneralPreferences(
       "default_transfer_behavior_index",
       0,
     ),
-    openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
+    openLinksExternally: settingsBoolean(source, "general", "open_links_externally", false),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
     searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),

@@ -13,7 +13,7 @@
     "build:desktop": "tsc && vite build --mode desktop",
     "build:mobile": "tsc && vite build --mode mobile",
     "build:android": "tsc && vite build --mode android",
-    "build:web": "tsc && vite build --mode web",
+    "build:web": "tsc && node --max-old-space-size=8192 ./node_modules/vite/bin/vite.js build --mode web",
     "deploy:web:dev": "npm run build:web && wrangler deploy --env dev",
     "preview": "vite preview --mode desktop",
     "preview:mobile": "vite preview --mode mobile",

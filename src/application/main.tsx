@@ -1,15 +1,24 @@
 import { analytics } from "@/telemetry/client";
 import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
 import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
-import { configureProviderAuthorizationLinkOpener } from "@/shared/platform/openExternalLink";
+import { isNativeMobileBuild, isWebBuild } from "@/shared/platform/buildTarget";
+import {
+  configureMistyBrowserLinkOpener,
+  installExternalLinkRouting,
+} from "@/shared/platform/openExternalLink";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import ReactDOM from "react-dom/client";
 import { mistyDesktopSurface } from "@/features/desktop-pet/desktopPet";
 
-configureProviderAuthorizationLinkOpener(async (url) => {
-  const { useWorkspaceStore } = await import("@/features/workspace");
-  useWorkspaceStore.getState().openBrowserTab({ url });
-});
+if (!isNativeMobileBuild && !isWebBuild) {
+  configureMistyBrowserLinkOpener(async (url) => {
+    if (!hasTauriInternals())
+      throw new Error("Misty Browser is unavailable outside the desktop app.");
+    const { useWorkspaceStore } = await import("@/features/workspace");
+    useWorkspaceStore.getState().openBrowserTab({ url });
+  });
+}
+installExternalLinkRouting();
 
 if (
   import.meta.env.MODE !== "mobile" &&

@@ -66,6 +66,10 @@ import {
   WorkspaceTabGroupButton,
   type TabGroup,
 } from "./WorkspaceTabGroupButton";
+import {
+  dockActionClass,
+  WindowsWorkspaceTitlebarControls,
+} from "./WindowsWorkspaceTitlebarControls";
 
 const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
   home: House,
@@ -165,6 +169,7 @@ export interface WorkspaceDockTreeProps {
   dockEdge?: { top: boolean; left: boolean; right: boolean };
   panelDirection?: DockSplitDirection;
   titlebarInsets?: { left: number; right: number };
+  windowsTitlebarControls?: boolean;
   focusedPaneId: string;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceTab) => void;
@@ -408,7 +413,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       >
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           <div
-            className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
+            className="flex min-w-0 flex-[0_1_auto] items-center gap-1 overflow-hidden"
             aria-label="Open apps"
           >
             {groups.map((group) => (
@@ -432,38 +437,44 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
           </div>
         </div>
         <div className="ml-1.5 flex h-7 shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            disabled={!canSplitSideways}
-            className={dockActionClass}
-            aria-label="Create split right"
-            title="Split right"
-            onClick={() => props.onSplitPane(pane.id, "right")}
-          >
-            <PanelRightDashed size={18} />
-          </button>
-          <button
-            type="button"
-            disabled={!canSplitVertically}
-            className={dockActionClass}
-            aria-label="Create split down"
-            title="Split down"
-            onClick={() => props.onSplitPane(pane.id, "down")}
-          >
-            <PanelBottomDashed size={18} />
-          </button>
-          <WorkspaceWindowMenu
-            windows={props.virtualWindows}
-            activeWindowId={props.activeVirtualWindowId}
-            canReopen={props.canReopenVirtualWindow}
-            canCloseWindow={(workspaceWindow) =>
-              canCloseWorkspaceWindow(workspaceWindow, props.virtualWindows)
-            }
-            onSelect={props.onSelectVirtualWindow}
-            onCreate={props.onCreateVirtualWindow}
-            onClose={props.onCloseVirtualWindow}
-            onReopen={props.onReopenVirtualWindow}
-          />
+          {!props.windowsTitlebarControls ? (
+            <button
+              type="button"
+              disabled={!canSplitSideways}
+              className={dockActionClass}
+              aria-label="Create split right"
+              title="Split right"
+              onClick={() => props.onSplitPane(pane.id, "right")}
+            >
+              <PanelRightDashed size={18} />
+            </button>
+          ) : null}
+          {!props.windowsTitlebarControls ? (
+            <button
+              type="button"
+              disabled={!canSplitVertically}
+              className={dockActionClass}
+              aria-label="Create split down"
+              title="Split down"
+              onClick={() => props.onSplitPane(pane.id, "down")}
+            >
+              <PanelBottomDashed size={18} />
+            </button>
+          ) : null}
+          {!props.windowsTitlebarControls ? (
+            <WorkspaceWindowMenu
+              windows={props.virtualWindows}
+              activeWindowId={props.activeVirtualWindowId}
+              canReopen={props.canReopenVirtualWindow}
+              canCloseWindow={(workspaceWindow) =>
+                canCloseWorkspaceWindow(workspaceWindow, props.virtualWindows)
+              }
+              onSelect={props.onSelectVirtualWindow}
+              onCreate={props.onCreateVirtualWindow}
+              onClose={props.onCloseVirtualWindow}
+              onReopen={props.onReopenVirtualWindow}
+            />
+          ) : null}
           {otherPanes.length ? (
             <button
               type="button"
@@ -477,6 +488,24 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
           ) : null}
         </div>
       </header>
+      <WindowsWorkspaceTitlebarControls
+        enabled={Boolean(props.windowsTitlebarControls)}
+        focused={focused}
+        paneId={pane.id}
+        canSplitSideways={canSplitSideways}
+        canSplitVertically={canSplitVertically}
+        windows={props.virtualWindows}
+        activeWindowId={props.activeVirtualWindowId}
+        canReopen={props.canReopenVirtualWindow}
+        canCloseWindow={(workspaceWindow) =>
+          canCloseWorkspaceWindow(workspaceWindow, props.virtualWindows)
+        }
+        onSplitPane={props.onSplitPane}
+        onSelectWindow={props.onSelectVirtualWindow}
+        onCreateWindow={props.onCreateVirtualWindow}
+        onCloseWindow={props.onCloseVirtualWindow}
+        onReopenWindow={props.onReopenVirtualWindow}
+      />
       <div className="min-h-0 min-w-0 overflow-hidden">
         {activeTab ? (
           mountedTabs.map((mountedTab) => {
@@ -785,8 +814,3 @@ export function minimumForWorkspaceTabs(tabs: WorkspaceTab[]): { width: number; 
     { width: 280, height: 180 },
   );
 }
-
-const dockActionClass = [
-  "grid size-7 place-items-center rounded text-cream-muted outline-none",
-  "hover:bg-charcoal-card hover:text-cream focus-visible:ring-1 focus-visible:ring-charcoal-active disabled:pointer-events-none disabled:opacity-35",
-].join(" ");

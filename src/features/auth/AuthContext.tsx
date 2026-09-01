@@ -1,4 +1,5 @@
 import { useAppRouteMemoryStore } from "@/features/app-shell";
+import { apiSessionInvalidEvent } from "@/api/client/session";
 import { useSetupStore } from "@/features/installer";
 import { removeSpaceReferenceCache } from "@/features/spaces";
 import { analytics } from "@/telemetry/client";
@@ -321,10 +322,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!canceled) finishAccountOperation();
       });
     };
-    window.addEventListener("misty:account-session-invalid", handleInvalidSession);
+    window.addEventListener(apiSessionInvalidEvent, handleInvalidSession);
     return () => {
       canceled = true;
-      window.removeEventListener("misty:account-session-invalid", handleInvalidSession);
+      window.removeEventListener(apiSessionInvalidEvent, handleInvalidSession);
     };
   }, [activeUser, beginAccountOperation, deactivateToChooser, finishAccountOperation]);
 
