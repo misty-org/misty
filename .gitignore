@@ -176,6 +176,7 @@ demo/**/research-session-frame.png
 *.arrow
 
 # Generated and test-only artifacts from the embedded storage service
+/service/rclone/
 service/MANUAL.*
 service/lib/encoder/encoder_cases_test.go
 service/cmd/bisync/testdata/bisync_vscode_debuggers_launch.json

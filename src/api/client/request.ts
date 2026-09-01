@@ -2,7 +2,12 @@ import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { ApiRequestError, decodeApiError } from "./errors";
 import { httpRequest } from "./http";
-import { isApiSessionTransitioning, readApiAuthToken, readApiSessionGeneration } from "./session";
+import {
+  isApiSessionTransitioning,
+  notifyApiSessionInvalid,
+  readApiAuthToken,
+  readApiSessionGeneration,
+} from "./session";
 
 export type ApiRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 
@@ -56,6 +61,7 @@ async function authenticatedResponse(
   if (!response.ok) {
     const text = await response.text();
     assertStableApiSession(accountGeneration);
+    if (response.status === 401 && token) notifyApiSessionInvalid();
     const decoded = decodeApiError(text);
     throw new ApiRequestError(decoded.message, response.status, decoded.code, text);
   }

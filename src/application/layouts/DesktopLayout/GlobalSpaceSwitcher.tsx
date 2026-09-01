@@ -1,11 +1,7 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { unreadActivityCountForSpace, useActivityStore } from "@/features/activity";
-import {
-  GlobalCreateSpaceDialog,
-  SpaceAvatar,
-  SpaceRowActions,
-  spaceLandingRoute,
-} from "@/features/spaces";
+import { GlobalCreateSpaceDialog, SpaceAvatar, SpaceRowActions } from "@/features/spaces";
+import { spaceLandingRoute } from "@/features/spaces/navigation";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
   DropdownMenu,

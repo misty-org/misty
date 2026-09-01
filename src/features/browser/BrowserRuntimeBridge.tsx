@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
   captureNativeBrowserRegion,
-  hideAllBrowserWebviews,
+  parkAllBrowserWebviews,
   requestBrowserWebviewLayoutByRuntimeId,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
@@ -113,7 +113,12 @@ export function BrowserRuntimeBridge() {
     activeBrowserSurfaceExists(state.layout.root),
   );
   useLayoutEffect(() => {
-    if (!browserSurfaceActive) void hideAllBrowserWebviews();
+    if (browserSurfaceActive) return;
+    // Commit the opaque workspace surface first. On the next frame Windows
+    // can keep each live browser child parked beneath it, ready for an
+    // immediate reveal when the user returns.
+    const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
+    return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
 
   useEffect(() => {

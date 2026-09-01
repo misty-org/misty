@@ -17,6 +17,9 @@ use tauri::{
 };
 use url::Url;
 
+#[cfg(windows)]
+use std::sync::atomic::{AtomicIsize, AtomicU32};
+
 use super::browser_macos::{
     configure_browser_webview, configure_main_webview_pointer_guard,
     evaluate_browser_async_javascript, native_macos_safari_user_agent,
@@ -38,12 +41,14 @@ const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
 const HTML2CANVAS_SOURCE: &str =
     include_str!("../../../node_modules/html2canvas/dist/html2canvas.min.js");
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 static BROWSER_OVERLAY_ACTIVE: AtomicBool = AtomicBool::new(false);
 static BROWSER_POINTER_TRACKING_ENABLED: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static MAIN_WEBVIEW_VIEW: AtomicUsize = AtomicUsize::new(0);
-#[cfg(target_os = "macos")]
+#[cfg(windows)]
+static MAIN_WEBVIEW_HWND: AtomicIsize = AtomicIsize::new(0);
+#[cfg(any(target_os = "macos", windows))]
 static MAIN_WEBVIEW_TRANSPARENT: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
@@ -335,11 +340,47 @@ fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
+    use windows_sys::Win32::{Foundation::HWND, UI::WindowsAndMessaging::FindWindowExW};
+
+    let main_webview = app
+        .get_webview("main")
+        .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
+    if MAIN_WEBVIEW_HWND.load(Ordering::Acquire) == 0 {
+        let window = main_webview.window();
+        let parent = window.hwnd().map_err(|error| error.to_string())?;
+        let class = "WRY_WEBVIEW\0".encode_utf16().collect::<Vec<_>>();
+        let hwnd = unsafe {
+            FindWindowExW(
+                parent.0 as HWND,
+                std::ptr::null_mut(),
+                class.as_ptr(),
+                std::ptr::null(),
+            )
+        };
+        MAIN_WEBVIEW_HWND.store(hwnd as isize, Ordering::Release);
+    }
+    if MAIN_WEBVIEW_HWND.load(Ordering::Acquire) == 0 {
+        return Err("Misty's main WebView2 window is unavailable.".to_owned());
+    }
+    // The renderer must stay transparent wherever CSS leaves the Browser page
+    // host open, otherwise moving it above the external page paints a solid
+    // rectangle instead of just the annotation or popup UI.
+    if !MAIN_WEBVIEW_TRANSPARENT.swap(true, Ordering::AcqRel) {
+        if let Err(error) = main_webview.set_background_color(Some(Color(0, 0, 0, 0))) {
+            MAIN_WEBVIEW_TRANSPARENT.store(false, Ordering::Release);
+            return Err(error.to_string());
+        }
+    }
+    Ok(())
+}
+
 fn browser_child_should_be_below_renderer(overlay_active: bool) -> bool {
     overlay_active
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn remember_main_macos_webview(_app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
@@ -385,6 +426,66 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
     refresh_browser_cursor_ownership(webview)
 }
 
+#[cfg(windows)]
+fn position_windows_webview(
+    webview: &Webview,
+    reveal: bool,
+    below_renderer: bool,
+) -> Result<(), String> {
+    use windows_sys::Win32::{
+        Foundation::{GetLastError, HWND},
+        UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+        },
+    };
+
+    if reveal {
+        webview.show().map_err(|error| error.to_string())?;
+    }
+    let failure = std::sync::Arc::new(AtomicU32::new(0));
+    let callback_failure = failure.clone();
+    webview
+        .with_webview(move |platform_webview| {
+            let mut child = Default::default();
+            if unsafe { platform_webview.controller().ParentWindow(&mut child) }.is_err() {
+                callback_failure.store(u32::MAX, Ordering::Release);
+                return;
+            }
+            let main = MAIN_WEBVIEW_HWND.load(Ordering::Acquire);
+            if main == 0 {
+                callback_failure.store(u32::MAX, Ordering::Release);
+                return;
+            }
+            let insert_after = if below_renderer {
+                main as HWND
+            } else {
+                HWND_TOP
+            };
+            let positioned = unsafe {
+                SetWindowPos(
+                    child.0 as HWND,
+                    insert_after,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOSIZE,
+                )
+            };
+            if positioned == 0 {
+                callback_failure.store(unsafe { GetLastError() }, Ordering::Release);
+            }
+        })
+        .map_err(|error| error.to_string())?;
+    match failure.load(Ordering::Acquire) {
+        0 => refresh_browser_cursor_ownership(webview),
+        u32::MAX => Err("A WebView2 window handle is unavailable.".to_owned()),
+        code => Err(format!(
+            "Could not update Browser stacking (Windows error {code})."
+        )),
+    }
+}
+
 /// Whether `view` already sits on the correct side of the app renderer inside
 /// `parent`. Restacking is only needed when this is false.
 #[cfg(target_os = "macos")]
@@ -425,7 +526,16 @@ fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     position_macos_webview(webview, true)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn present_macos_webview(webview: &Webview) -> Result<(), String> {
+    position_windows_webview(
+        webview,
+        true,
+        browser_child_should_be_below_renderer(BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire)),
+    )
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     webview.show().map_err(|error| error.to_string())
 }
@@ -516,7 +626,9 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 }
 
 #[tauri::command]
-pub fn browser_webview_create(
+// Keep this command asynchronous. WebView2 child creation needs the Windows
+// event loop to remain free while `add_child` finishes initializing the view.
+pub async fn browser_webview_create(
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewCreateRequest,
@@ -1138,11 +1250,29 @@ pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Resu
             Err(errors.join("; "))
         };
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
     {
-        // WebView2 and WebKitGTK do not expose sibling z-order through Tauri.
-        // Park external pages while renderer-owned popovers are open; the
-        // frontend reconciles the active page when the overlay closes.
+        remember_main_macos_webview(&app)?;
+        BROWSER_OVERLAY_ACTIVE.store(active, Ordering::Release);
+        let mut errors = Vec::new();
+        for (label, webview) in app.webviews() {
+            if label.starts_with("misty-browser-") {
+                if let Err(error) = position_windows_webview(&webview, false, active) {
+                    errors.push(error);
+                }
+            }
+        }
+        return if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        };
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        // WebKitGTK does not expose sibling z-order through Tauri. Park
+        // external pages while renderer-owned popovers are open; the frontend
+        // reconciles the active page when the overlay closes.
         if active {
             browser_webviews_hide_all(app)
         } else {
@@ -1227,6 +1357,34 @@ pub fn browser_webviews_hide_all(app: AppHandle) -> Result<(), String> {
         Ok(())
     } else {
         Err(errors.join("; "))
+    }
+}
+
+#[tauri::command]
+pub fn browser_webviews_park_all(app: AppHandle) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        remember_main_macos_webview(&app)?;
+        let mut errors = Vec::new();
+        for (label, webview) in app.webviews() {
+            if label.starts_with("misty-browser-") {
+                // Keep the live page composited directly beneath the app
+                // renderer while another workspace tab is active. Returning
+                // to Browser can then reveal it without a hide/show gap.
+                if let Err(error) = position_windows_webview(&webview, true, true) {
+                    errors.push(error);
+                }
+            }
+        }
+        return if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("; "))
+        };
+    }
+    #[cfg(not(windows))]
+    {
+        browser_webviews_hide_all(app)
     }
 }
 

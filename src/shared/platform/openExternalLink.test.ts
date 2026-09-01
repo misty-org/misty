@@ -1,12 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({ openUrl: vi.fn(async () => undefined) }));
+
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.openUrl }));
+vi.mock("@tauri-apps/plugin-os", () => ({ platform: () => "windows" }));
+
 import {
+  configureExternalLinkPreference,
+  configureMistyBrowserLinkOpener,
   configureProviderAuthorizationLinkOpener,
+  installExternalLinkRouting,
   normalizeExternalUrl,
+  openExternalLink,
   openProviderAuthorizationLink,
 } from "@/shared/platform/openExternalLink";
 
-afterEach(() => configureProviderAuthorizationLinkOpener(null));
+afterEach(() => {
+  configureExternalLinkPreference(() => false);
+  configureProviderAuthorizationLinkOpener(null);
+  mocks.openUrl.mockClear();
+  document.body.replaceChildren();
+});
 
 describe("normalizeExternalUrl", () => {
   it.each([
@@ -37,5 +51,39 @@ describe("openProviderAuthorizationLink", () => {
 
     expect(openInMisty).toHaveBeenCalledWith("https://accounts.example.com/authorize");
     expect(result.strategy).toBe("misty-browser");
+  });
+});
+
+describe("openExternalLink", () => {
+  it("opens web destinations in Misty Browser by default", async () => {
+    const openInMisty = vi.fn();
+    configureMistyBrowserLinkOpener(openInMisty);
+
+    await openExternalLink("https://example.com/docs");
+
+    expect(openInMisty).toHaveBeenCalledWith("https://example.com/docs");
+  });
+
+  it("routes plain absolute anchors through Misty Browser", async () => {
+    const openInMisty = vi.fn();
+    configureMistyBrowserLinkOpener(openInMisty);
+    const uninstall = installExternalLinkRouting();
+    document.body.innerHTML = '<a href="https://example.com/help" target="_blank">Help</a>';
+
+    document.querySelector<HTMLAnchorElement>("a")?.click();
+
+    await vi.waitFor(() => expect(openInMisty).toHaveBeenCalledWith("https://example.com/help"));
+    uninstall();
+  });
+
+  it("honors the system-browser preference", async () => {
+    const openInMisty = vi.fn();
+    configureMistyBrowserLinkOpener(openInMisty);
+    configureExternalLinkPreference(() => true);
+
+    await openExternalLink("https://example.com/system");
+
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://example.com/system");
+    expect(openInMisty).not.toHaveBeenCalled();
   });
 });
