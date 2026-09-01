@@ -49,13 +49,37 @@ describe("spaceErrorMessage", () => {
     ).toBe("This provider’s sign-in is not available on the current Misty server.");
   });
 
-  it("describes storage quota errors as an owner-pooled limit", () => {
-    const expected =
-      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.";
+  it("distinguishes personal and Space quota reasons while keeping legacy codes", () => {
+    expect(
+      spaceErrorMessage(
+        "owner_storage_quota_exceeded",
+        JSON.stringify({ reason: "personal_storage_limit_reached" }),
+      ),
+    ).toContain("Your personal storage is full");
+    expect(
+      spaceErrorMessage(
+        "owner_storage_quota_exceeded",
+        JSON.stringify({ reason: "space_storage_limit_reached" }),
+      ),
+    ).toContain("Space’s storage is full");
+    expect(
+      spaceErrorMessage(
+        "hosted_ai_limit_reached",
+        JSON.stringify({ reason: "personal_ai_limit_reached" }),
+      ),
+    ).toContain("Your personal weekly hosted AI allowance");
+    expect(
+      spaceErrorMessage(
+        "hosted_ai_limit_reached",
+        JSON.stringify({ reason: "space_ai_limit_reached" }),
+      ),
+    ).toContain("Its owner must upgrade");
+  });
 
-    expect(spaceErrorMessage("owner_storage_quota_exceeded", "fallback")).toBe(expected);
-    expect(spaceErrorMessage("space_storage_quota_exceeded", "fallback")).toBe(expected);
-    expect(expected).not.toContain("1 GB");
+  it("keeps the owned-Space limit message plan-neutral", () => {
+    const message = spaceErrorMessage("space_ownership_limit_reached", "fallback");
+    expect(message).toContain("your plan’s owned Space limit");
+    expect(message).not.toContain("three Spaces");
   });
 });
 

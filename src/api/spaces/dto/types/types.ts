@@ -27,6 +27,12 @@ export type AgentMentionFailure = {
     | "invalid_request"
     | string;
   message: string;
+  reason?:
+    | "personal_storage_limit_reached"
+    | "space_storage_limit_reached"
+    | "personal_ai_limit_reached"
+    | "space_ai_limit_reached"
+    | string;
 };
 
 export type InboxKind = "unread" | "mention" | "agent" | "approval" | "workflow";
