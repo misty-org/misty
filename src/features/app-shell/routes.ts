@@ -4,7 +4,6 @@ export const routes = {
   activity: "/activity",
   browser: "/browser",
   files: "/files",
-  home: "/home",
   invite: "/invite",
   newTab: "/new",
   spaces: "/spaces",

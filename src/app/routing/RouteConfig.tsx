@@ -19,8 +19,7 @@ function StartupRedirect() {
   if (!user) {
     return <Navigate to={routes.signIn} replace />;
   }
-  const fallback = routes.home;
-  return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
+  return <Navigate to={resolveStartupRoute(lastAppRoute, routes.browser)} replace />;
 }
 export const router = createBrowserRouter([
   {
@@ -46,10 +45,6 @@ export const router = createBrowserRouter([
           {
             element: <AppPagesLayout />,
             children: [
-              {
-                path: "home",
-                element: null,
-              },
               {
                 path: "new",
                 element: null,
@@ -107,7 +102,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "*",
-            element: <Navigate to={routes.home} replace />,
+            element: <Navigate to={routes.browser} replace />,
           },
         ],
       },

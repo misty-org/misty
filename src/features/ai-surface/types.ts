@@ -19,7 +19,6 @@ export interface ScreenRequest {
 export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
-  | "home"
   | "activity"
   | "space.chat"
   | "planner.tasks"

@@ -82,6 +82,6 @@ describe("account connections store", () => {
     await expect(
       useConnectionsStore.getState().beginAuthorization("google", ["calendar_read"]),
     ).resolves.toBe("https://accounts.example/authorize");
-    expect(connectionsApi.authorize).toHaveBeenCalledWith("google", ["calendar_read"], "/home");
+    expect(connectionsApi.authorize).toHaveBeenCalledWith("google", ["calendar_read"], "/browser");
   });
 });

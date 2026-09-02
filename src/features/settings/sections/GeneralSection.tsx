@@ -1,6 +1,8 @@
 import {
   workspaceDefaultViewIndex,
+  workspaceDefaultViewOption,
   workspaceDefaultViewOptions,
+  workspaceDefaultViewStoredIndex,
 } from "@/features/workspace/workspaceDefaultView";
 import { startupViewOptions } from "@/features/app-shell";
 import {
@@ -64,16 +66,22 @@ export function GeneralSection(props: SettingsContentProps) {
           description="Choose the starting page. Selecting a navbar destination fills an unused tab or pane."
         >
           <SelectControl
-            value={numberSetting(
-              props.document,
-              "general",
-              "workspace_default_tab_index",
-              workspaceDefaultViewIndex,
+            value={workspaceDefaultViewOption(
+              numberSetting(
+                props.document,
+                "general",
+                "workspace_default_tab_index",
+                workspaceDefaultViewIndex,
+              ),
             )}
             options={[...workspaceDefaultViewOptions]}
             disabled={props.working}
             onChange={(value) =>
-              props.onSettingChange("general", "workspace_default_tab_index", value)
+              props.onSettingChange(
+                "general",
+                "workspace_default_tab_index",
+                workspaceDefaultViewStoredIndex(value),
+              )
             }
           />
         </SettingsRow>

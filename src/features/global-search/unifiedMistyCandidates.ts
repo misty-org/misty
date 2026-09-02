@@ -4,7 +4,6 @@ import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import type { GlobalSearchFilters, GlobalSearchResult, UnifiedMistyCandidate } from "./types";
 
 const coreToolCommandIds = new Set([
-  "tool.home",
   "tool.journal",
   "tool.planner",
   "tool.social",

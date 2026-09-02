@@ -190,8 +190,6 @@ GET /api/me/agent-requests
 GET /api/me/app-requests/{requestID}
 GET /api/me/avatar
 GET /api/me/conversations/{conversationID}/collaboration
-GET /api/me/home
-GET /api/me/home/agenda
 GET /api/me/library-lock
 GET /api/me/settings
 GET /api/me/space-templates
@@ -220,7 +218,6 @@ GET /api/spaces/{spaceID}/drawings
 GET /api/spaces/{spaceID}/drawings/{drawingID}
 GET /api/spaces/{spaceID}/drawings/{drawingID}/assets
 GET /api/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download
-GET /api/spaces/{spaceID}/home
 GET /api/spaces/{spaceID}/integrations
 GET /api/spaces/{spaceID}/invitations
 GET /api/spaces/{spaceID}/item-state
@@ -289,8 +286,6 @@ GET /me/agent-requests
 GET /me/app-requests/{requestID}
 GET /me/avatar
 GET /me/conversations/{conversationID}/collaboration
-GET /me/home
-GET /me/home/agenda
 GET /me/library-lock
 GET /me/settings
 GET /me/space-templates
@@ -319,7 +314,6 @@ GET /spaces/{spaceID}/drawings
 GET /spaces/{spaceID}/drawings/{drawingID}
 GET /spaces/{spaceID}/drawings/{drawingID}/assets
 GET /spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download
-GET /spaces/{spaceID}/home
 GET /spaces/{spaceID}/integrations
 GET /spaces/{spaceID}/invitations
 GET /spaces/{spaceID}/item-state
@@ -408,8 +402,6 @@ GET /v1/me/agent-requests
 GET /v1/me/app-requests/{requestID}
 GET /v1/me/avatar
 GET /v1/me/conversations/{conversationID}/collaboration
-GET /v1/me/home
-GET /v1/me/home/agenda
 GET /v1/me/library-lock
 GET /v1/me/settings
 GET /v1/me/space-templates
@@ -438,7 +430,6 @@ GET /v1/spaces/{spaceID}/drawings
 GET /v1/spaces/{spaceID}/drawings/{drawingID}
 GET /v1/spaces/{spaceID}/drawings/{drawingID}/assets
 GET /v1/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download
-GET /v1/spaces/{spaceID}/home
 GET /v1/spaces/{spaceID}/integrations
 GET /v1/spaces/{spaceID}/invitations
 GET /v1/spaces/{spaceID}/item-state
@@ -649,7 +640,6 @@ POST /api/me/app-requests/{requestID}/link
 POST /api/me/conversations/{conversationID}/goal
 POST /api/me/deletion
 POST /api/me/export
-POST /api/me/home/apps
 POST /api/me/library-lock
 POST /api/me/screen-model/{jobID}
 POST /api/me/space-templates
@@ -767,7 +757,6 @@ POST /me/app-requests/{requestID}/link
 POST /me/conversations/{conversationID}/goal
 POST /me/deletion
 POST /me/export
-POST /me/home/apps
 POST /me/library-lock
 POST /me/screen-model/{jobID}
 POST /me/space-templates
@@ -903,7 +892,6 @@ POST /v1/me/app-requests/{requestID}/link
 POST /v1/me/conversations/{conversationID}/goal
 POST /v1/me/deletion
 POST /v1/me/export
-POST /v1/me/home/apps
 POST /v1/me/library-lock
 POST /v1/me/screen-model/{jobID}
 POST /v1/me/space-templates
