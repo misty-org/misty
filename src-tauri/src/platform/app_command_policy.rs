@@ -98,6 +98,52 @@ mod tests {
         }
     }
 
+    /// Plugin permissions come from capabilities. A capability scoped by window
+    /// would also cover website views attached to that window, and one with
+    /// remote URLs would grant commands to websites; neither may exist.
+    #[test]
+    fn capabilities_never_reach_website_views() {
+        let capabilities = [
+            include_str!("../../capabilities/default.json"),
+            include_str!("../../capabilities/bot.json"),
+            include_str!("../../capabilities/cursor-companion.json"),
+        ];
+        let website_labels = [
+            "misty-browser-a",
+            "misty-browser-storage-1",
+            "misty-browser-capture-1",
+            "render-control",
+        ];
+        for raw in capabilities {
+            let capability: serde_json::Value = serde_json::from_str(raw).unwrap();
+            let name = capability["identifier"].as_str().unwrap();
+            assert!(
+                capability.get("remote").is_none(),
+                "{name} grants remote URLs"
+            );
+            assert!(
+                capability.get("windows").is_none(),
+                "{name} is scoped by window"
+            );
+            for pattern in capability["webviews"].as_array().unwrap() {
+                let pattern = pattern.as_str().unwrap();
+                for label in website_labels {
+                    let matches = match pattern.strip_suffix('*') {
+                        Some(prefix) => label.starts_with(prefix),
+                        None => label == pattern,
+                    };
+                    assert!(!matches, "{name}: {pattern} covers {label}");
+                }
+            }
+        }
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
+        assert_ne!(
+            config["app"]["withGlobalTauri"],
+            serde_json::Value::Bool(true)
+        );
+    }
+
     #[test]
     fn content_views_cannot_inherit_host_commands() {
         for label in ["misty-mini-app-a", "browser-a", "unknown", "main-spoof"] {

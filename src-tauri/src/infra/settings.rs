@@ -16,6 +16,14 @@ use crate::infra::environment::AppEnvironmentService;
 #[cfg(desktop)]
 use crate::infra::system_dependencies::detected_login_shell_path;
 
+#[path = "settings/open_with.rs"]
+mod open_with;
+use open_with::{
+    approved_applications, association_key_for_path, migrate_legacy_open_with_if_needed,
+    open_with_association_for_path, open_with_associations, remove_open_with_association,
+    set_open_with_association_for_path,
+};
+
 #[derive(Debug, Clone)]
 pub struct SettingsService {
     path: PathBuf,
@@ -120,6 +128,19 @@ const DEFAULT_PAGE_STATE_EXCLUSIONS: &str = "paypal.com\nstripe.com\nchase.com\n
 fn load_settings(path: PathBuf) -> ApiResult<SettingsSnapshot> {
     let mut document = load_settings_document(&path)?;
     migrate_legacy_open_with_if_needed(&path, &mut document)?;
+    // Seed Open With approvals at startup, before newly synced values arrive.
+    let current: Vec<String> = document
+        .get("open_with")
+        .and_then(Value::as_object)
+        .map(|open_with| {
+            open_with
+                .values()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+    approved_applications(&path, &current)?;
     if normalize_settings_document(&mut document) {
         save_settings_document(&path, &document)?;
     }
@@ -417,174 +438,6 @@ fn ensure_object(root: &mut Map<String, Value>, key: &str) -> bool {
     }
 }
 
-fn open_with_association_for_path(
-    settings_path: PathBuf,
-    file_path: String,
-) -> ApiResult<Option<String>> {
-    let mut document = load_settings_document(&settings_path)?;
-    migrate_legacy_open_with_if_needed(&settings_path, &mut document)?;
-    let key = association_key_for_path(&file_path);
-    let Some(open_with) = document.get_mut("open_with").and_then(Value::as_object_mut) else {
-        return Ok(None);
-    };
-    let Some(application_path) = open_with
-        .get(&key)
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .map(str::to_owned)
-    else {
-        return Ok(None);
-    };
-
-    if Path::new(&application_path).exists() {
-        return Ok(Some(application_path));
-    }
-
-    open_with.remove(&key);
-    save_settings_document(&settings_path, &document)?;
-    Ok(None)
-}
-
-fn set_open_with_association_for_path(
-    settings_path: PathBuf,
-    file_path: String,
-    application_path: String,
-) -> ApiResult<SettingsSnapshot> {
-    if application_path.trim().is_empty() {
-        return Err(ApiError::Message(
-            "Application path is required.".to_owned(),
-        ));
-    }
-
-    let mut document = load_settings_document(&settings_path)?;
-    migrate_legacy_open_with_if_needed(&settings_path, &mut document)?;
-    let key = association_key_for_path(&file_path);
-    let Some(root) = document.as_object_mut() else {
-        return Err(ApiError::Message(
-            "Settings document must be a JSON object.".to_owned(),
-        ));
-    };
-    let open_with = root
-        .entry("open_with")
-        .or_insert_with(|| Value::Object(Default::default()));
-    if !open_with.is_object() {
-        *open_with = Value::Object(Default::default());
-    }
-    open_with
-        .as_object_mut()
-        .expect("open_with object")
-        .insert(key, Value::String(application_path));
-    save_settings(settings_path, document)
-}
-
-fn open_with_associations(settings_path: PathBuf) -> ApiResult<Vec<OpenWithAssociation>> {
-    let mut document = load_settings_document(&settings_path)?;
-    migrate_legacy_open_with_if_needed(&settings_path, &mut document)?;
-    let Some(open_with) = document.get_mut("open_with").and_then(Value::as_object_mut) else {
-        return Ok(Vec::new());
-    };
-
-    let mut removed_missing = false;
-    let mut associations = Vec::new();
-    open_with.retain(|key, value| {
-        let Some(application_path) = value.as_str().filter(|value| !value.trim().is_empty()) else {
-            removed_missing = true;
-            return false;
-        };
-        if !Path::new(application_path).exists() {
-            removed_missing = true;
-            return false;
-        }
-        associations.push(OpenWithAssociation {
-            key: key.clone(),
-            application_path: application_path.to_owned(),
-        });
-        true
-    });
-    associations.sort_by(|left, right| left.key.cmp(&right.key));
-    if removed_missing {
-        save_settings_document(&settings_path, &document)?;
-    }
-    Ok(associations)
-}
-
-fn remove_open_with_association(
-    settings_path: PathBuf,
-    key: String,
-) -> ApiResult<SettingsSnapshot> {
-    let mut document = load_settings_document(&settings_path)?;
-    migrate_legacy_open_with_if_needed(&settings_path, &mut document)?;
-    let Some(root) = document.as_object_mut() else {
-        return Err(ApiError::Message(
-            "Settings document must be a JSON object.".to_owned(),
-        ));
-    };
-    if let Some(open_with) = root.get_mut("open_with").and_then(Value::as_object_mut) {
-        open_with.remove(&key);
-    }
-    save_settings(settings_path, document)
-}
-
-fn migrate_legacy_open_with_if_needed(settings_path: &Path, document: &mut Value) -> ApiResult<()> {
-    if document.get("open_with").is_some_and(Value::is_object) {
-        return Ok(());
-    }
-
-    let Some(legacy_path) = legacy_open_with_path(settings_path) else {
-        return Ok(());
-    };
-    let legacy = match fs::read_to_string(&legacy_path) {
-        Ok(raw) => serde_json::from_str::<Value>(&raw)
-            .ok()
-            .filter(Value::is_object)
-            .unwrap_or_else(|| Value::Object(Default::default())),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(err) => {
-            return Err(ApiError::Message(format!(
-                "Failed to read legacy open_with.json: {err}"
-            )));
-        }
-    };
-    let Some(legacy_map) = legacy.as_object() else {
-        return Ok(());
-    };
-    let open_with = legacy_map
-        .iter()
-        .filter_map(|(key, value)| {
-            value
-                .as_str()
-                .map(|path| (key.clone(), Value::String(path.to_owned())))
-        })
-        .collect();
-    if let Some(root) = document.as_object_mut() {
-        root.insert("open_with".to_owned(), Value::Object(open_with));
-        save_settings_document(settings_path, document)?;
-        let _ = fs::remove_file(legacy_path);
-    }
-    Ok(())
-}
-
-fn legacy_open_with_path(settings_path: &Path) -> Option<PathBuf> {
-    settings_path
-        .parent()?
-        .parent()
-        .map(|root| root.join("open_with.json"))
-}
-
-fn association_key_for_path(file_path: &str) -> String {
-    let normalized = file_path.replace('\\', "/");
-    let file_name = normalized
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .next_back()
-        .unwrap_or(file_path);
-    let key = file_name
-        .rfind('.')
-        .map(|index| &file_name[index..])
-        .unwrap_or(file_name);
-    key.to_lowercase()
-}
-
 #[cfg(test)]
 #[path = "settings/code_workspace_tests.rs"]
 mod code_workspace_tests;
@@ -773,6 +626,17 @@ mod tests {
             open_with_association_for_path(settings_path.clone(), "/tmp/other.pdf".to_owned())
                 .expect("get association");
         assert_eq!(association, Some(app_path.display().to_string()));
+
+        // A synced association to an application not chosen here is ignored.
+        let other = make_existing_app(&settings_path, "Other.app");
+        let mut synced = load_settings_document(&settings_path).expect("load settings");
+        synced["open_with"][".txt"] = Value::String(other.display().to_string());
+        save_settings_document(&settings_path, &synced).expect("save settings");
+        assert_eq!(
+            open_with_association_for_path(settings_path.clone(), "/tmp/notes.txt".to_owned())
+                .expect("get association"),
+            None
+        );
 
         let saved = load_settings_document(&settings_path).expect("load settings");
         assert_eq!(

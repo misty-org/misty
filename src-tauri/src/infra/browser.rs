@@ -311,19 +311,6 @@ pub struct BrowserCompanionStateRequest {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct BrowserCompanionEvent {
-    id: String,
-    kind: String,
-    prompt: String,
-    action_id: String,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-}
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
 struct BrowserFocusEvent {
     id: String,
 }
@@ -1165,39 +1152,12 @@ fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
     true
 }
 
-fn forward_companion_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
-    if url.scheme() != "misty-companion" {
-        return false;
-    }
-    let values = url.query_pairs().collect::<HashMap<_, _>>();
-    let value = |key: &str| values.get(key).map(|value| value.as_ref()).unwrap_or("");
-    let trusted = app
-        .try_state::<BrowserSessionState>()
-        .map(|state| shortcut_token_matches(&state, id, value("token")))
-        .unwrap_or(false);
-    if !trusted {
-        return true;
-    }
-    let number = |key: &str| value(key).parse::<f64>().unwrap_or(0.0);
-    let kind = url.path().trim_start_matches('/').to_owned();
-    if !matches!(kind.as_str(), "submit" | "action" | "capture") {
-        return true;
-    }
-    let _ = app.emit_to(
-        browser_owner_label(app, id),
-        "misty://browser-companion",
-        BrowserCompanionEvent {
-            id: id.to_owned(),
-            kind,
-            prompt: value("prompt").chars().take(32 << 10).collect(),
-            action_id: value("action").chars().take(200).collect(),
-            x: number("x"),
-            y: number("y"),
-            width: number("width"),
-            height: number("height"),
-        },
-    );
-    true
+/// Pages used to reach the in-page companion through this scheme. The token
+/// that authenticated it is readable by a hostile page (it shares the page's
+/// JavaScript world), so a forged URL could submit agent prompts. The scheme
+/// is swallowed and nothing is forwarded.
+fn forward_companion_navigation(_app: &AppHandle, _id: &str, url: &Url) -> bool {
+    url.scheme() == "misty-companion"
 }
 
 fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
@@ -1408,7 +1368,17 @@ pub fn browser_set_download_directory(directory: String) -> Result<(), String> {
     let chosen = if directory.trim().is_empty() {
         None
     } else if path.is_absolute() {
-        Some(path)
+        // The folder syncs with the account's settings, so it is checked here
+        // rather than trusted; anything else keeps the Downloads folder.
+        let home = dirs::home_dir().ok_or("Choose a folder for downloads.")?;
+        let safe = crate::platform::synced_paths::download_directory(&path, &home);
+        if safe.is_none() {
+            *user_download_directory()
+                .lock()
+                .map_err(|_| "Download settings are unavailable.".to_owned())? = None;
+            return Err("Choose a folder in your home folder or on an external drive.".to_owned());
+        }
+        safe
     } else {
         return Err("Choose a folder for downloads.".to_owned());
     };

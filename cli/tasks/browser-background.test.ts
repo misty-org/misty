@@ -21,7 +21,9 @@ test("native background reporting coalesces changes and sends only changed color
   };
   window.top = window;
   runInNewContext(script, {
+    // The viewport script supplies the token and its captured native channel.
     window, shortcutToken: "test-token", innerWidth: 1000, innerHeight: 700,
+    sendToHost: (message: string) => { reports.push(message); return true; },
     document: {
       body: {},
       createElement: () => ({ getContext: () => context }),
