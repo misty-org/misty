@@ -6,6 +6,7 @@
   "exports": {
     "./catalog": "./interface/catalog.ts",
     "./react": "./interface/react.tsx",
+    "./store": "./interface/store.tsx",
     "./styles.css": "./interface/styles.css"
   },
   "files": [
