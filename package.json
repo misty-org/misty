@@ -1,8 +1,17 @@
 {
-  "name": "@misty/plugins",
+  "name": "@misty/store",
   "private": true,
   "version": "0.3.0",
   "type": "module",
+  "exports": {
+    "./catalog": "./interface/catalog.ts",
+    "./react": "./interface/react.tsx",
+    "./styles.css": "./interface/styles.css"
+  },
+  "files": [
+    "catalog",
+    "interface"
+  ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
     "build": "tsc && vite build && node scripts/build-plugins.mjs",

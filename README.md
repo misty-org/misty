@@ -1,10 +1,10 @@
-# Misty Plugins
+# Misty Store
 
-The official first-party plugin workspace for Misty.
+The official first-party Store app workspace for Misty.
 
 Plugins are now authored with the same frontend stack as `apps/desktop`: TypeScript, React, Vite, and Tailwind CSS. There is no native plugin ABI in this repo anymore; plugin panels run as web surfaces and talk to Misty through a small host bridge.
 
-## What's Here
+## What's here
 
 | Path | Contents |
 |------|----------|
@@ -12,6 +12,7 @@ Plugins are now authored with the same frontend stack as `apps/desktop`: TypeScr
 | `extensions/*/manifest.json` | Local install manifests with web runtime metadata |
 | `extensions/*/plugin.json` | Hub/local plugin details used by Misty |
 | `catalog/` | Public catalog index and marketplace entries |
+| `interface/` | Shared catalog contract and React presentation primitives |
 | `scripts/build-plugins.mjs` | Copies plugin metadata/assets into `dist/` after Vite builds |
 
 ## Development
@@ -66,3 +67,22 @@ window.mistyPluginHost = {
 ```
 
 Hosted panels use the same typed command contract over `postMessage`; Misty validates the iframe source, plugin id, and a per-plugin command allowlist before invoking native functionality. Without a host, panels remain available in browser-smoke mode and clearly disable system actions.
+
+## Shared catalog interface
+
+`interface/` is the canonical presentation dependency for the desktop Store and
+the public website. It owns the extension data shape, stable URL helpers,
+platform labels, filtering behavior, artwork treatment, and verification badge.
+Each product synchronizes this small source distribution before development and
+builds, then supplies its own theme variables and product-specific layout.
+
+Change shared extension presentation in this repository first. The consumer
+repositories keep generated copies so builds remain reproducible and can verify
+drift without requiring a network connection.
+
+After `main` passes CI, the repository dispatches
+`extension-interface-updated` to `misty` and `misty-website`. Configure the
+organization-scoped `MISTY_REPO_DISPATCH_TOKEN` Actions secret with permission
+to dispatch workflows in both repositories. Their sync workflows validate and
+commit the refreshed generated sources, which also triggers the normal website
+deployment pipeline.
