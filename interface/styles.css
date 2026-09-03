@@ -1,0 +1,62 @@
+.misty-extension-artwork {
+  --misty-extension-artwork-size: 48px;
+  --misty-extension-artwork-image-size: 58%;
+
+  display: inline-grid;
+  width: var(--misty-extension-artwork-size);
+  height: var(--misty-extension-artwork-size);
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid
+    var(
+      --misty-extension-artwork-border,
+      color-mix(in srgb, currentColor 12%, transparent)
+    );
+  border-radius: 12px;
+  background: var(
+    --misty-extension-artwork-background,
+    color-mix(in srgb, currentColor 6%, transparent)
+  );
+  color: var(--misty-extension-artwork-foreground, currentColor);
+}
+
+.misty-extension-artwork[data-size="small"] {
+  --misty-extension-artwork-size: 40px;
+  border-radius: 8px;
+}
+
+.misty-extension-artwork[data-size="large"] {
+  --misty-extension-artwork-size: 64px;
+  border-radius: 16px;
+}
+
+.misty-extension-artwork__image {
+  display: block;
+  width: var(--misty-extension-artwork-image-size);
+  height: var(--misty-extension-artwork-image-size);
+  object-fit: contain;
+}
+
+.misty-extension-artwork__fallback {
+  width: 50%;
+  height: 50%;
+}
+
+.misty-extension-verified {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  white-space: nowrap;
+}
+
+.misty-extension-verified svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}

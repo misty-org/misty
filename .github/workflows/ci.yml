@@ -20,3 +20,22 @@ jobs:
       - name: Verify install bundles
         run: |
           node -e 'for (const {id} of require("./catalog/index.json")) { const fs=require("fs"); if (!fs.existsSync(`dist/plugins/${id}/web/index.html`) || !fs.existsSync(`dist/plugins/${id}/manifest.json`)) throw new Error(`Incomplete bundle: ${id}`) }'
+
+  notify-consumers:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch interface synchronization
+        env:
+          GH_TOKEN: ${{ secrets.MISTY_REPO_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "MISTY_REPO_DISPATCH_TOKEN is not configured; consumer sync was skipped."
+            exit 0
+          fi
+          for repository in misty misty-website; do
+            gh api --method POST "repos/misty-org/$repository/dispatches" \
+              -f event_type=extension-interface-updated \
+              -f "client_payload[source_sha]=$GITHUB_SHA"
+          done
