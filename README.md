@@ -35,4 +35,4 @@ Other local gates:
 
 - `npm run check` — formatting, types, lint, frontend tests, and the production dependency audit.
 - `npm run cli -- check all` — the full local gate: `npm run check`, the release task tests, the native desktop crate (format, clippy, tests), the server (Go format, vet, tests, contracts, app suites), the website, built-in tools, and the CLI.
-- `npm run cli -- check app|server|cli|tasks` — one area at a time.
+- `npm run cli -- check app|server|cli|scripts` — one area at a time.

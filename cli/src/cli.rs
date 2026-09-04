@@ -124,7 +124,7 @@ enum EnvCommand {
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum CheckTarget {
-    Tasks,
+    Scripts,
     App,
     Server,
     Website,
@@ -467,8 +467,8 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
         },
         Command::Check(command) => match command.target {
             CheckTarget::App => checks::app(&settings.workspace),
-            CheckTarget::Tasks => crate::process::CommandSpec::new(crate::process::npm())
-                .args(["run", "test:tasks"])
+            CheckTarget::Scripts => crate::process::CommandSpec::new(crate::process::npm())
+                .args(["run", "test:scripts"])
                 .run(&settings.workspace.misty),
             CheckTarget::Server => checks::server(&settings.workspace),
             CheckTarget::Website => checks::website(&settings.workspace),
@@ -477,7 +477,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             CheckTarget::All => {
                 checks::app(&settings.workspace)?;
                 crate::process::CommandSpec::new(crate::process::npm())
-                    .args(["run", "test:tasks"])
+                    .args(["run", "test:scripts"])
                     .run(&settings.workspace.misty)?;
                 checks::server(&settings.workspace)?;
                 checks::website(&settings.workspace)?;

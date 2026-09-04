@@ -38,6 +38,7 @@ import {
 } from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
 import {
+  configureBrowserCustomBangs,
   configureBrowserSearchEngine,
   configureBrowserSearchSuggestions,
 } from "@/features/workspace/browserSearchEngine";
@@ -286,6 +287,9 @@ function applySettingsSideEffects(
   configureBrowserSearchEngine(String(runtimeAdapters.get("browser.searchEngine")!.read(document)));
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
+  );
+  configureBrowserCustomBangs(
+    settingsString(document, "general", "browser_custom_bangs_json", "[]"),
   );
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),

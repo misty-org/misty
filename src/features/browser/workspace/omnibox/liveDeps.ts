@@ -2,8 +2,8 @@ import { bookmarks } from "@/features/bookmarks/library";
 import { invoke } from "@tauri-apps/api/core";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { searchLocalMistyContent } from "@/features/global-search/localContentSearch";
-import { allLayoutViews, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
-import { currentWindows } from "@/features/workspace/windows";
+import { useWorkspaceStore } from "@/features/workspace";
+import { openBrowserTabs } from "@/features/workspace/browserTabs";
 import {
   browserSearchEngine,
   browserSearchSuggestionsEnabled,
@@ -36,20 +36,5 @@ export const liveOmniboxDeps: OmniboxDeps = {
       route: result.href,
     })),
   clipboardUrl: () => (hasTauriInternals() ? readText() : Promise.resolve(null)),
-  openTabs: () =>
-    // The same windows `focusTab` can switch to.
-    currentWindows(useWorkspaceStore.getState())
-      .flatMap((window) => allLayoutViews(window.layout))
-      .filter((tab) => tab.surfaceId === "browser")
-      .map((tab) => {
-        const state = parseBrowserViewState(tab.state);
-        return {
-          tabId: tab.id,
-          url: state.url,
-          title: tab.title,
-          profileId: state.profileId,
-          private: Boolean(state.private),
-          agentOwned: Boolean(state.agentOwned),
-        };
-      }),
+  openTabs: openBrowserTabs,
 };

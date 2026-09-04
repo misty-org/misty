@@ -13,7 +13,6 @@ import {
 import { save } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
-import { bookmarkWindowViews } from "./bookmarkWindowViews";
 import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
 
 export interface BrowserPageCommands {
@@ -35,8 +34,6 @@ export interface BrowserPageCommands {
   copyLink?: () => void;
   qrCode?: () => void;
   bookmark?: () => void;
-  /** Saves every web page in this window to a new bookmark group. */
-  bookmarkAllViews: () => void;
   clearBrowsingData: () => void;
 }
 
@@ -120,19 +117,6 @@ export function useBrowserPageCommands(input: {
     clearBrowsingData: () => setClearDataRequest((value) => value + 1),
     bookmark: webPage ? () => setBookmarkRequest((value) => value + 1) : undefined,
     qrCode: webPage ? () => setQrCodeRequest((value) => value + 1) : undefined,
-    bookmarkAllViews: () => {
-      try {
-        const result = bookmarkWindowViews();
-        notice(
-          tab.id,
-          result
-            ? `Saved ${result.count} ${result.count === 1 ? "tab" : "tabs"} to “${result.group}”.`
-            : "There are no web pages in this window to bookmark.",
-        );
-      } catch (error) {
-        report(tab.id, error);
-      }
-    },
     copyLink: webPage
       ? () =>
           void navigator.clipboard
