@@ -1,7 +1,6 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
-use url::Url;
 
 pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
@@ -10,14 +9,11 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   // replace globals, prototype methods (postMessage, URLSearchParams) and
   // Object.prototype.toJSON, so nothing that carries the token may reach them.
   // Capture what the messages need now and build them by concatenation.
-  const nativeHost = __MISTY_NATIVE_HOST_PLACEHOLDER__;
   const encode = encodeURIComponent;
   const stringify = JSON.stringify;
-  const bindChannel = () => {
-    const channel = window.webkit?.messageHandlers?.mistyFocus;
-    return channel && typeof channel.postMessage === 'function' ? channel.postMessage.bind(channel) : null;
-  };
-  let postToHost = nativeHost ? bindChannel() : null;
+  // Kiri's host channel: the engine's native message handler, bound here.
+  const bindChannel = __KIRI_HOST_SENDER_PLACEHOLDER__;
+  let postToHost = bindChannel();
   const sendToHost = (message) => {
     // The handler is normally installed before the first document starts.
     postToHost = postToHost || bindChannel();
@@ -26,15 +22,13 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     return true;
   };
   const finite = (value) => (typeof value === 'number' && value === value && value !== Infinity && value !== -Infinity ? value : 0);
-  // macOS posts host navigations through the captured channel: a page can
+  // Host navigations are posted through the captured channel: a page can
   // observe its own navigations, but not a bound native function call.
   const sendHostNavigation = (url) => {
-    if (nativeHost) sendToHost('{"navigate":"' + url + '"}');
-    else window.location.href = url;
+    sendToHost('{"navigate":"' + url + '"}');
   };
   const sendFocus = () => {
-    if (nativeHost) sendToHost(shortcutToken);
-    else window.location.href = 'misty-focus:event?token=' + encode(shortcutToken);
+    sendToHost(shortcutToken);
   };
   __MISTY_CONTEXT_MENU_PLACEHOLDER__
   __MISTY_BACKGROUND_PLACEHOLDER__
@@ -113,10 +107,6 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   }, true);
 
   const sendPointer = (pointer) => {
-    if (!nativeHost) {
-      __MISTY_POINTER_NAVIGATION_PLACEHOLDER__
-      return;
-    }
     sendToHost('{"token":"' + shortcutToken + '","pointer":{"x":' + finite(pointer.x) + ',"y":' + finite(pointer.y) +
       ',"inside":' + (pointer.inside === true ? 'true' : 'false') + '}}');
   };
@@ -194,20 +184,9 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 
 pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
     BROWSER_VIEWPORT_SCRIPT
-        .replace(
-            "__MISTY_NATIVE_HOST_PLACEHOLDER__",
-            if cfg!(target_os = "macos") { "true" } else { "false" },
-        )
-        .replace(
-            "__MISTY_POINTER_NAVIGATION_PLACEHOLDER__",
-            if cfg!(target_os = "macos") {
-                ""
-            } else {
-                "window.location.href = pointer.inside ? 'misty-pointer:move?x=' + finite(pointer.x) + '&y=' + finite(pointer.y) : 'misty-pointer:leave';"
-            },
-        )
+        .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", kiri::channel::sender_script())
         .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
-        .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
+        .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", include_str!("browser_context_menu.js"))
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
@@ -226,18 +205,23 @@ pub(super) fn set_status_bubble_enabled(enabled: bool) {
     STATUS_BUBBLE_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
-pub(super) fn browser_status_script() -> String {
-    include_str!("browser_status.js").replace(
-        "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
-        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
-            "true"
-        } else {
-            "false"
-        },
-    )
+/// The tab's token authenticates the Escape-to-stop report on Kiri's host channel.
+pub(super) fn browser_status_script(shortcut_token: &str) -> String {
+    include_str!("browser_status.js")
+        .replace(
+            "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
+            if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
+                "true"
+            } else {
+                "false"
+            },
+        )
+        .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", kiri::channel::sender_script())
+        .replace(
+            "__MISTY_STATUS_TOKEN_PLACEHOLDER__",
+            &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
+        )
 }
-
-pub(super) const BROWSER_MEDIA_SCRIPT: &str = include_str!("browser_media.js");
 
 pub(super) fn browser_scrollbar_script() -> String {
     include_str!("browser_scrollbars.js").replace(
@@ -319,43 +303,12 @@ pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPo
     );
 }
 
-pub(super) fn browser_pointer_navigation(url: &Url) -> Option<BrowserPointerNavigation> {
-    if url.scheme() != "misty-pointer" {
-        return None;
-    }
-    if url.path().trim_start_matches('/') == "leave" {
-        return Some(BrowserPointerNavigation {
-            x: 0.0,
-            y: 0.0,
-            inside: false,
-        });
-    }
-    if url.path().trim_start_matches('/') != "move" {
-        return None;
-    }
-    let mut x = None;
-    let mut y = None;
-    for (key, value) in url.query_pairs() {
-        match key.as_ref() {
-            "x" => x = value.parse::<f64>().ok(),
-            "y" => y = value.parse::<f64>().ok(),
-            _ => {}
-        }
-    }
-    let (x, y) = (x?, y?);
-    if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 || x > 100_000.0 || y > 100_000.0 {
-        return None;
-    }
-    Some(BrowserPointerNavigation { x, y, inside: true })
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        browser_pointer_navigation, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
+        browser_status_script, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
         BROWSER_VIEWPORT_SCRIPT,
     };
-    use url::Url;
 
     #[test]
     fn pointer_reporting_uses_no_page_dom_mutation_or_remote_desktop_ipc() {
@@ -363,26 +316,23 @@ mod tests {
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("if (nativeHost) sendToHost(shortcutToken)"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("sendToHost(shortcutToken)"));
     }
 
     #[test]
-    fn pointer_navigation_accepts_only_bounded_coordinates() {
-        let pointer =
-            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=12.5&y=44").unwrap())
-                .unwrap();
-        assert_eq!(pointer.x, 12.5);
-        assert_eq!(pointer.y, 44.0);
-        assert!(pointer.inside);
-        assert!(
-            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=-1&y=4").unwrap())
-                .is_none()
-        );
-        assert!(
-            !browser_pointer_navigation(&Url::parse("misty-pointer:leave").unwrap())
-                .unwrap()
-                .inside
-        );
+    fn host_messages_ride_the_kiri_channel_and_never_navigate() {
+        let viewport = browser_viewport_script("token", true);
+        let status = browser_status_script("token");
+        for script in [&viewport, &status] {
+            assert!(script.contains(kiri::channel::sender_script()));
+            assert!(!script.contains("__KIRI_HOST_SENDER_PLACEHOLDER__"));
+        }
+        assert!(!viewport.contains("misty-focus:"));
+        assert!(!viewport.contains("location.href ="));
+        assert!(!status.contains("location.href ="));
+        assert!(!status.contains("misty-status:"));
+        assert!(!status.contains("__MISTY_STATUS_TOKEN_PLACEHOLDER__"));
+        assert!(status.contains("const statusToken = \"token\""));
     }
 
     #[test]

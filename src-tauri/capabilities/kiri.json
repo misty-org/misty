@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "kiri-pages",
+  "description": "Website pages in browser tabs may reach Kiri's single entry point and nothing else",
+  "platforms": ["macOS", "windows", "linux"],
+  "webviews": ["misty-browser-*"],
+  "remote": {
+    "urls": ["https://*:*", "http://*:*"]
+  },
+  "permissions": ["kiri:default"]
+}

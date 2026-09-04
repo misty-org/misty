@@ -327,10 +327,10 @@ pub(super) fn configure_main_webview_pointer_guard(_webview: &Webview) -> Result
 
 #[cfg(not(target_os = "macos"))]
 pub(super) fn configure_browser_webview(
-    _webview: &Webview,
+    webview: &Webview,
     _native_live_resize: bool,
 ) -> Result<(), String> {
-    Ok(())
+    super::browser_site_permissions::install(webview)
 }
 
 #[cfg(not(target_os = "macos"))]

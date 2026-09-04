@@ -3905,6 +3905,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "kiri"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "block2",
+ "ciborium",
+ "gtk",
+ "javascriptcore-rs",
+ "objc",
+ "objc2",
+ "objc2-foundation",
+ "objc2-web-kit",
+ "psl",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tokio",
+ "url",
+ "webkit2gtk",
+ "webview2-com",
+ "windows 0.61.3",
+]
+
+[[package]]
 name = "kqueue"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4443,6 +4468,7 @@ dependencies = [
  "hmac",
  "image",
  "iroh",
+ "kiri",
  "libc",
  "lz4_flex",
  "mdns-sd",
@@ -6005,6 +6031,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "psl"
+version = "2.1.240"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea2ee47ef40869436389d1ae67f6cb442728f74e0ba9059e1053ef6ce60e7a10"
+dependencies = [
+ "psl-types",
 ]
 
 [[package]]

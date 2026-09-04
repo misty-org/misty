@@ -1,0 +1,63 @@
+[package]
+name = "kiri"
+version = "0.1.0"
+edition = "2021"
+description = "Misty's native web platform layer: web APIs the OS webviews leave out, supplied from Rust."
+publish = false
+# Tauri derives the plugin's ACL identifier from this; it must match the package name.
+links = "kiri"
+
+[features]
+default = ["tauri"]
+# The Tauri plugin and engine hooks. Without it the core (envelope, gate,
+# permission rules, capabilities) builds and tests on its own:
+# `cargo test --no-default-features`.
+tauri = [
+    "dep:tauri",
+    "dep:tokio",
+    "dep:block2",
+    "dep:objc",
+    "dep:objc2",
+    "dep:objc2-foundation",
+    "dep:objc2-web-kit",
+    "dep:webview2-com",
+    "dep:windows",
+    "dep:gtk",
+    "dep:javascriptcore-rs",
+    "dep:webkit2gtk",
+]
+
+[dependencies]
+base64 = "0.22"
+ciborium = "0.2"
+psl = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Kiri's native code must use the same webview2-com / windows / webkit2gtk
+# versions as the wry that Tauri resolves to, so these move together with
+# Misty's Tauri (src-tauri/Cargo.toml). Bump them as one.
+tauri = { version = ">=2.11.3, <2.12", optional = true }
+tokio = { version = "1", features = ["sync", "time"], optional = true }
+url = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = { version = "0.6.2", optional = true }
+objc = { version = "0.2.7", optional = true }
+objc2 = { version = "0.6.4", optional = true }
+objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSObject", "NSProcessInfo", "NSString", "NSURL", "NSUUID"] }
+objc2-web-kit = { version = "0.3.2", optional = true, default-features = false, features = ["std", "block2", "objc2-app-kit", "WKFrameInfo", "WKSecurityOrigin", "WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = { version = "0.38.2", optional = true }
+windows = { version = "0.61", optional = true, features = ["Win32_System_Com"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = { version = "0.18", optional = true }
+javascriptcore-rs = { version = "=1.1.2", optional = true, features = ["v2_28"] }
+webkit2gtk = { version = "=2.0", optional = true, features = ["v2_40"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

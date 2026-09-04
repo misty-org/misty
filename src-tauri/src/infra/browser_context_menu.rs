@@ -326,15 +326,13 @@ pub(super) fn select(
                 .map_err(|e| e.to_string())?;
         }
         "copy" | "cut" | "paste" => {
-            let action = action.to_owned();
-            view.with_webview(move |platform| unsafe {
-                let native: &objc2::runtime::AnyObject = &*platform.inner().cast();
-                match action.as_str() {
-                    "copy" => { let _: () = objc2::msg_send![native, copy: std::ptr::null::<objc2::runtime::AnyObject>()]; },
-                    "cut" => { let _: () = objc2::msg_send![native, cut: std::ptr::null::<objc2::runtime::AnyObject>()]; },
-                    _ => { let _: () = objc2::msg_send![native, paste: std::ptr::null::<objc2::runtime::AnyObject>()]; },
-                }
-            }).map_err(|e| e.to_string())?;
+            use kiri::engine::EditCommand;
+            let command = match action {
+                "copy" => EditCommand::Copy,
+                "cut" => EditCommand::Cut,
+                _ => EditCommand::Paste,
+            };
+            kiri::engine::edit(&view, command)?;
         }
         _ => unreachable!(),
     }

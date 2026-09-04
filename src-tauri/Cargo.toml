@@ -45,6 +45,7 @@ hex = "0.4"
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
 misty-agent-files = { path = "crates/agent-files" }
+kiri = { path = "../kiri" }
 libc = "0.2"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

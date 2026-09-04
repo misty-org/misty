@@ -23,6 +23,8 @@ extern "C" {
         url: *const c_char,
     );
     fn misty_extensions_navigation(view: *mut c_void, action: *mut c_void) -> bool;
+    fn misty_extensions_set_compat_channel(install: extern "C" fn(*mut c_void));
+    fn misty_extensions_compat_message(message: *mut c_void, reply: *mut c_void);
     fn misty_extensions_supported() -> bool;
     fn misty_extensions_tab_event(identifier: *const c_char, event: *const c_char);
 }
@@ -45,9 +47,28 @@ pub fn initialize(app: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     unsafe {
         misty_extensions_set_events(event);
+        // Compat requests ride Kiri's extension transport.
+        kiri::extensions::bridge::set_extension_channel(CompatHost);
+        misty_extensions_set_compat_channel(install_compat_channel);
         wry::set_native_navigation_interceptor(|view, action| {
             misty_extensions_navigation(view, action)
         });
+    }
+}
+
+#[cfg(target_os = "macos")]
+extern "C" fn install_compat_channel(controller: *mut c_void) {
+    unsafe { kiri::extensions::bridge::install(controller) }
+}
+
+/// The native extension host answers what Kiri's transport admits.
+#[cfg(target_os = "macos")]
+struct CompatHost;
+
+#[cfg(target_os = "macos")]
+impl kiri::extensions::bridge::ExtensionChannel for CompatHost {
+    unsafe fn receive(&self, message: *mut c_void, reply: *mut c_void) {
+        misty_extensions_compat_message(message, reply);
     }
 }
 
