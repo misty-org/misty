@@ -1,4 +1,5 @@
-import { useSpacesStore } from "@/features/spaces";
+import { useAgentsSpaces as useSpacesStore } from "@/features/agents/agentsRuntime";
+
 import type { GlobalAiActionProposal } from "./types";
 
 export function proposeAction(prompt: string): GlobalAiActionProposal {

@@ -17,6 +17,7 @@ import {
   Input,
   cn,
 } from "@/shared/ui";
+import { useSurfacePresentation } from "@/shared/mobile";
 import { Check, Copy, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   useState,
@@ -42,6 +43,7 @@ export interface SpaceTaskDrawerProps {
 }
 
 export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const { draft, setDraft, editing, busy, canManage, onClose } = props;
   const [copiedKey, setCopiedKey] = useState(false);
 
@@ -69,9 +71,12 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent
         className={cn(
-          "flex h-[min(880px,82vh)] w-[min(1200px,82vw)] min-h-[540px] max-w-[85vw]",
+          mobile
+            ? "inset-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0"
+            : "flex h-[min(880px,82vh)] w-[min(1200px,82vw)] min-h-[540px] max-w-[85vw]",
           "flex-col gap-0 overflow-hidden rounded-2xl border border-charcoal-border",
           "bg-charcoal-card p-0 shadow-2xl",
+          mobile && "rounded-none border-0 pt-[env(safe-area-inset-top)]",
         )}
       >
         <form
@@ -84,9 +89,21 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
           </DialogTitle>
 
           {/* Main Body */}
-          <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_280px] overflow-hidden max-sm:grid-cols-1">
+          <div
+            className={cn(
+              "grid min-h-0 flex-1 overflow-hidden",
+              mobile
+                ? "grid-cols-1 overflow-y-auto"
+                : "grid-cols-[minmax(0,1fr)_280px] max-sm:grid-cols-1",
+            )}
+          >
             {/* Left Content Area */}
-            <div className="flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto p-7">
+            <div
+              className={cn(
+                "flex min-h-0 flex-1 flex-col space-y-6 overflow-y-auto",
+                mobile ? "p-4" : "p-7",
+              )}
+            >
               {/* Title input */}
               <div className="flex items-center gap-2 max-sm:pr-10">
                 <Input
@@ -111,7 +128,10 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
                         size="icon"
                         variant="ghost"
                         type="button"
-                        className="size-9 shrink-0 text-cream-muted hover:text-cream"
+                        className={cn(
+                          "shrink-0 text-cream-muted hover:text-cream",
+                          mobile ? "size-11" : "size-9",
+                        )}
                         aria-label="Task actions"
                       >
                         <MoreHorizontal className="size-4" />
@@ -172,6 +192,7 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
             className={cn(
               "flex-row items-center justify-between border-t border-charcoal-border/70",
               "bg-charcoal-card/40 px-6 py-3.5",
+              mobile && "pb-[max(0.875rem,env(safe-area-inset-bottom))]",
             )}
           >
             <div className="hidden text-[11px] text-cream-faint sm:block">
@@ -182,14 +203,21 @@ export function SpaceTaskDrawer(props: SpaceTaskDrawerProps) {
               to save
             </div>
             <div className="ml-auto flex items-center gap-2.5">
-              <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={onClose}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(mobile && "min-h-11")}
+                type="button"
+                disabled={busy}
+                onClick={onClose}
+              >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 disabled={busy || !canManage || !draft.title.trim()}
                 type="submit"
-                className="px-4"
+                className={cn("px-4", mobile && "min-h-11")}
               >
                 {busy ? <LoaderCircle className="mr-1.5 size-3.5 animate-spin" /> : null}
                 {editing ? "Save changes" : "Create task"}

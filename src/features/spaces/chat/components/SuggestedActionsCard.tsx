@@ -1,5 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
+import { SocialError as SystemErrorActivity } from "@/features/spaces/chat/socialRuntime";
 import type { SpaceRoadmap } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type {
   SpaceActionSuggestionBatch,

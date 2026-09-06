@@ -97,6 +97,7 @@ describe("SpaceSwitcherMenu", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",

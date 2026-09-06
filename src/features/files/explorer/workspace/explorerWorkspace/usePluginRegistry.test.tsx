@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/features/files/native", () => ({
+  explorerPrepareDragItems: vi.fn(),
+  explorerCancelDragPreparation: vi.fn(),
   pluginCommandsSnapshot: mocks.pluginCommandsSnapshot,
 }));
 

@@ -25,12 +25,14 @@ export function MemberList({
   members,
   loading,
   owner,
+  canTransferOwnership,
   currentUserId,
   onAction,
 }: {
   members: SpaceMember[];
   loading: boolean;
   owner: boolean;
+  canTransferOwnership: boolean;
   currentUserId: string | undefined;
   onAction: (action: MemberAction) => void;
 }) {
@@ -74,7 +76,11 @@ export function MemberList({
                   userId={member.user_id}
                   memberName={member.name}
                 />
-                <MemberActionsMenu member={member} onAction={onAction} />
+                <MemberActionsMenu
+                  member={member}
+                  canTransferOwnership={canTransferOwnership}
+                  onAction={onAction}
+                />
               </div>
             ) : null}
           </div>
@@ -87,9 +93,11 @@ export function MemberList({
 
 function MemberActionsMenu({
   member,
+  canTransferOwnership,
   onAction,
 }: {
   member: SpaceMember;
+  canTransferOwnership: boolean;
   onAction: (action: MemberAction) => void;
 }) {
   return (
@@ -100,10 +108,14 @@ function MemberActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
-          <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {canTransferOwnership ? (
+          <>
+            <DropdownMenuItem onSelect={() => onAction({ kind: "transfer", member })}>
+              <ShieldCheck className="mr-2 size-4" /> Transfer ownership
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem
           className="text-cream-bright focus:text-cream-bright"
           onSelect={() => onAction({ kind: "remove", member })}

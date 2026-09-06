@@ -2,7 +2,7 @@ import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
 import { TableCell, TableRow } from "@/shared/ui";
 import type { MouseEvent } from "react";
 import { memo, useMemo } from "react";
-import { useExplorerDragSource, useExplorerDropZone } from "../../drag/ExplorerDragContext";
+import { useExplorerDragSource, useExplorerDropZone } from "../../drag/ExplorerDragHooks";
 import { storageIdForPath } from "../../drag/operations";
 import type { FileBrowserProps } from "../../model/interfaces/components/FileBrowser";
 import type { ExplorerDragModifiers, ExplorerDragPayload } from "../../model/interfaces/drag/types";

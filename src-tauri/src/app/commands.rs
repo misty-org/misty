@@ -35,7 +35,6 @@ use crate::infra::agents::{
 };
 use crate::infra::autostart::LaunchOnLoginSnapshot;
 use crate::infra::claude::{ClaudeSendRequest, ClaudeStatus, ClaudeStreamEvent};
-#[cfg(desktop)]
 use crate::infra::connected_devices::{
     ConnectPeerRequest, ConnectedDevicesService, ConnectedDevicesSnapshot,
     InitializeConnectedDevicesRequest, PeerPathRequest, PeerReadRequest,
@@ -189,6 +188,47 @@ pub async fn mail_cache_remove(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<()> {
     crate::infra::mail_cache::remove(&state.environment.cache_dir(), &account_id).await
+}
+
+#[tauri::command]
+pub fn mobile_cache_read(
+    account_id: String,
+    record_key: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<Option<String>> {
+    crate::infra::mobile_cache::read(&state.environment.cache_dir(), &account_id, &record_key)
+}
+
+#[tauri::command]
+pub fn mobile_cache_write(
+    account_id: String,
+    record_key: String,
+    value: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    crate::infra::mobile_cache::write(
+        &state.environment.cache_dir(),
+        &account_id,
+        &record_key,
+        &value,
+    )
+}
+
+#[tauri::command]
+pub fn mobile_cache_remove(
+    account_id: String,
+    record_key: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    crate::infra::mobile_cache::remove(&state.environment.cache_dir(), &account_id, &record_key)
+}
+
+#[tauri::command]
+pub fn mobile_cache_purge_account(
+    account_id: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<()> {
+    crate::infra::mobile_cache::purge_account(&state.environment.cache_dir(), &account_id)
 }
 
 #[tauri::command]
@@ -1547,7 +1587,7 @@ pub async fn devices_unmount(
         .map_err(|err| ApiError::Message(format!("Device unmount failed: {err}")))?
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_initialize(
     request: InitializeConnectedDevicesRequest,
@@ -1566,7 +1606,7 @@ pub async fn connected_devices_initialize(
     Ok(snapshot)
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_snapshot(
     state: State<'_, MistyRuntime>,
@@ -1574,7 +1614,7 @@ pub async fn connected_devices_snapshot(
     state.connected_devices.snapshot()
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_subscribe_directory(
     path: String,
@@ -1589,7 +1629,7 @@ pub async fn connected_devices_subscribe_directory(
     )
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_connect(
     request: ConnectPeerRequest,
@@ -1598,7 +1638,20 @@ pub async fn connected_devices_connect(
     state.connected_devices.connect(request).await
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
+#[tauri::command]
+pub async fn connected_devices_open_workspace_route(
+    device_id: String,
+    request: crate::domain::connected_devices::OpenWorkspaceRouteRequest,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<crate::domain::connected_devices::OpenWorkspaceRouteResult> {
+    state
+        .connected_devices
+        .open_workspace_route(&device_id, request)
+        .await
+}
+
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_roots(
     device_id: String,
@@ -1607,7 +1660,7 @@ pub async fn connected_devices_roots(
     state.connected_devices.roots(&device_id).await
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_list_directory(
     request: PeerPathRequest,
@@ -1616,7 +1669,7 @@ pub async fn connected_devices_list_directory(
     state.connected_devices.list_directory(request).await
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_read_file(
     request: PeerReadRequest,
@@ -1625,7 +1678,7 @@ pub async fn connected_devices_read_file(
     state.connected_devices.read_file(request).await
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_media_url(
     path: String,
@@ -1634,7 +1687,7 @@ pub async fn connected_devices_media_url(
     state.connected_devices.media_url(&path).await
 }
 
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 #[tauri::command]
 pub async fn connected_devices_prepare_clipboard_files(
     device_id: String,

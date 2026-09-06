@@ -20,6 +20,7 @@ vi.mock("@/telemetry/metadata", () => ({
 
 vi.mock("@/shared/platform/openExternalLink", () => ({
   openSystemExternalLink: mocks.openExternal,
+  configureExternalLinkPreference: vi.fn(),
 }));
 
 vi.mock("./supportBundle", () => ({ downloadSupportBundle: mocks.downloadBundle }));
@@ -29,6 +30,7 @@ vi.mock("./recoveryActions", () => ({
   resetWorkspaceLayout: mocks.resetLayout,
 }));
 
+import { useTourStore } from "@/features/tour";
 import { SupportRecoverySection } from "./SupportRecoverySection";
 
 describe("SupportRecoverySection", () => {
@@ -103,6 +105,25 @@ describe("SupportRecoverySection", () => {
     expect(issueUrl.pathname).toBe("/misty-org/misty-public/issues/new");
     expect(issueUrl.searchParams.get("title")).toContain("Planner focus jumps");
     expect(mocks.downloadBundle).not.toHaveBeenCalled();
+  });
+
+  it("replays the app tour and closes settings when requested", async () => {
+    useTourStore.setState({ isOpen: false, currentStep: "closed" });
+    const closeSettingsListener = vi.fn();
+    window.addEventListener("misty:close-settings", closeSettingsListener);
+
+    await act(async () => root.render(<SupportRecoverySection />));
+    const startTourButton = Array.from(container.querySelectorAll("button")).find((btn) =>
+      btn.textContent?.includes("Start tour"),
+    );
+    expect(startTourButton).toBeDefined();
+
+    await act(async () => startTourButton?.click());
+
+    expect(closeSettingsListener).toHaveBeenCalledOnce();
+    expect(useTourStore.getState().isOpen).toBe(true);
+    expect(useTourStore.getState().currentStep).toBe("welcome");
+    window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });
 

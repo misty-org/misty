@@ -13,12 +13,17 @@ export function createDockLeaf(tabs: WorkspaceTab[] = []): WorkspacePane {
   };
 }
 
-export function fillEmptyDockLeaves(node: WorkspaceDockNode): WorkspaceDockNode {
+export function fillEmptyDockLeaves(
+  node: WorkspaceDockNode,
+  createTab?: () => WorkspaceTab,
+): WorkspaceDockNode {
   if (node.type === "leaf") {
-    return node;
+    if (node.tabs.length || !createTab) return node;
+    const tab = createTab();
+    return { ...node, tabs: [tab], activeTabId: tab.id };
   }
-  const first = fillEmptyDockLeaves(node.first);
-  const second = fillEmptyDockLeaves(node.second);
+  const first = fillEmptyDockLeaves(node.first, createTab);
+  const second = fillEmptyDockLeaves(node.second, createTab);
   return first === node.first && second === node.second ? node : { ...node, first, second };
 }
 

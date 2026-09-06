@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
@@ -10,7 +8,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
+import type { TerminalServices, TerminalPreferences } from "./terminalServices";
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { TerminalPaneOverlays, type TerminalSessionStatus } from "./TerminalPaneOverlays";
 import {
@@ -27,22 +25,21 @@ import {
   cwdBySlot,
   registerSlot,
   sessionBySlot,
+  retainTerminalSession,
+  forgetTerminalSession,
   titleBySlot,
 } from "./terminalRegistry";
-import { selectTerminalPreferences, useSettingsStore } from "@/features/settings";
-import { useShallow } from "zustand/react/shallow";
 import { useTerminalPaneHandle, type TerminalPaneHandle } from "./useTerminalPaneHandle";
 
 export type { TerminalPaneHandle } from "./useTerminalPaneHandle";
 export type { TerminalSessionStatus } from "./TerminalPaneOverlays";
 
-type TerminalOutputEvent = { sessionId: string; data: string };
-type TerminalExitEvent = { sessionId: string; exitCode?: number };
-
 const MISTY_MONOSPACE_STACK =
   'ui-monospace, "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace';
 const CURSOR_STYLES = ["block", "bar", "underline"] as const;
 interface TerminalPaneProps {
+  services: TerminalServices;
+  preferences: TerminalPreferences;
   slotId: string;
   tabId: string | null;
   cwd?: string | null;
@@ -62,6 +59,8 @@ interface TerminalPaneProps {
 export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
   function TerminalPane(props, handleRef) {
     const {
+      services,
+      preferences: terminalPreferences,
       slotId,
       tabId,
       cwd,
@@ -76,6 +75,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       onCancelSsh,
     } = props;
     const environment = props.environment ?? localTerminalEnvironment;
+    const focusedRef = useRef(focused);
+    focusedRef.current = focused;
 
     const hostRef = useRef<HTMLDivElement | null>(null);
     const terminalRef = useRef<Terminal | null>(null);
@@ -86,9 +87,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     const sessionIdRef = useRef("");
     const fontScaleRef = useRef(1);
     const [fontScale, setFontScale] = useState(1);
-    const terminalPreferences = useSettingsStore(
-      useShallow((state) => selectTerminalPreferences(state.settings?.document)),
-    );
     // xterm is built once inside a rAF callback, so the constructor reads
     // through a ref rather than the render-time value.
     const preferencesRef = useRef(terminalPreferences);
@@ -128,14 +126,15 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       const host = hostRef.current;
       const pixelWidth = host ? Math.round(host.clientWidth) : 0;
       const pixelHeight = host ? Math.round(host.clientHeight) : 0;
-      void invoke("terminal_resize", {
-        sessionId,
-        cols: term.cols,
-        rows: term.rows,
-        pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
-        pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
-      }).catch(() => undefined);
-    }, []);
+      void services.terminal
+        .resize(sessionId, {
+          cols: term.cols,
+          rows: term.rows,
+          pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+          pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
+        })
+        .catch(() => undefined);
+    }, [services]);
 
     useEffect(() => {
       const host = hostRef.current;
@@ -147,7 +146,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       setHostKey(null);
 
       let disposed = false;
-      const unlistens: UnlistenFn[] = [];
+      const unlistens: Array<() => void> = [];
       let cleanup: (() => void) | null = null;
 
       // Double rAF: first frame paints the pane, second frame measures it.
@@ -181,9 +180,12 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           const unicode = new Unicode11Addon();
           const links = new WebLinksAddon((event, uri) => {
             event.preventDefault();
-            void openSystemExternalLink(uri);
+            void services.openExternal(uri).catch((error) => services.reportError(String(error)));
           });
-          const clipboard = new ClipboardAddon();
+          const clipboard = new ClipboardAddon(undefined, {
+            readText: () => services.clipboard.readText(),
+            writeText: (_selection, text) => services.clipboard.writeText(text),
+          });
           const image = new ImageAddon({
             sixelSupport: true,
             sixelScrolling: true,
@@ -279,7 +281,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           const inputDisposable = term.onData((data) => {
             const sessionId = sessionIdRef.current;
             if (!sessionId) return;
-            void invoke("terminal_write", { sessionId, data }).catch(() => undefined);
+            void services.terminal.write(sessionId, data).catch(() => undefined);
           });
 
           const focusDisposable = term.onSelectionChange(() => onFocusRef.current?.());
@@ -292,64 +294,38 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
           const observer = new ResizeObserver(fitAndPush);
           observer.observe(host);
 
-          // Set up event listeners BEFORE spawning so first bytes aren't
-          // dropped. `terminal_create` may resolve before the listen()
-          // registration lands if we do it the other way around.
+          // The SDK buffers output until this owned handle is subscribed.
           const setup = async () => {
             try {
-              const outputUnlisten = await listen<TerminalOutputEvent>(
-                "misty://terminal-output",
-                ({ payload }) => {
-                  if (payload.sessionId === sessionIdRef.current) term.write(payload.data);
-                },
-              );
-              const exitUnlisten = await listen<TerminalExitEvent>(
-                "misty://terminal-exit",
-                ({ payload }) => {
-                  if (payload.sessionId !== sessionIdRef.current) return;
-                  const closedId = sessionIdRef.current;
-                  sessionIdRef.current = "";
-                  if (sessionBySlot.get(slotId) === closedId) {
-                    sessionBySlot.delete(slotId);
-                    bufferBySlot.delete(slotId);
-                  }
-                  setStatus("exited");
-                  term.writeln(
-                    `\r\n\x1b[90m[process exited${payload.exitCode == null ? "" : ` with code ${payload.exitCode}`}]\x1b[0m`,
-                  );
-                  onExitRef.current?.(payload.exitCode);
-                },
-              );
-              unlistens.push(outputUnlisten, exitUnlisten);
-              if (disposed) return;
-
               const pixelWidth = host ? Math.round(host.clientWidth) : 0;
               const pixelHeight = host ? Math.round(host.clientHeight) : 0;
 
               const existing = sessionBySlot.get(slotId);
               if (existing) {
                 sessionIdRef.current = existing;
-                await invoke("terminal_resize", {
-                  sessionId: existing,
-                  cols: term.cols,
-                  rows: term.rows,
-                  pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
-                  pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
-                }).catch(() => undefined);
+                await services.terminal
+                  .resize(existing, {
+                    cols: term.cols,
+                    rows: term.rows,
+                    pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+                    pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
+                  })
+                  .catch(() => undefined);
                 // Nudge the shell to redraw its prompt after reattach so
                 // the visible line matches the shell's cursor tracker.
                 // ^L is the widely-supported "redraw" input for zsh/bash
                 // when zle is active.
                 if (!restore) {
-                  void invoke("terminal_write", {
-                    sessionId: existing,
-                    data: "\x0c",
-                  }).catch(() => undefined);
+                  void services.terminal.write(existing, "\x0c").catch(() => undefined);
                 }
               } else {
                 if (environment.kind === "ssh") {
                   setStatus("connecting");
-                  const preflight = await preflightSshEnvironment(environment.ssh);
+                  const preflight = await preflightSshEnvironment(
+                    services.terminal,
+                    environment.ssh,
+                  );
+                  if (disposed) return;
                   if (preflight.state === "confirmation_required") {
                     setHostKey(preflight);
                     setStatus("awaiting_fingerprint");
@@ -359,26 +335,60 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
                     throw new Error(preflight.message);
                   }
                 }
-                const sessionId = await invoke<string>("terminal_create", {
-                  request: {
-                    cwd: cwd?.trim() || null,
-                    cols: term.cols,
-                    rows: term.rows,
-                    pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
-                    pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
-                    env: {},
-                    environment: terminalEnvironmentRequest(environment),
-                  },
+                if (disposed) return;
+                const { handle: sessionId } = await services.terminal.create({
+                  cwd: cwd?.trim() || undefined,
+                  cols: Math.max(2, term.cols),
+                  rows: Math.max(2, term.rows),
+                  pixelWidth: pixelWidth > 0 ? pixelWidth : undefined,
+                  pixelHeight: pixelHeight > 0 ? pixelHeight : undefined,
+                  env: {},
+                  environment: terminalEnvironmentRequest(environment),
                 });
-                if (!sessionId || disposed) return;
+                if (disposed) {
+                  await services.terminal.close(sessionId).catch(() => undefined);
+                  return;
+                }
                 sessionIdRef.current = sessionId;
-                sessionBySlot.set(slotId, sessionId);
+                retainTerminalSession(slotId, sessionId, () => services.terminal.close(sessionId));
               }
+              if (disposed) return;
               setStatus("running");
-              term.focus();
+              const unsubscribe = await services.terminal.subscribe(
+                sessionIdRef.current,
+                (event) => {
+                  if (disposed) return;
+                  if (event.type === "output") {
+                    term.write(event.data);
+                    return;
+                  }
+                  const closedId = sessionIdRef.current;
+                  sessionIdRef.current = "";
+                  if (sessionBySlot.get(slotId) === closedId) {
+                    forgetTerminalSession(slotId);
+                    bufferBySlot.delete(slotId);
+                  }
+                  void services.terminal.close(closedId).catch(() => undefined);
+                  setStatus("exited");
+                  term.writeln(
+                    `\r\n\x1b[90m[process exited${event.exitCode == null ? "" : ` with code ${event.exitCode}`}]\x1b[0m`,
+                  );
+                  onExitRef.current?.(event.exitCode ?? undefined);
+                },
+              );
+              if (disposed) unsubscribe();
+              else unlistens.push(unsubscribe);
+              if (!disposed && focusedRef.current) term.focus();
             } catch (nextError) {
               if (disposed) return;
+              const failedHandle = sessionIdRef.current;
+              sessionIdRef.current = "";
+              if (failedHandle) {
+                if (sessionBySlot.get(slotId) === failedHandle) forgetTerminalSession(slotId);
+                void services.terminal.close(failedHandle).catch(() => undefined);
+              }
               setStatus("unavailable");
+              services.reportError(String(nextError));
               setError(
                 nextError instanceof Error
                   ? nextError.message
@@ -437,7 +447,11 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
       setStatus("connecting");
       setError("");
       try {
-        const result = await trustSshHost(environment.ssh, hostKey.fingerprints[0]);
+        const result = await trustSshHost(
+          services.terminal,
+          environment.ssh,
+          hostKey.fingerprints[0],
+        );
         if (result.state !== "trusted") throw new Error(result.message);
         setHostKey(null);
         setRestartToken((token) => token + 1);
@@ -445,7 +459,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
         setStatus("unavailable");
         setError(nextError instanceof Error ? nextError.message : "Host confirmation failed.");
       }
-    }, [environment, hostKey]);
+    }, [services, environment, hostKey]);
 
     // Re-fit when the pane becomes visible (e.g., switched back to this tab
     // or unhidden a split). Uses rAF so layout has settled.
@@ -485,6 +499,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, TerminalPaneProps>(
     ]);
 
     useTerminalPaneHandle({
+      services,
       handleRef,
       terminalRef,
       searchRef,

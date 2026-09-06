@@ -1,4 +1,4 @@
-import { useAppThemeStore } from "@/features/settings";
+import { useRoadmapRuntime } from "./roadmapRuntime";
 import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -20,7 +20,7 @@ export function RoadmapSnapshotPreview({ snapshot }: { snapshot: SpaceRoadmapSna
 }
 
 function RoadmapSnapshotFlow({ snapshot }: { snapshot: SpaceRoadmapSnapshot }) {
-  const resolvedTheme = useAppThemeStore((state) => state.resolvedTheme);
+  const resolvedTheme = useRoadmapRuntime().theme;
   const nodes = useMemo<RoadmapNode[]>(
     () => snapshotRoadmapNodes(snapshot, new Set<string>(), () => undefined),
     [snapshot],

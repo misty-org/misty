@@ -1,6 +1,11 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { unreadActivityCountForSpace, useActivityStore } from "@/features/activity";
-import { GlobalCreateSpaceDialog, SpaceAvatar, SpaceRowActions } from "@/features/spaces";
+import {
+  GlobalCreateSpaceDialog,
+  SpaceAvatar,
+  SpaceRowActions,
+  spaceNavigationName,
+} from "@/features/spaces";
 import { spaceLandingRoute } from "@/features/spaces/navigation";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
@@ -16,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
   cn,
+  navigationMenuPrimaryLayoutClass,
   navigationDisclosureChevronClass,
   navigationDisclosureLabelClass,
 } from "@/shared/ui";
@@ -34,12 +40,12 @@ export function GlobalSpaceSwitcher(props: {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const activityItems = useActivityStore((state) => state.allItems);
-  const activeName = props.activeSpace?.name ?? "Misty";
+  const activeName = props.activeSpace ? spaceNavigationName(props.activeSpace) : "Misty";
   const activeUnread = props.activeSpace
     ? unreadActivityCountForSpace(activityItems, props.activeSpace.id)
     : 0;
   const switcherLabel = props.activeSpace
-    ? `Switch Space, current Space: ${props.activeSpace.name}${activeUnread > 0 ? `, ${activeUnread} unread` : ""}`
+    ? `Switch Space, current Space: ${spaceNavigationName(props.activeSpace)}${activeUnread > 0 ? `, ${activeUnread} unread` : ""}`
     : "Choose a Space";
 
   const switchSpace = (space: Space) => {
@@ -59,8 +65,9 @@ export function GlobalSpaceSwitcher(props: {
                   <button
                     type="button"
                     className={cn(
-                      "misty-navigator-row-target flex h-9 w-full max-w-full min-w-0 items-center",
-                      "gap-2.5 rounded-md border-0 bg-transparent px-2.5 text-left transition-colors",
+                      "misty-navigator-row-target h-9 flex-1 max-w-[calc(100%_-_2.5rem)] min-w-0 items-center",
+                      navigationMenuPrimaryLayoutClass,
+                      "rounded-md border-0 bg-transparent px-2.5 text-left transition-colors",
                       "hover:bg-charcoal-card/60",
                       navigatorFocusRingClass,
                     )}
@@ -68,7 +75,7 @@ export function GlobalSpaceSwitcher(props: {
                     data-misty-window-drag-block="true"
                     data-space-menu-open={menuOpen ? "true" : "false"}
                   >
-                    <span className="relative grid size-7 shrink-0 place-items-center">
+                    <span className="relative flex size-[18px] shrink-0 items-center justify-center">
                       {props.activeSpace ? (
                         <>
                           <SpaceAvatar
@@ -89,14 +96,9 @@ export function GlobalSpaceSwitcher(props: {
                         />
                       )}
                     </span>
-                    <span
-                      className={cn(
-                        navigationDisclosureLabelClass,
-                        "max-w-[calc(100%_-_2.375rem)]",
-                      )}
-                    >
+                    <span className={cn(navigationDisclosureLabelClass, "min-w-0")}>
                       <OverflowFadeText
-                        className="min-w-0 overflow-hidden whitespace-nowrap text-base font-semibold text-cream"
+                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-base font-semibold text-cream"
                         data-active-space-name="true"
                         title={activeName}
                       >
@@ -105,6 +107,7 @@ export function GlobalSpaceSwitcher(props: {
                       <ChevronDown
                         size={16}
                         className={cn(
+                          navigationMenuPrimaryLayoutClass,
                           navigationDisclosureChevronClass,
                           "text-cream-muted transition-transform duration-150 motion-reduce:transition-none",
                           menuOpen && "rotate-180",
@@ -121,7 +124,7 @@ export function GlobalSpaceSwitcher(props: {
             </Tooltip>
           </TooltipProvider>
 
-          <DropdownMenuContent align="start" sideOffset={6} className="w-[304px]">
+          <DropdownMenuContent align="start" sideOffset={6} className="w-[240px]">
             <DropdownMenuLabel>Spaces</DropdownMenuLabel>
             <div className="misty-transient-scrollbar grid max-h-[320px] gap-1 overflow-y-auto">
               {props.spaces.map((space) => {
@@ -153,14 +156,19 @@ export function GlobalSpaceSwitcher(props: {
                       <OverflowFadeText
                         className="block min-w-0 flex-1 overflow-hidden whitespace-nowrap"
                         data-space-name={space.id}
-                        title={space.name}
+                        title={spaceNavigationName(space)}
                       >
-                        {space.name}
+                        {spaceNavigationName(space)}
                       </OverflowFadeText>
                       {unread > 0 ? <span className="sr-only">{unread} unread</span> : null}
                     </DropdownMenuItem>
                     <div
-                      className="pointer-events-auto absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end opacity-100"
+                      className={cn(
+                        "pointer-events-none absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end opacity-0 transition-opacity",
+                        "group-hover/space-menu-row:pointer-events-auto group-hover/space-menu-row:opacity-100",
+                        "group-focus-within/space-menu-row:pointer-events-auto group-focus-within/space-menu-row:opacity-100",
+                        "has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100",
+                      )}
                       data-space-row-actions={space.id}
                     >
                       <SpaceRowActions space={space} />

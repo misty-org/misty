@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { useWorkspaceStore } from "@/features/workspace";
 import type { PluginPanelEntry } from "@/native/contracts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ExplorerPluginTabMenu } from "./ExplorerPluginTabMenu";
 
 const panel: PluginPanelEntry = {

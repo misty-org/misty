@@ -4,14 +4,13 @@ import {
   explorerPrepareOpenItem,
   connectedDevicesMediaUrl,
 } from "@/features/files/native";
-import type { ArchiveEntry, FileEntry } from "@/native/contracts";
+import type { FileEntry } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import type {
   LoadedInspectorPreview,
   PreparedPreviewPath,
 } from "../../model/interfaces/components/FileInspectorPreview";
-import { formatBytes } from "../../utils/fileFormat";
 import {
   FOLDER_PREVIEW_LIMIT,
   INSPECTOR_IMAGE_PREVIEW_MAX_DIMENSION,
@@ -138,17 +137,8 @@ export function previewPayloadIsText(mimeType: string): boolean {
   return mimeType.startsWith("text/") || mimeType.startsWith("application/json");
 }
 
-export function archiveEntryName(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
-  return trimmed.split("/").filter(Boolean).pop() ?? path;
-}
-
-export function archiveEntryIsArchive(path: string): boolean {
-  const lowerPath = path.toLowerCase();
-  return [...archivePreviewExtensions].some((extension) => lowerPath.endsWith(`.${extension}`));
-}
-
-export function formatArchiveEntrySize(entry: ArchiveEntry): string {
-  const size = entry.uncompressedSize || entry.compressedSize;
-  return size > 0 ? formatBytes(size) : "";
-}
+export {
+  archiveEntryName,
+  archiveEntryIsArchive,
+  formatArchiveEntrySize,
+} from "./archivePresentation";

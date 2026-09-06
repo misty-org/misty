@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSection } from "@/features/settings";
 import type * as AppShell from "@/features/app-shell";
 import type * as FileSearch from "@/features/files/search";
-import { NAVIGATOR_APP_IDS, workspaceAppIconColorClass } from "@/features/workspace";
+import { NAVIGATOR_APP_IDS } from "@/features/workspace";
 import type * as SettingsStoreModule from "./store/useSettingsStore";
 
 /**
@@ -150,7 +150,7 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector("main")?.textContent).not.toContain("Deployment");
   });
 
-  it.each(["transfers", "models", "agents", "extensions"] as const)(
+  it.each(["models", "extensions"] as const)(
     "labels the unfinished %s settings page as coming soon",
     async (section) => {
       await renderWorkspace(section);
@@ -171,16 +171,19 @@ describe("SettingsWorkspace", () => {
     const inactiveSurface = inactiveItem?.querySelector('[data-settings-nav-surface="true"]');
 
     // Compared as class tokens, not substrings: every row also carries
-    // `hover:bg-charcoal-card`, which a substring check would match on both.
+    // hover/selected color utilities share prefixes, which a substring check
+    // would match on both.
     const classesOf = (node: Element | null | undefined) => (node?.className ?? "").split(/\s+/);
 
     // The fill begins where the tree branch ends, while the outer button keeps
     // the full hit area and focus target.
     expect(classesOf(activeItem)).not.toContain("bg-charcoal-card");
-    expect(classesOf(activeSurface)).toContain("bg-charcoal-card/80");
+    expect(classesOf(activeSurface)).toContain(
+      "group-aria-[current=page]/tree-row:bg-charcoal-active",
+    );
     expect(classesOf(activeItem)).toContain("text-cream-bright");
     expect(classesOf(inactiveItem)).toContain("text-cream-muted");
-    expect(classesOf(inactiveSurface)).not.toContain("bg-charcoal-card");
+    expect(classesOf(inactiveSurface)).not.toContain("bg-charcoal-active");
     // The old edge marker must not come back alongside the fill.
     expect(classesOf(activeItem)).not.toContain("misty-active-marker-side");
     expect(classesOf(inactiveItem)).not.toContain("misty-marker-host");
@@ -191,13 +194,16 @@ describe("SettingsWorkspace", () => {
 
     const nav = container.querySelector('nav[aria-label="Settings sections"]');
     const captions = [...(nav?.querySelectorAll("h2") ?? [])].map((node) => node.textContent);
-    expect(captions).toEqual(["Preferences", "Apps", "Agents", "System"]);
+    expect(captions).toEqual(["Preferences", "Agents", "System"]);
   });
 
-  it("keeps the Apps group aligned with every available navigator app", () => {
+  it("keeps installable-app settings out of Misty Core", () => {
+    expect(settingsRegistry.some((entry) => NAVIGATOR_APP_IDS.includes(entry.id as never))).toBe(
+      false,
+    );
     expect(
-      settingsRegistry.filter((entry) => entry.group === "apps").map((entry) => entry.id),
-    ).toEqual([...NAVIGATOR_APP_IDS]);
+      settingsRegistry.some((entry) => entry.id === "transfers" || entry.id === "search"),
+    ).toBe(false);
     expect(
       settingsRegistry.filter((entry) => entry.group === "agents").map((entry) => entry.id),
     ).toEqual(["models", "misty"]);
@@ -207,58 +213,44 @@ describe("SettingsWorkspace", () => {
     await renderWorkspace("general");
 
     const nav = container.querySelector('nav[aria-label="Settings sections"]');
-    const appsToggle = nav?.querySelector<HTMLButtonElement>(
-      'button[aria-label="Collapse Apps settings"]',
+    const preferencesToggle = nav?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Collapse Preferences settings"]',
     );
 
-    expect(appsToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(preferencesToggle?.getAttribute("aria-expanded")).toBe("true");
 
     await act(async () => {
-      appsToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      preferencesToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(
       nav
-        ?.querySelector('button[aria-label="Expand Apps settings"]')
+        ?.querySelector('button[aria-label="Expand Preferences settings"]')
         ?.getAttribute("aria-expanded"),
     ).toBe("false");
-    expect(nav?.querySelector('[data-settings-nav-entry="files"]')).toBeNull();
-    expect(nav?.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
+    expect(nav?.querySelector('[data-settings-nav-entry="general"]')).toBeNull();
     expect(nav?.querySelector('[data-settings-nav-entry="models"]')).not.toBeNull();
     expect(nav?.querySelector('[data-settings-nav-entry="server"]')).not.toBeNull();
 
     await act(async () => {
       nav
-        ?.querySelector<HTMLButtonElement>('button[aria-label="Expand Apps settings"]')
+        ?.querySelector<HTMLButtonElement>('button[aria-label="Expand Preferences settings"]')
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(nav?.querySelector('[data-settings-nav-entry="files"]')).not.toBeNull();
+    expect(nav?.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
   });
 
-  it("keeps app icons white while retaining semantic color for other settings", async () => {
+  it("uses monochrome Lucide icons for every settings entry", async () => {
     await renderWorkspace("general");
-
-    const iconClasses = (id: string) =>
-      container
-        .querySelector(`[data-settings-nav-entry="${id}"] [data-settings-nav-surface] > span`)
-        ?.className.split(/\s+/) ?? [];
-
-    const neutralAppIds = [...NAVIGATOR_APP_IDS, "transfers", "extensions"] as const;
-    for (const appId of neutralAppIds) {
-      const workspaceAppId = appId === "extensions" ? "marketplace" : appId;
-      expect(settingsRegistry.find((entry) => entry.id === appId)?.iconClassName).toBe(
-        workspaceAppIconColorClass(workspaceAppId),
-      );
-      expect(iconClasses(appId), appId).toContain("text-cream-bright");
-      expect(iconClasses(appId).join(" "), appId).not.toMatch(/text-(?:avatar|agent)-/);
-    }
-
-    for (const entry of settingsRegistry.filter(
-      ({ id }) => !neutralAppIds.some((appId) => appId === id),
-    )) {
-      expect(entry.iconClassName, entry.id).toMatch(/^text-(?:avatar|agent)-/);
-      expect(iconClasses(entry.id), entry.id).toContain(entry.iconClassName);
+    for (const entry of settingsRegistry) {
+      const row = container.querySelector(`[data-settings-nav-entry="${entry.id}"]`);
+      expect(row?.querySelector("svg.lucide"), entry.id).not.toBeNull();
+      expect(
+        row?.querySelector("img, linearGradient, [class*='text-avatar-'], [class*='text-agent-']"),
+        entry.id,
+      ).toBeNull();
+      expect(row?.querySelector("svg")?.getAttribute("stroke")).toBe("currentColor");
     }
   });
 
@@ -276,10 +268,11 @@ describe("SettingsWorkspace", () => {
 
     expect(classes).toContain("tracking-normal");
     expect(classes).toContain("text-[13px]");
-    expect(classes).toContain("gap-1");
+    expect(classes).toContain("gap-2.5");
+    expect(groupToggle?.querySelector("[data-settings-group-icon]")).not.toBeNull();
     expect(classes).not.toContain("tracking-[0.04em]");
-    expect(classes).not.toContain("hover:bg-charcoal-card");
-    expect(classes).not.toContain("hover:text-cream-bright");
+    expect(classes).toContain("hover:bg-charcoal-card");
+    expect(classes).toContain("hover:text-cream-bright");
     expect(groupToggle?.querySelector('[data-chevron-placement="inline"]')).not.toBeNull();
   });
 
@@ -292,14 +285,13 @@ describe("SettingsWorkspace", () => {
       general?.querySelector('[data-settings-nav-surface="true"]')?.className ?? ""
     ).split(/\s+/);
 
-    expect(classes).toContain("ml-6");
+    expect(classes).toContain("ml-[27px]");
     expect(classes).toContain("mr-2");
     expect(classes).toContain("h-7");
     expect(classes).toContain("text-[13px]");
-    expect(surfaceClasses).toContain("ml-2");
+    expect(surfaceClasses).toContain("ml-1");
     expect(surfaceClasses).toContain("gap-2");
-    expect(surfaceClasses).toContain("pl-2");
-    expect(surfaceClasses).toContain("pr-3");
+    expect(surfaceClasses).toContain("px-2");
     expect(general?.querySelector('[data-tree-branch="true"]')).not.toBeNull();
     expect(general?.querySelector('[data-tree-branch="true"]')?.className.split(/\s+/)).toContain(
       "-left-2",
@@ -308,8 +300,11 @@ describe("SettingsWorkspace", () => {
       general?.querySelector('[data-settings-nav-surface="true"] > span')?.className.split(/\s+/),
     ).toContain("size-5");
     expect(
+      general?.querySelector('[data-settings-nav-surface="true"] > span')?.className,
+    ).toContain("[&_svg]:!size-[18px]");
+    expect(
       container
-        .querySelector('[data-settings-nav-entry="search"] [data-tree-branch="true"]')
+        .querySelector('[data-settings-nav-entry="shortcuts"] [data-tree-branch="true"]')
         ?.getAttribute("data-tree-branch-end"),
     ).toBe("true");
   });

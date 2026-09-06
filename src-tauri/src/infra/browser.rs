@@ -21,9 +21,10 @@ use url::Url;
 use std::sync::atomic::{AtomicIsize, AtomicU32};
 
 use super::browser_macos::{
-    configure_browser_webview, configure_main_webview_pointer_guard,
-    evaluate_browser_async_javascript, native_macos_safari_user_agent,
-    refresh_browser_cursor_ownership, reload_browser_webview, unregister_browser_cursor_ownership,
+    browser_requires_ephemeral_store, configure_browser_webview,
+    configure_main_webview_pointer_guard, evaluate_browser_async_javascript,
+    native_macos_safari_user_agent, refresh_browser_cursor_ownership, reload_browser_webview,
+    unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
     browser_pointer_navigation, browser_viewport_script, emit_browser_pointer,
@@ -39,6 +40,7 @@ const MAX_SNAPSHOT_CHARS: usize = 256 * 1024;
 const MAX_INTERACTIVE_ELEMENTS: usize = 500;
 const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
+use super::browser_profile::data_store_identifier as browser_profile_identifier;
 const HTML2CANVAS_SOURCE: &str =
     include_str!("../../../node_modules/html2canvas/dist/html2canvas.min.js");
 #[cfg(any(target_os = "macos", windows))]
@@ -64,7 +66,7 @@ struct BrowserSession {
     scope_id: String,
     grants: HashMap<String, BrowserGrant>,
     snapshot_generation: u64,
-    element_selectors: HashMap<String, String>,
+    element_targets: HashMap<String, String>,
     downloads: Vec<BrowserDownload>,
     pending_agent_download: Option<PendingAgentDownload>,
 }
@@ -85,6 +87,8 @@ struct PendingAgentDownload {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewCreateRequest {
+    #[serde(default)]
+    pub profile_id: Option<String>,
     pub id: String,
     pub url: String,
     pub x: f64,
@@ -288,7 +292,7 @@ struct RawSnapshot {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawInteractiveElement {
-    selector: String,
+    target: String,
     tag: String,
     role: String,
     name: String,
@@ -564,6 +568,33 @@ fn external_url(raw: &str) -> Result<Url, String> {
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
+/// Only the debug integration harness registers this state, before creating views.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(crate) struct BrowserProbeDirectories {
+    pub profiles: PathBuf,
+    pub downloads: PathBuf,
+}
+
+fn browser_data_directory(app: &AppHandle, profile: Option<&str>) -> Result<PathBuf, String> {
+    browser_profile_identifier(profile)?;
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    if let Some(directories) = app.try_state::<BrowserProbeDirectories>() {
+        let path = directories.profiles.join(profile.unwrap_or("legacy"));
+        std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
+        return Ok(path);
+    }
+    let base = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?;
+    let path = match profile {
+        Some(profile) => base.join("browser-profiles").join(profile),
+        None => base.join("browser-profile"),
+    };
+    std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
+    Ok(path)
+}
+
 fn logical_bounds(
     x: f64,
     y: f64,
@@ -633,6 +664,7 @@ pub async fn browser_webview_create(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
+    let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
     remember_main_macos_webview(&app)?;
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
@@ -668,7 +700,10 @@ pub async fn browser_webview_create(
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
     let builder = WebviewBuilder::new(label, WebviewUrl::External(external_url(&request.url)?))
-        .background_throttling(BackgroundThrottlingPolicy::Disabled);
+        .background_throttling(BackgroundThrottlingPolicy::Disabled)
+        .data_directory(browser_data_directory(&app, request.profile_id.as_deref())?)
+        .data_store_identifier(profile_identifier)
+        .incognito(browser_requires_ephemeral_store());
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
     // Safari identity from the installed Safari bundle instead of pinning a
@@ -721,7 +756,7 @@ pub async fn browser_webview_create(
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                     if let Ok(mut sessions) = state.sessions.lock() {
                         if let Some(session) = sessions.get_mut(&page_id) {
-                            session.element_selectors.clear();
+                            session.element_targets.clear();
                         }
                     }
                     let _ = apply_shortcuts(&webview, &state);
@@ -882,7 +917,7 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
     };
     match event {
         DownloadEvent::Requested { url, destination } => {
-            let Some(download_dir) = dirs::download_dir().filter(|path| path.is_absolute()) else {
+            let Some(download_dir) = browser_download_directory(app) else {
                 emit_download_failure(
                     app,
                     &state,
@@ -917,6 +952,25 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
             true
         }
         _ => true,
+    }
+}
+
+fn browser_download_directory(app: &AppHandle) -> Option<PathBuf> {
+    #[cfg(all(debug_assertions, target_os = "macos"))]
+    if let Some(directories) = app.try_state::<BrowserProbeDirectories>() {
+        return Some(directories.downloads.clone());
+    }
+    #[cfg(target_os = "ios")]
+    {
+        return app
+            .path()
+            .app_data_dir()
+            .ok()
+            .map(|path| path.join("browser-downloads"));
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        dirs::download_dir().filter(|path| path.is_absolute())
     }
 }
 
@@ -1554,40 +1608,11 @@ async fn inspect_browser(
     id: &str,
     request: &BrowserAgentExecuteRequest,
 ) -> Result<Value, String> {
+    let nonce = serde_json::to_string(&uuid::Uuid::new_v4().to_string())
+        .map_err(|error| error.to_string())?;
     let script = format!(
-        r#"(() => {{
-      try {{
-        const maxText = {MAX_SNAPSHOT_CHARS};
-        const maxElements = {MAX_INTERACTIVE_ELEMENTS};
-        const rawText = document.body?.innerText || '';
-        const selectorFor = (element) => {{
-          if (element.id) return '#' + CSS.escape(element.id);
-          const parts = [];
-          let current = element;
-          while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.body) {{
-            let part = current.tagName.toLowerCase();
-            const parent = current.parentElement;
-            if (parent) {{
-              const siblings = Array.from(parent.children).filter((item) => item.tagName === current.tagName);
-              if (siblings.length > 1) part += `:nth-of-type(${{siblings.indexOf(current) + 1}})`;
-            }}
-            parts.unshift(part);
-            current = parent;
-            if (parts.length >= 8) break;
-          }}
-          return 'body > ' + parts.join(' > ');
-        }};
-        const candidates = Array.from(document.querySelectorAll('a[href],button,input:not([type="hidden"]),select,textarea,[role="button"],[role="link"],[tabindex]:not([tabindex="-1"])')).slice(0, maxElements);
-        const interactive = candidates.map((element) => ({{
-          selector: selectorFor(element), tag: element.tagName.toLowerCase(),
-          role: element.getAttribute('role') || '',
-          name: (element.getAttribute('aria-label') || element.innerText || element.getAttribute('value') || element.getAttribute('title') || '').trim().slice(0, 300)
-        }}));
-        return {{ url: location.href, title: document.title || '', text: rawText.slice(0, maxText), truncated: rawText.length > maxText, interactive, error: '' }};
-      }} catch (error) {{
-        return {{ url: location.href, title: document.title || '', text: '', truncated: false, interactive: [], error: String(error) }};
-      }}
-    }})()"#
+        "({})({nonce}, {MAX_SNAPSHOT_CHARS}, {MAX_INTERACTIVE_ELEMENTS})",
+        include_str!("browser_inspection_snapshot.js")
     );
     let raw = eval_json(
         app.get_webview(&webview_label(id)?)
@@ -1615,7 +1640,7 @@ async fn inspect_browser(
     if !grant.capabilities.contains("browser.inspect") {
         return Err("Browser inspection is not granted.".to_owned());
     }
-    let interactive = replace_snapshot_selectors(session, snapshot.interactive);
+    let interactive = replace_snapshot_targets(session, snapshot.interactive);
     Ok(json!({
         "url": snapshot.url, "title": snapshot.title, "text": snapshot.text,
         "truncated": snapshot.truncated, "interactive": interactive,
@@ -1623,12 +1648,12 @@ async fn inspect_browser(
     }))
 }
 
-fn replace_snapshot_selectors(
+fn replace_snapshot_targets(
     session: &mut BrowserSession,
     elements: Vec<RawInteractiveElement>,
 ) -> Vec<Value> {
     session.snapshot_generation = session.snapshot_generation.wrapping_add(1);
-    session.element_selectors.clear();
+    session.element_targets.clear();
     let generation = session.snapshot_generation;
     elements
         .into_iter()
@@ -1636,8 +1661,8 @@ fn replace_snapshot_selectors(
         .map(|(index, element)| {
             let element_ref = format!("element-{generation}-{index}");
             session
-                .element_selectors
-                .insert(element_ref.clone(), element.selector);
+                .element_targets
+                .insert(element_ref.clone(), element.target);
             json!({"ref": element_ref, "tag": element.tag, "role": element.role, "name": element.name})
         })
         .collect()
@@ -1660,7 +1685,7 @@ async fn click_browser(
         .get("expectDownload")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    let (selector, existing_download_ids) = {
+    let (target, existing_download_ids) = {
         let mut sessions = state
             .sessions
             .lock()
@@ -1677,7 +1702,7 @@ async fn click_browser(
             return Err("Browser clicks are not granted.".to_owned());
         }
         let selector = session
-            .element_selectors
+            .element_targets
             .get(element_ref)
             .cloned()
             .ok_or_else(|| "The page changed; inspect it again before clicking.".to_owned())?;
@@ -1697,16 +1722,10 @@ async fn click_browser(
                 .collect::<HashSet<_>>(),
         )
     };
-    let encoded_selector = serde_json::to_string(&selector).map_err(|error| error.to_string())?;
+    let encoded_target = serde_json::to_string(&target).map_err(|error| error.to_string())?;
     let script = format!(
-        r#"(() => {{
-      try {{
-        const element = document.querySelector({encoded_selector});
-        if (!element) return {{ ok: false, error: 'The inspected element no longer exists.' }};
-        element.click();
-        return {{ ok: true }};
-      }} catch (error) {{ return {{ ok: false, error: String(error) }}; }}
-    }})()"#
+        "({})({encoded_target})",
+        include_str!("browser_inspection_click.js")
     );
     let result = eval_json(
         app.get_webview(&webview_label(id)?)
@@ -1885,26 +1904,26 @@ mod tests {
     #[test]
     fn new_snapshots_invalidate_old_element_references() {
         let mut session = BrowserSession::default();
-        let first = replace_snapshot_selectors(
+        let first = replace_snapshot_targets(
             &mut session,
             vec![RawInteractiveElement {
-                selector: "#first".to_owned(),
+                target: "snapshot-a:0".to_owned(),
                 tag: "button".to_owned(),
                 role: String::new(),
                 name: "First".to_owned(),
             }],
         );
         let first_ref = first[0]["ref"].as_str().unwrap().to_owned();
-        let second = replace_snapshot_selectors(
+        let second = replace_snapshot_targets(
             &mut session,
             vec![RawInteractiveElement {
-                selector: "#second".to_owned(),
+                target: "snapshot-b:0".to_owned(),
                 tag: "a".to_owned(),
                 role: String::new(),
                 name: "Second".to_owned(),
             }],
         );
-        assert!(!session.element_selectors.contains_key(&first_ref));
+        assert!(!session.element_targets.contains_key(&first_ref));
         assert_ne!(first[0]["ref"], second[0]["ref"]);
     }
 

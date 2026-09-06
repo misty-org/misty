@@ -1,5 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
+import { confirmLibraryAction as confirmAction } from "@/features/spaces/library/libraryRuntime";
 import type { FormEvent } from "react";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 import type { SelectCollection } from "./useLibraryCollectionRoute";

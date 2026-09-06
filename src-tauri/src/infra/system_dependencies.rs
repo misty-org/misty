@@ -5,13 +5,14 @@ use std::{
 };
 
 pub fn resolve_executable(name: &str, settings_path: Option<&Path>) -> Option<PathBuf> {
-    if !matches!(name, "ffmpeg" | "ffprobe" | "yt-dlp") {
+    if !matches!(name, "ffmpeg" | "ffprobe" | "yt-dlp" | "restic") {
         return None;
     }
     let override_name = match name {
         "ffmpeg" => "FFMPEG_BIN",
         "ffprobe" => "FFPROBE_BIN",
-        _ => "YTDLP_BIN",
+        "yt-dlp" => "YTDLP_BIN",
+        _ => "RESTIC_BIN",
     };
     if let Some(path) = env::var_os(override_name)
         .map(PathBuf::from)

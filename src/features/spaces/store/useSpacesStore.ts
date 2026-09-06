@@ -1,6 +1,6 @@
 import { activityApi } from "@/api/activity/api";
-import { notifyAccountScopeReset } from "@/features/auth";
-import { mergeSpaceMessages } from "@/features/spaces/chat";
+import { notifyAccountScopeReset } from "@/features/auth/accountStore";
+import { mergeSpaceMessages } from "../chat/store/useSpaceMessageSpansStore";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
 import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
@@ -12,7 +12,7 @@ import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./createSpacesRealtimeActions";
-export { buildMessageSpans } from "@/features/spaces/chat";
+export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const snapshotAutoMinIntervalMs = 1_500;
 const snapshotRateLimitCooldownMs = 10_000;
@@ -159,7 +159,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       });
     }
     const tasks = [get().loadMembers(spaceId)];
-    if (canReadMessages && space.kind !== "misty") {
+    if (canReadMessages) {
       tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
     }
     const results = await Promise.allSettled(tasks);

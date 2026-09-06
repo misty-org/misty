@@ -1,4 +1,4 @@
-import { agentTaskDisplayState } from "@/features/agents";
+import { agentTaskDisplayState } from "@/features/agents/agentWorkState";
 import { useDropZone, usePointerDrag, type PointerDragPayload } from "@/features/dnd";
 import type {
   SpaceAgentMembership,
@@ -7,6 +7,7 @@ import type {
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, cn } from "@/shared/ui";
+import { useSurfacePresentation } from "@/shared/mobile";
 import {
   CheckSquare,
   GripVertical,
@@ -73,6 +74,7 @@ export function SpaceTaskBoard({
   onCreate: (title: string, status: SpaceTaskStatus) => void;
   onOpenFullCreate?: (status: SpaceTaskStatus, initialTitle?: string) => void;
 }) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const [creating, setCreating] = useState<SpaceTaskStatus>();
   const [title, setTitle] = useState("");
 
@@ -83,7 +85,10 @@ export function SpaceTaskBoard({
 
   return (
     <div
-      className="flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden"
+      className={cn(
+        "flex h-full min-h-0 gap-0 overflow-x-auto overflow-y-hidden",
+        mobile && "snap-x snap-mandatory scroll-px-3 gap-3 px-3",
+      )}
       aria-label="Task board"
     >
       {boardStatuses.map((column) => (
@@ -167,6 +172,7 @@ function BoardColumn({
   onDelete: (task: SpaceTask) => void;
   onMoveById: (taskId: string, status: SpaceTaskStatus, beforeTaskId?: string) => void;
 }) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const dropZone = useDropZone({
     id: `task-column:${column.id}`,
     accepts: acceptsTask,
@@ -186,6 +192,8 @@ function BoardColumn({
       className={cn(
         "flex h-full min-h-0 min-w-[264px] flex-1 basis-0 flex-col",
         "border-r border-charcoal-border/55 px-3 py-2 transition-colors last:border-r-0",
+        mobile &&
+          "w-[calc(100vw-48px)] max-w-[420px] flex-none snap-center rounded-xl border border-charcoal-border bg-charcoal-card/35",
         dropZone.active ? "bg-charcoal-hover shadow-none" : "bg-transparent",
       )}
     >

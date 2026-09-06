@@ -1,6 +1,5 @@
 export { AiPaneHost, useAiSurfaceActions, useAiSurfaceAdapter } from "./AiPaneHost";
 export { AiSelectionMenu } from "./AiSelectionMenu";
-export { MistyRegionCapture } from "./MistyRegionCapture";
 export { useAiVoiceRecorder } from "./useAiVoiceRecorder";
 export { VoiceInputMenu } from "./VoiceInputMenu";
 export type { AiVoiceInputDevice } from "./useAiVoiceRecorder";

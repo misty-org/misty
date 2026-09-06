@@ -7,6 +7,8 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import type { ActivityItem, NativeNotificationPermission } from "./types";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { useActivityStore } from "./useActivityStore";
 
 const permissionDeniedStorageKey = "misty:activity:notification-permission-denied";
 
@@ -54,9 +56,14 @@ export async function publishNativeActivity(item: ActivityItem): Promise<boolean
   if (await mistyWindowIsFocused()) return false;
   if ((await nativeNotificationPermission()) !== "granted") return false;
   try {
+    const mobileCount = Math.max(1, useActivityStore.getState().attentionCount);
     sendNotification({
-      title: item.title,
-      ...(item.body ? { body: item.body } : {}),
+      title: isNativeMobileBuild ? "Misty" : item.title,
+      ...(isNativeMobileBuild
+        ? { body: `${mobileCount} new ${mobileCount === 1 ? "update" : "updates"}.` }
+        : item.body
+          ? { body: item.body }
+          : {}),
       ...(preferences.soundNotificationsEnabled ? { sound: "Ping" } : {}),
       group: "misty-activity",
       autoCancel: true,

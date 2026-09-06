@@ -59,69 +59,11 @@ describe("SpacePanelContent", () => {
     expect(container.querySelector("nav[aria-label='Library collections']")).toBeNull();
   });
 
-  it("shows only Social in the canonical Misty Space", async () => {
-    const space = spaceFixture({
-      id: "misty",
-      kind: "misty",
-      name: "Misty",
-      role: "member",
-      permissions: { "messages.read": true, "space.invite": false },
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/social"]}>
-          <Routes>
-            <Route
-              path="/spaces/:spaceId/:section"
-              element={<SpacePanelContent spaces={[space]} loading={false} />}
-            />
-          </Routes>
-        </MemoryRouter>,
-      );
-    });
-
-    expect(container.querySelector('[aria-label="Misty conversations"]')).not.toBeNull();
-    expect(container.textContent).not.toContain("Journal");
-    expect(container.textContent).not.toContain("Planner");
-    expect(container.textContent).not.toContain("Library");
-    expect(container.querySelector("nav[aria-label='Space management']")).toBeNull();
-  });
-
-  it("does not expose the shared Everyone conversation", async () => {
-    const space = spaceFixture({
-      id: "misty",
-      kind: "misty",
-      name: "Misty",
-      role: "member",
-      permissions: { "messages.read": true, "space.invite": false },
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/social"]}>
-          <Routes>
-            <Route
-              path="/spaces/:spaceId/:section"
-              element={<SpacePanelContent spaces={[space]} loading={false} />}
-            />
-          </Routes>
-        </MemoryRouter>,
-      );
-    });
-
-    expect(container.querySelector('[aria-label="Misty support inbox"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Misty conversations"]')).not.toBeNull();
-    expect(
-      container.querySelector('[aria-label="Misty conversations"]')?.textContent,
-    ).not.toContain("Everyone");
-    expect(container.querySelector('[aria-label^="Create a new"]')).toBeNull();
-  });
-
   it("does not render skeleton and active space navigation stacked together", async () => {
     vi.useFakeTimers();
     const space1: Space = {
       id: "space-1",
+      is_default: true,
       owner_user_id: "owner",
       name: "Space One",
       role: "owner",
@@ -178,6 +120,7 @@ describe("SpacePanelContent", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",

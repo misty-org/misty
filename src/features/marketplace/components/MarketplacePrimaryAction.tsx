@@ -30,10 +30,13 @@ export function MarketplacePrimaryAction({
       className={cn("max-[860px]:h-11", className)}
       disabled={
         busy ||
-        (plugin.kind === "builtin" && !onPrimaryAction) ||
-        (!plugin.installed && !onInstall) ||
-        (plugin.installed && !plugin.enabled && !onToggle) ||
-        (plugin.installed && plugin.enabled && !onPrimaryAction)
+        (plugin.kind === "builtin"
+          ? !onPrimaryAction
+          : plugin.updateAvailable || !plugin.installed
+            ? !onInstall
+            : !plugin.enabled
+              ? !onToggle
+              : !onPrimaryAction)
       }
       onClick={() => {
         if (plugin.kind === "builtin") {
@@ -41,6 +44,10 @@ export function MarketplacePrimaryAction({
           return;
         }
         if (!plugin.installed) {
+          onInstall?.(plugin);
+          return;
+        }
+        if (plugin.updateAvailable) {
           onInstall?.(plugin);
           return;
         }

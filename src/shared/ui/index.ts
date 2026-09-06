@@ -29,7 +29,6 @@ export * from "./popover";
 export * from "./portal";
 export * from "./progress";
 export * from "./radio-group";
-export * from "./resizable";
 export * from "./scroll-area";
 export * from "./select";
 export * from "./separator";
@@ -49,3 +48,5 @@ export * from "./toolbar";
 export * from "./tooltip";
 export * from "./tree-branch";
 export * from "./utils";
+
+export * from "./navigation-menu";

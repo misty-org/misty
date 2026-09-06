@@ -1,14 +1,13 @@
 import type { DesktopNavItem } from "@/application/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
-import { ArrowLeftRight, Bot, FolderOpen, House, Store } from "lucide-react";
+import { Bot, Compass, FolderOpen, House } from "lucide-react";
 
 export const desktopNavItems: DesktopNavItem[] = [
   { id: "home", label: "Home", path: routes.home, icon: House, exact: true },
   { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
-  { id: "transfers", label: "Transfers", path: routes.transfers, icon: ArrowLeftRight },
   { id: "agents", label: "Agents", path: routes.agents, icon: Bot },
-  { id: "marketplace", label: "Store", path: routes.store, icon: Store },
+  { id: "marketplace", label: "Discover", path: routes.discover, icon: Compass },
 ];
 
 const deepLinkPrefixes = [
@@ -24,13 +23,13 @@ const deepLinkPrefixes = [
   routes.assistant,
   routes.automations,
   routes.agents,
+  routes.activity,
   routes.spaces,
   routes.studio,
   routes.account,
   routes.settings,
   routes.library,
-  routes.store,
-  "/marketplace",
+  routes.discover,
   routes.changelog,
   routes.signIn,
   routes.register,
@@ -43,14 +42,13 @@ export function desktopRouteIdFromPath(pathname: string): AppTab {
   if (pathname.startsWith(routes.terminal)) return "terminal";
   if (pathname.startsWith(routes.files)) return "files";
   if (pathname.startsWith(routes.code)) return "code";
-  if (pathname.startsWith(routes.store) || pathname.startsWith("/marketplace"))
-    return "marketplace";
+  if (pathname.startsWith(routes.discover)) return "marketplace";
   // Assistant remains an accepted legacy deep link that redirects into Agents.
   if (pathname.startsWith(routes.assistant) || pathname.startsWith(routes.agents)) return "agents";
   if (pathname.startsWith(routes.spaces) || pathname.startsWith(routes.library)) return "spaces";
   if (pathname.startsWith(routes.studio) || pathname.startsWith(routes.automations))
     return "spaces";
-  if (pathname.startsWith(routes.transfers)) return "transfers";
+  if (pathname.startsWith(routes.transfers)) return "files";
   if (pathname.startsWith(routes.providers)) return "providers";
   if (pathname.startsWith(routes.account)) return "account";
   if (

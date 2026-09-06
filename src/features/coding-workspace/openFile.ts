@@ -39,6 +39,7 @@ export function openFileInWorkspace(
         lineEnding: file.lineEnding,
         readonly: file.readonly,
         loading: false,
+        loaded: true,
         error: null,
       });
       if (targetLine !== undefined) {
@@ -83,6 +84,7 @@ export async function ensureProjectBuffer(rootPath: string, path: string, name: 
       lineEnding: file.lineEnding,
       readonly: file.readonly,
       loading: false,
+      loaded: true,
       error: null,
     });
   } catch (error) {

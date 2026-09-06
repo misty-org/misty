@@ -1,10 +1,12 @@
 import { activityApi } from "@/api/activity/api";
-import { buildMessageSpans, mergeSpaceMessages } from "@/features/spaces/chat";
+import { buildMessageSpans, mergeSpaceMessages } from "../chat/store/useSpaceMessageSpansStore";
 import { resolveSpacesApiBase, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { queueMobileChatSubmission } from "@/features/chat-composer/mobileChatQueue";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
-export { buildMessageSpans } from "@/features/spaces/chat";
+export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
@@ -57,6 +59,30 @@ export function createSpaceContentActions(
             }
           : state.messagesBySpace,
       }));
+      if (isNativeMobileBuild && !navigator.onLine && optimisticMessage?.client_nonce) {
+        const spans =
+          optimisticMessage.content ??
+          (trimmed
+            ? buildMessageSpans(
+                trimmed,
+                get().membersBySpace[spaceId] ?? [],
+                get().agentsBySpace[spaceId] ?? [],
+                selectedAgentIdsByLabel,
+              )
+            : []);
+        await queueMobileChatSubmission({
+          clientNonce: optimisticMessage.client_nonce,
+          spaceId,
+          conversationId: "",
+          content: spans,
+          fileNodeIds,
+          attachmentIds,
+          libraryItemIds,
+          replyToMessageId,
+        });
+        set({ sending: false });
+        return;
+      }
       try {
         const spans =
           optimisticMessage?.content ??

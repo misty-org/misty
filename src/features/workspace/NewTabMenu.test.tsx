@@ -1,4 +1,4 @@
-import { NewTabMenu } from "@/features/workspace";
+import { NewTabMenu } from "./NewTabMenu";
 import { FolderOpen, Inbox } from "lucide-react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

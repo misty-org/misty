@@ -26,6 +26,7 @@ import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } fro
 import { useEffect, useRef, useState } from "react";
 
 export function MistyConversationSidebar(props: {
+  mobile?: boolean;
   conversations: GlobalAiConversation[];
   activeConversationId: string;
   loading: boolean;
@@ -56,7 +57,12 @@ export function MistyConversationSidebar(props: {
   };
 
   return (
-    <aside className="flex min-h-0 flex-col border-r border-charcoal-border/80 bg-charcoal-sidebar px-2 pb-2">
+    <aside
+      className={cn(
+        "flex min-h-0 flex-col border-r border-charcoal-border/80 bg-charcoal-sidebar px-2 pb-2",
+        props.mobile && "h-full border-r-0",
+      )}
+    >
       <header className="flex h-16 shrink-0 items-center gap-2.5 px-2">
         <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-400/10 ring-1 ring-white/5">
           <img src={mistyCompanion} alt="" className="size-9 object-contain" draggable={false} />

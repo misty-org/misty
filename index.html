@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
     <title>Misty</title>
     <style>
@@ -17,12 +20,12 @@
       body {
         margin: 0;
         height: 100%;
-        background: oklch(1 0 0);
+        background: #f1f1f1;
       }
       @media (prefers-color-scheme: dark) {
         html,
         body {
-          background: oklch(0.141 0.005 285.823);
+          background: #131313;
         }
       }
       #root {
@@ -40,6 +43,6 @@
       FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
     -->
     <div id="root"></div>
-    <script type="module" src="/src/application/main.tsx"></script>
+    <script type="module" src="/src/application/entry.ts"></script>
   </body>
 </html>

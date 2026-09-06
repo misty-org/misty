@@ -24,7 +24,7 @@ export type WindowRect = {
 
 export type DesktopPlatform = "macos" | "windows" | "linux" | "browser" | "unknown";
 
-export type AppNoticeSource = "app" | "providers" | "transfers" | "settings";
+export type AppNoticeSource = "app" | "providers" | "settings";
 
 export type AppNoticeKind = "error" | "message";
 

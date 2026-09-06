@@ -1,8 +1,9 @@
 import { readAccountSessionGeneration } from "@/features/auth";
-import { SystemErrorActivity } from "@/features/activity";
+import { LibraryError as SystemErrorActivity } from "@/features/spaces/library/libraryRuntime";
 import { useExplorerStore } from "@/features/files/explorer";
-import { useSpacesStore } from "@/features/spaces";
-import { spacesApi } from "@/api/spaces/api";
+import { useLibrarySpaces as useSpacesStore } from "@/features/spaces/library/libraryRuntime";
+import { spaceNavigationName } from "@/features/spaces/defaultSpace";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import {
   Badge,
   Button,
@@ -207,7 +208,7 @@ export function AddFilesToSpaceDialog({
               <SelectContent>
                 {eligibleSpaces.map((space) => (
                   <SelectItem key={space.id} value={space.id}>
-                    {space.name}
+                    {spaceNavigationName(space)}
                     {space.is_shared ? " · Shared" : ""}
                   </SelectItem>
                 ))}

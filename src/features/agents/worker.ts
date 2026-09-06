@@ -8,6 +8,7 @@ import {
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import { invoke } from "@tauri-apps/api/core";
+import { browserRuntimeIdForScope } from "@/features/browser/browserRuntime";
 
 const leaseHeartbeatMs = 20_000;
 const activePollMs = 750;
@@ -183,9 +184,11 @@ async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]
   if (!contextId || !agentId || !expiresAt || capabilities.length === 0) {
     throw new Error("invalid_browser_grant");
   }
+  const runtimeId = browserRuntimeIdForScope(job.scopeId);
+  if (!runtimeId) throw new Error("browser_context_closed");
   await invoke("browser_agent_grant_register", {
     request: {
-      id: browserRuntimeIdForScope(job.scopeId),
+      id: runtimeId,
       scopeId: job.scopeId,
       grantId: contextId,
       agentId,
@@ -193,10 +196,6 @@ async function registerRunBoundBrowserContext(job: ClaimedWorkflowNodeJob["job"]
       expiresAt,
     },
   });
-}
-
-function browserRuntimeIdForScope(scopeId: string): string {
-  return scopeId.startsWith("scope-") ? scopeId.slice("scope-".length) : scopeId;
 }
 
 export function deviceContentReference(

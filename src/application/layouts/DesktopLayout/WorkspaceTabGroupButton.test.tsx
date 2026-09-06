@@ -107,9 +107,56 @@ describe("WorkspaceTabGroupButton", () => {
     });
 
     const renderedTab = container.firstElementChild;
-    expect(renderedTab?.className).toContain("flex-1");
+    expect(renderedTab?.className).toContain("flex-[1_1_120px]");
     expect(renderedTab?.className).toContain("min-w-[36px]");
-    expect(renderedTab?.className).toContain("max-w-[200px]");
+    expect(renderedTab?.className).toContain("max-w-[160px]");
+  });
+
+  it("centers a grouped tab count in a fixed badge box", () => {
+    const tabs = ["one", "two"].map(
+      (id) =>
+        ({
+          id,
+          surfaceId: "inbox",
+          groupKey: "tool:inbox",
+          instanceKey: id,
+          title: `Inbox ${id}`,
+          route: "/inbox",
+          sidebarVisible: true,
+          state: {},
+          createdAt: 1,
+          lastFocusedAt: 1,
+        }) satisfies WorkspaceTab,
+    );
+
+    act(() => {
+      root.render(
+        <WorkspaceTabGroupButton
+          group={{
+            key: "tool:inbox",
+            surfaceId: "inbox",
+            label: "Inbox",
+            tabs,
+            storeGroupKey: "tool:inbox",
+          }}
+          icon={Inbox}
+          activeTabId={tabs[0].id}
+          canClose
+          lastUsedTabByGroup={{}}
+          onOpen={vi.fn()}
+          onClose={vi.fn()}
+          onMoveTab={vi.fn()}
+        />,
+      );
+    });
+
+    const badge = [...container.querySelectorAll("span")].find(
+      (element) => element.textContent === "2",
+    );
+    expect(badge?.className).toContain("items-center");
+    expect(badge?.className).toContain("justify-center");
+    expect(badge?.className).toContain("leading-none");
+    expect(badge?.className).toContain("tabular-nums");
   });
 
   it("does not offer a close control for the final tab in the final window", () => {

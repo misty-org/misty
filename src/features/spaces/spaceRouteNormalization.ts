@@ -1,4 +1,3 @@
-import { spaceNotesEnabled } from "@/features/notes";
 import { socialProvider, socialProviderFromRoute, socialProviderPath } from "./social/socialRoute";
 
 const validSections = new Set([
@@ -32,7 +31,6 @@ export function canonicalSpaceRoute(route: string): string {
   if (section === "assistant") return `/agents?spaceId=${encodeURIComponent(spaceId)}`;
   if (section === "files") return path("library");
   if (section === "members") return path("settings/members");
-  if (section === "notes" && !spaceNotesEnabled) return path("drawings");
   if (section === "chat") {
     const provider = socialProvider(parsed.searchParams.get("provider")) ?? "misty";
     return `${socialProviderPath(spaceId, provider, parsed.search)}${parsed.hash}`;
@@ -69,7 +67,7 @@ export function canonicalSpaceRoute(route: string): string {
     const settingsSection = validSettingsSections.has(requested) ? requested : "general";
     return path(`settings/${settingsSection}`);
   }
-  if (!validSections.has(section)) return path(spaceNotesEnabled ? "notes" : "drawings");
+  if (!validSections.has(section)) return path("home");
   return path([section, ...parts.slice(3)].join("/"));
 }
 

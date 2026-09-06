@@ -1,14 +1,14 @@
 import { applyAgentRunEvent } from "./agent-run-events";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
-import { mergeSpaceMessages, messageFromSpaceEvent } from "@/features/spaces/chat";
+import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import type { SpaceEvent } from "@/api/spaces/dto/interfaces/types";
 import { readRealtimeCursor, writeRealtimeCursor } from "@/api/spaces/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
 import type { RealtimeEnvelope } from "../model/stores/spaces/types/useSpacesBackendStore";
-export { buildMessageSpans } from "@/features/spaces/chat";
+export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;

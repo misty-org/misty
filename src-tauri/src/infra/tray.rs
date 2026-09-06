@@ -175,7 +175,7 @@ fn refresh(app: &AppHandle<Wry>) -> Result<(), String> {
     Ok(())
 }
 
-fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .or_else(|| app.webview_windows().into_values().next())

@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
+import {
+  deploymentStorageKey,
+  readDeploymentStorageItem,
+  resolveApiBase,
+} from "@/api/deployment/api";
 import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "../model/interfaces/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
@@ -32,7 +36,7 @@ export const agentDeviceCapabilities = {
  */
 export async function ensureServerAgentDevice(
   local: AgentDevice,
-  connected?: { endpointId: string; platform: "macos" | "windows" | "unknown" },
+  connected?: { endpointId: string; platform: "ios" | "macos" | "windows" | "unknown" },
 ): Promise<ServerTrustedDevice> {
   let identity = await loadOrCreateDeviceIdentity(local.id);
   let publicKey = identity.publicKey;
@@ -97,7 +101,7 @@ export async function ensureServerAgentDevice(
 async function registerServerDevice(
   local: AgentDevice,
   publicKey: string,
-  connected?: { endpointId: string; platform: "macos" | "windows" | "unknown" },
+  connected?: { endpointId: string; platform: "ios" | "macos" | "windows" | "unknown" },
 ): Promise<ServerTrustedDevice> {
   return devicesApi.register<ServerTrustedDevice>({
     name: local.displayName || "This Misty",
@@ -140,7 +144,8 @@ export async function signedAgentDeviceRequest<T>(
   const bodyDigest = toHex(
     new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body))),
   );
-  const canonical = deviceSignaturePayload(method, path, timestamp, nonce, bodyDigest);
+  const apiBasePath = new URL(await resolveApiBase()).pathname;
+  const canonical = deviceSignaturePayload(method, path, timestamp, nonce, bodyDigest, apiBasePath);
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
     fromBase64(identity.privateKey).buffer as ArrayBuffer,
@@ -206,9 +211,11 @@ export function deviceSignaturePayload(
   timestamp: string,
   nonce: string,
   bodyDigest: string,
+  apiBasePath = "/api",
 ): string {
   const pathname = path.split("?", 1)[0] || "/";
-  const canonicalPath = `/api${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+  const basePath = `/${apiBasePath}`.replace(/\/{2,}/g, "/").replace(/\/$/, "");
+  const canonicalPath = `${basePath}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
   return `${method.toUpperCase()}\n${canonicalPath}\n${timestamp}\n${nonce}\n${bodyDigest.toLowerCase()}`;
 }
 

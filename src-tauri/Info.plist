@@ -4,5 +4,7 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>Misty uses your microphone only when you choose voice input, then turns your recording into editable text.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Misty uses your camera only after you approve a camera action, and stops capture when that action finishes.</string>
 </dict>
 </plist>

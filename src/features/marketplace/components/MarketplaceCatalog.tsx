@@ -56,7 +56,7 @@ export function MarketplaceCatalog({
           </h2>
           <p className="mt-1 max-w-[68ch] text-xs leading-5 text-cream-muted">{description}</p>
         </div>
-        <div aria-label="Store pages" className="ml-auto flex shrink-0 items-center gap-1">
+        <div aria-label="Discover pages" className="ml-auto flex shrink-0 items-center gap-1">
           <span aria-live="polite" className="mr-1 text-xs tabular-nums text-cream-muted">
             {loading && entries.length === 0
               ? "Loading"

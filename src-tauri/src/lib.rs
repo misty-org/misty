@@ -11,12 +11,12 @@ mod infra;
 mod platform;
 mod telemetry;
 
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub mod sdk_package_probe;
+
 #[cfg(desktop)]
 use app::commands::{
-    agents_device_identity_load, agents_device_identity_store, connected_devices_connect,
-    connected_devices_initialize, connected_devices_list_directory, connected_devices_media_url,
-    connected_devices_prepare_clipboard_files, connected_devices_read_file,
-    connected_devices_roots, connected_devices_snapshot, connected_devices_subscribe_directory,
+    agents_device_identity_load, agents_device_identity_store,
     media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
     media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
     media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
@@ -46,7 +46,8 @@ use app::commands::{
     file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
     file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
     file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
-    mail_cache_remove, mail_cache_write, notes_store_asset, open_terminal_at_path,
+    mail_cache_remove, mail_cache_write, mobile_cache_purge_account, mobile_cache_read,
+    mobile_cache_remove, mobile_cache_write, notes_store_asset, open_terminal_at_path,
     operation_queue_cancel, operation_queue_cancel_batch, operation_queue_clear_terminal,
     operation_queue_pause, operation_queue_pause_all, operation_queue_pause_batch,
     operation_queue_redo, operation_queue_resolve_conflict, operation_queue_resume,
@@ -76,11 +77,18 @@ use app::commands::{
     android_all_files_access_status, android_grant_local_folder,
     android_open_all_files_access_settings,
 };
+#[cfg(any(desktop, target_os = "ios"))]
+use app::commands::{
+    connected_devices_connect, connected_devices_initialize, connected_devices_list_directory,
+    connected_devices_media_url, connected_devices_open_workspace_route,
+    connected_devices_prepare_clipboard_files, connected_devices_read_file,
+    connected_devices_roots, connected_devices_snapshot, connected_devices_subscribe_directory,
+};
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{
     shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
 };
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
@@ -91,7 +99,7 @@ use infra::browser::{
     browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
     BrowserSessionState,
 };
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(desktop)]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
@@ -105,8 +113,9 @@ use infra::code_workspace::{
 #[cfg(desktop)]
 use infra::misty::fetch_plugin_bundle_checksum;
 use infra::misty::{
-    check_system, ensure_local_access_token, fetch_misty_releases, get_misty_process_status,
-    install_plugin_bundle, launch_misty, open_external_url, probe_paths, restart_misty,
+    check_system, ensure_local_access_token, fetch_misty_releases, finalize_official_app_install,
+    get_misty_process_status, install_plugin_bundle, launch_misty, official_app_package_ready,
+    official_app_resolve_granted_path, open_external_url, probe_paths, restart_misty,
     save_authenticated_user, save_verified_license, scan_local_plugins, set_plugin_enabled,
     sign_out_misty, stop_misty, uninstall_plugin,
 };
@@ -124,7 +133,8 @@ use infra::terminal::{
 #[cfg(desktop)]
 use infra::tray;
 use platform::plugins::mac_rounded_corners;
-use tauri::Manager;
+use std::sync::Arc;
+use tauri::{Emitter, Manager};
 use telemetry::TelemetryReporter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -178,8 +188,19 @@ pub fn run() {
             };
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             let runtime = MistyRuntime::new();
-            app.manage(runtime);
             #[cfg(desktop)]
+            {
+                let route_app = app.handle().clone();
+                let _ = runtime
+                    .connected_devices
+                    .set_workspace_route_handler(Arc::new(move |request| {
+                        route_app
+                            .emit("misty://open-workspace-route", request)
+                            .is_ok()
+                    }));
+            }
+            app.manage(runtime);
+            #[cfg(any(desktop, target_os = "ios"))]
             app.manage(BrowserSessionState::default());
             // The floating Misty window is intentionally not created during
             // the first public beta. The in-app Misty panel remains available.
@@ -199,6 +220,8 @@ pub fn run() {
 
     #[cfg(desktop)]
     let builder = builder
+        .manage(platform::mini_app::MiniAppState::default())
+        .register_uri_scheme_protocol("misty-mini-app", platform::mini_app::handle)
         .register_uri_scheme_protocol("misty-extension", platform::extension_protocol::handle);
 
     #[cfg(desktop)]
@@ -238,351 +261,418 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             {
+                if window.label() != "main" {
+                    return;
+                }
                 if let tauri::WindowEvent::Resized(_) = event {
                     if let Ok(ns_window) = window.ns_window() {
                         unsafe {
                             let ns_window = ns_window as cocoa::base::id;
                             platform::plugins::mac_rounded_corners::position_traffic_lights(
-                                ns_window, -4.0, 5.0,
+                                ns_window, -4.0, 0.0,
                             );
                         }
                     }
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            mac_rounded_corners::enable_rounded_corners,
-            mac_rounded_corners::enable_modern_window_style,
-            mac_rounded_corners::enable_custom_titlebar_window_style,
-            mac_rounded_corners::reposition_traffic_lights,
-            mac_rounded_corners::set_native_wallpaper_video,
-            app_snapshot,
-            app_environment_snapshot,
-            app_configure_server,
-            mail_cache_read,
-            mail_cache_write,
-            mail_cache_remove,
-            self_host_entitlement_store,
-            self_host_entitlement_load,
-            agents_device_snapshot,
-            agents_register_folder_scope,
-            agents_open_citation,
-            agents_prepare_document,
-            agents_prepare_scoped_document,
-            #[cfg(desktop)]
-            agents_device_identity_load,
-            #[cfg(desktop)]
-            agents_device_identity_store,
-            #[cfg(desktop)]
-            connected_devices_initialize,
-            #[cfg(desktop)]
-            connected_devices_snapshot,
-            #[cfg(desktop)]
-            connected_devices_subscribe_directory,
-            #[cfg(desktop)]
-            connected_devices_connect,
-            #[cfg(desktop)]
-            connected_devices_roots,
-            #[cfg(desktop)]
-            connected_devices_list_directory,
-            #[cfg(desktop)]
-            connected_devices_read_file,
-            #[cfg(desktop)]
-            connected_devices_media_url,
-            #[cfg(desktop)]
-            connected_devices_prepare_clipboard_files,
-            claude_status,
-            claude_send_message,
-            claude_drain_events,
-            claude_abort,
-            check_system,
-            probe_paths,
-            misty_template_status,
-            build_misty_template,
-            install_misty_template,
-            restart_misty_app,
-            ensure_local_access_token,
-            fetch_misty_releases,
-            save_authenticated_user,
-            save_verified_license,
-            sign_out_misty,
-            launch_misty,
-            restart_misty,
-            stop_misty,
-            #[cfg(desktop)]
-            scan_local_plugins,
-            #[cfg(desktop)]
-            fetch_plugin_bundle_checksum,
-            #[cfg(desktop)]
-            install_plugin_bundle,
-            #[cfg(desktop)]
-            set_plugin_enabled,
-            #[cfg(desktop)]
-            uninstall_plugin,
-            get_misty_process_status,
-            open_external_url,
-            #[cfg(desktop)]
-            terminal_create,
-            #[cfg(desktop)]
-            terminal_write,
-            #[cfg(desktop)]
-            terminal_resize,
-            #[cfg(desktop)]
-            terminal_interrupt,
-            #[cfg(desktop)]
-            terminal_kill,
-            #[cfg(desktop)]
-            terminal_ssh_environments,
-            #[cfg(desktop)]
-            terminal_ssh_preflight,
-            #[cfg(desktop)]
-            terminal_ssh_trust_host,
-            #[cfg(desktop)]
-            code_read_text_file,
-            #[cfg(desktop)]
-            code_write_text_file,
-            #[cfg(desktop)]
-            code_create_file,
-            #[cfg(desktop)]
-            code_create_folder,
-            #[cfg(desktop)]
-            code_rename_path,
-            #[cfg(desktop)]
-            code_delete_path,
-            #[cfg(desktop)]
-            code_walk_files,
-            #[cfg(desktop)]
-            code_find_in_files,
-            #[cfg(desktop)]
-            code_watch_dir,
-            #[cfg(desktop)]
-            code_stop_watch,
-            #[cfg(desktop)]
-            code_lsp_start,
-            #[cfg(desktop)]
-            code_lsp_send,
-            #[cfg(desktop)]
-            code_lsp_stop,
-            #[cfg(desktop)]
-            browser_webview_create,
-            browser_shortcuts_update,
-            #[cfg(desktop)]
-            browser_webview_set_bounds,
-            #[cfg(desktop)]
-            browser_webview_capture_region,
-            #[cfg(desktop)]
-            browser_webview_reconcile,
-            #[cfg(desktop)]
-            browser_webview_set_theme,
-            #[cfg(desktop)]
-            browser_webview_navigate,
-            #[cfg(desktop)]
-            browser_webview_back,
-            #[cfg(desktop)]
-            browser_webview_forward,
-            #[cfg(desktop)]
-            browser_webview_reload,
-            #[cfg(desktop)]
-            browser_webview_show,
-            #[cfg(desktop)]
-            browser_webviews_set_overlay_active,
-            #[cfg(desktop)]
-            browser_webviews_set_pointer_tracking,
-            #[cfg(desktop)]
-            browser_webviews_set_companion,
-            #[cfg(desktop)]
-            browser_webview_hide,
-            #[cfg(desktop)]
-            browser_webviews_hide_all,
-            #[cfg(desktop)]
-            browser_webviews_park_all,
-            #[cfg(desktop)]
-            browser_webview_close,
-            #[cfg(desktop)]
-            browser_agent_grant_register,
-            #[cfg(desktop)]
-            browser_agent_grant_revoke,
-            #[cfg(desktop)]
-            browser_agent_execute,
-            storage_snapshot,
-            clipboard_snapshot,
-            clipboard_set_local,
-            clipboard_publish_shared,
-            clipboard_publish_image_bytes,
-            clipboard_apply_shared,
-            clipboard_shared_image_bytes,
-            clipboard_native_file_refs,
-            clipboard_write_file_bytes,
-            clipboard_write_file_refs,
-            notes_store_asset,
-            devices_snapshot,
-            devices_unmount,
-            explorer_list_directory,
-            #[cfg(target_os = "android")]
-            android_grant_local_folder,
-            #[cfg(target_os = "android")]
-            android_all_files_access_status,
-            #[cfg(target_os = "android")]
-            android_open_all_files_access_settings,
-            explorer_directory_size_snapshot,
-            explorer_calculate_directory_sizes,
-            explorer_create_item,
-            explorer_rename_item,
-            explorer_delete_items,
-            explorer_paste_items,
-            explorer_prepare_open_item,
-            explorer_prepare_drag_items,
-            explorer_cancel_drag_preparation,
-            explorer_preview_item,
-            explorer_save_preview_item,
-            explorer_generate_image_thumbnail,
-            file_metadata_snapshot,
-            search_init,
-            search_get_status,
-            search_start_scan,
-            search_cancel_scan,
-            search_query,
-            explorer_open_path,
-            explorer_open_with,
-            explorer_open_association,
-            explorer_set_open_association,
-            explorer_path_is_directory,
-            explorer_path_exists,
-            explorer_library_snapshot,
-            explorer_library_record_recent,
-            explorer_library_record_last_opened,
-            explorer_library_set_tags,
-            smart_library_snapshot,
-            smart_library_scan,
-            smart_library_import_files,
-            smart_library_preflight_import,
-            smart_library_prepare_previews,
-            smart_library_apply_results,
-            smart_library_set_server_folder_id,
-            smart_library_search,
-            smart_library_resolve_assets,
-            smart_library_assets_page,
-            smart_library_delete,
-            #[cfg(desktop)]
-            media_search_scan_movies,
-            #[cfg(desktop)]
-            media_search_snapshot,
-            #[cfg(desktop)]
-            media_search_prepare_chunk,
-            #[cfg(desktop)]
-            media_search_complete,
-            #[cfg(desktop)]
-            media_search_approve_assets,
-            #[cfg(desktop)]
-            media_search_acknowledge_removed_assets,
-            #[cfg(desktop)]
-            media_search_record_chunk,
-            #[cfg(desktop)]
-            media_search_set_asset_state,
-            #[cfg(desktop)]
-            media_search_reset_device_index,
-            #[cfg(desktop)]
-            media_search_complete_legacy_adoption,
-            #[cfg(desktop)]
-            media_search_resolve_assets,
-            explorer_queue_create_item,
-            explorer_queue_rename_item,
-            explorer_queue_rename_items,
-            explorer_queue_delete_items,
-            explorer_queue_paste_items,
-            explorer_queue_paste_text,
-            explorer_queue_paste_blob,
-            file_sync_pairs_snapshot,
-            file_sync_pair_save,
-            file_sync_pair_remove,
-            file_sync_compare,
-            file_sync_apply,
-            workspaces_snapshot,
-            workspaces_save,
-            settings_snapshot,
-            settings_save,
-            settings_launch_on_login_snapshot,
-            settings_apply_launch_on_login,
-            settings_open_with_associations,
-            settings_remove_open_with_association,
-            coding_ai_read_api_key,
-            coding_ai_write_api_key,
-            coding_ai_clear_api_key,
-            shortcuts_snapshot,
-            shortcuts_update,
-            shortcuts_reassign,
-            shortcuts_reset,
-            #[cfg(desktop)]
-            plugin_commands_snapshot,
-            #[cfg(desktop)]
-            plugin_command_run,
-            #[cfg(desktop)]
-            plugin_panel_render,
-            extension_command_run,
-            #[cfg(desktop)]
-            plugin_diagnostics_snapshot,
-            providers_snapshot,
-            providers_refresh,
-            providers_import_cloud_connection,
-            providers_select_remote,
-            providers_save_remote,
-            providers_test_remote,
-            providers_config_paths,
-            providers_configure_remote,
-            providers_verify_start,
-            providers_job_status,
-            providers_job_cancel,
-            providers_verify_result,
-            providers_backend_actions,
-            providers_run_backend_action,
-            providers_config_security,
-            providers_harden_config,
-            providers_repair_config_security,
-            providers_disconnect_remote,
-            transfers_snapshot,
-            transfers_delete_selected,
-            transfers_delete_all,
-            open_terminal_at_path,
-            operation_queue_snapshot,
-            operation_queue_cancel,
-            operation_queue_cancel_batch,
-            operation_queue_retry,
-            operation_queue_pause,
-            operation_queue_resume,
-            operation_queue_pause_batch,
-            operation_queue_resume_batch,
-            operation_queue_pause_all,
-            operation_queue_resume_all,
-            operation_queue_retry_transfer,
-            operation_queue_set_bandwidth_limit,
-            operation_queue_set_transfer_profile,
-            operation_queue_undo,
-            operation_queue_redo,
-            operation_queue_resolve_conflict,
-            operation_queue_clear_terminal,
-            archive_list,
-            archive_create,
-            archive_extract,
-            duplicates_scan,
-            duplicates_cancel,
-            duplicates_hash_remote_candidates,
-            saved_searches_snapshot,
-            saved_searches_save,
-            saved_searches_delete,
-            compare_files,
-            compare_folders,
-            compare_apply_text_merge,
-            file_tools_checksum,
-            file_tools_set_readonly,
-            file_tools_chmod,
-            file_tools_create_symlink,
-            file_tools_read_symlink,
-            telemetry::telemetry_set_error_reporting_enabled,
-        ])
+        .invoke_handler({
+            let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
+                Box::new(tauri::generate_handler![
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_open,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_widget_open,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_layout,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_close,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_rpc,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_reply,
+                    #[cfg(desktop)]
+                    platform::mini_app::mini_app_post,
+                    #[cfg(desktop)]
+                    platform::mini_app::permissions::mini_app_permission_status,
+                    #[cfg(desktop)]
+                    platform::mini_app::permissions::mini_app_permission_decide,
+                    #[cfg(desktop)]
+                    platform::mini_app::permissions::mini_app_permission_list,
+                    #[cfg(desktop)]
+                    platform::mini_app::permissions::mini_app_context,
+                    #[cfg(desktop)]
+                    platform::mini_app::permissions::mini_app_device_call,
+                    platform::mini_app::permissions::host_files::mini_app_host_file,
+                    mac_rounded_corners::reveal_main_window,
+                    mac_rounded_corners::enable_rounded_corners,
+                    mac_rounded_corners::enable_modern_window_style,
+                    mac_rounded_corners::enable_custom_titlebar_window_style,
+                    mac_rounded_corners::reposition_traffic_lights,
+                    mac_rounded_corners::set_native_wallpaper_video,
+                    app_snapshot,
+                    app_environment_snapshot,
+                    app_configure_server,
+                    mail_cache_read,
+                    mail_cache_write,
+                    mail_cache_remove,
+                    mobile_cache_read,
+                    mobile_cache_write,
+                    mobile_cache_remove,
+                    mobile_cache_purge_account,
+                    self_host_entitlement_store,
+                    self_host_entitlement_load,
+                    agents_device_snapshot,
+                    agents_register_folder_scope,
+                    agents_open_citation,
+                    agents_prepare_document,
+                    agents_prepare_scoped_document,
+                    #[cfg(desktop)]
+                    agents_device_identity_load,
+                    #[cfg(desktop)]
+                    agents_device_identity_store,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_initialize,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_snapshot,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_subscribe_directory,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_connect,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_open_workspace_route,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_roots,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_list_directory,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_read_file,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_media_url,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    connected_devices_prepare_clipboard_files,
+                    claude_status,
+                    claude_send_message,
+                    claude_drain_events,
+                    claude_abort,
+                    check_system,
+                    probe_paths,
+                    misty_template_status,
+                    build_misty_template,
+                    install_misty_template,
+                    restart_misty_app,
+                    ensure_local_access_token,
+                    fetch_misty_releases,
+                    save_authenticated_user,
+                    save_verified_license,
+                    sign_out_misty,
+                    launch_misty,
+                    restart_misty,
+                    stop_misty,
+                    #[cfg(desktop)]
+                    scan_local_plugins,
+                    #[cfg(desktop)]
+                    fetch_plugin_bundle_checksum,
+                    #[cfg(desktop)]
+                    install_plugin_bundle,
+                    #[cfg(desktop)]
+                    official_app_package_ready,
+                    #[cfg(desktop)]
+                    official_app_resolve_granted_path,
+                    #[cfg(desktop)]
+                    finalize_official_app_install,
+                    #[cfg(desktop)]
+                    set_plugin_enabled,
+                    #[cfg(desktop)]
+                    uninstall_plugin,
+                    get_misty_process_status,
+                    open_external_url,
+                    #[cfg(desktop)]
+                    terminal_create,
+                    #[cfg(desktop)]
+                    terminal_write,
+                    #[cfg(desktop)]
+                    terminal_resize,
+                    #[cfg(desktop)]
+                    terminal_interrupt,
+                    #[cfg(desktop)]
+                    terminal_kill,
+                    #[cfg(desktop)]
+                    terminal_ssh_environments,
+                    #[cfg(desktop)]
+                    terminal_ssh_preflight,
+                    #[cfg(desktop)]
+                    terminal_ssh_trust_host,
+                    #[cfg(desktop)]
+                    code_read_text_file,
+                    #[cfg(desktop)]
+                    code_write_text_file,
+                    #[cfg(desktop)]
+                    code_create_file,
+                    #[cfg(desktop)]
+                    code_create_folder,
+                    #[cfg(desktop)]
+                    code_rename_path,
+                    #[cfg(desktop)]
+                    code_delete_path,
+                    #[cfg(desktop)]
+                    code_walk_files,
+                    #[cfg(desktop)]
+                    code_find_in_files,
+                    #[cfg(desktop)]
+                    code_watch_dir,
+                    #[cfg(desktop)]
+                    code_stop_watch,
+                    #[cfg(desktop)]
+                    code_lsp_start,
+                    #[cfg(desktop)]
+                    code_lsp_send,
+                    #[cfg(desktop)]
+                    code_lsp_stop,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_create,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_shortcuts_update,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_set_bounds,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_capture_region,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_reconcile,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_set_theme,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_navigate,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_back,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_forward,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_reload,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_show,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webviews_set_overlay_active,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webviews_set_pointer_tracking,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webviews_set_companion,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_hide,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webviews_hide_all,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webviews_park_all,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_close,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_agent_grant_register,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_agent_grant_revoke,
+                    #[cfg(any(desktop, target_os = "ios"))]
+                    browser_agent_execute,
+                    storage_snapshot,
+                    clipboard_snapshot,
+                    clipboard_set_local,
+                    clipboard_publish_shared,
+                    clipboard_publish_image_bytes,
+                    clipboard_apply_shared,
+                    clipboard_shared_image_bytes,
+                    clipboard_native_file_refs,
+                    clipboard_write_file_bytes,
+                    clipboard_write_file_refs,
+                    notes_store_asset,
+                    devices_snapshot,
+                    devices_unmount,
+                    explorer_list_directory,
+                    #[cfg(target_os = "android")]
+                    android_grant_local_folder,
+                    #[cfg(target_os = "android")]
+                    android_all_files_access_status,
+                    #[cfg(target_os = "android")]
+                    android_open_all_files_access_settings,
+                    explorer_directory_size_snapshot,
+                    explorer_calculate_directory_sizes,
+                    explorer_create_item,
+                    explorer_rename_item,
+                    explorer_delete_items,
+                    explorer_paste_items,
+                    explorer_prepare_open_item,
+                    explorer_prepare_drag_items,
+                    explorer_cancel_drag_preparation,
+                    explorer_preview_item,
+                    explorer_save_preview_item,
+                    explorer_generate_image_thumbnail,
+                    file_metadata_snapshot,
+                    search_init,
+                    search_get_status,
+                    search_start_scan,
+                    search_cancel_scan,
+                    search_query,
+                    explorer_open_path,
+                    explorer_open_with,
+                    explorer_open_association,
+                    explorer_set_open_association,
+                    explorer_path_is_directory,
+                    explorer_path_exists,
+                    explorer_library_snapshot,
+                    explorer_library_record_recent,
+                    explorer_library_record_last_opened,
+                    explorer_library_set_tags,
+                    smart_library_snapshot,
+                    smart_library_scan,
+                    smart_library_import_files,
+                    smart_library_preflight_import,
+                    smart_library_prepare_previews,
+                    smart_library_apply_results,
+                    smart_library_set_server_folder_id,
+                    smart_library_search,
+                    smart_library_resolve_assets,
+                    smart_library_assets_page,
+                    smart_library_delete,
+                    #[cfg(desktop)]
+                    media_search_scan_movies,
+                    #[cfg(desktop)]
+                    media_search_snapshot,
+                    #[cfg(desktop)]
+                    media_search_prepare_chunk,
+                    #[cfg(desktop)]
+                    media_search_complete,
+                    #[cfg(desktop)]
+                    media_search_approve_assets,
+                    #[cfg(desktop)]
+                    media_search_acknowledge_removed_assets,
+                    #[cfg(desktop)]
+                    media_search_record_chunk,
+                    #[cfg(desktop)]
+                    media_search_set_asset_state,
+                    #[cfg(desktop)]
+                    media_search_reset_device_index,
+                    #[cfg(desktop)]
+                    media_search_complete_legacy_adoption,
+                    #[cfg(desktop)]
+                    media_search_resolve_assets,
+                    explorer_queue_create_item,
+                    explorer_queue_rename_item,
+                    explorer_queue_rename_items,
+                    explorer_queue_delete_items,
+                    explorer_queue_paste_items,
+                    explorer_queue_paste_text,
+                    explorer_queue_paste_blob,
+                    file_sync_pairs_snapshot,
+                    file_sync_pair_save,
+                    file_sync_pair_remove,
+                    file_sync_compare,
+                    file_sync_apply,
+                    workspaces_snapshot,
+                    workspaces_save,
+                    settings_snapshot,
+                    settings_save,
+                    settings_launch_on_login_snapshot,
+                    settings_apply_launch_on_login,
+                    settings_open_with_associations,
+                    settings_remove_open_with_association,
+                    coding_ai_read_api_key,
+                    coding_ai_write_api_key,
+                    coding_ai_clear_api_key,
+                    shortcuts_snapshot,
+                    shortcuts_update,
+                    shortcuts_reassign,
+                    shortcuts_reset,
+                    #[cfg(desktop)]
+                    plugin_commands_snapshot,
+                    #[cfg(desktop)]
+                    plugin_command_run,
+                    #[cfg(desktop)]
+                    plugin_panel_render,
+                    extension_command_run,
+                    #[cfg(desktop)]
+                    plugin_diagnostics_snapshot,
+                    providers_snapshot,
+                    providers_refresh,
+                    providers_import_cloud_connection,
+                    providers_select_remote,
+                    providers_save_remote,
+                    providers_test_remote,
+                    providers_config_paths,
+                    providers_configure_remote,
+                    providers_verify_start,
+                    providers_job_status,
+                    providers_job_cancel,
+                    providers_verify_result,
+                    providers_backend_actions,
+                    providers_run_backend_action,
+                    providers_config_security,
+                    providers_harden_config,
+                    providers_repair_config_security,
+                    providers_disconnect_remote,
+                    transfers_snapshot,
+                    transfers_delete_selected,
+                    transfers_delete_all,
+                    open_terminal_at_path,
+                    operation_queue_snapshot,
+                    operation_queue_cancel,
+                    operation_queue_cancel_batch,
+                    operation_queue_retry,
+                    operation_queue_pause,
+                    operation_queue_resume,
+                    operation_queue_pause_batch,
+                    operation_queue_resume_batch,
+                    operation_queue_pause_all,
+                    operation_queue_resume_all,
+                    operation_queue_retry_transfer,
+                    operation_queue_set_bandwidth_limit,
+                    operation_queue_set_transfer_profile,
+                    operation_queue_undo,
+                    operation_queue_redo,
+                    operation_queue_resolve_conflict,
+                    operation_queue_clear_terminal,
+                    archive_list,
+                    archive_create,
+                    archive_extract,
+                    duplicates_scan,
+                    duplicates_cancel,
+                    duplicates_hash_remote_candidates,
+                    saved_searches_snapshot,
+                    saved_searches_save,
+                    saved_searches_delete,
+                    compare_files,
+                    compare_folders,
+                    compare_apply_text_merge,
+                    file_tools_checksum,
+                    file_tools_set_readonly,
+                    file_tools_chmod,
+                    file_tools_create_symlink,
+                    file_tools_read_symlink,
+                    telemetry::telemetry_set_error_reporting_enabled,
+                ]);
+            move |invoke: tauri::ipc::Invoke<tauri::Wry>| {
+                if !platform::app_command_policy::allows(
+                    invoke.message.webview_ref().label(),
+                    invoke.message.command(),
+                ) {
+                    invoke
+                        .resolver
+                        .reject("This view cannot invoke Host commands.");
+                    return true;
+                }
+                dispatch(invoke)
+            }
+        })
         .build(tauri::generate_context!())
         .expect("failed to build Misty Tauri app")
         .run(|_app, event| {
+            // Dock activation must work even if the frontend is still loading
+            // or failed before it could report readiness.
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::RunEvent::Reopen { .. }) {
+                if let Err(error) = tray::show_main_window(_app) {
+                    eprintln!("Could not reopen Misty: {error}");
+                }
+            }
             if matches!(event, tauri::RunEvent::Exit) {
+                #[cfg(desktop)]
+                platform::mini_app::shutdown(_app);
                 telemetry::shutdown();
             }
         });

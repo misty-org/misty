@@ -65,6 +65,9 @@ export function MarketplaceDetailDialog({
                   </DialogTitle>
                   <DialogDescription className="mt-1 truncate text-xs">
                     {plugin.author || "Misty"} · v{plugin.version}
+                    {plugin.updateAvailable && plugin.catalogVersion
+                      ? ` · v${plugin.catalogVersion} available`
+                      : ""}
                     {plugin.verified ? " · verified" : ""}
                   </DialogDescription>
                 </div>

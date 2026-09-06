@@ -8,39 +8,50 @@ export function RoadmapOutline({
   selectedId,
   onSelect,
   onOpenTask,
+  mobile = false,
 }: {
   snapshot: SpaceRoadmapSnapshot;
   selectedId: string;
   onSelect: (id: string) => void;
   onOpenTask: (taskId: string) => void;
+  mobile?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(mobile);
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="border-t border-charcoal-border/70 bg-charcoal-bg"
+      className={cn("border-charcoal-border/70 bg-charcoal-bg", mobile ? "h-full" : "border-t")}
     >
-      <CollapsibleTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold text-cream-muted"
-        >
-          <ListTree className="size-3.5" />
-          Accessible outline
-          <ChevronDown
-            className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
-          />
-        </Button>
-      </CollapsibleTrigger>
+      {!mobile ? (
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 w-full justify-start gap-2 rounded-none px-3 text-[10px] font-semibold text-cream-muted"
+          >
+            <ListTree className="size-3.5" />
+            Accessible outline
+            <ChevronDown
+              className={cn("ml-auto size-3.5 transition-transform", open && "rotate-180")}
+            />
+          </Button>
+        </CollapsibleTrigger>
+      ) : null}
       <CollapsibleContent>
-        <nav className="max-h-52 overflow-auto p-2 pt-0" aria-label="Roadmap outline">
+        <nav
+          className={cn(
+            "overflow-auto p-2",
+            mobile ? "h-full pb-[env(safe-area-inset-bottom)]" : "max-h-52 pt-0",
+          )}
+          aria-label="Roadmap outline"
+        >
           {snapshot.milestones.map((milestone) => (
             <div key={milestone.id}>
               <Button
                 className={cn(
-                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  mobile ? "min-h-12" : "h-8",
+                  "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
                   selectedId === milestone.id && "bg-charcoal-card",
                 )}
                 type="button"
@@ -60,6 +71,7 @@ export function RoadmapOutline({
                     <Button
                       className={cn(
                         outlineItemClass,
+                        mobile && "min-h-12",
                         "pl-7 text-xs",
                         selectedId === goal.id && "bg-charcoal-card text-cream",
                       )}
@@ -73,7 +85,7 @@ export function RoadmapOutline({
                     </Button>
                     {goal.tasks.map((task) => (
                       <Button
-                        className={cn(outlineItemClass, "pl-12 text-[11px]")}
+                        className={cn(outlineItemClass, mobile && "min-h-12", "pl-12 text-[11px]")}
                         type="button"
                         variant="ghost"
                         key={task.id}
@@ -91,6 +103,7 @@ export function RoadmapOutline({
                   <Button
                     className={cn(
                       outlineItemClass,
+                      mobile && "min-h-12",
                       "pl-7 text-xs",
                       selectedId === node.id && "bg-charcoal-card text-cream",
                     )}
@@ -110,7 +123,8 @@ export function RoadmapOutline({
             .map((node) => (
               <Button
                 className={cn(
-                  "h-8 w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
+                  mobile ? "min-h-12" : "h-8",
+                  "w-full justify-start gap-2 rounded px-2 text-left text-xs hover:bg-charcoal-card",
                   selectedId === node.id && "bg-charcoal-card",
                 )}
                 type="button"

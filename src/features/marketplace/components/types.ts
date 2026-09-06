@@ -5,6 +5,8 @@ export type MarketplaceEntry = {
   kind?: "app" | "extension" | "builtin";
   name: string;
   version: string;
+  catalogVersion?: string;
+  updateAvailable?: boolean;
   author: string;
   overview: string;
   installed: boolean;

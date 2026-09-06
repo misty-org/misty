@@ -1,12 +1,11 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { preloadDesktopFilesPage, useExplorerStore } from "@/features/files/explorer";
-import { filesMultiPanelStore } from "@/features/files/dockStores";
-import { useMediaSearchStore, useSearchStore } from "@/features/files/search";
+import { useMediaSearchStore } from "@/features/files/search/store/useMediaSearchStore";
+import { useSearchStore } from "@/features/files/search/store/useSearchStore";
 import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
-import { useTransfersStore } from "@/features/transfers";
-import { dockLeaves, useMultiPanelStore, useWorkspaceStore } from "@/features/workspace";
+import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -32,20 +31,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
       dockLeaves(workspaceLayout.root)[0],
     [workspaceLayout],
   );
-  const activeWorkspaceTab = activeWorkspacePane?.tabs.find(
-    (tab) => tab.id === activeWorkspacePane.activeTabId,
-  );
-  const explorerPanelStore = useMemo(
-    () =>
-      activeWorkspaceTab?.surfaceId === "files"
-        ? filesMultiPanelStore(activeWorkspaceTab.id)
-        : useMultiPanelStore,
-    [activeWorkspaceTab?.id, activeWorkspaceTab?.surfaceId],
-  );
-  const activePaneId = explorerPanelStore((state) => state.activePaneId);
-  const activePanePath = useExplorerStore(
-    (state) => state.panes[activePaneId]?.listing?.path ?? "",
-  );
   const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
@@ -59,15 +44,14 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     if (appLoadStarted.current) return;
     appLoadStarted.current = true;
     if (!hasTauriInternals()) return;
-    void preloadDesktopFilesPage()?.catch(() => undefined);
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
 
   useEffect(() => {
     if (!app || !hasTauriInternals()) return;
-    // Loading the durable media queue at app startup resumes explicitly
-    // approved work without requiring the user to revisit the Library page.
+    // The durable host queue resumes approved media work even while the Files
+    // App is closed. The UI itself remains outside the shell bundle.
     void useMediaSearchStore.getState().load();
   }, [app]);
 
@@ -149,8 +133,8 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     navigate,
     app,
     settingsLoad,
-    activePaneId,
-    activePanePath,
+    activePaneId: "",
+    activePanePath: "",
     activeWorkspacePaneId: activeWorkspacePane?.id ?? "",
     lastAppRoute,
     lastNonSettingsRouteRef,

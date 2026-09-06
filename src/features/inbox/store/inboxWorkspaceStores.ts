@@ -1,4 +1,9 @@
-import { createInboxStore, type InboxStoreHook, useInboxStore } from "./useInboxStore";
+import {
+  createInboxStore,
+  disposeInboxStore,
+  type InboxStoreHook,
+  useInboxStore,
+} from "./useInboxStore";
 
 const workspaceStores = new Map<string, InboxStoreHook>();
 
@@ -18,5 +23,7 @@ export function inboxStoreForWorkspace(workspaceId?: string): InboxStoreHook {
 }
 
 export function releaseInboxWorkspaceStore(workspaceId: string): void {
+  const store = workspaceStores.get(workspaceId);
+  if (store) disposeInboxStore(store);
   workspaceStores.delete(workspaceId);
 }

@@ -1,10 +1,6 @@
 import { useActivityStore } from "@/features/activity";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { refreshAllAgentAccountState, resetAllAgentAccountState } from "@/features/agents";
-import { useExplorerStore } from "@/features/files/explorer";
-import { resetSearchAccountState } from "@/features/files/search";
 import type { CurrentLicense } from "@/features/installer";
-import { resetNotesAccountState } from "@/features/notes";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState, useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
@@ -24,16 +20,11 @@ function scopedAuthUserStorageKey(): string {
 export function resetAccountScopedState(): void {
   useUserStore.getState().clear();
   useActivityStore.getState().setAccount("");
-  useExplorerStore.setState({ notifications: [], notificationHistory: [] });
-  resetSearchAccountState();
   resetSpacesAccountState();
-  resetAllAgentAccountState();
-  resetNotesAccountState();
   resetConnectionsAccountState();
 }
 export function refreshAuthenticatedAccountState(): void {
   void useSpacesStore.getState().load();
-  refreshAllAgentAccountState();
 }
 
 export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {

@@ -1,5 +1,5 @@
 import { Upload, X } from "lucide-react";
-import { SystemErrorActivity } from "@/features/activity";
+import { LibraryError as SystemErrorActivity } from "@/features/spaces/library/libraryRuntime";
 
 import { Button, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
 import type { LibraryUploadJob } from "../types/useSpaceLibraryData";

@@ -1,5 +1,10 @@
 import { Button, Input, cn } from "@/shared/ui";
 import {
+  MobileFullScreenSheet,
+  useMobileSurfaceChrome,
+  useSurfacePresentation,
+} from "@/shared/mobile";
+import {
   Background,
   BackgroundVariant,
   Handle,
@@ -29,7 +34,8 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
-import { automationsApi } from "./api";
+import {runtimeAutomationsApi as automationsApi} from "@/features/agents/agentsRuntime";
+
 import { AutomationIntegrationIcon } from "./AutomationIntegrationIcon";
 import {
   normalizeAutomationRuns,
@@ -55,6 +61,7 @@ const starterCatalog = [
   { label: "Discord", query: "send a Discord message", value: "discord" },
   { label: "Airtable", query: "create an Airtable record", value: "airtable" },
 ];
+const automationGraphLine = "rgb(63 63 63)";
 
 export function AutomationEditor(props: {
   flow: AutomationFlow;
@@ -69,13 +76,16 @@ export function AutomationEditor(props: {
 }
 
 function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
+  const mobileCompact = presentation === "mobile-compact";
   const [structure, setStructure] = useState<AutomationStructure | null>(null);
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [selectedStep, setSelectedStep] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(!mobileCompact);
   const [query, setQuery] = useState("");
   const [catalogResults, setCatalogResults] = useState<AutomationCatalogResult[]>([]);
   const [name, setName] = useState(props.flow.name);
@@ -107,6 +117,12 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
     [selectedStep, structure?.steps],
   );
   const needsTrigger = structure?.steps[0]?.type === "EMPTY";
+
+  const chromeConfig = useMemo(
+    () => ({ title: name || "Automation", level: "detail" as const, onBack: props.onBack }),
+    [name, props.onBack],
+  );
+  useMobileSurfaceChrome(chromeConfig);
 
   const runAction = async (key: string, action: () => Promise<void>) => {
     if (busy) return;
@@ -248,6 +264,173 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
       await loadStructure();
     });
 
+  if (mobile) {
+    return (
+      <main
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream"
+        data-misty-automation-editor
+      >
+        <div className="flex min-h-14 shrink-0 items-center gap-2 border-b border-charcoal-border px-4">
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onBlur={() => void rename()}
+            onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
+            className="h-11 min-w-0 flex-1 border-transparent bg-transparent px-2 text-base font-semibold shadow-none focus:border-charcoal-border"
+            aria-label="Automation name"
+          />
+          <span className="rounded-full border border-charcoal-border px-2 py-1 text-xs text-cream-muted">
+            {props.flow.published ? "Published" : "Draft"}
+          </span>
+        </div>
+
+        {message ? (
+          <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-card px-4 text-sm text-cream-muted">
+            <CircleAlert className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{message}</span>
+            <button className="size-11" onClick={() => setMessage("")} aria-label="Dismiss">
+              <X className="mx-auto size-4" />
+            </button>
+          </div>
+        ) : null}
+
+        <div className="flex shrink-0 gap-2 border-b border-charcoal-border p-3">
+          <Button
+            className="min-h-11 flex-1"
+            variant="outline"
+            disabled={Boolean(busy)}
+            onClick={() => void testFlow()}
+          >
+            {busy === "test" ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Play className="size-4" />
+            )}
+            Test
+          </Button>
+          <Button
+            className="min-h-11 flex-1"
+            disabled={Boolean(busy)}
+            onClick={() => void publish()}
+          >
+            {busy === "publish" ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            Publish
+          </Button>
+        </div>
+
+        <div className="misty-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="m-0 text-sm font-semibold text-cream-bright">Workflow steps</h2>
+            <span className="text-xs text-cream-muted">{structure?.steps.length ?? 0} steps</span>
+          </div>
+          {loading ? (
+            <div className="flex min-h-40 items-center justify-center text-sm text-cream-muted">
+              <LoaderCircle className="mr-2 size-4 animate-spin" /> Loading workflow
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
+              {(structure?.steps ?? []).map((step, index) => (
+                <button
+                  key={step.name}
+                  className="flex min-h-16 w-full items-center gap-3 border-b border-charcoal-border px-4 text-left last:border-b-0"
+                  onClick={() => {
+                    setSelectedStep(step.name);
+                    setConfigText("{}");
+                    setDrawerOpen(true);
+                  }}
+                >
+                  <span className="w-5 text-center text-xs text-cream-muted">{index + 1}</span>
+                  <AutomationIntegrationIcon value={`${step.type} ${step.displayName}`} framed />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-cream-bright">
+                      {step.displayName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-cream-muted">
+                      {step.relationship === "trigger"
+                        ? "Starts the automation"
+                        : step.valid
+                          ? "Configured"
+                          : "Needs setup"}
+                    </span>
+                  </span>
+                  {step.valid ? (
+                    <Check className="size-4 text-status-green" />
+                  ) : (
+                    <ChevronRight className="size-5 text-cream-muted" />
+                  )}
+                </button>
+              ))}
+              {!structure?.steps.length ? (
+                <div className="flex min-h-40 flex-col items-center justify-center px-6 text-center text-sm text-cream-muted">
+                  <WorkflowIcon />
+                  Choose a trigger to start this automation.
+                </div>
+              ) : null}
+            </div>
+          )}
+          <Button
+            className="mt-3 min-h-11 w-full"
+            variant="outline"
+            onClick={() => {
+              setSelectedStep("");
+              setDrawerOpen(true);
+            }}
+          >
+            <Plus className="size-4" /> {needsTrigger ? "Choose trigger" : "Add step"}
+          </Button>
+          <div className="mt-5 overflow-hidden rounded-xl border border-charcoal-border">
+            <BottomPanel
+              tab={bottomTab}
+              onTab={setBottomTab}
+              runs={runs}
+              structure={structure}
+              mobile
+            />
+          </div>
+        </div>
+
+        <MobileFullScreenSheet
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          title={selected ? "Step settings" : needsTrigger ? "Choose a trigger" : "Add a step"}
+          doneLabel={selected ? "Save" : undefined}
+          onDone={selected ? () => void saveSelected() : undefined}
+        >
+          {selected ? (
+            <StepSettings
+              selected={selected}
+              configText={configText}
+              onConfigTextChange={setConfigText}
+              busy={busy}
+              onSave={() => void saveSelected()}
+              onDelete={() => void deleteSelected()}
+              mobile
+            />
+          ) : (
+            <StepCatalog
+              needsTrigger={Boolean(needsTrigger)}
+              query={query}
+              onQueryChange={setQuery}
+              onSearch={() => void searchCatalog()}
+              results={catalogResults}
+              loading={busy === "search" || busy === "add"}
+              onPick={(item) => void addCatalogItem(item)}
+              onStarter={(item) => {
+                setQuery(item.query);
+                void searchCatalog(item.query);
+              }}
+              onUtility={(type, label) => void addUtility(type, label)}
+            />
+          )}
+        </MobileFullScreenSheet>
+      </main>
+    );
+  }
+
   return (
     <main
       className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream"
@@ -338,7 +521,7 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
                 variant={BackgroundVariant.Dots}
                 gap={22}
                 size={1}
-                color="var(--color-charcoal-border)"
+                color={automationGraphLine}
               />
             </ReactFlow>
           )}
@@ -371,53 +554,14 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
               </button>
             </div>
             {selected ? (
-              <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
-                <div className="flex items-center gap-3 border-b border-charcoal-border pb-4">
-                  <AutomationIntegrationIcon
-                    value={`${selected.type} ${selected.displayName}`}
-                    framed
-                  />
-                  <div className="min-w-0">
-                    <p className="m-0 truncate text-sm font-medium text-cream-bright">
-                      {selected.displayName}
-                    </p>
-                    <p className="m-0 mt-0.5 text-[10px] text-cream-muted">
-                      {selected.configStatus || selected.type}
-                    </p>
-                  </div>
-                </div>
-                <label className="mt-5 block text-[11px] font-medium text-cream">Inputs</label>
-                <p className="mb-2 mt-1 text-[10px] leading-4 text-cream-muted">
-                  Use JSON for fields and output references. Connection fields are resolved securely
-                  by Misty.
-                </p>
-                <textarea
-                  className="h-44 w-full resize-y rounded-lg border border-charcoal-border bg-charcoal-bg p-3 font-mono text-[11px] leading-5 text-cream outline-none focus:border-charcoal-active"
-                  value={configText}
-                  onChange={(event) => setConfigText(event.target.value)}
-                  spellCheck={false}
-                />
-                <div className="mt-3 flex items-center gap-2">
-                  <Button size="sm" disabled={Boolean(busy)} onClick={() => void saveSelected()}>
-                    {busy === "save" ? (
-                      <LoaderCircle className="size-4 animate-spin" />
-                    ) : (
-                      <Check className="size-4" />
-                    )}{" "}
-                    Save settings
-                  </Button>
-                  {selected.relationship !== "trigger" ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="ml-auto text-[#d68b80]"
-                      onClick={() => void deleteSelected()}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
+              <StepSettings
+                selected={selected}
+                configText={configText}
+                onConfigTextChange={setConfigText}
+                busy={busy}
+                onSave={() => void saveSelected()}
+                onDelete={() => void deleteSelected()}
+              />
             ) : (
               <StepCatalog
                 needsTrigger={Boolean(needsTrigger)}
@@ -602,21 +746,97 @@ function UtilityButton(props: {
   );
 }
 
+function StepSettings(props: {
+  selected: AutomationStep;
+  configText: string;
+  onConfigTextChange: (value: string) => void;
+  busy: string;
+  onSave: () => void;
+  onDelete: () => void;
+  mobile?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto p-4",
+        props.mobile && "px-0 pt-1",
+      )}
+    >
+      <div className="flex items-center gap-3 border-b border-charcoal-border pb-4">
+        <AutomationIntegrationIcon
+          value={`${props.selected.type} ${props.selected.displayName}`}
+          framed
+        />
+        <div className="min-w-0">
+          <p className="m-0 truncate text-sm font-medium text-cream-bright">
+            {props.selected.displayName}
+          </p>
+          <p className="m-0 mt-0.5 text-xs text-cream-muted">
+            {props.selected.configStatus || props.selected.type}
+          </p>
+        </div>
+      </div>
+      <label className="mt-5 block text-sm font-medium text-cream">Inputs</label>
+      <p className="mb-2 mt-1 text-xs leading-5 text-cream-muted">
+        Use JSON for fields and output references. Connection fields are resolved securely by Misty.
+      </p>
+      <textarea
+        className="h-52 w-full resize-y rounded-lg border border-charcoal-border bg-charcoal-bg p-3 font-mono text-base leading-6 text-cream outline-none focus:border-charcoal-active"
+        value={props.configText}
+        onChange={(event) => props.onConfigTextChange(event.target.value)}
+        spellCheck={false}
+      />
+      <div className="mt-3 flex items-center gap-2">
+        {!props.mobile ? (
+          <Button size="sm" disabled={Boolean(props.busy)} onClick={props.onSave}>
+            {props.busy === "save" ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <Check className="size-4" />
+            )}{" "}
+            Save settings
+          </Button>
+        ) : null}
+        {props.selected.relationship !== "trigger" ? (
+          <Button
+            variant="ghost"
+            className="ml-auto min-h-11 text-[#d68b80]"
+            onClick={props.onDelete}
+          >
+            <Trash2 className="size-4" /> Delete step
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function BottomPanel(props: {
   tab: "inputs" | "outputs" | "runs" | "errors";
   onTab: (tab: "inputs" | "outputs" | "runs" | "errors") => void;
   runs: AutomationRun[];
   structure: AutomationStructure | null;
+  mobile?: boolean;
 }) {
   const errors = props.structure?.steps.filter((step) => !step.valid) ?? [];
   return (
-    <section className="h-[132px] shrink-0 border-t border-charcoal-border bg-charcoal-card">
-      <div className="flex h-9 items-center gap-5 border-b border-charcoal-border px-5">
+    <section
+      className={cn(
+        "shrink-0 bg-charcoal-card",
+        props.mobile ? "min-h-44" : "h-[132px] border-t border-charcoal-border",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center gap-1 border-b border-charcoal-border",
+          props.mobile ? "min-h-11 overflow-x-auto px-2" : "h-9 gap-5 px-5",
+        )}
+      >
         {(["inputs", "outputs", "runs", "errors"] as const).map((tab) => (
           <button
             key={tab}
             className={cn(
-              "h-full border-b text-[11px] capitalize",
+              "h-full min-h-11 border-b px-2 text-xs capitalize",
               props.tab === tab
                 ? "border-cream text-cream"
                 : "border-transparent text-cream-muted hover:text-cream",
@@ -628,7 +848,12 @@ function BottomPanel(props: {
           </button>
         ))}
       </div>
-      <div className="misty-transient-scrollbar h-[92px] overflow-auto px-5 py-3 text-[11px] leading-5 text-cream-muted">
+      <div
+        className={cn(
+          "misty-transient-scrollbar overflow-auto px-5 py-3 text-xs leading-5 text-cream-muted",
+          props.mobile ? "min-h-32" : "h-[92px]",
+        )}
+      >
         {props.tab === "runs"
           ? props.runs.length
             ? props.runs.map((run) => (
@@ -668,6 +893,10 @@ function BottomPanel(props: {
   );
 }
 
+function WorkflowIcon() {
+  return <GitBranch className="mb-3 size-6" aria-hidden="true" />;
+}
+
 function buildGraph(steps: AutomationStep[], selectedStep: string) {
   const depthByName = new Map<string, number>();
   const branchOffset = new Map<string, number>();
@@ -695,7 +924,7 @@ function buildGraph(steps: AutomationStep[], selectedStep: string) {
             source: step.parentName,
             target: step.name,
             type: "smoothstep",
-            style: { stroke: "var(--color-charcoal-border)", strokeWidth: 1.5 },
+            style: { stroke: automationGraphLine, strokeWidth: 1.5 },
           },
         ]
       : [],

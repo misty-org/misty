@@ -34,6 +34,7 @@ export function TeamList({
   agents,
   loading,
   owner,
+  canTransferOwnership,
   currentUserId,
   onMemberAction,
 }: {
@@ -42,6 +43,7 @@ export function TeamList({
   agents: SpaceAgentMembership[];
   loading: boolean;
   owner: boolean;
+  canTransferOwnership: boolean;
   canManageAgents: boolean;
   currentUserId?: string;
   onMemberAction: (action: MemberAction) => void;
@@ -86,6 +88,7 @@ export function TeamList({
                 bordered={index > 0}
                 currentUserId={currentUserId}
                 owner={owner}
+                canTransferOwnership={canTransferOwnership}
                 onMemberAction={onMemberAction}
               />
             ) : (
@@ -108,12 +111,14 @@ function MemberRow({
   bordered,
   currentUserId,
   owner,
+  canTransferOwnership,
   onMemberAction,
 }: {
   member: SpaceMember;
   bordered: boolean;
   currentUserId?: string;
   owner: boolean;
+  canTransferOwnership: boolean;
   onMemberAction: (action: MemberAction) => void;
 }) {
   return (
@@ -157,10 +162,14 @@ function MemberRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => onMemberAction({ kind: "transfer", member })}>
-                <ShieldCheck className="mr-2 size-4" /> Transfer ownership
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {canTransferOwnership ? (
+                <>
+                  <DropdownMenuItem onSelect={() => onMemberAction({ kind: "transfer", member })}>
+                    <ShieldCheck className="mr-2 size-4" /> Transfer ownership
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
               <DropdownMenuItem
                 className="text-cream-bright focus:text-cream-bright"
                 onSelect={() => onMemberAction({ kind: "remove", member })}

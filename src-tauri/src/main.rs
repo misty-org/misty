@@ -1,3 +1,3 @@
 fn main() {
-    misty_desktop::run();
+    misty_native::run();
 }

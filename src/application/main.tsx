@@ -1,3 +1,6 @@
+import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
+import { initializeHostSocialRuntime } from "@/features/spaces/chat/hostSocialRuntime";
+import { initializeHostLibraryRuntime } from "@/features/spaces/library/hostLibraryRuntime";
 import { analytics } from "@/telemetry/client";
 import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
 import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
@@ -19,6 +22,9 @@ if (!isNativeMobileBuild && !isWebBuild) {
   });
 }
 installExternalLinkRouting();
+initializeHostLibraryRuntime();
+initializeHostSocialRuntime();
+initializeHostAgentsRuntime();
 
 if (
   import.meta.env.MODE !== "mobile" &&
@@ -32,7 +38,7 @@ if (
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 
-void bootstrap();
+export const startup = bootstrap();
 
 async function bootstrap() {
   const desktopSurface = mistyDesktopSurface();
@@ -53,7 +59,11 @@ async function bootstrap() {
   const { bootstrapDemoSession } = await import("@/features/auth");
   await bootstrapDemoSession();
   void analytics.initialize().then(initializeAnalyticsLifecycle);
-  const [{ App }] = await Promise.all([import("./App"), import("@/styles/styles.css")]);
+  const [{ App }] = await Promise.all([
+    import("./App"),
+    import("@/styles/styles.css"),
+    isNativeMobileBuild ? import("@/styles/mobile.css") : Promise.resolve(),
+  ]);
   root.render(
     <TelemetryErrorBoundary>
       <App />

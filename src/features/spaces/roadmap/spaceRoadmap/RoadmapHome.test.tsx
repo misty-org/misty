@@ -18,6 +18,8 @@ vi.mock("./RoadmapSnapshotPreview", () => ({
 }));
 
 import { RoadmapHome } from "./RoadmapHome";
+import { RoadmapRuntimeProvider } from "./roadmapRuntime";
+import { roadmapTestRuntime } from "./roadmapTestRuntime";
 
 describe("RoadmapHome preview", () => {
   let container: HTMLDivElement;
@@ -41,16 +43,18 @@ describe("RoadmapHome preview", () => {
   it("shows a roadmap canvas snapshot without a roadmap count", async () => {
     await act(async () => {
       root.render(
-        <RoadmapHome
-          spaceId="space-1"
-          roadmaps={[snapshot().roadmap]}
-          canManage
-          loading={false}
-          error=""
-          onCreate={vi.fn()}
-          onOpen={vi.fn()}
-          onRetry={vi.fn()}
-        />,
+        <RoadmapRuntimeProvider runtime={roadmapTestRuntime({ roadmap: loadRoadmap })}>
+          <RoadmapHome
+            spaceId="space-1"
+            roadmaps={[snapshot().roadmap]}
+            canManage
+            loading={false}
+            error=""
+            onCreate={vi.fn()}
+            onOpen={vi.fn()}
+            onRetry={vi.fn()}
+          />
+        </RoadmapRuntimeProvider>,
       );
       await Promise.resolve();
       await Promise.resolve();

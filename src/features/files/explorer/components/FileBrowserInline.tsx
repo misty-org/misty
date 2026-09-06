@@ -1,9 +1,8 @@
-import type { FileEntry } from "@/native/contracts";
 import { Input, TableCell, TableRow } from "@/shared/ui";
 import { useLayoutEffect, useRef } from "react";
 import type { PassiveRenameDraft } from "../model/types/components/FileBrowserInline";
 import type { ExplorerInlineEditState, ExplorerSortColumn } from "../store";
-import { FileIcon } from "./FileBrowserIcons";
+import { FileNameIcon } from "./FileBrowserIcons";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 export type { PassiveRenameDraft } from "../model/types/components/FileBrowserInline";
 
@@ -15,9 +14,6 @@ export function InlineCreateTableRow(props: {
   onCommit: () => void;
   onCancel: () => void;
 }) {
-  const entry = {
-    kind: props.edit.itemKind === "folder" ? "folder" : "file",
-  } as FileEntry;
   return (
     <TableRow className={fileBrowserStyles.tableRow} data-state="selected">
       {props.columns.map((column) => {
@@ -28,7 +24,11 @@ export function InlineCreateTableRow(props: {
               key={column}
             >
               <span className="flex min-w-0 items-center gap-2 font-medium">
-                <FileIcon entry={entry} size={20} variant="table" />
+                <FileNameIcon
+                  name={props.edit.value}
+                  kind={props.edit.itemKind === "folder" ? "folder" : "file"}
+                  size={20}
+                />
                 <InlineNameEditor {...props} variant="table" />
               </span>
             </TableCell>
@@ -67,8 +67,8 @@ export function InlineNameEditor(props: {
     const input = inputRef.current;
     if (!input) return;
     input.focus();
-    input.setSelectionRange(0, props.edit.value.length);
-  }, [props.edit.value.length, sessionKey]);
+    input.setSelectionRange(0, input.value.length);
+  }, [sessionKey]);
 
   return (
     <span
@@ -98,6 +98,7 @@ export function InlineNameEditor(props: {
           value={props.edit.value}
           onChange={(event) => props.onChange(event.target.value)}
           onKeyDown={(event) => {
+            event.stopPropagation();
             if (event.nativeEvent.isComposing) return;
             if (event.key === "Enter") {
               event.preventDefault();

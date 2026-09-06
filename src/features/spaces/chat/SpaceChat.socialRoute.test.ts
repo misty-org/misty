@@ -1,30 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  shouldOpenMistySupportConversation,
-  shouldShowSocialConversation,
-  socialLandingConversation,
-} from "./SpaceChat";
-
-describe("Misty Social landing route", () => {
-  it.each(["instagram", "messenger", "x", "discord"] as const)(
-    "preserves an explicit %s provider instead of opening Misty support",
-    (provider) => {
-      expect(shouldOpenMistySupportConversation("misty", "", provider)).toBe(false);
-    },
-  );
-
-  it("opens Misty support from the unfiltered Misty Social landing page", () => {
-    expect(shouldOpenMistySupportConversation("misty", "", "misty")).toBe(true);
-  });
-
-  it("does not replace an explicitly selected conversation", () => {
-    expect(shouldOpenMistySupportConversation("misty", "conversation-1", "misty")).toBe(false);
-  });
-
-  it("does not apply Misty support routing to regular Spaces", () => {
-    expect(shouldOpenMistySupportConversation("shared", "", "misty")).toBe(false);
-  });
-});
+import { shouldShowSocialConversation, socialLandingConversation } from "./SpaceChat";
 
 describe("Social provider conversation isolation", () => {
   it.each(["instagram", "messenger", "x", "discord"] as const)(
@@ -46,24 +21,17 @@ describe("Social provider conversation isolation", () => {
 
 describe("Social provider landing selection", () => {
   const conversations = [
-    { id: "support-1", kind: "misty_support", origin: "misty" },
     { id: "instagram-1", kind: "standard", origin: "instagram" },
     { id: "discord-agent", kind: "direct", origin: "discord", direct_agent_id: "agent-1" },
     { id: "discord-1", kind: "standard", origin: "discord" },
   ];
 
-  it("opens private support from the canonical Misty Space", () => {
-    expect(socialLandingConversation("misty", "misty", conversations)?.id).toBe("support-1");
-  });
-
-  it("keeps the regular Misty page on Everyone", () => {
-    expect(socialLandingConversation("misty", "standard", conversations)).toBeUndefined();
+  it("keeps native Social on Everyone", () => {
+    expect(socialLandingConversation("misty", conversations)).toBeUndefined();
   });
 
   it("opens the first matching external conversation and skips agent DMs", () => {
-    expect(socialLandingConversation("instagram", "standard", conversations)?.id).toBe(
-      "instagram-1",
-    );
-    expect(socialLandingConversation("discord", "standard", conversations)?.id).toBe("discord-1");
+    expect(socialLandingConversation("instagram", conversations)?.id).toBe("instagram-1");
+    expect(socialLandingConversation("discord", conversations)?.id).toBe("discord-1");
   });
 });

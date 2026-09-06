@@ -1,4 +1,5 @@
-import { agentsApi } from "@/api/agents/api";
+import { runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
+
 import { create } from "zustand";
 import {
   globalMistyError,
@@ -7,11 +8,19 @@ import {
   proposeAction,
 } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
-import { mistyIntent } from "./unifiedMistyCandidates";
-import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface";
+import { mistyIntent } from "./mistyIntent";
+import {
+  runtimeAiApi as aiSurfaceApi,
+  subscribeAgentsInvocation as subscribeToAiInvocation,
+} from "@/features/agents/agentsRuntime";
+
 import type { GlobalAiActionProposal } from "./types";
-import { executeGlobalSearch, executeGlobalVisualSearch } from "./globalSearchExecution";
-export { globalSearchContext } from "./globalSearchDocuments";
+import {
+  searchAgents as executeGlobalSearch,
+  visualSearchAgents as executeGlobalVisualSearch,
+} from "@/features/agents/agentsRuntime";
+
+export { globalSearchContext } from "./globalSearchContext";
 import {
   announceGlobalPanel,
   applyGlobalInvocationEvent,

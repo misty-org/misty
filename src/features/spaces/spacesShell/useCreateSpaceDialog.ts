@@ -1,4 +1,3 @@
-import { spaceNotesEnabled } from "@/features/notes";
 import { reportSystemError } from "@/features/activity";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
@@ -86,9 +85,7 @@ export function useCreateSpaceDialog(options: {
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();
       resetDraft();
-      navigate(
-        `/spaces/${encodeURIComponent(created.space.id)}/${spaceNotesEnabled ? "notes" : "drawings"}`,
-      );
+      navigate(`/spaces/${encodeURIComponent(created.space.id)}/home`);
     } catch (error) {
       reportSystemError({
         error,

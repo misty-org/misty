@@ -1,5 +1,10 @@
 import { invokeShortcutCommand, ShortcutHint, shortcutCommandRegistry } from "@/features/shortcuts";
-import { dockLeaves, dockTabs, useWorkspaceStore, type WorkspaceTab } from "@/features/workspace";
+import {
+  dockLeaves,
+  dockTabs,
+  useWorkspaceStore,
+  type WorkspaceTab,
+} from "@/features/workspace/core";
 import { Button } from "@/shared/ui";
 import { ArrowUp, Clock3, Command, Loader2 } from "lucide-react";
 import { motion } from "motion/react";

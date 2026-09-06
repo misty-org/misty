@@ -1,10 +1,7 @@
-import { PhotoEditor } from "@/features/editor";
-import {
-  useAiSurfaceAdapter,
-  type AiArtifact,
-  type AiSurfaceAdapter,
-} from "@/features/ai-surface/AiPaneHost";
-import { spacesApi } from "@/api/spaces/api";
+import { useLibraryAi as useAiSurfaceAdapter } from "../libraryRuntime";
+import { LibraryPhotoEditor as PhotoEditor } from "@/features/spaces/library/libraryRuntime";
+import type { AiArtifact, AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { editedImageFilename, editedImageMimeType } from "./libraryMediaKind";
 import { defaultLibraryEdit } from "../SpaceLibraryViewerUtils";

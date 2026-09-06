@@ -5,6 +5,8 @@ import {
   type WorkspaceDockNode,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,8 +19,9 @@ import {
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
+import { openBrowserPopup } from "./openBrowserPopup";
 import { useAiSurfaceStore } from "@/features/ai-surface";
-import { captureAttachmentFromDataUrl } from "@/features/ai-surface/MistyRegionCapture";
+import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
 
 const browserBlockingOverlaySelector = [
   '[data-slot="dropdown-menu-content"][data-state="open"]',
@@ -39,7 +42,10 @@ export function browserBlockingOverlayOpen(root: ParentNode = document): boolean
 export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
     const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
-    return activeTab?.surfaceId === "browser";
+    return (
+      activeTab?.surfaceId === "browser" ||
+      (activeTab?.surfaceId === "official-app" && activeTab.groupKey === "app:browser")
+    );
   });
 }
 
@@ -107,10 +113,31 @@ interface BrowserCompanionEvent {
   height: number;
 }
 
+interface IosBrowserEvent {
+  kind: "page" | "title" | "popup" | "download" | "error";
+  id?: string;
+  sourceId?: string;
+  phase?: "started" | "finished";
+  url?: string;
+  title?: string;
+  path?: string;
+  state?: "requested" | "finished" | "failed";
+  success?: boolean;
+  error?: string;
+  message?: string;
+}
+
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
   const browserSurfaceActive = useWorkspaceStore((state) =>
     activeBrowserSurfaceExists(state.layout.root),
+  );
+  useEffect(
+    () =>
+      subscribeEmbeddedBrowserSuspension((suspended, reason) =>
+        setBrowserWebviewsSuspended(suspended, reason),
+      ),
+    [],
   );
   useLayoutEffect(() => {
     if (browserSurfaceActive) return;
@@ -120,6 +147,53 @@ export function BrowserRuntimeBridge() {
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
+
+  useEffect(() => {
+    if (!isNativeMobileBuild) return;
+    const onIosBrowserEvent = (event: Event) => {
+      const payload = (event as CustomEvent<IosBrowserEvent>).detail;
+      if (payload.kind === "popup" && payload.url) {
+        useWorkspaceStore.getState().openBrowserTab({
+          url: payload.url,
+          sourceTabId: payload.sourceId
+            ? (browserTabIdForRuntime(payload.sourceId) ?? undefined)
+            : undefined,
+        });
+        navigate("/browser");
+        return;
+      }
+      if (!payload.id) return;
+      const tabId = browserTabIdForRuntime(payload.id);
+      if (!tabId) return;
+      if (payload.kind === "page" && payload.url && payload.phase) {
+        useBrowserRuntimeStore.getState().setLoading(tabId, payload.phase === "started");
+        useWorkspaceStore.getState().updateBrowserTab(tabId, { url: payload.url });
+        if (payload.phase === "finished") {
+          useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
+          requestBrowserWebviewLayoutByRuntimeId(payload.id);
+        }
+      } else if (payload.kind === "title" && payload.title?.trim()) {
+        useWorkspaceStore.getState().updateBrowserTab(tabId, { title: payload.title.trim() });
+      } else if (payload.kind === "download" && payload.state !== "requested") {
+        if (payload.success) {
+          const name = payload.path?.split(/[\\/]/).pop() || "download";
+          useBrowserRuntimeStore
+            .getState()
+            .setNotice(tabId, `Downloaded ${name}. Use Share or Export to save it in Files.`);
+        } else {
+          useBrowserRuntimeStore
+            .getState()
+            .setError(tabId, payload.error || "The download failed.");
+        }
+      } else if (payload.kind === "error") {
+        useBrowserRuntimeStore
+          .getState()
+          .setError(tabId, payload.message || "The page could not be loaded.");
+      }
+    };
+    window.addEventListener("misty:ios-browser-event", onIosBrowserEvent);
+    return () => window.removeEventListener("misty:ios-browser-event", onIosBrowserEvent);
+  }, [navigate]);
 
   useEffect(() => {
     const beginPointerGesture = () => setBrowserPointerGestureActive(true);
@@ -301,13 +375,10 @@ export function BrowserRuntimeBridge() {
       }),
       listen<BrowserPopupEvent>("misty://browser-popup", ({ payload }) => {
         if (disposed) return;
-        const sourceTabId = browserTabIdForRuntime(payload.sourceId);
-        useWorkspaceStore.getState().openBrowserTab({
-          url: payload.url,
-          sourceTabId: sourceTabId ?? undefined,
-        });
+        const tab = openBrowserPopup(payload);
+        if (!tab) return;
         useRecentToolsStore.getState().recordToolUsage("browser");
-        navigate("/browser");
+        navigate(tab.route);
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {
         if (disposed || payload.state === "requested") return;
@@ -315,7 +386,14 @@ export function BrowserRuntimeBridge() {
         if (!tabId) return;
         if (payload.success) {
           const name = payload.path.split(/[\\/]/).pop() || "download";
-          useBrowserRuntimeStore.getState().setNotice(tabId, `Saved ${name} to Downloads.`);
+          useBrowserRuntimeStore
+            .getState()
+            .setNotice(
+              tabId,
+              isNativeMobileBuild
+                ? `Downloaded ${name}. Use Share or Export to save it in Files.`
+                : `Saved ${name} to Downloads.`,
+            );
           window.setTimeout(() => useBrowserRuntimeStore.getState().setNotice(tabId, null), 5_000);
         } else {
           useBrowserRuntimeStore

@@ -1,0 +1,21 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@misty/apps/*": ["./vendor/misty-apps/interface/*"],
+      "@misty/apps": ["./vendor/misty-apps/interface/store.tsx"],
+      "lib0/*": ["node_modules/yjs/node_modules/lib0/*"]
+    }
+  },
+  "include": [
+    "sdk-browser-host-probe.tsx",
+    "sdk-inbox-host-probe.tsx",
+    "sdk-files-pane-probe.tsx",
+    "sdk-journal-render-probe.ts",
+    "sdk-journal-collaboration-probe.ts",
+    "sdk-journal-host-probe.tsx"
+  ]
+}

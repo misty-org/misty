@@ -1,6 +1,6 @@
-import { spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { LibrarySharedReference } from "@/api/spaces/dto/interfaces/types";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmLibraryAction as confirmAction } from "@/features/spaces/library/libraryRuntime";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 import type { SelectCollection } from "./useLibraryCollectionRoute";
 

@@ -2,18 +2,13 @@ import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { resetInboxAccountState, useInboxStore } from "@/features/inbox";
 import { useSpacesStore } from "@/features/spaces";
-import {
-  dockTabs,
-  NAVIGATOR_APP_IDS,
-  useNavigatorAppsStore,
-  useWorkspaceStore,
-} from "@/features/workspace";
+import { dockTabs, useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalNavigator } from "./GlobalNavigator";
-import { spaceFixture, spaceTab } from "./GlobalNavigator.testFixtures";
+import { seedNavigatorApps, spaceFixture, spaceTab } from "./GlobalNavigator.testFixtures";
 
 vi.mock("@/features/auth", () => ({
   useAuth: () => ({ user: { id: "account-1", email: "owner@example.com" } }),
@@ -48,9 +43,10 @@ describe("GlobalNavigator disclosures", () => {
       presenceBySpace: {},
     });
     useWorkspaceStore.getState().reset();
+    seedNavigatorApps();
     resetInboxAccountState();
     useNavigatorAppsStore.setState({
-      appIdsByAccount: { "account-1": [...NAVIGATOR_APP_IDS] },
+      appIdsByAccount: {},
       collapsedByAccount: { "account-1": false },
     });
     useWorkspaceStore.setState({
@@ -118,11 +114,11 @@ describe("GlobalNavigator disclosures", () => {
           tabs: [
             {
               id: "inbox-tab",
-              surfaceId: "inbox",
-              groupKey: "tool:inbox",
+              surfaceId: "official-app",
+              groupKey: "app:inbox",
               instanceKey: "inbox",
               title: "Inbox",
-              route: "/inbox?provider=microsoft",
+              route: "/apps/inbox?provider=microsoft",
               sidebarVisible: true,
               state: {},
               createdAt: 1,
@@ -133,7 +129,7 @@ describe("GlobalNavigator disclosures", () => {
       },
     });
 
-    await renderNavigator("/inbox?provider=microsoft");
+    await renderNavigator("/apps/inbox?provider=microsoft");
 
     const inboxItems = [
       ...container.querySelectorAll<HTMLAnchorElement>(
@@ -148,16 +144,11 @@ describe("GlobalNavigator disclosures", () => {
         .find((item) => item.textContent?.trim() === "Outlook")
         ?.getAttribute("aria-current"),
     ).toBe("page");
-    expect(container.querySelector('[data-navigator-feature-icon="gmail"]')).toBeNull();
-    expect(container.querySelector('[data-navigator-feature-icon="outlook"]')).toBeNull();
-    const gmailIcon = container.querySelector('[data-mail-provider-icon="gmail"]');
-    const outlookIcon = container.querySelector('[data-mail-provider-icon="outlook"]');
-    expect(gmailIcon).not.toBeNull();
-    expect(outlookIcon).not.toBeNull();
-    expect(gmailIcon?.classList.contains("brightness-0")).toBe(true);
-    expect(gmailIcon?.classList.contains("invert")).toBe(true);
-    expect(outlookIcon?.classList.contains("brightness-0")).toBe(true);
-    expect(outlookIcon?.classList.contains("invert")).toBe(true);
+    expect(
+      inboxItems.map((item) =>
+        item.querySelector("[data-mail-provider-icon]")?.getAttribute("data-mail-provider-icon"),
+      ),
+    ).toEqual(["gmail", "outlook"]);
 
     await act(async () => useInboxStore.setState({ selectedProvider: "" }));
 
@@ -175,11 +166,11 @@ describe("GlobalNavigator disclosures", () => {
           tabs: [
             {
               id: "agents-tab",
-              surfaceId: "agents",
-              groupKey: "tool:agents",
+              surfaceId: "official-app",
+              groupKey: "app:agents",
               instanceKey: "agents",
               title: "Agents",
-              route: "/agents?view=automations",
+              route: "/apps/agents?view=automations",
               sidebarVisible: true,
               state: {},
               createdAt: 1,
@@ -190,7 +181,7 @@ describe("GlobalNavigator disclosures", () => {
       },
     });
 
-    await renderNavigator("/agents?view=automations");
+    await renderNavigator("/apps/agents?view=automations");
 
     const trigger = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Agents"][data-navigator-disclosure-trigger="true"]',
@@ -204,8 +195,8 @@ describe("GlobalNavigator disclosures", () => {
     ];
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Chat", "Automations"]);
     expect(items.map((item) => item.getAttribute("href"))).toEqual([
-      "/agents",
-      "/agents?view=automations",
+      "/apps/agents",
+      "/apps/agents?view=automations",
     ]);
     expect(
       items
@@ -230,14 +221,16 @@ describe("GlobalNavigator disclosures", () => {
           tabs: [
             {
               ...spaceTab,
-              groupKey: "space:space-1:planner",
-              route: "/spaces/space-1/planner/agenda/week?date=2026-08-26",
+              groupKey: "app:planner",
+              instanceKey: "planner",
+              title: "Planner",
+              route: "/apps/planner?space=space-1&view=agenda&date=2026-08-26",
             },
           ],
         },
       },
     });
-    await renderNavigator("/spaces/space-1/planner/agenda/week?date=2026-08-26");
+    await renderNavigator("/apps/planner?space=space-1&view=agenda&date=2026-08-26");
 
     const trigger = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Planner"][data-navigator-disclosure-trigger="true"]',
@@ -266,7 +259,7 @@ describe("GlobalNavigator disclosures", () => {
       items.find((item) => item.textContent?.includes("Roadmaps"))?.hasAttribute("aria-current"),
     ).toBe(false);
     expect(items.find((item) => item.textContent?.includes("Tasks"))?.getAttribute("href")).toBe(
-      "/spaces/space-1/planner/tasks/board",
+      "/apps/planner?space=space-1&view=tasks",
     );
 
     const library = container.querySelector('button[aria-label="Library"]');
@@ -345,14 +338,16 @@ describe("GlobalNavigator disclosures", () => {
           tabs: [
             {
               ...spaceTab,
-              groupKey: "space:space-1:social",
-              route: "/spaces/space-1/social/instagram",
+              groupKey: "app:chat",
+              instanceKey: "chat",
+              title: "Social",
+              route: "/apps/social?space=space-1&provider=instagram",
             },
           ],
         },
       },
     });
-    await renderNavigator("/spaces/space-1/social/instagram");
+    await renderNavigator("/apps/social?space=space-1&provider=instagram");
 
     const socialDestinations = container.querySelector(
       '[role="group"][aria-label="Social destinations"]',
@@ -380,14 +375,14 @@ describe("GlobalNavigator disclosures", () => {
       socialItems.every((item) =>
         item
           .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("grid-cols-[24px_minmax(0,1fr)]"),
+          ?.className.includes("grid-cols-[20px_minmax(0,1fr)]"),
       ),
     ).toBe(true);
     expect(
       socialItems.every((item) =>
         item
           .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("group-hover/tree-row:bg-charcoal-hover"),
+          ?.className.includes("group-hover/tree-row:bg-charcoal-card"),
       ),
     ).toBe(true);
     expect(
@@ -395,36 +390,18 @@ describe("GlobalNavigator disclosures", () => {
         .find((item) => item.textContent?.trim() === "Instagram")
         ?.getAttribute("aria-current"),
     ).toBe("page");
-    const instagramIcon = socialItems
-      .find((item) => item.textContent?.trim() === "Instagram")
-      ?.querySelector('[data-social-provider-icon="instagram"]');
-    expect(instagramIcon?.querySelector("linearGradient")).not.toBeNull();
     expect(
-      socialItems
-        .find((item) => item.textContent?.trim() === "Misty")
-        ?.querySelector('[data-social-provider-icon="misty"]'),
-    ).not.toBeNull();
-    expect(
-      socialItems
-        .find((item) => item.textContent?.trim() === "Misty")
-        ?.querySelector<HTMLElement>('[data-social-provider-icon="misty"]')?.style.width,
-    ).toBe("18px");
-    expect(
-      socialItems
-        .find((item) => item.textContent?.trim() === "Discord")
-        ?.querySelector("svg")
-        ?.classList.contains("!size-5"),
-    ).toBe(true);
-    expect(
-      socialItems
-        .filter((item) => item.textContent?.trim() !== "Misty")
-        .every((item) => item.querySelector("svg")?.classList.contains("overflow-visible")),
-    ).toBe(true);
+      socialItems.map((item) =>
+        item
+          .querySelector("[data-social-provider-icon]")
+          ?.getAttribute("data-social-provider-icon"),
+      ),
+    ).toEqual(["misty", "instagram", "messenger", "x", "discord"]);
     await act(async () => {
       socialItems.find((item) => item.textContent?.trim() === "X")?.click();
     });
     expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]?.route).toBe(
-      "/spaces/space-1/social/x",
+      "/apps/social?space=space-1&provider=x",
     );
 
     const socialTrigger = container.querySelector<HTMLButtonElement>(
@@ -487,11 +464,11 @@ describe("GlobalNavigator disclosures", () => {
             spaceTab,
             {
               id: "transfers-tab",
-              surfaceId: "transfers",
-              groupKey: "tool:transfers",
-              instanceKey: "transfers",
+              surfaceId: "official-app",
+              groupKey: "app:files",
+              instanceKey: "files",
               title: "Transfers",
-              route: "/transfers",
+              route: "/apps/files?view=transfers",
               sidebarVisible: true,
               state: {},
               createdAt: 2,
@@ -501,7 +478,7 @@ describe("GlobalNavigator disclosures", () => {
         },
       },
     });
-    await renderNavigator("/transfers");
+    await renderNavigator("/apps/files?view=transfers");
 
     const trigger = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Files"][data-navigator-disclosure-trigger="true"]',
@@ -509,15 +486,17 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     const triggerClasses = trigger?.className.split(/\s+/) ?? [];
     expect(triggerClasses).toContain("box-border");
-    expect(triggerClasses).toContain("grid-cols-[28px_minmax(0,1fr)]");
+    expect(triggerClasses).toContain("grid-cols-[18px_minmax(0,1fr)]");
     expect(triggerClasses).not.toContain("hover:bg-charcoal-active");
     expect(triggerClasses).not.toContain("hover:text-cream");
 
     const destinations = container.querySelector('[role="group"][aria-label="Files destinations"]');
     const items = [...(destinations?.querySelectorAll<HTMLAnchorElement>("a") ?? [])];
     expect(items.map((item) => item.textContent?.trim())).toEqual(["Explorer", "Transfers"]);
+    expect(items[1]?.getAttribute("href")).toBe("/apps/files?view=transfers");
+    expect(items[1]?.getAttribute("aria-current")).toBe("page");
     expect(featureIconNames(destinations)).toEqual(["explorer", "transfers"]);
-    expect(destinations?.className).toContain("gap-1");
+    expect(destinations?.className).toContain("gap-[var(--navigation-tree-gap)]");
     expect(items.every((item) => item.className.includes("h-7"))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-branch="true"]'))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
@@ -528,14 +507,14 @@ describe("GlobalNavigator disclosures", () => {
     ).toBe(true);
     expect(
       items.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("pl-1"),
+        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("px-2"),
       ),
     ).toBe(true);
     expect(
       items.every((item) =>
         item
           .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("group-hover/tree-row:bg-charcoal-hover"),
+          ?.className.includes("group-hover/tree-row:bg-charcoal-card"),
       ),
     ).toBe(true);
     expect(
@@ -544,7 +523,7 @@ describe("GlobalNavigator disclosures", () => {
         ?.getAttribute("data-tree-branch-end"),
     ).toBe("true");
     expect(items.find((item) => item.textContent?.includes("Explorer"))?.getAttribute("href")).toBe(
-      "/files",
+      "/apps/files",
     );
     expect(
       items.find((item) => item.textContent?.includes("Transfers"))?.getAttribute("aria-current"),

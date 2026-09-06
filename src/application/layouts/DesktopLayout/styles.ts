@@ -1,4 +1,4 @@
-import { cn } from "@/shared/ui";
+import { cn, navigationMenuPrimaryLayoutClass } from "@/shared/ui";
 import type { FramePacingState } from "@/application/layouts/model/types";
 
 export const desktopFrameClass = [
@@ -76,11 +76,10 @@ export const navigatorFocusRingClass = [
   "focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-workspace",
 ].join(" ");
 
-export const navigatorPrimaryRowLayoutClass =
-  "grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2.5";
+export const navigatorPrimaryRowLayoutClass = navigationMenuPrimaryLayoutClass;
 
 export const navigatorSubsectionIconClass =
-  "misty-navigator-subsection-icon grid size-6 shrink-0 place-items-center text-cream-bright [&_img]:!size-5 [&_svg]:!size-5";
+  "misty-navigator-subsection-icon pointer-events-none grid size-6 shrink-0 place-items-center text-cream-bright [contain:layout_paint] [&_img]:!size-5 [&_svg]:!size-5";
 
 // The account controls stay visually separate from the scrolling app list so
 // they remain a stable, floating account island at the bottom of the rail.
@@ -145,7 +144,7 @@ export const workStatusToastDurationMs = 3500;
 // minus whatever width the navigator rail already covers.
 export const desktopTitlebarControlsEnd = 240;
 export const windowsTitlebarControlsEnd = 264;
-export const desktopTitlebarNavigationInset = 96;
+export const desktopTitlebarNavigationInset = 84;
 export const windowsTitlebarNavigationInset = 8;
 
 export function desktopTitlebarNavigationGeometry(
@@ -182,7 +181,7 @@ export const desktopWallpaperLayerClass = "hidden";
 export const desktopTitlebarNavigationClass =
   "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center gap-1";
 export const desktopTitlebarNavigationButtonClass = [
-  "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
   "disabled:pointer-events-none disabled:text-cream-muted/35",

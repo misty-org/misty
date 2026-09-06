@@ -4,9 +4,15 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProfilePopover } from "./ProfilePopover";
 
+let mockUser: { id: string; email: string; name: string } | null = {
+  id: "account-1",
+  email: "owner@example.com",
+  name: "Owner",
+};
+
 vi.mock("@/features/auth", () => ({
   useAuth: () => ({
-    user: { id: "account-1", email: "owner@example.com", name: "Owner" },
+    user: mockUser,
     accounts: [],
     transitioning: false,
     switchAccount: vi.fn(),
@@ -22,6 +28,7 @@ vi.mock("@/features/installer", () => ({
 describe("ProfilePopover", () => {
   afterEach(() => {
     document.body.innerHTML = "";
+    mockUser = { id: "account-1", email: "owner@example.com", name: "Owner" };
   });
 
   it("uses the shell overlay, dismisses outside, and restores trigger focus", async () => {
@@ -91,6 +98,42 @@ describe("ProfilePopover", () => {
       expect(leadingIcon?.getAttribute("width")).toBe("18");
       expect(leadingIcon?.getAttribute("height")).toBe("18");
       expect(leadingIcon?.getAttribute("stroke-width")).toBe("2");
+    }
+    await act(async () => root.unmount());
+  });
+
+  it("shows only Sign in button when no account is signed in", async () => {
+    mockUser = null;
+    const host = document.createElement("div");
+    const overlay = document.createElement("div");
+    overlay.id = "misty-shell-overlays";
+    const anchor = document.createElement("button");
+    document.body.append(host, overlay, anchor);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <ProfilePopover
+            anchorRef={{ current: anchor }}
+            currentPath="/spaces"
+            open
+            onClose={vi.fn()}
+            onOpenAccountSettings={vi.fn()}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    const signInButton = Array.from(overlay.querySelectorAll("button")).find((candidate) =>
+      candidate.textContent?.includes("Sign in"),
+    );
+    expect(signInButton).toBeDefined();
+
+    for (const label of ["Account settings", "Take app tour", "Switch accounts", "Log out"]) {
+      const button = Array.from(overlay.querySelectorAll("button")).find((candidate) =>
+        candidate.textContent?.includes(label),
+      );
+      expect(button).toBeUndefined();
     }
     await act(async () => root.unmount());
   });

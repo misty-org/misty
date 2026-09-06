@@ -32,6 +32,7 @@ function deferred<T>() {
 
 const spaceA: Space = {
   id: "space-a",
+  is_default: true,
   owner_user_id: "user-a",
   name: "Account A's Space",
   role: "owner",

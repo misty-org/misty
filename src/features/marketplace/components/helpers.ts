@@ -7,11 +7,16 @@ export function pluginStatus(plugin: MarketplaceEntry) {
   if (!plugin.installed) {
     return "available";
   }
+  if (plugin.updateAvailable) {
+    return "update available";
+  }
   return plugin.enabled ? "installed" : "disabled";
 }
 
 export function statusBadgeVariant(plugin: MarketplaceEntry) {
-  return plugin.installed && plugin.enabled ? ("secondary" as const) : ("outline" as const);
+  return plugin.installed && plugin.enabled && !plugin.updateAvailable
+    ? ("secondary" as const)
+    : ("outline" as const);
 }
 
 export function actionLabel(plugin: MarketplaceEntry) {
@@ -20,6 +25,9 @@ export function actionLabel(plugin: MarketplaceEntry) {
   }
   if (!plugin.installed) {
     return "Install";
+  }
+  if (plugin.updateAvailable) {
+    return "Update";
   }
   return plugin.enabled ? "Open" : "Enable";
 }

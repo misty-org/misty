@@ -29,7 +29,6 @@ export function SpaceChatConversationList({
   onEditConversation,
   onDeleteConversation,
   isSpaceOwner = false,
-  isMistySpace = false,
   accounts = [],
   accountsLoading = false,
   authorizingProvider = null,
@@ -44,7 +43,6 @@ export function SpaceChatConversationList({
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
-  isMistySpace?: boolean;
   accounts?: AccountConnection[];
   accountsLoading?: boolean;
   authorizingProvider?: string | null;
@@ -54,7 +52,7 @@ export function SpaceChatConversationList({
     .filter((conversation) => !conversation.direct_agent_id)
     .filter((conversation) => conversation.origin === provider)
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
-  const showEveryone = !isMistySpace && provider === "misty";
+  const showEveryone = provider === "misty";
   const conversationCount = visibleConversations.length + (showEveryone ? 1 : 0);
   const providerAccounts =
     provider === "misty"

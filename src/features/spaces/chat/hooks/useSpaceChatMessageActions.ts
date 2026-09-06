@@ -1,5 +1,5 @@
-import { buildMessageSpans } from "@/features/spaces";
-import { spacesApi } from "@/api/spaces/api";
+import { buildMessageSpans } from "@/features/spaces/chat/store/useSpaceMessageSpansStore";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import type {
   SpaceConversation,
   SpaceMember,
@@ -10,6 +10,8 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
 import type { MessageEditingState } from "./useMessageEditing";
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
+import { queueSocialSubmission as queueMobileChatSubmission } from "@/features/spaces/chat/socialRuntime";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 
 export interface SpaceChatMessageActionsOptions {
   spaceId: string;
@@ -104,6 +106,32 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       setGroupMessages((current) => mergeSpaceMessages(current, [optimisticMessage]));
     }
     draft.reset();
+
+    if (isNativeMobileBuild && !navigator.onLine) {
+      try {
+        await queueMobileChatSubmission({
+          clientNonce,
+          spaceId,
+          conversationId,
+          content,
+          fileNodeIds: snapshot.selectedFileIds,
+          attachmentIds,
+          libraryItemIds: snapshot.selectedLibraryIds,
+          replyToMessageId: snapshot.replyToMessageId,
+        });
+      } catch {
+        if (conversationId) {
+          setGroupMessages((current) =>
+            current.map((message) =>
+              message.client_nonce === clientNonce
+                ? { ...message, local_delivery_state: "failed" }
+                : message,
+            ),
+          );
+        }
+      }
+      return;
+    }
 
     try {
       if (conversationId) {

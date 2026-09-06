@@ -17,7 +17,13 @@ export function useControlledProactivity(
   accountId: string,
   adapter: AiSurfaceAdapter | null,
 ): ControlledProactiveSuggestion | null {
-  const proposedAction = adapter?.getSuggestedActions?.()[0];
+  let proposedAction: AiSuggestedAction | undefined;
+  try {
+    proposedAction = adapter?.getSuggestedActions?.()[0];
+  } catch {
+    // Revoked component callbacks remain guarded; optional suggestions simply
+    // disappear during the render that replaces a closed surface.
+  }
   const actionId = proposedAction?.id ?? "";
   const actionLabel = proposedAction?.label ?? "";
   const actionPrompt = proposedAction?.prompt ?? "";

@@ -2,6 +2,8 @@ import { useAppRouteMemoryStore } from "@/features/app-shell";
 import { apiSessionInvalidEvent } from "@/api/client/session";
 import { useSetupStore } from "@/features/installer";
 import { removeSpaceReferenceCache } from "@/features/spaces";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import { mobileCachePurgeAccount } from "@/native/mobile-cache";
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
 import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
@@ -10,6 +12,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -57,6 +60,30 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
 });
 
+/**
+ * Restricted identity provider used by a separately packaged official app.
+ * The package receives display identity from the host, while every network
+ * request continues to use its short-lived, app-scoped runtime credential.
+ */
+export function OfficialAppAuthProvider(props: { user: AuthUser; children: ReactNode }) {
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: props.user,
+      setUser: () => undefined,
+      accounts: [],
+      transitioning: false,
+      refreshUser: async () => props.user,
+      authenticateAccount: async (request) => request(),
+      switchAccount: async () => undefined,
+      resumeAccount: async () => undefined,
+      removeAccount: async () => undefined,
+      logout: async () => undefined,
+    }),
+    [props.user],
+  );
+  return <AuthContext.Provider value={value}>{props.children}</AuthContext.Provider>;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useSetupStore((state) => state.signOut);
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
@@ -88,14 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Signs out the active account and returns to the sign-in chooser without
   // silently jumping to another saved account. Every account stays listed.
   const deactivateToChooser = useCallback(async () => {
+    const accountId = activeUser?.id ?? "";
     await deactivateActiveAccount();
     await signOut();
+    if (isNativeMobileBuild && accountId) await removeSavedAccountSession(accountId);
     useAppRouteMemoryStore.getState().resetAppRoute();
     useUserStore.getState().clear();
     setUserState(null);
     setAccounts(listSavedAccountSessions());
     navigate("/signin", { replace: true });
-  }, [navigate, signOut]);
+  }, [activeUser?.id, navigate, signOut]);
 
   const setUser = useCallback(
     (nextUser: AuthUser | null) => {
@@ -391,6 +420,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const removeAccount = useCallback(async (accountId: string) => {
     await removeSavedAccountSession(accountId);
     await removeSpaceReferenceCache(accountId);
+    if (isNativeMobileBuild) await mobileCachePurgeAccount(accountId);
     setAccounts(listSavedAccountSessions());
   }, []);
 

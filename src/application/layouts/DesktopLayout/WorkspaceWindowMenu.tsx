@@ -34,6 +34,7 @@ export function WorkspaceWindowMenu(props: {
           className={dockActionClass}
           aria-label="Manage virtual windows"
           title="Manage virtual windows"
+          data-tour-target="workspace-window-menu"
         >
           <AppWindow size={18} />
         </button>

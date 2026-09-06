@@ -1,4 +1,10 @@
-import { apiRequest, httpRequest, readApiAuthToken, resolveRequiredApiBase } from "@/api/client";
+import {
+  apiRequest,
+  apiRequestCredentials,
+  httpRequest,
+  readApiAuthToken,
+  resolveRequiredApiBase,
+} from "@/api/client";
 import type {
   AiArtifact,
   AiInvocationCreated,
@@ -271,7 +277,7 @@ async function streamAiInvocation(
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await httpRequest(`${base}${eventsUrl}`, {
     method: "GET",
-    credentials: "include",
+    credentials: apiRequestCredentials(),
     headers,
     signal,
   });
