@@ -1,3 +1,6 @@
+import { initializeHostAgentsRuntime } from "../src/features/agents/hostAgentsRuntime";
+import { initializeHostSocialRuntime } from "../src/features/spaces/chat/hostSocialRuntime";
+import { initializeHostLibraryRuntime } from "../src/features/spaces/library/hostLibraryRuntime";
 /** Native signed-package + actual host UI check. Account/installation API replies are fixtures. */
 import React, { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
@@ -22,6 +25,9 @@ import { BrowserRuntimeBridge } from "../src/features/browser/BrowserRuntimeBrid
 import { TooltipProvider } from "../src/shared/ui";
 import { officialDesktopPackageReady } from "../src/features/apps/desktopPackages";
 
+initializeHostLibraryRuntime();
+initializeHostSocialRuntime();
+initializeHostAgentsRuntime();
 const params = new URLSearchParams(location.search);
 const nonce = params.get("nonce")!;
 const catalog = await fetch(params.get("catalog")!).then((response) => response.json());
