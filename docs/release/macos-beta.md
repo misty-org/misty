@@ -14,6 +14,8 @@ The `misty` repository already has these Apple secrets: `MACOS_DEVELOPER_ID`, `M
 
 Run `npm run beta:keys` only on the release maintainer’s computer. It creates or verifies two separate signing keys, configures the GitHub signing secrets, and updates public trust. Private backups live in `~/.config/misty-release/` with owner-only permissions. Back up that directory securely. On another computer, restore those keys first; the command refuses to replace established trust. Apple signing, app-package signing, and desktop-updater signing are separate systems.
 
+The Go repository is private and disables deploy keys. The authenticated local `prepare` and `promote` commands verify its exact commit and successful `Verify` CI check through GitHub CLI. The macOS workflow checks out the public SDK and Apps pins; it does not need private server source or a broad personal token. A workflow artifact alone does not complete private-server verification: finish with `npm run beta:prepare -- --collect` using an account that can read the Go repository.
+
 ## Prepare
 
 1. Verify and commit SDK changes, then run `npm run sdk:sync` in Misty. It checks the SDK and an isolated archive consumer and refreshes both consumers’ pinned archives.
