@@ -1,4 +1,4 @@
-import { assertAppsClosedForUpdate } from "@/features/apps/appUpdateSafety";
+import { reserveAppUpdate } from "@/features/apps/appUpdateSafety";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
@@ -87,8 +87,9 @@ export function DesktopUpdaterSettings() {
     setState("installing");
     setError("");
     setProgress(EMPTY_UPDATE_PROGRESS);
+    let releaseUpdate = () => {};
     try {
-      assertAppsClosedForUpdate();
+      releaseUpdate = reserveAppUpdate();
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));
       });
@@ -97,6 +98,8 @@ export function DesktopUpdaterSettings() {
       setError(readableUpdateError(cause));
       setState("error");
       busyRef.current = false;
+    } finally {
+      releaseUpdate();
     }
   }
 
