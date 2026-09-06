@@ -4,6 +4,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { booleanSetting, stringSetting, SwitchControl, TextAreaControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
+import { ClearBrowsingDataRow } from "./ClearBrowsingDataRow";
 
 export function PrivacySection(props: SettingsContentProps & { page?: "app" | "browser" }) {
   return (
@@ -14,7 +15,7 @@ export function PrivacySection(props: SettingsContentProps & { page?: "app" | "b
             <SettingsRow
               label="Don't capture page state on these sites"
               description="One site per line. Subdomains are included. Only the address and scroll position are kept."
-              last
+              stacked
             >
               <TextAreaControl
                 value={stringSetting(props.document, "privacy", "page_state_excluded_sites", "")}
@@ -25,6 +26,9 @@ export function PrivacySection(props: SettingsContentProps & { page?: "app" | "b
                 }
               />
             </SettingsRow>
+          </SettingsSectionBlock>
+          <SettingsSectionBlock title="Browsing data">
+            <ClearBrowsingDataRow />
           </SettingsSectionBlock>
         </>
       )}
@@ -50,7 +54,6 @@ export function PrivacySection(props: SettingsContentProps & { page?: "app" | "b
           <SettingsRow
             label="Send anonymous crash reports"
             description="Share sanitized unexpected React and Rust errors without file or account data."
-            last
           >
             <SwitchControl
               checked={booleanSetting(

@@ -24,6 +24,7 @@ import { AgentDetailsPanel, type AgentDetailsSectionId } from "./page/AgentDetai
 import { agentDetailsSections } from "./page/AgentDetailsSections";
 import { useAgentActivity } from "./page/useAgentActivity";
 import { useAgentChangeGuard } from "./page/useAgentChangeGuard";
+import { useAgentFolderSync } from "./folders/useAgentFolderSync";
 import { AgentWorkspaceFrame, type AgentWorkspacePage } from "./workspace/AgentWorkspaceFrame";
 
 /*
@@ -92,6 +93,7 @@ export default function NativeAgentsPage() {
     store.setAccount(user?.id ?? "");
     if (user?.id) void store.loadConversations();
   }, [user?.id]);
+  useAgentFolderSync(user?.id ?? "");
   const linkedAgentId = params.get("agent");
   const linkedConversationId = params.get("conversation");
   useEffect(() => {

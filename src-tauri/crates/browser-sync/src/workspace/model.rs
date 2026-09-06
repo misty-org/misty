@@ -64,7 +64,7 @@ fn parent_record(record: &ViewRecord) -> Option<(Kind, String)> {
                 .to_owned(),
         )),
         Kind::Bookmark => Some((Kind::Folder, field(record, "group_id")?.to_owned())),
-        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch | Kind::ExtensionSyncKey | Kind::ExtensionRemoval => {
+        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch | Kind::ExtensionSyncKey | Kind::ExtensionRemoval | Kind::Login => {
             None
         }
     }
@@ -81,6 +81,7 @@ pub fn collection_of(kind: Kind) -> Option<&'static str> {
         Kind::SavedTabGroup => Some(crate::collections::TAB_GROUPS),
         Kind::HistoryBatch => Some(crate::collections::HISTORY),
         Kind::ExtensionSyncKey | Kind::ExtensionRemoval => Some(crate::collections::EXTENSION_SYNC),
+        Kind::Login => Some(crate::collections::PASSWORDS),
         _ => None,
     }
 }
@@ -124,19 +125,22 @@ pub fn rebase(records: &[ViewRecord], changes: &[Change]) -> crate::Result<Vec<V
     for change in changes {
         match change {
             Change::Create { kind, id, fields } => {
-                entities::validate(*kind, fields)?;
+                let mut fields = fields.clone();
+                drop_cleared_fields(*kind, &mut fields);
+                entities::validate(*kind, &fields)?;
                 by_key
                     .entry((*kind, id.clone()))
                     .or_insert_with(|| ViewRecord {
                         kind: *kind,
                         id: id.clone(),
-                        fields: fields.clone(),
+                        fields,
                     });
             }
             Change::Patch { kind, id, fields } => {
                 if let Some(record) = by_key.get_mut(&(*kind, id.clone())) {
                     let mut merged = record.fields.clone();
                     merged.extend(fields.clone());
+                    drop_cleared_fields(*kind, &mut merged);
                     entities::validate(*kind, &merged)?;
                     record.fields = merged;
                 }
@@ -147,6 +151,18 @@ pub fn rebase(records: &[ViewRecord], changes: &[Change]) -> crate::Result<Vec<V
         }
     }
     Ok(by_key.into_values().collect())
+}
+
+/// Optional tab fields set to null are removed rather than stored, so a record
+/// that drops them has exactly the shape versions without them accept.
+fn drop_cleared_fields(kind: Kind, fields: &mut entities::Fields) {
+    if kind == Kind::Tab {
+        for field in entities::PINNED_TAB_FIELDS {
+            if fields.get(field).is_some_and(|value| value.is_null()) {
+                fields.remove(field);
+            }
+        }
+    }
 }
 
 /// `rebase` for a queue of edits made against known workspace versions. An edit

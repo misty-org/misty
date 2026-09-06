@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => ({
   theme: "#131313",
 }));
 vi.mock("@/features/settings", () => ({
-  extensionThemeChangedEvent: "misty://extension-theme-changed",
-  extensionThemeSnapshot: () => ({
+  appThemeChangedEvent: "misty://app-theme-changed",
+  appThemeSnapshot: () => ({
     tokens: {
       background: mocks.theme,
     },
@@ -90,7 +90,7 @@ describe("main window readiness", () => {
     expect(mocks.background).toHaveBeenLastCalledWith("#131313");
     mocks.theme = "#fafafa";
     await act(async () => {
-      window.dispatchEvent(new Event("misty://extension-theme-changed"));
+      window.dispatchEvent(new Event("misty://app-theme-changed"));
       await vi.advanceTimersByTimeAsync(120);
     });
     expect(mocks.background).toHaveBeenLastCalledWith("#fafafa");
@@ -99,7 +99,7 @@ describe("main window readiness", () => {
     );
     view.unmount();
     mocks.background.mockClear();
-    window.dispatchEvent(new Event("misty://extension-theme-changed"));
+    window.dispatchEvent(new Event("misty://app-theme-changed"));
     expect(mocks.background).not.toHaveBeenCalled();
   });
   it("waits for fonts, saved zoom, and the committed layout before revealing", async () => {

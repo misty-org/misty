@@ -107,7 +107,7 @@ export function BrowserBangsSettings(
         {bangs.length === 0 ? (
           <p className={settingsEmptyClass}>No shortcuts of your own yet.</p>
         ) : null}
-        <div className="grid gap-2 px-5 py-3 @[640px]/settings:grid-cols-[110px_minmax(0,0.6fr)_minmax(0,1fr)_auto]">
+        <div className="grid gap-2 border-t border-charcoal-border py-3 @[640px]/settings:grid-cols-[110px_minmax(0,0.6fr)_minmax(0,1fr)_auto]">
           {field("trigger", "Shortcut name", "jira")}
           {field("name", "Site name", "Jira")}
           {field("url", "Search address", "https://example.com/search?q=%s")}
@@ -116,7 +116,7 @@ export function BrowserBangsSettings(
           </Button>
         </div>
         {problem ? (
-          <p role="alert" className="px-5 pb-3 text-sm text-cream-muted">
+          <p role="alert" className="pb-3 text-sm text-cream-muted">
             {problem}
           </p>
         ) : null}

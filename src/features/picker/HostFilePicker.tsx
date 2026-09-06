@@ -1,4 +1,4 @@
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import type { FileEntry } from "@/native/ipc";
 import { explorerPrepareOpenItem } from "@/native/filesystem";
 import { formatBytes } from "@/shared/lib/fileFormat";
@@ -222,7 +222,7 @@ export function MistyFilePicker({
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {selectionSummary}
         {error ? (
-          <SystemErrorActivity
+          <SystemErrorNotice
             error={error}
             scope="file-picker:prepare"
             title="File selection failed"

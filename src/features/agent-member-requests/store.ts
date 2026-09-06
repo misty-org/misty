@@ -1,5 +1,3 @@
-import { useActivityStore } from "@/features/activity/useActivityStore";
-import type { ActivityItem } from "@/features/activity/types";
 import { create } from "zustand";
 import { agentMemberRequestsApi, type AgentMemberRequest } from "./api";
 
@@ -68,7 +66,6 @@ export const useAgentMemberRequests = create<MemberRequestStore>((set, get) => (
     try {
       await agentMemberRequestsApi.decide(id, approve, controller.signal);
       if (current !== generation || controller.signal.aborted) return false;
-      useActivityStore.getState().resolveSourceRequest(accountId, "agent_requests", id);
       set({ items: get().items.filter((item) => item.id !== id) });
       saved = true;
     } catch {
@@ -81,25 +78,3 @@ export const useAgentMemberRequests = create<MemberRequestStore>((set, get) => (
     return saved && current === generation;
   },
 }));
-
-export function agentMemberRequestActivities(
-  accountId: string,
-  items: AgentMemberRequest[],
-): ActivityItem[] {
-  return items.map((item) => ({
-    id: `agent-request:${accountId}:${item.id}`,
-    accountId,
-    source: "agent_requests",
-    sourceId: item.id,
-    spaceId: item.space_id,
-    kind: "agent",
-    lifecycle: "request",
-    sourceLabel: item.space_name,
-    title: `${item.requester_name || "A member"}’s agent asked ${item.target_agent_name}`,
-    // The message is another member's agent's text; keep it out of system notifications.
-    body: "Review the request in Activity. Nothing runs until you approve it.",
-    createdAt: item.created_at,
-    attention: true,
-    target: { kind: "route", href: `/activity?agent-request=${encodeURIComponent(item.id)}` },
-  }));
-}

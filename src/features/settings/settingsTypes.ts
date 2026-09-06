@@ -1,7 +1,6 @@
 import type { useAppStore } from "@/features/app-shell";
 import type {
   LaunchOnLoginSnapshot,
-  OpenWithAssociation,
   ReassignShortcutRequest,
   ResetShortcutRequest,
   ShortcutsSnapshot,
@@ -16,6 +15,7 @@ export type SettingsSection =
   | "browser-downloads"
   | "browser-privacy"
   | "browser-permissions"
+  | "browser-passwords"
   | "browser-handoff"
   | "browser-import"
   | "spaces-defaults"
@@ -33,11 +33,9 @@ export type SettingsSection =
   | "sync"
   | "appearance"
   | "layout"
-  | "notifications"
   | "shortcuts"
   | "social"
   | "journal"
-  | "files"
   | "search"
   | "planner"
   | "library"
@@ -66,8 +64,6 @@ export interface SettingsContentProps {
   onShortcutChange: (request: UpdateShortcutRequest) => Promise<void>;
   onShortcutReassign: (request: ReassignShortcutRequest) => Promise<void>;
   onResetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;
-  onRemoveOpenWithAssociation: (key: string) => Promise<void>;
   shortcuts: ShortcutsSnapshot | null;
-  openWithAssociations: OpenWithAssociation[];
   app: ReturnType<typeof useAppStore.getState>["app"];
 }

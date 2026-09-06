@@ -50,6 +50,11 @@ import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { minimumForWorkspaceViews } from "./WorkspaceDockTree";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
+import { TabPageMenu } from "./PinnedTabMenu";
+import { FavoritesStrip } from "./FavoritesStrip";
+import { NowPlayingMenu } from "./NowPlayingMenu";
+import { useTabHoverCards } from "./TabHoverCard";
+import { useWindowSwipe } from "./useWindowSwipe";
 import { navigatorMotionClass } from "./styles";
 import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 
@@ -80,6 +85,8 @@ export function WorkspaceTabStrip(
   const ref = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   useTabPresenceMotion(tabListRef, !vertical);
+  const hoverCards = useTabHoverCards();
+  useWindowSwipe(ref, tabListRef, props.windows, props.activeWindowId, props.onSelectWindow);
   useTabStripFade(tabListRef, !vertical, tabs.length);
   const pane =
     dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
@@ -201,6 +208,7 @@ export function WorkspaceTabStrip(
         }
         data-misty-window-titlebar-region={props.titlebarInsets ? "true" : undefined}
       >
+        <FavoritesStrip vertical={vertical} onOpen={props.onOpen} />
         <div
           {...reorder}
           ref={bindTabList}
@@ -222,7 +230,9 @@ export function WorkspaceTabStrip(
             const active = tab.id === layout.activeTabId,
               view = activeLayoutView(tab),
               label = tabLabel(tab),
-              panes = dockLeaves(tab.root);
+              panes = dockLeaves(tab.root),
+              pinned = Boolean(tab.pinnedUrl),
+              iconOnly = pinned && !vertical;
             return (
               <Fragment key={tab.id}>
                 {firstInGroup && (
@@ -236,13 +246,18 @@ export function WorkspaceTabStrip(
                 {!group?.collapsed && (
                   <Renameable
                     menuItems={
-                      <TabGroupTabMenu
-                        tab={tab}
-                        onEdit={(id) => {
-                          pendingGroupEditor.current = id;
-                        }}
-                        onOpen={props.onOpen}
-                      />
+                      <>
+                        <TabPageMenu tab={tab} />
+                        {!pinned && (
+                          <TabGroupTabMenu
+                            tab={tab}
+                            onEdit={(id) => {
+                              pendingGroupEditor.current = id;
+                            }}
+                            onOpen={props.onOpen}
+                          />
+                        )}
+                      </>
                     }
                     onMenuCloseAutoFocus={(event) => {
                       if (!pendingGroupEditor.current) return;
@@ -260,11 +275,14 @@ export function WorkspaceTabStrip(
                       style={group ? groupStyle(group) : undefined}
                       data-group-active={group ? active : undefined}
                       data-active={active}
+                      {...hoverCards.bind(view, label, active)}
                       data-reorder-item={tab.id}
                       data-reorder-preview="true"
                       data-misty-window-drag-block="true"
+                      data-pinned={pinned || undefined}
                       className={cn(
                         group && "misty-tab-group-member",
+                        iconOnly && "misty-workspace-tab-pinned",
                         "misty-workspace-tab group/tab flex items-center rounded-md border text-xs transition-colors",
                         "duration-150 select-none focus-within:ring-1",
                         "focus-within:ring-cream-muted/50",
@@ -280,7 +298,10 @@ export function WorkspaceTabStrip(
                         tabIndex={active ? 0 : -1}
                         title={label}
                         data-reorder-handle="true"
-                        className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-1"
+                        className={cn(
+                          "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden",
+                          iconOnly ? "justify-center px-0" : "justify-start pl-2 pr-1",
+                        )}
                         onClick={() => select(tab.id)}
                         onKeyDown={(event) => {
                           const index = tabs.findIndex((item) => item.id === tab.id);
@@ -309,9 +330,13 @@ export function WorkspaceTabStrip(
                           icon={Blocks}
                           isActive={active}
                         />
-                        <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-                          {label}
-                        </OverflowFadeText>
+                        {iconOnly ? (
+                          <span className="sr-only">{label}, pinned</span>
+                        ) : (
+                          <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+                            {label}
+                          </OverflowFadeText>
+                        )}
                         {panes.length > 1 ? (
                           <span
                             aria-hidden="true"
@@ -321,8 +346,10 @@ export function WorkspaceTabStrip(
                           </span>
                         ) : null}
                       </Pressable>
-                      <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
-                      {panes.length > 1 ? (
+                      {!iconOnly && (
+                        <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
+                      )}
+                      {pinned ? null : panes.length > 1 ? (
                         <DropdownMenu modal={false}>
                           <MenuTrigger
                             iconOnly
@@ -406,6 +433,7 @@ export function WorkspaceTabStrip(
           })}
           {newTabButton}
         </div>
+        {hoverCards.card}
         {editingGroup && (
           <TabGroupEditor
             key={editingGroup}
@@ -416,6 +444,7 @@ export function WorkspaceTabStrip(
         )}
         {!props.windowsTitlebarControls && (
           <div className="misty-workspace-tab-actions">
+            <NowPlayingMenu onOpen={props.onOpen} />
             <IconButton
               size="xs"
               tooltip={false}

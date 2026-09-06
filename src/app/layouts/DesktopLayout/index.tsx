@@ -1,7 +1,10 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
-import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
-import { CursorCompanionController, WorkflowSchedulesBridge } from "@/features/agents";
+import {
+  CursorCompanionController,
+  useMistyPanelStore,
+  WorkflowSchedulesBridge,
+} from "@/features/agents";
 import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
@@ -33,6 +36,8 @@ import { Outlet } from "react-router-dom";
 import "./docking.css";
 import { dockingGeometry } from "./dockingGeometry";
 import { useMergedTitlebar } from "./useMergedTitlebar";
+import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
+import { WorkspaceWithMistyPanel } from "./WorkspaceWithMistyPanel";
 import { useDockingTransition } from "./useDockingTransition";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { GlobalNavigator } from "./GlobalNavigator";
@@ -69,10 +74,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   const {
     location,
     navigate,
-    app,
     settingsLoad,
     activePaneId,
-    activePanePath,
     activeWorkspacePaneId,
     lastAppRoute,
     lastNonSettingsRouteRef,
@@ -88,13 +91,16 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
   const appZoom = appZoomRenderScale(useAppZoomValue());
-  const { app: frameApp } = useDesktopFrameStyle();
+  useDesktopFrameStyle();
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
   const [profileOpen, setProfileOpen] = useState(false);
   const docking = useWindowDockingLayout();
   const navigatorLayout = useNavigatorLayoutValue();
+  const focusMode = useFocusModeShortcuts();
+  // Focus mode hides the rail like auto-hide without changing the saved preference.
+  const navigatorAutoHide = navigatorLayout.autoHide || focusMode;
   const navigatorLayoutRef = useRef(navigatorLayout);
   navigatorLayoutRef.current = navigatorLayout;
   const navigatorWidth = navigatorRailWidth;
@@ -235,6 +241,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useCallback(() => openLauncher(true), [openLauncher]),
   );
   useShortcutHandler("app.open_settings", openSettingsOverlay);
+  useShortcutHandler(
+    "misty.contextual_companion",
+    useCallback(() => useMistyPanelStore.getState().toggle(), []),
+  );
   useShortcutHandler("app.toggle_navigator", toggleNavigatorAutoHide);
   useShortcutHandler(
     "navigation.refresh",
@@ -256,7 +266,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   );
 
   useEffect(() => {
-    const tools = ["browser", "files", "agents"];
+    const tools = ["browser", "agents"];
     const unregister = tools.map((tool) =>
       registerShortcutHandler(`tool.${tool}`, () => focusTool(tool)),
     );
@@ -272,7 +282,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   const shellRef = useRef<HTMLElement>(null);
   useDockingTransition(
     shellRef,
-    `${docking.navigation}:${docking.tabs}:${navigatorLayout.autoHide}`,
+    `${docking.navigation}:${docking.tabs}:${navigatorAutoHide}:${focusMode}`,
   );
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
@@ -287,8 +297,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   const sharedTitlebar =
     !isAuthRoute &&
     !standaloneRouteTitle &&
+    !focusMode &&
     docking.tabs === "top" &&
-    !(docking.navigation === "top" && !navigatorLayout.autoHide);
+    !(docking.navigation === "top" && !navigatorAutoHide);
   const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
   const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
@@ -301,18 +312,18 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
   }, [isAuthRoute, shouldShowWindowsControls]);
-  const tabsFollowNavigator = docking.navigation === "left" && !navigatorLayout.autoHide;
+  const tabsFollowNavigator = docking.navigation === "left" && !navigatorAutoHide;
   const geometry = dockingGeometry({
     ...docking,
-    autoHide: navigatorLayout.autoHide,
-    shareTopBand: !isAuthRoute && !standaloneRouteTitle,
+    autoHide: navigatorAutoHide,
+    shareTopBand: !isAuthRoute && !standaloneRouteTitle && !focusMode,
     chromeLeft: titlebarNavigationGeometry.left,
     chromeRight: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
   });
   const topTabInsets = geometry.titlebarInsets;
   useMergedTitlebar(
     shellRef,
-    `${docking.navigation}:${docking.tabs}:${navigatorLayout.autoHide}`,
+    `${docking.navigation}:${docking.tabs}:${navigatorAutoHide}:${focusMode}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
     shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
@@ -430,7 +441,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
         {!isAuthRoute ? (
           <NavigatorRail
-            autoHide={navigatorLayout.autoHide}
+            autoHide={navigatorAutoHide}
             position={docking.navigation}
             geometry={geometry}
           >
@@ -454,11 +465,14 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 <Outlet />
               </StandaloneRouteSurface>
             ) : (
-              <WorkspaceCanvas
-                windowsTitlebarControls={shouldShowWindowsControls}
-                tabPosition={docking.tabs}
-                titlebarInsets={topTabInsets}
-              />
+              <WorkspaceWithMistyPanel>
+                <WorkspaceCanvas
+                  windowsTitlebarControls={shouldShowWindowsControls}
+                  tabPosition={docking.tabs}
+                  titlebarInsets={topTabInsets}
+                  hideTabStrip={focusMode}
+                />
+              </WorkspaceWithMistyPanel>
             )}
             {!isAuthRoute && user?.id ? (
               <CursorCompanionController key={user.id} accountId={user.id} />
@@ -477,15 +491,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 currentPath={`${location.pathname}${location.search}`}
                 activePaneId={activePaneId}
                 activeWorkspacePaneId={activeWorkspacePaneId}
-                activePanePath={
-                  activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
-                }
               />
             ) : null}
             <BrowserSearchDialog />
             <BrowserRuntimeBridge />
             <BrowserContextMenuBridge />
-            <ActivityBridge />
             <WorkflowSchedulesBridge />
             <AgentJobWorker />
             <AppTour />
@@ -498,7 +508,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
   if (import.meta.env.DEV && pathname === "/dev/ui") return "UI gallery";
-  if (pathname === "/activity") return "Activity";
   if (pathname.startsWith("/invite/")) return "Space invitation";
   return null;
 }

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { DesktopSettingsRow } from "@/features/settings/desktop";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@/shared/ui";
 import {
@@ -133,7 +133,7 @@ export function DesktopUpdaterSettings() {
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
           <div className="flex flex-wrap items-center justify-end gap-2 max-[760px]:justify-start">
             {state === "error" ? (
-              <SystemErrorActivity
+              <SystemErrorNotice
                 error={error}
                 scope="settings:updates"
                 title="Misty update needs attention"

@@ -8,7 +8,6 @@ import { PageStateBridge } from "@/features/browser-workspace/PageStateBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
-import { ActivityPanel } from "@/features/activity/ActivityPanel";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { lazy, Suspense } from "react";
 import { Navigate, useLocation } from "react-router-dom";
@@ -74,7 +73,6 @@ export function AppFrameLayout() {
       <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
       <AgentExecutionSurface />
-      <ActivityPanel />
       <UpdateNotices accountId={user?.id ?? ""} />
       <UnsavedQuitGuard />
       <BrowserSyncSleepOverlay

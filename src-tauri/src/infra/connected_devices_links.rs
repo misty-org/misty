@@ -21,15 +21,10 @@ struct Dialed {
 }
 
 /// What a device's policy lets the other device do over the LAN.
-pub(super) fn policy_permissions(files: &str, clipboard: bool) -> Vec<String> {
+/// Misty no longer shares files with other devices (file management moved to
+/// Kura, a separate app), so the signed policy's file setting grants nothing.
+pub(super) fn policy_permissions(_files: &str, clipboard: bool) -> Vec<String> {
     let mut permissions = Vec::new();
-    if files == "view" || files == "edit" {
-        permissions
-            .extend(["roots:read", "files:read", "directories:subscribe"].map(str::to_owned));
-    }
-    if files == "edit" {
-        permissions.push("files:write".to_owned());
-    }
     if clipboard {
         permissions.extend(["clipboard:send", "clipboard:receive"].map(str::to_owned));
     }

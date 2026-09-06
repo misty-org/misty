@@ -99,6 +99,7 @@ fn control(
 }
 #[tauri::command]
 pub fn browser_agent_execution_cancel(
+    app: AppHandle,
     state: State<'_, BrowserExecutionState>,
     browser: State<'_, BrowserSessionState>,
     request: ExecutionControlRequest,
@@ -114,7 +115,7 @@ pub fn browser_agent_execution_cancel(
         .map_err(|_| "device_control_unavailable")?
         .stopped = true;
     entry.changed.notify_one();
-    revoke_execution_grant(&browser, &entry.scope, &entry.grant)
+    revoke_execution_grant(&app, &browser, &entry.scope, &entry.grant)
 }
 #[tauri::command]
 pub fn browser_agent_execution_renew(
@@ -183,6 +184,6 @@ pub async fn browser_agent_execute_bounded(
     if let Ok(mut inner) = entry.inner.lock() {
         inner.stopped = true;
     }
-    let _ = revoke_execution_grant(&browser, &entry.scope, &entry.grant);
+    let _ = revoke_execution_grant(&app, &browser, &entry.scope, &entry.grant);
     result
 }

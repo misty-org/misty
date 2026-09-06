@@ -20,7 +20,7 @@ const definitions = [
   command("test.terminal", "Terminal action", {
     description: "A scoped terminal test action.",
     category: "Terminal",
-    scope: "tool:files",
+    scope: "tool:browser",
     mac: "Cmd+J",
     windows: "Ctrl+J",
   }),
@@ -79,9 +79,7 @@ describe("ShortcutsSection", () => {
       onShortcutChange: vi.fn(async () => undefined),
       onShortcutReassign: vi.fn(async () => undefined),
       onResetShortcuts: vi.fn(async () => undefined),
-      onRemoveOpenWithAssociation: vi.fn(async () => undefined),
       shortcuts: snapshot,
-      openWithAssociations: [],
       app: null,
     };
   });

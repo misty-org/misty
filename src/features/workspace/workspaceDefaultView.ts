@@ -6,9 +6,13 @@ import {
 } from "./model";
 
 /** Settings store the view's index in the setting's legacy values, where 0 was
- * the retired Home page; it now opens the default. */
-const defaultViewSurfaces = [null, "browser", "files", "agents"] as const;
-export const workspaceDefaultViewOptions = ["Browser", "Files", "Agents"] as const;
+ * the retired Home page and 2 the retired Files tool; both now open the default. */
+const defaultViewSurfaces = [null, "browser", null, "agents"] as const;
+const defaultViewChoices = [
+  { label: "Browser", storedIndex: 1 },
+  { label: "Agents", storedIndex: 3 },
+] as const;
+export const workspaceDefaultViewOptions = defaultViewChoices.map((choice) => choice.label);
 export const workspaceDefaultViewIndex = 1;
 let defaultIndex = workspaceDefaultViewIndex;
 export function configureWorkspaceDefaultView(index: number): void {
@@ -17,8 +21,15 @@ export function configureWorkspaceDefaultView(index: number): void {
 }
 /** The option shown for a stored index, and the index stored for an option. */
 export const workspaceDefaultViewOption = (index: number) =>
-  defaultViewSurfaces[index] ? index - 1 : workspaceDefaultViewIndex - 1;
-export const workspaceDefaultViewStoredIndex = (option: number) => option + 1;
+  Math.max(
+    0,
+    defaultViewChoices.findIndex(
+      (choice) =>
+        choice.storedIndex === (defaultViewSurfaces[index] ? index : workspaceDefaultViewIndex),
+    ),
+  );
+export const workspaceDefaultViewStoredIndex = (option: number) =>
+  defaultViewChoices[option]?.storedIndex ?? workspaceDefaultViewIndex;
 function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;
@@ -32,7 +43,7 @@ function createTab(index: number, placeholder: boolean): WorkspaceView {
     title:
       surfaceId === "browser"
         ? browserViewTitle((state as { url: string }).url)
-        : workspaceDefaultViewOptions[index - 1],
+        : (defaultViewChoices.find((choice) => choice.storedIndex === index)?.label ?? "Agents"),
     route: `/${surfaceId}`,
     sidebarVisible: surfaceId !== "browser",
     state,

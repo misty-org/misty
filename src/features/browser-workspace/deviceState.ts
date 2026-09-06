@@ -37,7 +37,6 @@ export function retainDeviceState(
     // Sync only ever sees a private tab's placeholder; the page stays local.
     if (isPrivateBrowserView(old)) return { ...tab, ...old };
     let state = tab.state;
-    if (tab.surfaceId === "files") state = old.state;
     if (tab.surfaceId === "browser") {
       const nextBrowser = parseBrowserViewState(tab.state);
       const oldBrowser = parseBrowserViewState(old.state);

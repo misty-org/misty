@@ -1,6 +1,10 @@
 import type { ShortcutBindingPair, ShortcutCommandDefinition, ShortcutPlatform } from "./types";
 import { command } from "./factory";
-import { filesShortcutCommands } from "./filesCommands";
+import {
+  browserFeatureCommands,
+  focusModeCommands,
+  tabFeatureCommands,
+} from "./browserFeatureCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
@@ -9,8 +13,10 @@ const shellCommands: ShortcutCommandDefinition[] = [
       "Search the web, open an address, or type ! to search your files, spaces and bookmarks.",
     category: "Navigation",
     aliases: ["search", "url", "website", "google", "bangs", "shortcuts"],
-    mac: "Cmd+K",
-    windows: "Ctrl+K",
+    mac: "Cmd+T",
+    macAlternate: "Cmd+K",
+    windows: "Ctrl+T",
+    windowsAlternate: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
     allowShadowing: true,
@@ -24,8 +30,8 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
-  command("misty.contextual_companion", "Open Misty", {
-    description: "Open Misty in the current window.",
+  command("misty.contextual_companion", "Toggle Misty panel", {
+    description: "Open or close the Misty panel beside the workspace.",
     category: "Misty",
     aliases: ["assistant", "ask misty"],
     mac: "Cmd+Shift+K",
@@ -62,6 +68,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
+  ...focusModeCommands,
   command("app.zoom_in", "Zoom in", {
     description: "Increase the app interface scale.",
     category: "View",
@@ -94,6 +101,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
 ];
 
 const workspaceCommands: ShortcutCommandDefinition[] = [
+  ...tabFeatureCommands,
   command("workspace.new_virtual_window", "New virtual window", {
     description: "Create a full workspace window inside the active Space.",
     category: "Virtual windows",
@@ -167,8 +175,6 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
     category: "Tabs and panes",
     scope: "workspace",
     aliases: ["add tab", "tool picker"],
-    mac: "Cmd+T",
-    windows: "Ctrl+T",
     allowInEditable: true,
     nativeMenu: true,
   }),
@@ -307,7 +313,6 @@ const toolSlots = [
   ["social", "Social", 4],
   ["library", "Library", 5],
   ["browser", "Browser", 6],
-  ["files", "Files", 7],
   ["code", "Code", 8],
 ] as const;
 
@@ -343,7 +348,6 @@ const tabAndToolCommands = [
 ];
 
 const toolCommands: ShortcutCommandDefinition[] = [
-  ...filesShortcutCommands,
   command("planner.create", "Create Planner item", {
     description: "Create an item in the focused Planner view.",
     category: "Planner",
@@ -389,6 +393,7 @@ const toolCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
+  ...browserFeatureCommands,
   command("browser.history", "Show history", {
     description: "Open the websites you have visited.",
     category: "Browser",

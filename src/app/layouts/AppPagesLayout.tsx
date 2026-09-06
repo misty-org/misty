@@ -5,10 +5,8 @@ import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
 
 const appPageTitles = new Map<string, string>([
-  [routes.files, "Misty - Files"],
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],
-  [routes.activity, "Misty - Activity"],
   [routes.scheduled, "Misty - Scheduled"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],

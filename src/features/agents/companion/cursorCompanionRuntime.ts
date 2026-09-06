@@ -7,6 +7,7 @@ import {
   useCompanionState,
   type CompanionControl,
 } from "./companionState";
+import type { CompanionClick } from "./companionGuide";
 import { createCompanionControl } from "./cursorCompanionControl";
 import { CursorCompanionSession } from "./cursorCompanionSession";
 import { CursorCompanionTypedTurns } from "./cursorCompanionTyped";
@@ -19,6 +20,7 @@ export function startCursorCompanion(accountId: string) {
   const s = new CursorCompanionSession(accountId);
   const voice = new CursorCompanionVoice(s);
   const typed = new CursorCompanionTypedTurns(s, voice);
+  s.pointer.onStep = (step) => void typed.continueGuide(step).catch((e) => s.fail(s.turn, e));
   const stopPreferences = useSettingsProfiles.subscribe(s.applyPreferences);
   s.applyPreferences();
   const unsubscribe = useMistyStore.subscribe(() => {
@@ -31,6 +33,7 @@ export function startCursorCompanion(accountId: string) {
   void listenToNative(s, voice, typed, removers).catch((e) => s.fail(s.turn, e));
   return () => {
     s.disposed = true;
+    s.pointer.cancel();
     stopPreferences();
     unsubscribe();
     s.stopAudio();
@@ -139,14 +142,9 @@ async function listenToNative(
     }
   });
   listen("misty://cursor-displays-changed", () => {
-    if (s.pointPending) {
-      s.pointPending = false;
-      s.change({
-        point: undefined,
-      });
-      s.maybeHide();
-    }
+    if (s.pointPending) s.pointer.clear();
   });
+  listen<CompanionClick>("misty://cursor-click", (payload) => s.pointer.clicked(payload));
   const control = createCompanionControl(s, voice);
   useCompanionState.setState({
     accountId,

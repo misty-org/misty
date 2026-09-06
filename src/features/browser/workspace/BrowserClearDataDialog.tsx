@@ -51,17 +51,37 @@ export function BrowserClearDataDialog(props: {
   suspensionReason: string;
 }) {
   const overlay = useBrowserOverlayControl(props.suspensionReason);
+  useEffect(() => {
+    if (props.request) overlay.onOpenChange(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.request]);
+  return (
+    <ClearBrowsingDataDialog
+      open={overlay.open}
+      onOpenChange={overlay.onOpenChange}
+      profileId={props.profileId}
+      onCleared={() =>
+        useBrowserRuntimeStore.getState().setNotice(props.tabId, "Browsing data cleared.")
+      }
+    />
+  );
+}
+
+/** The clear-data dialog itself, shared by browser tabs and Settings. */
+export function ClearBrowsingDataDialog(props: {
+  open: boolean;
+  onOpenChange(open: boolean): void;
+  profileId?: string;
+  onCleared(): void;
+}) {
   const [range, setRange] = useState(1);
   const [selected, setSelected] = useState<Set<Choice>>(new Set(["history", "cache"]));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!props.request) return;
-    setError(null);
-    overlay.onOpenChange(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.request]);
+    if (props.open) setError(null);
+  }, [props.open]);
 
   const clear = async () => {
     const span = ranges[range].ms;
@@ -78,8 +98,8 @@ export function BrowserClearDataDialog(props: {
       const kinds = (["cookies", "cache"] as const).filter((kind) => selected.has(kind));
       if (kinds.length)
         await browserLibrary.clearWebsiteData({ profileId: props.profileId, kinds, since });
-      overlay.onOpenChange(false);
-      useBrowserRuntimeStore.getState().setNotice(props.tabId, "Browsing data cleared.");
+      props.onOpenChange(false);
+      props.onCleared();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
@@ -88,7 +108,7 @@ export function BrowserClearDataDialog(props: {
   };
 
   return (
-    <Dialog open={overlay.open} onOpenChange={overlay.onOpenChange}>
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear browsing data</DialogTitle>
         <DialogDescription>Applies to this browser profile on this device.</DialogDescription>
@@ -140,7 +160,7 @@ export function BrowserClearDataDialog(props: {
           </p>
         ) : null}
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => overlay.onOpenChange(false)}>
+          <Button type="button" variant="ghost" onClick={() => props.onOpenChange(false)}>
             Cancel
           </Button>
           <Button type="button" disabled={working || !selected.size} onClick={() => void clear()}>

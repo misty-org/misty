@@ -1,5 +1,5 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { useActivityStore } from "@/features/activity";
+import { clearSystemErrors } from "@/features/support/systemErrors";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
 import type { CurrentLicense } from "@/features/native-session";
@@ -20,7 +20,7 @@ function scopedAuthUserStorageKey(): string {
 export function resetAccountScopedState(previousAccountId?: string): void {
   notifyAccountScopeWillReset();
   useUserStore.getState().clear();
-  useActivityStore.getState().setAccount("");
+  clearSystemErrors();
   resetSpacesAccountState();
   resetConnectionsAccountState();
   resetWorkspaceAccountState();

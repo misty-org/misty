@@ -90,7 +90,9 @@ func aiInvocationBrowserGrants(ctx context.Context, database *db.Database, userI
 		}
 		labels = append(labels, label+" (scopeId "+item.OpaqueRef+")")
 	}
-	if capabilities["browser.inspect"] {
+	// Any screen the run can see can also wait for the user: a browser page,
+	// the Misty window or the desktop.
+	if capabilities["browser.inspect"] || capabilities["browser.workspace.visual"] {
 		capabilities["browser.request_user_action"] = true
 	}
 	return labels, capabilities

@@ -1,6 +1,12 @@
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { createDockLeaf, dockLeaves, dockTreeViews, mapDockTreeViews } from "./dockTree";
-import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceTab, WorkspaceView } from "./model";
+import type {
+  WorkspaceDockNode,
+  WorkspaceLayout,
+  WorkspaceTab,
+  WorkspaceView,
+  WorkspaceWindow,
+} from "./model";
 
 export function layoutTabs(layout: WorkspaceLayout): WorkspaceTab[] {
   if (layout.tabs?.length) return layout.tabs;
@@ -144,5 +150,17 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
   return activateTab(
     { ...layout, tabs: [...updated, ...Array.from(recovered.values(), singleViewTab)] },
     layout.activeTabId ?? tabs[0].id,
+  );
+}
+
+export function workspaceTabsById(state: {
+  windowsByScope: Record<string, WorkspaceWindow[] | undefined>;
+}): Map<string, WorkspaceView> {
+  return new Map(
+    Object.values(state.windowsByScope)
+      .filter((windows): windows is NonNullable<typeof windows> => Boolean(windows))
+      .flat()
+      .flatMap((workspaceWindow) => allLayoutViews(workspaceWindow.layout))
+      .map((tab) => [tab.id, tab]),
   );
 }

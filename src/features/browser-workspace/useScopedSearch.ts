@@ -5,18 +5,9 @@ import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useBrowserDownloadsStore } from "@/features/browser";
 import { useWorkspaceStore } from "@/features/workspace";
-import {
-  semanticQueryMinimumCharacters,
-  semanticSearchDebounceMs,
-} from "@/features/files/workspace";
+import { kuraInstalled } from "@/native/kura";
 import type { SearchScope } from "./bangs/types";
-import {
-  fileResults,
-  searchAgents,
-  searchFileContents,
-  searchIndexedFiles,
-  type ScopedSearchResult,
-} from "./scopedSearchSources";
+import { kuraSearchResult, searchAgents, type ScopedSearchResult } from "./scopedSearchSources";
 import {
   searchBookmarkLibrary,
   searchBrowserHistory,
@@ -41,7 +32,7 @@ type Source = (
 const debounceMs = 180;
 const none: never[] = [];
 
-/** Scopes that answer from one function. Files and agents have their own paths below. */
+/** Scopes that answer from one function. Files (handed to Kura) and agents have their own paths below. */
 const sources: Partial<Record<SearchScope, Source>> = {
   spaces: searchEverythingInSpaces,
   notes: searchSpaceNotes,
@@ -59,8 +50,8 @@ const spaceScopes = new Set<SearchScope>(["spaces", "notes", "tasks", "chat"]);
 
 /**
  * The default scope is answered by the address bar's providers, not here.
- * Files show name matches first, then fold in content matches once the slower
- * semantic search settles. Responses for stale queries are dropped, and a
+ * Files searches are handed to Kura, the separate file manager. Responses for
+ * stale queries are dropped, and a
  * refresh keeps the current rows until new ones arrive.
  */
 export function useScopedSearch(scope: SearchScope, query: string, open = true) {
@@ -136,29 +127,19 @@ export function useScopedSearch(scope: SearchScope, query: string, open = true) 
       return;
     }
     let cancelled = false;
-    const timers: number[] = [];
     setLoading(true);
-    const indexed = new Promise<Awaited<ReturnType<typeof searchIndexedFiles>>>((resolve) =>
-      timers.push(window.setTimeout(() => resolve(searchIndexedFiles(trimmed)), debounceMs)),
-    );
-    const semantic = trimmed.length >= semanticQueryMinimumCharacters;
-    void indexed.then((hits) => {
-      if (cancelled) return;
-      setResults(fileResults(hits));
-      if (!semantic) setLoading(false);
-    });
-    if (semantic)
-      timers.push(
-        window.setTimeout(async () => {
-          const merged = await searchFileContents(trimmed, await indexed);
+    const timer = window.setTimeout(() => {
+      void kuraInstalled()
+        .catch(() => false)
+        .then((installed) => {
           if (cancelled) return;
-          setResults(fileResults(merged));
+          setResults([kuraSearchResult(trimmed, installed)]);
           setLoading(false);
-        }, semanticSearchDebounceMs),
-      );
+        });
+    }, debounceMs);
     return () => {
       cancelled = true;
-      timers.forEach((timer) => window.clearTimeout(timer));
+      window.clearTimeout(timer);
     };
   }, [scope, trimmed]);
 

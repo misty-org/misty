@@ -24,6 +24,7 @@ const script = rust
   .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", context)
   .replace("__MISTY_CONTEXT_SEMANTIC_PLACEHOLDER__", "() => null")
   .replace("__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__", '"test-token"')
+  .replace("__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__", "[]")
   .replace("__MISTY_POINTER_TRACKING_PLACEHOLDER__", "false");
 
 for (const overflow of ["auto", "hidden", "clip", "scroll"]) {

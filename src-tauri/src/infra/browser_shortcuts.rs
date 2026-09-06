@@ -9,8 +9,90 @@ use super::browser::BrowserSessionState;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserShortcutBinding {
-    shortcut: String,
-    allow_in_editable: bool,
+    pub shortcut: String,
+    pub allow_in_editable: bool,
+}
+
+pub fn default_shortcut_bindings() -> Vec<BrowserShortcutBinding> {
+    #[cfg(target_os = "macos")]
+    let defaults: &[(&str, bool)] = &[
+        ("Cmd+T", true),
+        ("Cmd+K", true),
+        ("Cmd+L", true),
+        ("Cmd+W", false),
+        ("Cmd+R", true),
+        ("Cmd+F", true),
+        ("Cmd+P", true),
+        ("Cmd+D", true),
+        ("Cmd+Y", true),
+        ("Cmd+Option+L", true),
+        ("Cmd+Option+I", true),
+        ("Cmd+Shift+N", true),
+        ("Cmd+Shift+P", true),
+        ("Cmd+Shift+K", true),
+        ("Cmd+Comma", true),
+        ("Cmd+Shift+B", true),
+        ("Cmd+Plus", true),
+        ("Cmd+Minus", true),
+        ("Cmd+0", true),
+        ("Cmd+Shift+T", false),
+        ("Cmd+Shift+Backspace", true),
+        ("Cmd+[", false),
+        ("Cmd+]", false),
+        ("Ctrl+Tab", false),
+        ("Ctrl+Shift+Tab", false),
+    ];
+    #[cfg(not(target_os = "macos"))]
+    let defaults: &[(&str, bool)] = &[
+        ("Ctrl+T", true),
+        ("Ctrl+K", true),
+        ("Ctrl+L", true),
+        ("Ctrl+W", false),
+        ("Ctrl+R", true),
+        ("Ctrl+F", true),
+        ("Ctrl+P", true),
+        ("Ctrl+D", true),
+        ("Ctrl+H", true),
+        ("Ctrl+J", true),
+        ("Ctrl+Shift+I", true),
+        ("Ctrl+Shift+N", true),
+        ("Ctrl+Shift+P", true),
+        ("Ctrl+Shift+K", true),
+        ("Ctrl+Comma", true),
+        ("Ctrl+Shift+B", true),
+        ("Ctrl+Plus", true),
+        ("Ctrl+Minus", true),
+        ("Ctrl+0", true),
+        ("Ctrl+Shift+T", false),
+        ("Ctrl+Shift+Delete", true),
+        ("Alt+Left", false),
+        ("Alt+Right", false),
+        ("Ctrl+Tab", false),
+        ("Ctrl+Shift+Tab", false),
+    ];
+    defaults
+        .iter()
+        .map(|(shortcut, allow_in_editable)| BrowserShortcutBinding {
+            shortcut: (*shortcut).to_owned(),
+            allow_in_editable: *allow_in_editable,
+        })
+        .collect()
+}
+
+pub(super) fn current_shortcut_bindings(
+    state: &BrowserSessionState,
+) -> Vec<BrowserShortcutBinding> {
+    state
+        .shortcut_bindings
+        .lock()
+        .map(|guard| {
+            if guard.is_empty() {
+                default_shortcut_bindings()
+            } else {
+                guard.clone()
+            }
+        })
+        .unwrap_or_else(|_| default_shortcut_bindings())
 }
 
 #[derive(Debug, Serialize, Clone)]

@@ -141,3 +141,25 @@ describe("Clicky companion protocol", () => {
     expect(position.y).toBeCloseTo(target.y, 3);
   });
 });
+
+describe("walkthrough steps", () => {
+  it("reads a step marker and keeps it out of the spoken text", () => {
+    expect(
+      companionReply("open source control. [POINT:285,11:open Source Control:screen1] [GUIDE:1/3]"),
+    ).toEqual({
+      text: "open source control.",
+      point: { x: 285, y: 11, label: "open Source Control", screen: "screen1" },
+      guide: { step: 1, total: 3 },
+    });
+  });
+
+  it("ignores impossible steps", () => {
+    expect(companionReply("done [POINT:none] [GUIDE:4/3]").guide).toBeUndefined();
+    expect(companionReply("done [GUIDE:0/3]").guide).toBeUndefined();
+    expect(companionReply("done [GUIDE:3/3]")).toEqual({
+      text: "done",
+      point: undefined,
+      guide: { step: 3, total: 3 },
+    });
+  });
+});

@@ -62,10 +62,10 @@ export function BrowserPermissionSettings() {
           leading="none"
           trailing
           className="gap-0 divide-y divide-charcoal-border"
-          rowClassName="px-5 py-3"
+          rowClassName="border-t border-charcoal-border py-3"
         />
       ) : !error && entries.length === 0 ? (
-        <p className="p-4 text-sm text-cream-muted">
+        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
           No saved choices for open browser profiles. Websites use the default Ask setting.
         </p>
       ) : (
@@ -73,7 +73,7 @@ export function BrowserPermissionSettings() {
           {entries.map((entry) => (
             <li
               key={`${entry.profile}:${entry.origin}`}
-              className="flex items-center gap-4 px-5 py-3"
+              className="flex items-center gap-4 border-t border-charcoal-border py-3"
             >
               <div className="min-w-0 flex-1">
                 <p className="break-all text-sm">{entry.origin}</p>
@@ -106,7 +106,7 @@ export function BrowserPermissionSettings() {
         </ul>
       )}
       {error ? (
-        <div role="alert" className="px-5 py-3 text-sm">
+        <div role="alert" className="border-t border-charcoal-border py-3 text-sm">
           <p>{error}</p>
           <Button
             type="button"

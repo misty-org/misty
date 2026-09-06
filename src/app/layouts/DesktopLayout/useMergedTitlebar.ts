@@ -104,9 +104,13 @@ export function useMergedTitlebar(
           '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
         )
         .forEach((element) => apply(element, false, true));
-      shell.querySelectorAll<HTMLElement>("[data-workspace-pane]").forEach((pane) => {
-        if (![...retained].some((element) => pane.contains(element))) apply(pane, true);
-      });
+      // A top tab strip already owns the titlebar band; panes start below it (overlapping
+      // only by the connected-tab seam) and never need the fallback title header.
+      const topTabs = shell.querySelector('.misty-workspace-tabs[data-tab-position="top"]');
+      if (!topTabs)
+        shell.querySelectorAll<HTMLElement>("[data-workspace-pane]").forEach((pane) => {
+          if (![...retained].some((element) => pane.contains(element))) apply(pane, true);
+        });
       for (const element of modified.keys()) if (!retained.has(element)) clear(element);
       if (
         shell

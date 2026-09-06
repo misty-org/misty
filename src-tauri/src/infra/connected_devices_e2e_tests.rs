@@ -1,7 +1,7 @@
 //! Two devices in one process, each with its own built-in peer transport
 //! worker, exercising the whole flow over a real LAN connection: trust from the
-//! root-signed device list, browsing, file changes and transfers with byte
-//! counts, policy changes, clipboard sharing, reconnecting, and removal.
+//! root-signed device list, clipboard sharing, agent file delivery,
+//! reconnecting, and removal. Misty no longer shares files between devices.
 
 use std::{
     sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -14,19 +14,11 @@ use crate::infra::{
     device_trust,
 };
 use crate::{
-    domain::{
-        clipboard::{ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient},
-        explorer::{ClipboardOperation, PasteItem, PasteItemsRequest},
-        operation_queue::OperationStatus,
-    },
+    domain::clipboard::{ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient},
     infra::{
-        document_intelligence::ServiceLease,
-        environment::AppEnvironmentService,
-        explorer::ExplorerService,
-        explorer_library::ExplorerLibraryService,
-        operation_queue::OperationQueueService,
-        peer_files::PeerVirtualPath,
-        transfers::{TransferFilter, TransferService},
+        document_intelligence::ServiceLease, environment::AppEnvironmentService,
+        explorer::ExplorerService, explorer_library::ExplorerLibraryService,
+        transfers::TransferService,
     },
     platform::mini_app::{insert_builtin_test_instance, MiniAppState},
 };
@@ -150,7 +142,7 @@ async fn eventually(mut condition: impl FnMut() -> bool) -> bool {
 // cargo test --lib e2e_tests -- --ignored
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "starts two peer transport workers on the local network"]
-async fn devices_trust_the_signed_list_share_files_and_clipboard_and_drop_removed_devices() {
+async fn devices_trust_the_signed_list_share_the_clipboard_and_drop_removed_devices() {
     let credentials = tempfile::tempdir().unwrap();
     let _ = misty_credential_store::configure_root(credentials.path().to_path_buf());
     let trust = tempfile::tempdir().unwrap();
@@ -187,164 +179,12 @@ async fn devices_trust_the_signed_list_share_files_and_clipboard_and_drop_remove
         .unwrap();
     assert!(a.service.is_connected(peer_b));
 
-    // B's shared folder, as A addresses it.
-    let shared = tempfile::tempdir().unwrap();
-    let shared_path = std::fs::canonicalize(shared.path()).unwrap();
-    let roots = a.service.roots(peer_b).await.unwrap();
-    let system = roots
-        .iter()
-        .find(|root| {
-            matches!(
-                root.kind,
-                crate::domain::connected_devices::PeerRootKind::System
-            )
-        })
-        .unwrap();
-    let relative = shared_path.strip_prefix("/").unwrap();
-    let directory = PeerVirtualPath::format(peer_b, &system.id, relative).unwrap();
-    let listing = a
-        .service
-        .list_directory(PeerPathRequest {
-            device_id: peer_b.into(),
-            path: directory.clone(),
-            show_hidden: false,
-        })
-        .await
-        .unwrap();
-    assert!(matches!(
-        listing,
-        PeerResponse::Directory { writable: true, .. }
-    ));
-
-    // Upload, counting bytes as they leave.
-    let local = tempfile::tempdir().unwrap();
-    let content: Vec<u8> = (0..3_000_000u32).map(|value| (value % 251) as u8).collect();
-    let source = local.path().join("upload.bin");
-    std::fs::write(&source, &content).unwrap();
-    let (sent, not_canceled) = (AtomicU64::new(0), AtomicBool::new(false));
-    a.service
-        .upload_file(
-            &source,
-            &directory,
-            "upload.bin",
-            watch(&sent, &not_canceled),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        std::fs::read(shared_path.join("upload.bin")).unwrap(),
-        content
-    );
-    assert_eq!(sent.load(Ordering::Relaxed), content.len() as u64);
-    // Uploads never replace an existing item.
+    // Misty no longer shares files with other devices; that moved to Kura.
     assert!(a
         .service
-        .upload_file(&source, &directory, "upload.bin", TransferWatch::default())
+        .roots(peer_b)
         .await
-        .is_err());
-
-    // Create, rename, copy within B, and delete.
-    let folder = a
-        .service
-        .create_item(&directory, "Folder", true)
-        .await
-        .unwrap();
-    assert!(shared_path.join("Folder").is_dir());
-    let uploaded = PeerVirtualPath::parse(&directory)
-        .unwrap()
-        .child("upload.bin")
-        .unwrap();
-    let renamed = a
-        .service
-        .rename_item(&uploaded, "renamed.bin")
-        .await
-        .unwrap();
-    assert!(shared_path.join("renamed.bin").is_file());
-    let copied = a
-        .service
-        .transfer_item(&renamed.path, &folder.path, "copy.bin", true)
-        .await
-        .unwrap();
-    assert_eq!(
-        std::fs::read(shared_path.join("Folder/copy.bin")).unwrap(),
-        content
-    );
-    a.service.delete_item(&renamed.path, true).await.unwrap();
-    assert!(!shared_path.join("renamed.bin").exists());
-
-    // Download, counting bytes as they arrive.
-    let received = AtomicU64::new(0);
-    let downloaded = a
-        .service
-        .materialize_with(&copied.path, watch(&received, &not_canceled))
-        .await
-        .unwrap();
-    assert_eq!(std::fs::read(downloaded.local_path).unwrap(), content);
-    assert_eq!(received.load(Ordering::Relaxed), content.len() as u64);
-
-    // Through A's transfer queue, the transfer record shows every byte.
-    let queue = OperationQueueService::new(a.explorer.clone(), a.transfers.clone())
-        .with_connected_devices(a.service.clone());
-    queue
-        .enqueue_paste_items(PasteItemsRequest {
-            sources: vec![PasteItem {
-                path: source.to_string_lossy().into_owned(),
-                is_directory: false,
-                size_bytes: Some(content.len() as i64),
-                remote_modified: None,
-            }],
-            destination_directory: folder.path.clone(),
-            operation: ClipboardOperation::Copy,
-            target_name: None,
-        })
-        .await
-        .unwrap();
-    let mut finished = None;
-    for _ in 0..200 {
-        let snapshot = queue.snapshot().await;
-        let operation = snapshot.operations.first().cloned();
-        if let Some(operation) = operation.filter(|operation| {
-            !matches!(
-                operation.status,
-                OperationStatus::Queued | OperationStatus::InProgress
-            )
-        }) {
-            finished = Some(operation);
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    let finished = finished.expect("the queued upload finished");
-    assert_eq!(
-        finished.status,
-        OperationStatus::Completed,
-        "{}",
-        finished.error_message
-    );
-    assert_eq!(
-        std::fs::read(shared_path.join("Folder/upload.bin")).unwrap(),
-        content
-    );
-    let record = a
-        .transfers
-        .snapshot(TransferFilter::default())
-        .await
-        .unwrap()
-        .rows
-        .into_iter()
-        .find(|row| row.id == finished.transfer_id)
-        .unwrap();
-    assert_eq!(record.transferred_bytes, content.len() as i64);
-    assert_eq!(record.total_bytes, content.len() as i64);
-
-    // B changes its policy: the next change is refused at once, without the server.
-    set_policy("view", true);
-    assert!(a
-        .service
-        .create_item(&directory, "Denied", true)
-        .await
-        .is_err());
-    assert!(!shared_path.join("Denied").exists());
+        .map_or(true, |roots| roots.is_empty()));
 
     // Clipboard: copying on A reaches B.
     let pasted = Arc::new(Mutex::new(Vec::<ClipboardPayload>::new()));
@@ -375,46 +215,75 @@ async fn devices_trust_the_signed_list_share_files_and_clipboard_and_drop_remove
     device_trust::set_server_device_id(peer_b).unwrap();
     device_trust::set_own_endpoint(&"0".repeat(64)).unwrap();
     device_trust::pin_root(&root.public_key().unwrap(), VAULT).unwrap();
-    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[]))).unwrap();
+    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[])))
+        .unwrap();
     set_policy("view", true);
     let inbox_scope = format!("inbox:{peer_b}");
-    let grant_for = |signer: &crate::infra::device_identity::DeviceIdentity, requester: &str, scope: &str| {
-        let grant = crate::infra::device_records::RunGrant {
-            account_id: ACCOUNT.into(),
-            grant_id: format!("rungrant_{}", uuid::Uuid::new_v4()),
-            requester_device_id: requester.into(),
-            target_device_id: peer_b.into(),
-            agent_id: String::new(),
-            capabilities: vec!["files.receive".into()],
-            scopes: vec![scope.into()],
-            issued_at: unix_now(),
-            expires_at: unix_now() + 600,
+    let grant_for =
+        |signer: &crate::infra::device_identity::DeviceIdentity, requester: &str, scope: &str| {
+            let grant = crate::infra::device_records::RunGrant {
+                account_id: ACCOUNT.into(),
+                grant_id: format!("rungrant_{}", uuid::Uuid::new_v4()),
+                requester_device_id: requester.into(),
+                target_device_id: peer_b.into(),
+                agent_id: String::new(),
+                capabilities: vec!["files.receive".into()],
+                scopes: vec![scope.into()],
+                issued_at: unix_now(),
+                expires_at: unix_now() + 600,
+            };
+            let payload = grant.payload().unwrap();
+            SignedRecord::new(&payload, signer.sign_record(&payload).unwrap())
         };
-        let payload = grant.payload().unwrap();
-        SignedRecord::new(&payload, signer.sign_record(&payload).unwrap())
-    };
-    let b_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_bbbbbbbbbbbb").unwrap();
-    let a_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_aaaaaaaaaaaa").unwrap();
+    let b_identity =
+        crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_bbbbbbbbbbbb")
+            .unwrap();
+    let a_identity =
+        crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_aaaaaaaaaaaa")
+            .unwrap();
+    let local = tempfile::tempdir().unwrap();
+    let content: Vec<u8> = (0..200_000u32).map(|value| (value % 251) as u8).collect();
     let report = local.path().join("report.pdf");
     std::fs::write(&report, &content[..200_000]).unwrap();
     let receipt = a
         .service
-        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &inbox_scope), &inbox_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&b_identity, peer_b, &inbox_scope),
+            &inbox_scope,
+        )
         .await
         .unwrap();
     assert_eq!(receipt.size, 200_000);
-    assert_eq!(receipt.sha256, hex::encode(Sha256::digest(&content[..200_000])));
-    assert_eq!(std::fs::read(inbox.path().join(&receipt.file_name)).unwrap(), &content[..200_000]);
+    assert_eq!(
+        receipt.sha256,
+        hex::encode(Sha256::digest(&content[..200_000]))
+    );
+    assert_eq!(
+        std::fs::read(inbox.path().join(&receipt.file_name)).unwrap(),
+        &content[..200_000]
+    );
     // A grant B did not sign, or for another inbox, delivers nothing.
     assert!(a
         .service
-        .deliver_file(peer_b, &report, grant_for(&a_identity, &a.network_id, &inbox_scope), &inbox_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&a_identity, &a.network_id, &inbox_scope),
+            &inbox_scope
+        )
         .await
         .is_err());
     let other_scope = format!("inbox:{}", a.network_id);
     assert!(a
         .service
-        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &other_scope), &other_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&b_identity, peer_b, &other_scope),
+            &other_scope
+        )
         .await
         .is_err());
     assert_eq!(std::fs::read_dir(inbox.path()).unwrap().count(), 1);

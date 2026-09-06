@@ -59,6 +59,22 @@
   --navigation-primary-icon-size: var(--misty-navigation-icon-size);
 }
 
+/* Shared sidebar metrics. The Agents and Space sidebars both read these so their rows,
+   labels and icons stay in step. */
+:root {
+  --misty-sidebar-row-height: 38px;
+  --misty-sidebar-item-height: 36px;
+  --misty-sidebar-row-padding: 10px;
+  --misty-sidebar-label-size: 14px;
+  --misty-sidebar-icon-size: 18px;
+  --misty-sidebar-badge-size: 7px;
+  /* Status dots on agent conversation rows (the one surface approved for status color).
+     Mixed toward the theme text so they sit right on dark and light themes. */
+  --misty-status-idle: color-mix(in srgb, var(--misty-theme-text-muted) 70%, transparent);
+  --misty-status-attention: color-mix(in srgb, #e8a33a 82%, var(--misty-theme-text));
+  --misty-status-failed: var(--misty-theme-danger);
+}
+
 /* The global rail uses square 34px tiles around 18px glyphs and 28px avatars. */
 .misty-global-navigator {
   --misty-navigation-icon-size: 18px;
@@ -161,7 +177,7 @@
   color: var(--misty-theme-text-bright);
 }
 
-:is(.misty-space-rail-control, .misty-navigator-tray-item):is(
+.misty-space-rail-control:is(
   :hover,
   :focus-visible,
   [aria-current="page"],

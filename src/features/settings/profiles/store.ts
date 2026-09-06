@@ -10,6 +10,7 @@ import {
   reconcileProfile,
   migrateProfileState,
   type DeviceProfileState,
+  type ProfileMutation,
 } from "./model";
 import { mutateState, readState } from "./persistence";
 import { type PreferenceValue } from "./registry";
@@ -21,6 +22,9 @@ interface Context {
   session: number;
   seed: Record<string, unknown>;
   projected?: string;
+  /** Edits already on screen that are not yet committed to this device's store. */
+  pending: ProfileMutation[];
+  writes: Promise<unknown>;
   channel?: BroadcastChannel;
   refresh?: Promise<void>;
   refreshAgain?: boolean;
@@ -50,19 +54,33 @@ function report(error: unknown, ctx?: Context) {
   if (!ctx || fresh(ctx))
     useSettingsProfiles.setState({ error: error instanceof Error ? error.message : String(error) });
 }
+const signatureOf = (values: Record<string, unknown>) =>
+  JSON.stringify(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
+/** Keeps uncommitted edits visible over state read back from disk, other windows or the server. */
+function withPending(ctx: Context, state: DeviceProfileState): DeviceProfileState {
+  const missing = ctx.pending.filter(
+    (edit) => !state.outbox.some((queued) => queued.id === edit.id),
+  );
+  return missing.length ? { ...state, outbox: [...state.outbox, ...missing] } : state;
+}
 async function publish(ctx: Context, next: DeviceProfileState) {
   if (!fresh(ctx)) return;
-  useSettingsProfiles.setState({ state: next });
+  useSettingsProfiles.setState({ state: withPending(ctx, next) });
   const project = async () => {
     if (!fresh(ctx)) return;
     const current = useSettingsProfiles.getState().state;
     if (!current) return;
     const values = effectiveValues(current);
-    const signature = JSON.stringify(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
+    const signature = signatureOf(values);
     if (ctx.projected === signature) return;
+    // A newer edit supersedes this projection; applying it would flash the old value back.
+    const stillCurrent = () => {
+      const latest = useSettingsProfiles.getState().state;
+      return fresh(ctx) && !!latest && signatureOf(effectiveValues(latest)) === signature;
+    };
     try {
-      await useSettingsStore.getState().applyProfileValues(values, () => fresh(ctx));
-      if (fresh(ctx)) ctx.projected = signature;
+      await useSettingsStore.getState().applyProfileValues(values, stillCurrent);
+      if (stillCurrent()) ctx.projected = signature;
     } catch (error) {
       // Failed platform effects can be retried by the next invalidation or focus.
       if (fresh(ctx))
@@ -118,6 +136,26 @@ function cloud<T>(ctx: Context, work: () => Promise<T>): Promise<T> {
   cloudQueue = result;
   return result;
 }
+/** Commits an edit that is already on screen; on failure the screen returns to the saved value. */
+async function persist(
+  ctx: Context,
+  id: string,
+  value: PreferenceValue | undefined,
+  edit: ProfileMutation,
+) {
+  const settle = () => (ctx.pending = ctx.pending.filter((pending) => pending.id !== edit.id));
+  try {
+    await mutate(ctx, (state) => editPreference(state, id, value, edit.id), true);
+    settle();
+  } catch (error) {
+    settle();
+    report(error, ctx);
+    ctx.projected = undefined;
+    const saved = await readState<DeviceProfileState>(ctx.scope).catch(() => null);
+    await publish(ctx, saved?.state ?? initialProfileState(ctx.seed)).catch(() => {});
+    throw error;
+  }
+}
 async function synchronize(ctx: Context) {
   if (!fresh(ctx)) return;
   const saved = await readState<DeviceProfileState>(ctx.scope);
@@ -152,6 +190,8 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       seed: structuredClone(document),
       epoch: ++epoch,
       session: readApiSessionGeneration(),
+      pending: [],
+      writes: Promise.resolve(),
     };
     context?.channel?.close();
     context = ctx;
@@ -214,30 +254,33 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
     })();
     return ctx.refresh;
   },
+  // The screen and the app's behavior change first. Saving to this device follows, and the account
+  // sync is deferred: the durable outbox delivers the edit whenever the server is reachable.
   edit: async (id, value) => {
     const ctx = requiredContext();
+    let write: Promise<void>;
     try {
       if (!ctx.accountId) throw new Error("Sign in to change settings.");
-      const mutationId = crypto.randomUUID();
-      let changed = false;
-      await mutate(
-        ctx,
-        (state) => {
-          const next = editPreference(state, id, value, mutationId);
-          changed = next !== state;
-          return next;
-        },
-        true,
-      );
-      if (!changed) return;
-      if (fresh(ctx)) set({ error: null });
-      if (ctx.accountId && navigator.onLine)
-        void get()
-          .refresh()
-          .catch(() => {});
+      const current = get().state;
+      if (!current) throw new Error("Settings are still loading");
+      const next = editPreference(current, id, value, crypto.randomUUID());
+      if (next === current) return;
+      const edit = next.outbox[next.outbox.length - 1];
+      ctx.pending.push(edit);
+      ctx.projected = undefined;
+      set({ state: next, error: null });
+      useSettingsStore.getState().previewProfileValues(effectiveValues(next));
+      // Edits commit in the order they were made, so the last one always wins on disk.
+      write = ctx.writes.catch(() => {}).then(() => persist(ctx, id, value, edit));
+      ctx.writes = write;
     } catch (error) {
       report(error, ctx);
       throw error;
     }
+    await write;
+    if (fresh(ctx) && ctx.accountId && navigator.onLine)
+      void get()
+        .refresh()
+        .catch(() => {});
   },
 }));

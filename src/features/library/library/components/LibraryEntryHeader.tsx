@@ -1,5 +1,4 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
-import type { ReactNode } from "react";
 import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
 import { mediaTypeOptions, sortOptions } from "./SpaceLibraryChrome";
 import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
@@ -25,7 +24,6 @@ const sections = [
   { value: "recent", label: "All" },
   { value: "favorites", label: "Favorites" },
   { value: "albums", label: "Albums" },
-  { value: "smart", label: "Smart" },
   { value: "deleted", label: "Trash" },
 ];
 const more: { value: LibraryCollectionKind; label: string }[] = [
@@ -38,40 +36,24 @@ const more: { value: LibraryCollectionKind; label: string }[] = [
   { value: "years", label: "Years" },
 ];
 
-export function LibraryEntryHeader({
-  smartControls,
-}: {
-  smartControls?: {
-    search: ReactNode;
-    actions: ReactNode;
-    filterControl: ReactNode;
-    viewToggle: ReactNode;
-  };
-} = {}) {
+export function LibraryEntryHeader() {
   const { data, collectionActions } = useSpaceLibraryContext();
   const upload = useLibraryUploadState();
   const extra = more.find((x) => x.value === data.collection);
-  // Smart Library supplies local-catalog actions in the same shared toolbar slots.
-  const onDevice = data.collection === "smart";
   return (
     <>
       <CollectionHeading
         title="Library"
         actions={
           <>
-            {onDevice ? (
-              smartControls?.search
-            ) : (
-              <CollectionSearch
-                aria-label="Search library"
-                placeholder={data.collection === "deleted" ? "Search trash" : "Search library"}
-                value={data.searchInput}
-                onChange={(e) => data.setSearchInput(e.target.value)}
-                onFocus={() => data.setSearchFocused(true)}
-                onBlur={() => window.setTimeout(() => data.setSearchFocused(false), 120)}
-              />
-            )}
-            {onDevice && smartControls?.actions}
+            <CollectionSearch
+              aria-label="Search library"
+              placeholder={data.collection === "deleted" ? "Search trash" : "Search library"}
+              value={data.searchInput}
+              onChange={(e) => data.setSearchInput(e.target.value)}
+              onFocus={() => data.setSearchFocused(true)}
+              onBlur={() => window.setTimeout(() => data.setSearchFocused(false), 120)}
+            />
             {data.collection === "albums" && !data.selectedCollectionId
               ? data.canEditLibrary && (
                   <Button
@@ -84,7 +66,6 @@ export function LibraryEntryHeader({
                   </Button>
                 )
               : data.collection !== "deleted" &&
-                !onDevice &&
                 upload.uploadAvailable && (
                   <Button
                     variant="primary"
@@ -105,51 +86,45 @@ export function LibraryEntryHeader({
         value={data.collection}
         onChange={(value) => collectionActions.selectCollection(value as LibraryCollectionKind)}
         filterControl={
-          onDevice ? (
-            smartControls?.filterControl
-          ) : (
-            <CollectionFilterMenu
-              label="Filter and sort Library"
-              active={
-                Boolean(data.mediaType) ||
-                data.sort !== "recently-added" ||
-                data.direction !== "desc"
-              }
-              onReset={() => {
-                data.setMediaType("");
-                data.setSort("recently-added");
-                data.setDirection("desc");
-              }}
-              groups={[
-                {
-                  label: "Media type",
-                  submenu: true,
-                  value: data.mediaType || "all",
-                  options: mediaTypeOptions.map((x) => ({ ...x, value: x.value || "all" })),
-                  onChange: (value) =>
-                    data.setMediaType((value === "all" ? "" : value) as typeof data.mediaType),
+          <CollectionFilterMenu
+            label="Filter and sort Library"
+            active={
+              Boolean(data.mediaType) || data.sort !== "recently-added" || data.direction !== "desc"
+            }
+            onReset={() => {
+              data.setMediaType("");
+              data.setSort("recently-added");
+              data.setDirection("desc");
+            }}
+            groups={[
+              {
+                label: "Media type",
+                submenu: true,
+                value: data.mediaType || "all",
+                options: mediaTypeOptions.map((x) => ({ ...x, value: x.value || "all" })),
+                onChange: (value) =>
+                  data.setMediaType((value === "all" ? "" : value) as typeof data.mediaType),
+              },
+              {
+                label: "Sort by",
+                kind: "sort",
+                submenu: true,
+                value: `${data.sort}:${data.direction}`,
+                options: data.currentAlbum
+                  ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
+                  : sortOptions,
+                onChange: (value) => {
+                  const [sort, direction] = value.split(":");
+                  data.setSort(sort as NonNullable<LibraryItemQuery["sort"]>);
+                  data.setDirection(direction as "asc" | "desc");
                 },
-                {
-                  label: "Sort by",
-                  kind: "sort",
-                  submenu: true,
-                  value: `${data.sort}:${data.direction}`,
-                  options: data.currentAlbum
-                    ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
-                    : sortOptions,
-                  onChange: (value) => {
-                    const [sort, direction] = value.split(":");
-                    data.setSort(sort as NonNullable<LibraryItemQuery["sort"]>);
-                    data.setDirection(direction as "asc" | "desc");
-                  },
-                },
-              ]}
-            />
-          )
+              },
+            ]}
+          />
         }
         utilities={
           <>
-            {data.libraryViewMode === "grid" && !onDevice && (
+            {data.libraryViewMode === "grid" && (
               <NavIsland aria-label="Item scale">
                 <IconButton
                   label="Zoom out"
@@ -188,11 +163,7 @@ export function LibraryEntryHeader({
           </>
         }
         actions={
-          onDevice ? (
-            smartControls?.viewToggle
-          ) : (
-            <CollectionViewToggle value={data.libraryViewMode} onChange={data.setLibraryViewMode} />
-          )
+          <CollectionViewToggle value={data.libraryViewMode} onChange={data.setLibraryViewMode} />
         }
       />
     </>

@@ -76,7 +76,7 @@ export const uiRules = {
 export type UiRuleId = keyof typeof uiRules;
 
 /** Theme palettes are data, not styling, and may spell out hex colors. */
-const themeData = /(?:extensionTheme)\.ts$/;
+const themeData = /(?:settings\/store\/appTheme)\.ts$/;
 
 export function uiViolations(path: string, text: string): UiRuleId[] {
   return (Object.keys(uiRules) as UiRuleId[]).filter((id) => {

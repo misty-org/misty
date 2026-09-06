@@ -10,6 +10,12 @@ use std::{
 };
 
 #[cfg(not(target_os = "macos"))]
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter, Cursor},
+};
+
+#[cfg(not(target_os = "macos"))]
 use image::{
     codecs::{
         gif::GifDecoder,

@@ -1,32 +1,16 @@
-export const defaultFileActionOptions = ["Open", "Preview", "Show Details"];
-export const fileViewModeOptions = ["List", "Grid"];
-// The store already consumes and clamps this to 5-240; these are the values the
-// UI offers.
-export const discoveryIntervalOptions = [5, 15, 30, 60, 240];
-export const discoveryIntervalLabels = [
-  "5 minutes",
-  "15 minutes",
-  "30 minutes",
-  "1 hour",
-  "4 hours",
-];
-
 export const settingsDisabledControlClass =
   "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg disabled:text-cream-muted disabled:opacity-100 disabled:shadow-none";
-
-export const settingsControlButtonClass = `w-[220px] max-w-full gap-1.5 ${settingsDisabledControlClass}`;
 
 export const settingsControlButtonCompactClass = `min-w-24 gap-1.5 ${settingsDisabledControlClass}`;
 
 export const settingsReferenceListClass = "grid min-w-0";
 
-export const settingsReferenceHeaderClass =
-  "min-h-10 bg-charcoal-card text-xs font-medium text-cream-muted";
+export const settingsReferenceHeaderClass = "min-h-9 text-xs font-medium text-cream-muted";
 
 export const settingsReferenceSpanClass = "min-w-0 [overflow-wrap:anywhere]";
 
-export const settingsEmptyClass = "px-5 py-4 text-sm text-cream-muted";
+export const settingsEmptyClass = "border-t border-charcoal-border py-3 text-sm text-cream-muted";
 
 export const settingsAssociationRowClass =
   "grid min-h-[54px] grid-cols-[minmax(110px,0.22fr)_minmax(0,1fr)_32px] items-center " +
-  "gap-[18px] border-b border-charcoal-border/60 px-5 py-2 text-sm text-cream";
+  "gap-[18px] border-t border-charcoal-border py-2 text-sm text-cream";

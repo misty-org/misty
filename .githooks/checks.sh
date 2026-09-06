@@ -30,11 +30,12 @@ billing() {
   [ -f "$billing_root/.githooks/checks.sh" ] || { echo "Billing checkout missing: $billing_root" >&2; return 1; }
   (cd "$billing_root" && MISTY_SERVER_REPO="$root" bash .githooks/checks.sh go)
 }
-server() { parallel server-go billing-contract agent-runtime journal-collab; }
+server() { parallel server-go billing-contract agent-runtime journal-collab clipboard-worker; }
 server_go() { bash "$hooks/server-tests.sh"; }
 billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
+clipboard_worker() { (cd server/apps/clipboard && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
 rust_desktop() { parallel desktop-crate browser-sync-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }

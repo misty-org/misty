@@ -12,9 +12,9 @@ describe("shortcut platform defaults", () => {
   it("uses native primary modifiers for shell navigation", () => {
     const launcher = shortcutCommandsById.get("search.toggle")!;
     const nextTab = shortcutCommandsById.get("workspace.next_tab")!;
-    expect(launcher.defaults.macos.primary).toBe("Cmd+K");
-    expect(launcher.defaults.windows.primary).toBe("Ctrl+K");
-    expect(launcher.defaults.linux.primary).toBe("Ctrl+K");
+    expect(launcher.defaults.macos.primary).toBe("Cmd+T");
+    expect(launcher.defaults.windows.primary).toBe("Ctrl+T");
+    expect(launcher.defaults.linux.primary).toBe("Ctrl+T");
     const companion = shortcutCommandsById.get("misty.contextual_companion")!;
     expect(companion.defaults.macos.primary).toBe("Cmd+Shift+K");
     expect(companion.defaults.windows.primary).toBe("Ctrl+Shift+K");

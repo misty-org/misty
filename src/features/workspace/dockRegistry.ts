@@ -16,7 +16,6 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
     serialize: parseBrowserViewState,
     restore: parseBrowserViewState,
   },
-  files: descriptor("files", "multiple", "suspend", 360, 240),
   scheduled: descriptor("scheduled", "singleton", "keep-alive", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
 };

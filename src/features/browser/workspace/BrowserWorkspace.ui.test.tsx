@@ -146,8 +146,13 @@ describe("BrowserWorkspace", () => {
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
-    expect(container.querySelector('[aria-label="Annotate page"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Viewport: Responsive"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Misty"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Extensions"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Bookmark this page"]')?.closest("form")).toBe(
+      omnibox?.closest("form"),
+    );
+    expect(container.querySelector('[aria-label="Annotate page"]')).toBeNull();
+    expect(container.querySelector('[aria-label^="Viewport"]')).toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Close "]')).toBeNull();
   });
@@ -166,16 +171,30 @@ describe("BrowserWorkspace", () => {
     );
     expect(ownershipMarker?.textContent?.trim()).toBe("Misty");
   });
-  it("opens the page annotation toolkit and closes it without navigating", async () => {
+  it("opens the page annotation toolkit from the menu and closes it without navigating", async () => {
     await act(async () => root.render(view(browserTab)));
-    const annotate = container.querySelector<HTMLButtonElement>('[aria-label="Annotate page"]');
+    const trigger = container.querySelector<HTMLElement>('[aria-label="Browser menu"]');
+    await act(async () => {
+      openMenu(trigger);
+      await settleBrowserOverlay();
+    });
+    const moreTools = [
+      ...document.body.querySelectorAll<HTMLElement>('[data-browser-menu] [role="menuitem"]'),
+    ].find((item) => item.textContent?.trim().startsWith("More tools"));
+    await act(async () => {
+      moreTools?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      await settleBrowserOverlay();
+    });
+    const annotate = [
+      ...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]'),
+    ].find((item) => item.textContent?.trim() === "Annotate page");
+    expect(annotate).toBeDefined();
     await act(async () => annotate?.click());
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Pen"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Rectangle"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Text"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Clear annotations"]')).not.toBeNull();
-    expect(annotate?.getAttribute("aria-pressed")).toBe("true");
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
         .find((button) => button.textContent?.trim() === "Close")

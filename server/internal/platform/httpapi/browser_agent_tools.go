@@ -109,6 +109,28 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 	} else if tool.Name == "browser.upload" {
 		return nil, db.ErrSpaceForbidden
 	}
+	if tool.Name == screenActTool {
+		var act struct {
+			Goal               string `json:"goal"`
+			AllowConsequential bool   `json:"allowConsequential"`
+		}
+		_ = json.Unmarshal(tool.Arguments, &act)
+		if act.AllowConsequential {
+			// Sending, buying, deleting or changing access on screen follows the
+			// same "Ask before acting" approval card as app actions.
+			approval, waiting, err := s.confirmAgentAction(ctx, invocation, "screen.act:"+input.ScopeID, act.Goal,
+				"On screen: "+truncateAgentRuntimeText(act.Goal, 180), act.Goal)
+			if err != nil {
+				return nil, err
+			}
+			if waiting != nil {
+				return waiting, nil
+			}
+			if err := s.useAgentActionApproval(ctx, invocation.UserID, approval); err != nil {
+				return nil, err
+			}
+		}
+	}
 	config := TestingMustAPIRawJSON(configData)
 	var job *db.WorkflowDeviceNodeJob
 	var err error

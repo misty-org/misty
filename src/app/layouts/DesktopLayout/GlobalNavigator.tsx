@@ -9,10 +9,8 @@ import {
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { WorkspaceSpaceNavigation } from "@/features/spaces";
-import { ActivityMenu } from "./ActivityMenu";
 import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
-import { NavigatorFiles } from "./NavigatorFiles";
 import { NavigatorDestinations } from "./NavigatorDestinations";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
 import { navigatorHeaderRowClass, navigatorHierarchyActionClass } from "./styles";
@@ -104,7 +102,6 @@ export function GlobalNavigator(props: {
                   />
                 ),
               },
-              { value: "files", label: "Files", content: <NavigatorFiles activeTab={activeTab} /> },
               {
                 value: "extensions",
                 label: "Extensions",
@@ -122,7 +119,6 @@ export function GlobalNavigator(props: {
           utilityControls={
             <>
               <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
-              <ActivityMenu className={navigatorHierarchyActionClass} />
               {props.syncControl}
             </>
           }

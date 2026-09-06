@@ -1,4 +1,5 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { nextStepPrompt, type CompanionGuideStep } from "./companionGuide";
 import { companionStage } from "./companionStage";
 import type { CompanionSubmission } from "./companionState";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
@@ -46,10 +47,15 @@ export class CursorCompanionTypedTurns {
       conversationId: request.conversationId,
       agentId: useMistyStore.getState().selectedAgentId,
     };
+    // A continuation of a spoken request keeps its voice conversation and is
+    // read aloud there; every other typed turn is silent.
+    const voiceOwned =
+      Boolean(request.voice) ||
+      Boolean(request.continuation && this.voice.ownsContinuation(request.conversationId));
     if (!(await s.interruptNative())) return;
     // Typed turns use the durable text runtime. An idle voice connection must
     // not report provider failures into this turn or narrate its result.
-    s.closeConversationVoice();
+    if (!voiceOwned) s.closeConversationVoice();
     const generation = s.turn;
     s.invocationId = undefined;
     s.captures = [];
@@ -63,7 +69,7 @@ export class CursorCompanionTypedTurns {
         throw new Error(
           "The conversation changed. Send your request again in the intended conversation.",
         );
-      await this.submitCaptured(request, generation, screens, controller.signal);
+      await this.submitCaptured(request, generation, screens, controller.signal, voiceOwned);
     } catch (error) {
       if (!controller.signal.aborted) s.fail(generation, error);
       throw error;
@@ -75,6 +81,7 @@ export class CursorCompanionTypedTurns {
     generation: number,
     screens: DisplayCapture[],
     signal: AbortSignal,
+    voiceOwned: boolean,
   ) {
     const s = this.s;
     if (!s.active(generation)) return;
@@ -95,6 +102,7 @@ export class CursorCompanionTypedTurns {
           interactionMode: s.state.mode,
           model: s.state.model,
           ...(screens.length ? { displayCaptures: screens } : {}),
+          ...(request.intent && screens.length ? { intent: request.intent } : {}),
           continuation: request.continuation,
         },
       ),
@@ -110,7 +118,23 @@ export class CursorCompanionTypedTurns {
       s.owned = false;
       throw new Error(current.error || "The companion could not start. Please try again.");
     }
+    if (voiceOwned && s.submittedConversationId) {
+      // The voice conversation points at and reads this answer when it finishes.
+      s.owned = false;
+      s.delegatedTask = { id: s.invocationId, conversationId: s.submittedConversationId };
+    }
     s.settle();
     this.voice.settleDelegatedTask();
   }
+
+  /** The next walkthrough step, from a fresh look at the screen after its target was clicked. */
+  continueGuide = (step: CompanionGuideStep) =>
+    this.submit({
+      prompt: nextStepPrompt(step.point),
+      conversationId: step.conversationId,
+      look: true,
+      continuation: true,
+      intent: "teach",
+      voice: step.voice,
+    });
 }

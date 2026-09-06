@@ -13,19 +13,6 @@ import type {
   UnifiedMistyCandidate,
 } from "./types";
 
-type ExplorerContextPane = {
-  listing?: {
-    entries?: Array<{
-      id: string;
-      kind: "file" | "folder";
-      name: string;
-      path: string;
-      location: { kind: string };
-    }>;
-  };
-  selectedIds?: string[];
-};
-
 export function SearchAskToggle(props: {
   mode: GlobalAiMode;
   compact?: boolean;
@@ -289,8 +276,6 @@ export function removeLastFilter(
 
 export function contextForCurrentView(
   currentPath: string,
-  activePanePath: string,
-  pane?: ExplorerContextPane,
   registeredAiContext: AiContextReference[] = [],
 ): GlobalAiContextRef[] {
   const context: GlobalAiContextRef[] = [];
@@ -314,26 +299,6 @@ export function contextForCurrentView(
       source: "current",
     });
   }
-  if (currentPath.startsWith("/files") && activePanePath) {
-    context.push({
-      id: `folder:${activePanePath}`,
-      kind: "folder",
-      title: activePanePath.split(/[\\/]/).filter(Boolean).pop() || "Current folder",
-      source: "current",
-      localPath: activePanePath,
-    });
-    const entries = pane?.listing?.entries ?? [];
-    const selected = new Set(pane?.selectedIds ?? []);
-    for (const entry of entries.filter((item) => selected.has(item.id)).slice(0, 6)) {
-      context.push({
-        id: entry.id,
-        kind: entry.kind,
-        title: entry.name,
-        source: "current",
-        ...(entry.location.kind === "local" ? { localPath: entry.path } : {}),
-      });
-    }
-  }
   for (const item of registeredAiContext) {
     context.push({
       id: item.id,
@@ -351,7 +316,6 @@ export function contextForCurrentView(
 }
 
 function routeTitle(path: string) {
-  if (path.startsWith("/files")) return "Files";
   if (path.startsWith("/agents")) return "Agents";
   if (path.startsWith("/discover") || path.startsWith("/store") || path.startsWith("/marketplace"))
     return "Discover";

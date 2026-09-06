@@ -127,7 +127,7 @@ export function AgentCompanionPanel() {
             <kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</kbd>
           </DesktopSettingsRow>
         )}
-        <DesktopSettingsRow label="Model" last>
+        <DesktopSettingsRow label="Model">
           <Select
             value={state.model || serverDefaultModel}
             disabled={!control}

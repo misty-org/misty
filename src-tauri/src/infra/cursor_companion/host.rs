@@ -2,7 +2,10 @@
 mod audio;
 #[path = "platform.rs"]
 mod platform;
+#[path = "pointing.rs"]
+mod pointing;
 use base64::{engine::general_purpose::STANDARD, Engine};
+pub use pointing::*;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -41,10 +44,14 @@ pub struct CursorCompanionState {
     started: AtomicBool,
     capture: AtomicBool,
     keyboard_activity: AtomicU64,
+    /// Click positions leave the native hook only while a walkthrough step waits.
+    watch_clicks: AtomicBool,
+    click_turn: AtomicU64,
 }
 pub enum Shortcut {
     KeyboardActivity,
     Held(bool),
+    Click(f64, f64),
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
@@ -99,6 +106,7 @@ pub fn stop(app: &AppHandle) {
     let state = managed.inner().clone();
     state.enabled.store(false, Ordering::SeqCst);
     state.held.store(false, Ordering::SeqCst);
+    state.watch_clicks.store(false, Ordering::SeqCst);
     let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
     let cleared = serde_json::json!({
         "generation": turn, "enabled": false, "visible": false,
@@ -134,6 +142,7 @@ pub fn cursor_companion_interrupt(
         .compare_exchange(expected, expected + 1, Ordering::SeqCst, Ordering::SeqCst)
         .map_err(|_| "Companion already interrupted")?;
     state.held.store(false, Ordering::SeqCst);
+    state.watch_clicks.store(false, Ordering::SeqCst);
     if let Ok(mut data) = state.data.lock() {
         data.task.clear();
     }
@@ -446,6 +455,7 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         .keyboard_activity
                         .fetch_add(1, Ordering::Relaxed);
                 }
+                Shortcut::Click(x, y) => forward_click(&events_app, &events_state, x, y),
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
                         continue;

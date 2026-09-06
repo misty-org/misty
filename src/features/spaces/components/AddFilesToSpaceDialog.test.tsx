@@ -6,7 +6,6 @@ import type * as ReactRouterDom from "react-router-dom";
 const mocks = vi.hoisted(() => ({
   load: vi.fn().mockResolvedValue(undefined),
   navigate: vi.fn(),
-  ingestLocal: vi.fn(),
   uploadLibraryPath: vi.fn(),
   spaces: [
     {
@@ -29,15 +28,11 @@ vi.mock("react-router-dom", async () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/features/activity/useActivityStore", () => ({
-  useActivityStore: { getState: () => ({ ingestLocal: mocks.ingestLocal }) },
-}));
-
 vi.mock("@/features/library/library/LibraryRuntime", async () => ({
   libraryApi: { uploadLibraryPath: mocks.uploadLibraryPath },
   useLibrarySpaces: (selector: (state: unknown) => unknown) =>
     selector({ spaces: mocks.spaces, loading: false, load: mocks.load }),
-  LibraryError: (await import("@/features/activity")).SystemErrorActivity,
+  LibraryError: (await import("@/features/support/systemErrors")).SystemErrorNotice,
 }));
 
 vi.mock("../store/useSpacesStore", () => ({
@@ -110,7 +105,6 @@ describe("AddFilesToSpaceDialog", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     mocks.load.mockClear();
     mocks.navigate.mockClear();
-    mocks.ingestLocal.mockClear();
     mocks.uploadLibraryPath.mockReset();
     container = document.createElement("div");
     document.body.append(container);
@@ -186,12 +180,6 @@ describe("AddFilesToSpaceDialog", () => {
         onProgress: expect.any(Function),
       });
     }
-    expect(mocks.ingestLocal).toHaveBeenCalledWith({
-      title: "3 copies added to Launch room.",
-      kind: "completion",
-      appId: "library",
-      spaceId: "space-allowed",
-    });
     expect(libraryEvent).toHaveBeenCalledOnce();
     expect((libraryEvent.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({
       space_id: "space-allowed",

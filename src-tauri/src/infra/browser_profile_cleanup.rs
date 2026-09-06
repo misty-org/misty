@@ -30,6 +30,26 @@ pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), Str
     #[cfg(not(target_os = "macos"))]
     let _ = identifier;
     let directory = browser_data_directory(&app, Some(&profile_id))?;
-    std::fs::remove_dir_all(directory).map_err(|error| error.to_string())?;
-    Ok(())
+    // A profile that never opened a page has no folder; that is already clean.
+    match std::fs::remove_dir_all(directory) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.to_string()),
+        _ => Ok(()),
+    }
+}
+
+/// Erases a deleted device profile's website data. The default account profile
+/// is never a device profile, so it cannot be removed this way.
+#[tauri::command]
+pub async fn browser_device_profile_delete(
+    webview: Webview,
+    app: AppHandle,
+    profile_id: String,
+) -> Result<(), String> {
+    if webview.label() != "main" {
+        return Err("Only Misty's trusted shell can remove browser profiles.".into());
+    }
+    if super::super::browser_sync::is_account_browser_profile(&profile_id).await {
+        return Err("The account's own browser profile can't be removed.".into());
+    }
+    remove(app, profile_id).await
 }

@@ -7,7 +7,6 @@ const settingNames: Record<ImportSettingKind, string> = {
   searchEngine: "search engine",
   homepage: "homepage",
   startup: "startup",
-  bookmarksBar: "bookmarks bar",
   sitePermissions: "camera and microphone choices",
 };
 const count = (n: number, one: string, many = `${one}s`) =>

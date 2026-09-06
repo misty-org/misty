@@ -15,50 +15,22 @@ mod shell_plugins;
 mod telemetry;
 
 #[cfg(desktop)]
-use app::commands::{
-    media_search_acknowledge_removed_assets, media_search_approve_assets, media_search_complete,
-    media_search_complete_legacy_adoption, media_search_prepare_chunk, media_search_record_chunk,
-    media_search_reset_device_index, media_search_resolve_assets, media_search_scan_movies,
-    media_search_set_asset_state, media_search_snapshot,
-};
+use app::commands::{};
 use app::commands::{
     agents_choose_folder_scope, agents_device_snapshot, agents_list_scoped_files,
-    agents_prepare_scoped_document, agents_revoke_folder_scope,
-    app_snapshot, archive_create, archive_extract, archive_list, clipboard_apply_shared,
-    clipboard_native_file_refs, clipboard_publish_image_bytes, clipboard_publish_shared,
-    clipboard_set_local, clipboard_shared_image_bytes, clipboard_snapshot,
-    clipboard_write_file_bytes, clipboard_write_file_refs, compare_apply_text_merge, compare_files,
-    compare_folders, devices_snapshot, devices_unmount, duplicates_cancel, duplicates_scan,
-    explorer_calculate_directory_sizes, explorer_cancel_drag_preparation,
-    explorer_directory_size_snapshot, explorer_generate_image_thumbnail,
-    explorer_library_record_last_opened, explorer_library_record_recent, explorer_library_snapshot,
-    explorer_list_directory, explorer_open_association, explorer_open_path, explorer_open_with,
-    explorer_path_exists, explorer_path_is_directory, explorer_prepare_drag_items,
-    explorer_prepare_open_item, explorer_preview_item, explorer_queue_create_item,
-    explorer_queue_delete_items, explorer_queue_paste_blob, explorer_queue_paste_items,
-    explorer_queue_paste_text, explorer_queue_rename_item, explorer_queue_rename_items,
-    explorer_save_preview_item, file_metadata_snapshot, file_sync_apply, file_sync_compare,
-    file_sync_pair_remove, file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum,
-    file_tools_create_symlink, file_tools_read_symlink, navigation_names_snapshot,
-    navigation_names_update, open_terminal_at_path, operation_queue_cancel, operation_queue_pause,
-    operation_queue_pause_all, operation_queue_redo, operation_queue_resolve_conflict,
-    operation_queue_resume, operation_queue_resume_all, operation_queue_retry_transfer,
-    operation_queue_snapshot, operation_queue_undo, saved_searches_delete, saved_searches_save,
-    saved_searches_snapshot, search_cancel_scan, search_get_status, search_init, search_query,
-    search_start_scan, settings_apply_launch_on_login, settings_launch_on_login_snapshot,
-    settings_open_with_associations, settings_profile_commit, settings_profile_state,
-    settings_save, settings_snapshot, smart_library_apply_results, smart_library_assets_page,
-    smart_library_delete, smart_library_import_files, smart_library_preflight_import,
-    smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
-    smart_library_set_server_folder_id, smart_library_snapshot, transfers_snapshot,
+    agents_prepare_scoped_document, agents_revoke_folder_scope, app_snapshot,
+    clipboard_apply_shared, clipboard_native_file_refs, clipboard_publish_image_bytes,
+    clipboard_publish_shared, clipboard_set_local, clipboard_shared_image_bytes,
+    clipboard_snapshot, clipboard_write_file_bytes, clipboard_write_file_refs, devices_snapshot,
+    explorer_list_directory, explorer_prepare_open_item, navigation_names_snapshot,
+    navigation_names_update, settings_apply_launch_on_login, settings_default_browser_snapshot,
+    settings_launch_on_login_snapshot, settings_profile_commit, settings_profile_state,
+    settings_request_default_browser, settings_save, settings_snapshot,
 };
 
 #[cfg(desktop)]
 use app::commands::{
-    connected_devices_initialize, connected_devices_media_url,
-    connected_devices_prepare_clipboard_files, connected_devices_roots,
-    connected_devices_set_identity, connected_devices_snapshot,
-    connected_devices_subscribe_directory,
+    connected_devices_initialize, connected_devices_set_identity, connected_devices_snapshot,
 };
 #[cfg(desktop)]
 use app::device_admission_commands::{
@@ -92,6 +64,20 @@ use infra::browser::{
     browser_webview_developer_tools, browser_webview_find, browser_webview_print,
     browser_webview_save_page, browser_webview_set_muted, browser_webview_stop,
 };
+#[cfg(desktop)]
+use infra::browser::page_tools::media_tools::{
+    browser_webview_media_playback, browser_webview_picture_in_picture,
+    browser_webview_reader_article,
+};
+#[cfg(desktop)]
+use infra::browser::profile_cleanup::browser_device_profile_delete;
+#[cfg(desktop)]
+use infra::browser::host_messages::passwords::{
+    browser_password_offer_respond, browser_passwords_delete, browser_passwords_list,
+    browser_passwords_reveal, browser_passwords_save,
+};
+#[cfg(desktop)]
+use infra::browser_site_style::browser_set_mouse_gestures;
 #[cfg(desktop)]
 use infra::browser_agent_control::{
     browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew,
@@ -153,9 +139,6 @@ pub fn run() {
         }
     }));
 
-    #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_drag::init());
-
     // Web APIs that website tabs reach natively; see kiri/README.md.
     #[cfg(desktop)]
     let builder = builder.plugin(infra::browser_kiri::plugin());
@@ -188,7 +171,10 @@ pub fn run() {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
                     let passed = infra::browser::kiri_probe::run(handle.clone()).await;
-                    println!("KIRI PROBE DONE: {}", if passed { "all passed" } else { "failures" });
+                    println!(
+                        "KIRI PROBE DONE: {}",
+                        if passed { "all passed" } else { "failures" }
+                    );
                     handle.exit(if passed { 0 } else { 1 });
                 });
             }
@@ -232,6 +218,8 @@ pub fn run() {
             }
             #[cfg(unix)]
             app.manage(infra::agent_files::AgentFilesState::default());
+            #[cfg(all(desktop, unix))]
+            infra::clipboard_bridge::start(app.handle().clone(), runtime.environment.config_dir());
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
@@ -353,13 +341,14 @@ pub fn run() {
                     crate::infra::misty_context::misty_screen_status,
                     crate::infra::misty_context::misty_screen_capture,
                     crate::infra::workspace_autopilot::agent_workspace_context,
+                    crate::infra::workspace_autopilot::agent_desktop_recent_audio,
+                    crate::infra::workspace_autopilot::agent_control_yield,
                     #[cfg(desktop)]
                     platform::mini_app::builtin_service_open,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_close,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
-                    mac_rounded_corners::set_native_wallpaper_video,
                     app_snapshot,
                     agents_device_snapshot,
                     #[cfg(unix)]
@@ -374,6 +363,7 @@ pub fn run() {
                     infra::agent_files::agent_files_manifest,
                     #[cfg(unix)]
                     infra::agent_files::agent_files_history,
+                    #[cfg(unix)]
                     infra::agent_files::agent_files_snapshot,
                     #[cfg(unix)]
                     infra::agent_files::agent_files_undo,
@@ -388,9 +378,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     connected_devices_snapshot,
                     #[cfg(desktop)]
-                    connected_devices_subscribe_directory,
                     #[cfg(desktop)]
-                    connected_devices_roots,
                     #[cfg(desktop)]
                     connected_devices_set_identity,
                     #[cfg(desktop)]
@@ -436,9 +424,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     device_send_file,
                     #[cfg(desktop)]
-                    connected_devices_media_url,
                     #[cfg(desktop)]
-                    connected_devices_prepare_clipboard_files,
                     check_system,
                     ensure_local_access_token,
                     save_authenticated_user,
@@ -461,6 +447,12 @@ pub fn run() {
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_snapshot,
                     #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_snap,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_capture_region,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_watch_clicks,
+                    #[cfg(any(target_os = "macos", windows))]
                     infra::agent_workspace::agent_window_take_task,
                     infra::agent_workspace::agent_window_ack_task,
                     infra::agent_workspace::agent_window_task_receipt,
@@ -475,6 +467,8 @@ pub fn run() {
                     infra::agent_workspace::agent_browser_session_id,
                     #[cfg(desktop)]
                     crate::infra::browser::browser_context_menu_select,
+                    #[cfg(desktop)]
+                    crate::infra::browser::browser_webview_context_menu_at,
                     #[cfg(desktop)]
                     browser_shortcuts_update,
                     #[cfg(desktop)]
@@ -504,6 +498,14 @@ pub fn run() {
                     infra::browser_site_permissions::browser_site_permissions_list,
                     #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_permissions_reset,
+                    #[cfg(desktop)]
+                    infra::browser_site_zoom::browser_set_site_zoom_levels,
+                    #[cfg(desktop)]
+                    infra::browser_content_blocking::browser_set_content_blocking,
+                    #[cfg(desktop)]
+                    infra::browser_site_style::browser_set_site_styles,
+                    #[cfg(desktop)]
+                    infra::browser_site_style::browser_webview_pick_element,
                     browser_webview_set_zoom,
                     #[cfg(desktop)]
                     browser_webview_show,
@@ -531,6 +533,26 @@ pub fn run() {
                     browser_set_download_prompt,
                     #[cfg(desktop)]
                     browser_webview_set_muted,
+                    #[cfg(desktop)]
+                    browser_webview_picture_in_picture,
+                    #[cfg(desktop)]
+                    browser_webview_media_playback,
+                    #[cfg(desktop)]
+                    browser_webview_reader_article,
+                    #[cfg(desktop)]
+                    browser_device_profile_delete,
+                    #[cfg(desktop)]
+                    browser_set_mouse_gestures,
+                    #[cfg(desktop)]
+                    browser_password_offer_respond,
+                    #[cfg(desktop)]
+                    browser_passwords_list,
+                    #[cfg(desktop)]
+                    browser_passwords_reveal,
+                    #[cfg(desktop)]
+                    browser_passwords_delete,
+                    #[cfg(desktop)]
+                    browser_passwords_save,
                     #[cfg(desktop)]
                     browser_history_clear,
                     #[cfg(desktop)]
@@ -604,74 +626,19 @@ pub fn run() {
                     clipboard_write_file_bytes,
                     clipboard_write_file_refs,
                     devices_snapshot,
-                    devices_unmount,
                     explorer_list_directory,
-                    explorer_directory_size_snapshot,
-                    explorer_calculate_directory_sizes,
                     explorer_prepare_open_item,
-                    explorer_prepare_drag_items,
-                    explorer_cancel_drag_preparation,
-                    explorer_preview_item,
-                    explorer_save_preview_item,
-                    explorer_generate_image_thumbnail,
-                    file_metadata_snapshot,
-                    search_init,
-                    search_get_status,
-                    search_start_scan,
-                    search_cancel_scan,
-                    search_query,
-                    explorer_open_path,
-                    explorer_open_with,
-                    explorer_open_association,
-                    explorer_path_is_directory,
-                    explorer_path_exists,
-                    explorer_library_snapshot,
-                    explorer_library_record_recent,
-                    explorer_library_record_last_opened,
-                    smart_library_snapshot,
-                    smart_library_scan,
-                    smart_library_import_files,
-                    smart_library_preflight_import,
-                    smart_library_prepare_previews,
-                    smart_library_apply_results,
-                    smart_library_set_server_folder_id,
-                    smart_library_resolve_assets,
-                    smart_library_assets_page,
-                    smart_library_delete,
                     #[cfg(desktop)]
-                    media_search_scan_movies,
                     #[cfg(desktop)]
-                    media_search_snapshot,
                     #[cfg(desktop)]
-                    media_search_prepare_chunk,
                     #[cfg(desktop)]
-                    media_search_complete,
                     #[cfg(desktop)]
-                    media_search_approve_assets,
                     #[cfg(desktop)]
-                    media_search_acknowledge_removed_assets,
                     #[cfg(desktop)]
-                    media_search_record_chunk,
                     #[cfg(desktop)]
-                    media_search_set_asset_state,
                     #[cfg(desktop)]
-                    media_search_reset_device_index,
                     #[cfg(desktop)]
-                    media_search_complete_legacy_adoption,
                     #[cfg(desktop)]
-                    media_search_resolve_assets,
-                    explorer_queue_create_item,
-                    explorer_queue_rename_item,
-                    explorer_queue_rename_items,
-                    explorer_queue_delete_items,
-                    explorer_queue_paste_items,
-                    explorer_queue_paste_text,
-                    explorer_queue_paste_blob,
-                    file_sync_pairs_snapshot,
-                    file_sync_pair_save,
-                    file_sync_pair_remove,
-                    file_sync_compare,
-                    file_sync_apply,
                     navigation_names_snapshot,
                     navigation_names_update,
                     settings_snapshot,
@@ -680,35 +647,15 @@ pub fn run() {
                     settings_save,
                     settings_launch_on_login_snapshot,
                     settings_apply_launch_on_login,
-                    settings_open_with_associations,
+                    settings_default_browser_snapshot,
+                    settings_request_default_browser,
                     shortcuts_snapshot,
+                    crate::infra::kura::kura_installed,
+                    crate::app::clipboard_commands::clipboard_cloud_view,
+                    crate::app::clipboard_commands::clipboard_cloud_copy,
+                    crate::app::clipboard_commands::clipboard_cloud_save,
+                    crate::infra::kura::kura_open,
                     shortcuts_replace,
-                    transfers_snapshot,
-                    open_terminal_at_path,
-                    operation_queue_snapshot,
-                    operation_queue_cancel,
-                    operation_queue_retry_transfer,
-                    operation_queue_pause,
-                    operation_queue_resume,
-                    operation_queue_pause_all,
-                    operation_queue_resume_all,
-                    operation_queue_undo,
-                    operation_queue_redo,
-                    operation_queue_resolve_conflict,
-                    archive_list,
-                    archive_create,
-                    archive_extract,
-                    duplicates_scan,
-                    duplicates_cancel,
-                    saved_searches_snapshot,
-                    saved_searches_save,
-                    saved_searches_delete,
-                    compare_files,
-                    compare_folders,
-                    compare_apply_text_merge,
-                    file_tools_checksum,
-                    file_tools_create_symlink,
-                    file_tools_read_symlink,
                     telemetry::telemetry_set_error_reporting_enabled,
                 ]);
             move |invoke: tauri::ipc::Invoke<tauri::Wry>| {

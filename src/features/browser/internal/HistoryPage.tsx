@@ -15,6 +15,7 @@ import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 import { historySectionRange, historySections, type HistorySection } from "./historySections";
+import { ArchivedTabsList } from "./ArchivedTabsList";
 
 const pageSize = 150;
 
@@ -86,18 +87,21 @@ export function HistoryPage(props: BrowserInternalPageProps) {
     [props.profileId, text, section],
   );
 
+  const archived = section === "archived";
   useEffect(() => {
     setVisits([]);
     setSelected(new Set());
     setMore(false);
     setError(null);
-    setLoading(true);
+    // Archived tabs are listed from this device, not loaded from history.
+    setLoading(!archived);
+    if (archived) return;
     const timer = window.setTimeout(() => void load(), text ? 150 : 0);
     return () => {
       window.clearTimeout(timer);
       invalidateRequests();
     };
-  }, [invalidateRequests, load, text]);
+  }, [archived, invalidateRequests, load, text]);
 
   const groups = useMemo(() => {
     const byDay = new Map<string, BrowserHistoryVisit[]>();
@@ -155,10 +159,17 @@ export function HistoryPage(props: BrowserInternalPageProps) {
           {error}
         </p>
       ) : null}
+      {archived ? (
+        <ArchivedTabsList
+          text={text}
+          navigate={props.navigate}
+          openInNewView={props.openInNewView}
+        />
+      ) : null}
       {loading && !visits.length ? (
         <CollectionSkeleton label="Loading history" view="rows" />
       ) : null}
-      {!loading && !error && !visits.length ? (
+      {!archived && !loading && !error && !visits.length ? (
         <InternalPageEmpty
           title={
             text

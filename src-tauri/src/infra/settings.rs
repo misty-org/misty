@@ -6,10 +6,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use super::settings_migration::{
-    migrate_code_workspace_settings, migrate_external_link_default, prune_retired_settings,
-    SETTINGS_SCHEMA_VERSION,
-};
+use super::settings_migration::{prune_retired_settings, SETTINGS_SCHEMA_VERSION};
 
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
@@ -214,8 +211,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         .get("schema_version")
         .and_then(Value::as_i64)
         .unwrap_or(0);
-    changed |= migrate_code_workspace_settings(root, stored_version);
-    changed |= migrate_external_link_default(root, stored_version);
     if stored_version < SETTINGS_SCHEMA_VERSION {
         // Prune before backfilling, or the defaults pass would re-add keys this
         // pass is about to remove. The return value is ignored because bumping
@@ -235,12 +230,7 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         &[
             ("launch_on_login", json!(false)),
             ("auto_update_enabled", json!(true)),
-            ("confirm_destructive_actions", json!(true)),
-            ("default_file_action_index", json!(0)),
-            ("open_links_externally", json!(false)),
             ("preferred_workspace_root", json!("")),
-            ("preferred_terminal_app", json!("System Default")),
-            ("default_transfer_behavior_index", json!(0)),
             ("startup_view_index", json!(0)),
             ("reopen_last_session", json!(true)),
             ("browser_search_engine_index", json!(0)),
@@ -251,46 +241,10 @@ fn normalize_settings_document(document: &mut Value) -> bool {
         root,
         "appearance",
         &[
+            ("theme_mode", json!("dark")),
             ("compact_mode_enabled", json!(false)),
-            ("thumbnail_previews_enabled", json!(true)),
-            ("wallpaper_path", json!("")),
-            ("panel_opacity", json!(0.82)),
             ("app_zoom", json!(1.0)),
             ("navigator_auto_hide", json!(false)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "files",
-        &[
-            ("default_view_mode_index", json!(0)),
-            ("show_hidden_files", json!(false)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "terminal",
-        &[
-            ("font_family", json!("")),
-            ("font_size", json!(13)),
-            ("cursor_blink", json!(true)),
-            ("cursor_style_index", json!(0)),
-            ("scrollback", json!(50000)),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "editor",
-        &[
-            ("font_family", json!("")),
-            ("font_size", json!(14)),
-            ("interface_scale", json!(1.0)),
-            ("theme", json!("gruvbox-dark")),
-            ("tab_size", json!(2)),
-            ("word_wrap", json!(true)),
-            ("line_numbers", json!(true)),
-            ("autosave_delay_ms", json!(1000)),
-            ("format_on_save", json!(false)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -305,81 +259,6 @@ fn normalize_settings_document(document: &mut Value) -> bool {
                 "page_state_excluded_sites",
                 json!(DEFAULT_PAGE_STATE_EXCLUSIONS),
             ),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "search",
-        &[
-            ("automatic_file_discovery_enabled", json!(true)),
-            ("discovery_interval_minutes", json!(15)),
-            ("max_depth", json!(18)),
-            ("include_hidden", json!(false)),
-            ("ignored_paths", json!("")),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "transfer_profiles",
-        &[
-            ("default_profile_id", json!("balanced")),
-            (
-                "profiles",
-                json!([
-                    {
-                        "id": "balanced",
-                        "name": "Balanced",
-                        "transfers": 4,
-                        "checkers": 8,
-                        "bandwidth_limit": "",
-                        "retries": 3,
-                        "low_level_retries": 10,
-                        "checksum": false
-                    },
-                    {
-                        "id": "low-bandwidth",
-                        "name": "Low Bandwidth",
-                        "transfers": 2,
-                        "checkers": 4,
-                        "bandwidth_limit": "2Mi",
-                        "retries": 3,
-                        "low_level_retries": 10,
-                        "checksum": false
-                    },
-                    {
-                        "id": "many-small-files",
-                        "name": "Many Small Files",
-                        "transfers": 8,
-                        "checkers": 16,
-                        "bandwidth_limit": "",
-                        "retries": 3,
-                        "low_level_retries": 10,
-                        "checksum": false
-                    },
-                    {
-                        "id": "careful-verify",
-                        "name": "Careful Verify",
-                        "transfers": 2,
-                        "checkers": 4,
-                        "bandwidth_limit": "",
-                        "retries": 5,
-                        "low_level_retries": 10,
-                        "checksum": true
-                    }
-                ]),
-            ),
-        ],
-    );
-    changed |= ensure_section_defaults(
-        root,
-        "notifications",
-        &[
-            ("desktop_notifications_enabled", json!(true)),
-            ("in_app_notifications_enabled", json!(true)),
-            ("sound_notifications_enabled", json!(false)),
-            ("badge_count_enabled", json!(true)),
-            ("quiet_hours_enabled", json!(false)),
-            ("digest_notifications_enabled", json!(false)),
         ],
     );
     changed |= ensure_section_defaults(
@@ -439,10 +318,6 @@ fn ensure_object(root: &mut Map<String, Value>, key: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "settings/code_workspace_tests.rs"]
-mod code_workspace_tests;
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -483,6 +358,11 @@ mod tests {
                 },
                 "shortcuts": { "keymap_index": 1 },
                 "advanced": { "server_address": "localhost:50051" },
+                "editor": { "tab_size": 4 },
+                "terminal": { "scrollback": 1000 },
+                "files": { "show_hidden_files": true },
+                "search": { "automatic_file_discovery_enabled": false },
+                "transfer_profiles": { "default_profile_id": "balanced" },
                 "plugin_namespace": {
                     "enabled": true
                 }
@@ -496,14 +376,6 @@ mod tests {
             document.get("schema_version").and_then(Value::as_i64),
             Some(SETTINGS_SCHEMA_VERSION)
         );
-        assert_eq!(
-            document
-                .get("general")
-                .and_then(Value::as_object)
-                .and_then(|general| general.get("preferred_terminal_app"))
-                .and_then(Value::as_str),
-            Some("Ghostty"),
-        );
         // Unknown keys must survive the prune, or an extension's settings would
         // vanish on upgrade.
         assert_eq!(
@@ -513,14 +385,6 @@ mod tests {
                 .and_then(|general| general.get("custom_general_value"))
                 .and_then(Value::as_str),
             Some("kept"),
-        );
-        assert_eq!(
-            document
-                .get("general")
-                .and_then(Value::as_object)
-                .and_then(|general| general.get("open_links_externally"))
-                .and_then(Value::as_bool),
-            Some(false),
         );
         assert_eq!(
             document
@@ -540,24 +404,20 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(true),
         );
-        assert!(document
-            .get("notifications")
-            .and_then(Value::as_object)
-            .is_some_and(
-                |notifications| notifications.contains_key("desktop_notifications_enabled")
-            ));
-        assert_eq!(
-            document
-                .get("search")
-                .and_then(Value::as_object)
-                .and_then(|search| search.get("automatic_file_discovery_enabled"))
-                .and_then(Value::as_bool),
-            Some(true),
-        );
+        // Schema 6: the Code workspace, file manager and file indexing left Misty, so their
+        // sections are neither kept nor backfilled.
+        for section in ["search", "editor", "terminal", "files", "transfer_profiles"] {
+            assert!(
+                !document
+                    .as_object()
+                    .is_some_and(|root| root.contains_key(section)),
+                "{section} should have been pruned",
+            );
+        }
         assert!(!document
-            .get("search")
+            .get("general")
             .and_then(Value::as_object)
-            .is_some_and(|search| search.contains_key("automatic_image_discovery_enabled")));
+            .is_some_and(|general| general.contains_key("preferred_terminal_app")));
 
         // Schema 3 retirements: controls that persisted but had no reader.
         for (section, key) in [
@@ -579,8 +439,6 @@ mod tests {
 
         // Sections introduced alongside the redesign must be backfilled.
         for (section, key) in [
-            ("editor", "tab_size"),
-            ("files", "default_view_mode_index"),
             ("general", "reopen_last_session"),
             ("appearance", "app_zoom"),
         ] {

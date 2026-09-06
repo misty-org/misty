@@ -16,7 +16,7 @@ export function SettingsSyncSection({ showStatus = true }: { showStatus?: boolea
         Your settings are saved to your account on the server and apply across devices.
       </SettingsNote>
       {showStatus && (
-        <div className="px-5 pb-4">
+        <div className="pb-3">
           <SyncStatusView
             status={controller.status}
             busy={controller.busy}

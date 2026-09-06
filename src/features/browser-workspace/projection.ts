@@ -34,7 +34,6 @@ function panes(tree: SplitTree): string[] {
 /** Where a synced tool view opens when its record carries no route: records
  * from older clients may omit it, and the model allows null. */
 const surfaceRoutes = {
-  files: "/files",
   agents: "/agents",
   space: "/spaces",
   extensions: "/extensions",
@@ -42,8 +41,9 @@ const surfaceRoutes = {
 /** A synced view as the pane content the workspace UI renders. */
 function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {
   const fields = record.fields;
-  if (fields.surface === "home") {
-    // Older clients still sync the retired Home page; it opens as a new tab.
+  if (fields.surface === "home" || fields.surface === "files") {
+    // Older clients still sync the retired Home page and Files views (Files
+    // moved to Kura, a separate app); both open as a new tab.
     const state = createBrowserViewState();
     return {
       id: record.id,
@@ -152,10 +152,15 @@ export function projectWorkspace(
         title: tab.fields.title,
         root: build(tab.fields.tree),
         focusedPaneId: paneIds.includes(focused) ? focused : paneIds[0],
-        ...(groups ? { tabGroupId: groups.groupOfTab.get(tab.id) } : {}),
+        ...(tab.fields.pinned_url ? { pinnedUrl: tab.fields.pinned_url } : {}),
+        ...(groups && !tab.fields.pinned_url ? { tabGroupId: groups.groupOfTab.get(tab.id) } : {}),
       });
     }
-    byWindow.set(window.id, windowTabs);
+    // Concurrent reorders can interleave; pinned tabs always lead their window.
+    byWindow.set(window.id, [
+      ...windowTabs.filter((tab) => tab.pinnedUrl),
+      ...windowTabs.filter((tab) => !tab.pinnedUrl),
+    ]);
   }
 
   // Preserve every live view even if a concurrently replaced split/container

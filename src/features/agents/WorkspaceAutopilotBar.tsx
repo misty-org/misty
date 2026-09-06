@@ -1,4 +1,4 @@
-import { MessageSquare, Pause, Play, Square, Check } from "lucide-react";
+import { Pause, Play, Square, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn, IconButton } from "@/shared/ui";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -9,6 +9,7 @@ import {
   type Execution,
 } from "./localExecution";
 import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
+import { releasePendingWait } from "@/features/agent-interventions/WaitingForYouCard";
 
 export const agentOverlayBarClass = cn(
   "pointer-events-auto fixed inset-x-0 bottom-4 layer-workspace-overlay mx-auto flex",
@@ -83,9 +84,11 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
           ? execution.desktopControl
             ? `${name} is working`
             : `${name} is controlling Misty`
-          : execution.state === "paused"
-            ? "Paused"
-            : "Task finished")
+          : execution.state === "waiting"
+            ? `${name} is waiting for you`
+            : execution.state === "paused"
+              ? "Paused"
+              : "Task finished")
       }
     >
       {error && (
@@ -103,28 +106,32 @@ export function WorkspaceAutopilotBar({ execution, name }: { execution: Executio
               : "Preparing the task…"
             : execution.state === "finished"
               ? "Task finished — you have control."
-              : "Paused — you have control.")}
+              : execution.state === "waiting"
+                ? `${name} is waiting for you — you have control. Resume when you're done.`
+                : "Paused — you have control.")}
       </p>
       <div className="flex items-center gap-1" role="group" aria-label="Playback controls">
         <IconButton
           size="md"
-          label="Show chat"
-          onClick={() => useMistyStore.getState().openPanel()}
-        >
-          <MessageSquare className="size-4" />
-        </IconButton>
-        <IconButton
-          size="md"
           label="Resume"
-          disabled={pending || execution.state !== "paused"}
+          disabled={pending || (execution.state !== "paused" && execution.state !== "waiting")}
           onClick={() =>
-            act(() =>
-              steerLocalExecution(
+            act(async () => {
+              // A run waiting for the person continues itself once released.
+              if (
+                execution.state === "waiting" &&
+                (await releasePendingWait(
+                  execution.accountId,
+                  useMistyStore.getState().invocationId,
+                ))
+              )
+                return;
+              await steerLocalExecution(
                 execution.desktopControl
                   ? "Continue the task. Inspect the current desktop and verify prior actions before continuing."
                   : "Continue the task. Capture the whole Misty window first and verify prior actions before continuing.",
-              ),
-            )
+              );
+            })
           }
         >
           <Play className="size-4" />

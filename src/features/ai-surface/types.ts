@@ -11,7 +11,8 @@ export interface ScreenRequest {
   kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
-  location: "separate" | "window" | "ask";
+  /** current: the user's tab; window: a new tab in their window; separate: an agent window. */
+  location: "current" | "separate" | "window" | "ask";
   /** Client progress: waiting for a choice, opening, or done. */
   state?: "pending" | "opening" | "opened" | "declined" | "failed";
   error?: string;
@@ -191,6 +192,8 @@ export interface AiInvocationRequest {
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
+  /** "teach" explains and points at the attached displays, with no tools. */
+  companionIntent?: "teach";
   /** Pins a new conversation's Thinking model with its first message. */
   modelOverride?: string;
   displayCaptures?: DisplayCapture[];
@@ -198,6 +201,8 @@ export interface AiInvocationRequest {
   taskId?: string;
   executionMode?: "user" | "agent" | "team";
   windowLabel?: string;
+  /** The Misty browser tab in front of the user, so "this page" has a referent. */
+  currentTab?: { title: string; url: string };
   mode: AiInvocationMode;
   surfaceId: AiSurfaceId;
   trigger: AiTrigger;

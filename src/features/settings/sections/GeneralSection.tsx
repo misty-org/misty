@@ -4,7 +4,11 @@ import {
   workspaceDefaultViewOptions,
   workspaceDefaultViewStoredIndex,
 } from "@/features/workspace/workspaceDefaultView";
-import { startupViewOptions } from "@/features/app-shell";
+import {
+  startupViewOption,
+  startupViewOptions,
+  startupViewStoredIndex,
+} from "@/features/app-shell";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -52,10 +56,14 @@ export function GeneralSection(props: SettingsContentProps) {
           indent
         >
           <SelectControl
-            value={numberSetting(props.document, "general", "startup_view_index", 0)}
+            value={startupViewOption(
+              numberSetting(props.document, "general", "startup_view_index", 0),
+            )}
             options={startupViewOptions}
             disabled={props.working || reopenLastSession}
-            onChange={(value) => props.onSettingChange("general", "startup_view_index", value)}
+            onChange={(value) =>
+              props.onSettingChange("general", "startup_view_index", startupViewStoredIndex(value))
+            }
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -82,19 +90,6 @@ export function GeneralSection(props: SettingsContentProps) {
                 "workspace_default_tab_index",
                 workspaceDefaultViewStoredIndex(value),
               )
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Confirm destructive actions"
-          description="Ask before delete, empty trash, and other irreversible actions."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "general", "confirm_destructive_actions", true)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("general", "confirm_destructive_actions", value)
             }
           />
         </SettingsRow>

@@ -1,5 +1,4 @@
 import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
-import type { NavigatorAppId } from "@/features/workspace";
 import {
   parseBrowserViewState,
   spaceWorkspaceToolFromRoute,
@@ -94,7 +93,7 @@ export function ViewIcon({
     : null;
   if (
     website &&
-    ["planner", "journal", "library", "files"].includes(appId) &&
+    ["planner", "journal", "library"].includes(appId) &&
     Object.prototype.hasOwnProperty.call(websiteIntegrations, website)
   )
     return (
@@ -124,7 +123,7 @@ export function ViewIcon({
     return (
       <span className="inline-flex shrink-0 [&_svg]:!size-4">
         <DestinationIcon
-          appId={appId as NavigatorAppId}
+          appId={appId}
           item={{
             id: section,
             label: section,

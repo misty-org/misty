@@ -1,4 +1,3 @@
-import { ActivityPage } from "@/features/activity";
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
 import { SpaceInvitationRedemption } from "@/features/spaces";
@@ -50,10 +49,6 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
-                path: "activity",
-                element: <ActivityPage />,
-              },
-              {
                 path: "scheduled",
                 element: null,
               },
@@ -63,10 +58,6 @@ export const router = createBrowserRouter([
               },
               {
                 path: "agents",
-                element: null,
-              },
-              {
-                path: "files",
                 element: null,
               },
               {

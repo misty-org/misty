@@ -55,31 +55,7 @@ export const mistyCodeCommands = [
   "code.undo_selection",
 ] as const;
 
-export const mistyFilesCommands = [
-  "explorer.new_folder",
-  "explorer.search",
-  "explorer.rename",
-  "explorer.batch_rename",
-  "explorer.delete",
-  "explorer.download",
-  "explorer.open_with",
-  "explorer.copy",
-  "explorer.cut",
-  "explorer.paste",
-  "explorer.copy_path",
-  "explorer.undo",
-  "explorer.redo",
-  "explorer.refresh",
-  "explorer.duplicate_finder",
-  "explorer.compare_with",
-  "explorer.toggle_hidden",
-  "explorer.preview.toggle",
-  "explorer.preview_save",
-  "explorer.sidebar.toggle",
-] as const;
-
 export const MistyAppCommandSchema = z.enum([
-  ...mistyFilesCommands,
   ...mistyTerminalCommands,
   ...mistyPlannerCommands,
   ...mistyBrowserCommands,
@@ -88,8 +64,6 @@ export const MistyAppCommandSchema = z.enum([
 
 export function commandsForApp(appId: string): readonly MistyAppCommand[] {
   switch (appId) {
-    case "files":
-      return mistyFilesCommands;
     case "code":
       return mistyCodeCommands;
     case "terminal":
@@ -104,17 +78,5 @@ export function commandsForApp(appId: string): readonly MistyAppCommand[] {
       return [];
   }
 }
-
-/** One ID per requested background job; increment revision only on a state transition. */
-export const MistyActivityOperationSchema = z.strictObject({
-  operationId: z.string().min(1).max(160),
-  revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
-  status: z.enum(["running", "blocked", "completed", "resolved"]),
-  title: z.string().trim().min(1).max(160),
-  body: z.string().max(1000).optional(),
-  route: z.string().max(2048).optional(),
-});
-
-export type MistyActivityOperation = z.input<typeof MistyActivityOperationSchema>;
 
 export type MistyAppCommand = z.infer<typeof MistyAppCommandSchema>;

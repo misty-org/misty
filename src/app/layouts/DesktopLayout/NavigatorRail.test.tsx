@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dockingMetrics } from "./dockingGeometry";
 import { NavigatorRail } from "./NavigatorRail";
 
 const native = vi.hoisted(() => ({ tracking: vi.fn(), suspend: vi.fn() }));
@@ -35,7 +36,7 @@ describe("fixed-width navigation rail", () => {
         {content}
       </NavigatorRail>,
     );
-    expect(rail().style.width).toBe("54px");
+    expect(rail().style.width).toBe(`${dockingMetrics.rail}px`);
     expect(rail().hasAttribute("inert")).toBe(false);
     expect(screen.queryByRole("button", { name: "Show navigation" })).toBeNull();
     fireEvent.pointerLeave(rail());
@@ -63,7 +64,9 @@ describe("fixed-width navigation rail", () => {
       expect(element.hasAttribute("inert")).toBe(true);
       expect(
         ["left", "right"].includes(position) ? element.style.width : element.style.height,
-      ).toBe(["left", "right"].includes(position) ? "54px" : "38px");
+      ).toBe(
+        `${["left", "right"].includes(position) ? dockingMetrics.rail : dockingMetrics.horizontalRail}px`,
+      );
       expect(native.suspend).toHaveBeenLastCalledWith(false, "navigator-reveal");
     },
   );

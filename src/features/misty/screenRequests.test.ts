@@ -87,7 +87,18 @@ it("continues in a separate window by default, without a new user turn", async (
   expect(submitAnswer.mock.calls[0][0]).toContain("Start at https://example.com.");
 });
 
-it("opens a tab in this window at the requested page", async () => {
+it("acts in the user's current tab when they named it", async () => {
+  withRequest({ kind: "open", reason: "Play this game", location: "current", state: "pending" });
+  continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
+  expect(submitAnswer.mock.calls[0][0]).toContain("current Misty tab");
+  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
+    executionMode: "agent",
+    openScreen: { place: "current" },
+  });
+});
+
+it("opens a new tab in this window at the requested page", async () => {
   withRequest({
     kind: "open",
     reason: "Read the site",
@@ -99,7 +110,7 @@ it("opens a tab in this window at the requested page", async () => {
   await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
   expect(submitAnswer.mock.calls[0][6]).toMatchObject({
     executionMode: "agent",
-    openScreen: { url: "https://example.com" },
+    openScreen: { url: "https://example.com", place: "new" },
   });
 });
 

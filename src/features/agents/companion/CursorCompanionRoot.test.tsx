@@ -114,3 +114,76 @@ it("reports snapshot failures instead of silently leaving the overlay hidden", a
     error: expect.stringContaining("could not restore its display state"),
   });
 });
+
+it("marks the exact spot, says the step, and holds a walkthrough step until it is clicked", async () => {
+  let now = 0;
+  let frame: FrameRequestCallback = () => {};
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    frame = cb;
+    return 1;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+  mocks.invoke.mockResolvedValue({
+    generation: 1,
+    visible: true,
+    phase: "idle",
+    mode: "auto",
+    model: "",
+  });
+  const { container } = render(<CursorCompanionRoot />);
+  await act(async () => {});
+  const tick = (time: number) => {
+    now = time;
+    act(() => {
+      mocks.listeners.get(cursorEvent)!({
+        payload: {
+          x: 100,
+          y: 100,
+          displays: [{ id: 1, x: 0, y: 0, width: 1000, height: 800, scale: 1 }],
+        },
+      });
+      frame(now);
+    });
+  };
+  tick(0);
+  act(() =>
+    mocks.listeners.get(presentationEvent)!({
+      payload: {
+        generation: 1,
+        visible: true,
+        phase: "idle",
+        mode: "auto",
+        model: "",
+        point: {
+          x: 400,
+          y: 300,
+          displayId: 1,
+          label: "click Commit",
+          guide: { step: 1, total: 2 },
+          awaitingClick: true,
+        },
+      } satisfies Presentation,
+    }),
+  );
+  for (let time = 16; time <= 4_000; time += 16) tick(time);
+  const marker = container.querySelector<HTMLElement>(".cursor-point-marker")!;
+  expect(marker.dataset.shape).toBe("ring");
+  expect(marker.style.transform).toBe("translate(389px, 289px)");
+  expect(marker.style.opacity).toBe("1");
+  expect(container.querySelector(".cursor-point-bubble")?.textContent).toBe(
+    "1 of 2 · click Commit",
+  );
+  // The character parks beside the ring instead of covering it.
+  const group = container.querySelector<HTMLElement>(".cursor-group")!;
+  const [x] = /translate\(([\d.]+)px/.exec(group.style.transform)!.slice(1).map(Number);
+  expect(x - 16).toBeGreaterThan(411);
+  for (let time = 4_000; time <= 20_000; time += 500) tick(time);
+  expect(marker.style.opacity).toBe("1");
+  expect(mocks.emitTo).not.toHaveBeenCalledWith(
+    "main",
+    "misty://cursor-point-finished",
+    expect.anything(),
+  );
+});

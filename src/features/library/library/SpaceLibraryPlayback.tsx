@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, File, Pause, Play, SkipBack, SkipForward } f
 import { useEffect, useRef, useState } from "react";
 
 import { libraryApi as spacesApi } from "./LibraryRuntime";
-import { LibraryError as SystemErrorActivity } from "./LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "./LibraryRuntime";
 import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import {
   Dialog,
@@ -177,11 +177,10 @@ export function LibraryMemoryPlayback({
           ) : (
             <>
               {contentError ? (
-                <SystemErrorActivity
+                <SystemErrorNotice
                   error={contentError}
                   scope={`library:playback:${spaceId}:${item.id}`}
                   title="Library item could not be played"
-                  target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}/library` }}
                 />
               ) : null}
               {contentError ? (

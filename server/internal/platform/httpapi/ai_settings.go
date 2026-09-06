@@ -92,8 +92,8 @@ func (s *AIService) AppActionsSetting() http.HandlerFunc {
 	}
 }
 
-// ScreenLocationSetting changes only where agents open a screen when a task
-// needs one: a separate window, the user's Misty window, or ask each time.
+// ScreenLocationSetting changes only where agents open a new screen when a task
+// needs one: a new tab in the user's Misty window, a separate window, or ask.
 func (s *AIService) ScreenLocationSetting() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)

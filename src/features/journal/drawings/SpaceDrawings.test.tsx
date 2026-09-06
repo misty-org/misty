@@ -36,9 +36,9 @@ vi.mock("@/features/auth", () => ({
   accountScopeResetEvent: "misty:account-scope-reset",
   useAuth: () => ({ user: { id: "user-1", name: "Matthew Chen", email: "matt@example.com" } }),
 }));
-vi.mock("@/features/activity", () => ({
+vi.mock("@/features/support/systemErrors", () => ({
   reportSystemError: vi.fn(),
-  SystemErrorActivity: () => null,
+  SystemErrorNotice: () => null,
 }));
 vi.mock("@/features/ai-surface/AiPaneHost", () => ({ useAiSurfaceAdapter: vi.fn() }));
 vi.mock("@/features/journal", () => ({

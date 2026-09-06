@@ -1,7 +1,19 @@
 import type { DisplayCapture } from "./protocol";
+/** A walkthrough step: this answer shows `step` of about `total`. */
+export interface CompanionGuide {
+  step: number;
+  total: number;
+}
+const guideTags = /\[GUIDE:(\d{1,2})\/(\d{1,2})\]/g;
 export function companionReply(content: string) {
   const tags = /\[POINT:([^\]\r\n]*)\]/g;
   let point: { x: number; y: number; label: string; screen?: string } | undefined;
+  let guide: CompanionGuide | undefined;
+  for (const match of content.matchAll(guideTags)) {
+    const step = Number(match[1]),
+      total = Number(match[2]);
+    guide = step >= 1 && total >= step ? { step, total } : undefined;
+  }
   for (const match of content.matchAll(tags)) {
     if (match[1].trim().toLowerCase() === "none") {
       point = undefined;
@@ -13,7 +25,11 @@ export function companionReply(content: string) {
     if (parsed)
       point = { x: Number(parsed[1]), y: Number(parsed[2]), label: parsed[3], screen: parsed[4] };
   }
-  return { text: content.replace(tags, "").trim(), point };
+  return {
+    text: content.replace(tags, "").replace(guideTags, "").trim(),
+    point,
+    guide,
+  };
 }
 export function resolvePoint(
   point: ReturnType<typeof companionReply>["point"],

@@ -53,6 +53,7 @@ function rendered(tracking) {
     .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
     .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
     .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
+    .replace('__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__', '[]')
     .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', String(tracking));
 }
 

@@ -5,7 +5,6 @@ import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Spinner } from "@/shared/ui";
 import { Mic, Reply, Square, X } from "lucide-react";
 import { useEffect, useRef, useImperativeHandle, useState, type Ref, type ReactNode } from "react";
@@ -20,6 +19,11 @@ import { ConversationModelPicker } from "../models/ConversationModelPicker";
 import { AgentModeToggle } from "../collaboration/AgentModeToggle";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
+import {
+  releasePendingWait,
+  WaitingForYouCard,
+} from "@/features/agent-interventions/WaitingForYouCard";
+import { continuationScreen } from "../executionHandoff";
 import { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
 export type AgentVoiceControl = { toggle(): void };
 export function AgentWorkspaceConversation({
@@ -62,6 +66,7 @@ export function AgentWorkspaceConversation({
       conversationsLoading: s.conversationsLoading,
       error: s.error,
       invocationId: s.invocationId,
+      invocationConversationId: s.invocationConversationId,
     })),
   );
   const draft = state.query;
@@ -86,7 +91,6 @@ export function AgentWorkspaceConversation({
       error: error || null,
     });
   const companion = useCompanionState((s) => s.presentation);
-  const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
   const voice = useAiVoiceRecorder({
     contextKey: `${accountId}:${agent?.id}:${conversation?.id ?? ""}`,
     onTranscript: (text) => {
@@ -130,7 +134,9 @@ export function AgentWorkspaceConversation({
       selectedAgentId: agent?.id,
       selectedSpaceId: spaceId,
       activeConversationId: conversation?.id ?? "",
-      ...(useMistyStore.getState().handoff?.surfaceId === "files"
+      // A pending handoff (a page, selection or folder sent to Misty) belongs
+      // to the next message here.
+      ...(useMistyStore.getState().handoff
         ? {}
         : { handoff: undefined, browserRequest: undefined, context: [] }),
     });
@@ -175,7 +181,13 @@ export function AgentWorkspaceConversation({
     reportError,
   });
   const { planning, questions, proposedPlan } = collaboration;
-  const send = async (typed = draft, quote = reply, targetConversationId?: string) => {
+  /** `resume`: an answer to a run that handed off, continued on that run's screen. */
+  const send = async (
+    typed = draft,
+    quote = reply,
+    targetConversationId?: string,
+    resume = false,
+  ) => {
     // /plan and /goal run as commands rather than messages.
     if (!quote && !state.working && typed.trim().startsWith("/")) {
       const rewritten = await collaboration.command(typed);
@@ -192,6 +204,9 @@ export function AgentWorkspaceConversation({
       return;
     if (state.working) {
       try {
+        // Writing to a run that waits for you means you are back: release the
+        // wait so the run continues and reads this message.
+        await releasePendingWait(accountId, state.invocationId);
         await useMistyStore.getState().steerResponse?.(prompt, conversation?.id);
       } catch (error) {
         reportError(error instanceof Error ? error.message : String(error));
@@ -199,28 +214,26 @@ export function AgentWorkspaceConversation({
       return;
     }
     prepare();
+    const handoff = useMistyStore.getState().handoff;
     try {
-      if (isDesktop && useMistyStore.getState().handoff?.surfaceId !== "files") {
-        const submit = useCompanionState.getState().submit;
-        if (!submit) throw new Error("The companion is starting. Try again in a moment.");
-        await submit({
-          prompt,
-          attachments: attachments.attachments,
-          conversationId: targetId,
-        });
-      } else {
-        await useMistyStore
-          .getState()
-          .submitAnswer(
-            prompt,
-            attachments.attachments,
-            undefined,
-            "workspace",
-            [],
-            { conversationId: targetId, context: [] },
-            { executionMode: "user", interactionMode: companion.mode, model: companion.model },
-          );
-      }
+      // The cursor companion is a separate surface; typing here never goes through it.
+      await useMistyStore.getState().submitAnswer(
+        prompt,
+        attachments.attachments,
+        undefined,
+        "workspace",
+        [],
+        { conversationId: targetId, context: handoff?.context ?? [] },
+        {
+          executionMode: "user",
+          interactionMode: companion.mode,
+          model: companion.model,
+          ...(resume ? { ...continuationScreen(targetId), continuation: true } : {}),
+        },
+      );
+      // Folder work keeps its handoff for follow-ups; other context is sent once.
+      if (handoff && handoff.surfaceId !== "files" && useMistyStore.getState().handoff === handoff)
+        useMistyStore.setState({ handoff: undefined, browserRequest: undefined, context: [] });
     } catch (error) {
       reportError(error instanceof Error ? error.message : String(error));
       return;
@@ -310,11 +323,24 @@ export function AgentWorkspaceConversation({
         ) : (
           <MistyFolderWork accountId={accountId} disabled={state.working} />
         )}
+        <WaitingForYouCard
+          accountId={accountId}
+          agentName={agent?.name || "Misty"}
+          invocationIds={[
+            ...(conversation?.messages.flatMap((message) =>
+              message.invocationId ? [message.invocationId] : [],
+            ) ?? []),
+            ...(state.invocationId && state.invocationConversationId === conversation?.id
+              ? [state.invocationId]
+              : []),
+          ]}
+          revision={`${state.working}:${state.invocationId ?? ""}`}
+        />
         {questions && (
           <AgentQuestionCard
             questionSet={questions}
             agentName={agent?.name || "Misty"}
-            onContinue={(prompt) => void send(prompt, "")}
+            onContinue={(prompt) => void send(prompt, "", undefined, true)}
           />
         )}
         {reply && (
@@ -415,16 +441,10 @@ export function AgentWorkspaceConversation({
             ) : undefined
           }
         />
-        {/* The transcript shows its own working status once it has messages. */}
-        {((state.working && !conversation?.messages.length) ||
-          voice.recording ||
-          voice.transcribing) && (
+        {/* Working status belongs to the transcript, under the message that started it. */}
+        {(voice.recording || voice.transcribing) && (
           <p className="agent-compose-status" role="status">
-            {voice.recording
-              ? "Listening…"
-              : voice.transcribing
-                ? "Transcribing…"
-                : `${agent?.name || "Misty"} is working…`}
+            {voice.recording ? "Listening…" : "Transcribing…"}
           </p>
         )}
         {!conversation?.messages.length && belowComposer}

@@ -1,6 +1,5 @@
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import type * as AppShell from "@/features/app-shell";
-import type * as FileSearch from "@/features/files/workspace/search";
 import type { SettingsSection } from "@/features/settings";
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
@@ -83,16 +82,6 @@ vi.mock("./store/useSettingsStore", async (importOriginal) => {
   return {
     ...actual,
     useSettingsStore,
-  };
-});
-vi.mock("@/features/files/workspace/search", async (importOriginal) => {
-  const actual = await importOriginal<typeof FileSearch>();
-  const useSearchStore = (selector?: (state: unknown) => unknown) =>
-    selector ? selector(mocks.searchState) : mocks.searchState;
-  useSearchStore.getState = () => mocks.searchState;
-  return {
-    ...actual,
-    useSearchStore,
   };
 });
 vi.mock("@/features/native-session", () => ({
@@ -187,7 +176,8 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector('[data-settings-page="browser-downloads"]')).not.toBeNull();
     expect(container.querySelector('[data-settings-page="browser-privacy"]')).not.toBeNull();
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
-    expect(container.querySelector("[aria-expanded]")).toBeNull();
+    // Dropdown controls report aria-expanded; navigation never discloses entries.
+    expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
   it("shows a model choice per sense", async () => {
     await render("models");

@@ -1,26 +1,8 @@
 {
-  "src/features/files/workspace/explorer/workspace/ExplorerDesktopDialogStyles.ts": [
-    {
-      "length": 177,
-      "hash": "0c987fdfe42144b1"
-    }
-  ],
-  "src/features/files/workspace/explorer/workspace/ExplorerDesktopStatus.tsx": [
-    {
-      "length": 249,
-      "hash": "ce8b49a0e0b4191d"
-    }
-  ],
   "src/features/journal/components/JournalAttribution.tsx": [
     {
       "length": 307,
       "hash": "b696271c03ef9587"
-    }
-  ],
-  "src/features/settings/SettingsControls.tsx": [
-    {
-      "length": 184,
-      "hash": "de5f715a25619ef0"
     }
   ],
   "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
@@ -59,12 +41,6 @@
     {
       "length": 165,
       "hash": "80b68ed6b80d10b1"
-    }
-  ],
-  "src/features/workspace/ChromeTabStrip.tsx": [
-    {
-      "length": 161,
-      "hash": "667b2934839f0389"
     }
   ],
   "src/shared/ui/overlays/AlertDialog.tsx": [

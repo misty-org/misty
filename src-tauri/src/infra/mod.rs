@@ -7,15 +7,16 @@ pub mod autostart;
 pub mod browser;
 #[cfg(desktop)]
 pub mod browser_agent_control;
+pub mod default_browser;
 
 #[cfg(desktop)]
 pub mod browser_history;
 #[cfg(desktop)]
 pub mod browser_import;
 #[cfg(desktop)]
-pub mod browser_library;
-#[cfg(desktop)]
 pub(crate) mod browser_kiri;
+#[cfg(desktop)]
+pub mod browser_library;
 #[cfg(desktop)]
 pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
@@ -23,10 +24,11 @@ mod browser_pointer_guard_macos;
 #[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_search_suggest;
-pub mod extensions;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
+pub mod clipboard_bridge;
+pub mod cloud_clipboard;
 pub mod command_defaults;
 pub mod commands;
 #[cfg(desktop)]
@@ -56,36 +58,27 @@ mod device_server_e2e_tests;
 #[cfg(desktop)]
 pub mod device_trust;
 pub mod devices;
-pub mod directory_size;
-mod directory_size_local;
 pub mod document_intelligence;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
-pub mod file_sync;
+pub mod extensions;
+pub mod kura;
 mod macos_privacy;
-#[cfg(desktop)]
-pub mod media_search;
-pub mod metadata;
 pub mod misty;
 pub mod misty_home;
 pub mod native_clipboard;
-pub mod operation_queue;
 pub mod paths;
 #[cfg(desktop)]
 pub mod peer_files;
 #[cfg(desktop)]
-pub mod peer_writes;
-#[cfg(desktop)]
 pub mod peer_identity;
 #[cfg(desktop)]
+pub mod peer_writes;
+#[cfg(desktop)]
 mod plugin_routes;
-pub mod power_pack;
-pub mod search;
 pub mod settings;
 mod settings_migration;
-pub mod smart_library;
-mod smart_library_ingestion;
 #[cfg(desktop)]
 pub mod system_dependencies;
 pub mod transfers;
@@ -154,6 +147,15 @@ pub mod cursor_companion;
 
 #[cfg(desktop)]
 pub mod browser_site_permissions;
+
+#[cfg(desktop)]
+pub mod browser_site_zoom;
+
+#[cfg(desktop)]
+pub mod browser_content_blocking;
+
+#[cfg(desktop)]
+pub mod browser_site_style;
 
 pub mod settings_profile_store;
 

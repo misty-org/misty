@@ -1,5 +1,5 @@
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
-import { SocialError as SystemErrorActivity } from "../SocialRuntime";
+import { SocialError as SystemErrorNotice } from "../SocialRuntime";
 import {
   Command,
   CommandEmpty,
@@ -92,7 +92,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
             />
           ) : null}
           {props.error ? (
-            <SystemErrorActivity
+            <SystemErrorNotice
               error={props.error}
               scope="social:composer:library"
               title="Library suggestions could not be loaded"
