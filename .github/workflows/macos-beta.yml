@@ -23,7 +23,7 @@ jobs:
       - id: pins
         working-directory: misty
         run: |
-          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("release/pins.json")); for(const k of ["sdk","apps","server"])fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${p[k]}\n`);fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("release/pins.json")); for(const k of ["sdk","apps"])fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${p[k]}\n`);fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
       - uses: actions/checkout@v4
         with:
           repository: misty-org/misty-sdk
@@ -34,11 +34,6 @@ jobs:
           repository: misty-org/misty-apps
           ref: ${{ steps.pins.outputs.apps }}
           path: misty-apps
-      - uses: actions/checkout@v4
-        with:
-          repository: misty-org/misty-server
-          ref: ${{ steps.pins.outputs.server }}
-          path: misty-server
       - uses: actions/setup-node@v4
         with:
           node-version: 22
