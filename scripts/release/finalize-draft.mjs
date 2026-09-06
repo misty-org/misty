@@ -4,6 +4,11 @@ import { root, readJSON, writeJSON, version, checksums, run, capture, files } fr
 const releaseVersion = version(readJSON(resolve(root,'package.json')).version);
 const output = resolve(root,'artifacts',`v${releaseVersion}`);
 const manifest = readJSON(resolve(output,'release-manifest.json'));
+if (manifest.source.host !== capture('git',['rev-parse','HEAD'])) throw new Error('Package artifacts came from a different host revision.');
+if (process.env.GITHUB_REF_NAME) {
+  const live = capture('git',['ls-remote','origin',`refs/heads/${process.env.GITHUB_REF_NAME}`]).split(/\s+/)[0];
+  if (live !== manifest.source.host) throw new Error('This preparation was superseded by a newer source revision.');
+}
 const platforms = {};
 manifest.targets = [];
 for (const arch of ['aarch64','x86_64']) {

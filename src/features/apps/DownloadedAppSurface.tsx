@@ -129,6 +129,12 @@ function ComponentInstance(props: Props) {
 
   useEffect(() => {
     const root = container.current!;
+    let releaseView: () => void;
+    try { releaseView = retainAppView(props.app.id, instanceId); }
+    catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Wait for the current update to finish.");
+      return;
+    }
     const scope = createAppRpcScope({
       identity: {
         appId: props.app.id,
@@ -234,7 +240,6 @@ function ComponentInstance(props: Props) {
         navigate: (route) => current.current.props.onNavigate(route),
       }),
     );
-    const releaseView = retainAppView(props.app.id, scope.identity.instanceId);
     const codeControls = createCodeControlsRpc(scope);
     const agents = createAgentsRpc(scope, {
       serverBase: props.serverBase,

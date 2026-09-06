@@ -1,4 +1,4 @@
-import { assertAppsClosedForUpdate } from "./appUpdateSafety";
+import { assertAppsClosedForUpdate, reserveAppUpdate } from "./appUpdateSafety";
 import { assertAppCompatible } from "./appCompatibility";
 import { appsApi, type OfficialApp, type UserAppInstallation } from "@/api/apps";
 import { errorText } from "@/shared/lib/format";
@@ -125,7 +125,9 @@ export const useAppsStore = create<AppsState>((set, get) => {
       let alreadyLocal = false;
       let packageOperationId: string | null = null;
       let installation: UserAppInstallation | null = null;
+      let releaseUpdate = () => {};
       try {
+        releaseUpdate = reserveAppUpdate(app.id);
         const needsDesktopPackage =
           !isNativeMobileBuild && !isWebBuild && app.desktop.runtime === "downloaded";
         alreadyLocal = needsDesktopPackage ? await officialDesktopPackageReady(app) : false;
@@ -183,6 +185,8 @@ export const useAppsStore = create<AppsState>((set, get) => {
               : {}),
           }));
         throw error;
+      } finally {
+        releaseUpdate();
       }
     },
     setPinned: async (appId, pinned) => {
@@ -202,7 +206,9 @@ export const useAppsStore = create<AppsState>((set, get) => {
     uninstall: async (appId) => {
       assertAppsClosedForUpdate(appId);
       const action = beginAction(appId);
+      let releaseUpdate = () => {};
       try {
+        releaseUpdate = reserveAppUpdate(appId);
         const installation = await appsApi.uninstall(appId);
         action.assert();
         set((state) => ({
@@ -215,6 +221,8 @@ export const useAppsStore = create<AppsState>((set, get) => {
       } catch (error) {
         if (action.current()) set({ actionAppId: "", error: errorText(error) });
         throw error;
+      } finally {
+        releaseUpdate();
       }
     },
     reset: () => {
