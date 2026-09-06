@@ -45,7 +45,7 @@ jobs:
       - name: Verify Code, app installation, and release scripts
         working-directory: misty
         run: |
-          npm test -- src/features/coding-workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts
+          npm test -- src/features/coding-workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts src/features/apps/runtimeInspection.test.ts
           node --test scripts/release/*.test.mjs
       - name: Package and verify ten signed downloadable apps
         working-directory: misty
@@ -89,6 +89,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
           key: beta-${{ matrix.target }}
       - run: npm ci
       - name: Load public release trust

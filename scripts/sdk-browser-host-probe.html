@@ -4,6 +4,6 @@
 </head><body><div id="root"></div><output id="result">Verifying downloaded Browser…</output>
 <script>
 const report = message => { document.getElementById('result').textContent=message; void window.__TAURI_INTERNALS__?.invoke('sdk_probe_complete',{nonce:new URLSearchParams(location.search).get('nonce'),success:false,message}); };
-window.addEventListener('error', event=>report(event.message || 'Browser probe failed to load'));
-window.addEventListener('unhandledrejection', event=>report(String(event.reason)));
+window.addEventListener('error', event=>report((event.error?.stack || event.message) || 'Browser probe failed to load'));
+window.addEventListener('unhandledrejection', event=>report(String(event.reason?.stack || event.reason)));
 </script><script type="module" src="./sdk-browser-host-probe.tsx"></script></body></html>
