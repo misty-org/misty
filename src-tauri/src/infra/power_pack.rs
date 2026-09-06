@@ -1306,7 +1306,10 @@ mod tests {
             .unwrap()
             .expect("remote path");
 
-        assert_eq!(path, "/Users/misty/.misty/mnt/drive-work/Reports");
+        assert_eq!(
+            Path::new(&path),
+            mount_root.join("drive-work").join("Reports")
+        );
     }
 
     #[test]

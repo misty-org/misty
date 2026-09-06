@@ -42,6 +42,7 @@ Commit the verification record, then run `npm run beta:promote -- feeds`. It req
 ## Recovery
 
 - Failed preparation leaves feeds and catalogs unchanged. Fix the failure on the preparation branch. If a draft already contains different assets, use a new beta version; never overwrite a published release.
+- An Apple `401: Invalid credentials` stops preparation before compilation. Replace `MACOS_NOTARY_APP_PASSWORD` with a fresh app-specific password for `MACOS_NOTARY_APPLE_ID`, confirm `MACOS_NOTARY_TEAM_ID`, and rerun the failed workflow jobs. Do not put credentials in source files or release notes.
 - Failed or interrupted app installation restores the previous installation before retrying. A successfully replaced package retains one previous package under the managed app root for recovery. Package bytes and extracted files are verified before execution.
 - Open app tabs block replacement; Code’s unsaved buffers block tab closure until saved. Host updates require saving work and closing app tabs before installation.
 - If a published beta is bad, stop offering it and ship a corrected higher beta version. Keep existing assets available; do not downgrade users by rewriting signatures or reusing an old version.

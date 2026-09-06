@@ -121,6 +121,8 @@ mod tests {
         fs::write(root.join("folder/a.txt"), b"12345").unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink("/", root.join("escape")).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(root.parent().unwrap(), root.join("escape")).unwrap();
         let value = scan_storage(&root, &AtomicBool::new(false)).unwrap();
         assert_eq!(value["bytes"], 5);
         assert_eq!(value["files"], 1);

@@ -39,6 +39,10 @@ jobs:
             build-essential curl file libappindicator3-dev librsvg2-dev \
             libssl-dev libwebkit2gtk-4.1-dev patchelf
 
+      - name: Install the macOS backup integration prerequisite
+        if: runner.os == 'macOS'
+        run: brew install restic
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -47,6 +51,12 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@1.91.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+          key: native-desktop
 
       - name: Install JavaScript dependencies
         run: npm ci
