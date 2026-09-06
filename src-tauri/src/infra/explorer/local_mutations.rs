@@ -80,8 +80,17 @@ pub(super) async fn rename_local_item_cancellable(
 }
 
 #[cfg(test)]
+tokio::task_local! {
+    pub(super) static MUTATION_COMPLETED: Arc<tokio::sync::Barrier>;
+}
+
+#[cfg(test)]
 pub(super) async fn observe_local_mutation_for_cancellation() {
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    if let Ok(barrier) = MUTATION_COMPLETED.try_with(Arc::clone) {
+        barrier.wait().await;
+    } else {
+        tokio::task::yield_now().await;
+    }
 }
 
 #[cfg(not(test))]

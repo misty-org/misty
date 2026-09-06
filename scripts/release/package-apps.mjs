@@ -9,7 +9,8 @@ const pins = readJSON(resolve(root,'release/pins.json'));
 const trust = readJSON(resolve(root,'release/trust.json'));
 const apps = resolve(process.env.MISTY_APPS_ROOT || resolve(root,'../misty-apps'));
 const sdk = resolve(process.env.MISTY_SDK_ROOT || resolve(root,'../misty-sdk'));
-for (const [name,path] of [['apps',apps],['sdk',sdk]]) {
+const server = resolve(process.env.MISTY_SERVER_ROOT || resolve(root,'../misty-server'));
+for (const [name,path] of [['apps',apps],['sdk',sdk],['server',server]]) {
   if (capture('git',['rev-parse','HEAD'],path) !== pins[name]) throw new Error(`${name} checkout does not match release/pins.json.`);
 }
 const output = resolve(root,'artifacts',`v${releaseVersion}`);
