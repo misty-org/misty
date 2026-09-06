@@ -5,12 +5,15 @@ const releaseVersion = version(readJSON(resolve(root,'package.json')).version);
 const output = resolve(root,'artifacts',`v${releaseVersion}`);
 const manifest = readJSON(resolve(output,'release-manifest.json'));
 const platforms = {};
+manifest.targets = [];
 for (const arch of ['aarch64','x86_64']) {
   const record = readJSON(resolve(output,`verification-${arch}.json`));
   if (record.version !== releaseVersion || !record.signatureVerified || !record.notarizationVerified || !record.gatekeeperAccepted) throw new Error(`macOS verification incomplete: ${arch}`);
+  manifest.targets.push(record);
   const name = `Misty-${releaseVersion}-${arch}.app.tar.gz`;
   platforms[`darwin-${arch}`] = {url:`https://github.com/misty-org/misty/releases/download/v${releaseVersion}/${name}`,signature:readFileSync(resolve(output,`${name}.sig`),'utf8').trim()};
 }
+writeJSON(resolve(output,'release-manifest.json'),manifest);
 writeJSON(resolve(output,'latest.json'),{version:releaseVersion,notes:`Misty ${releaseVersion} beta. Save work and close app tabs before installing.`,pub_date:new Date().toISOString(),platforms});
 writeFileSync(resolve(output,'RELEASE-NOTES.md'),`Misty ${releaseVersion}\n\nApple Silicon and Intel installers, ten downloadable apps, and SDK 0.1.0 archives.\n\nUses https://dev-api.mistysys.com/v1. That development server must remain online.\n\nAutomated signing, notarization, package integrity and build gates passed. Interactive installation and a real two-version update remain explicit promotion gates in release/validation.json.\n`);
 checksums(output);

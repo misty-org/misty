@@ -15,6 +15,9 @@ if (!binary.includes(arch === 'aarch64' ? 'arm64' : 'x86_64')) throw new Error('
 const output = resolve(root,'artifacts',`v${releaseVersion}`); mkdirSync(output,{recursive:true});
 const dmg = files(bundle).filter(p=>p.endsWith('.dmg'));
 if (dmg.length !== 1) throw new Error('Expected one signed installer.');
+run('codesign',['--verify','--strict','--verbose=2',dmg[0]]);
+run('xcrun',['stapler','validate',dmg[0]]);
+run('spctl',['--assess','--type','open','--context','context:primary-signature','--verbose=2',dmg[0]]);
 const names = [
   [dmg[0],`Misty-${releaseVersion}-${arch}.dmg`],
   [resolve(bundle,'macos/Misty.app.tar.gz'),`Misty-${releaseVersion}-${arch}.app.tar.gz`],

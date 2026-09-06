@@ -116,7 +116,9 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: npm run tauri build -- --target ${{ matrix.target }} --bundles app,dmg --ci
+        run: |
+          npm run tauri build -- --target ${{ matrix.target }} --bundles app,dmg --ci
+          node scripts/release/sign-dmg.mjs ${{ matrix.target }}
       - run: node scripts/release/collect-macos.mjs ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
