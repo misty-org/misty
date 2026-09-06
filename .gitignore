@@ -25,6 +25,8 @@
 node_modules/
 build/
 dist/
+.build/
+public/official-apps/
 
 *.d
 *.o
@@ -39,3 +41,5 @@ dist/
 *.app
 
 **/.cache
+
+artifacts/

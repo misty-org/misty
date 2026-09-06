@@ -1,39 +1,396 @@
-import { useEffect, useState } from "react";
-import { ArchiveRestore, Ban, CheckCircle2, DatabaseBackup, FolderPlus, HardDrive, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArchiveRestore,
+  Ban,
+  CheckCircle2,
+  DatabaseBackup,
+  FolderPlus,
+  HardDrive,
+  RefreshCw,
+  X,
+} from "lucide-react";
+import {
+  connectMistyApp,
+  type MistyAppSDK,
+  type MistyBackupJob,
+} from "@misty/sdk";
 import { ActionButton, Field, StatusLine } from "../../shared/pluginChrome";
-import { usePluginJob } from "../../shared/usePluginJob";
-import type { PluginPanelProps } from "../types";
 
-type Repository = { id: string; name: string; kind: "local" | "cloud"; location: string; available: boolean; initialized: boolean; lastBackup?: string };
-type Snapshot = { id: string; time: string; paths: string[]; hostname?: string; size?: number };
+type Folder = { handle: string; name: string };
+type Repository = {
+  handle: string;
+  folderName: string;
+  repository: string;
+  name: string;
+};
+type Snapshot = { id: string; time: string };
 
-export function BackupsPlugin({ context }: PluginPanelProps) {
-  const jobs = usePluginJob(context);
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [repositoryId, setRepositoryId] = useState("");
+export function BackupsPlugin() {
+  const sdk = useRef<MistyAppSDK | null>(null);
+  const alive = useRef(true);
+  const job = useRef("");
+  const repositoryRef = useRef<Repository | null>(null);
+  const sourcesRef = useRef<Folder[]>([]);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [repository, setRepository] = useState<Repository | null>(null);
+  const [sources, setSources] = useState<Folder[]>([]);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
-  const [view, setView] = useState<"overview" | "setup" | "snapshots">("overview");
-  const [message, setMessage] = useState("Loading backup repositories…");
-  const [error, setError] = useState(false);
-  const [location, setLocation] = useState("");
-  const [sources, setSources] = useState<string[]>(context.selectedPaths);
-  const [repositoryKind, setRepositoryKind] = useState<"local" | "cloud">("local");
-  const [cloudRemotes, setCloudRemotes] = useState<string[]>([]);
-  const loadRepositories = async () => { const result = await context.runHostCommand<{ ok?: boolean; repositories?: Repository[]; cloudRemotes?: string[]; message?: string }>("backups.repositories"); setRepositories(result.repositories ?? []); setCloudRemotes(result.cloudRemotes ?? []); setRepositoryId((id) => id || result.repositories?.[0]?.id || ""); setMessage(result.message ?? (result.repositories?.length ? "Choose a repository and source folders." : "Set up a repository to create your first backup.")); setError(result.ok === false); };
-  useEffect(() => { void loadRepositories(); }, [context]);
-  const repository = repositories.find((item) => item.id === repositoryId);
-  const loadSnapshots = async () => { if (!repositoryId) return; const result = await context.runHostCommand<{ ok?: boolean; snapshots?: Snapshot[]; message?: string }>("backups.snapshots", { repositoryId }); setSnapshots(result.snapshots ?? []); setMessage(result.message ?? `${result.snapshots?.length ?? 0} snapshots found.`); setError(result.ok === false); setView("snapshots"); };
-  const chooseFolders = async (multiple: boolean, title: string) => context.runHostCommand<{ paths?: string[] }>("host.pickFolders", { multiple, title });
-  const initialize = async () => { const name = (document.querySelector("#backup-name") as HTMLInputElement)?.value; if (!location) { setError(true); setMessage("Choose a local volume folder or enter a connected remote and subpath."); return; } if (!window.confirm(`Initialize an encrypted repository at ${location}?`)) return; const result = await context.runHostCommand<{ ok?: boolean; message?: string }>("backups.repository.init", { kind: repositoryKind, name, location }); setMessage(result.message ?? "Repository initialized."); setError(result.ok === false); if (result.ok !== false) { setView("overview"); await loadRepositories(); } };
-  const restore = async (snapshotId: string) => { const picked = await chooseFolders(false, "Choose restore destination"); if (!picked.paths?.[0]) return; if (!window.confirm("Restore this snapshot into a newly created folder? Existing files will not be overwritten.")) return; await jobs.start("backups.restore", { repositoryId, snapshotId, destination: picked.paths[0] }); };
-  return <div className="panel-stack backups-panel">
-    <header className="panel-title"><h2>Backups</h2><p>Encrypted snapshots to a local volume or a connected Misty cloud remote.</p></header>
-    <nav className="subnav" aria-label="Backup sections"><button className={view === "overview" ? "active" : ""} onClick={() => setView("overview")}>Overview</button><button className={view === "snapshots" ? "active" : ""} disabled={!repositoryId} onClick={() => void loadSnapshots()}>Snapshots</button><button className={view === "setup" ? "active" : ""} onClick={() => setView("setup")}>Add repository</button></nav>
-    {view === "setup" ? <section className="setup-form"><div className="callout"><HardDrive size={18} /><div><strong>Choose a safe destination</strong><span>Misty rejects the operating-system volume, network mounts, read-only locations, and paths outside the selected volume.</span></div></div><div className="control-grid"><Field label="Repository type"><select id="backup-kind" className="select-input" value={repositoryKind} onChange={(event) => { setRepositoryKind(event.target.value as "local" | "cloud"); setLocation(""); }}><option value="local">Local non-system volume</option><option value="cloud">Connected Misty cloud remote</option></select></Field><Field label="Repository name"><input id="backup-name" className="text-input" placeholder="Studio archive" maxLength={64} /></Field></div><Field label="Destination" hint={repositoryKind === "cloud" ? "Choose a configured remote identity and add a repository subpath." : "Only writable local non-system volumes are accepted."}><div className="input-action"><input className="text-input" list={repositoryKind === "cloud" ? "backup-cloud-remotes" : undefined} value={location} onChange={(event) => setLocation(event.target.value)} placeholder={repositoryKind === "cloud" ? "remote:Misty Backups/device" : "Choose a volume folder"} />{repositoryKind === "local" ? <ActionButton type="button" className="secondary-button" onClick={() => void chooseFolders(false, "Choose a non-system volume").then((result) => setLocation(result.paths?.[0] ?? ""))}>Browse…</ActionButton> : null}</div>{repositoryKind === "cloud" ? <datalist id="backup-cloud-remotes">{cloudRemotes.map((remote) => <option key={remote} value={`${remote}:Misty Backups`} />)}</datalist> : null}</Field><ActionButton type="button" onClick={() => void initialize()}><FolderPlus size={16} />Review and initialize</ActionButton></section> : null}
-    {view === "overview" ? <><div className="control-grid"><Field label="Repository"><select className="select-input" value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}><option value="">No repository configured</option>{repositories.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.available ? item.kind : "unavailable"}</option>)}</select></Field></div>{repository ? <div className="repository-summary"><DatabaseBackup size={20} /><div><strong>{repository.name}</strong><span>{repository.location}</span><small>{repository.available ? repository.lastBackup ? `Last backup ${new Date(Number(repository.lastBackup)).toLocaleString()}` : "Ready for first backup" : "Repository unavailable"}</small></div></div> : null}<div className="source-box"><strong>Source folders</strong><span>{sources.length ? sources.join(", ") : "Choose one or more local folders."}</span></div><div className="action-row"><ActionButton type="button" className="secondary-button" disabled={jobs.running} onClick={() => void chooseFolders(true, "Choose folders to back up").then((result) => result.paths?.length && setSources(result.paths))}><FolderPlus size={16} />Choose sources…</ActionButton><ActionButton type="button" disabled={!repository?.available || !sources.length || jobs.running} onClick={() => void jobs.start("backups.start", { repositoryId, sources })}><DatabaseBackup size={16} />Back up now</ActionButton><ActionButton type="button" className="secondary-button" disabled={!repository?.available || jobs.running} onClick={() => void jobs.start("backups.check", { repositoryId })}><CheckCircle2 size={16} />Verify repository</ActionButton><ActionButton type="button" className="secondary-button" onClick={() => void loadRepositories()}><RefreshCw size={16} />Refresh</ActionButton></div></> : null}
-    {view === "snapshots" ? <section className="snapshot-list">{snapshots.length ? snapshots.map((snapshot) => <article key={snapshot.id}><div><strong>{new Date(snapshot.time).toLocaleString()}</strong><span>{snapshot.paths.join(", ")}</span><small>{snapshot.id.slice(0, 12)}{snapshot.size ? ` · ${snapshot.size.toLocaleString()} bytes` : ""}</small></div><ActionButton type="button" className="secondary-button" disabled={jobs.running} onClick={() => void restore(snapshot.id)}><ArchiveRestore size={15} />Restore…</ActionButton></article>) : <div className="empty-state"><ArchiveRestore size={24} /><strong>No snapshots yet</strong><span>Create a backup to establish the first restore point.</span></div>}</section> : null}
-    {jobs.running && jobs.job?.progress != null ? <div className="progress-track"><span style={{ width: `${jobs.job.progress}%` }} /></div> : null}
-    <StatusLine tone={jobs.job?.status === "failed" || error ? "error" : jobs.job?.status === "completed" ? "success" : "neutral"}>{jobs.job?.error ?? jobs.job?.message ?? message}</StatusLine>
-    {jobs.running ? <ActionButton type="button" className="secondary-button cancel-button" onClick={() => void jobs.cancel()}><Ban size={16} />Cancel current operation</ActionButton> : null}
-  </div>;
+  const [view, setView] = useState<"overview" | "setup" | "snapshots">(
+    "overview",
+  );
+  const [name, setName] = useState("Misty Backups");
+  const [message, setMessage] = useState(
+    "Choose or create an encrypted repository.",
+  );
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  repositoryRef.current = repository;
+  sourcesRef.current = sources;
+
+  useEffect(() => {
+    alive.current = true;
+    try {
+      sdk.current = connectMistyApp();
+      void sdk.current.backups.status().then(
+        (status) => {
+          if (!alive.current) return;
+          setAvailable(status.available);
+          if (!status.available)
+            setError(
+              status.message ?? "Backups are unavailable on this device.",
+            );
+        },
+        (caught) => alive.current && setError(String(caught)),
+      );
+    } catch (caught) {
+      setError(String(caught));
+    }
+    return () => {
+      alive.current = false;
+      if (job.current)
+        void sdk.current?.backups.jobCancel(job.current).catch(() => undefined);
+      const opened = repositoryRef.current;
+      if (opened)
+        void sdk.current?.backups
+          .repositoryClose(opened.repository)
+          .catch(() => undefined);
+      if (opened)
+        void sdk.current?.files.release(opened.handle).catch(() => undefined);
+      for (const source of sourcesRef.current)
+        void sdk.current?.files.release(source.handle).catch(() => undefined);
+    };
+  }, []);
+
+  const poll = async (jobId: string): Promise<MistyBackupJob> => {
+    while (alive.current && job.current === jobId) {
+      const current = await sdk.current!.backups.jobStatus(jobId);
+      if (current.status !== "running") return current;
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+    throw new Error("Backup operation cancelled.");
+  };
+  const run = async (start: () => Promise<{ jobId: string }>) => {
+    if (!sdk.current || running) return null;
+    setRunning(true);
+    setError("");
+    let jobId = "";
+    try {
+      jobId = (await start()).jobId;
+      job.current = jobId;
+      const result = await poll(jobId);
+      if (result.status !== "completed")
+        throw new Error(result.message || "Backup operation failed.");
+      setMessage(result.message);
+      return result.result ?? null;
+    } catch (caught) {
+      if (alive.current) setError(String(caught));
+      return null;
+    } finally {
+      if (jobId)
+        void sdk.current?.backups.jobClose(jobId).catch(() => undefined);
+      if (job.current === jobId) job.current = "";
+      if (alive.current) setRunning(false);
+    }
+  };
+  const chooseFolder = async (write: boolean) =>
+    sdk.current?.files.pickDirectory({ write }) ?? null;
+  const openRepository = async (create: boolean) => {
+    if (!sdk.current || busy || running) return;
+    setBusy(true);
+    setError("");
+    let folder: Folder | null = null;
+    try {
+      folder = await chooseFolder(true);
+      if (!folder) return;
+      const opened = await sdk.current.backups.repositoryOpen({
+        directory: folder.handle,
+        create,
+        name: create ? name : undefined,
+      });
+      if (!alive.current) return;
+      if (repository) {
+        await sdk.current.backups
+          .repositoryClose(repository.repository)
+          .catch(() => undefined);
+        await sdk.current.files
+          .release(repository.handle)
+          .catch(() => undefined);
+      }
+      setRepository({
+        handle: folder.handle,
+        folderName: folder.name,
+        repository: opened.repository,
+        name: opened.name,
+      });
+      setSnapshots([]);
+      setView("overview");
+      setMessage(`${opened.name} is open.`);
+      folder = null;
+    } catch (caught) {
+      if (alive.current) setError(String(caught));
+    } finally {
+      if (folder)
+        void sdk.current?.files.release(folder.handle).catch(() => undefined);
+      if (alive.current) setBusy(false);
+    }
+  };
+  const addSource = async () => {
+    if (!sdk.current || busy || running) return;
+    setBusy(true);
+    try {
+      const folder = await chooseFolder(false);
+      if (folder && alive.current)
+        setSources((current) => [...current, folder].slice(0, 64));
+    } catch (caught) {
+      if (alive.current) setError(String(caught));
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  const removeSource = (handle: string) => {
+    setSources((current) => current.filter((source) => source.handle !== handle));
+    void sdk.current?.files.release(handle).catch(() => undefined);
+  };
+  const loadSnapshots = async () => {
+    if (!repository) return;
+    const result = await run(() =>
+      sdk.current!.backups.snapshotsStart(repository.repository),
+    );
+    if (result?.snapshots && alive.current) {
+      setSnapshots([...result.snapshots]);
+      setView("snapshots");
+      setMessage(
+        `${result.snapshots.length} snapshot${result.snapshots.length === 1 ? "" : "s"} found.`,
+      );
+    }
+  };
+  const restore = async (snapshot: string) => {
+    if (!repository || !sdk.current) return;
+    const destination = await chooseFolder(true);
+    if (!destination) return;
+    const result = await run(() =>
+      sdk.current!.backups.restoreStart(
+        repository.repository,
+        snapshot,
+        destination.handle,
+      ),
+    );
+    await sdk.current.files.release(destination.handle).catch(() => undefined);
+    if (result?.folder)
+      setMessage(`Restored into ${destination.name}/${result.folder}.`);
+  };
+  const cancel = () => {
+    if (job.current) void sdk.current?.backups.jobCancel(job.current);
+  };
+
+  return (
+    <div className="panel-stack backups-panel">
+      <header className="panel-title">
+        <h2>Backups</h2>
+        <p>Encrypted snapshots using folders you explicitly choose.</p>
+      </header>
+      <nav className="subnav" aria-label="Backup sections">
+        <button
+          className={view === "overview" ? "active" : ""}
+          onClick={() => setView("overview")}
+        >
+          Overview
+        </button>
+        <button
+          className={view === "snapshots" ? "active" : ""}
+          disabled={!repository}
+          onClick={() => void loadSnapshots()}
+        >
+          Snapshots
+        </button>
+        <button
+          className={view === "setup" ? "active" : ""}
+          onClick={() => setView("setup")}
+        >
+          Repository
+        </button>
+      </nav>
+      {view === "setup" ? (
+        <section className="setup-form">
+          <div className="callout">
+            <HardDrive size={18} />
+            <div>
+              <strong>Local encrypted repository</strong>
+              <span>
+                Choose an empty folder to create one, or reselect a repository
+                registered to this account.
+              </span>
+            </div>
+          </div>
+          <Field label="Repository name">
+            <input
+              className="text-input"
+              value={name}
+              maxLength={64}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </Field>
+          <div className="action-row">
+            <ActionButton
+              disabled={!available || busy || running || !name.trim()}
+              onClick={() => void openRepository(true)}
+            >
+              <FolderPlus size={16} />
+              Create in empty folder
+            </ActionButton>
+            <ActionButton
+              className="secondary-button"
+              disabled={!available || busy || running}
+              onClick={() => void openRepository(false)}
+            >
+              <HardDrive size={16} />
+              Open existing
+            </ActionButton>
+          </div>
+        </section>
+      ) : null}
+      {view === "overview" ? (
+        <>
+          <div className="repository-summary">
+            <DatabaseBackup size={20} />
+            <div>
+              <strong>{repository?.name ?? "No repository open"}</strong>
+              <span>
+                {repository
+                  ? `Chosen folder: ${repository.folderName}`
+                  : "Open a repository to begin."}
+              </span>
+            </div>
+          </div>
+          <div className="source-box">
+            <strong>Source folders</strong>
+            {sources.length ? (
+              <div className="source-list">
+                {sources.map((source) => (
+                  <span key={source.handle}>
+                    {source.name}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${source.name}`}
+                      disabled={running}
+                      onClick={() => removeSource(source.handle)}
+                    >
+                      <X size={13} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span>Choose local folders to include.</span>
+            )}
+          </div>
+          <div className="action-row">
+            <ActionButton
+              className="secondary-button"
+              disabled={busy || running || sources.length >= 64}
+              onClick={() => void addSource()}
+            >
+              <FolderPlus size={16} />
+              Add source
+            </ActionButton>
+            <ActionButton
+              disabled={!repository || !sources.length || running}
+              onClick={() =>
+                void run(() =>
+                  sdk.current!.backups.backupStart(
+                    repository!.repository,
+                    sources.map((source) => source.handle),
+                  ),
+                )
+              }
+            >
+              <DatabaseBackup size={16} />
+              Back up now
+            </ActionButton>
+            <ActionButton
+              className="secondary-button"
+              disabled={!repository || running}
+              onClick={() =>
+                void run(() =>
+                  sdk.current!.backups.checkStart(repository!.repository),
+                )
+              }
+            >
+              <CheckCircle2 size={16} />
+              Verify
+            </ActionButton>
+            <ActionButton
+              className="secondary-button"
+              disabled={!repository || running}
+              onClick={() => void loadSnapshots()}
+            >
+              <RefreshCw size={16} />
+              Snapshots
+            </ActionButton>
+          </div>
+        </>
+      ) : null}
+      {view === "snapshots" ? (
+        <section className="snapshot-list">
+          {snapshots.length ? (
+            snapshots.map((snapshot) => (
+              <article key={snapshot.id}>
+                <div>
+                  <strong>{new Date(snapshot.time).toLocaleString()}</strong>
+                  <small>{snapshot.id.slice(0, 12)}</small>
+                </div>
+                <ActionButton
+                  className="secondary-button"
+                  disabled={running}
+                  onClick={() => void restore(snapshot.id)}
+                >
+                  <ArchiveRestore size={15} />
+                  Restore…
+                </ActionButton>
+              </article>
+            ))
+          ) : (
+            <div className="empty-state">
+              <ArchiveRestore size={24} />
+              <strong>No snapshots yet</strong>
+              <span>Create a backup to establish the first restore point.</span>
+            </div>
+          )}
+        </section>
+      ) : null}
+      <StatusLine tone={error ? "error" : "neutral"}>
+        {error || message}
+      </StatusLine>
+      {running ? (
+        <ActionButton
+          className="secondary-button cancel-button"
+          onClick={cancel}
+        >
+          <Ban size={16} />
+          Cancel current operation
+        </ActionButton>
+      ) : null}
+    </div>
+  );
 }

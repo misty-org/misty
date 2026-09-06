@@ -6,7 +6,27 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = await json("package.json");
 const index = await json("catalog/index.json");
 const interfaceManifest = await json("interface/manifest.json");
+const officialCatalog = await json("apps/catalog.json");
 const ids = new Set();
+const capabilityContracts = {
+  storage_report: ["files.read"],
+  themes: ["appearance.write"],
+  image_optimizer: ["files.read", "files.write"],
+  quick_convert: ["files.read", "files.write", "media.convert"],
+  backups: ["files.read", "files.write", "backups.manage"],
+  ytdlp: ["files.write", "media.download"],
+};
+const pluginSources = {
+  storage_report: "storageReport/StorageReportPlugin.tsx",
+  themes: "themes/ThemesPlugin.tsx",
+  image_optimizer: "imageOptimizer/ImageOptimizerPlugin.tsx",
+  quick_convert: "quickConvert/QuickConvertPlugin.tsx",
+  backups: "backups/BackupsPlugin.tsx",
+  ytdlp: "ytdlp/YtdlpPlugin.tsx",
+};
+const releasePlatforms = ["macos-aarch64", "macos-x86_64"];
+
+await validateOfficialApps(officialCatalog);
 
 if (
   interfaceManifest.schemaVersion !== 1 ||
@@ -69,6 +89,15 @@ for (const id of ids) {
     catalog.install.artifacts.length === 0
   )
     fail(`${id} must have release artifacts.`);
+  if (
+    JSON.stringify(
+      catalog.install.artifacts.map((artifact) => artifact.platform),
+    ) !== JSON.stringify(releasePlatforms)
+  ) {
+    fail(
+      `${id} may publish only ${releasePlatforms.join(", ")} until other native App adapters are validated.`,
+    );
+  }
   for (const artifact of catalog.install.artifacts) {
     if (
       !artifact.url?.includes(
@@ -80,6 +109,31 @@ for (const id of ids) {
       );
   }
   const tools = manifest.tools ?? [];
+  const expectedCapabilities = capabilityContracts[id];
+  if (
+    JSON.stringify(manifest.runtime_capabilities ?? []) !==
+      JSON.stringify(expectedCapabilities) ||
+    JSON.stringify(detail.runtime_capabilities ?? []) !==
+      JSON.stringify(expectedCapabilities) ||
+    JSON.stringify(catalog.runtime_capabilities ?? []) !==
+      JSON.stringify(expectedCapabilities)
+  ) {
+    fail(
+      `${id} manifest, plugin detail, and catalog must declare ${expectedCapabilities.join(", ")}.`,
+    );
+  }
+  if (tools.length || (detail.included_tools ?? []).length) {
+    fail(
+      `${id} must use Host-owned capability services instead of package executables.`,
+    );
+  }
+  const pluginSource = await readFile(
+    path.join(repo, "src/plugins", pluginSources[id]),
+    "utf8",
+  );
+  if (/runHostCommand|usePluginJob|host\.pickFolders/.test(pluginSource)) {
+    fail(`${id} still calls the legacy extension command broker.`);
+  }
   for (const tool of tools) {
     if (
       !tool.id ||
@@ -124,8 +178,92 @@ for (const file of sourceFiles.filter(
 }
 
 console.log(
-  `Validated ${ids.size} extension catalog entries at v${packageJson.version}.`,
+  `Validated ${ids.size} extension entries and ${officialCatalog.apps.length} official apps at v${packageJson.version}.`,
 );
+
+async function validateOfficialApps(catalog) {
+  if (
+    catalog.schema_version !== 1 ||
+    catalog.host_protocol_version !== 2 ||
+    !Array.isArray(catalog.apps)
+  ) {
+    fail(
+      "apps/catalog.json must use official app schema version 1 and host protocol version 2.",
+    );
+  }
+  const expected = [
+    "chat",
+    "journal",
+    "planner",
+    "library",
+    "inbox",
+    "agents",
+    "files",
+    "browser",
+    "code",
+    "terminal",
+  ];
+  if (catalog.apps.some(app => app.desktop?.runtime === "downloaded") &&
+      (!catalog.signing?.key_id || !catalog.signing?.public_key)) {
+    fail("Downloaded official apps must declare a signing key.");
+  }
+  const appIds = catalog.apps.map((app) => app?.id);
+  if (JSON.stringify(appIds) !== JSON.stringify(expected)) {
+    fail(`Official app ids must be ${expected.join(", ")} in product order.`);
+  }
+  for (const app of catalog.apps) {
+    if (
+      app.app_id !== `com.misty.${app.slug}` ||
+      !/^[a-z][a-z0-9-]*$/.test(app.slug ?? "")
+    ) {
+      fail(
+        `${app.id} must declare its immutable reverse-domain id and friendly slug.`,
+      );
+    }
+    if (
+      !app.name ||
+      app.publisher !== "Misty" ||
+      app.official !== true ||
+      !/^\d+\.\d+\.\d+$/.test(app.version ?? "")
+    ) {
+      fail(`Invalid official app identity for ${app.id}.`);
+    }
+    if (
+      !Number.isInteger(app.permission_version) ||
+      app.permission_version < 1 ||
+      ![1, 2].includes(app.minimum_host_protocol) ||
+      !Array.isArray(app.scopes)
+    ) {
+      fail(`Invalid official app protocol contract for ${app.id}.`);
+    }
+    if (app.desktop?.runtime === "downloaded") {
+      if (app.minimum_host_protocol !== 2 ||
+          app.desktop.entry !== `https://apps.mistysys.com/official-apps/${app.id}/${app.version}/desktop.zip` ||
+          !/^[a-f0-9]{64}$/.test(app.desktop.sha256 ?? "") ||
+          Buffer.from(app.desktop.signature ?? "", "base64").length !== 64 ||
+          app.desktop.signature_key_id !== catalog.signing.key_id) {
+        fail(`${app.id} must declare a signed SDK protocol 2 component package.`);
+      }
+    } else if (app.desktop?.runtime !== "embedded" || Object.keys(app.desktop).length !== 1) {
+      fail(`${app.id} must use an embedded or verified downloaded desktop runtime.`);
+    }
+    const expectedMobile = ["code", "terminal"].includes(app.id)
+      ? "unsupported"
+      : "embedded";
+    if (app.mobile?.runtime !== expectedMobile)
+      fail(`${app.id} has an invalid mobile Host runtime.`);
+    if (Object.keys(app.mobile).length !== 1)
+      fail(`${app.id} mobile runtime must not advertise package assets.`);
+  }
+  for (const id of ["code", "terminal"]) {
+    if (
+      catalog.apps.find((app) => app.id === id)?.mobile.runtime !==
+      "unsupported"
+    ) {
+      fail(`${id} must remain desktop only.`);
+    }
+  }
+}
 
 async function json(relative) {
   try {

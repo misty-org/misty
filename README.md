@@ -1,19 +1,26 @@
-# Misty Store
+# Misty Apps
 
-The official first-party Store app workspace for Misty.
+The App catalog, extension packages, and Discover web experience for Misty.
+
+The SDK now lives in the sibling `misty-sdk` repository as `@misty/sdk` and `@misty/contracts`. Build that checkout first with `npm ci && npm run build`; this repository uses a local package dependency during development.
+
+Misty-built apps are compiled into the trusted Host. Installable third-party Apps are authored with
+TypeScript, React, and standard ES-module imports. Their packages produce a self-contained
+`index.html`, `app.js` module, and `app.css`. Package code communicates with Misty only through
+`@misty/sdk`; credentials, native APIs, and Host globals are never exposed.
 
 Plugins are now authored with the same frontend stack as `apps/desktop`: TypeScript, React, Vite, and Tailwind CSS. There is no native plugin ABI in this repo anymore; plugin panels run as web surfaces and talk to Misty through a small host bridge.
 
 ## What's here
 
-| Path | Contents |
-|------|----------|
-| `src/` | React plugin panels and shared web plugin bridge |
-| `extensions/*/manifest.json` | Local install manifests with web runtime metadata |
-| `extensions/*/plugin.json` | Hub/local plugin details used by Misty |
-| `catalog/` | Public catalog index and marketplace entries |
-| `interface/` | Shared catalog contract and React presentation primitives |
-| `scripts/build-plugins.mjs` | Copies plugin metadata/assets into `dist/` after Vite builds |
+| Path                         | Contents                                                     |
+| ---------------------------- | ------------------------------------------------------------ |
+| `src/`                       | React plugin panels and shared web plugin bridge             |
+| `extensions/*/manifest.json` | Local install manifests with web runtime metadata            |
+| `extensions/*/plugin.json`   | Hub/local plugin details used by Misty                       |
+| `catalog/`                   | Public catalog index and marketplace entries                 |
+| `interface/`                 | Shared catalog contract and React presentation primitives    |
+| `scripts/build-plugins.mjs`  | Copies plugin metadata/assets into `dist/` after Vite builds |
 
 ## Development
 
@@ -54,29 +61,38 @@ The build emits the web app plus installable plugin metadata under `dist/`:
 
 Each `dist/plugins/<plugin>/` directory is self-contained and can be zipped as an install bundle. Tagged releases build and publish `quick_convert.zip`, `themes.zip`, and `ytdlp.zip`; catalog entries point to those versioned bundles rather than an unbuilt source archive.
 
-## Host Bridge
+Tagged releases publish the Discover site and the platform-specific extension
+archives. The official app catalog contains only `embedded` or `unsupported`
+platform entries, so release automation cannot publish a second downloadable or
+hosted copy of trusted Host code. After publication, the release dispatches that
+catalog to `misty-server`; its workflow opens a tested catalog update pull request.
 
-When Misty hosts a web plugin, it can attach `window.mistyPluginHost`:
+## Misty SDK
+
+An App starts from its ES-module entry and receives the capability-scoped SDK:
 
 ```ts
-window.mistyPluginHost = {
-  selectedPaths: async () => ["/path/from/files"],
-  notify: ({ level, title, message, pluginId }) => {},
-  runCommand: async (command, payload) => ({ ok: true }),
-};
+import { defineApp } from "@misty/sdk";
+
+void defineApp({
+  mount({ root, misty }) {
+    // Render React into root and use only misty.* for host capabilities.
+  },
+});
 ```
 
-Hosted panels use the same typed command contract over `postMessage`; Misty validates the iframe source, plugin id, and a per-plugin command allowlist before invoking native functionality. Without a host, panels remain available in browser-smoke mode and clearly disable system actions.
+The SDK uses a versioned message protocol. Misty derives identity from the owning sandbox, validates
+every requested capability, and keeps all authentication material in the host process.
 
 ## Shared catalog interface
 
-`interface/` is the canonical presentation dependency for the desktop Store and
+`interface/` is the canonical presentation dependency for desktop Discover and
 the public website. It owns the extension data shape, stable URL helpers,
 platform labels, filtering behavior, artwork treatment, and verification badge.
 Each product synchronizes this small source distribution before development and
 builds, then supplies its own theme variables and product-specific layout.
 
-Change shared extension presentation in this repository first. The consumer
+Change shared App presentation in this repository first. The consumer
 repositories keep generated copies so builds remain reproducible and can verify
 drift without requiring a network connection.
 

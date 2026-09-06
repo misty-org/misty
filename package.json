@@ -1,31 +1,42 @@
 {
-  "name": "@misty/store",
+  "name": "@misty/apps",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "exports": {
+    "./apps": "./interface/apps.ts",
+    "./mobile-sdk": "./interface/mobile-sdk.ts",
+    "./sdk": "./interface/sdk.ts",
     "./catalog": "./interface/catalog.ts",
     "./react": "./interface/react.tsx",
     "./store": "./interface/store.tsx",
     "./styles.css": "./interface/styles.css"
   },
   "files": [
+    "apps",
     "catalog",
     "interface"
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
-    "build": "tsc && vite build && node scripts/build-plugins.mjs",
+    "build": "npm run build:sdk && npm run build:extensions",
+    "build:release": "npm run build:sdk && npm run build:extensions",
+    "build:sdk": "node -e \"import('@misty/sdk').then(({createMistyAppSDK}) => { if (typeof createMistyAppSDK !== 'function') throw new Error('The public SDK package is incomplete'); })\"",
+    "build:extensions": "tsc && vite build && node scripts/build-plugins.mjs",
     "package:release": "node scripts/package-release.mjs",
     "test": "vitest run",
     "validate": "node scripts/validate-catalog.mjs",
-    "preview": "vite preview --host 127.0.0.1 --port 4174"
+    "sync:server-apps": "node scripts/sync-server-official-apps.mjs",
+    "preview": "vite preview --host 127.0.0.1 --port 4174",
+    "package:official-apps": "node scripts/build-official-apps.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-dfaa2f6d310702ec.tgz",
+    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-06efa82248fa485d.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
