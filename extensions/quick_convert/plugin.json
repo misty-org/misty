@@ -2,29 +2,28 @@
   "schema_version": 1,
   "id": "quick_convert",
   "name": "Quick Convert",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Misty",
   "status": "installed",
-  "overview": "Quick Convert creates collision-safe media copies without leaving Misty. It runs only the verified FFmpeg shipped with the installed app.",
+  "overview": "Convert chosen images, audio, and video into new copies using Misty\u2019s isolated media converter.",
   "capabilities": [
-    "Convert the currently selected file into common image, audio, and video formats",
-    "Write converted copies beside the source file with predictable names",
-    "Use the pinned, app-bundled FFmpeg and FFprobe executables"
+    "Convert batches of chosen image, audio, or video files",
+    "Choose format and quality; preserve original files",
+    "Cancel pending conversions and save copies with collision-safe names"
   ],
-  "where_it_appears": [
-    "Workspace app tab from Files"
-  ],
+  "where_it_appears": ["Workspace app tab from Files"],
   "permissions": [
-    "Read access to selected files",
-    "Write access beside the selected file",
-    "Execute the verified bundled FFmpeg and FFprobe tools"
+    "Read media chosen in the native picker",
+    "Save new copies in a folder chosen for writing",
+    "Convert chosen media in a restricted native process"
   ],
   "getting_started": [
-    "Install Quick Convert from Misty's marketplace.",
-    "Select an image, audio, or video file in Files.",
-    "Open Quick Convert in a workspace tab and choose an output format."
+    "Install FFmpeg on your Mac. Isolated converters for other platforms are in development.",
+    "Open Quick Convert and choose media files and an output folder.",
+    "Choose a format and quality, then convert. Completed copies are kept when cancellation is requested."
   ],
   "changelog": [
+    "v0.4.0 - Replaced legacy command jobs with explicit file grants and Host-owned restricted media conversion on macOS.",
     "v0.3.0 - Added workspace-tab launch behavior, bridge readiness, and automatic job recovery.",
     "v0.2.0 - Added secure hosted conversion jobs with quality and destination controls, cancellation, collision-safe output names, and output reveal.",
     "v0.1.0 - Added a selected-file conversion panel backed by system FFmpeg."
@@ -39,7 +38,7 @@
       "url": "https://misty.local/plugins/quick_convert/source"
     }
   ],
-  "included_tools": [{"name":"FFmpeg","version":"7.1.1"},{"name":"FFprobe","version":"7.1.1"}],
+  "included_tools": [],
   "actions": [
     {
       "label": "Open",
@@ -49,7 +48,8 @@
   "launcher": {
     "views": ["Files"],
     "show_in_launcher": true,
-    "requires_selected_file": true,
+    "requires_selected_file": false,
     "open_mode": "tab"
-  }
+  },
+  "runtime_capabilities": ["files.read", "files.write", "media.convert"]
 }

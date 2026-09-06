@@ -2,29 +2,28 @@
   "schema_version": 1,
   "id": "ytdlp",
   "name": "yt-dlp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Misty",
   "status": "installed",
-  "overview": "yt-dlp brings video, playlist, and audio downloads into Misty using pinned, verified yt-dlp, FFmpeg, and FFprobe executables shipped with the app.",
+  "overview": "yt-dlp reviews and downloads public HTTPS media through Misty’s restricted native service into a folder you choose.",
   "capabilities": [
-    "Download single YouTube videos or playlists",
+    "Review single videos or bounded playlists",
     "Convert downloads into MP3, M4A, MP4, or WEBM",
-    "Save media into sensible Music, Movies, or Downloads folders"
+    "Save media into an explicitly chosen folder"
   ],
-  "where_it_appears": [
-    "Workspace app tab"
-  ],
+  "where_it_appears": ["Workspace app tab"],
   "permissions": [
-    "Network access through the verified bundled yt-dlp",
-    "Write access to local download folders",
-    "Shell access to invoke yt-dlp and FFmpeg"
+    "Connect to public media sites through Misty’s filtered network service",
+    "Write completed media into a folder chosen explicitly",
+    "Run Misty’s restricted media service"
   ],
   "getting_started": [
-    "Install the yt-dlp app from Misty's Store. Its media tools are included.",
+    "Install yt-dlp and FFmpeg through the Host-managed system toolchain.",
     "Open yt-dlp from Apps in a workspace tab.",
     "Paste a YouTube URL, choose MP3 or MP4, and start the download."
   ],
   "changelog": [
+    "v0.4.0 - Replaced shell access with explicit destination grants and a Host-owned restricted downloader and filtered public-network service on macOS.",
     "v0.3.0 - Added workspace-tab launch behavior, bridge readiness, and automatic job recovery.",
     "v0.2.0 - Added dependency checks, URL inspection, playlist safeguards, cancellable download jobs, bounded playlists, safe command arguments, and output reveal.",
     "v0.1.0 - Added the initial yt-dlp panel."
@@ -51,5 +50,6 @@
     "requires_selected_file": false,
     "open_mode": "tab"
   },
-  "included_tools": [{"name":"yt-dlp","version":"2026.06.09"},{"name":"FFmpeg","version":"7.1.1"},{"name":"FFprobe","version":"7.1.1"}]
+  "included_tools": [],
+  "runtime_capabilities": ["files.write", "media.download"]
 }

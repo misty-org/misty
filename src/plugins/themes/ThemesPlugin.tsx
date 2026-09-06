@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Eye, Palette, RotateCcw, Undo2 } from "lucide-react";
 import { ActionButton, Field, StatusLine } from "../../shared/pluginChrome";
-import type { PluginPanelProps } from "../types";
+import { connectMistyApp, type MistyAppSDK, type MistyAppearanceResult } from "@misty/sdk";
 
 type ThemeToken = { token: string; label: string; value: string };
 const defaultTokens: ThemeToken[] = [
   { token: "background", label: "Background", value: "#0B0D10" },
   { token: "surface", label: "Surface", value: "#111418" },
-  { token: "foreground", label: "Primary text", value: "#F1F3F4" },
-  { token: "muted", label: "Muted text", value: "#A7ABB3" },
+  { token: "text", label: "Primary text", value: "#F1F3F4" },
+  { token: "textMuted", label: "Muted text", value: "#A7ABB3" },
   { token: "accent", label: "Accent", value: "#7DD3FC" },
   { token: "selection", label: "Selection", value: "#1E4F66" },
   { token: "success", label: "Success", value: "#22C55E" },
@@ -32,7 +32,9 @@ export function contrastRatio(first: string, second: string) {
   return (bright + 0.05) / (dark + 0.05);
 }
 
-export function ThemesPlugin({ context }: PluginPanelProps) {
+export function ThemesPlugin() {
+  const sdk = useRef<MistyAppSDK | null>(null);
+  const alive = useRef(false);
   const [tokens, setTokens] = useState(defaultTokens);
   const [activePreset, setActivePreset] = useState("misty-dark");
   const [status, setStatus] = useState("Loading Misty’s current theme…");
@@ -40,28 +42,47 @@ export function ThemesPlugin({ context }: PluginPanelProps) {
   const [busy, setBusy] = useState(false);
 
   async function snapshot() {
-    const result = await context.runHostCommand<{ ok?: boolean; themeId?: string; tokens?: Record<string, string>; message?: string }>("themes.snapshot");
+    const result = await request(() => sdk.current!.appearance.snapshot());
+    if (!alive.current) return;
     if (result.ok === false) { setTone("error"); setStatus(result.message ?? "Could not read the current theme."); return; }
     if (result.themeId) setActivePreset(result.themeId);
     if (result.tokens) setTokens((current) => current.map((item) => ({ ...item, value: result.tokens?.[item.token] ?? item.value })));
     setTone("neutral"); setStatus("Edit a color, preview it, then apply when it feels right.");
   }
-  useEffect(() => { void snapshot(); }, []);
+  useEffect(() => {
+    alive.current = true;
+    try {
+      sdk.current = connectMistyApp();
+      void snapshot();
+    } catch (error) {
+      setTone("error"); setStatus(String(error));
+    }
+    return () => { alive.current = false; };
+  }, []);
+  async function request(operation: () => Promise<MistyAppearanceResult>): Promise<MistyAppearanceResult> {
+    try { return await operation(); }
+    catch (error) { return { ok: false, message: String(error) }; }
+  }
 
   function updateToken(token: string, value: string) { setTokens((current) => current.map((item) => item.token === token ? { ...item, value: value.toUpperCase() } : item)); }
   function payload() { return Object.fromEntries(tokens.map((item) => [item.token, item.value])); }
   function invalidToken() { return tokens.find((item) => !validHex(item.value)); }
 
-  async function command(name: string, data: Record<string, unknown>, success: string) {
+  async function command(name: "preview" | "apply" | "revert", success: string) {
     const invalid = invalidToken();
-    if (invalid && name !== "themes.revert") { setTone("error"); setStatus(`${invalid.label} must be a six-digit hex color.`); return; }
-    if (name !== "themes.revert") {
+    if (invalid && name !== "revert") { setTone("error"); setStatus(`${invalid.label} must be a six-digit hex color.`); return; }
+    if (name !== "revert") {
       const values = payload();
-      if (contrastRatio(values.foreground, values.background) < 4.5) { setTone("error"); setStatus("Primary text needs at least 4.5:1 contrast against the background."); return; }
-      if (contrastRatio(values.muted, values.background) < 3) { setTone("error"); setStatus("Muted text needs at least 3:1 contrast against the background."); return; }
+      if (contrastRatio(values.text, values.background) < 4.5) { setTone("error"); setStatus("Primary text needs at least 4.5:1 contrast against the background."); return; }
+      if (contrastRatio(values.textMuted, values.background) < 3) { setTone("error"); setStatus("Muted text needs at least 3:1 contrast against the background."); return; }
     }
     setBusy(true);
-    const result = await context.runHostCommand<{ ok?: boolean; message?: string; tokens?: Record<string, string> }>(name, data);
+    const result = await request(() => name === "revert"
+      ? sdk.current!.appearance.revert()
+      : name === "apply"
+        ? sdk.current!.appearance.apply(payload(), activePreset)
+        : sdk.current!.appearance.preview(payload()));
+    if (!alive.current) return;
     setBusy(false);
     setTone(result.ok === false ? "error" : "success"); setStatus(result.message ?? success);
     if (result.tokens) setTokens((current) => current.map((item) => ({ ...item, value: result.tokens?.[item.token] ?? item.value })));
@@ -69,7 +90,8 @@ export function ThemesPlugin({ context }: PluginPanelProps) {
 
   async function applyPreset(id: string) {
     setActivePreset(id); setBusy(true);
-    const result = await context.runHostCommand<{ ok?: boolean; message?: string; tokens?: Record<string, string> }>("themes.applyPreset", { preset: id, preview: true });
+    const result = await request(() => sdk.current!.appearance.preset(id));
+    if (!alive.current) return;
     setBusy(false);
     if (result.ok === false) { setTone("error"); setStatus(result.message ?? "Could not preview the preset."); return; }
     if (result.tokens) setTokens((current) => current.map((item) => ({ ...item, value: result.tokens?.[item.token] ?? item.value })));
@@ -83,9 +105,9 @@ export function ThemesPlugin({ context }: PluginPanelProps) {
       <div className="token-grid">{tokens.map((item) => <Field key={item.token} label={item.label}><div className="swatch-row"><input className="color-input" type="color" value={validHex(item.value) ? item.value : "#000000"} onChange={(event) => updateToken(item.token, event.target.value)} aria-label={`${item.label} color`} /><input className="text-input mono-input" value={item.value} onChange={(event) => updateToken(item.token, event.target.value)} aria-label={`${item.label} hex value`} aria-invalid={!validHex(item.value)} spellCheck={false} /></div></Field>)}</div>
       <StatusLine tone={tone}>{status}</StatusLine>
       <div className="action-row">
-        <ActionButton type="button" onClick={() => void command("themes.apply", { preset: activePreset, tokens: payload() }, "Theme saved.")} disabled={busy}><Check size={16} />Apply Theme</ActionButton>
-        <ActionButton type="button" className="secondary-button" onClick={() => void command("themes.preview", { tokens: payload() }, "Preview updated.")} disabled={busy}><Eye size={16} />Preview</ActionButton>
-        <ActionButton type="button" className="secondary-button" onClick={() => void command("themes.revert", {}, "Reverted to the saved theme.")} disabled={busy}><Undo2 size={16} />Revert</ActionButton>
+        <ActionButton type="button" onClick={() => void command("apply", "Theme saved.")} disabled={busy}><Check size={16} />Apply Theme</ActionButton>
+        <ActionButton type="button" className="secondary-button" onClick={() => void command("preview", "Preview updated.")} disabled={busy}><Eye size={16} />Preview</ActionButton>
+        <ActionButton type="button" className="secondary-button" onClick={() => void command("revert", "Reverted to the saved theme.")} disabled={busy}><Undo2 size={16} />Revert</ActionButton>
         <ActionButton type="button" className="secondary-button" onClick={() => { setTokens(defaultTokens); setActivePreset("misty-dark"); }} disabled={busy}><RotateCcw size={16} />Reset Fields</ActionButton>
       </div>
     </div>

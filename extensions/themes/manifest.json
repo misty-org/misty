@@ -2,7 +2,7 @@
   "schema_version": 3,
   "id": "themes",
   "name": "Themes",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Customize Misty's theme tokens and apply presets like Gruvbox.",
   "author": "Misty",
   "enabled": true,
@@ -21,6 +21,8 @@
     "runtime": "web",
     "entry": "web/index.html?plugin=themes"
   },
+  "runtime_capabilities": ["appearance.write"],
+  "tools": [],
   "panels": [
     {
       "id": "themes.panel",

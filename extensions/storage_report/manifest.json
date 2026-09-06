@@ -1,7 +1,39 @@
 {
-  "schema_version": 3, "id": "storage_report", "name": "Storage Report", "version": "0.3.0", "description": "Analyze a selected local folder without following symlinks.", "author": "Misty", "enabled": true, "platforms": ["web"],
-  "runtime": { "type": "web", "entry": "web/index.html?plugin=storage_report" },
-  "launcher": { "views": ["Files"], "show_in_launcher": true, "requires_selected_file": true, "open_mode": "tab" },
-  "plugin": { "runtime": "web", "entry": "web/index.html?plugin=storage_report" },
-  "panels": [{ "id": "storage-report.panel", "title": "Storage Report", "window_type": "panel", "default_width": 680, "default_height": 620, "entry": "web/index.html?plugin=storage_report", "launcher": { "views": ["Files"] } }]
+  "schema_version": 3,
+  "id": "storage_report",
+  "name": "Storage Report",
+  "version": "0.4.0",
+  "description": "Analyze a selected local folder without following symlinks.",
+  "author": "Misty",
+  "enabled": true,
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "web/index.html?plugin=storage_report"
+  },
+  "launcher": {
+    "views": ["Files"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
+  "plugin": {
+    "runtime": "web",
+    "entry": "web/index.html?plugin=storage_report"
+  },
+  "runtime_capabilities": ["files.read"],
+  "tools": [],
+  "panels": [
+    {
+      "id": "storage-report.panel",
+      "title": "Storage Report",
+      "window_type": "panel",
+      "default_width": 680,
+      "default_height": 620,
+      "entry": "web/index.html?plugin=storage_report",
+      "launcher": {
+        "views": ["Files"]
+      }
+    }
+  ]
 }

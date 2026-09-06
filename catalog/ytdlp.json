@@ -1,31 +1,32 @@
 {
   "published": true,
-  "version": "0.3.0",
-  "overview": "yt-dlp brings YouTube downloading into Misty without leaving the app.",
+  "version": "0.4.0",
+  "overview": "Review and download public HTTPS media through Misty’s restricted native service.",
   "status": "available",
   "capabilities": [
     "Download single videos or playlists",
     "Convert downloads into MP3, M4A, MP4, or WEBM",
     "Save media into sensible local destinations"
   ],
-  "where_it_appears": [
-    "Workspace app tab"
-  ],
+  "where_it_appears": ["Workspace app tab"],
   "permissions": [
-    "Network access through the verified bundled yt-dlp",
-    "Write access to local download folders",
-    "Shell access to invoke yt-dlp and FFmpeg"
+    "Connect to public media sites through Misty’s filtered network service",
+    "Write completed media into a folder chosen explicitly",
+    "Use Misty’s Host-owned restricted media service"
   ],
   "getting_started": [
-    "Install the yt-dlp app from the Store. Its media tools are included.",
+    "Install the yt-dlp app from the Store.",
     "Open it from Apps in a workspace tab.",
     "Paste a supported media URL and review the download."
   ],
   "changelog": [
+    "v0.4.0 - Replaced shell access with explicit destination grants and a Host-owned restricted downloader and filtered public-network service on macOS.",
     "v0.3.0 - Moved yt-dlp into the workspace app tab with resumable job status.",
     "v0.2.0 - Added media inspection, playlist safeguards, cancellable download jobs, and output reveal.",
     "v0.1.0 - Added the initial yt-dlp panel."
   ],
+  "included_tools": [],
+  "runtime_capabilities": ["files.write", "media.download"],
   "links": [
     {
       "label": "yt-dlp project",
@@ -44,9 +45,7 @@
   ],
   "verified": true,
   "launcher": {
-    "views": [
-      "all"
-    ],
+    "views": ["all"],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
@@ -54,10 +53,14 @@
   "install": {
     "root": "private",
     "artifacts": [
-      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-aarch64.zip" },
-      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-macos-x86_64.zip" },
-      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-windows-x86_64.zip" },
-      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/ytdlp-linux-x86_64.zip" }
+      {
+        "platform": "macos-aarch64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/ytdlp-macos-aarch64.zip"
+      },
+      {
+        "platform": "macos-x86_64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/ytdlp-macos-x86_64.zip"
+      }
     ]
   },
   "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/ytdlp/assets/logo.svg"

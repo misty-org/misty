@@ -2,8 +2,8 @@
   "schema_version": 3,
   "id": "quick_convert",
   "name": "Quick Convert",
-  "version": "0.3.0",
-  "description": "Convert selected image, audio, and video files with verified bundled FFmpeg.",
+  "version": "0.4.0",
+  "description": "Convert chosen image, audio, and video files through Misty’s restricted media service.",
   "author": "Misty",
   "enabled": true,
   "platforms": ["web"],
@@ -14,19 +14,15 @@
   "launcher": {
     "views": ["Files"],
     "show_in_launcher": true,
-    "requires_selected_file": true,
+    "requires_selected_file": false,
     "open_mode": "tab"
   },
   "plugin": {
     "runtime": "web",
     "entry": "web/index.html?plugin=quick_convert"
   },
-  "tools": [
-    {"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"aarch64","path":"tools/macos-aarch64/ffprobe"},
-    {"id":"ffmpeg","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"macos","architecture":"x86_64","path":"tools/macos-x86_64/ffprobe"},
-    {"id":"ffmpeg","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffmpeg"},{"id":"ffprobe","version":"7.1.1","platform":"linux","architecture":"x86_64","path":"tools/linux-x86_64/ffprobe"},
-    {"id":"ffmpeg","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffmpeg.exe"},{"id":"ffprobe","version":"7.1.1","platform":"windows","architecture":"x86_64","path":"tools/windows-x86_64/ffprobe.exe"}
-  ],
+  "runtime_capabilities": ["files.read", "files.write", "media.convert"],
+  "tools": [],
   "panels": [
     {
       "id": "quick-convert.panel",

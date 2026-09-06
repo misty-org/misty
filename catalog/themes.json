@@ -1,6 +1,6 @@
 {
   "published": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "overview": "Themes is Misty's built-in theme builder for presets and token editing.",
   "status": "available",
   "capabilities": [
@@ -23,10 +23,12 @@
     "Apply a preset or adjust token colors."
   ],
   "changelog": [
+    "v0.4.0 - Replaced the legacy settings command with an explicit Host appearance grant.",
     "v0.3.0 - Moved Themes into the workspace app tab with preserved editor state.",
     "v0.2.0 - Added preview, apply and revert flows, persistent custom tokens, and accessible color controls.",
     "v0.1.0 - Added the first theme builder with curated presets."
   ],
+  "included_tools": [],
   "links": [
     {
       "label": "Documentation",
@@ -41,10 +43,7 @@
   ],
   "verified": true,
   "launcher": {
-    "views": [
-      "Settings",
-      "Plugins"
-    ],
+    "views": ["Settings", "Plugins"],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
@@ -52,11 +51,16 @@
   "install": {
     "root": "private",
     "artifacts": [
-      { "platform": "macos-aarch64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/themes-macos-aarch64.zip" },
-      { "platform": "macos-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/themes-macos-x86_64.zip" },
-      { "platform": "windows-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/themes-windows-x86_64.zip" },
-      { "platform": "linux-x86_64", "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.3.0/themes-linux-x86_64.zip" }
+      {
+        "platform": "macos-aarch64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/themes-macos-aarch64.zip"
+      },
+      {
+        "platform": "macos-x86_64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/themes-macos-x86_64.zip"
+      }
     ]
   },
-  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/themes/assets/logo.svg"
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/themes/assets/logo.svg",
+  "runtime_capabilities": ["appearance.write"]
 }
