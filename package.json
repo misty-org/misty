@@ -1,0 +1,22 @@
+{
+  "name": "@misty/public-packages",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @misty/contracts && npm run build --workspace @misty/sdk",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run",
+    "check": "npm run build && npm run typecheck && npm test",
+    "contracts:routes": "node scripts/export-routes.mjs",
+    "test:packed": "node scripts/check-packed.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.10",
+    "@types/node": "^24.0.0"
+  }
+}
