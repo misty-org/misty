@@ -1,3 +1,4 @@
+import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { spacesApi } from "@/api/spaces/api";
 import type { useSpacesStore } from "@/features/spaces";
 import type { useAuth } from "@/features/auth";
@@ -37,11 +38,11 @@ export function socialRuntime() {
   return current;
 }
 export const socialApi = new Proxy({} as typeof spacesApi, {
-  get: (_, key) => socialRuntime().api[key as keyof typeof spacesApi],
+  get: (target, key) => runtimeProperty(target, key, () => socialRuntime().api[key as keyof typeof spacesApi]),
 });
 function hook<K extends keyof SocialRuntime>(name: K): SocialRuntime[K] {
   return new Proxy((...args: unknown[]) => (socialRuntime()[name] as Function)(...args), {
-    get: (_, key) => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key],
+    get: (target, key) => runtimeProperty(target, key, () => (socialRuntime()[name] as unknown as Record<string | symbol, unknown>)[key]),
   }) as SocialRuntime[K];
 }
 export const useSocialSpaces = hook("useSpacesStore"),

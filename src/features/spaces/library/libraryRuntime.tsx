@@ -1,3 +1,4 @@
+import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { spacesApi } from "@/api/spaces/api";
 import type { useSpacesStore } from "@/features/spaces";
 import type { useWorkspaceTabTitle, useWorkspaceTabFocused } from "@/features/workspace";
@@ -33,12 +34,12 @@ export function libraryRuntime(): LibraryRuntime {
   return current;
 }
 export const libraryApi = new Proxy({} as typeof spacesApi, {
-  get: (_target, key) => libraryRuntime().api[key as keyof typeof spacesApi],
+  get: (target, key) => runtimeProperty(target, key, () => libraryRuntime().api[key as keyof typeof spacesApi]),
 });
 export const useLibrarySpaces = new Proxy(
   ((selector: Parameters<typeof useSpacesStore>[0]) =>
     libraryRuntime().useSpacesStore(selector)) as typeof useSpacesStore,
-  { get: (_target, key) => libraryRuntime().useSpacesStore[key as keyof typeof useSpacesStore] },
+  { get: (target, key) => runtimeProperty(target, key, () => libraryRuntime().useSpacesStore[key as keyof typeof useSpacesStore]) },
 );
 export const useLibraryTitle: typeof useWorkspaceTabTitle = (...args) =>
   libraryRuntime().useWorkspaceTabTitle(...args);
