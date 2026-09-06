@@ -1,4 +1,4 @@
-import { formatDate } from "@/features/files/explorer";
+import { formatDate } from "@/features/files/format";
 import { SystemErrorActivity } from "@/features/activity";
 import { useSearchStore } from "@/features/files/search";
 import type { SearchStatus } from "@/native/contracts";

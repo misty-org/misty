@@ -131,32 +131,11 @@ pub fn enable_modern_window_style<R: Runtime>(
                 #[cfg(target_os = "macos")]
                 unsafe {
                     let ns_window = webview.ns_window() as id;
-                    ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
-                    ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
-                    ns_window.setMovable_(cocoa::base::YES);
-                    ns_window.setHasShadow_(cocoa::base::YES);
-                    // The macOS-specific Tauri config creates a normal titled,
-                    // resizable overlay window. Do not rewrite its style mask
-                    // after creation: AppKit may rebuild the content hierarchy,
-                    // severing the webview's native autoresizing relationship.
-                    let mut collection_behavior = ns_window.collectionBehavior();
-                    collection_behavior.remove(
-                        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary,
+                    apply_modern_window_style(
+                        ns_window,
+                        offset_x.unwrap_or(-4.0),
+                        offset_y.unwrap_or(0.0),
                     );
-                    collection_behavior.insert(
-                        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenPrimary,
-                    );
-                    ns_window.setCollectionBehavior_(collection_behavior);
-
-                    // Wry owns the main WKWebView's parent, frame, and native
-                    // autoresizing mask. Reapplying them here creates a second
-                    // resize owner and can stall its live-resize paint cycle.
-
-                    let ox = offset_x.unwrap_or(0.0);
-                    let oy = offset_y.unwrap_or(0.0);
-                    if ox != 0.0 || oy != 0.0 {
-                        position_traffic_lights(ns_window, ox, oy);
-                    }
                 }
             })
             .map_err(|e| e.to_string())?;
@@ -172,6 +151,69 @@ pub fn enable_modern_window_style<R: Runtime>(
         apply_windows_rounded_corners(&window);
         Ok(())
     }
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn apply_modern_window_style(ns_window: id, offset_x: f64, offset_y: f64) {
+    ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
+    ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+    ns_window.setMovable_(cocoa::base::YES);
+    ns_window.setHasShadow_(cocoa::base::YES);
+    // The macOS-specific Tauri config creates a normal titled,
+    // resizable overlay window. Do not rewrite its style mask
+    // after creation: AppKit may rebuild the content hierarchy,
+    // severing the webview's native autoresizing relationship.
+    let mut collection_behavior = ns_window.collectionBehavior();
+    collection_behavior
+        .remove(NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary);
+    collection_behavior
+        .insert(NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenPrimary);
+    ns_window.setCollectionBehavior_(collection_behavior);
+
+    // Wry owns the main WKWebView's parent, frame, and native
+    // autoresizing mask. Reapplying them here creates a second
+    // resize owner and can stall its live-resize paint cycle.
+
+    let ox = offset_x;
+    let oy = offset_y;
+    position_traffic_lights(ns_window, ox, oy);
+}
+
+#[cfg(target_os = "macos")]
+static MAIN_WINDOW_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn main_window_ready() -> bool {
+    #[cfg(target_os = "macos")]
+    return MAIN_WINDOW_READY.load(std::sync::atomic::Ordering::Acquire);
+    #[cfg(not(target_os = "macos"))]
+    true
+}
+
+/// Completes window preparation after React, fonts, and saved zoom are ready.
+/// Native startup already shows the window independently of this callback.
+#[tauri::command]
+pub async fn reveal_main_window<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
+    if window.label() != "main" || main_window_ready() {
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        window
+            .with_webview(move |webview| unsafe {
+                if !main_window_ready() {
+                    let ns_window = webview.ns_window() as id;
+                    apply_modern_window_style(ns_window, -4.0, 0.0);
+                    let _: () = msg_send![ns_window, displayIfNeeded];
+                    MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
+                    ns_window.makeKeyAndOrderFront_(nil);
+                }
+                let _ = send.send(());
+            })
+            .map_err(|error| error.to_string())?;
+        receive.await.map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 /// Opts a Windows 11 window into the system's rounded-corner treatment. No-op on
@@ -445,34 +487,39 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
         return;
     }
 
-    let close_frame: cocoa::foundation::NSRect = msg_send![close_button, frame];
-    let titlebar_view: id = msg_send![close_button, superview];
-    let default_y = if titlebar_view.is_null() {
-        close_frame.origin.y
+    // Match the 38-point HTML titlebar's center, in content coordinates.
+    // Converting into each button's superview avoids AppKit titlebar-height
+    // and flipped-coordinate assumptions across macOS versions.
+    let content_view = ns_window.contentView();
+    let bounds: cocoa::foundation::NSRect = msg_send![content_view, bounds];
+    let flipped: bool = msg_send![content_view, isFlipped];
+    let center_y = if flipped {
+        19.0 + offset_y
     } else {
-        let titlebar_bounds: cocoa::foundation::NSRect = msg_send![titlebar_view, bounds];
-        ((titlebar_bounds.size.height - close_frame.size.height) / 2.0).max(0.0)
+        bounds.size.height - 19.0 - offset_y
     };
-
-    let new_x = default_x + offset_x;
-    let new_y = default_y - offset_y;
-
-    let new_frame = cocoa::foundation::NSRect::new(NSPoint::new(new_x, new_y), close_frame.size);
-    let _: () = msg_send![close_button, setFrame: new_frame];
-
-    if !miniaturize_button.is_null() {
-        let frame: cocoa::foundation::NSRect = msg_send![miniaturize_button, frame];
-        let new_frame =
-            cocoa::foundation::NSRect::new(NSPoint::new(new_x + button_spacing, new_y), frame.size);
-        let _: () = msg_send![miniaturize_button, setFrame: new_frame];
-    }
-
-    if !zoom_button.is_null() {
-        let frame: cocoa::foundation::NSRect = msg_send![zoom_button, frame];
-        let new_frame = cocoa::foundation::NSRect::new(
-            NSPoint::new(new_x + button_spacing * 2.0, new_y),
+    for (index, button) in [close_button, miniaturize_button, zoom_button]
+        .iter()
+        .enumerate()
+    {
+        if button.is_null() {
+            continue;
+        }
+        let button = *button;
+        let frame: cocoa::foundation::NSRect = msg_send![button, frame];
+        let parent: id = msg_send![button, superview];
+        if parent.is_null() {
+            continue;
+        }
+        let rect = cocoa::foundation::NSRect::new(
+            NSPoint::new(
+                default_x + offset_x + button_spacing * index as f64,
+                center_y - frame.size.height / 2.0,
+            ),
             frame.size,
         );
-        let _: () = msg_send![zoom_button, setFrame: new_frame];
+        let converted: cocoa::foundation::NSRect =
+            msg_send![parent, convertRect: rect fromView: content_view];
+        let _: () = msg_send![button, setFrame: converted];
     }
 }

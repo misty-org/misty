@@ -2,7 +2,7 @@ import { Alert, AlertDescription, cn } from "@/shared/ui";
 
 const toneClasses: Record<AuthMessageProps["tone"], string> = {
   error: "border-charcoal-active/30 bg-charcoal-active text-cream-bright",
-  success: "border-status-green/25 bg-sage-bg text-sage-fg",
+  success: "border-charcoal-border bg-charcoal-card text-cream",
   muted: "border-charcoal-border bg-charcoal-card text-cream-muted",
 };
 

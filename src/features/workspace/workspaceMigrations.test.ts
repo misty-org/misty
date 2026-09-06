@@ -32,6 +32,29 @@ function retiredSearchTab(): WorkspaceTab {
 }
 
 describe("workspace surface migration", () => {
+  it.each(["transfers", "official-app"] as const)(
+    "moves saved %s tabs into Files without losing their identity",
+    (surfaceId) => {
+      const tab = {
+        ...legacyHomeTab(),
+        surfaceId,
+        groupKey: "app:transfers" as const,
+        instanceKey: "transfers",
+        title: "Transfers",
+        route: "/apps/transfers",
+        state: { filter: "failed" },
+      };
+      const pane = createDockLeaf([tab]);
+      const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id });
+      expect(dockTabs(migrated.root)[0]).toMatchObject({
+        id: tab.id,
+        groupKey: "app:files",
+        instanceKey: "files",
+        route: "/apps/files?view=transfers",
+        state: tab.state,
+      });
+    },
+  );
   it("keeps a restored Home tab intact", () => {
     const pane = createDockLeaf([legacyHomeTab()]);
     const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id }, "global");
@@ -58,7 +81,7 @@ describe("workspace surface migration", () => {
       groupKey: "space:family",
       instanceKey: "family",
       title: "Space",
-      route: "/spaces/family/notes",
+      route: "/spaces/family/home",
     });
   });
 
@@ -77,8 +100,32 @@ describe("workspace surface migration", () => {
       6,
     );
 
-    expect(dockTabs(migrated.layout.root)[0].surfaceId).toBe("inbox");
-    expect(dockTabs(migrated.layoutsByScope.global!.root)[0].surfaceId).toBe("inbox");
+    expect(dockTabs(migrated.layout.root)[0].surfaceId).toBe("home");
+    expect(dockTabs(migrated.layoutsByScope.global!.root)[0].surfaceId).toBe("home");
+  });
+
+  it("moves bundled tools onto the App runtime", () => {
+    const pane = createDockLeaf([
+      {
+        ...legacyHomeTab(),
+        id: "tab:legacy-files",
+        surfaceId: "files",
+        groupKey: "app:files",
+        instanceKey: "files",
+        title: "Files",
+        route: "/apps/files",
+      },
+    ]);
+    const migrated = migrateRetiredWorkspaceTabs({ root: pane, focusedPaneId: pane.id });
+
+    expect(dockTabs(migrated.root)[0]).toMatchObject({
+      surfaceId: "official-app",
+      groupKey: "app:files",
+      instanceKey: "files",
+      title: "Files",
+      route: "/apps/files",
+      state: {},
+    });
   });
 
   it("moves saved Chat tabs into the Social group and canonical route", () => {
@@ -95,10 +142,11 @@ describe("workspace surface migration", () => {
     ]);
     const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
     expect(dockTabs(migrated.root)[0]).toMatchObject({
-      groupKey: "space:family:social",
-      instanceKey: "family:social",
+      surfaceId: "official-app",
+      groupKey: "app:chat",
+      instanceKey: "chat",
       title: "Social",
-      route: "/spaces/family/social/misty?conversation=one",
+      route: "/apps/social?space=family&conversation=one",
     });
   });
 
@@ -110,13 +158,13 @@ describe("workspace surface migration", () => {
         surfaceId: "space",
         groupKey: "space:family:social",
         instanceKey: "family:social",
-        title: "Social",
+        title: "Chat",
         route: "/spaces/family/social?provider=instagram&conversation=one",
       },
     ]);
     const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
     expect(dockTabs(migrated.root)[0]?.route).toBe(
-      "/spaces/family/social/instagram?conversation=one",
+      "/apps/social?space=family&provider=instagram&conversation=one",
     );
   });
 
@@ -128,13 +176,13 @@ describe("workspace surface migration", () => {
         surfaceId: "space",
         groupKey: "space:family:social",
         instanceKey: "family:social",
-        title: "Social",
+        title: "Chat",
         route: "/spaces/family/social/x?conversation=direct-one",
       },
     ]);
     const migrated = migrateSpaceToolTabs({ root: pane, focusedPaneId: pane.id });
     expect(dockTabs(migrated.root)[0]?.route).toBe(
-      "/spaces/family/social/x?conversation=direct-one",
+      "/apps/social?space=family&conversation=direct-one&provider=x",
     );
   });
 });

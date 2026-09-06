@@ -1,25 +1,12 @@
-import { AgentsPage } from "@/features/agents";
-import { ExtensionAppWorkspace } from "@/features/extensions";
-import { BrowserWorkspace } from "@/features/browser";
-import { DeveloperWorkspace } from "@/features/developer-workspace";
-import FilesPage from "@/features/files/explorer";
-import { MarketplacePage } from "@/features/marketplace";
-import { InboxWorkspace } from "@/features/inbox";
-import { TerminalWorkspace } from "@/features/terminal";
-import { TransfersWorkspacePanel } from "@/features/transfers";
+import { DiscoverPage } from "@/features/marketplace";
+import { OfficialAppRuntimePage } from "@/features/apps";
 import { canonicalSpaceRoute, socialProviderFromRoute, SpaceSectionView } from "@/features/spaces";
 import { WorkspaceTabRouteScope, type WorkspaceTab } from "@/features/workspace";
-import { isWebBuild } from "@/shared/platform/buildTarget";
-import { cn, ComingSoonSurface, DesktopAccessState, ErrorState } from "@/shared/ui";
+import { cn, ComingSoonSurface, ErrorState } from "@/shared/ui";
 import { Plus } from "lucide-react";
 
 /** Static surface for a workspace tab that isn't the currently-routed one. */
 export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; active?: boolean }) {
-  if (isWebBuild) {
-    const desktopFeature = desktopFeatureForSurface(tab.surfaceId);
-    if (desktopFeature) return <DesktopAccessState feature={desktopFeature} />;
-  }
-
   const scopedTab =
     tab.surfaceId === "space" ? { ...tab, route: canonicalSpaceRoute(tab.route) } : tab;
   return (
@@ -33,27 +20,31 @@ function WorkspaceSurfaceContent({ tab, active }: { tab: WorkspaceTab; active: b
   switch (tab.surfaceId) {
     case "home":
       return <ComingSoonSurface feature="Home" />;
-    case "inbox":
-      return <InboxWorkspace workspaceId={tab.id} initialRoute={tab.route} />;
-    case "browser":
-      return <BrowserWorkspace tab={tab} />;
-    case "terminal":
-      return <TerminalWorkspace tab={tab} active={active} />;
-    case "code":
-      return <DeveloperWorkspace tab={tab} />;
-    case "files":
-      return <FilesPage embedded workspaceId={tab.id} workspaceTitle={tab.title} />;
-    case "transfers":
-      return <TransfersWorkspacePanel workspaceId={tab.id} />;
-    case "agents":
-      return <AgentsPage />;
-    case "extension":
-      return <ExtensionAppWorkspace tab={tab} />;
+    case "official-app":
+      return <OfficialAppRuntimePage appId={appIdFromTab(tab)} tab={tab} active={active} />;
     case "marketplace":
-      return <MarketplacePage embedded />;
+      return <DiscoverPage embedded />;
     case "space":
       return <SpacePane tab={tab} />;
+    default:
+      return <LegacyAppSurface title={tab.title} />;
   }
+}
+
+function LegacyAppSurface({ title }: { title: string }) {
+  return (
+    <ErrorState
+      className="h-full"
+      title={`${title || "This App"} moved to Discover`}
+      description="This saved tab used Misty’s retired built-in runtime. Close it and open the App from Discover."
+    />
+  );
+}
+
+function appIdFromTab(tab: WorkspaceTab): string {
+  if (tab.groupKey.startsWith("app:")) return tab.groupKey.slice(4);
+  const parts = tab.route.split(/[?#]/)[0].split("/").filter(Boolean);
+  return parts[0] === "apps" ? safeDecode(parts[1] ?? "") : "";
 }
 
 export function desktopFeatureForSurface(surfaceId: WorkspaceTab["surfaceId"]): string | null {

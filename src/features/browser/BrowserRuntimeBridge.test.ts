@@ -31,6 +31,14 @@ describe("browser blocking overlays", () => {
 });
 
 describe("active native Browser ownership", () => {
+  it("recognizes the Browser App without treating other Apps as native browser owners", () => {
+    const root = createDockLeaf([
+      { id: "app-browser", surfaceId: "official-app", groupKey: "app:browser" } as never,
+    ]);
+    expect(activeBrowserSurfaceExists(root)).toBe(true);
+    root.tabs[0].groupKey = "app:inbox";
+    expect(activeBrowserSurfaceExists(root)).toBe(false);
+  });
   it("releases native Browser content when Inbox is the active surface", () => {
     const root = initialWorkspaceLayout().root;
 
@@ -67,7 +75,15 @@ describe("browser popup tab opening", () => {
 
     const focusedPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     expect(focusedPane.activeTabId).toBe(second.id);
-    expect(focusedPane.tabs.map((t) => t.id)).toEqual([first.id, second.id]);
+    expect(
+      focusedPane.tabs
+        .filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([first.id, second.id]);
   });
 
   it("focuses the owning split when the native page receives a pointer-down", () => {

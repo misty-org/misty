@@ -12,7 +12,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalNavigator } from "./GlobalNavigator";
-import { browserTab, spaceFixture, spaceTab } from "./GlobalNavigator.testFixtures";
+import {
+  createAppNavigationRegistration,
+  useAppNavigationStore,
+} from "@/features/apps/appNavigation";
+import { createAppRpcScope } from "@/features/apps/rpc/session";
+import { executeAppCapability } from "@/features/apps/appCapabilityGateway";
+import type { OfficialApp } from "@/api/apps";
+import {
+  browserTab,
+  seedNavigatorApps,
+  spaceFixture,
+  spaceTab,
+} from "./GlobalNavigator.testFixtures";
 
 const desktopPetMocks = vi.hoisted(() => ({
   toggleDesktopMistyPanel: vi.fn(async () => false),
@@ -35,6 +47,7 @@ describe("GlobalNavigator Space tools", () => {
   let root: Root;
 
   beforeEach(() => {
+    useAppNavigationStore.setState({ entries: [] });
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -57,8 +70,9 @@ describe("GlobalNavigator Space tools", () => {
       },
     });
     useWorkspaceStore.getState().reset();
+    seedNavigatorApps();
     useNavigatorAppsStore.setState({
-      appIdsByAccount: { "account-1": [...NAVIGATOR_APP_IDS] },
+      appIdsByAccount: {},
       collapsedByAccount: { "account-1": false },
     });
     useWorkspaceStore.setState({
@@ -153,7 +167,7 @@ describe("GlobalNavigator Space tools", () => {
     ).toBe("Notes");
   });
 
-  it("keeps Home, Store, and Search separate from configurable apps", async () => {
+  it("keeps Home, Discover, and Search separate from configurable apps", async () => {
     await renderNavigator();
     const navigation = container.querySelector(
       '[data-navigator-section-scroll="primary navigation"]',
@@ -171,14 +185,21 @@ describe("GlobalNavigator Space tools", () => {
     const actions = container.querySelector('[aria-label="Workspace actions"]');
     expect(
       [...actions!.querySelectorAll("a, button")].map((item) => item.getAttribute("aria-label")),
-    ).toEqual(["Home", "Store", "Search"]);
+    ).toEqual(["Home", "Discover"]);
     expect(actions?.querySelector('a[aria-label="Home"]')?.getAttribute("href")).toBe(
       "/spaces/space-1/home",
     );
-    expect(actions?.querySelector('a[aria-label="Store"]')?.getAttribute("href")).toBe("/store");
+    expect(actions?.querySelector('a[aria-label="Discover"]')?.getAttribute("href")).toBe(
+      "/discover",
+    );
+
+    const searchButton = container.querySelector<HTMLButtonElement>(
+      '[data-navigator-space-row="true"] button[aria-label="Search"]',
+    );
+    expect(searchButton).not.toBeNull();
 
     await act(async () => {
-      actions?.querySelector<HTMLButtonElement>('button[aria-label="Search"]')?.click();
+      searchButton?.click();
       await vi.waitFor(() =>
         expect(desktopPetMocks.toggleDesktopMistyPanel).toHaveBeenCalledOnce(),
       );
@@ -191,7 +212,11 @@ describe("GlobalNavigator Space tools", () => {
     await renderNavigator();
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Search"]')?.click();
+      container
+        .querySelector<HTMLButtonElement>(
+          '[data-navigator-space-row="true"] button[aria-label="Search"]',
+        )
+        ?.click();
       await vi.waitFor(() =>
         expect(desktopPetMocks.toggleDesktopMistyPanel).toHaveBeenCalledOnce(),
       );
@@ -211,10 +236,11 @@ describe("GlobalNavigator Space tools", () => {
     expect(switcher?.querySelector('[aria-label="Family default profile picture"]')).not.toBeNull();
     expect(switcher?.querySelector('img[alt=""]')).toBeNull();
     expect(switcher?.className).toContain("h-9");
-    expect(switcher?.className).toContain("px-2.5");
-    expect(switcher?.className).toContain("w-full");
+    expect(switcher?.className).toContain("flex-1");
+    expect(switcher?.className).toContain("max-w-[calc(100%_-_2.5rem)]");
     const activeSpaceName = switcher?.querySelector('[data-active-space-name="true"]');
     expect(activeSpaceName?.className).toContain("overflow-hidden");
+    expect(activeSpaceName?.className).toContain("max-w-[150px]");
     expect(activeSpaceName?.className).not.toContain("mask-image");
     expect(activeSpaceName?.getAttribute("data-text-overflowing")).toBe("false");
     expect(activeSpaceName?.className).not.toContain("truncate");
@@ -233,16 +259,12 @@ describe("GlobalNavigator Space tools", () => {
     expect(actions?.className).toContain("grid");
     expect(actions?.className).toContain("gap-1");
     expect(actions?.className).toContain("w-full");
-    const searchButton = actions?.querySelector('button[aria-label="Search"]');
+    const searchButton = spaceRow?.querySelector('button[aria-label="Search"]');
     const homeButton = actions?.querySelector('a[aria-label="Home"]');
-    const marketplaceButton = actions?.querySelector('a[aria-label="Store"]');
-    expect(searchButton?.className).toContain("h-9");
-    expect(searchButton?.className).toContain("w-full");
-    expect(searchButton?.className).toContain("justify-start");
-    expect(searchButton?.className).toContain("text-cream-bright");
-    expect(searchButton?.className).not.toContain("text-cream-muted");
+    const marketplaceButton = actions?.querySelector('a[aria-label="Discover"]');
+    expect(searchButton?.className).toContain("size-9");
     expect(searchButton?.querySelector("svg")?.getAttribute("width")).toBe("18");
-    expect(searchButton?.textContent).toBe("Search");
+    expect(searchButton?.textContent).toBe("");
     expect(homeButton?.className).toContain("text-cream-bright");
     expect(homeButton?.className).not.toContain("text-avatar-yellow");
     expect(homeButton?.className).toContain("h-9");
@@ -253,7 +275,7 @@ describe("GlobalNavigator Space tools", () => {
     expect(marketplaceButton?.className).toContain("w-full");
     expect(marketplaceButton?.className).toContain("text-cream-bright");
     expect(marketplaceButton?.querySelector("svg")?.getAttribute("width")).toBe("18");
-    expect(marketplaceButton?.textContent).toBe("Store");
+    expect(marketplaceButton?.textContent).toBe("Discover");
     expect(container.querySelector('[data-navigator-space-switcher="true"]')).toBeNull();
 
     expect(container.querySelector('button[aria-label="Collapse Apps"]')?.textContent).toContain(
@@ -281,11 +303,11 @@ describe("GlobalNavigator Space tools", () => {
     );
   });
 
-  it("opens Store from the workspace header", async () => {
+  it("opens Discover from the workspace header", async () => {
     await renderNavigator();
 
     await act(async () => {
-      container.querySelector<HTMLAnchorElement>('a[aria-label="Store"]')?.click();
+      container.querySelector<HTMLAnchorElement>('a[aria-label="Discover"]')?.click();
       await Promise.resolve();
     });
 
@@ -294,8 +316,8 @@ describe("GlobalNavigator Space tools", () => {
         expect.objectContaining({
           surfaceId: "marketplace",
           groupKey: "tool:marketplace",
-          route: "/store",
-          title: "Store",
+          route: "/discover",
+          title: "Discover",
         }),
       ]),
     );
@@ -412,7 +434,7 @@ describe("GlobalNavigator Space tools", () => {
     ).not.toBeNull();
   });
 
-  it("keeps creation and persistent row actions in the Space menu", async () => {
+  it("keeps creation and hover-revealed row actions in the Space menu", async () => {
     await renderNavigator();
 
     const menu = await openSpaceMenu();
@@ -423,17 +445,49 @@ describe("GlobalNavigator Space tools", () => {
     expect(menu?.querySelector('a[aria-label="Family settings"]')).not.toBeNull();
 
     const actions = menu?.querySelector('[data-space-row-actions="space-1"]');
-    expect(actions?.className).toContain("opacity-100");
-    expect(actions?.className).toContain("pointer-events-auto");
+    expect(actions?.className).toContain("opacity-0");
+    expect(actions?.className).toContain("group-hover/space-menu-row:opacity-100");
     expect(actions?.className).toContain("w-[86px]");
-    expect(actions?.className).not.toContain("opacity-0");
     const spaceName = menu?.querySelector('[data-space-name="space-1"]');
     expect(spaceName?.className).toContain("overflow-hidden");
     expect(spaceName?.className).not.toContain("mask-image");
     expect(spaceName?.getAttribute("data-text-overflowing")).toBe("false");
     expect(spaceName?.getAttribute("title")).toBe("Family");
     expect(spaceName?.closest('[role="menuitem"]')?.className).toContain("pr-[94px]");
-    expect(menu?.className).toContain("w-[304px]");
+    expect(menu?.className).toContain("w-[240px]");
+  });
+
+  it("limits active space name width and fades out overflowing text", async () => {
+    const longSpace = {
+      ...spaceFixture,
+      id: "space-long",
+      name: "Very Long Space Name That Exceeds The Maximum Allowed Header Width",
+    };
+    useSpacesStore.setState({
+      spaces: [longSpace],
+    });
+    useWorkspaceStore.setState({
+      activeScopeKey: "space:space-long",
+    });
+
+    await renderNavigator("/spaces/space-long/notes");
+
+    const switcher = container.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Switch Space, current Space: Very Long Space Name"]',
+    );
+    expect(switcher).not.toBeNull();
+    expect(switcher?.className).toContain("flex-1");
+    expect(switcher?.className).toContain("max-w-[calc(100%_-_2.5rem)]");
+
+    const activeSpaceName = switcher?.querySelector('[data-active-space-name="true"]');
+    expect(activeSpaceName?.className).toContain("max-w-[150px]");
+    expect(activeSpaceName?.className).toContain("overflow-hidden");
+    expect(activeSpaceName?.getAttribute("title")).toBe(
+      "Very Long Space Name That Exceeds The Maximum Allowed Header Width",
+    );
+
+    const spaceRow = container.querySelector('[data-navigator-space-row="true"]');
+    expect(spaceRow?.querySelector('button[aria-label="Search"]')).not.toBeNull();
   });
 
   it("removes the permanent Spaces section from the navigator", async () => {
@@ -546,7 +600,7 @@ describe("GlobalNavigator Space tools", () => {
     });
 
     const currentTabs = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(currentTabs.some((t) => t.surfaceId === "browser")).toBe(true);
+    expect(currentTabs.some((tab) => tab.groupKey === "app:browser")).toBe(true);
   });
 
   it("aligns every navigation row to the same icon and horizontal spacing", async () => {
@@ -565,8 +619,8 @@ describe("GlobalNavigator Space tools", () => {
     for (const row of toolLinks) {
       const iconContainer = row.firstElementChild;
       expect(iconContainer?.tagName.toLowerCase()).toBe("span");
-      expect(iconContainer?.className).toContain("size-7");
-      expect(iconContainer?.className).toContain("place-items-center");
+      expect(iconContainer?.className).toContain("size-[18px]");
+      expect(iconContainer?.className).toContain("justify-center");
       expect(iconContainer?.querySelector("svg")?.getAttribute("width")).toBe("20");
       expect(iconContainer?.querySelector("svg")?.classList.contains("!size-5")).toBe(true);
       const appIcon = iconContainer?.querySelector<HTMLElement>("[data-app-icon]");
@@ -582,8 +636,9 @@ describe("GlobalNavigator Space tools", () => {
     const switcher = container.querySelector(
       'button[aria-label="Switch Space, current Space: Family"]',
     );
-    expect(switcher?.className.split(" ")).toContain("w-full");
-    expect(switcher?.firstElementChild?.className).toContain("size-7");
+    expect(switcher?.className.split(" ")).toContain("flex-1");
+    expect(switcher?.className.split(" ")).toContain("max-w-[calc(100%_-_2.5rem)]");
+    expect(switcher?.firstElementChild?.className).toContain("size-[18px]");
     expect(switcher?.firstElementChild?.querySelector("[class*='size-7']")).not.toBeNull();
     expect(switcher?.lastElementChild?.className).toContain("gap-1");
     expect(switcher?.lastElementChild?.className).not.toContain("flex-1");
@@ -595,6 +650,84 @@ describe("GlobalNavigator Space tools", () => {
     expect(switcher?.lastElementChild?.lastElementChild?.getAttribute("class")).toContain(
       "duration-150",
     );
+  });
+
+  it("renders instance-owned SDK navigation, opens its workspace route and removes it on close", async () => {
+    const scope = createAppRpcScope({
+      identity: {
+        appId: "journal",
+        accountId: "account-1",
+        spaceId: "space-1",
+        instanceId: "tab-1",
+      },
+      scopes: ["navigation.write"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      isCurrentAccount: () => true,
+    });
+    const navigation = createAppNavigationRegistration(scope);
+    const otherScope = createAppRpcScope({
+      identity: {
+        appId: "journal",
+        accountId: "another-account",
+        spaceId: "space-1",
+        instanceId: "other-tab",
+      },
+      scopes: ["navigation.write"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      isCurrentAccount: () => true,
+    });
+    createAppNavigationRegistration(otherScope).setItems([
+      { id: "private", label: "Other account private item", route: "/apps/journal?space=space-1" },
+    ]);
+    try {
+      await executeAppCapability(
+        {
+          app: { id: "journal", slug: "journal", scopes: ["navigation.write"] } as OfficialApp,
+          session: {
+            app_id: "journal",
+            space_id: "space-1",
+            scopes: ["navigation.write"],
+            expires_at: "2099-01-01T00:00:00Z",
+            token: "fixture",
+            sdk_base_url: "/app-runtime",
+          },
+          serverBase: "https://misty.example/v1",
+          user: { id: "account-1", name: "Fixture", email: "fixture@example.com" },
+          platform: "desktop",
+          setNavigationItems: navigation.setItems,
+        },
+        "navigation.setItems",
+        {
+          items: [
+            {
+              id: "downloaded",
+              label: "Downloaded app view",
+              route: "/apps/journal?view=drawings",
+            },
+          ],
+        },
+      );
+      await renderNavigator();
+      expect(container.textContent).not.toContain("Other account private item");
+      const link = [...container.querySelectorAll("a")].find((item) =>
+        item.textContent?.includes("Downloaded app view"),
+      );
+      expect(link?.getAttribute("href")).toBe("/apps/journal?view=drawings&space=space-1");
+      await act(async () =>
+        link?.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0 })),
+      );
+      expect(
+        dockTabs(useWorkspaceStore.getState().layout.root).some(
+          (tab) => tab.route === "/apps/journal?view=drawings&space=space-1",
+        ),
+      ).toBe(true);
+      await act(async () => scope.close());
+      expect(container.textContent).not.toContain("Downloaded app view");
+      expect(container.querySelector('[data-navigator-disclosure="journal"]')).not.toBeNull();
+    } finally {
+      scope.close();
+      otherScope.close();
+    }
   });
 
   async function openSpaceMenu() {

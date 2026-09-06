@@ -49,7 +49,7 @@ import {
   PanelResizeHandle,
   type ImperativePanelGroupHandle,
 } from "react-resizable-panels";
-import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
+import { WorkspaceSurface } from "./WorkspaceSurface";
 import {
   AiPaneHost,
   type AiContextReference,
@@ -81,6 +81,7 @@ const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
   files: FolderOpen,
   transfers: ArrowLeftRight,
   agents: Bot,
+  "official-app": Blocks,
   extension: Blocks,
   marketplace: Store,
 };
@@ -94,8 +95,9 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   files: "Files",
   transfers: "Transfers",
   agents: "Agents",
+  "official-app": "App",
   extension: "App",
-  marketplace: "Store",
+  marketplace: "Discover",
 };
 const tabDragType = "application/x-misty-workspace-tab";
 
@@ -119,6 +121,9 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
       const isHome = routeParts[2] === "home";
       label = tool === "space" ? (isHome ? "Home" : "Space") : spaceToolLabel(tool);
       contextLabel = `${spaceName} · ${label}`;
+    } else if (tab.surfaceId === "official-app") {
+      label = tab.title || "App";
+      contextLabel = label;
     }
     const existing = map.get(key);
     if (existing) {
@@ -173,7 +178,7 @@ export interface WorkspaceDockTreeProps {
   focusedPaneId: string;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceTab) => void;
-  onClose: (tab: WorkspaceTab) => void;
+  onClose: (tab: WorkspaceTab, paneId: string) => void;
   onOpenNewTab: (option: NewTabOption, paneId: string) => void;
   onMoveTab: (tabId: string, paneId: string, index?: number) => boolean;
   onDockTab: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
@@ -293,11 +298,10 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
   const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId) ?? pane.tabs[0];
   const focused = pane.id === props.focusedPaneId;
-  const mountedTabs = pane.tabs.filter(
-    (tab) =>
-      tab.id === activeTab?.id ||
-      dockWidgetRegistry.get(tab.surfaceId).mountPolicy === "keep-alive",
-  );
+  // Open tabs own live UI state and subscriptions. Hiding an inactive surface
+  // must not unmount it, otherwise collaborative tools reconnect and reload on
+  // every tab switch. Closing the tab remains the lifecycle boundary.
+  const mountedTabs = pane.tabs;
   const groups = groupTabs(pane.tabs);
   const canCloseTab = pane.tabs.length > 0;
   const scopedTabs = useMemo(
@@ -413,8 +417,9 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       >
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           <div
-            className="flex min-w-0 flex-[0_1_auto] items-center gap-1 overflow-hidden"
+            className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
             aria-label="Open apps"
+            data-tour-target="workspace-tab-bar"
           >
             {groups.map((group) => (
               <WorkspaceTabGroupButton
@@ -426,14 +431,14 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
                 canCloseTab={(tab) => canCloseWorkspaceTab(tab, scopedTabs)}
                 lastUsedTabByGroup={props.lastUsedTabByGroup}
                 onOpen={props.onOpen}
-                onClose={props.onClose}
+                onClose={(tab) => props.onClose(tab, pane.id)}
                 onMoveTab={(tabId, index) => props.onMoveTab(tabId, pane.id, index)}
                 paneTabs={pane.tabs}
               />
             ))}
-          </div>
-          <div className="flex shrink-0 items-center">
-            <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
+            <div className="flex shrink-0 items-center">
+              <WorkspaceNewTabMenu paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
+            </div>
           </div>
         </div>
         <div className="ml-1.5 flex h-7 shrink-0 items-center gap-0.5">
@@ -507,39 +512,28 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         onReopenWindow={props.onReopenVirtualWindow}
       />
       <div className="min-h-0 min-w-0 overflow-hidden">
-        {activeTab ? (
-          mountedTabs.map((mountedTab) => {
-            const isActive = mountedTab.id === activeTab.id;
-            return (
-              <div
-                key={mountedTab.id}
-                className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
-                aria-hidden={!isActive}
-              >
-                <AiPaneHost
-                  paneId={pane.id}
-                  defaultAdapter={workspaceAiAdapter(mountedTab)}
-                  active={isActive}
+        {activeTab
+          ? mountedTabs.map((mountedTab) => {
+              const isActive = mountedTab.id === activeTab.id;
+              return (
+                <div
+                  key={mountedTab.id}
+                  className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
+                  aria-hidden={!isActive}
                 >
-                  <WorkspaceTabTitleProvider tabId={mountedTab.id}>
-                    <WorkspaceSurface tab={mountedTab} active={isActive} />
-                  </WorkspaceTabTitleProvider>
-                </AiPaneHost>
-              </div>
-            );
-          })
-        ) : (
-          <AiPaneHost paneId={pane.id} active>
-            <EmptyWorkspacePane
-              onOpen={() => {
-                useWorkspaceStore.getState().focusPane(pane.id);
-                window.dispatchEvent(
-                  new CustomEvent("misty:open-new-tab-picker", { detail: { paneId: pane.id } }),
-                );
-              }}
-            />
-          </AiPaneHost>
-        )}
+                  <AiPaneHost
+                    paneId={pane.id}
+                    defaultAdapter={workspaceAiAdapter(mountedTab)}
+                    active={isActive}
+                  >
+                    <WorkspaceTabTitleProvider tabId={mountedTab.id}>
+                      <WorkspaceSurface tab={mountedTab} active={isActive} />
+                    </WorkspaceTabTitleProvider>
+                  </AiPaneHost>
+                </div>
+              );
+            })
+          : null}
       </div>
       {dropZone ? <DockDropPreview zone={dropZone} /> : null}
     </section>
@@ -561,6 +555,7 @@ function workspaceAiAdapter(tab: WorkspaceTab | undefined): AiSurfaceAdapter | n
 }
 
 function aiSurfaceForTab(tab: WorkspaceTab): AiSurfaceId {
+  if (tab.surfaceId === "official-app") return "extension";
   if (tab.surfaceId !== "space") return tab.surfaceId;
   const parts = tab.route.split("?")[0].split("/").filter(Boolean);
   const section = parts[2] ?? "";
@@ -724,7 +719,7 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
     action(
       "marketplace.explain",
       "Explain",
-      "Explain the visible Store item and what access it needs.",
+      "Explain the visible Discover item and what access it needs.",
     ),
   ],
 };

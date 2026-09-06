@@ -2,7 +2,7 @@ import { useSetupStore } from "@/features/installer";
 import { routes } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import {
-  preferredMistySpace,
+  preferredDefaultSpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
   socialProviderPath,
@@ -37,6 +37,8 @@ function toBrowserEntry(plugin: PluginEntry): MarketplaceEntry {
     kind: "app",
     name: plugin.name,
     version: plugin.version,
+    catalogVersion: plugin.catalog_version,
+    updateAvailable: plugin.update_available,
     author: plugin.author,
     overview: plugin.overview,
     installed: plugin.installed,
@@ -63,6 +65,7 @@ const builtInApps: MarketplaceEntry[] = NAVIGATOR_APP_IDS.map((id) => ({
   kind: "builtin",
   name: WORKSPACE_TOOLS_META[id].label,
   version: "1",
+  updateAvailable: false,
   author: "Misty",
   overview: NAVIGATOR_APP_DESCRIPTIONS[id],
   installed: true,
@@ -209,7 +212,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
     };
     return {
       surfaceId: "marketplace",
-      label: selected?.name ?? "Store",
+      label: selected?.name ?? "Discover",
       getContext: () => [
         {
           kind: "apps.catalog",
@@ -328,7 +331,7 @@ export default function MarketplacePage(props: { embedded?: boolean }) {
       onPrimaryAction={(plugin) => {
         const appId = builtInAppId(plugin);
         if (appId) {
-          navigate(builtInAppRoute(appId, preferredMistySpace(spaces)?.id, user?.id ?? ""));
+          navigate(builtInAppRoute(appId, preferredDefaultSpace(spaces)?.id, user?.id ?? ""));
           return;
         }
         navigate(extensionAppRoute(plugin.id, { title: plugin.name }));

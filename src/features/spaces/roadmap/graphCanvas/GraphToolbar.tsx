@@ -1,6 +1,6 @@
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui";
 import { ClipboardPaste, Copy, CopyPlus, Maximize2, Redo2, Trash2, Undo2 } from "lucide-react";
-import { useShortcutTitle } from "@/features/shortcuts";
+import { useRoadmapShortcutTitle as useShortcutTitle } from "../spaceRoadmap/roadmapRuntime";
 
 export function GraphToolbar(props: {
   canEdit: boolean;

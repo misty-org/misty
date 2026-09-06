@@ -1,4 +1,4 @@
-import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "../libraryRuntime";
 import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useMemo, useState } from "react";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
@@ -101,7 +101,9 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
       .catch((error: unknown) => {
         if (!current) return;
         if (
-          error instanceof SpaceRequestError &&
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
           error.code === "library_reauthentication_required" &&
           sensitiveCollectionScope
         ) {

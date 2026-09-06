@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { SpacePageLoadingPlaceholder } from "../components/SpacesLoadingPlaceholder";
-import { preferredMistySpace } from "../mistySpace";
+import { preferredDefaultSpace } from "../defaultSpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
 import type { SpacesShellOutletContext } from "./outletContext";
@@ -26,7 +26,7 @@ export function SpacesIndexRedirect() {
 
   useEffect(() => {
     if (!destination) return;
-    navigate(destination, { replace: true, state: { mistySpaceSwitch: true } });
+    navigate(destination, { replace: true, state: { spaceSwitch: true } });
   }, [destination, navigate]);
 
   if (loading || (!snapshotReady && !error)) {
@@ -60,7 +60,7 @@ export function SpacesIndexRedirect() {
 }
 
 export function resolveSpacesLandingRoute(spaces: Space[]): string | null {
-  const fallback = preferredMistySpace(spaces);
+  const fallback = preferredDefaultSpace(spaces);
   if (!fallback) return null;
   return defaultSpaceRoute(fallback.id);
 }

@@ -1,8 +1,9 @@
 import { DEFAULT_NAVIGATOR_APP_IDS, useNavigatorAppsStore } from "@/features/workspace";
+import { useAppsStore } from "@/features/apps";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NavigatorAppsSection } from "./NavigatorAppsSection";
 
 describe("NavigatorAppsSection", () => {
@@ -14,6 +15,43 @@ describe("NavigatorAppsSection", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     useNavigatorAppsStore.setState({ appIdsByAccount: {}, collapsedByAccount: {} });
+    const appIds = ["inbox", "chat", "journal", "files", "agents", "browser", "terminal"];
+    useAppsStore.setState({
+      ready: true,
+      actionAppId: "",
+      catalog: appIds.map((id) => ({
+        id,
+        name: id === "chat" ? "Chat" : `${id[0]?.toUpperCase()}${id.slice(1)}`,
+        publisher: "Misty" as const,
+        description: id === "browser" ? "Browse the web in Misty" : `${id} app`,
+        version: "1.0.0",
+        permission_version: 1,
+        minimum_host_protocol: 1,
+        official: true as const,
+        age_rating: "4+",
+        scopes: [],
+        desktop: { runtime: "hosted" as const },
+        mobile: { runtime: "hosted" as const },
+      })),
+      installations: appIds.map((app_id, pin_rank) => ({
+        app_id,
+        state: "installed" as const,
+        installed_version: "1.0.0",
+        permission_version: 1,
+        granted_scopes: [],
+        pinned: pin_rank < 5,
+        pin_rank,
+        installed_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+      })),
+      setPinned: vi.fn(async (appId, pinned) => {
+        useAppsStore.setState((state) => ({
+          installations: state.installations.map((item) =>
+            item.app_id === appId ? { ...item, pinned } : item,
+          ),
+        }));
+      }),
+    });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -45,7 +83,7 @@ describe("NavigatorAppsSection", () => {
     );
     expect(browser?.getAttribute("aria-pressed")).toBe("false");
     await act(async () => browser?.click());
-    expect(useNavigatorAppsStore.getState().appIdsByAccount["account-1"]).toContain("browser");
+    expect(useAppsStore.getState().installations.find((item) => item.app_id === "browser")?.pinned).toBe(true);
 
     await act(async () => {
       if (search) {
@@ -56,9 +94,9 @@ describe("NavigatorAppsSection", () => {
         search.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
-    expect(document.body.textContent).toContain("Run commands locally");
+    expect(document.body.textContent).toContain("terminal app");
     expect(document.body.textContent).not.toContain("Browse the web in Misty");
-    expect(document.body.querySelector('a[href="/store"]')?.textContent).toBe("Browse apps");
+    expect(document.body.querySelector('a[href="/discover"]')?.textContent).toBe("Browse apps");
   });
 
   it("collapses the app list and preserves the choice", async () => {

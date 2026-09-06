@@ -69,7 +69,7 @@ describe("MistyWorkspace", () => {
       spaces: [
         {
           id: "family",
-          kind: "standard",
+          is_default: true,
           owner_user_id: "account-a",
           name: "Family",
           role: "owner",
@@ -125,6 +125,8 @@ describe("MistyWorkspace", () => {
       );
     });
     expect(submitAgentTask).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Conversation Space: Family" })).not.toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Conversation Space: Family (default)" }),
+    ).not.toBeNull();
   });
 });

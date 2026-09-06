@@ -1,13 +1,8 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'misty-desktop_iOS' do
-platform :ios, '14.0'
-  # Pods for misty-desktop_iOS
-end
-
-target 'misty-desktop_macOS' do
-platform :osx, '11.0'
-  # Pods for misty-desktop_macOS
+target 'misty-native_iOS' do
+platform :ios, '15.0'
+  # Pods for misty-native_iOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

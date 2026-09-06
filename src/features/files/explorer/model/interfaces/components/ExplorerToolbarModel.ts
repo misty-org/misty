@@ -24,6 +24,17 @@ export interface ExplorerCommandPaletteEntry {
 }
 
 export interface ExplorerToolbarProps {
+  /** Display labels may differ from the owning runtime's internal path identifiers. */
+  breadcrumbs?: Array<{ label: string; path: string }>;
+  displayPath?: string;
+  pathPlaceholder?: string;
+  canCut?: boolean;
+  canCopy?: boolean;
+  canPaste?: boolean;
+  canRename?: boolean;
+  canDelete?: boolean;
+  canRestore?: boolean;
+  onRestore?: () => void;
   paneId: string;
   path: string;
   commandQuery: string;

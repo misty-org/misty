@@ -116,6 +116,8 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
       "You already own three Spaces. Delete one permanently before creating another.",
+    default_space_protected:
+      "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded:
       "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
     space_storage_quota_exceeded:

@@ -1,9 +1,10 @@
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useTransfersStore } from "@/features/transfers";
+import type * as BuildTarget from "@/shared/platform/buildTarget";
 
 vi.mock("@/shared/platform/buildTarget", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/shared/platform/buildTarget")>()),
+  ...(await importOriginal<typeof BuildTarget>()),
   isWebBuild: true,
 }));
 

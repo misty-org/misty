@@ -4,7 +4,6 @@ import type {
   SpaceTask,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
-import { SystemErrorActivity } from "@/features/activity";
 import { avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
@@ -144,12 +143,6 @@ export function TaskEmptyState({
       title={title}
       description={description}
     />
-  );
-}
-
-export function TaskErrorState({ message }: { message: string }) {
-  return (
-    <SystemErrorActivity error={message} scope="planner:tasks" title="Tasks could not be loaded" />
   );
 }
 

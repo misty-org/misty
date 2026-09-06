@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { MistyTerminalSDK } from "@misty/sdk";
 
 interface SshEnvironmentBase {
   id: string;
@@ -12,7 +12,7 @@ interface SshEnvironmentBase {
 
 export interface ConfiguredSshEnvironment extends SshEnvironmentBase {
   source: "configured";
-  configPath: string;
+  configPath?: string;
 }
 
 export interface DirectSshEnvironment extends SshEnvironmentBase {
@@ -36,28 +36,35 @@ export interface SshHostKeyStatus {
 export type SshConnectionInputResult =
   { ok: true; environment: SshEnvironment } | { ok: false; message: string };
 
-type ListedSshEnvironment = Omit<ConfiguredSshEnvironment, "source">;
-
 export const localTerminalEnvironment: TerminalEnvironment = { kind: "local" };
 
-export async function listSshEnvironments(): Promise<SshEnvironment[]> {
-  const environments = await invoke<ListedSshEnvironment[]>("terminal_ssh_environments");
-  return environments.map((environment) => ({ ...environment, source: "configured" }));
+export async function listSshEnvironments(terminal: MistyTerminalSDK): Promise<SshEnvironment[]> {
+  const environments = await terminal.environments();
+  return environments.map(({ user, ...environment }) => ({
+    ...environment,
+    ...(user ? { user } : {}),
+    source: "configured",
+    deviceLocal: true,
+    agentTools: "device_local",
+  }));
 }
 
-export function preflightSshEnvironment(environment: SshEnvironment): Promise<SshHostKeyStatus> {
-  return invoke<SshHostKeyStatus>("terminal_ssh_preflight", {
-    connection: sshConnectionRequest(environment),
-  });
+export async function preflightSshEnvironment(
+  terminal: MistyTerminalSDK,
+  environment: SshEnvironment,
+): Promise<SshHostKeyStatus> {
+  return terminal.preflight(sshConnectionRequest(environment)) as Promise<SshHostKeyStatus>;
 }
 
-export function trustSshHost(
+export async function trustSshHost(
+  terminal: MistyTerminalSDK,
   environment: SshEnvironment,
   fingerprint: string,
 ): Promise<SshHostKeyStatus> {
-  return invoke<SshHostKeyStatus>("terminal_ssh_trust_host", {
-    request: { connection: sshConnectionRequest(environment), fingerprint },
-  });
+  return terminal.trustHost(
+    sshConnectionRequest(environment),
+    fingerprint,
+  ) as Promise<SshHostKeyStatus>;
 }
 
 export function terminalEnvironmentRequest(environment: TerminalEnvironment) {

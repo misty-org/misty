@@ -1,5 +1,6 @@
 import { resolveMentionedAgentSpaceId } from "@/features/agents/agentSpaceSelection";
-import { useSpacesStore } from "@/features/spaces";
+import { useAgentsSpaces as useSpacesStore } from "@/features/agents/agentsRuntime";
+
 import type { GlobalSearchState } from "./globalSearchState";
 
 export async function conversationForGlobalPrompt(get: () => GlobalSearchState, prompt: string) {

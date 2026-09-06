@@ -1,7 +1,9 @@
-import { createMultiPanelStore, MultiPanelWorkspace } from "@/features/workspace";
+import { MultiPanelWorkspace } from "./MultiPanelWorkspace";
+import { createMultiPanelStore } from "./useMultiPanelStore";
 import { act } from "react";
+import { renderExplorerBottomBar } from "@/features/files/explorer/workspace/ExplorerWorkspaceChrome";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("MultiPanelWorkspace", () => {
   let container: HTMLDivElement;
@@ -144,5 +146,84 @@ describe("MultiPanelWorkspace", () => {
       "/Users/demo/Documents",
       "/Users/demo",
     ]);
+  });
+
+  it("keeps navigation and preview available inside an 800px embedded Files pane", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 800,
+      height: 600,
+      top: 0,
+      left: 0,
+      right: 800,
+      bottom: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    const store = createMultiPanelStore({ idPrefix: "compact-files" });
+    store.getState().initialize("/Users/demo", "demo");
+    const peer = createMultiPanelStore({ idPrefix: "other-files" });
+    peer.getState().initialize("/Users/other", "other");
+    await act(async () => {
+      root.render(
+        <MultiPanelWorkspace
+          store={store}
+          showTabStrip={false}
+          renderNavigationAside={<nav aria-label="Files folders">Documents</nav>}
+          navigationAsideWidth={220}
+          renderAside={<aside>File details</aside>}
+          renderBottomBar={renderExplorerBottomBar}
+          renderPane={(_, path) => <output>{path}</output>}
+        />,
+      );
+    });
+    expect(container.querySelector('nav[aria-label="Files folders"]')).not.toBeNull();
+    expect(container.querySelector("nav")?.parentElement?.className).not.toContain(
+      "max-[980px]:hidden",
+    );
+    expect(container.querySelector("aside")?.textContent).toBe("File details");
+    expect(container.querySelector('[aria-label="Resize preview panel"]')).not.toBeNull();
+    expect(container.querySelector("aside")?.className).not.toContain("max-[980px]:hidden");
+    const button = container.querySelector<HTMLButtonElement>('button[title="Hide sidebar"]');
+    expect(button).not.toBeNull();
+    await act(async () => button!.click());
+    expect(store.getState().tabs[0].sidebarVisible).toBe(false);
+    expect(peer.getState().tabs[0].sidebarVisible).toBe(true);
+    const restore = container.querySelector<HTMLButtonElement>('button[title="Show sidebar"]');
+    expect(restore).not.toBeNull();
+    await act(async () => restore!.click());
+    expect(store.getState().tabs[0].sidebarVisible).toBe(true);
+  });
+  it("resizes both side panels with pointer dragging when only resize-by callbacks are supplied", async () => {
+    const store = createMultiPanelStore({ idPrefix: "resize-files" });
+    store.getState().initialize("/Users/demo", "demo");
+    const resizeNavigation = vi.fn();
+    const resizePreview = vi.fn();
+    await act(async () =>
+      root.render(
+        <MultiPanelWorkspace
+          store={store}
+          renderPane={() => <p>Files</p>}
+          renderNavigationAside={<nav>Folders</nav>}
+          renderAside={<p>Preview</p>}
+          onNavigationAsideResizeBy={resizeNavigation}
+          onAsideResizeBy={resizePreview}
+        />,
+      ),
+    );
+    const drag = async (label: string, end: number) => {
+      await act(async () => {
+        container
+          .querySelector(`[aria-label="${label}"]`)!
+          .dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 300 }));
+        window.dispatchEvent(new MouseEvent("pointermove", { clientX: end }));
+        window.dispatchEvent(new MouseEvent("pointerup"));
+        window.dispatchEvent(new MouseEvent("pointermove", { clientX: 600 }));
+      });
+    };
+    await drag("Resize file explorer sidebar", 340);
+    await drag("Resize preview panel", 260);
+    expect(resizeNavigation.mock.calls).toEqual([[40]]);
+    expect(resizePreview.mock.calls).toEqual([[40]]);
   });
 });

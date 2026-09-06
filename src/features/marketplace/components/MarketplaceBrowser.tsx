@@ -173,7 +173,7 @@ export function MarketplaceBrowser({
               onChange={changeSection}
             />
             <div
-              aria-label="Resize Store sidebar"
+              aria-label="Resize Discover sidebar"
               aria-orientation="vertical"
               aria-valuemax={maxStoreSidebarWidth}
               aria-valuemin={minStoreSidebarWidth}
@@ -199,7 +199,7 @@ export function MarketplaceBrowser({
           <header className="shrink-0 border-b border-charcoal-border px-6 py-5 max-[640px]:px-4 max-[640px]:py-4">
             <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
               <div className="min-w-[220px] flex-1">
-                <h1 className="text-lg font-semibold text-cream-bright">Store</h1>
+                <h1 className="text-lg font-semibold text-cream-bright">Discover</h1>
                 <p className="mt-1 text-xs text-cream-muted">
                   Discover tools for the way you work.
                 </p>
@@ -212,25 +212,25 @@ export function MarketplaceBrowser({
                     size={16}
                   />
                   <Input
-                    aria-label="Search Store"
+                    aria-label="Search Discover"
                     className="h-10 w-full pl-9"
                     disabled={loading && marketplacePlugins.length === 0}
                     onChange={(event) => onQueryChange(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Escape" && query) onQueryChange("");
                     }}
-                    placeholder="Search Store"
+                    placeholder="Search Discover"
                     value={query}
                   />
                 </div>
                 {onRefresh ? (
                   <Button
-                    aria-label="Reload Store"
+                    aria-label="Reload Discover"
                     className="size-9 text-cream-muted shadow-none hover:text-cream max-[860px]:size-11"
                     disabled={loading}
                     onClick={onRefresh}
                     size="icon"
-                    title="Reload Store"
+                    title="Reload Discover"
                     type="button"
                     variant="ghost"
                   >
@@ -245,7 +245,7 @@ export function MarketplaceBrowser({
                 <SystemErrorActivity
                   error={error}
                   scope="marketplace"
-                  title="Store could not be refreshed"
+                  title="Discover could not be refreshed"
                   target={{ kind: "workspace-tool", tool: "marketplace" }}
                 />
               </div>
@@ -323,11 +323,11 @@ export function MarketplaceBrowser({
       >
         <Button
           aria-expanded={sidebarOpen}
-          aria-label={sidebarOpen ? "Hide Store sidebar" : "Show Store sidebar"}
+          aria-label={sidebarOpen ? "Hide Discover sidebar" : "Show Discover sidebar"}
           className="size-8 text-cream-muted shadow-none hover:text-cream-bright"
           onClick={() => setSidebarOpen((open) => !open)}
           size="icon"
-          title={sidebarOpen ? "Hide Store sidebar" : "Show Store sidebar"}
+          title={sidebarOpen ? "Hide Discover sidebar" : "Show Discover sidebar"}
           type="button"
           variant="ghost"
         >

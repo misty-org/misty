@@ -88,6 +88,7 @@ export function SpaceMembersPopover({ space, trigger }: { space: Space; trigger?
             aria-label="Space team"
             aria-haspopup="dialog"
             aria-expanded={open}
+            data-tour-target="space-share-button"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
           </Button>

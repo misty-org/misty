@@ -105,6 +105,7 @@ const presets: Record<string, EditableThemeTokens> = {
 };
 
 let previewSnapshot: ExtensionThemeSnapshot | null = null;
+let previewOwner: string | null = null;
 let revision = 0;
 
 export function extensionThemeSnapshot(): ExtensionThemeSnapshot {
@@ -115,14 +116,16 @@ export function extensionThemeSnapshot(): ExtensionThemeSnapshot {
 
 export function applyStoredExtensionTheme(): ExtensionThemeSnapshot {
   previewSnapshot = null;
+  previewOwner = null;
   const snapshot = extensionThemeSnapshot();
   applySnapshot(snapshot);
   return snapshot;
 }
 
-export function revertExtensionThemePreview(): void {
-  if (!previewSnapshot) return;
+export function revertExtensionThemePreview(owner?: string): void {
+  if (!previewSnapshot || (owner != null && previewOwner !== owner)) return;
   previewSnapshot = null;
+  previewOwner = null;
   applySnapshot(extensionThemeSnapshot());
   announceThemeChange();
 }
@@ -130,6 +133,7 @@ export function revertExtensionThemePreview(): void {
 export function runExtensionThemeCommand(
   command: string,
   payload: Record<string, unknown>,
+  owner = "host",
 ): Record<string, unknown> {
   if (command === "themes.snapshot") {
     const snapshot = extensionThemeSnapshot();
@@ -144,8 +148,10 @@ export function runExtensionThemeCommand(
     if (payload.preview === false) {
       persistSnapshot(snapshot);
       previewSnapshot = null;
+      previewOwner = null;
     } else {
       previewSnapshot = snapshot;
+      previewOwner = owner;
     }
     applySnapshot(snapshot);
     announceThemeChange();
@@ -162,8 +168,10 @@ export function runExtensionThemeCommand(
     if (command === "themes.apply") {
       persistSnapshot(snapshot);
       previewSnapshot = null;
+      previewOwner = null;
     } else {
       previewSnapshot = snapshot;
+      previewOwner = owner;
     }
     applySnapshot(snapshot);
     announceThemeChange();
@@ -171,7 +179,10 @@ export function runExtensionThemeCommand(
   }
 
   if (command === "themes.revert") {
+    if (previewSnapshot && previewOwner !== owner)
+      return { ok: false, message: "Another App owns the current preview." };
     previewSnapshot = null;
+    previewOwner = null;
     const snapshot = storedSnapshot() ?? snapshotFromEditable("misty-dark", presets["misty-dark"]);
     applySnapshot(snapshot);
     announceThemeChange();

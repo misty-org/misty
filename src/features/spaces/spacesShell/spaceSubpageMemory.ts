@@ -1,5 +1,5 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { spaceNotesEnabled } from "@/features/notes";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 
 type PlannerSubpage = "tasks" | "agenda" | "roadmaps";
 type JournalSubpage = "notes" | "drawings";

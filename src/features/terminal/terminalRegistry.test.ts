@@ -4,18 +4,17 @@ import {
   cwdBySlot,
   killTerminalTab,
   registerSlot,
+  retainTerminalSession,
   sessionBySlot,
   slotsByTab,
   titleBySlot,
 } from "./terminalRegistry";
 
-const invoke = vi.hoisted(() => vi.fn(() => Promise.resolve()));
-
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+const close = vi.fn(() => Promise.resolve());
 
 describe("terminal dock lifecycle", () => {
   beforeEach(() => {
-    invoke.mockClear();
+    close.mockClear();
     sessionBySlot.clear();
     bufferBySlot.clear();
     cwdBySlot.clear();
@@ -25,7 +24,7 @@ describe("terminal dock lifecycle", () => {
 
   it("kills a dock tab PTY exactly once and forgets all retained state", () => {
     registerSlot("tab:terminal", "slot:terminal");
-    sessionBySlot.set("slot:terminal", "session:terminal");
+    retainTerminalSession("slot:terminal", "session:terminal", close);
     bufferBySlot.set("slot:terminal", "scrollback");
     cwdBySlot.set("slot:terminal", "/tmp");
     titleBySlot.set("slot:terminal", "zsh");
@@ -33,10 +32,8 @@ describe("terminal dock lifecycle", () => {
     killTerminalTab("tab:terminal");
     killTerminalTab("tab:terminal");
 
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenCalledWith("terminal_kill", {
-      sessionId: "session:terminal",
-    });
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledWith();
     expect(slotsByTab.has("tab:terminal")).toBe(false);
     expect(sessionBySlot.has("slot:terminal")).toBe(false);
     expect(bufferBySlot.has("slot:terminal")).toBe(false);
@@ -47,11 +44,11 @@ describe("terminal dock lifecycle", () => {
   it("keeps one stable slot owner while a dock surface is visually unmounted", () => {
     registerSlot("tab:terminal", "slot:first");
     registerSlot("tab:terminal", "slot:second");
-    sessionBySlot.set("slot:second", "session:second");
+    retainTerminalSession("slot:second", "session:second", close);
 
     killTerminalTab("tab:terminal");
 
-    expect(invoke).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledWith("terminal_kill", { sessionId: "session:second" });
+    expect(close).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledWith();
   });
 });

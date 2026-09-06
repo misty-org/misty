@@ -120,8 +120,8 @@ describe("Spaces snapshot background refresh", () => {
 function spaceFixture(name: string): Space {
   return {
     id: "current",
+    is_default: false,
     name,
-    kind: "standard",
     owner_user_id: "owner",
     role: "owner",
     member_count: 1,

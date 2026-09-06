@@ -13,6 +13,7 @@ const { SpaceUsagePopover } = await import("../components/SpaceUsagePopover");
 
 const space: Space = {
   id: "space-1",
+  is_default: false,
   owner_user_id: "owner",
   name: "Design team",
   role: "owner",

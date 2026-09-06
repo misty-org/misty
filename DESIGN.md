@@ -207,7 +207,15 @@ The palette is a compressed charcoal ladder with warm off-white text, softened a
 
 ## Layout
 
-Misty is a full-height, split-capable workspace. The shell has a compact title/tab band, persistent navigation, optional tool-specific sidebars, and flexible work canvases separated by one-pixel rules. Toolbars generally occupy 36–44px; list and table rows stay compact enough to show meaningful context without scrolling away the workspace.
+Misty is a full-height workspace with two deliberate shells. Desktop is split-capable, with a compact title/tab band, persistent navigation, optional tool-specific sidebars, and flexible work canvases separated by one-pixel rules. Native mobile projects that workspace into one active surface without changing its panes, tabs, or virtual windows. Toolbars generally occupy 36–44px on desktop; mobile controls use at least 44×44px targets.
+
+### Apple mobile shell
+
+- iPhone and narrow iPad layouts use a safe-area-aware top bar and a fixed bottom bar: Home, Chat, Planner, Inbox, More.
+- iPad layouts at least 1024 CSS pixels wide replace More with a persistent 280px sidebar, while still showing only one independent workspace surface.
+- Mobile sheets are full-height or bottom anchored, account for the home indicator and software keyboard, and never rely on hover.
+- Inputs remain at least 16px. The shell supports a 320px minimum width, landscape rotation, large text, coarse pointers, and reduced motion.
+- Desktop-only splits, resizers, pane movement, tab dragging, window chrome, pet controls, extension storefronts, and shortcut configuration do not appear in the mobile hierarchy.
 
 Use an 8px control rhythm and 12–16px row or section rhythm. Major tool areas align to shared vertical boundaries. Sidebars should be narrow enough to preserve the canvas, but labels must truncate predictably and icons must remain stable. Large empty regions are acceptable in boards, previews, and editors when they represent working space; do not fill them with decorative cards.
 
@@ -216,6 +224,10 @@ On tablets, preserve the same hierarchy and tonal language while allowing naviga
 **The One-Chrome Rule.** A surface gets one structural shell. Tool content should not rebuild the full application frame inside itself.
 
 **The Continuous-Canvas Rule.** Prefer dividers and tonal changes over card grids when content belongs to one working surface.
+
+### Discover catalog
+
+Discover uses a fixed navigation rail (176px), full-width search, wrapping category filters, and one continuous list with compact rows (84px minimum). Its layout responds to the pane’s container width: metadata narrows at 1080px; at 820px the rail becomes horizontal navigation and metadata hides; at 440px row icons, gaps, and actions compact further. These are desktop pane adaptations; native mobile storefront availability remains governed by PRODUCT.md.
 
 ## Elevation & Depth
 
@@ -277,6 +289,12 @@ Persistent navigation is quiet by default: ash labels and icons on workspace bla
 ### Tables and Lists
 
 Rows share one continuous surface, separated by hairlines. Unread, selected, or focused state may change weight and move one tonal step. Preserve stable columns, predictable truncation, and right-aligned metadata so dense information remains easy to compare.
+
+### Discover apps and details
+
+Discover shares the active workspace theme variables, native system typography, and hairline structure. App names use compact semibold type (15px); descriptions and actions step down to 13px, with metadata at 12px. Featured, Apps, and Installed are the only section destinations. Rows use the existing official app icons and sage verification mark, with theme-card emphasis on hover or focus. The bright filled Add action retains canvas-colored text through hover; Open uses a quiet bordered action.
+
+Selecting an app or Add opens a focused details dialog with About, Permissions, and Where it appears. The body scrolls independently while the heading and action footer remain visible; closing restores focus to the originating control. Catalog facts and action states come from the existing official app catalog and installations, including update, unavailable, and removal states. Preserve that review-before-install flow and the existing install/remove semantics. Approved mockups are visual references only; generated mockup imagery is not a shipped asset.
 
 ### Workspace Chrome
 

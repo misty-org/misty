@@ -28,6 +28,10 @@ const legacyUserKey = "misty_user";
 
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
+// A cold start can fan out several authenticated requests before the first
+// secure-store read finishes. On iOS each concurrent read can present its own
+// system authentication sheet, so every caller must share one retrieval.
+let tokenReadPromise: Promise<string | null> | undefined;
 // The most recent payload written to the OS keystore. Writing to the keychain
 // can prompt the user on macOS, and the app persists the vault on nearly every
 // auth state change (login, /me refresh, effect re-runs), so we skip redundant
@@ -97,13 +101,24 @@ export async function readAccountAuthToken(): Promise<string | null> {
   }
   if (cachedToken !== undefined) return cachedToken;
 
+  if (tokenReadPromise) return tokenReadPromise;
+  tokenReadPromise = loadAccountAuthToken();
+  try {
+    return await tokenReadPromise;
+  } finally {
+    tokenReadPromise = undefined;
+  }
+}
+
+async function loadAccountAuthToken(): Promise<string | null> {
   try {
     if (isNativeMobileBuild) {
-      cachedToken = await retrieve(desktopTokenService, desktopTokenUser);
+      const token = await retrieve(desktopTokenService, desktopTokenUser);
+      if (cachedToken === undefined) cachedToken = token;
     } else {
       const vault = await loadSecureVault();
       const active = selectActiveSession(vault);
-      cachedToken = active?.token ?? null;
+      if (cachedToken === undefined) cachedToken = active?.token ?? null;
       if (active && vault.activeAccountId !== vaultAccountId(active.account.id)) {
         vault.activeAccountId = vaultAccountId(active.account.id);
         await persistSecureVault(vault);
@@ -112,7 +127,7 @@ export async function readAccountAuthToken(): Promise<string | null> {
     writeTokenStoredMarker(Boolean(cachedToken));
     await syncManagedAiToken(cachedToken ?? "");
   } catch (error) {
-    cachedToken = null;
+    if (cachedToken === undefined) cachedToken = null;
     writeTokenStoredMarker(false);
     recordTokenDebugEvent({
       level: "error",

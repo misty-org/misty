@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { FileIcon } from "../FileBrowserIcons";
 import { fileBrowserStyles } from "../FileBrowserStyles";
 import { GRID_THUMBNAIL_MAX_DIMENSION } from "./fileTableConfig";
-import { gridThumbnailSupported, requestGridThumbnail } from "./gridThumbnails";
+import { gridThumbnailSupported } from "./gridThumbnailSupported";
+import { useFileBrowserRuntime } from "./FileBrowserRuntime";
 
 /** A grid tile's image, falling back to the file-type icon. */
 export function GridThumbnail({
@@ -45,13 +46,14 @@ export function GridThumbnail({
 }
 
 function useGridThumbnailUrl(entry: FileEntry, enabled: boolean): string | null {
+  const { requestThumbnail } = useFileBrowserRuntime();
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setThumbnailUrl(null);
     if (!enabled || !gridThumbnailSupported(entry)) return () => undefined;
-    return requestGridThumbnail(entry, GRID_THUMBNAIL_MAX_DIMENSION, setThumbnailUrl);
-  }, [enabled, entry]);
+    return requestThumbnail(entry, GRID_THUMBNAIL_MAX_DIMENSION, setThumbnailUrl);
+  }, [enabled, entry, requestThumbnail]);
 
   return thumbnailUrl;
 }

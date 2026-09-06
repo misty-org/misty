@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   openSystemExternalLink: vi.fn(),
 }));
 
-vi.mock("@/features/auth", () => ({
+vi.mock("@/features/auth/accountStore", () => ({
   accountCreateHandoffUrl: mocks.accountCreateHandoffUrl,
   resolveAccountApiBase: mocks.resolveAccountApiBase,
 }));

@@ -5,7 +5,6 @@ import type {
   SpaceIntegration,
 } from "@/api/spaces/dto/interfaces/types";
 import type { SpaceAgendaVisibility } from "@/features/spaces";
-import { MistyBrandIcon } from "@/features/workspace";
 import {
   Button,
   Dialog,
@@ -17,8 +16,7 @@ import {
   Separator,
   Switch,
 } from "@/shared/ui";
-import { CheckCircle2, LoaderCircle, Plus, Search } from "lucide-react";
-import { SiGooglecalendar } from "react-icons/si";
+import { CalendarDays, CheckCircle2, LoaderCircle, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { TaskInlineSelect } from "../SpaceTaskPrimitives";
 
@@ -106,7 +104,7 @@ export function CalendarSourceDrawer(props: CalendarSourceDrawerProps) {
               <CalendarVisibilitySwitch
                 checked={calendarCheckedState([props.visibility.tasks, props.visibility.roadmap])}
                 description="Tasks and roadmap items"
-                icon={<MistyBrandIcon size={20} />}
+                icon={<CalendarDays size={20} />}
                 label="Misty"
                 onCheckedChange={(checked) =>
                   props.onVisibilityChange((current) => ({
@@ -379,7 +377,7 @@ function GoogleConnectionStatus(props: { unavailable: boolean; connected: boolea
 
 function GoogleCalendarIcon({ className }: { className?: string }) {
   return (
-    <SiGooglecalendar className={`shrink-0 text-[#4285F4] ${className ?? ""}`} aria-hidden="true" />
+    <CalendarDays className={`shrink-0 ${className ?? ""}`} aria-hidden="true" />
   );
 }
 

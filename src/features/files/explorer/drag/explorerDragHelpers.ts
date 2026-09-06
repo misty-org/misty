@@ -1,6 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { ExplorerDragItem, ExplorerDragModifiers } from "../model/interfaces/drag/types";
-import { useExplorerStore } from "../store";
 import { edgeScrollDelta } from "./geometry";
 const EDGE_SCROLL_SIZE = 32;
 export function modifiersFromEvent(
@@ -55,9 +54,4 @@ export function dragPreviewDataUrl(items: ExplorerDragItem[]): string {
     62,
   );
   return canvas.toDataURL("image/png");
-}
-
-export function refreshExplorerPanes(): void {
-  const store = useExplorerStore.getState();
-  Object.keys(store.panes).forEach((paneId) => void store.refreshPane(paneId));
 }

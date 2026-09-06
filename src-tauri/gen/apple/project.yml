@@ -1,4 +1,4 @@
-name: misty-desktop
+name: misty-native
 options:
   bundleIdPrefix: com.misty.mobile
   deploymentTarget:
@@ -10,6 +10,7 @@ configs:
 settingGroups:
   app:
     base:
+      DEVELOPMENT_TEAM: 7D6BVN4W87
       PRODUCT_NAME: Misty
       PRODUCT_BUNDLE_IDENTIFIER: com.misty.mobile
 targetTemplates:
@@ -24,7 +25,7 @@ targetTemplates:
     settings:
       groups: [app]
 targets:
-  misty-desktop_iOS:
+  misty-native_iOS:
     type: application
     platform: iOS
     sources:
@@ -32,21 +33,29 @@ targets:
       - path: Assets.xcassets
       - path: Externals
         buildPhase: none
-      - path: misty-desktop_iOS
+      - path: misty-native_iOS
       - path: assets
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
     info:
-      path: misty-desktop_iOS/Info.plist
+      path: misty-native_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        LSSupportsOpeningDocumentsInPlace: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - remote-notification
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "1"
         ITSAppUsesNonExemptEncryption: false
@@ -58,7 +67,7 @@ targets:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: Misty uses local secure runtime services on this device to browse and transfer files.
     entitlements:
-      path: misty-desktop_iOS/misty-desktop_iOS.entitlements
+      path: misty-native_iOS/misty-native_iOS.entitlements
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -66,7 +75,8 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
-        TARGETED_DEVICE_FAMILY: 2
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APS_ENVIRONMENT: development
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
@@ -75,6 +85,11 @@ targets:
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
         OTHER_LDFLAGS: $(inherited) -lresolv
       groups: [app]
+      configs:
+        debug:
+          APS_ENVIRONMENT: development
+        release:
+          APS_ENVIRONMENT: production
     dependencies:
       - framework: libapp.a
         embed: false
@@ -83,10 +98,14 @@ targets:
       - sdk: MetalKit.framework
       - sdk: QuartzCore.framework
       - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      - script: |
+          if [ -f "$HOME/.cargo/env" ]; then . "$HOME/.cargo/env"; fi
+          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:$PATH"
+          npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:

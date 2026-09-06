@@ -1,7 +1,6 @@
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
-import { canOpenMistySpaceSection } from "../mistySpace";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
@@ -10,7 +9,7 @@ import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 const sections = [
   { id: "journal", label: "Journal", icon: Notebook },
   { id: "planner", label: "Planner", icon: CheckSquare2 },
-  { id: "social", label: "Social", icon: MessagesSquare },
+  { id: "social", label: "Chat", icon: MessagesSquare },
   { id: "library", label: "Library", icon: BookOpenText },
 ] as const;
 
@@ -19,7 +18,6 @@ export function SpaceSectionNavigation({ spaceId, section }: { spaceId: string; 
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const permissions = space?.permissions;
   const visibleSections = sections
-    .filter(({ id }) => !space || canOpenMistySpaceSection(space, id))
     .filter(({ id }) => id !== "social" || permissions?.["messages.read"] !== false)
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);

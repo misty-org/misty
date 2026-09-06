@@ -1,23 +1,18 @@
 import {
   Button,
-  TreeBranch,
   cn,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
-  navigationTreeBranchClass,
-  navigationTreeGroupClass,
-  navigationTreeIconClass,
-  navigationTreeItemIconClass,
-  navigationTreeRowClass,
-  navigationTreeSurfaceClass,
+  NavigationSectionButton,
+  NavigationTreeItem,
+  navigationMenuGroupClass,
 } from "@/shared/ui";
-import { ChevronDown, type LucideIcon, X } from "lucide-react";
+import { type LucideIcon, X } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useEffect, useState } from "react";
 
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
+  const mobile = props.presentation === "mobile";
   const activeGroup = props.items.find((item) => item.id === props.activeId)?.group;
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
 
@@ -40,6 +35,59 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     });
   };
 
+  if (mobile) {
+    return (
+      <div
+        aria-label={props.ariaLabel}
+        className="grid h-full min-h-0 grid-rows-[48px_auto_minmax(0,1fr)] overflow-hidden bg-charcoal-bg"
+      >
+        <header className="flex items-center gap-3 border-b border-charcoal-border px-3">
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-cream-bright">
+            {props.title}
+          </h1>
+          <Button
+            aria-label={`Close ${props.ariaLabel.toLowerCase()}`}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+            onClick={props.onClose}
+          >
+            <X className="size-4" strokeWidth={1.8} />
+          </Button>
+        </header>
+        <nav
+          className="misty-transient-scrollbar flex min-h-14 gap-1 overflow-x-auto border-b border-charcoal-border bg-charcoal-sidebar px-2 py-1.5"
+          aria-label={props.navigationLabel}
+        >
+          {props.items.map((item) => {
+            const Icon = item.icon;
+            const active = item.id === props.activeId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm",
+                  active
+                    ? "bg-charcoal-active text-cream-bright"
+                    : "text-cream-muted hover:bg-charcoal-hover active:bg-charcoal-hover",
+                )}
+                onClick={() => props.onSelect(item.id)}
+              >
+                <Icon className="size-4" aria-hidden="true" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="misty-scrollbar min-h-0 overflow-y-auto overscroll-contain p-4">
+          {props.children}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       aria-label={props.ariaLabel}
@@ -57,9 +105,10 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         )}
       >
         <nav className="flex min-h-0 flex-col" aria-label={props.navigationLabel}>
-          <div className={navigationTreeGroupClass}>
+          <div className={navigationMenuGroupClass}>
             {props.items.map((item, index) => {
               const Icon = item.icon;
+              const GroupIcon = item.groupIcon;
               const active = props.activeId === item.id;
               // Group captions use the global navigator's section-header
               // treatment so the two rails read as the same component.
@@ -71,82 +120,31 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               return (
                 <Fragment key={item.id}>
                   {startsGroup && item.groupLabel ? (
-                    <h2 className={cn("flex h-7 shrink-0 items-center", index > 0 && "mt-2.5")}>
-                      <button
-                        aria-expanded={!groupCollapsed}
+                    <h2 className={cn("flex h-8 shrink-0 items-center", index > 0 && "mt-1")}>
+                      <NavigationSectionButton
+                        open={!groupCollapsed}
+                        label={item.groupLabel}
+                        icon={
+                          GroupIcon ? (
+                            <GroupIcon aria-hidden="true" data-settings-group-icon="true" />
+                          ) : null
+                        }
                         aria-label={`${groupCollapsed ? "Expand" : "Collapse"} ${item.groupLabel} settings`}
-                        className={cn(
-                          navigationDisclosureLabelClass,
-                          "h-7 w-full rounded-md px-2.5 text-left",
-                          "text-[13px] font-semibold tracking-normal text-cream-muted",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
-                        )}
                         onClick={() => item.group && toggleGroup(item.group)}
-                        type="button"
-                      >
-                        <span className="truncate">{item.groupLabel}</span>
-                        <ChevronDown
-                          aria-hidden="true"
-                          className={cn(
-                            navigationDisclosureChevronClass,
-                            "size-4 transition-transform duration-150 motion-reduce:transition-none",
-                            groupCollapsed && "-rotate-90",
-                          )}
-                          data-chevron-placement="inline"
-                          strokeWidth={1.8}
-                        />
-                      </button>
+                      />
                     </h2>
                   ) : null}
                   {!groupCollapsed ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "w-full justify-start rounded-md font-medium",
-                        "text-cream-muted transition-colors active:not-aria-[haspopup]:translate-y-0",
-                        "hover:text-cream-bright",
-                        "focus-visible:ring-2 focus-visible:ring-charcoal-active",
-                        item.group
-                          ? cn(navigationTreeRowClass, "w-[calc(100%_-_2rem)] gap-0 p-0")
-                          : "h-9 gap-2.5 px-2.5 text-sm hover:bg-charcoal-card",
-                        active &&
-                          (item.group ? "text-cream-bright" : "bg-charcoal-card text-cream-bright"),
-                      )}
+                    <NavigationTreeItem
+                      icon={<Icon aria-hidden="true" />}
+                      label={item.label}
+                      selected={active}
+                      last={endsGroup}
+                      nested={Boolean(item.group)}
+                      settings
                       data-settings-nav-entry={item.id}
                       onClick={() => props.onSelect(item.id)}
-                    >
-                      {item.group ? (
-                        <TreeBranch
-                          className={navigationTreeBranchClass}
-                          first={startsGroup}
-                          last={endsGroup}
-                        />
-                      ) : null}
-                      {item.group ? (
-                        <span
-                          className={cn(
-                            navigationTreeSurfaceClass,
-                            "group-hover/tree-row:bg-charcoal-card",
-                            active && "bg-charcoal-card/80",
-                          )}
-                          data-settings-nav-surface="true"
-                        >
-                          <span className={cn(navigationTreeIconClass, item.iconClassName)}>
-                            <Icon className={navigationTreeItemIconClass} strokeWidth={1.85} />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                        </span>
-                      ) : (
-                        <>
-                          <span className="grid size-4 shrink-0 place-items-center">
-                            <Icon className="size-4" strokeWidth={1.8} />
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
-                        </>
-                      )}
-                    </Button>
+                    />
                   ) : null}
                 </Fragment>
               );
@@ -257,12 +255,11 @@ export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;
   label: string;
   icon: LucideIcon;
-  /** Optional semantic color, shared with the corresponding navbar app icon. */
-  iconClassName?: string;
   /** Adjacent entries sharing a group are drawn together. */
   group?: string;
   /** Caption shown above the first entry of a group. Omit for an unlabeled break. */
   groupLabel?: string;
+  groupIcon?: LucideIcon;
 }
 
 export interface DesktopSettingsFrameProps<Id extends string> {
@@ -273,6 +270,6 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   navigationLabel: string;
   onClose?: () => void;
   onSelect: (id: Id) => void;
-  presentation?: "page" | "overlay";
+  presentation?: "page" | "overlay" | "mobile";
   title: ReactNode;
 }

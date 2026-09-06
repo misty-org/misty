@@ -3,7 +3,6 @@ import type {
   AiContextReference,
   AiSelectionSnapshot,
 } from "@/features/ai-surface";
-import type { useExplorerStore } from "@/features/files/explorer";
 import { cn } from "@/shared/ui";
 import {
   Bot,
@@ -23,6 +22,19 @@ import type {
   GlobalSearchResult,
   UnifiedMistyCandidate,
 } from "./types";
+
+type ExplorerContextPane = {
+  listing?: {
+    entries?: Array<{
+      id: string;
+      kind: "file" | "folder";
+      name: string;
+      path: string;
+      location: { kind: string };
+    }>;
+  };
+  selectedIds?: string[];
+};
 
 export function SearchAskToggle(props: {
   mode: GlobalAiMode;
@@ -315,7 +327,7 @@ export function removeLastFilter(
 export function contextForCurrentView(
   currentPath: string,
   activePanePath: string,
-  pane?: ReturnType<typeof useExplorerStore.getState>["panes"][string],
+  pane?: ExplorerContextPane,
   registeredAiContext: AiContextReference[] = [],
 ): GlobalAiContextRef[] {
   const context: GlobalAiContextRef[] = [];
@@ -352,7 +364,7 @@ export function contextForCurrentView(
     for (const entry of entries.filter((item) => selected.has(item.id)).slice(0, 6)) {
       context.push({
         id: entry.id,
-        kind: entry.kind === "folder" ? "folder" : "file",
+        kind: entry.kind,
         title: entry.name,
         source: "current",
         ...(entry.location.kind === "local" ? { localPath: entry.path } : {}),
@@ -379,6 +391,7 @@ function routeTitle(path: string) {
   if (path.startsWith("/home")) return "Home";
   if (path.startsWith("/files")) return "Files";
   if (path.startsWith("/agents")) return "Agents";
-  if (path.startsWith("/store") || path.startsWith("/marketplace")) return "Store";
+  if (path.startsWith("/discover") || path.startsWith("/store") || path.startsWith("/marketplace"))
+    return "Discover";
   return "Current view";
 }

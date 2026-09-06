@@ -47,22 +47,22 @@ describe("Explorer sidebar devices", () => {
 
 describe("Explorer sidebar interaction styles", () => {
   it("uses a clearly elevated Quick access hover surface", () => {
-    expect(sidebarStyles.quickAccessSurface).toContain("group-hover/tree-row:bg-charcoal-hover");
+    expect(sidebarStyles.quickAccessSurface).toContain("group-hover/tree-row:bg-charcoal-card");
     expect(sidebarStyles.quickAccessSurface).toContain("group-hover/tree-row:text-cream-bright");
   });
 
   it("keeps branch content close to the connector line", () => {
     expect(sidebarStyles.treeSurface).toContain("ml-1");
-    expect(sidebarStyles.itemButton).toContain("pl-1");
-    expect(sidebarStyles.pinnedButton).toContain("pl-1");
-    expect(sidebarStyles.deviceButton).toContain("pl-1");
-    expect(sidebarStyles.deviceGroupToggle).toContain("pl-1");
+    expect(sidebarStyles.itemButton).toContain("px-2");
+    expect(sidebarStyles.pinnedButton).toContain("px-2");
+    expect(sidebarStyles.deviceButton).toContain("px-2");
+    expect(sidebarStyles.deviceGroupToggle).toContain("px-2");
   });
 
   it("uses prominent icons throughout sidebar item rows", () => {
-    expect(sidebarStyles.itemIcon).toContain("size-7");
-    expect(sidebarStyles.itemIcon).toContain("[&_svg]:!size-5");
-    expect(sidebarStyles.remoteIcon).toContain("[&_img]:!size-5");
-    expect(sidebarStyles.deviceIcon).toContain("[&_svg]:!size-5");
+    expect(sidebarStyles.itemIcon).toContain("size-5");
+    expect(sidebarStyles.itemIcon).toContain("[&_svg]:!size-[18px]");
+    expect(sidebarStyles.remoteIcon).toContain("[&_img]:!size-[18px]");
+    expect(sidebarStyles.deviceIcon).toContain("[&_svg]:!size-[18px]");
   });
 });

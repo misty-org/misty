@@ -17,7 +17,7 @@ export type * from "./conversationTypes";
 
 export interface Space {
   id: string;
-  kind?: "standard" | "misty";
+  is_default: boolean;
   security_domain_id?: string;
   owner_user_id: string;
   name: string;

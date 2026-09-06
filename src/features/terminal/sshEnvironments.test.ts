@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { MistyTerminalSDK } from "@misty/sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   listSshEnvironments,
@@ -10,7 +10,11 @@ import {
   type SshEnvironment,
 } from "./sshEnvironments";
 
-vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+const terminal = {
+  environments: vi.fn(),
+  preflight: vi.fn(),
+  trustHost: vi.fn(),
+} as unknown as MistyTerminalSDK;
 
 const environment: SshEnvironment = {
   source: "configured",
@@ -27,26 +31,30 @@ const environment: SshEnvironment = {
 describe("SSH terminal environments", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("uses native commands with structured arguments", async () => {
+  it("uses SDK methods with structured arguments", async () => {
     const { source: _source, ...listedEnvironment } = environment;
-    vi.mocked(invoke).mockResolvedValueOnce([listedEnvironment]);
-    await expect(listSshEnvironments()).resolves.toEqual([environment]);
-    expect(invoke).toHaveBeenCalledWith("terminal_ssh_environments");
+    vi.mocked(terminal.environments).mockResolvedValueOnce([listedEnvironment]);
+    await expect(listSshEnvironments(terminal)).resolves.toEqual([environment]);
+    expect(terminal.environments).toHaveBeenCalledWith();
 
-    vi.mocked(invoke).mockResolvedValueOnce({ state: "trusted", fingerprints: [], message: "ok" });
-    await preflightSshEnvironment(environment);
-    expect(invoke).toHaveBeenLastCalledWith("terminal_ssh_preflight", {
-      connection: { kind: "configured", id: "production" },
+    vi.mocked(terminal.preflight).mockResolvedValueOnce({
+      state: "trusted",
+      fingerprints: [],
+      message: "ok",
     });
+    await preflightSshEnvironment(terminal, environment);
+    expect(terminal.preflight).toHaveBeenLastCalledWith({ kind: "configured", id: "production" });
 
-    vi.mocked(invoke).mockResolvedValueOnce({ state: "trusted", fingerprints: [], message: "ok" });
-    await trustSshHost(environment, "SHA256:abc");
-    expect(invoke).toHaveBeenLastCalledWith("terminal_ssh_trust_host", {
-      request: {
-        connection: { kind: "configured", id: "production" },
-        fingerprint: "SHA256:abc",
-      },
+    vi.mocked(terminal.trustHost).mockResolvedValueOnce({
+      state: "trusted",
+      fingerprints: [],
+      message: "ok",
     });
+    await trustSshHost(terminal, environment, "SHA256:abc");
+    expect(terminal.trustHost).toHaveBeenLastCalledWith(
+      { kind: "configured", id: "production" },
+      "SHA256:abc",
+    );
   });
 
   it("sends only a config alias to terminal creation", () => {

@@ -8,9 +8,23 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
   cn,
 } from "@/shared/ui";
-import { Grid2X2, Image as List, Minus, Plus, Search, Upload, X } from "lucide-react";
+import { useSurfacePresentation } from "@/shared/mobile";
+import {
+  Grid2X2,
+  Image as List,
+  Minus,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Upload,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import {
   LIBRARY_ITEM_SCALE_MAX,
@@ -58,9 +72,146 @@ const sortOptions = [
 ];
 
 export function SpaceLibraryHeader(props: SpaceLibraryHeaderProps) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const [searchOpen, setSearchOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const showSearch = searchOpen || Boolean(props.searchInput);
   const hasVisibleItems = props.visibleItemCount > 0;
+
+  if (mobile) {
+    return (
+      <header className="grid shrink-0 gap-2 border-b border-charcoal-border bg-charcoal-bg p-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-cream-muted" />
+          <Input
+            className="h-11 bg-charcoal-card pl-10 pr-10 text-base"
+            aria-label="Search Library"
+            placeholder="Search Library"
+            value={props.searchInput}
+            onChange={(event) => props.onSearchInput(event.target.value)}
+            onFocus={props.onSearchFocus}
+            onBlur={props.onSearchBlur}
+          />
+          {props.searchInput ? (
+            <Button
+              className="absolute right-0 top-0 size-11"
+              size="icon"
+              variant="ghost"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => props.onSearchInput("")}
+              aria-label="Clear Library search"
+            >
+              <X className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex min-h-11 items-center gap-2">
+          <Button
+            variant="outline"
+            className="min-h-11 flex-1"
+            onClick={() => setFiltersOpen(true)}
+          >
+            <SlidersHorizontal className="size-4" /> Filter and sort
+          </Button>
+          <div
+            className="flex min-h-11 items-center rounded-lg border border-charcoal-border p-1"
+            role="group"
+            aria-label="Library layout"
+          >
+            <Button
+              className="size-11"
+              size="icon"
+              variant={props.viewMode === "grid" ? "secondary" : "ghost"}
+              onClick={() => props.onViewMode("grid")}
+              aria-label="Grid view"
+            >
+              <Grid2X2 className="size-4" />
+            </Button>
+            <Button
+              className="size-11"
+              size="icon"
+              variant={props.viewMode === "list" ? "secondary" : "ghost"}
+              onClick={() => props.onViewMode("list")}
+              aria-label="List view"
+            >
+              <List className="size-4" />
+            </Button>
+          </div>
+          {props.uploadAvailable ? (
+            <Button
+              className="size-11"
+              size="icon"
+              disabled={props.uploadDisabled}
+              onClick={props.onUpload}
+              aria-label="Upload"
+            >
+              <Upload className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+        <SpaceLibraryUploadTray jobs={props.uploadJobs} onClear={props.onClearUploads} />
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-2xl border-x-0 border-b-0 bg-charcoal-bg pb-[max(1rem,env(safe-area-inset-bottom))]"
+          >
+            <SheetHeader>
+              <SheetTitle>Library view</SheetTitle>
+            </SheetHeader>
+            <div className="mt-5 grid gap-5">
+              <label className="grid gap-2 text-sm font-medium text-cream-muted">
+                Media type
+                <Select
+                  value={props.mediaType || "all"}
+                  onValueChange={(value) => props.onMediaType(value === "all" ? "" : value)}
+                >
+                  <SelectTrigger className="h-11 text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mediaTypeOptions.map((option) => (
+                      <SelectItem key={option.value || "all"} value={option.value || "all"}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              {hasVisibleItems ? (
+                <label className="grid gap-2 text-sm font-medium text-cream-muted">
+                  Sort
+                  <Select
+                    value={`${props.sort}:${props.direction}`}
+                    onValueChange={(value) => {
+                      const [sort, direction] = value.split(":") as [
+                        NonNullable<LibraryItemQuery["sort"]>,
+                        NonNullable<LibraryItemQuery["direction"]>,
+                      ];
+                      props.onSort(sort, direction);
+                    }}
+                  >
+                    <SelectTrigger className="h-11 text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(props.albumOrderAvailable
+                        ? [{ value: "album-order:asc", label: "Album order" }, ...sortOptions]
+                        : sortOptions
+                      ).map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+              ) : null}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </header>
+    );
+  }
 
   return (
     <header className="flex min-h-11 shrink-0 flex-wrap items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5">

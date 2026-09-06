@@ -24,6 +24,8 @@ export interface ExplorerSidebarProps {
   androidAllFilesAccess: AndroidAllFilesAccessStatus | null;
   androidGrantedFolders: FileEntry[];
   onGrantLocalFolder: (request?: AndroidLocalGrantRequest) => void;
+  /** SDK desktop views choose and retain folders through the host picker. */
+  onChooseFolder?: () => void;
   onUnpinPinnedPath: (path: string) => void;
 }
 

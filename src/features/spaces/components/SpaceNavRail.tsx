@@ -10,9 +10,10 @@ import { LockKeyhole, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type DragEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { invitedSpacePreview } from "../spaceInvitation";
+import { spaceNavigationName } from "../defaultSpace";
 import { spaceLandingRoute } from "../navigation";
 import { useSpacesStore } from "../store/useSpacesStore";
-import { useWorkspaceStore } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace/core";
 import { SpaceAvatar } from "./SpaceAvatar";
 
 const spaceOrderStorageKey = "misty:space-nav-order:v1";
@@ -90,7 +91,8 @@ export function SpaceNavRail() {
         const active = space.id === activeSpaceId;
         const invitation = invitationBySpaceId.get(space.id);
         const unreadCount = unreadActivityCountForSpace(activityItems, space.id);
-        const accessibleLabel = `${space.name} Space${invitation ? " invitation" : ""}${
+        const navigationName = spaceNavigationName(space);
+        const accessibleLabel = `${navigationName} Space${invitation ? " invitation" : ""}${
           unreadCount ? `, ${unreadCount} new` : ""
         }`;
         return (
@@ -102,10 +104,10 @@ export function SpaceNavRail() {
                 ? `/spaces/${encodeURIComponent(space.id)}/invitation`
                 : spaceLandingRoute(space.id, undefined, location.pathname)
             }
-            state={{ mistySpaceSwitch: true }}
+            state={{ spaceSwitch: true }}
             aria-label={accessibleLabel}
             aria-current={active ? "page" : undefined}
-            title={invitation ? `${space.name} — invitation pending` : space.name}
+            title={invitation ? `${navigationName} — invitation pending` : navigationName}
             data-invitation-pending={invitation ? "true" : undefined}
             draggable
             data-misty-window-drag-block="true"

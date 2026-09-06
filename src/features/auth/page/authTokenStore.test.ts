@@ -20,6 +20,7 @@ const grace = { id: "user-grace", name: "Grace", email: "grace@example.com" };
 
 describe("multi-account auth token storage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     keychainValue = null;
     const values = new Map<string, string>();
     Object.defineProperty(globalThis, "localStorage", {
@@ -37,6 +38,28 @@ describe("multi-account auth token storage", () => {
     });
     localStorage.clear();
     vi.resetModules();
+  });
+
+  it("shares one secure-store read across concurrent startup requests", async () => {
+    let finishRetrieve: ((value: string | null) => void) | undefined;
+    const keystore = await import("@impierce/tauri-plugin-keystore");
+    vi.mocked(keystore.retrieve).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRetrieve = resolve;
+        }),
+    );
+    const store = await import("../store/useAuthTokenStore");
+
+    const reads = [
+      store.readAccountAuthToken(),
+      store.readAccountAuthToken(),
+      store.readAccountAuthToken(),
+    ];
+
+    expect(keystore.retrieve).toHaveBeenCalledTimes(1);
+    finishRetrieve?.(null);
+    await expect(Promise.all(reads)).resolves.toEqual([null, null, null]);
   });
 
   it("migrates the existing single Keychain token into an account vault", async () => {

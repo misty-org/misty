@@ -1,5 +1,5 @@
 import type { MultiPanelTab } from "@/features/workspace";
-import { NewTabMenu } from "@/features/workspace";
+import { NewTabMenu } from "@/features/workspace/NewTabMenu";
 import { FolderOpen, House } from "lucide-react";
 
 export function createExplorerAddTabControl(homePath: string) {

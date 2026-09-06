@@ -2,6 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop-bot",
   "description": "Misty desktop bot overlay permissions",
+  "platforms": ["macOS", "windows", "linux"],
   "windows": ["misty-bot-*"],
   "permissions": [
     "core:event:default",

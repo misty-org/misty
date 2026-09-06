@@ -14,7 +14,6 @@ export interface SpacePanelSidebarContextProps {
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
-  isMistySpace?: boolean;
   socialAccounts?: AccountConnection[];
   socialAccountsLoading?: boolean;
   socialAuthorizingProvider?: string | null;
@@ -45,7 +44,6 @@ export function SpacePanelSidebarContext(props: SpacePanelSidebarContextProps) {
         onEditConversation={props.onEditConversation}
         onDeleteConversation={props.onDeleteConversation}
         isSpaceOwner={props.isSpaceOwner}
-        isMistySpace={props.isMistySpace}
         accounts={props.socialAccounts}
         accountsLoading={props.socialAccountsLoading}
         authorizingProvider={props.socialAuthorizingProvider}

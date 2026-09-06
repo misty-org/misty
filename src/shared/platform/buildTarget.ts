@@ -10,6 +10,7 @@ export const mistyBuildTarget: MistyBuildTarget =
         : "desktop";
 
 export const isNativeMobileBuild = mistyBuildTarget === "mobile" || mistyBuildTarget === "android";
+export const isIosBuild = mistyBuildTarget === "mobile";
 export const isAndroidBuild = mistyBuildTarget === "android";
 export const isWebBuild = mistyBuildTarget === "web";
 

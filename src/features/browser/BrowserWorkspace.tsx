@@ -9,6 +9,7 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import {
   useAiSurfaceAdapter,
@@ -18,8 +19,18 @@ import {
 import { useShortcutHandler } from "@/features/shortcuts";
 import { SystemErrorActivity } from "@/features/activity";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { useMobileSurfaceChrome } from "@/shared/mobile";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ArrowRight, MessageCirclePlus, Pencil, RotateCw, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  MessageCirclePlus,
+  Pencil,
+  RotateCw,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   browserContentHash,
@@ -85,6 +96,7 @@ export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
 function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   const nativeRuntime = hasTauriInternals();
   const state = parseBrowserTabState(tab.state);
+  useMobileSurfaceChrome({ title: tab.title || browserTabTitle(state.url), level: "root" });
   const pageHostRef = useRef<HTMLDivElement | null>(null);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
@@ -274,7 +286,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   useBrowserWebviewGeometry({
     hostRef: pageHostRef,
     nativeRuntime,
-    nativeLiveResize: viewport === "responsive",
+    nativeLiveResize: !isNativeMobileBuild && viewport === "responsive",
     tab,
     url: state.url,
     theme: browserTheme,
@@ -447,6 +459,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       <div
         className={cn(
           "relative z-10 flex items-center gap-2 border-b px-4",
+          isNativeMobileBuild && "gap-1 px-1",
           lightChrome ? "border-black/[0.08]" : "border-white/[0.055]",
         )}
         style={{ backgroundColor: browserChromeBackground }}
@@ -511,27 +524,33 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         />
 
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            className={cn(
-              iconButtonClass,
-              annotationsActive &&
-                (lightChrome ? "bg-black/[0.06] text-[#202020]" : "bg-white/[0.06] text-[#e9e9e9]"),
-            )}
-            aria-label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
-            aria-pressed={annotationsActive}
-            title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
-            onClick={() => setAnnotationsActive((active) => !active)}
-          >
-            <Pencil size={20} strokeWidth={1.7} />
-          </button>
-          <BrowserViewportMenu
-            value={viewport}
-            onChange={setViewport}
-            iconButtonClass={iconButtonClass}
-            lightChrome={lightChrome}
-            suspensionReason={viewportMenuSuspensionReason}
-          />
+          {!isNativeMobileBuild ? (
+            <>
+              <button
+                type="button"
+                className={cn(
+                  iconButtonClass,
+                  annotationsActive &&
+                    (lightChrome
+                      ? "bg-black/[0.06] text-[#202020]"
+                      : "bg-white/[0.06] text-[#e9e9e9]"),
+                )}
+                aria-label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                aria-pressed={annotationsActive}
+                title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                onClick={() => setAnnotationsActive((active) => !active)}
+              >
+                <Pencil size={20} strokeWidth={1.7} />
+              </button>
+              <BrowserViewportMenu
+                value={viewport}
+                onChange={setViewport}
+                iconButtonClass={iconButtonClass}
+                lightChrome={lightChrome}
+                suspensionReason={viewportMenuSuspensionReason}
+              />
+            </>
+          ) : null}
           <Popover open={agentMenuOverlay.open} onOpenChange={agentMenuOverlay.onOpenChange}>
             <PopoverTrigger asChild>
               <button
@@ -684,10 +703,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               lightChrome={lightChrome}
             />
           ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
-            <iframe
-              title={tab.title}
-              src={state.url}
-              className="absolute inset-0 size-full border-0"
+            <BrowserNativeRuntimeRequired
+              url={state.url}
+              onOpenExternal={() =>
+                void openSystemExternalLink(state.url).catch((error: unknown) =>
+                  setBrowserError(tab.id, error),
+                )
+              }
             />
           ) : null}
           <BrowserAnnotationLayer
@@ -698,6 +720,39 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () => void }) {
+  return (
+    <div
+      className="absolute inset-0 grid place-items-center overflow-y-auto bg-charcoal-bg p-6"
+      data-testid="browser-native-runtime-required"
+    >
+      <div className="flex w-full max-w-md flex-col items-center text-center">
+        <div className="mb-5 grid size-12 place-items-center rounded-xl bg-charcoal-card text-sage-fg">
+          <ShieldCheck className="size-6" aria-hidden="true" />
+        </div>
+        <h1 className="text-base font-semibold tracking-[-0.02em] text-cream-bright">
+          Open this page in the Misty desktop app
+        </h1>
+        <p className="mt-2 max-w-sm text-sm leading-5 text-cream-muted">
+          Misty runs websites in a separate native browser view. The web companion does not use
+          embedded page frames.
+        </p>
+        <p className="mt-4 max-w-full truncate rounded-md bg-charcoal-card px-3 py-2 font-mono text-xs text-cream-muted">
+          {props.url}
+        </p>
+        <button
+          type="button"
+          className="mt-5 inline-flex min-h-9 items-center gap-2 rounded-md bg-charcoal-active px-3 text-sm font-medium text-cream-bright transition-colors hover:bg-charcoal-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted"
+          onClick={props.onOpenExternal}
+        >
+          <ExternalLink className="size-4" aria-hidden="true" />
+          Open in default browser
+        </button>
+      </div>
+    </div>
   );
 }
 

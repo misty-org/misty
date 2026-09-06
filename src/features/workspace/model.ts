@@ -22,6 +22,7 @@ export type WorkspaceSurfaceId =
   | "files"
   | "transfers"
   | "agents"
+  | "official-app"
   | "extension"
   | "marketplace";
 

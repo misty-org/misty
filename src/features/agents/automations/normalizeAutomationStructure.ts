@@ -47,17 +47,19 @@ export function normalizeAutomationStructure(value: unknown): AutomationStructur
       if (!isObject(row)) return [];
       const name = stringValue(row.name);
       if (!name) return [];
-      return [{
-        name,
-        type: stringValue(row.type) || "PIECE",
-        displayName: stringValue(row.displayName) || name,
-        parentName: nullableString(row.parentName),
-        relationship: stringValue(row.relationship) || "next",
-        valid: row.valid === true,
-        configStatus: stringValue(row.configStatus),
-        branchIndex: typeof row.branchIndex === "number" ? row.branchIndex : undefined,
-        branchName: stringValue(row.branchName) || undefined,
-      } satisfies AutomationStep];
+      return [
+        {
+          name,
+          type: stringValue(row.type) || "PIECE",
+          displayName: stringValue(row.displayName) || name,
+          parentName: nullableString(row.parentName),
+          relationship: stringValue(row.relationship) || "next",
+          valid: row.valid === true,
+          configStatus: stringValue(row.configStatus),
+          branchIndex: typeof row.branchIndex === "number" ? row.branchIndex : undefined,
+          branchName: stringValue(row.branchName) || undefined,
+        } satisfies AutomationStep,
+      ];
     }),
   };
 }
@@ -69,14 +71,16 @@ export function normalizeAutomationRuns(value: unknown): AutomationRun[] {
     if (!isObject(row)) return [];
     const id = stringValue(row.id);
     if (!id) return [];
-    return [{
-      id,
-      flowId: stringValue(row.flowId),
-      status: stringValue(row.status) || "UNKNOWN",
-      created: stringValue(row.created),
-      duration: stringValue(row.duration),
-      failedStepName: stringValue(row.failedStepName),
-    }];
+    return [
+      {
+        id,
+        flowId: stringValue(row.flowId),
+        status: stringValue(row.status) || "UNKNOWN",
+        created: stringValue(row.created),
+        duration: stringValue(row.duration),
+        failedStepName: stringValue(row.failedStepName),
+      },
+    ];
   });
 }
 
@@ -86,17 +90,21 @@ export function normalizeCatalogResults(value: unknown, kind: "action" | "trigge
   return rows.flatMap((row): AutomationCatalogResult[] => {
     if (!isObject(row)) return [];
     const pieceName = stringValue(row.pieceName) || stringValue(row.piece_name);
-    const componentName = kind === "action"
-      ? stringValue(row.actionName) || stringValue(row.action_name) || stringValue(row.name)
-      : stringValue(row.triggerName) || stringValue(row.trigger_name) || stringValue(row.name);
+    const componentName =
+      kind === "action"
+        ? stringValue(row.actionName) || stringValue(row.action_name) || stringValue(row.name)
+        : stringValue(row.triggerName) || stringValue(row.trigger_name) || stringValue(row.name);
     if (!pieceName || !componentName) return [];
-    return [{
-      pieceName,
-      componentName,
-      displayName: stringValue(row.displayName) || stringValue(row.display_name) || humanize(componentName),
-      description: stringValue(row.description) || stringValue(row.oneLineDescription),
-      connected: row.connected === true,
-    }];
+    return [
+      {
+        pieceName,
+        componentName,
+        displayName:
+          stringValue(row.displayName) || stringValue(row.display_name) || humanize(componentName),
+        description: stringValue(row.description) || stringValue(row.oneLineDescription),
+        connected: row.connected === true,
+      },
+    ];
   });
 }
 
@@ -118,5 +126,8 @@ function nullableString(value: unknown): string | null {
 }
 
 function humanize(value: string) {
-  return value.replace(/^@activepieces\/piece-/, "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value
+    .replace(/^@activepieces\/piece-/, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

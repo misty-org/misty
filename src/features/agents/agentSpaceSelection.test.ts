@@ -2,10 +2,10 @@ import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { describe, expect, it } from "vitest";
 import { resolveAgentSpaceId, resolveMentionedAgentSpaceId } from "./agentSpaceSelection";
 
-function space(id: string, kind: "standard" | "misty"): Space {
+function space(id: string, isDefault = false): Space {
   return {
     id,
-    kind,
+    is_default: isDefault,
     owner_user_id: "owner",
     name: id,
     role: "owner",
@@ -18,14 +18,14 @@ function space(id: string, kind: "standard" | "misty"): Space {
 }
 
 describe("resolveAgentSpaceId", () => {
-  const spaces = [space("misty", "misty"), space("family", "standard")];
+  const spaces = [space("personal", true), space("family")];
 
-  it("prefers a normal Space when Agents opens without Space context", () => {
-    expect(resolveAgentSpaceId(spaces, "tool:agents")).toBe("family");
+  it("prefers the default Space when Agents opens without Space context", () => {
+    expect(resolveAgentSpaceId(spaces, "tool:agents")).toBe("personal");
   });
 
-  it("preserves an explicit current Space, including Misty", () => {
-    expect(resolveAgentSpaceId(spaces, "space:misty")).toBe("misty");
+  it("preserves an explicit current Space", () => {
+    expect(resolveAgentSpaceId(spaces, "space:personal")).toBe("personal");
     expect(resolveAgentSpaceId(spaces, "space:family")).toBe("family");
   });
 

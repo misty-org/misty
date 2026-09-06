@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import type {
   SpaceMessageAgentRun,
   SpaceRun,

@@ -1,6 +1,9 @@
-import { useAuth, useAccountAvatarUrl } from "@/features/auth";
-import { SystemErrorActivity } from "@/features/activity";
+import {useAgentsAuth as useAuth,useAgentsAvatar as useAccountAvatarUrl} from "@/features/agents/agentsRuntime";
+
+import {AgentsError as SystemErrorActivity} from "@/features/agents/agentsRuntime";
+
 import { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
+import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import {
   Avatar,
   AvatarFallback,
@@ -17,7 +20,8 @@ import {
 } from "@/shared/ui";
 import { ArrowRight, Pin, PinOff, Plus, RefreshCw, Search, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { automationsApi } from "./api";
+import {runtimeAutomationsApi as automationsApi} from "@/features/agents/agentsRuntime";
+
 import { AutomationIntegrationIcon } from "./AutomationIntegrationIcon";
 import {
   normalizeAutomationStructure,
@@ -34,6 +38,9 @@ export function AutomationListings(props: {
   onCreate: () => void;
   onOpen: (flow: AutomationFlow) => void;
 }) {
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
+  useMobileSurfaceChrome({ title: "Automations", level: "root" });
   const { user } = useAuth();
   const avatarUrl = useAccountAvatarUrl(user?.id, user?.avatarVersion);
   const [query, setQuery] = useState("");
@@ -86,14 +93,19 @@ export function AutomationListings(props: {
         />
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-5 p-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]">
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-5 md:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)]",
+          mobile ? "p-3" : "p-5",
+        )}
+      >
         <section className="flex min-h-0 flex-col">
-          <div className="mb-2 flex h-8 shrink-0 items-center gap-2">
+          <div className={cn("mb-2 flex shrink-0 items-center gap-2", mobile ? "min-h-11" : "h-8")}>
             <h1 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold text-cream-bright">
               My Automations
             </h1>
             <Button
-              size="sm"
+              size={mobile ? "default" : "sm"}
               onClick={props.onCreate}
               disabled={props.loading || props.connected !== true}
             >
@@ -101,12 +113,12 @@ export function AutomationListings(props: {
               New
             </Button>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
             <div className="shrink-0 border-b border-charcoal-border p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-cream-muted" />
                 <Input
-                  className="h-8 bg-charcoal-bg pl-8 text-xs"
+                  className={cn("bg-charcoal-bg pl-9", mobile ? "h-11 text-base" : "h-8 text-xs")}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   aria-label="Search automations"
@@ -132,6 +144,7 @@ export function AutomationListings(props: {
                     onSelect={setSelectedId}
                     onOpen={props.onOpen}
                     onTogglePin={togglePinned}
+                    mobile={mobile}
                   />
                 ) : (
                   <div className="pb-2">
@@ -146,6 +159,7 @@ export function AutomationListings(props: {
                       onSelect={setSelectedId}
                       onOpen={props.onOpen}
                       onTogglePin={togglePinned}
+                      mobile={mobile}
                     />
                     <AutomationSection
                       title="Recently edited"
@@ -158,6 +172,7 @@ export function AutomationListings(props: {
                       onSelect={setSelectedId}
                       onOpen={props.onOpen}
                       onTogglePin={togglePinned}
+                      mobile={mobile}
                     />
                   </div>
                 )
@@ -282,6 +297,7 @@ type AutomationRowsProps = {
   onSelect: (flowId: string) => void;
   onOpen: (flow: AutomationFlow) => void;
   onTogglePin: (flowId: string) => void;
+  mobile?: boolean;
 };
 
 function AutomationSection(props: AutomationRowsProps & { title: string; emptyLabel: string }) {
@@ -315,8 +331,8 @@ function AutomationRows(props: AutomationRowsProps) {
                 : "hover:bg-charcoal-border/65",
             )}
             aria-current={selected ? "true" : undefined}
-            onClick={() => props.onSelect(flow.id)}
-            onDoubleClick={() => props.onOpen(flow)}
+            onClick={() => (props.mobile ? props.onOpen(flow) : props.onSelect(flow.id))}
+            onDoubleClick={() => !props.mobile && props.onOpen(flow)}
           >
             <AutomationIntegrationIcon value={flow.trigger} framed />
             <span className="min-w-0 flex-1">
@@ -351,7 +367,7 @@ function CreatorAvatar(props: { url: string; name: string }) {
   return (
     <Avatar size="sm" className="size-4 border-0">
       <AvatarImage src={props.url} alt="" />
-      <AvatarFallback className="text-[8px]">{initials(props.name)}</AvatarFallback>
+      <AvatarFallback className="text-[10px]">{initials(props.name)}</AvatarFallback>
     </Avatar>
   );
 }

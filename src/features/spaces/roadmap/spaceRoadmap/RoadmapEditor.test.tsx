@@ -27,6 +27,8 @@ vi.mock("@/features/spaces/roadmap/spaceRoadmap/RoadmapInspector", () => ({
 }));
 
 import { RoadmapEditor } from "./RoadmapEditor";
+import { RoadmapRuntimeProvider } from "./roadmapRuntime";
+import { roadmapTestRuntime } from "./roadmapTestRuntime";
 
 describe("RoadmapEditor layout", () => {
   let container: HTMLDivElement;
@@ -109,31 +111,33 @@ function Harness() {
   }>();
   const [, setSaveState] = useState<"saved" | "saving" | "unsaved" | "conflict">("saved");
   return (
-    <RoadmapEditor
-      spaceId="space-1"
-      canManage
-      snapshot={snapshot()}
-      tasks={[]}
-      saveState="saved"
-      error=""
-      selectedId={selectedId}
-      expandedGoalIds={expandedGoalIds}
-      nodeDrawerOpen={nodeDrawerOpen}
-      placementRequest={placementRequest}
-      palette={[]}
-      navigate={vi.fn()}
-      mutate={vi.fn()}
-      load={vi.fn()}
-      retrySave={vi.fn()}
-      archiveRoadmap={vi.fn()}
-      addPaletteItem={vi.fn()}
-      saveLayout={vi.fn()}
-      setSaveState={setSaveState}
-      setSelectedId={setSelectedId}
-      setExpandedGoalIds={setExpandedGoalIds}
-      setNodeDrawerOpen={setNodeDrawerOpen}
-      setPlacementRequest={setPlacementRequest}
-    />
+    <RoadmapRuntimeProvider runtime={roadmapTestRuntime()}>
+      <RoadmapEditor
+        spaceId="space-1"
+        canManage
+        snapshot={snapshot()}
+        tasks={[]}
+        saveState="saved"
+        error=""
+        selectedId={selectedId}
+        expandedGoalIds={expandedGoalIds}
+        nodeDrawerOpen={nodeDrawerOpen}
+        placementRequest={placementRequest}
+        palette={[]}
+        navigate={vi.fn()}
+        mutate={vi.fn()}
+        load={vi.fn()}
+        retrySave={vi.fn()}
+        archiveRoadmap={vi.fn()}
+        addPaletteItem={vi.fn()}
+        saveLayout={vi.fn()}
+        setSaveState={setSaveState}
+        setSelectedId={setSelectedId}
+        setExpandedGoalIds={setExpandedGoalIds}
+        setNodeDrawerOpen={setNodeDrawerOpen}
+        setPlacementRequest={setPlacementRequest}
+      />
+    </RoadmapRuntimeProvider>
   );
 }
 

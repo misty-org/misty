@@ -16,7 +16,6 @@ export function SpaceManagementNavigation({
 }) {
   const location = useLocation();
   if (!space) return null;
-  if (space.kind === "misty" && space.permissions?.["space.invite"] !== true) return null;
   const encodedSpaceId = encodeURIComponent(space.id);
 
   const settingsPath = `/spaces/${encodedSpaceId}/settings/general`;

@@ -35,7 +35,14 @@ const appIconDetails: Record<WorkspaceToolId, { icon: LucideIcon }> = {
   marketplace: { icon: Store },
 };
 
-/** Keeps top-level app identity neutral across navigation, Settings, and Store. */
+/** Shared by navbar entries and workspace tabs so app identity stays consistent. */
+export function workspaceAppIcon(appId: string): LucideIcon | undefined {
+  return Object.prototype.hasOwnProperty.call(appIconDetails, appId)
+    ? appIconDetails[appId as WorkspaceToolId].icon
+    : undefined;
+}
+
+/** Keeps top-level app identity neutral across navigation, Settings, and Discover. */
 export function workspaceAppIconColorClass(_appId: WorkspaceToolId): string {
   return "text-cream-bright";
 }

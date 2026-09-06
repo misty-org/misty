@@ -57,6 +57,7 @@ export function AiPaneHost({
   defaultAdapterRef.current = defaultAdapter;
   const adapterRef = useRef<AiSurfaceAdapter | null>(adapter);
   adapterRef.current = adapter;
+  const registrationRef = useRef<symbol | null>(null);
   const registerPane = useAiSurfaceStore((state) => state.registerPane);
   const updatePaneAdapter = useAiSurfaceStore((state) => state.updatePaneAdapter);
   const summonCompanion = useAiSurfaceStore((state) => state.summon);
@@ -64,10 +65,13 @@ export function AiPaneHost({
   const proactive = useControlledProactivity(accountId, adapter);
 
   const register = useCallback((adapter: AiSurfaceAdapter) => {
+    const registration = Symbol("ai-surface-registration");
+    registrationRef.current = registration;
     adapterRef.current = adapter;
     setRegisteredAdapter((current) => (current === adapter ? current : adapter));
     return () => {
-      if (adapterRef.current === adapter) {
+      if (registrationRef.current === registration) {
+        registrationRef.current = null;
         adapterRef.current = defaultAdapterRef.current;
         setRegisteredAdapter(null);
       }
@@ -82,6 +86,7 @@ export function AiPaneHost({
   const update = useCallback(
     (next: AiSurfaceAdapter) => {
       adapterRef.current = next;
+      setRegisteredAdapter((current) => (current === next ? current : next));
       if (!accountId) return;
       setContextBoundary(accountId, paneId, aiContextBoundary(next));
       updatePaneAdapter(accountId, paneId, next);
@@ -188,7 +193,14 @@ export function useAiSurfaceActions(adapter?: AiSurfaceAdapter | null) {
 
 export function aiContextBoundary(adapter: AiSurfaceAdapter | null) {
   if (!adapter) return "none";
-  const context = adapter.getContext();
+  let context;
+  try {
+    context = adapter.getContext();
+  } catch {
+    // Downloaded surfaces can expire before React commits their replacement.
+    // Never retain the old context or crash the host while it is being removed.
+    return "none";
+  }
   const spaces = [
     ...new Set(
       context

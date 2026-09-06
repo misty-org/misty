@@ -22,9 +22,10 @@ use crate::{
     },
     domain::connected_devices::{
         decode_control_frame, encode_control_frame, validate_clipboard_offer, verify_peer_ticket,
-        ClipboardOffer, ClipboardOfferKind, PeerError, PeerErrorCode, PeerFileReference,
-        PeerRequest, PeerRequestEnvelope, PeerResponse, PeerResponseEnvelope, PeerRoot,
-        PeerTicketClaims, DEVICE_ALPN, MAX_CONTROL_FRAME_BYTES,
+        ClipboardOffer, ClipboardOfferKind, OpenWorkspaceRouteRequest, OpenWorkspaceRouteResult,
+        OpenWorkspaceRouteStatus, PeerError, PeerErrorCode, PeerFileReference, PeerRequest,
+        PeerRequestEnvelope, PeerResponse, PeerResponseEnvelope, PeerRoot, PeerTicketClaims,
+        WorkspaceRouteSurface, DEVICE_ALPN, MAX_CONTROL_FRAME_BYTES,
     },
     error::{ApiError, ApiResult},
     infra::{peer_files::PeerRootRegistry, peer_identity},
@@ -116,6 +117,9 @@ pub struct ConnectedDevicesService {
     cache_root: Arc<PathBuf>,
     gateway: Arc<RwLock<Option<PeerMediaGateway>>>,
     clipboard_handler: Arc<RwLock<Option<Arc<dyn Fn(ClipboardPayload) + Send + Sync>>>>,
+    workspace_route_handler:
+        Arc<RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>>,
+    workspace_route_results: Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
     directory_subscriptions: Arc<Mutex<HashSet<String>>>,
     clipboard_blobs: Arc<Mutex<HashMap<String, ClipboardBlobRecord>>>,
 }
@@ -130,6 +134,8 @@ impl ConnectedDevicesService {
             cache_root: Arc::new(cache_root),
             gateway: Arc::new(RwLock::new(None)),
             clipboard_handler: Arc::new(RwLock::new(None)),
+            workspace_route_handler: Arc::new(RwLock::new(None)),
+            workspace_route_results: Arc::new(Mutex::new(HashMap::new())),
             directory_subscriptions: Arc::new(Mutex::new(HashSet::new())),
             clipboard_blobs: Arc::new(Mutex::new(HashMap::new())),
         }
@@ -140,6 +146,14 @@ impl ConnectedDevicesService {
         handler: Arc<dyn Fn(ClipboardPayload) + Send + Sync>,
     ) -> ApiResult<()> {
         *self.clipboard_handler.write().map_err(lock_error)? = Some(handler);
+        Ok(())
+    }
+
+    pub fn set_workspace_route_handler(
+        &self,
+        handler: Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>,
+    ) -> ApiResult<()> {
+        *self.workspace_route_handler.write().map_err(lock_error)? = Some(handler);
         Ok(())
     }
 
@@ -238,6 +252,8 @@ impl ConnectedDevicesService {
             roots: state.roots.clone(),
             clipboard_handler: self.clipboard_handler.clone(),
             clipboard_blobs: self.clipboard_blobs.clone(),
+            workspace_route_handler: self.workspace_route_handler.clone(),
+            workspace_route_results: self.workspace_route_results.clone(),
         };
         *self.state.write().map_err(lock_error)? = Some(state);
         tokio::spawn(run_accept_loop(accept_context));
@@ -363,6 +379,29 @@ impl ConnectedDevicesService {
             PeerResponse::Roots { roots } => Ok(roots),
             _ => Err(ApiError::Message(
                 "Peer returned an unexpected response.".to_owned(),
+            )),
+        }
+    }
+
+    pub async fn open_workspace_route(
+        &self,
+        device_id: &str,
+        request: OpenWorkspaceRouteRequest,
+    ) -> ApiResult<OpenWorkspaceRouteResult> {
+        let request_id = request.request_id.clone();
+        let connection = self.authorized_connection(device_id)?;
+        let response = exchange_control_with_id(
+            &connection,
+            &request_id,
+            PeerRequest::OpenWorkspaceRoute { request },
+        )
+        .await?;
+        match response {
+            PeerResponse::WorkspaceRoute { result } if result.request_id == request_id => {
+                Ok(result)
+            }
+            _ => Err(ApiError::Message(
+                "Peer returned an unexpected workspace handoff response.".to_owned(),
             )),
         }
     }
@@ -1100,6 +1139,13 @@ fn peer_content_type(path: &str) -> &'static str {
         .to_ascii_lowercase()
         .as_str()
     {
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        "heic" | "heif" => "image/heic",
+        "jpeg" | "jpg" => "image/jpeg",
+        "png" => "image/png",
+        "webp" => "image/webp",
         "mp4" | "m4v" => "video/mp4",
         "webm" => "video/webm",
         "mov" => "video/quicktime",
@@ -1207,6 +1253,9 @@ struct PeerAcceptContext {
     roots: PeerRootRegistry,
     clipboard_handler: Arc<RwLock<Option<Arc<dyn Fn(ClipboardPayload) + Send + Sync>>>>,
     clipboard_blobs: Arc<Mutex<HashMap<String, ClipboardBlobRecord>>>,
+    workspace_route_handler:
+        Arc<RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>>,
+    workspace_route_results: Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
 }
 
 async fn run_accept_loop(context: PeerAcceptContext) {
@@ -1273,6 +1322,8 @@ async fn handle_incoming_connection(
         let claims = claims.clone();
         let clipboard_handler = context.clipboard_handler.clone();
         let clipboard_blobs = context.clipboard_blobs.clone();
+        let workspace_route_handler = context.workspace_route_handler.clone();
+        let workspace_route_results = context.workspace_route_results.clone();
         tokio::spawn(async move {
             let _ = handle_authorized_stream(
                 send,
@@ -1281,6 +1332,8 @@ async fn handle_incoming_connection(
                 claims,
                 clipboard_handler,
                 clipboard_blobs,
+                workspace_route_handler,
+                workspace_route_results,
             )
             .await;
         });
@@ -1294,6 +1347,10 @@ async fn handle_authorized_stream(
     claims: PeerTicketClaims,
     clipboard_handler: Arc<RwLock<Option<Arc<dyn Fn(ClipboardPayload) + Send + Sync>>>>,
     clipboard_blobs: Arc<Mutex<HashMap<String, ClipboardBlobRecord>>>,
+    workspace_route_handler: Arc<
+        RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>,
+    >,
+    workspace_route_results: Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
 ) -> ApiResult<()> {
     let envelope: PeerRequestEnvelope = read_frame(&mut receive).await?;
     if claims.exp <= unix_now() {
@@ -1633,6 +1690,21 @@ async fn handle_authorized_stream(
                 .map_err(|error| ApiError::Unavailable(error.to_string()))?;
             Ok(())
         }
+        PeerRequest::OpenWorkspaceRoute { request } => {
+            let result = handle_workspace_route_request(
+                &envelope.request_id,
+                &claims,
+                request,
+                &workspace_route_handler,
+                &workspace_route_results,
+            )?;
+            write_response(
+                &mut send,
+                &envelope.request_id,
+                Ok(PeerResponse::WorkspaceRoute { result }),
+            )
+            .await
+        }
         PeerRequest::Ping { nonce } => {
             write_response(
                 &mut send,
@@ -1655,6 +1727,77 @@ async fn handle_authorized_stream(
         }
         PeerRequest::GetRoots => write_forbidden(&mut send, &envelope.request_id).await,
     }
+}
+
+fn handle_workspace_route_request(
+    envelope_request_id: &str,
+    claims: &PeerTicketClaims,
+    request: OpenWorkspaceRouteRequest,
+    handler: &Arc<RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>>,
+    results: &Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
+) -> ApiResult<OpenWorkspaceRouteResult> {
+    let now = unix_now();
+    {
+        let mut cached = results.lock().map_err(lock_error)?;
+        cached.retain(|_, (stored_at, _)| *stored_at > now - 600);
+        if let Some((_, result)) = cached.get(&request.request_id) {
+            return Ok(result.clone());
+        }
+    }
+
+    let sent_at = chrono::DateTime::parse_from_rfc3339(&request.sent_at)
+        .map(|value| value.timestamp())
+        .unwrap_or(0);
+    let expired = sent_at < now - 120 || sent_at > now + 30;
+    let identity_valid = request.request_id == envelope_request_id
+        && uuid::Uuid::parse_str(&request.request_id).is_ok()
+        && request.source_device_id == claims.source_device_id
+        && !request.source_device_name.trim().is_empty()
+        && request.source_device_name.len() <= 80;
+    let route_valid = match request.surface {
+        WorkspaceRouteSurface::Code => request.route.starts_with("/code"),
+        WorkspaceRouteSurface::Terminal => request.route.starts_with("/terminal"),
+        WorkspaceRouteSurface::Transfers => request.route.starts_with("/transfers"),
+        WorkspaceRouteSurface::Files => request.route.starts_with("/files"),
+    } && request.route.len() <= 2048;
+
+    let result = if expired {
+        OpenWorkspaceRouteResult {
+            request_id: request.request_id.clone(),
+            status: OpenWorkspaceRouteStatus::Expired,
+            reason: "This handoff request expired. Try again from the sending device.".to_owned(),
+        }
+    } else if !identity_valid || !route_valid {
+        OpenWorkspaceRouteResult {
+            request_id: request.request_id.clone(),
+            status: OpenWorkspaceRouteStatus::Rejected,
+            reason: "This device did not accept the requested workspace route.".to_owned(),
+        }
+    } else {
+        let emitted = handler
+            .read()
+            .map_err(lock_error)?
+            .clone()
+            .is_some_and(|handler| handler(request.clone()));
+        OpenWorkspaceRouteResult {
+            request_id: request.request_id.clone(),
+            status: if emitted {
+                OpenWorkspaceRouteStatus::Opened
+            } else {
+                OpenWorkspaceRouteStatus::Rejected
+            },
+            reason: if emitted {
+                "Opened on the selected desktop.".to_owned()
+            } else {
+                "The destination app could not open this workspace route.".to_owned()
+            },
+        }
+    };
+    results
+        .lock()
+        .map_err(lock_error)?
+        .insert(request.request_id, (now, result.clone()));
+    Ok(result)
 }
 
 fn has_permission(claims: &PeerTicketClaims, permission: &str) -> bool {
@@ -1707,12 +1850,25 @@ async fn exchange_control(
     connection: &iroh::endpoint::Connection,
     request: PeerRequest,
 ) -> ApiResult<PeerResponse> {
+    exchange_control_with_id(connection, &uuid::Uuid::new_v4().to_string(), request).await
+}
+
+async fn exchange_control_with_id(
+    connection: &iroh::endpoint::Connection,
+    request_id: &str,
+    request: PeerRequest,
+) -> ApiResult<PeerResponse> {
     let (mut send, mut receive) = connection
         .open_bi()
         .await
         .map_err(|error| ApiError::Unavailable(error.to_string()))?;
-    write_request(&mut send, request).await?;
+    write_request_with_id(&mut send, request_id, request).await?;
     let response: PeerResponseEnvelope = read_frame(&mut receive).await?;
+    if response.request_id != request_id {
+        return Err(ApiError::Message(
+            "Peer response request ID did not match.".to_owned(),
+        ));
+    }
     response.response.map_err(peer_error)
 }
 
@@ -1720,8 +1876,16 @@ async fn write_request(
     send: &mut iroh::endpoint::SendStream,
     request: PeerRequest,
 ) -> ApiResult<()> {
+    write_request_with_id(send, &uuid::Uuid::new_v4().to_string(), request).await
+}
+
+async fn write_request_with_id(
+    send: &mut iroh::endpoint::SendStream,
+    request_id: &str,
+    request: PeerRequest,
+) -> ApiResult<()> {
     let envelope = PeerRequestEnvelope {
-        request_id: uuid::Uuid::new_v4().to_string(),
+        request_id: request_id.to_owned(),
         request,
     };
     let frame = encode_control_frame(&envelope)?;
@@ -1849,4 +2013,97 @@ fn unix_now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as i64
+}
+
+#[cfg(test)]
+mod workspace_route_tests {
+    use super::*;
+    use crate::domain::connected_devices::DEVICE_PROTOCOL_VERSION;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    fn claims() -> PeerTicketClaims {
+        PeerTicketClaims {
+            iss: "misty-api".to_owned(),
+            aud: DEVICE_PROTOCOL_VERSION.to_owned(),
+            jti: "ticket".to_owned(),
+            pair_id: "pair".to_owned(),
+            source_device_id: "source-device".to_owned(),
+            source_endpoint_id: "source-endpoint".to_owned(),
+            target_device_id: "target-device".to_owned(),
+            target_endpoint_id: "target-endpoint".to_owned(),
+            protocol_version: DEVICE_PROTOCOL_VERSION.to_owned(),
+            permissions: Vec::new(),
+            iat: unix_now() - 1,
+            exp: unix_now() + 60,
+        }
+    }
+
+    fn request(request_id: &str) -> OpenWorkspaceRouteRequest {
+        OpenWorkspaceRouteRequest {
+            request_id: request_id.to_owned(),
+            route: "/terminal".to_owned(),
+            surface: WorkspaceRouteSurface::Terminal,
+            sent_at: chrono::Utc::now().to_rfc3339(),
+            source_device_id: "source-device".to_owned(),
+            source_device_name: "Misty iPhone".to_owned(),
+        }
+    }
+
+    #[test]
+    fn workspace_routes_validate_and_are_idempotent() {
+        let request_id = uuid::Uuid::new_v4().to_string();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let handler_calls = calls.clone();
+        let handler: Arc<
+            RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>,
+        > = Arc::new(RwLock::new(Some(Arc::new(move |_| {
+            handler_calls.fetch_add(1, Ordering::SeqCst);
+            true
+        }))));
+        let results = Arc::new(Mutex::new(HashMap::new()));
+
+        let first = handle_workspace_route_request(
+            &request_id,
+            &claims(),
+            request(&request_id),
+            &handler,
+            &results,
+        )
+        .expect("first route");
+        let duplicate = handle_workspace_route_request(
+            &request_id,
+            &claims(),
+            request(&request_id),
+            &handler,
+            &results,
+        )
+        .expect("duplicate route");
+
+        assert_eq!(first.status, OpenWorkspaceRouteStatus::Opened);
+        assert_eq!(duplicate, first);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn workspace_routes_reject_mismatches_and_expiry() {
+        let handler: Arc<
+            RwLock<Option<Arc<dyn Fn(OpenWorkspaceRouteRequest) -> bool + Send + Sync>>>,
+        > = Arc::new(RwLock::new(Some(Arc::new(|_| true))));
+        let results = Arc::new(Mutex::new(HashMap::new()));
+        let mismatch_id = uuid::Uuid::new_v4().to_string();
+        let mut mismatch = request(&mismatch_id);
+        mismatch.route = "/code".to_owned();
+        let rejected =
+            handle_workspace_route_request(&mismatch_id, &claims(), mismatch, &handler, &results)
+                .expect("rejected route");
+        assert_eq!(rejected.status, OpenWorkspaceRouteStatus::Rejected);
+
+        let expired_id = uuid::Uuid::new_v4().to_string();
+        let mut expired = request(&expired_id);
+        expired.sent_at = (chrono::Utc::now() - chrono::Duration::minutes(5)).to_rfc3339();
+        let result =
+            handle_workspace_route_request(&expired_id, &claims(), expired, &handler, &results)
+                .expect("expired route");
+        assert_eq!(result.status, OpenWorkspaceRouteStatus::Expired);
+    }
 }

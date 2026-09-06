@@ -1,10 +1,4 @@
-export { ChromeTabStrip } from "./ChromeTabStrip";
-export type { ChromeTabStripProps, ChromeTabStripTab } from "./ChromeTabStrip";
 export type { MultiPanelClosedPane, MultiPanelPane, MultiPanelTab } from "./model/interfaces/types";
-export { MultiPanelWorkspace, useMultiPanelStoreContext } from "./MultiPanelWorkspace";
-export type { MultiPanelWorkspaceProps } from "./MultiPanelWorkspace";
-export { NewTabMenu } from "./NewTabMenu";
-export type { NewTabMenuOption } from "./NewTabMenu";
 export {
   activeMultiPanelTab,
   createMultiPanelStore,
@@ -32,3 +26,5 @@ export * from "./WorkspaceAppIcon";
 export * from "./MistyBrandIcon";
 export * from "./workspaceTabOperations";
 export * from "./WorkspaceTabRouteScope";
+export * from "./workspaceDefaultTab";
+export * from "./mobileWorkspaceProjection";

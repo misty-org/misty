@@ -19,23 +19,23 @@ describe("workspace deep links", () => {
     });
   });
 
-  it("gives each Space tool its own tab identity within the decoded Space scope", () => {
+  it("redirects legacy Space tools into App-owned tabs", () => {
     expect(workspaceSurfaceFromRoute("/spaces/product%20launch/planner")).toMatchObject({
-      surfaceId: "space",
-      groupKey: "space:product launch:planner",
-      scopeKey: "space:product launch",
+      surfaceId: "official-app",
+      groupKey: "app:planner",
       title: "Planner",
-      route: "/spaces/product%20launch/planner",
+      route: "/apps/planner?space=product+launch",
     });
   });
 
   it("keeps Social separate and maps legacy Chat routes into its group", () => {
     expect(workspaceSurfaceFromRoute("/spaces/family/social")).toMatchObject({
-      groupKey: "space:family:social",
+      groupKey: "app:chat",
       title: "Social",
+      route: "/apps/social?space=family",
     });
     expect(workspaceSurfaceFromRoute("/spaces/family/chat")).toMatchObject({
-      groupKey: "space:family:social",
+      groupKey: "app:chat",
       title: "Social",
     });
   });
@@ -44,54 +44,63 @@ describe("workspace deep links", () => {
     const route = "/spaces/family/social/messenger";
 
     expect(workspaceSurfaceFromRoute(route)).toMatchObject({
-      groupKey: "space:family:social",
-      route,
+      groupKey: "app:chat",
+      route: "/apps/social?space=family&provider=messenger",
     });
   });
 
   it("matches nested routes only within the same Space tool tab", () => {
     const tab = {
-      surfaceId: "space" as const,
-      groupKey: "space:product launch:journal" as const,
+      surfaceId: "official-app" as const,
+      groupKey: "app:journal" as const,
     };
 
-    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/notes")).toBe(true);
-    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/drawings/one")).toBe(true);
-    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/planner")).toBe(false);
-    expect(workspaceTabMatchesRoute(tab, "/spaces/another-space/notes")).toBe(false);
+    expect(workspaceTabMatchesRoute(tab, "/apps/journal?space=product%20launch")).toBe(true);
+    expect(workspaceTabMatchesRoute(tab, "/apps/journal/drawings/one")).toBe(true);
+    expect(workspaceTabMatchesRoute(tab, "/apps/planner?space=product%20launch")).toBe(false);
   });
 
   it.each([
-    ["/browser", "browser"],
-    ["/inbox", "inbox"],
-    ["/terminal", "terminal"],
-    ["/code", "code"],
-    ["/files", "files"],
-    ["/agents", "agents"],
-    ["/transfers", "transfers"],
-    ["/store", "marketplace"],
+    ["/browser", "official-app"],
+    ["/inbox", "official-app"],
+    ["/terminal", "official-app"],
+    ["/code", "official-app"],
+    ["/files", "official-app"],
+    ["/agents", "official-app"],
+    ["/transfers", "official-app"],
+    ["/discover", "marketplace"],
   ])("maps %s to the %s surface", (route, surfaceId) => {
     expect(workspaceSurfaceFromRoute(route)?.surfaceId).toBe(surfaceId);
   });
 
   it("opens coming-soon launch surfaces as singleton tabs", () => {
-    for (const route of ["/store", "/transfers"]) {
+    for (const route of ["/discover"]) {
       expect(workspaceSurfaceFromRoute(route)?.instancePolicy).toBe("single");
     }
   });
 
-  it("keeps legacy catalog links compatible with the Store surface", () => {
-    expect(workspaceSurfaceFromRoute("/marketplace")).toMatchObject({
-      surfaceId: "marketplace",
-      groupKey: "tool:marketplace",
-      instancePolicy: "single",
-    });
+  it.each(["/transfers", "/apps/transfers", "/apps/files?view=transfers"])(
+    "opens %s as the Files subsection",
+    (route) => {
+      expect(workspaceSurfaceFromRoute(route)).toMatchObject({
+        surfaceId: "official-app",
+        groupKey: "app:files",
+        instanceKey: "files",
+        route: "/apps/files?view=transfers",
+      });
+    },
+  );
+
+  it("does not preserve legacy catalog aliases", () => {
+    expect(workspaceSurfaceFromRoute("/marketplace")).toBeNull();
+    expect(workspaceSurfaceFromRoute("/store")).toBeNull();
   });
 
-  it("opens Inbox as one account-level tool surface", () => {
+  it("opens legacy Inbox through the account App runtime", () => {
     expect(workspaceSurfaceFromRoute("/inbox")).toMatchObject({
-      surfaceId: "inbox",
-      groupKey: "tool:inbox",
+      surfaceId: "official-app",
+      groupKey: "app:inbox",
+      route: "/apps/inbox",
       instancePolicy: "multiple",
     });
   });
@@ -102,17 +111,36 @@ describe("workspace deep links", () => {
         "/apps/quick_convert?name=Quick+Convert&selected=%2FUsers%2Fmisty%2Fmovie.mov",
       ),
     ).toMatchObject({
-      surfaceId: "extension",
+      surfaceId: "official-app",
       groupKey: "app:quick_convert",
       instancePolicy: "multiple",
-      title: "Quick Convert",
+      title: "Quick_convert",
     });
   });
 
-  it("keeps Code route navigation reusable while allowing explicit global Code tabs", () => {
+  it("opens every acquired built-in through the App runtime", () => {
+    expect(workspaceSurfaceFromRoute("/apps/files")).toMatchObject({
+      surfaceId: "official-app",
+      groupKey: "app:files",
+      route: "/apps/files",
+    });
+    expect(workspaceSurfaceFromRoute("/apps/social?space=family")).toMatchObject({
+      surfaceId: "official-app",
+      groupKey: "app:chat",
+      title: "Social",
+    });
+    expect(workspaceSurfaceFromRoute("/apps/planner?space=family")).toMatchObject({
+      surfaceId: "official-app",
+      groupKey: "app:planner",
+      route: "/apps/planner?space=family",
+    });
+  });
+
+  it("canonicalizes legacy Code routes into the Code App", () => {
     expect(workspaceSurfaceFromRoute("/code")).toMatchObject({
-      surfaceId: "code",
-      groupKey: "tool:code",
+      surfaceId: "official-app",
+      groupKey: "app:code",
+      route: "/apps/code",
       instancePolicy: "multiple",
     });
   });

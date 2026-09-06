@@ -126,7 +126,17 @@ export function shouldStartNewSession(lastActivity: number, now: number): boolea
   return now - lastActivity >= ANALYTICS_SESSION_TIMEOUT_MS;
 }
 
-const lifecycle = new AnalyticsLifecycleManager(analytics, window.localStorage, clientMetadata);
+// Accessing the Storage property itself can throw in an opaque App sandbox.
+// Defer the lookup until the manager's guarded reads/writes, so importing a
+// shared feature cannot crash the package before its startup handshake.
+const lifecycle = new AnalyticsLifecycleManager(
+  analytics,
+  {
+    getItem: (key) => window.localStorage.getItem(key),
+    setItem: (key, value) => window.localStorage.setItem(key, value),
+  },
+  clientMetadata,
+);
 let listenersInstalled = false;
 
 export function initializeAnalyticsLifecycle(): void {

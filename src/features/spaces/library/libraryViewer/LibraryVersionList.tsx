@@ -1,5 +1,5 @@
 import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
-import { SystemErrorActivity } from "@/features/activity";
+import { LibraryError as SystemErrorActivity } from "@/features/spaces/library/libraryRuntime";
 import { Button } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";

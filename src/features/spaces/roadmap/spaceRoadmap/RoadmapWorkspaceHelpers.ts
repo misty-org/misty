@@ -1,4 +1,4 @@
-import { readDeploymentStorageItem } from "@/api/deployment/api";
+import type { PlannerPreferenceStorage } from "./roadmapRuntime";
 import type {
   SpaceRoadmapEdgeEndpoint,
   SpaceRoadmapMilestone,
@@ -20,9 +20,9 @@ export function normalizeRoadmapSnapshot(snapshot: SpaceRoadmapSnapshot): SpaceR
   };
 }
 
-export function readExpandedGoals(key: string) {
+export function readExpandedGoals(storage: PlannerPreferenceStorage, key: string) {
   try {
-    const value = JSON.parse(readDeploymentStorageItem(key) ?? "[]") as unknown;
+    const value = JSON.parse(storage.getItem(key) ?? "[]") as unknown;
     return new Set(
       Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [],
     );
@@ -31,9 +31,9 @@ export function readExpandedGoals(key: string) {
   }
 }
 
-export function readBoolean(key: string) {
+export function readBoolean(storage: PlannerPreferenceStorage, key: string) {
   try {
-    return JSON.parse(window.localStorage.getItem(key) ?? "false") === true;
+    return JSON.parse(storage.getItem(key) ?? "false") === true;
   } catch {
     return false;
   }

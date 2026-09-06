@@ -1,21 +1,18 @@
-import { routes } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
-import { extensionAppRoute, useInstalledApps } from "@/features/extensions";
 import {
-  preferredMistySpace,
-  rememberedJournalRoute,
-  rememberedPlannerRoute,
-  socialProviderPath,
+  officialAppIdForNavigator,
+  officialAppRoute,
+  useInstalledNavigatorAppIds,
+} from "@/features/apps";
+import {
+  preferredDefaultSpace,
   useSpacesStore,
 } from "@/features/spaces";
 import {
   NAVIGATOR_APP_IDS,
   WORKSPACE_TOOLS_META,
   WorkspaceAppIcon,
-  navigatorAppIdsForAccount,
-  useNavigatorAppsStore,
   useWorkspaceStore,
-  dockWidgetRegistry,
   type NavigatorAppId,
   type WorkspaceGroupKey,
   type WorkspaceSurfaceId,
@@ -29,7 +26,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import { Blocks, Plus, type LucideIcon } from "lucide-react";
+import { Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface NewTabOption {
@@ -54,14 +51,12 @@ export function createNewTabOptions({
     const route = newTabRoute(appId, spaceId, accountId);
     return {
       appId,
-      surfaceId: app.surfaceId,
+      surfaceId: "official-app" as const,
       label: app.label,
       route,
       icon: app.icon,
-      instancePolicy:
-        dockWidgetRegistry.get(app.surfaceId).instancePolicy === "singleton"
-          ? "single"
-          : "multiple",
+      groupKey: `app:${officialAppIdForNavigator(appId)}` as const,
+      instancePolicy: "multiple" as const,
     };
   });
 }
@@ -78,15 +73,12 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const accountId = user?.id ?? "";
-  const enabledAppIds = useNavigatorAppsStore((state) =>
-    navigatorAppIdsForAccount(state, accountId),
-  );
+  const enabledAppIds = useInstalledNavigatorAppIds();
   const spaces = useSpacesStore((state) => state.spaces);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const installedApps = useInstalledApps();
   const scopedSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
   const activeSpaceId =
-    spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredMistySpace(spaces)?.id;
+    spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredDefaultSpace(spaces)?.id;
   const options = useMemo(() => {
     const optionsById = new Map(
       createNewTabOptions({ spaceId: activeSpaceId, accountId }).map((option) => [
@@ -98,16 +90,8 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
       const option = optionsById.get(appId);
       return option ? [option] : [];
     });
-    const installed = installedApps.map((app): NewTabOption => ({
-      surfaceId: "extension",
-      label: app.name,
-      route: extensionAppRoute(app.id, { title: app.name }),
-      icon: Blocks,
-      groupKey: `app:${app.id}`,
-      instancePolicy: "multiple",
-    }));
-    return [...enabledApps, ...installed];
-  }, [accountId, activeSpaceId, enabledAppIds, installedApps]);
+    return enabledApps;
+  }, [accountId, activeSpaceId, enabledAppIds]);
 
   useEffect(() => {
     const openPicker = (event: Event) => {
@@ -134,7 +118,7 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
+        align="start"
         collisionPadding={8}
         className="w-[min(360px,calc(100vw-16px))] p-1.5"
         style={{ maxHeight: "none", overflow: "visible" }}
@@ -177,12 +161,5 @@ function NewTabMenuItem(props: { option: NewTabOption; onSelect: () => void }) {
 }
 
 function newTabRoute(appId: NavigatorAppId, spaceId: string | undefined, accountId: string) {
-  if (appId === "social") return spaceId ? socialProviderPath(spaceId, "misty") : routes.spaces;
-  if (appId === "journal")
-    return spaceId ? rememberedJournalRoute(accountId, spaceId) : routes.spaces;
-  if (appId === "planner")
-    return spaceId ? rememberedPlannerRoute(accountId, spaceId) : routes.spaces;
-  if (appId === "library")
-    return spaceId ? `/spaces/${encodeURIComponent(spaceId)}/library` : routes.spaces;
-  return routes[appId];
+  return officialAppRoute(officialAppIdForNavigator(appId), spaceId, accountId);
 }

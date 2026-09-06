@@ -1,5 +1,5 @@
-import { clipboardWriteFileBytes } from "@/native";
-import { spacesApi } from "@/api/spaces/api";
+import { libraryRuntime } from "./libraryRuntime";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 
 export async function copyLibraryItemsToClipboard(
@@ -20,15 +20,7 @@ export async function copyBlobFilesToClipboard(
   files: Array<{ name: string; blob: Blob }>,
 ): Promise<void> {
   if (files.length === 0) return;
-  const copied = await clipboardWriteFileBytes(
-    await Promise.all(
-      files.map(async ({ name, blob }) => ({
-        name,
-        bytes: Array.from(new Uint8Array(await blob.arrayBuffer())),
-      })),
-    ),
-  );
-  if (!copied) throw new Error("The selected Library items could not be placed on the clipboard.");
+  await libraryRuntime().copyFiles(files);
 }
 
 function clipboardFileName(item: SpaceLibraryItem): string {

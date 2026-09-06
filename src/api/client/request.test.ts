@@ -47,6 +47,27 @@ describe("apiRequest", () => {
     expect(new Headers(init?.headers).get("X-Request-ID")).toMatch(/^desktop_/);
   });
 
+  it("keeps account cookies out of scoped app-runtime requests", async () => {
+    configureApiSession({
+      isTransitioning: () => false,
+      readGeneration: () => 0,
+      readToken: async () => "app-runtime-token",
+      requestCredentials: () => "omit",
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ agents: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await apiRequest("/agents");
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init?.credentials).toBe("omit");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer app-runtime-token");
+  });
+
   it("rejects a response that finishes after the active account changes", async () => {
     let release!: (response: Response) => void;
     vi.spyOn(globalThis, "fetch").mockImplementation(

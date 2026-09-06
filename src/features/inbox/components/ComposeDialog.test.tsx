@@ -19,58 +19,62 @@ describe("Compose dialog", () => {
     document.body.innerHTML = "";
   });
 
-  it("does not send until the person confirms", async () => {
-    const onSend = vi.fn().mockResolvedValue(undefined);
-    const onSave = vi.fn().mockResolvedValue({
-      provider: "gmail",
-      provider_id: "draft-1",
-      account_id: "google-1",
-      message: {},
-    });
-    await act(async () => {
-      root.render(
-        <ComposeDialog
-          open
-          accounts={[
-            {
-              connection_id: "connection-1",
-              provider: "google",
-              account_id: "google-1",
-              email: "alex@example.com",
-              display_name: "Alex",
-              total: 0,
-              unread: 0,
-            },
-          ]}
-          replyTo={null}
-          onOpenChange={vi.fn()}
-          onSave={onSave}
-          onSend={onSend}
-        />,
-      );
-    });
-    const inputs = [...document.querySelectorAll<HTMLInputElement>("input")];
-    await act(async () => {
-      setInput(inputs[0]!, "recipient@example.com");
-      setInput(inputs[1]!, "Hello");
-    });
-    await act(async () => {
-      [...document.querySelectorAll<HTMLButtonElement>("button")]
-        .find((button) => button.textContent === "Review send")
-        ?.click();
-    });
+  it.each(["user", "ai"] as const)(
+    "does not send a %s-authored draft until the person confirms",
+    async (authoringSource) => {
+      const onSend = vi.fn().mockResolvedValue(undefined);
+      const onSave = vi.fn().mockResolvedValue({
+        provider: "gmail",
+        provider_id: "draft-1",
+        account_id: "google-1",
+        message: {},
+      });
+      await act(async () => {
+        root.render(
+          <ComposeDialog
+            open
+            authoringSource={authoringSource}
+            accounts={[
+              {
+                connection_id: "connection-1",
+                provider: "google",
+                account_id: "google-1",
+                email: "alex@example.com",
+                display_name: "Alex",
+                total: 0,
+                unread: 0,
+              },
+            ]}
+            replyTo={null}
+            onOpenChange={vi.fn()}
+            onSave={onSave}
+            onSend={onSend}
+          />,
+        );
+      });
+      const inputs = [...document.querySelectorAll<HTMLInputElement>("input")];
+      await act(async () => {
+        setInput(inputs[0]!, "recipient@example.com");
+        setInput(inputs[1]!, "Hello");
+      });
+      await act(async () => {
+        [...document.querySelectorAll<HTMLButtonElement>("button")]
+          .find((button) => button.textContent === "Review send")
+          ?.click();
+      });
 
-    expect(onSave).toHaveBeenCalledOnce();
-    expect(onSend).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("Send this email?");
+      expect(onSave).toHaveBeenCalledOnce();
+      expect(onSend).not.toHaveBeenCalled();
+      expect(document.body.textContent).toContain("Send this email?");
 
-    await act(async () => {
-      [...document.querySelectorAll<HTMLButtonElement>("button")]
-        .find((button) => button.textContent === "Send email")
-        ?.click();
-    });
-    expect(onSend).toHaveBeenCalledWith("draft-1", "connection-1");
-  });
+      await act(async () => {
+        [...document.querySelectorAll<HTMLButtonElement>("button")]
+          .find((button) => button.textContent === "Send email")
+          ?.click();
+      });
+      expect(onSend).toHaveBeenCalledWith("draft-1", "connection-1", authoringSource);
+    },
+  );
 });
 
 function setInput(input: HTMLInputElement, value: string) {

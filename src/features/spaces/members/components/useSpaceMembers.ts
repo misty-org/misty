@@ -4,6 +4,7 @@ import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { canManageSpaceLifecycle } from "../../defaultSpace";
 
 const emptyMembers: never[] = [];
 
@@ -28,8 +29,7 @@ export function useSpaceMembers(spaceId: string) {
   const agents = store.agentMembershipsBySpace[spaceId] ?? emptyMembers;
   const [membersLoading] = useMinimumSpin(store.loading && members.length === 0);
   const owner = space?.role === "owner";
-  const canManageMembers =
-    space?.permissions?.["space.invite"] === true || (space?.kind !== "misty" && owner);
+  const canManageMembers = space?.permissions?.["space.invite"] === true || owner;
 
   const loadPendingInvitations = useCallback(async () => {
     if (!canManageMembers) {
@@ -55,6 +55,7 @@ export function useSpaceMembers(spaceId: string) {
     membersLoading,
     owner,
     canManageMembers,
+    canTransferOwnership: owner && canManageSpaceLifecycle(space, "transfer"),
     canInvite: canManageMembers,
     canManageAgents: owner || space?.permissions?.["agents.manage"] === true,
     pendingInvitations,

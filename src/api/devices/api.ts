@@ -32,6 +32,18 @@ export const devicesApi = {
     deviceId: string,
     body: unknown,
   ) => signed<T>(request, localId, `${devicePath(deviceId)}/peer-tickets`, "POST", body),
+  registerPushSubscription: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    body: { mistyDeviceId: string; environment: "sandbox" | "production"; token: string },
+  ) => signed(request, localId, `${devicePath(deviceId)}/push-subscription`, "PUT", body),
+  deletePushSubscription: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    body: { mistyDeviceId: string; environment: "sandbox" | "production"; token: string },
+  ) => signed(request, localId, `${devicePath(deviceId)}/push-subscription`, "DELETE", body),
   createPairing: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
     signed<T>(request, localId, `${devicePath(deviceId)}/pairing-sessions`, "POST", {}),
   redeemPairing: <T>(

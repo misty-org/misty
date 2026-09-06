@@ -14,7 +14,6 @@ import type {
 import { explorerPathKey, normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 
 import type { PaneExplorerState } from "../../model/interfaces/store/types";
-import type { NavigationMode } from "../../model/types/store/types";
 import { explorerRuntime, getExplorerStore } from "../runtime";
 import * as H from "./index";
 
@@ -50,47 +49,7 @@ export function shouldShowLoadingSkeleton(pane: PaneExplorerState, path: string)
   return target === mount || target.startsWith(`${mount}/`);
 }
 
-export function applyNavigationResult(
-  pane: PaneExplorerState,
-  listing: DirectoryListing,
-  mode: NavigationMode,
-): PaneExplorerState {
-  const previousPath = pane.listing?.path ?? "";
-  const selectedIdsByPath = previousPath
-    ? { ...pane.selectedIdsByPath, [previousPath]: pane.selectedIds }
-    : { ...pane.selectedIdsByPath };
-  let backHistory = [...pane.backHistory];
-  let forwardHistory = [...pane.forwardHistory];
-
-  if (mode === "push" && previousPath && !H.samePath(previousPath, listing.path)) {
-    if (!H.samePath(backHistory[backHistory.length - 1] ?? "", previousPath))
-      backHistory.push(previousPath);
-    forwardHistory = [];
-  } else if (mode === "back" && previousPath) {
-    backHistory = backHistory.slice(0, -1);
-    if (!H.samePath(forwardHistory[forwardHistory.length - 1] ?? "", previousPath))
-      forwardHistory.push(previousPath);
-  } else if (mode === "forward" && previousPath) {
-    forwardHistory = forwardHistory.slice(0, -1);
-    if (!H.samePath(backHistory[backHistory.length - 1] ?? "", previousPath))
-      backHistory.push(previousPath);
-  }
-
-  const visibleIds = new Set(listing.entries.map((entry) => entry.id));
-  const selectedIds = (selectedIdsByPath[listing.path] ?? []).filter((id) => visibleIds.has(id));
-  return {
-    ...pane,
-    listing,
-    hasFolderEntries: listing.entries.some((entry) => !entry.isDeleted && entry.kind === "folder"),
-    selectedIds,
-    selectedIdsByPath,
-    backHistory,
-    forwardHistory,
-    loading: false,
-    showLoadingSkeleton: false,
-    error: null,
-  };
-}
+export { applyNavigationResult } from "../../utils/paneNavigation";
 
 export function directoryListingsEqual(left: DirectoryListing, right: DirectoryListing): boolean {
   if (left === right) return true;

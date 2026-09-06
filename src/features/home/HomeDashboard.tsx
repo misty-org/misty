@@ -5,7 +5,6 @@ import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { useAuth } from "@/features/auth";
 import {
   SpaceAvatar,
-  canOpenMistySpaceSection,
   rememberedJournalRoute,
   rememberedPlannerRoute,
   socialProviderPath,
@@ -21,7 +20,8 @@ import {
   type WorkspaceToolId,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
-import { ArrowRight, CalendarDays, Clock3, UsersRound } from "lucide-react";
+import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
+import { ArrowRight, CalendarDays, Clock3, Flame, UsersRound } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -57,6 +57,8 @@ const contributionDays = contributionWeeks * 7;
 const fallbackTools: WorkspaceToolId[] = ["journal", "planner", "social", "inbox", "files"];
 
 export function HomeDashboard({ spaceId }: { spaceId: string }) {
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const recentTools = useRecentToolsStore((state) => state.recentTools);
@@ -69,8 +71,7 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
     readHomeActivity(user?.id ?? "", spaceId),
   );
   const space = spaces.find((candidate) => candidate.id === spaceId);
-  const encodedSpaceId = encodeURIComponent(spaceId);
-  const agendaPath = `/spaces/${encodedSpaceId}/planner/agenda/day`;
+  const agendaPath = `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/day`;
 
   const loadAgenda = useCallback(async () => {
     if (!space || space.permissions?.["tasks.view"] === false) {
@@ -146,7 +147,7 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
         if (seen.has(toolId) || toolId === "home" || toolId === "marketplace") return false;
         seen.add(toolId);
         if (!space) return !isSpaceTool(toolId);
-        return !isSpaceTool(toolId) || canOpenMistySpaceSection(space, toolId);
+        return !isSpaceTool(toolId) || spaceToolIsAvailable(space, toolId);
       })
       .slice(0, 4);
   }, [recentTools, space]);
@@ -166,12 +167,18 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   const streak = activityStreak(activity, now);
   const weekDates = contributionDates(now, 7);
   const overviewDates = contributionDates(now, contributionDays);
+  useMobileSurfaceChrome({ title: space?.name || "Home", level: "root" });
 
   if (!space) return null;
 
   return (
     <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright [@media(min-width:1024px)_and_(min-height:800px)]:overflow-y-hidden">
-      <div className="mx-auto w-full max-w-[1240px] px-5 py-6 sm:px-8 lg:px-10 [@media(min-width:1024px)_and_(min-height:800px)]:h-full">
+      <div
+        className={cn(
+          "mx-auto w-full max-w-[1240px] [@media(min-width:1024px)_and_(min-height:800px)]:h-full",
+          mobile ? "px-4 py-4" : "px-5 py-6 sm:px-8 lg:px-10",
+        )}
+      >
         <header className="mb-6">
           <h1 className="text-balance text-[clamp(1.75rem,3vw,2.75rem)] font-semibold tracking-[-0.03em] text-cream-bright">
             {greetingForDate(now)}, {firstName(user?.name)}.
@@ -182,7 +189,12 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
         <div className="space-y-6">
           <section aria-labelledby="jump-back-in-title">
             <SectionHeading id="jump-back-in-title" title="Jump back in" />
-            <div className="grid gap-2 rounded-2xl border border-charcoal-border bg-charcoal-card/55 p-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div
+              className={cn(
+                "grid gap-2 rounded-2xl border border-charcoal-border bg-charcoal-card/55 p-2",
+                mobile ? "grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-4",
+              )}
+            >
               {jumpTools.map((toolId) => {
                 const route = routeForTool(toolId, space, user?.id ?? "");
                 if (!route) return null;
@@ -202,7 +214,10 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
                       </span>
                     </span>
                     <ArrowRight
-                      className="size-4 shrink-0 text-cream-muted opacity-0 transition-opacity group-hover:opacity-100"
+                      className={cn(
+                        "size-4 shrink-0 text-cream-muted transition-opacity",
+                        mobile ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      )}
                       aria-hidden="true"
                     />
                   </DashboardLink>
@@ -262,7 +277,7 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
                     type="button"
                     className={cn(
                       "rounded-md px-2.5 py-1 text-xs font-medium capitalize outline-none transition-colors",
-                      "focus-visible:ring-2 focus-visible:ring-avatar-yellow/70",
+                      "focus-visible:ring-2 focus-visible:ring-cream-bright/70",
                       streakView === view
                         ? "bg-charcoal-active text-cream-bright"
                         : "text-cream-muted hover:text-cream",
@@ -290,6 +305,13 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   );
 }
 
+function spaceToolIsAvailable(space: Space, toolId: WorkspaceToolId): boolean {
+  if (toolId === "social") return space.permissions?.["messages.read"] !== false;
+  if (toolId === "planner") return space.permissions?.["tasks.view"] !== false;
+  if (toolId === "library") return space.permissions?.["library.view"] !== false;
+  return true;
+}
+
 function CurrentDateTime() {
   const [value, setValue] = useState(() => new Date());
   useEffect(() => {
@@ -315,22 +337,7 @@ function CurrentDateTime() {
 }
 
 function StreakFlame() {
-  return (
-    <svg className="size-5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        fill="#ef7340"
-        d="M12.9 1.9c.4 3.2-.7 4.7-2 6.1-1.4 1.8-2.7 3.4-2.1 5.9-1.5-1-2.1-2.5-1.8-4.4-2 1.8-3 4-3 6.2 0 4 3.5 7.3 8 7.3s8-3.3 8-7.5c0-3.7-2.1-7.2-7.1-13.6Z"
-      />
-      <path
-        fill="#f3a33f"
-        d="M13.8 8.1c.2 2-.6 3-1.5 4.1-1 1.2-1.8 2.3-1.3 4-1-.7-1.5-1.7-1.3-2.9-1.3 1.2-1.9 2.6-1.9 4 0 2.6 1.9 4.6 4.4 4.6 2.7 0 4.8-2.1 4.8-4.8 0-2.5-1.1-4.9-3.2-9Z"
-      />
-      <path
-        fill="#f5d77a"
-        d="M13.2 14.2c.1 1-.4 1.6-.9 2.2-.6.7-1 1.3-.7 2.2-.6-.4-.8-.9-.7-1.6-.7.7-1 1.4-1 2.2 0 1.4 1 2.4 2.4 2.4 1.5 0 2.6-1.1 2.6-2.6 0-1.3-.5-2.6-1.7-4.8Z"
-      />
-    </svg>
-  );
+  return <Flame className="size-5 shrink-0 text-cream-bright" aria-hidden="true" />;
 }
 
 function SectionHeading(props: { id: string; title: string; action?: ReactNode }) {
@@ -455,8 +462,8 @@ function WeekContributions(props: { dates: Date[]; activity: HomeActivity; today
             <span
               className={cn(
                 "grid aspect-square w-full max-w-12 place-items-center rounded-full text-xs font-semibold tabular-nums transition-colors",
-                active ? "bg-[#ff7a3d] text-charcoal-bg" : "bg-charcoal-bg text-cream-muted",
-                key === todayKey && !active && "ring-1 ring-[#ff7a3d]/70",
+                active ? "bg-cream-bright text-charcoal-bg" : "bg-charcoal-bg text-cream-muted",
+                key === todayKey && !active && "ring-1 ring-cream-bright/70",
               )}
               title={`${count} ${count === 1 ? "visit" : "visits"} on ${date.toLocaleDateString()}`}
             >
@@ -577,9 +584,9 @@ function agendaDotClass(kind: SpaceAgendaEntry["kind"]): string {
 }
 
 function contributionClass(count: number): string {
-  if (count >= 4) return "bg-[#ff7a3d]";
-  if (count >= 2) return "bg-[#c85c32]";
-  if (count >= 1) return "bg-[#713b2b]";
+  if (count >= 4) return "bg-cream-bright";
+  if (count >= 2) return "bg-cream-bright/70";
+  if (count >= 1) return "bg-cream-bright/40";
   return "bg-charcoal-active/75";
 }
 

@@ -1,20 +1,23 @@
-import { useAuth } from "@/features/auth";
-import { SystemErrorActivity } from "@/features/activity";
-import { MistyRegionCapture, VoiceInputMenu, useAiVoiceRecorder } from "@/features/ai-surface";
+import {useAgentsAuth as useAuth} from "@/features/agents/agentsRuntime";
+
+import {AgentsError as SystemErrorActivity} from "@/features/agents/agentsRuntime";
+
+import { VoiceInputMenu } from "@/features/ai-surface/VoiceInputMenu";
+import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { MistyComposer } from "@/features/global-search/MistyComposer";
 import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
-import {
-  captureToFile,
-  deleteMistyImage,
-  uploadMistyImage,
-} from "@/features/global-search/mistyImageAttachments";
+import {deleteAgentsImage as deleteMistyImage,uploadAgentsImage as uploadMistyImage} from "@/features/agents/agentsRuntime";
+import { captureToFile } from "@/features/global-search/mistyImageValues";
 import { useGlobalSearchStore } from "@/features/global-search/useGlobalSearchStore";
 import type { MistyImageAttachment } from "@/features/global-search/types";
-import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceStore } from "@/features/workspace";
+import {useAgentsSpaces as useSpacesStore} from "@/features/agents/agentsRuntime";
+
+import {useAgentsWorkspace as useWorkspaceStore} from "@/features/agents/agentsRuntime";
+
 import { Button, cn } from "@/shared/ui";
+import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import { Mic, Square } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -22,10 +25,14 @@ import { AgentConversationView } from "./AgentConversationView";
 import { resolveAgentSpaceId, resolveMentionedAgentSpaceId } from "../agentSpaceSelection";
 import { MistyConversationSidebar } from "./MistyConversationSidebar";
 import { MistySpacePicker } from "./MistySpacePicker";
-import {
-  agentBrowserResearchQuery,
-  createAgentOwnedBrowserWorkspace,
-} from "../agentOwnedBrowserWorkspace";
+import {createAgentsBrowser as createAgentOwnedBrowserWorkspace} from "@/features/agents/agentsRuntime";
+import { agentBrowserResearchQuery } from "../agentBrowserResearchQuery";
+
+const MistyRegionCapture = lazy(() =>
+  import("@/features/ai-surface/MistyRegionCapture").then((module) => ({
+    default: module.MistyRegionCapture,
+  })),
+);
 
 export function MistyWorkspace(props: {
   requestedConversationId?: string;
@@ -38,6 +45,10 @@ export function MistyWorkspace(props: {
   const [attachments, setAttachments] = useState<MistyImageAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
   const [capturing, setCapturing] = useState(false);
+  const [mobileListOpen, setMobileListOpen] = useState(true);
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
+  const mobileCompact = presentation === "mobile-compact";
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const {
     conversations,
@@ -126,12 +137,30 @@ export function MistyWorkspace(props: {
   const chooseConversation = (conversationId: string) => {
     selectConversation(conversationId);
     setSearchParams({ conversation: conversationId }, { replace: true });
+    setMobileListOpen(false);
   };
 
   const startNew = async (spaceId = defaultSpaceId) => {
     const conversationId = await newConversation(spaceId || undefined);
     setSearchParams({ conversation: conversationId }, { replace: true });
+    setMobileListOpen(false);
   };
+
+  const openMobileList = useCallback(() => setMobileListOpen(true), []);
+  const mobileChrome = useMemo(
+    () =>
+      mobile
+        ? mobileCompact && !mobileListOpen
+          ? {
+              title: activeConversation?.title || "Talk to Misty",
+              level: "detail" as const,
+              onBack: openMobileList,
+            }
+          : { title: "Agents", level: "root" as const }
+        : null,
+    [activeConversation?.title, mobile, mobileCompact, mobileListOpen, openMobileList],
+  );
+  useMobileSurfaceChrome(mobileChrome);
 
   const removeConversation = async (conversationId: string) => {
     const wasActive = conversationId === activeConversationId;
@@ -264,160 +293,181 @@ export function MistyWorkspace(props: {
 
   return (
     <main
-      className="grid h-full min-h-0 grid-cols-[270px_minmax(0,1fr)] overflow-hidden max-[760px]:grid-cols-[220px_minmax(0,1fr)]"
+      className={cn(
+        "grid h-full min-h-0 overflow-hidden",
+        mobileCompact ? "grid-cols-1" : "grid-cols-[270px_minmax(0,1fr)]",
+      )}
       data-misty-agent-chat
     >
-      <MistyConversationSidebar
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        loading={conversationsLoading}
-        onSelect={chooseConversation}
-        onNew={() => void startNew()}
-        onRename={(id, title) => void renameConversation(id, title)}
-        onDelete={(id) => void removeConversation(id)}
-        onManageConnections={props.onManageConnections}
-      />
+      {!mobileCompact || mobileListOpen ? (
+        <MistyConversationSidebar
+          mobile={mobile}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          loading={conversationsLoading}
+          onSelect={chooseConversation}
+          onNew={() => void startNew()}
+          onRename={(id, title) => void renameConversation(id, title)}
+          onDelete={(id) => void removeConversation(id)}
+          onManageConnections={props.onManageConnections}
+        />
+      ) : null}
 
-      <section
-        className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg"
-        aria-label="Misty workspace"
-      >
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-charcoal-border/80 px-6">
-          <div className="min-w-0 flex-1">
-            <h2 className="m-0 truncate text-[15px] font-semibold tracking-tight text-cream-bright">
-              {activeConversation?.title ?? "Talk to Misty"}
-            </h2>
-            <p className="m-0 mt-0.5 truncate text-[11px] text-cream-muted">
-              Ask questions and coordinate work across Misty.
-            </p>
-          </div>
-          <MistySpacePicker
-            spaces={spaces}
-            activeSpaceId={displayedSpaceId}
-            disabled={working || conversationsLoading}
-            onSelect={(spaceId) => {
-              if (spaceId === activeConversation?.spaceId) return;
-              if (
-                activeConversation &&
-                !activeConversation.spaceId &&
-                activeConversation.messages.length === 0
-              ) {
-                void bindConversationSpace(activeConversation.id, spaceId);
-                return;
-              }
-              void startNew(spaceId);
-            }}
-          />
-          <span
+      {!mobileCompact || !mobileListOpen ? (
+        <section
+          className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg"
+          aria-label="Misty workspace"
+        >
+          <header
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border border-charcoal-border",
-              "bg-charcoal-card/60 px-2.5 py-1 text-[10px] text-cream-muted",
+              "flex h-16 shrink-0 items-center gap-2 border-b border-charcoal-border/80 px-6",
+              mobile && "min-h-12 px-3",
             )}
           >
+            <div className="min-w-0 flex-1">
+              <h2 className="m-0 truncate text-[15px] font-semibold tracking-tight text-cream-bright">
+                {activeConversation?.title ?? "Talk to Misty"}
+              </h2>
+              <p className="m-0 mt-0.5 truncate text-[11px] text-cream-muted">
+                Ask questions and coordinate work across Misty.
+              </p>
+            </div>
+            <MistySpacePicker
+              spaces={spaces}
+              activeSpaceId={displayedSpaceId}
+              disabled={working || conversationsLoading}
+              onSelect={(spaceId) => {
+                if (spaceId === activeConversation?.spaceId) return;
+                if (
+                  activeConversation &&
+                  !activeConversation.spaceId &&
+                  activeConversation.messages.length === 0
+                ) {
+                  void bindConversationSpace(activeConversation.id, spaceId);
+                  return;
+                }
+                void startNew(spaceId);
+              }}
+            />
             <span
               className={cn(
-                "size-1.5 rounded-full",
-                working ? "animate-pulse bg-blue-400" : "bg-green-400",
+                "inline-flex items-center gap-1.5 rounded-full border border-charcoal-border",
+                "bg-charcoal-card/60 px-2.5 py-1 text-[10px] text-cream-muted",
+                mobileCompact && "hidden",
               )}
-            />
-            {working ? "Working" : "Ready"}
-          </span>
-        </header>
-        <div ref={scrollRef} className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto">
-          <div className="min-h-full">
-            <AgentConversationView
-              conversation={activeConversation}
-              working={working}
-              onConfirm={(id) => void approveAgentTask(id)}
-              onReject={rejectAction}
-              onCancel={(id) => void cancelAgentTask(id)}
-              onRetry={runPrompt}
-            />
-          </div>
-        </div>
-        <div className="shrink-0 bg-gradient-to-t from-charcoal-bg via-charcoal-bg to-transparent px-5 pb-5 pt-3">
-          <MistyComposer
-            value={draft}
-            onChange={setDraft}
-            mode="ask"
-            attachments={attachments}
-            maxAttachments={10}
-            onAddFiles={addFiles}
-            onRemoveAttachment={async (attachment) => {
-              setAttachments((items) => items.filter((item) => item.id !== attachment.id));
-              await deleteMistyImage(attachment).catch(() => undefined);
-            }}
-            onSubmit={submit}
-            onKeyDown={onComposerKeyDown}
-            onCapture={() => setCapturing(true)}
-            disabled={!user?.id}
-            busy={working}
-            onError={setAttachmentError}
-            className="mx-auto max-w-[760px]"
-            modelControl={
-              <MistyModelPicker
-                conversationId={activeConversationId}
-                modelId={activeConversation?.modelId}
-                reasoningEffort={activeConversation?.reasoningEffort}
-                disabled={working}
-                onChange={(settings) =>
-                  useGlobalSearchStore.setState((state) => ({
-                    conversations: state.conversations.map((item) =>
-                      item.id === activeConversationId ? { ...item, ...settings } : item,
-                    ),
-                  }))
-                }
+            >
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  working ? "animate-pulse bg-blue-400" : "bg-green-400",
+                )}
               />
-            }
-            voiceControl={
-              <div className="flex items-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn("size-7 text-cream-muted", voice.recording && "text-red-300")}
-                  onClick={voice.recording ? voice.stop : () => void voice.start()}
-                  disabled={voice.requesting || voice.transcribing}
-                  aria-label={voice.recording ? "Stop voice recording" : "Start voice recording"}
-                >
-                  {voice.recording ? (
-                    <Square className="size-3 fill-current" />
-                  ) : (
-                    <Mic className="size-4" />
-                  )}
-                </Button>
-                <VoiceInputMenu
-                  compact
-                  devices={voice.inputDevices}
-                  selectedDeviceId={voice.selectedInputDeviceId}
-                  disabled={voice.requesting || voice.recording || voice.transcribing}
-                  onRefresh={() => void voice.refreshInputDevices()}
-                  onSelect={voice.selectInputDevice}
-                />
-              </div>
-            }
-          />
-          {error || attachmentError ? (
-            <SystemErrorActivity
-              accountId={user?.id}
-              error={error || attachmentError}
-              scope="misty:workspace"
-              title="Misty needs attention"
-            />
-          ) : null}
-          <div className="mx-auto mt-2 flex max-w-[760px] justify-center text-[10px] text-cream-muted">
-            <span>Misty can make mistakes. Review important actions.</span>
+              {working ? "Working" : "Ready"}
+            </span>
+          </header>
+          <div ref={scrollRef} className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-full">
+              <AgentConversationView
+                conversation={activeConversation}
+                working={working}
+                onConfirm={(id) => void approveAgentTask(id)}
+                onReject={rejectAction}
+                onCancel={(id) => void cancelAgentTask(id)}
+                onRetry={runPrompt}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+          <div
+            className={cn(
+              "shrink-0 bg-charcoal-bg px-5 pb-5 pt-3",
+              mobile && "px-3 pb-[max(12px,env(safe-area-inset-bottom))]",
+            )}
+          >
+            <MistyComposer
+              value={draft}
+              onChange={setDraft}
+              mode="ask"
+              attachments={attachments}
+              maxAttachments={10}
+              onAddFiles={addFiles}
+              onRemoveAttachment={async (attachment) => {
+                setAttachments((items) => items.filter((item) => item.id !== attachment.id));
+                await deleteMistyImage(attachment).catch(() => undefined);
+              }}
+              onSubmit={submit}
+              onKeyDown={onComposerKeyDown}
+              onCapture={() => setCapturing(true)}
+              disabled={!user?.id}
+              busy={working}
+              onError={setAttachmentError}
+              className="mx-auto max-w-[760px]"
+              modelControl={
+                <MistyModelPicker
+                  conversationId={activeConversationId}
+                  modelId={activeConversation?.modelId}
+                  reasoningEffort={activeConversation?.reasoningEffort}
+                  disabled={working}
+                  onChange={(settings) =>
+                    useGlobalSearchStore.setState((state) => ({
+                      conversations: state.conversations.map((item) =>
+                        item.id === activeConversationId ? { ...item, ...settings } : item,
+                      ),
+                    }))
+                  }
+                />
+              }
+              voiceControl={
+                <div className="flex items-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn("size-7 text-cream-muted", voice.recording && "text-red-300")}
+                    onClick={voice.recording ? voice.stop : () => void voice.start()}
+                    disabled={voice.requesting || voice.transcribing}
+                    aria-label={voice.recording ? "Stop voice recording" : "Start voice recording"}
+                  >
+                    {voice.recording ? (
+                      <Square className="size-3 fill-current" />
+                    ) : (
+                      <Mic className="size-4" />
+                    )}
+                  </Button>
+                  <VoiceInputMenu
+                    compact
+                    devices={voice.inputDevices}
+                    selectedDeviceId={voice.selectedInputDeviceId}
+                    disabled={voice.requesting || voice.recording || voice.transcribing}
+                    onRefresh={() => void voice.refreshInputDevices()}
+                    onSelect={voice.selectInputDevice}
+                  />
+                </div>
+              }
+            />
+            {error || attachmentError ? (
+              <SystemErrorActivity
+                accountId={user?.id}
+                error={error || attachmentError}
+                scope="misty:workspace"
+                title="Misty needs attention"
+              />
+            ) : null}
+            <div className="mx-auto mt-2 flex max-w-[760px] justify-center text-[10px] text-cream-muted">
+              <span>Misty can make mistakes. Review important actions.</span>
+            </div>
+          </div>
+        </section>
+      ) : null}
       {capturing ? (
-        <MistyRegionCapture
-          onCancel={() => setCapturing(false)}
-          onCapture={(capture) => {
-            setCapturing(false);
-            void addFiles([captureToFile(capture)]);
-          }}
-        />
+        <Suspense fallback={null}>
+          <MistyRegionCapture
+            onCancel={() => setCapturing(false)}
+            onCapture={(capture) => {
+              setCapturing(false);
+              void addFiles([captureToFile(capture)]);
+            }}
+          />
+        </Suspense>
       ) : null}
     </main>
   );

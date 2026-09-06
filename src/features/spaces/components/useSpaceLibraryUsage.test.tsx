@@ -9,6 +9,7 @@ import { clearUsageCache } from "../store/usageCache";
 
 const dummySpace1: Space = {
   id: "space-1",
+  is_default: false,
   owner_user_id: "user-1",
   name: "Test Space 1",
   role: "owner",
@@ -21,6 +22,7 @@ const dummySpace1: Space = {
 
 const dummySpace2: Space = {
   id: "space-2",
+  is_default: false,
   owner_user_id: "user-1",
   name: "Test Space 2",
   role: "owner",

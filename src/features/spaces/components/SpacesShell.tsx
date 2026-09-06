@@ -1,17 +1,13 @@
 import { useAuth } from "@/features/auth";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace/core";
 import { Button, PermissionState } from "@/shared/ui";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { AnimatePresence, motion, MotionConfig } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { preferredMistySpace } from "../mistySpace";
+import { preferredDefaultSpace } from "../defaultSpace";
 import { CreateSpaceDialog } from "../spacesShell/CreateSpaceDialog";
 import type { SpacesShellOutletContext } from "../spacesShell/outletContext";
 import { SpaceInvitationSidebar, SpaceInvitationView } from "../spacesShell/SpaceInvitationView";
-import { readPanelVisible, writePanelVisible } from "../spacesShell/spacesShellStorage";
-import { rememberSpaceSubpageRoute } from "../spacesShell/spaceSubpageMemory";
 import { useCreateSpaceDialog } from "../spacesShell/useCreateSpaceDialog";
 import { useCreateSpaceRouteRequest } from "../spacesShell/useCreateSpaceRouteRequest";
 import { useSpacesStore } from "../store/useSpacesStore";
@@ -23,10 +19,7 @@ import {
   useSpacesTabsStore,
 } from "../store/useSpacesTabsStore";
 import { SpacePageFrame } from "./SpacePageLayout";
-import { spacePanelSidebarAvailable } from "./spacePanel/SpacePanelSidebarContext";
 import { useSpacePanelRoute } from "./spacePanel/spacePanelRoute";
-import { SpacePanelContent } from "./SpacePanelContent";
-import { spacesBottomBarActionsId, SpacesBottomBarToggle } from "./SpacesBottomBar";
 import { SpacesAppLoadingPlaceholder } from "./SpacesLoadingPlaceholder";
 import { SpacesReconnectScreen } from "./SpacesReconnectScreen";
 
@@ -40,7 +33,6 @@ export default function SpacesShell() {
   const currentSpacesRoute = `${location.pathname}${location.search}${location.hash}`;
   const pendingTabRouteRef = useRef<string | null>(null);
   const handledLocationKeyRef = useRef<string | null>(null);
-  const [panelVisible, setPanelVisible] = useState(readPanelVisible);
   const {
     spaces,
     invitations,
@@ -96,10 +88,6 @@ export default function SpacesShell() {
 
   const routeParts = location.pathname.split("/").filter(Boolean);
   const detailRouteActive = routeParts[0] === "spaces" && routeParts.length >= 3;
-  const spaceSurfaceActive = Boolean(activeInvitation || activeTab?.kind === "space");
-  const contextualPanelAvailable =
-    Boolean(activeInvitation) ||
-    (spaceSurfaceActive && spacePanelSidebarAvailable(panelRoute.section));
   const reconnect = useCallback(() => void load({ force: true, accountId }), [accountId, load]);
 
   const respondToActiveInvitation = async (accept: boolean) => {
@@ -108,7 +96,7 @@ export default function SpacesShell() {
     await respondInvite(activeInvitation.id, accept);
     navigate(accept ? defaultSpaceRoute(activeInvitation.space_id) : "/spaces", {
       replace: true,
-      state: { mistySpaceSwitch: true },
+      state: { spaceSwitch: true },
     });
   };
 
@@ -131,10 +119,10 @@ export default function SpacesShell() {
   useEffect(() => {
     if (!snapshotReady || loading || !panelRoute.activeSpaceId || activeSpace || activeInvitation)
       return;
-    const fallback = preferredMistySpace(spaces);
+    const fallback = preferredDefaultSpace(spaces);
     navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
       replace: true,
-      state: { mistySpaceSwitch: true },
+      state: { spaceSwitch: true },
     });
   }, [
     activeInvitation,
@@ -176,7 +164,7 @@ export default function SpacesShell() {
             : tool === "planner"
               ? "Planner"
               : tool === "social" || tool === "chat"
-                ? "Social"
+                ? "Chat"
                 : tool === "library"
                   ? "Library"
                   : null;
@@ -195,7 +183,6 @@ export default function SpacesShell() {
       }
     }
   }, [activeSpace?.id, activeSpace?.name]);
-  useEffect(() => writePanelVisible(panelVisible), [panelVisible]);
   useEffect(() => {
     if (!accountId || !snapshotReady) return;
     pruneTabSessions(
@@ -221,8 +208,8 @@ export default function SpacesShell() {
       updateActiveSpaceRoute(accountId, activeSpace.id, normalizedRoute);
       return;
     }
-    const state = location.state as { mistySpaceSwitch?: boolean } | null;
-    if (state?.mistySpaceSwitch) return;
+    const state = location.state as { spaceSwitch?: boolean } | null;
+    if (state?.spaceSwitch) return;
     const newTabId = addWorkspaceTab(accountId, activeSpace.id, "space", normalizedRoute);
     if (newTabId) selectWorkspaceTab(accountId, activeSpace.id, newTabId);
   }, [
@@ -237,11 +224,6 @@ export default function SpacesShell() {
     tabSession,
     updateActiveSpaceRoute,
   ]);
-  useEffect(() => {
-    if (activeTab?.kind !== "space") return;
-    rememberSpaceSubpageRoute(accountId, panelRoute.activeSpaceId, currentSpacesRoute);
-  }, [accountId, activeTab?.kind, currentSpacesRoute, panelRoute.activeSpaceId]);
-
   if (transitioning) return <SpacesAppLoadingPlaceholder />;
 
   if (!user)
@@ -274,83 +256,45 @@ export default function SpacesShell() {
   } satisfies SpacesShellOutletContext;
 
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}>
-      <div
-        className={[
-          "grid h-full min-h-0 bg-charcoal-bg",
-          contextualPanelAvailable ? "grid-rows-[minmax(0,1fr)_32px]" : "grid-rows-[minmax(0,1fr)]",
-          "overflow-hidden",
-          "transition-[grid-template-columns] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-        ].join(" ")}
-        style={{
-          gridTemplateColumns:
-            panelVisible && contextualPanelAvailable
-              ? "clamp(248px, 18vw, 268px) minmax(0, 1fr)"
-              : "0px minmax(0, 1fr)",
-        }}
-      >
-        <AnimatePresence initial={false}>
-          {panelVisible && contextualPanelAvailable ? (
-            <motion.aside
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -12 }}
-              className={[
-                "col-start-1 row-start-1 flex min-h-0",
-                "min-w-[248px] flex-col overflow-hidden",
-                "border-r border-charcoal-border bg-charcoal-sidebar px-3 pb-2 pt-3 text-sm text-cream-muted",
-              ].join(" ")}
-            >
-              {activeInvitation ? (
-                <SpaceInvitationSidebar invitation={activeInvitation} />
-              ) : (
-                <SpacePanelContent key={activeSpace?.id} spaces={spaces} loading={loading} />
-              )}
-            </motion.aside>
-          ) : null}
-        </AnimatePresence>
+    <div
+      className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden bg-charcoal-bg"
+      style={{
+        gridTemplateColumns: activeInvitation
+          ? "clamp(248px, 18vw, 268px) minmax(0, 1fr)"
+          : "minmax(0, 1fr)",
+      }}
+    >
+      {activeInvitation ? (
+        <aside className="col-start-1 row-start-1 flex min-h-0 min-w-[248px] flex-col overflow-hidden border-r border-charcoal-border bg-charcoal-sidebar px-3 pb-2 pt-3 text-sm text-cream-muted">
+          <SpaceInvitationSidebar invitation={activeInvitation} />
+        </aside>
+      ) : null}
 
-        <main
-          key={activeInvitation?.id ?? activeTab?.id}
-          className="relative col-start-2 row-start-1 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
-        >
-          {activeInvitation ? (
-            <SpaceInvitationView
-              invitation={activeInvitation}
-              error={error ?? ""}
-              onRespond={respondToActiveInvitation}
-            />
-          ) : activeTab?.kind === "space" ? (
-            detailRouteActive ? (
-              <SpacePageFrame>
-                <Outlet context={outletContext} />
-              </SpacePageFrame>
-            ) : (
+      <main
+        key={activeInvitation?.id ?? activeTab?.id}
+        className="relative row-start-1 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
+        style={{ gridColumnStart: activeInvitation ? 2 : 1 }}
+      >
+        {activeInvitation ? (
+          <SpaceInvitationView
+            invitation={activeInvitation}
+            error={error ?? ""}
+            onRespond={respondToActiveInvitation}
+          />
+        ) : activeTab?.kind === "space" ? (
+          detailRouteActive ? (
+            <SpacePageFrame>
               <Outlet context={outletContext} />
-            )
+            </SpacePageFrame>
           ) : (
             <Outlet context={outletContext} />
-          )}
-        </main>
+          )
+        ) : (
+          <Outlet context={outletContext} />
+        )}
+      </main>
 
-        {contextualPanelAvailable ? (
-          <footer className="col-span-full row-start-2 flex min-h-8 items-center border-t border-charcoal-border/45 bg-charcoal-bg px-2">
-            <SpacesBottomBarToggle
-              pressed={panelVisible}
-              onClick={() => setPanelVisible((visible) => !visible)}
-              title={panelVisible ? "Hide Spaces panel" : "Show Spaces panel"}
-            >
-              {panelVisible ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-            </SpacesBottomBarToggle>
-            <div
-              id={spacesBottomBarActionsId}
-              className="ml-auto flex min-w-0 items-center justify-end gap-1"
-            />
-          </footer>
-        ) : null}
-
-        <CreateSpaceDialog dialog={dialog} />
-      </div>
-    </MotionConfig>
+      <CreateSpaceDialog dialog={dialog} />
+    </div>
   );
 }

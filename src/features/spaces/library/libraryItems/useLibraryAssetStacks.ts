@@ -1,6 +1,6 @@
-import { spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmLibraryAction as confirmAction } from "@/features/spaces/library/libraryRuntime";
 import { buildLibraryAssetStack } from "../SpaceLibraryPrimitives";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 

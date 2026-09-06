@@ -73,7 +73,7 @@ describe("MarketplaceBrowser", () => {
     );
 
     expect(cardTitles(container)).toEqual(["Storage Report", "Themes", "Backups"]);
-    expect(container.querySelector("h1")?.textContent).toBe("Store");
+    expect(container.querySelector("h1")?.textContent).toBe("Discover");
     expect(container.textContent).toContain("Featured apps");
     expect(container.textContent).toContain("Essential apps");
     expect(container.textContent).toContain("Browse apps");
@@ -98,7 +98,7 @@ describe("MarketplaceBrowser", () => {
     const sidebar = container.querySelector('[data-store-sidebar="true"]');
     const resizer = container.querySelector<HTMLElement>('[data-store-sidebar-resizer="true"]');
     const toggle = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Hide Store sidebar"]',
+      'button[aria-label="Hide Discover sidebar"]',
     );
     const sidebarShell = container.querySelector<HTMLElement>('[data-store-sidebar-shell="true"]');
     expect(sidebarShell?.style.width).toBe("240px");
@@ -116,7 +116,7 @@ describe("MarketplaceBrowser", () => {
 
     await act(async () => toggle?.click());
     expect(container.querySelector('[data-store-sidebar="true"]')).toBeNull();
-    expect(container.querySelector('button[aria-label="Show Store sidebar"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Show Discover sidebar"]')).not.toBeNull();
   });
 
   it("keeps the manual reload fallback quiet and icon-only", async () => {
@@ -130,7 +130,7 @@ describe("MarketplaceBrowser", () => {
       />,
     );
 
-    const reload = container.querySelector('button[aria-label="Reload Store"]');
+    const reload = container.querySelector('button[aria-label="Reload Discover"]');
     expect(reload).not.toBeNull();
     expect(reload?.textContent).toBe("");
   });
@@ -194,6 +194,38 @@ describe("MarketplaceBrowser", () => {
     );
 
     expect(cardTitles(container)).toEqual(["Backups"]);
+  });
+
+  it("offers catalog updates directly and shows both versions", async () => {
+    const updated = entry({
+      id: "themes",
+      name: "Themes",
+      installed: true,
+      enabled: false,
+      version: "0.3.0",
+      catalogVersion: "0.4.0",
+      updateAvailable: true,
+    });
+    const installed: string[] = [];
+    await render(
+      <MarketplaceBrowser
+        marketplacePlugins={[updated]}
+        onInstall={(plugin) => installed.push(plugin.id)}
+        onQueryChange={() => {}}
+        onSelect={() => {}}
+        query=""
+        selectedPluginId="themes"
+      />,
+    );
+
+    const dialog = document.querySelector('[data-slot="dialog-content"]');
+    expect(dialog?.textContent).toContain("update available");
+    expect(dialog?.textContent).toContain("v0.3.0 · v0.4.0 available");
+    const update = [...(dialog?.querySelectorAll("button") ?? [])].find(
+      (button) => button.textContent === "Update",
+    );
+    await act(async () => update?.click());
+    expect(installed).toEqual(["themes"]);
   });
 
   it("paginates results in groups of 50", async () => {

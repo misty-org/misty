@@ -57,7 +57,7 @@ export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = 
   agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: Bot },
   marketplace: {
     id: "marketplace",
-    label: "Store",
+    label: "Discover",
     surfaceId: "marketplace",
     icon: Store,
   },

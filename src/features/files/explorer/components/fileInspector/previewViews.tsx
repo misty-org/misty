@@ -5,7 +5,11 @@ import type { LoadedInspectorPreview } from "../../model/interfaces/components/F
 import { formatBytes } from "../../utils/fileFormat";
 import { FileIcon } from "../FileBrowserIcons";
 import { inspectorStyles } from "../FileInspectorStyles";
-import { archiveEntryIsArchive, archiveEntryName, formatArchiveEntrySize } from "./previewSupport";
+import {
+  archiveEntryIsArchive,
+  archiveEntryName,
+  formatArchiveEntrySize,
+} from "./archivePresentation";
 
 export function PreviewImage(props: { className: string; src: string; alt: string }) {
   return (

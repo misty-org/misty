@@ -14,6 +14,8 @@ export function socialProviderFromRoute(route: string): SocialProviderId {
   try {
     const parsed = new URL(route, "https://misty.local");
     const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts[0] === "apps" && parts[1] === "social")
+      return socialProvider(parsed.searchParams.get("provider")) ?? "misty";
     if (parts[0] === "spaces" && parts[2] === "social") {
       return (
         socialProvider(parts[3]) ?? socialProvider(parsed.searchParams.get("provider")) ?? "misty"

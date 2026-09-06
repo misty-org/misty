@@ -1,12 +1,12 @@
-import { setBrowserWebviewsSuspended } from "@/features/browser";
+import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { SystemErrorActivity } from "@/features/activity";
-import { MistyRegionCapture, useAiSurfaceStore, useAiVoiceRecorder } from "@/features/ai-surface";
-import { useExplorerStore } from "@/features/files/explorer";
+import { useAiSurfaceStore } from "@/features/ai-surface/store";
+import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
 import { invokeShortcutCommand } from "@/features/shortcuts";
-import { useWorkspaceStore } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace/core";
 import { ScrollArea, cn } from "@/shared/ui";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { GlobalMistyComposerBar, GlobalMistyVoiceIsland } from "./GlobalMistyChrome";
 import { ConversationView } from "./GlobalMistyPanelContent";
@@ -24,6 +24,12 @@ import { buildUnifiedMistyCandidates } from "./unifiedMistyCandidates";
 import { useGlobalMistyAttachments } from "./useGlobalMistyAttachments";
 import { useGlobalMistyResults } from "./useGlobalMistyResults";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
+
+const MistyRegionCapture = lazy(() =>
+  import("@/features/ai-surface/MistyRegionCapture").then((module) => ({
+    default: module.MistyRegionCapture,
+  })),
+);
 
 const panelClass = [
   "pointer-events-auto flex max-h-[min(680px,calc(100dvh-120px))]",
@@ -159,7 +165,6 @@ export function GlobalMisty(props: {
       approveAgentTask: state.approveAgentTask,
     })),
   );
-  const pane = useExplorerStore((state) => state.panes[props.activePaneId]);
   const aiPaneId = props.activeWorkspacePaneId ?? props.activePaneId;
   const aiRegistration = useAiSurfaceStore((state) =>
     Object.values(state.registrations).find((registration) => registration.paneId === aiPaneId),
@@ -173,8 +178,13 @@ export function GlobalMisty(props: {
     () =>
       !includeCurrentContext
         ? []
-        : contextForCurrentView(props.currentPath, props.activePanePath, pane, registeredAiContext),
-    [includeCurrentContext, pane, props.activePanePath, props.currentPath, registeredAiContext],
+        : contextForCurrentView(
+            props.currentPath,
+            props.activePanePath,
+            undefined,
+            registeredAiContext,
+          ),
+    [includeCurrentContext, props.activePanePath, props.currentPath, registeredAiContext],
   );
   const activeMode = mode === "search" ? "search" : "ask";
   const attachmentState = useGlobalMistyAttachments({
@@ -261,8 +271,8 @@ export function GlobalMisty(props: {
   }, [closePanel, open]);
   useEffect(() => {
     if (!suspendBrowserWebviews) return;
-    setBrowserWebviewsSuspended(open, "global-misty");
-    return () => setBrowserWebviewsSuspended(false, "global-misty");
+    requestEmbeddedBrowserSuspension(open, "global-misty");
+    return () => requestEmbeddedBrowserSuspension(false, "global-misty");
   }, [open, suspendBrowserWebviews]);
   useEffect(() => {
     if (wasOpenRef.current && !open) onClosed?.();
@@ -533,13 +543,15 @@ export function GlobalMisty(props: {
         </AnimatePresence>
       </MotionConfig>
       {capturingRegion && allowCapture ? (
-        <MistyRegionCapture
-          onCancel={() => setCapturingRegion(false)}
-          onCapture={(nextCapture) => {
-            setCapturingRegion(false);
-            void attachmentState.addFiles([captureToFile(nextCapture)]);
-          }}
-        />
+        <Suspense fallback={null}>
+          <MistyRegionCapture
+            onCancel={() => setCapturingRegion(false)}
+            onCapture={(nextCapture) => {
+              setCapturingRegion(false);
+              void attachmentState.addFiles([captureToFile(nextCapture)]);
+            }}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

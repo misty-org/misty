@@ -4,7 +4,7 @@ use crate::domain::clipboard::ClipboardService;
 #[cfg(desktop)]
 use crate::domain::clipboard::{NativeClipboard, SharedClipboardClient};
 use crate::domain::file_sync::FileSyncPairStore;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 use crate::infra::connected_devices::ConnectedDevicesService;
 #[cfg(desktop)]
 use crate::infra::extension_runtime::ExtensionRuntimeService;
@@ -35,7 +35,7 @@ pub struct MistyRuntime {
     pub settings: SettingsService,
     pub commands: CommandService,
     pub devices: DeviceService,
-    #[cfg(desktop)]
+    #[cfg(any(desktop, target_os = "ios"))]
     pub connected_devices: ConnectedDevicesService,
     pub directory_size: DirectorySizeService,
     pub metadata: MetadataService,
@@ -64,7 +64,7 @@ impl MistyRuntime {
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         let environment = AppEnvironmentService::new_with_data_root(data_root);
         let storage_runtime = StorageRuntimeService::start(&environment);
-        #[cfg(desktop)]
+        #[cfg(any(desktop, target_os = "ios"))]
         let connected_devices = ConnectedDevicesService::new(environment.cache_dir());
         #[cfg(desktop)]
         let native_clipboard: Arc<dyn NativeClipboard> =
@@ -144,7 +144,7 @@ impl MistyRuntime {
             settings,
             commands,
             devices,
-            #[cfg(desktop)]
+            #[cfg(any(desktop, target_os = "ios"))]
             connected_devices,
             directory_size,
             metadata,

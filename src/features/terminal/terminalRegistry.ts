@@ -1,10 +1,19 @@
-import { invoke } from "@tauri-apps/api/core";
-
 // Module-scope state that survives React unmount. Each terminal "slot" is one
 // xterm/PTY pair and each dock tab owns at most one slot.
 
 /** Slot id → live PTY session id in Rust. */
 export const sessionBySlot = new Map<string, string>();
+const closeBySlot = new Map<string, () => Promise<void>>();
+
+export function retainTerminalSession(slotId: string, handle: string, close: () => Promise<void>) {
+  sessionBySlot.set(slotId, handle);
+  closeBySlot.set(slotId, close);
+}
+
+export function forgetTerminalSession(slotId: string) {
+  sessionBySlot.delete(slotId);
+  closeBySlot.delete(slotId);
+}
 
 /** Slot id → serialized xterm buffer, restored on remount. */
 export const bufferBySlot = new Map<string, string>();
@@ -32,14 +41,12 @@ export function unregisterSlot(tabId: string, slotId: string): void {
 
 /** Kill one slot's PTY and forget its buffer / cwd / title. */
 export function killTerminalSlot(slotId: string): void {
-  const sessionId = sessionBySlot.get(slotId);
-  sessionBySlot.delete(slotId);
+  const close = closeBySlot.get(slotId);
+  forgetTerminalSession(slotId);
   bufferBySlot.delete(slotId);
   cwdBySlot.delete(slotId);
   titleBySlot.delete(slotId);
-  if (sessionId) {
-    void invoke("terminal_kill", { sessionId }).catch(() => undefined);
-  }
+  if (close) void close().catch(() => undefined);
 }
 
 /** Kill every slot belonging to a workspace tab. Called when the tab closes. */

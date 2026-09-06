@@ -1,4 +1,3 @@
-import { rememberedPlannerRoute } from "@/features/spaces";
 import {
   useWorkspaceStore,
   WorkspaceAppIcon,
@@ -8,17 +7,10 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-  TreeBranch,
-  cn,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
-  navigationTreeBranchClass,
-  navigationTreeGroupClass,
-  navigationTreeItemIconClass,
-  navigationTreeRowClass,
-  navigationTreeSurfaceClass,
+  NavigationSectionButton,
+  NavigationTreeItem,
+  navigationMenuGroupClass,
 } from "@/shared/ui";
-import { ChevronRight } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -26,11 +18,7 @@ import {
   RoadmapsDestinationIcon,
   TasksDestinationIcon,
 } from "./NavigatorDestinationIcons";
-import {
-  navigatorFocusRingClass,
-  navigatorPrimaryRowLayoutClass,
-  navigatorSubsectionIconClass,
-} from "./styles";
+
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 type PlannerDestinationId = "tasks" | "agenda" | "roadmaps";
@@ -53,7 +41,7 @@ export function PlannerNavigatorDisclosure(props: {
   const activeDestination = props.active ? plannerDestinationFromRoute(props.activeRoute) : null;
   const destinations = plannerDestinationDetails.map((destination) => ({
     ...destination,
-    path: rememberedPlannerRoute(props.accountId, props.spaceId, destination.id),
+    path: plannerRoute(props.path, destination.id),
   }));
 
   useEffect(() => {
@@ -66,78 +54,39 @@ export function PlannerNavigatorDisclosure(props: {
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="grid w-full min-w-0 gap-1"
+      className={`${navigationMenuGroupClass} w-full min-w-0`}
       data-planner-disclosure="true"
     >
       <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "misty-navigator-row-target group/toggle box-border h-9 w-full rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
-            navigatorPrimaryRowLayoutClass,
-            "hover:bg-charcoal-card hover:text-cream-bright",
-            navigatorFocusRingClass,
-          )}
-          aria-label="Planner"
+        <NavigationSectionButton
+          icon={<WorkspaceAppIcon appId={"planner"} size="nav" />}
+          label={"Planner"}
+          open={open}
+          aria-label={"Planner"}
           data-navigator-disclosure-trigger="true"
-          title={open ? "Collapse Planner" : "Expand Planner"}
-        >
-          <span className="grid size-7 shrink-0 place-items-center">
-            <WorkspaceAppIcon appId="planner" size="nav" />
-          </span>
-          <span className={navigationDisclosureLabelClass}>
-            <span className="min-w-0 truncate">Planner</span>
-            <ChevronRight
-              className={cn(
-                navigationDisclosureChevronClass,
-                "size-4 transition-transform duration-150 motion-reduce:transition-none group-data-[state=open]/toggle:rotate-90",
-              )}
-              aria-hidden="true"
-              data-chevron-placement="inline"
-            />
-          </span>
-        </button>
+          title={`${open ? "Collapse" : "Expand"} ${"Planner"}`}
+        />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className={navigationTreeGroupClass} role="group" aria-label="Planner destinations">
+        <div className={navigationMenuGroupClass} role="group" aria-label="Planner destinations">
           {destinations.map(({ id, label, icon: Icon, path }, index) => {
             const active = id === activeDestination;
             return (
-              <Link
+              <NavigationTreeItem
                 key={id}
-                to={path}
-                onClick={() => openWorkspaceRoute(path)}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  navigationTreeRowClass,
-                  "misty-navigator-row-target rounded-md text-cream-muted no-underline outline-none transition-colors hover:text-cream-bright",
-                  navigatorFocusRingClass,
-                  active && "text-cream-bright",
-                )}
+                asChild
+                icon={<Icon aria-hidden />}
+                label={label}
+                selected={active}
+                last={index === destinations.length - 1}
               >
-                <TreeBranch
-                  className={navigationTreeBranchClass}
-                  first={index === 0}
-                  last={index === destinations.length - 1}
+                <Link
+                  to={path}
+                  onClick={() => {
+                    openWorkspaceRoute(path);
+                  }}
                 />
-                <span
-                  className={cn(
-                    navigationTreeSurfaceClass,
-                    "group-hover/tree-row:bg-charcoal-hover",
-                    active && "bg-charcoal-card/80",
-                  )}
-                  data-tree-row-surface="true"
-                >
-                  <span className={navigatorSubsectionIconClass}>
-                    <Icon
-                      className={navigationTreeItemIconClass}
-                      strokeWidth={1.85}
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                </span>
-              </Link>
+              </NavigationTreeItem>
             );
           })}
         </div>
@@ -148,13 +97,19 @@ export function PlannerNavigatorDisclosure(props: {
 
 function plannerDestinationFromRoute(route: string): PlannerDestinationId {
   try {
-    const part = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean)[3];
+    const part = new URL(route, "https://misty.local").searchParams.get("view");
     if (part === "agenda" || part === "calendar") return "agenda";
     if (part === "goals" || part === "milestones" || part === "roadmaps") return "roadmaps";
   } catch {
     // A malformed remembered route falls back to Tasks, just like route memory does.
   }
   return "tasks";
+}
+
+function plannerRoute(route: string, view: PlannerDestinationId) {
+  const url = new URL(route, "https://misty.local");
+  url.searchParams.set("view", view);
+  return `${url.pathname}${url.search}`;
 }
 
 function openWorkspaceRoute(path: string) {

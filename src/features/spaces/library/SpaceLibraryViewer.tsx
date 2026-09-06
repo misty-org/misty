@@ -1,6 +1,19 @@
 import type { LibraryItemViewerProps } from "@/api/spaces/dto/interfaces/SpaceLibraryViewer";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  cn,
+} from "@/shared/ui";
+import { useSurfacePresentation } from "@/shared/mobile";
+import { Info } from "lucide-react";
 import { useState } from "react";
 import { libraryItemMIME } from "./SpaceLibraryPrimitives";
 import { libraryEditStyle, normalizeLibraryEdit } from "./SpaceLibraryViewerUtils";
@@ -26,9 +39,11 @@ export function LibraryItemViewer(props: LibraryItemViewerProps) {
 }
 
 function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceLibraryItem }) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const { spaceId, item, items, allItems, assetStack, reauthenticationToken } = props;
   const { canEdit, canCopy, onClose, onSelect } = props;
   const [editing, setEditing] = useState(false);
+  const [metadataOpen, setMetadataOpen] = useState(false);
 
   const index = items.findIndex((candidate) => candidate.id === item.id);
   const mimeType = libraryItemMIME(item);
@@ -121,7 +136,11 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className={dialogClass}
+        className={cn(
+          mobile
+            ? "inset-0 grid h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-cols-1 grid-rows-[56px_minmax(0,1fr)] gap-0 overflow-hidden rounded-none border-0 bg-charcoal-bg p-0 [&>button]:hidden"
+            : dialogClass,
+        )}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           props.returnFocusRef.current?.focus();
@@ -138,7 +157,12 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
           }
         }}
       >
-        <header className="relative z-20 col-span-2 flex min-w-0 items-center justify-between gap-4 border-b border-charcoal-border/60 bg-charcoal-bg px-4">
+        <header
+          className={cn(
+            "relative z-20 flex min-w-0 items-center justify-between gap-4 border-b border-charcoal-border/60 bg-charcoal-bg px-4",
+            !mobile && "col-span-2",
+          )}
+        >
           <div className="min-w-0">
             <DialogTitle className="truncate text-sm font-medium">{item.display_name}</DialogTitle>
             <DialogDescription className="sr-only">
@@ -148,36 +172,49 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
               {index + 1} of {items.length}
             </p>
           </div>
-          <LibraryViewerToolbar
-            item={item}
-            assetStack={assetStack}
-            stackMediaID={stack.stackMediaID}
-            stackMemberRole={stack.stackMediaMember?.role}
-            activeEdit={activeEdit}
-            renditionReady={renditionReady}
-            canEdit={canEdit}
-            canCopy={canCopy}
-            editing={editing}
-            editSaving={edits.editSaving}
-            editingAvailable={versions.editingAvailable}
-            onSetStackCover={() =>
-              assetStack && void props.onSetStackCover(assetStack, stack.stackMediaID)
-            }
-            onUngroupStack={() => assetStack && void props.onUngroupStack(assetStack)}
-            onCopyEdit={() => props.onCopyEdit(normalizeLibraryEdit(activeEdit?.edit_definition))}
-            onSaveAsCopy={() => void edits.saveAsCopy()}
-            onSaveEdit={() => void edits.saveEdit()}
-            onToggleFavorite={() => void props.onUpdate(item, { favorite: !item.favorite })}
-            onToggleHidden={() => void props.onUpdate(item, { hidden: !item.hidden })}
-            onBeginEditing={() => {
-              if (!canEdit) return;
-              setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
-              setEditing(true);
-              edits.setEditError("");
-            }}
-            onCopyItem={() => void copyItem()}
-            onTrash={() => void props.onTrash(item)}
-          />
+          <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+            {mobile ? (
+              <Button
+                className="size-11 shrink-0"
+                size="icon"
+                variant="outline"
+                onClick={() => setMetadataOpen(true)}
+                aria-label="Item details"
+              >
+                <Info className="size-4" />
+              </Button>
+            ) : null}
+            <LibraryViewerToolbar
+              item={item}
+              assetStack={assetStack}
+              stackMediaID={stack.stackMediaID}
+              stackMemberRole={stack.stackMediaMember?.role}
+              activeEdit={activeEdit}
+              renditionReady={renditionReady}
+              canEdit={canEdit}
+              canCopy={canCopy}
+              editing={editing}
+              editSaving={edits.editSaving}
+              editingAvailable={versions.editingAvailable}
+              onSetStackCover={() =>
+                assetStack && void props.onSetStackCover(assetStack, stack.stackMediaID)
+              }
+              onUngroupStack={() => assetStack && void props.onUngroupStack(assetStack)}
+              onCopyEdit={() => props.onCopyEdit(normalizeLibraryEdit(activeEdit?.edit_definition))}
+              onSaveAsCopy={() => void edits.saveAsCopy()}
+              onSaveEdit={() => void edits.saveEdit()}
+              onToggleFavorite={() => void props.onUpdate(item, { favorite: !item.favorite })}
+              onToggleHidden={() => void props.onUpdate(item, { hidden: !item.hidden })}
+              onBeginEditing={() => {
+                if (!canEdit) return;
+                setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
+                setEditing(true);
+                edits.setEditError("");
+              }}
+              onCopyItem={() => void copyItem()}
+              onTrash={() => void props.onTrash(item)}
+            />
+          </div>
         </header>
 
         <LibraryViewerStage
@@ -211,31 +248,70 @@ function LibraryItemViewerContent(props: LibraryItemViewerProps & { item: SpaceL
           onNext={goNext}
         />
 
-        <LibraryViewerSidebar
-          item={item}
-          mimeType={mimeType}
-          canEdit={canEdit}
-          isImage={isImage}
-          isVideo={isVideo}
-          durationSeconds={Number(metadata.duration ?? 1)}
-          editing={editing}
-          editDraft={editDraft}
-          setEditDraft={setEditDraft}
-          editSaving={edits.editSaving}
-          editError={edits.editError}
-          editingAvailable={versions.editingAvailable}
-          editVersions={editVersions}
-          activeEdit={activeEdit}
-          onUpdate={props.onUpdate}
-          onCancelEdit={() => {
-            setEditing(false);
-            setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
-          }}
-          onSaveEdit={() => void edits.saveEdit()}
-          onSelectVersion={(editID) => void edits.selectEdit(editID)}
-          onRenderVersion={(editID) => void edits.renderEdit(editID)}
-          onDeleteVersion={(editID) => void edits.deleteEdit(editID)}
-        />
+        {!mobile ? (
+          <LibraryViewerSidebar
+            item={item}
+            mimeType={mimeType}
+            canEdit={canEdit}
+            isImage={isImage}
+            isVideo={isVideo}
+            durationSeconds={Number(metadata.duration ?? 1)}
+            editing={editing}
+            editDraft={editDraft}
+            setEditDraft={setEditDraft}
+            editSaving={edits.editSaving}
+            editError={edits.editError}
+            editingAvailable={versions.editingAvailable}
+            editVersions={editVersions}
+            activeEdit={activeEdit}
+            onUpdate={props.onUpdate}
+            onCancelEdit={() => {
+              setEditing(false);
+              setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
+            }}
+            onSaveEdit={() => void edits.saveEdit()}
+            onSelectVersion={(editID) => void edits.selectEdit(editID)}
+            onRenderVersion={(editID) => void edits.renderEdit(editID)}
+            onDeleteVersion={(editID) => void edits.deleteEdit(editID)}
+          />
+        ) : null}
+        {mobile ? (
+          <Sheet open={metadataOpen} onOpenChange={setMetadataOpen}>
+            <SheetContent
+              side="bottom"
+              className="h-[82dvh] rounded-t-2xl border-x-0 border-b-0 bg-charcoal-bg p-0 pb-[env(safe-area-inset-bottom)]"
+            >
+              <SheetHeader className="border-b border-charcoal-border p-4">
+                <SheetTitle>Item details</SheetTitle>
+              </SheetHeader>
+              <LibraryViewerSidebar
+                item={item}
+                mimeType={mimeType}
+                canEdit={canEdit}
+                isImage={isImage}
+                isVideo={isVideo}
+                durationSeconds={Number(metadata.duration ?? 1)}
+                editing={editing}
+                editDraft={editDraft}
+                setEditDraft={setEditDraft}
+                editSaving={edits.editSaving}
+                editError={edits.editError}
+                editingAvailable={versions.editingAvailable}
+                editVersions={editVersions}
+                activeEdit={activeEdit}
+                onUpdate={props.onUpdate}
+                onCancelEdit={() => {
+                  setEditing(false);
+                  setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));
+                }}
+                onSaveEdit={() => void edits.saveEdit()}
+                onSelectVersion={(editID) => void edits.selectEdit(editID)}
+                onRenderVersion={(editID) => void edits.renderEdit(editID)}
+                onDeleteVersion={(editID) => void edits.deleteEdit(editID)}
+              />
+            </SheetContent>
+          </Sheet>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

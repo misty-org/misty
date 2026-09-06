@@ -32,6 +32,7 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   files: descriptor("files", "multiple", "suspend", 360, 240),
   transfers: descriptor("transfers", "singleton", "suspend", 360, 240),
   agents: descriptor("agents", "singleton", "suspend", 360, 240),
+  "official-app": descriptor("official-app", "multiple", "keep-alive", 420, 280),
   extension: descriptor("extension", "multiple", "keep-alive", 420, 280),
   marketplace: descriptor("marketplace", "singleton", "suspend", 360, 240),
 };

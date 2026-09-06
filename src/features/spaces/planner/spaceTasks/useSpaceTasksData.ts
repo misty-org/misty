@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import type { PlannerTaskServices } from "./taskServices";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
 import { errorText } from "@/shared/lib/format";
@@ -13,11 +13,13 @@ const TASK_PAGE_SIZE = 200;
  * since filter changes can overlap in flight.
  */
 export function useSpaceTasksData(options: {
+  api: PlannerTaskServices;
+  subscribeChanges(listener: () => void): () => void;
   spaceId: string;
   view: TaskViewMode;
   filters: TaskFilterParams;
 }) {
-  const { spaceId, filters } = options;
+  const { spaceId, filters, api, subscribeChanges } = options;
   const [tasks, setTasks] = useState<SpaceTask[]>([]);
   const [statusTotals, setStatusTotals] = useState<Record<string, number>>({});
   const [nextCursor, setNextCursor] = useState("");
@@ -33,7 +35,7 @@ export function useSpaceTasksData(options: {
       const generation = ++loadGenerationRef.current;
       setLoading(true);
       try {
-        const taskResult = await spacesApi.tasks(spaceId, {
+        const taskResult = await api.tasks(spaceId, {
           status: status === "all" ? undefined : status,
           assigneeUserId: effectiveAssignee
             ? effectiveAssignee.startsWith("person:")
@@ -67,7 +69,7 @@ export function useSpaceTasksData(options: {
         if (generation === loadGenerationRef.current) setLoading(false);
       }
     },
-    [dueRange?.from, dueRange?.to, effectiveAssignee, priority, query, sort, spaceId, status],
+    [api, dueRange?.from, dueRange?.to, effectiveAssignee, priority, query, sort, spaceId, status],
   );
 
   useEffect(() => {
@@ -75,13 +77,8 @@ export function useSpaceTasksData(options: {
   }, [load]);
 
   useEffect(() => {
-    const reload = (event: Event) => {
-      if ((event as CustomEvent<{ space_id?: string }>).detail?.space_id === spaceId)
-        void load(false);
-    };
-    window.addEventListener("misty:space-coordination-event", reload);
-    return () => window.removeEventListener("misty:space-coordination-event", reload);
-  }, [load, spaceId]);
+    return subscribeChanges(() => void load(false));
+  }, [load, subscribeChanges]);
 
   return {
     tasks,

@@ -7,12 +7,13 @@ import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanne
 import { Button } from "@/shared/ui";
 import { LoaderCircle } from "lucide-react";
 import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
-import { TaskErrorState } from "../SpaceTaskPrimitives";
+import type { ReactNode } from "react";
 import { matchesDueFilter } from "./taskFiltering";
 import type { SpaceTaskActions } from "./useSpaceTaskActions";
 import type { SpaceTasksData } from "./useSpaceTasksData";
 
 export interface SpacePlannerBodyProps {
+  renderError(message: string): ReactNode;
   view: TaskViewMode;
   members: SpaceMember[];
   agents: SpaceAgentMembership[];
@@ -39,7 +40,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
     <section
       className={`min-h-0 ${view === "board" ? "overflow-hidden p-0" : "overflow-auto p-3"}`}
     >
-      {data.error ? <TaskErrorState message={data.error} /> : null}
+      {data.error ? props.renderError(data.error) : null}
       {isEmptyLoad ? (
         <div className="grid h-full min-h-56 place-items-center text-cream-muted">
           <LoaderCircle className="size-5 animate-spin" aria-label="Loading tasks" />

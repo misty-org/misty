@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Misty",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "identifier": "com.misty.desktop",
   "build": {
     "beforeDevCommand": "npm run dev:desktop",
@@ -30,7 +30,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' customprotocol: asset:; connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost http://localhost:* http://127.0.0.1:* http://10.0.2.2:* ws://localhost:* ws://127.0.0.1:* ws://10.0.2.2:* https://us.i.posthog.com https: wss:; frame-src 'self' asset: http://asset.localhost customprotocol: misty-extension: http://misty-extension.localhost http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:*; img-src 'self' asset: http://asset.localhost blob: data: https:; media-src 'self' blob: asset: http://asset.localhost http://127.0.0.1:*; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:",
+      "csp": "default-src 'self' customprotocol: asset:; connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost http://localhost:* http://127.0.0.1:* http://10.0.2.2:* ws://localhost:* ws://127.0.0.1:* ws://10.0.2.2:* https://us.i.posthog.com https: wss:; frame-src 'self'; img-src 'self' misty-extension: http://misty-extension.localhost asset: http://asset.localhost blob: data: https:; media-src 'self' blob: asset: http://asset.localhost http://127.0.0.1:*; font-src 'self' misty-extension: http://misty-extension.localhost data:; style-src 'self' misty-extension: http://misty-extension.localhost 'unsafe-inline'; script-src 'self' misty-extension: http://misty-extension.localhost; worker-src 'self' blob:",
       "assetProtocol": {
         "enable": true,
         "scope": [
@@ -56,20 +56,28 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0"
     },
     "fileAssociations": [
       {
-        "ext": ["mf"],
+        "ext": [
+          "mf"
+        ],
         "name": "Misty Workflow",
         "description": "Misty automation and agent workflow",
         "role": "Editor",
         "mimeType": "application/vnd.misty.workflow+json",
         "exportedType": {
           "identifier": "com.misty.workflow",
-          "conformsTo": ["public.json", "public.data"]
+          "conformsTo": [
+            "public.json",
+            "public.data"
+          ]
         }
       }
     ],
@@ -79,23 +87,30 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["misty"]
+        "schemes": [
+          "misty"
+        ]
       },
       "mobile": [
         {
-          "scheme": ["misty"],
+          "scheme": [
+            "misty"
+          ],
           "appLink": false
         }
       ]
     },
     "updater": {
-      "pubkey": "",
-      "endpoints": []
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZEOUZENUM4QUJBQTJFNEQKUldSTkxxcXJ5TldmL1VCcFVJQlhsZEh6NWpkQ29FWVNBVk5qYytmblhqcVMxNVg0UlBhRDRWQloK",
+      "endpoints": [
+        "https://apps.mistysys.com/updates/beta/latest.json"
+      ]
     }
   }
 }

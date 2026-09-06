@@ -11,18 +11,19 @@ import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import {
   canonicalSpaceRoute,
   defaultSpaceRoute,
-  preferredMistySpace,
+  preferredDefaultSpace,
   rememberedJournalRoute,
   rememberedPlannerRoute,
   socialProviderPath,
-  SpacesRealtimeBridge,
   useSpacesStore,
 } from "@/features/spaces";
+import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import {
   registerShortcutHandler,
   useShortcutHandler,
   useShortcutTitle,
 } from "@/features/shortcuts";
+import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
 import {
   canNavigateWorkspaceTabRoute,
   dockLeaves,
@@ -154,8 +155,6 @@ export function DesktopLayout(props: {
   const backTitle = useShortcutTitle("Back", "navigation.back");
   const forwardTitle = useShortcutTitle("Forward", "navigation.forward");
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
-  // A native browser child would smear across the resizing column, so it is
-  // parked for the two frames the shell takes to settle.
   const applyNavigatorLayout = useCallback((next: NavigatorLayout) => {
     setBrowserWebviewsSuspended(true, "navigator-layout");
     setNavigatorLayout(next);
@@ -204,6 +203,15 @@ export function DesktopLayout(props: {
   const closeRemotesOverlay = useCallback(() => {
     setRemotesOpen(false);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id || !spacesSnapshotReady) return;
+    const tourState = useTourStore.getState();
+    if (!isTourCompletedForAccount(tourState, user.id) && !tourState.isOpen) {
+      tourState.startTour();
+    }
+  }, [user?.id, spacesSnapshotReady]);
+
   useEffect(() => {
     if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
@@ -220,9 +228,16 @@ export function DesktopLayout(props: {
       }
       openSettingsOverlay();
     };
+    const handleCloseSettings = () => {
+      closeSettingsOverlay();
+    };
     window.addEventListener("misty:open-settings", handleOpenSettings);
-    return () => window.removeEventListener("misty:open-settings", handleOpenSettings);
-  }, [openSettingsOverlay]);
+    window.addEventListener("misty:close-settings", handleCloseSettings);
+    return () => {
+      window.removeEventListener("misty:open-settings", handleOpenSettings);
+      window.removeEventListener("misty:close-settings", handleCloseSettings);
+    };
+  }, [closeSettingsOverlay, openSettingsOverlay]);
 
   useEffect(() => {
     if (!location.pathname.startsWith("/providers")) return;
@@ -234,7 +249,7 @@ export function DesktopLayout(props: {
 
   useEffect(() => {
     if (location.pathname === "/home") {
-      const homeSpace = preferredMistySpace(spaces);
+      const homeSpace = preferredDefaultSpace(spaces);
       if (homeSpace) {
         navigate(`/spaces/${encodeURIComponent(homeSpace.id)}/home`, { replace: true });
       } else if (spacesSnapshotReady) {
@@ -243,7 +258,7 @@ export function DesktopLayout(props: {
       return;
     }
     if (location.pathname === "/spaces") {
-      const homeSpace = preferredMistySpace(spaces);
+      const homeSpace = preferredDefaultSpace(spaces);
       if (homeSpace && spacesSnapshotReady) {
         navigate(defaultSpaceRoute(homeSpace.id), { replace: true });
       }
@@ -259,7 +274,7 @@ export function DesktopLayout(props: {
     }
     // Provider and destination choices live in the query string. Keep the
     // complete route on the workspace tab so opening Social cannot fall back
-    // to its default Misty destination.
+    // to its default native Social destination.
     const surface = workspaceSurfaceFromRoute(currentRoute);
     if (surface) openWorkspaceSurface(surface);
   }, [
@@ -318,7 +333,7 @@ export function DesktopLayout(props: {
         const scope = useWorkspaceStore.getState().activeScopeKey;
         const activeSpaceId = scope.startsWith("space:")
           ? scope.slice(6)
-          : preferredMistySpace(availableSpaces)?.id;
+          : preferredDefaultSpace(availableSpaces)?.id;
         if (!activeSpaceId) {
           useAppStore.getState().setError(`Create or join a Space before opening ${tool}.`);
           return;
@@ -360,8 +375,6 @@ export function DesktopLayout(props: {
     return () => unregister.forEach((remove) => remove());
   }, [focusTool]);
 
-  // A revealed navigator floats over the workspace, so native browser children
-  // have to drop behind the renderer for it to be visible at all.
   useEffect(() => {
     setBrowserWebviewsSuspended(navigatorHidden && navigatorRevealed, "navigator-reveal");
     return () => setBrowserWebviewsSuspended(false, "navigator-reveal");
@@ -618,6 +631,7 @@ export function DesktopLayout(props: {
       <MediaSearchViewer />
       <SpacesRealtimeBridge />
       <ActivityBridge />
+      <AppTour />
     </main>
   );
 }

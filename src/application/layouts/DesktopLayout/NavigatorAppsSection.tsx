@@ -1,17 +1,11 @@
 import { routes } from "@/features/app-shell";
-import { extensionAppRoute, useInstalledApps } from "@/features/extensions";
 import {
-  NAVIGATOR_APP_DESCRIPTIONS,
-  NAVIGATOR_APP_IDS,
-  WORKSPACE_TOOLS_META,
-  WorkspaceAppIcon,
-  dockLeaves,
-  navigatorAppsCollapsedForAccount,
-  navigatorAppIdsForAccount,
-  useNavigatorAppsStore,
-  useWorkspaceStore,
-  workspaceSurfaceFromRoute,
-} from "@/features/workspace";
+  OfficialAppIcon,
+  navigatorAppIdForOfficialApp,
+  useAppsStore,
+  usePinnedNavigatorAppIds,
+} from "@/features/apps";
+import { navigatorAppsCollapsedForAccount, useNavigatorAppsStore } from "@/features/workspace";
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,50 +18,46 @@ import {
   navigationDisclosureChevronClass,
   navigationDisclosureLabelClass,
 } from "@/shared/ui";
-import { Blocks, Check, ChevronRight, Plus, Search } from "lucide-react";
+import { Check, ChevronRight, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { navigatorFocusRingClass, navigatorRowClass } from "./styles";
+import { navigatorFocusRingClass } from "./styles";
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const installedApps = useInstalledApps();
-  const activeAppId = useWorkspaceStore((state) => {
-    const activePane = dockLeaves(state.layout.root).find(
-      (pane) => pane.id === state.layout.focusedPaneId,
-    );
-    const tab = activePane?.tabs.find((candidate) => candidate.id === activePane.activeTabId);
-    return tab?.surfaceId === "extension" && tab.groupKey.startsWith("app:")
-      ? tab.groupKey.slice(4)
-      : undefined;
-  });
+  const catalog = useAppsStore((state) => state.catalog);
+  const installations = useAppsStore((state) => state.installations);
+  const actionAppId = useAppsStore((state) => state.actionAppId);
+  const setPinnedApp = useAppsStore((state) => state.setPinned);
   const collapsed = useNavigatorAppsStore((state) =>
     navigatorAppsCollapsedForAccount(state, props.accountId),
   );
-  const selectedAppIds = useNavigatorAppsStore((state) =>
-    navigatorAppIdsForAccount(state, props.accountId),
-  );
-  const setAppVisible = useNavigatorAppsStore((state) => state.setAppVisible);
+  const selectedAppIds = usePinnedNavigatorAppIds();
   const setCollapsed = useNavigatorAppsStore((state) => state.setCollapsed);
   const [open, setOpen] = useNavigatorDisclosureState(props.accountId, "apps", !collapsed);
   const normalizedQuery = query.trim().toLowerCase();
-  const visibleAppIds = useMemo(
+  const visibleApps = useMemo(
     () =>
-      NAVIGATOR_APP_IDS.filter((id) => {
-        if (!normalizedQuery) return true;
-        const meta = WORKSPACE_TOOLS_META[id];
-        return `${meta.label} ${NAVIGATOR_APP_DESCRIPTIONS[id]}`
-          .toLowerCase()
-          .includes(normalizedQuery);
-      }),
-    [normalizedQuery],
+      installations
+        .filter((installation) => installation.state === "installed")
+        .flatMap((installation) => {
+          const app = catalog.find((candidate) => candidate.id === installation.app_id);
+          const navigatorId = navigatorAppIdForOfficialApp(installation.app_id);
+          return app && navigatorId ? [{ app, installation, navigatorId }] : [];
+        })
+        .filter(({ app }) => {
+          if (!normalizedQuery) return true;
+          return `${app.name} ${app.description}`.toLowerCase().includes(normalizedQuery);
+        }),
+    [catalog, installations, normalizedQuery],
   );
 
   return (
     <Collapsible
       className="group/apps grid min-w-0 gap-0.5"
+      data-tour-target="apps-section"
       onOpenChange={(nextOpen) => {
         setCollapsed(props.accountId, !nextOpen);
         setOpen(nextOpen);
@@ -77,7 +67,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
       aria-label="Apps"
     >
       <div
-        className="flex w-full min-w-0 items-center pl-2.5 pr-0"
+        className="sticky top-0 z-10 flex w-full min-w-0 items-center bg-charcoal-workspace pl-2.5 pr-0"
         role="group"
         aria-label="Apps controls"
       >
@@ -121,6 +111,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
               )}
               aria-label="Add app"
               title="Add app"
+              data-tour-target="nav-add-app-button"
             >
               <Plus className="!size-3.5" size={14} strokeWidth={2} aria-hidden="true" />
             </button>
@@ -150,13 +141,12 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
             </div>
 
             <div className="misty-transient-scrollbar max-h-[360px] overflow-y-auto p-1.5">
-              {visibleAppIds.length ? (
-                visibleAppIds.map((id) => {
-                  const app = WORKSPACE_TOOLS_META[id];
-                  const selected = selectedAppIds.includes(id);
+              {visibleApps.length ? (
+                visibleApps.map(({ app, installation, navigatorId }) => {
+                  const selected = selectedAppIds.includes(navigatorId);
                   return (
                     <button
-                      key={id}
+                      key={app.id}
                       type="button"
                       className={cn(
                         "grid min-h-11 w-full grid-cols-[20px_minmax(0,1fr)_18px] items-center gap-2.5",
@@ -164,18 +154,21 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                         "hover:bg-charcoal-hover focus-visible:bg-charcoal-hover",
                       )}
                       aria-pressed={selected}
-                      onClick={() => setAppVisible(props.accountId, id, !selected)}
+                      disabled={Boolean(actionAppId)}
+                      onClick={() => void setPinnedApp(app.id, !installation.pinned)}
                     >
-                      <WorkspaceAppIcon appId={id} size="picker" />
+                      <OfficialAppIcon appId={app.id} size={20} />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm text-cream">{app.label}</span>
+                        <span className="block truncate text-sm text-cream">
+                          {app.name === "Chat" ? "Social" : app.name}
+                        </span>
                         <span className="block truncate text-[11px] text-cream-muted">
-                          {NAVIGATOR_APP_DESCRIPTIONS[id]}
+                          {app.description}
                         </span>
                       </span>
                       {selected ? (
                         <Check
-                          className="text-sage-fg"
+                          className="text-cream-bright"
                           size={16}
                           strokeWidth={2}
                           aria-hidden="true"
@@ -191,7 +184,8 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
 
             <div className="border-t border-charcoal-border p-1.5">
               <Link
-                to={routes.store}
+                to={routes.discover}
+                data-tour-target="nav-browse-apps"
                 className={cn(
                   "flex h-9 items-center rounded-md px-2.5 text-sm text-cream-muted no-underline",
                   "outline-none transition-colors hover:bg-charcoal-hover hover:text-cream-bright",
@@ -199,8 +193,6 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                 )}
                 onClick={() => {
                   setPickerOpen(false);
-                  const surface = workspaceSurfaceFromRoute(routes.store);
-                  if (surface) useWorkspaceStore.getState().openSurface(surface);
                 }}
               >
                 Browse apps
@@ -211,32 +203,8 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
       </div>
 
       <CollapsibleContent className="grid gap-1">
-        {selectedAppIds.length || installedApps.length ? (
-          <>
-            {props.children}
-            {installedApps.map((app) => {
-              const path = extensionAppRoute(app.id, { title: app.name });
-              const active = activeAppId === app.id;
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  aria-label={app.name}
-                  className={navigatorRowClass(active)}
-                  key={app.id}
-                  onClick={() => {
-                    const surface = workspaceSurfaceFromRoute(path);
-                    if (surface) useWorkspaceStore.getState().openSurface(surface);
-                  }}
-                  to={path}
-                >
-                  <span className="grid size-7 shrink-0 place-items-center">
-                    <Blocks aria-hidden="true" size={18} strokeWidth={1.8} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{app.name}</span>
-                </Link>
-              );
-            })}
-          </>
+        {selectedAppIds.length ? (
+          props.children
         ) : (
           <button
             type="button"

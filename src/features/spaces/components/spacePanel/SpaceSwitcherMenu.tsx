@@ -1,4 +1,5 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
+import { spaceNavigationName } from "@/features/spaces/defaultSpace";
 import {
   Button,
   DropdownMenu,
@@ -32,7 +33,7 @@ export function SpaceSwitcherMenu({
   onSwitchSpace: (spaceId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const title = activeSpace?.name ?? "Spaces";
+  const title = activeSpace ? spaceNavigationName(activeSpace) : "Spaces";
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -46,7 +47,9 @@ export function SpaceSwitcherMenu({
           ].join(" ")}
           variant="outline"
           type="button"
-          aria-label={activeSpace?.name ? `Space menu: ${activeSpace.name}` : "Space menu"}
+          aria-label={
+            activeSpace ? `Space menu: ${spaceNavigationName(activeSpace)}` : "Space menu"
+          }
           title={title}
         >
           <span className="grid size-[30px] shrink-0 place-items-center text-cream-muted">
@@ -76,7 +79,7 @@ export function SpaceSwitcherMenu({
                 <span className="grid size-4 shrink-0 place-items-center text-cream-muted">
                   <PanelsTopLeft size={13} strokeWidth={1.75} />
                 </span>
-                <span className="min-w-0 flex-1 truncate">{space.name}</span>
+                <span className="min-w-0 flex-1 truncate">{spaceNavigationName(space)}</span>
                 {active ? (
                   <Check
                     className="shrink-0 text-cream"

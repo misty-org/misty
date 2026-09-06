@@ -165,6 +165,8 @@ export interface PluginPanelEntry {
   manifestPath: string;
   libraryPath: string;
   webEntry: string;
+  /** Versioned data-only widget document; never JavaScript or HTML. */
+  declarativeUi?: unknown;
   launcherViews: string[];
 }
 
@@ -223,6 +225,10 @@ export interface PluginPanelElement {
   width: number;
   height: number;
   border: boolean;
+  action?: {
+    method: "clipboard.writeText" | "clipboard.readText" | "files.readText" | "network.fetch";
+    value: string;
+  };
 }
 
 export interface PluginPanelNotification {

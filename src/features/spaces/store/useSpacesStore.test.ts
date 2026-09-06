@@ -431,13 +431,13 @@ describe("Spaces mutations", () => {
   );
 
   it("prunes the space from store state immediately upon deleteSpace", async () => {
-    const mistySpace = spaceFixture({ id: "space-misty", name: "Misty", kind: "misty" });
+    const defaultSpace = spaceFixture({ id: "space-home", name: "Home", is_default: true });
     const customSpace = spaceFixture({ id: "space-custom", name: "Custom Project" });
-    useSpacesStore.setState({ spaces: [mistySpace, customSpace] });
+    useSpacesStore.setState({ spaces: [defaultSpace, customSpace] });
 
     apiMocks.delete.mockResolvedValueOnce(undefined);
     apiMocks.snapshot.mockResolvedValueOnce({
-      spaces: [mistySpace],
+      spaces: [defaultSpace],
       invitations: [],
       limits: null,
     });
@@ -445,17 +445,17 @@ describe("Spaces mutations", () => {
     await useSpacesStore.getState().deleteSpace("space-custom", "Custom Project");
 
     expect(apiMocks.delete).toHaveBeenCalledWith("space-custom", "Custom Project");
-    expect(useSpacesStore.getState().spaces).toEqual([mistySpace]);
+    expect(useSpacesStore.getState().spaces).toEqual([defaultSpace]);
   });
 
   it("prunes the space from store state immediately upon leaveSpace", async () => {
-    const mistySpace = spaceFixture({ id: "space-misty", name: "Misty", kind: "misty" });
+    const defaultSpace = spaceFixture({ id: "space-home", name: "Home", is_default: true });
     const customSpace = spaceFixture({ id: "space-custom", name: "Custom Project" });
-    useSpacesStore.setState({ spaces: [mistySpace, customSpace] });
+    useSpacesStore.setState({ spaces: [defaultSpace, customSpace] });
 
     apiMocks.leave.mockResolvedValueOnce(undefined);
     apiMocks.snapshot.mockResolvedValueOnce({
-      spaces: [mistySpace],
+      spaces: [defaultSpace],
       invitations: [],
       limits: null,
     });
@@ -463,7 +463,7 @@ describe("Spaces mutations", () => {
     await useSpacesStore.getState().leaveSpace("space-custom");
 
     expect(apiMocks.leave).toHaveBeenCalledWith("space-custom");
-    expect(useSpacesStore.getState().spaces).toEqual([mistySpace]);
+    expect(useSpacesStore.getState().spaces).toEqual([defaultSpace]);
   });
 
   it("does not leave a stale error from a previous failure once a call succeeds", async () => {
@@ -482,6 +482,7 @@ describe("Spaces mutations", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-default",
+    is_default: false,
     owner_user_id: "owner",
     name: "Default space",
     role: "owner",

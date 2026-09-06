@@ -2,7 +2,8 @@ import { Check, EllipsisVertical, Star } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { Button } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
+import { useSurfacePresentation } from "@/shared/mobile";
 
 import { useDropZone, usePointerDrag } from "@/features/dnd";
 import {
@@ -42,6 +43,7 @@ function assetStackLabel(assetStack: LibraryAssetStack) {
 }
 
 export function SpaceLibraryItems() {
+  const mobile = useSurfacePresentation() !== "desktop";
   const {
     data: {
       displayItems,
@@ -79,7 +81,7 @@ export function SpaceLibraryItems() {
       style={{
         gridTemplateColumns: listLayout
           ? "1fr"
-          : `repeat(auto-fill,minmax(${GRID_COLUMN_WIDTHS[itemScale]}px,1fr))`,
+          : `repeat(auto-fill,minmax(${mobile ? Math.min(148, GRID_COLUMN_WIDTHS[itemScale]) : GRID_COLUMN_WIDTHS[itemScale]}px,1fr))`,
       }}
     >
       {displayItems.map((item, itemIndex) => {
@@ -141,6 +143,7 @@ function LibraryItemCard({
   onShowMenu: (itemId: string, left: number, top: number, anchor?: Element) => void;
   selected: boolean;
 }) {
+  const mobile = useSurfacePresentation() !== "desktop";
   const {
     data: {
       spaceId,
@@ -158,7 +161,7 @@ function LibraryItemCard({
     collectionActions: { reorderAlbumItem },
   } = useSpaceLibraryContext();
   const { startDrag, state } = usePointerDrag();
-  const reorderable = canReorderAlbum && selectedItemIds.length === 0;
+  const reorderable = !mobile && canReorderAlbum && selectedItemIds.length === 0;
   const dragging = state.payload?.kind === LIBRARY_ITEM_DRAG_KIND && state.payload.id === item.id;
   const dropZone = useDropZone({
     id: `library-item:${item.id}`,
@@ -223,6 +226,7 @@ function LibraryItemCard({
               menuOpen={itemMenu?.itemId === item.id}
               onShowMenu={onShowMenu}
               updateItem={updateItem}
+              mobile={mobile}
             />
           ) : null}
         </div>
@@ -265,14 +269,14 @@ function LibraryItemCard({
             reauthenticationToken={sensitiveCollectionToken}
           />
           {assetStack ? (
-            <span className="absolute bottom-2 left-2 rounded-md bg-charcoal-workspace px-1.5 py-1 text-[9px] font-semibold capitalize text-cream-bright">
+            <span className="absolute bottom-2 left-2 rounded-md bg-charcoal-workspace px-1.5 py-1 text-[10px] font-semibold capitalize text-cream-bright">
               {assetStackLabel(assetStack)}
             </span>
           ) : null}
         </Button>
         {selectionAvailable ? (
           <Button
-            className={selectionToggleClassName(selected)}
+            className={selectionToggleClassName(selected, mobile)}
             type="button"
             aria-label={`${selected ? "Deselect" : "Select"} ${item.display_name}`}
             aria-pressed={selected}
@@ -294,6 +298,7 @@ function LibraryItemActions({
   menuOpen,
   onShowMenu,
   updateItem,
+  mobile,
 }: {
   item: SpaceLibraryItem;
   menuOpen: boolean;
@@ -302,14 +307,17 @@ function LibraryItemActions({
     item: SpaceLibraryItem,
     patch: Partial<Pick<SpaceLibraryItem, "favorite">>,
   ) => Promise<unknown>;
+  mobile?: boolean;
 }) {
-  const actionVisibility = menuOpen
+  const actionVisibility = mobile
     ? "pointer-events-auto opacity-100"
-    : [
-        "pointer-events-none opacity-0",
-        "group-hover:pointer-events-auto group-hover:opacity-100",
-        "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-      ].join(" ");
+    : menuOpen
+      ? "pointer-events-auto opacity-100"
+      : [
+          "pointer-events-none opacity-0",
+          "group-hover:pointer-events-auto group-hover:opacity-100",
+          "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+        ].join(" ");
 
   return (
     <div
@@ -317,7 +325,10 @@ function LibraryItemActions({
       aria-label={`Actions for ${item.display_name}`}
     >
       <Button
-        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
+        className={cn(
+          "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
+          mobile ? "size-11" : "size-7",
+        )}
         type="button"
         onClick={() => void updateItem(item, { favorite: !item.favorite })}
         title={item.favorite ? "Remove favorite" : "Favorite"}
@@ -326,7 +337,10 @@ function LibraryItemActions({
         <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
       </Button>
       <Button
-        className="grid size-7 shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream"
+        className={cn(
+          "grid shrink-0 place-items-center rounded-lg border-0 bg-transparent text-cream-muted hover:bg-charcoal-card hover:text-cream",
+          mobile ? "size-11" : "size-7",
+        )}
         type="button"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
@@ -354,16 +368,18 @@ function LibraryItemDragPreview({ name }: { name: string }) {
   );
 }
 
-function selectionToggleClassName(selected: boolean) {
+function selectionToggleClassName(selected: boolean, mobile: boolean) {
   const visibleState = "border-charcoal-active bg-charcoal-active text-cream-bright opacity-100";
-  const hiddenState = [
-    "pointer-events-none border-charcoal-border/50 bg-charcoal-workspace text-transparent opacity-0",
-    "group-hover:pointer-events-auto group-hover:opacity-100",
-    "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
-  ].join(" ");
+  const hiddenState = mobile
+    ? "border-charcoal-border/70 bg-charcoal-workspace text-transparent opacity-100"
+    : [
+        "pointer-events-none border-charcoal-border/50 bg-charcoal-workspace text-transparent opacity-0",
+        "group-hover:pointer-events-auto group-hover:opacity-100",
+        "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+      ].join(" ");
 
   return [
-    "absolute right-2 top-2 z-10 grid size-5 place-items-center rounded-md border shadow-xs",
+    `absolute right-2 top-2 z-10 grid place-items-center rounded-md border shadow-xs ${mobile ? "size-11" : "size-5"}`,
     "transition-opacity",
     selected ? visibleState : hiddenState,
   ].join(" ");

@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { detectUploadedAssetStacks } from "../SpaceLibraryPrimitives";
 import type { LibraryUploadJob, SpaceLibraryData } from "../types/useSpaceLibraryData";

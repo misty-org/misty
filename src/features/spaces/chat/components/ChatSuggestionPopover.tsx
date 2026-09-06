@@ -1,5 +1,5 @@
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
-import { SystemErrorActivity } from "@/features/activity";
+import { SocialError as SystemErrorActivity } from "@/features/spaces/chat/socialRuntime";
 import {
   Command,
   CommandEmpty,

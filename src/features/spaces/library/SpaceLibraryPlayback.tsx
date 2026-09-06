@@ -1,8 +1,8 @@
 import { ChevronLeft, ChevronRight, File, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
+import { LibraryError as SystemErrorActivity } from "@/features/spaces/library/libraryRuntime";
 import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
 

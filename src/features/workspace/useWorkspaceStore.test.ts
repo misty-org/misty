@@ -30,16 +30,20 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().reset();
   });
 
-  it("allows closing the final tab in a virtual window leaving an empty pane", () => {
+  it("keeps one default tab in the final pane", () => {
     const tab = useWorkspaceStore.getState().openSurface(browserRequest);
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
     expect(useWorkspaceStore.getState().closeTab(tab.id)).toBe(true);
 
     const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(remaining).toHaveLength(0);
+    expect(remaining).toMatchObject([{ surfaceId: "home", title: "Home" }]);
+    expect(useWorkspaceStore.getState().closeTab(remaining[0].id)).toBe(true);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { surfaceId: "home", title: "Home" },
+    ]);
   });
 
-  it("allows Home to close like any other tab", () => {
+  it("keeps Space Home open when the final tab closes", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     const homeRequest = workspaceSurfaceFromRoute("/spaces/family/home");
@@ -47,11 +51,68 @@ describe("desktop dock store", () => {
 
     const firstHome = store.openSurface(homeRequest);
     expect(useWorkspaceStore.getState().closeTab(firstHome.id)).toBe(true);
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toEqual([]);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { surfaceId: "space", title: "Home", route: "/spaces/family/home" },
+    ]);
   });
 
-  it("starts the global workspace without tabs", () => {
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toEqual([]);
+  it("closes non-Home last tab in the last virtual window, remembers it, and keeps Home open", () => {
+    const store = useWorkspaceStore.getState();
+    const browser = store.openSurface(browserRequest);
+    const initialHome = dockTabs(store.layout.root).find((t) => t.id !== browser.id)!;
+    expect(store.closeTab(initialHome.id)).toBe(true);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { id: browser.id, title: "Browser" },
+    ]);
+
+    expect(store.closeTab(browser.id)).toBe(true);
+    const remaining = dockTabs(useWorkspaceStore.getState().layout.root);
+    expect(remaining).toMatchObject([{ surfaceId: "home", title: "Home" }]);
+    expect(useWorkspaceStore.getState().closedTabs[0]?.tab.id).toBe(browser.id);
+  });
+
+  it("switches to another panel when closing the last tab of a panel in a multi-panel window", () => {
+    const store = useWorkspaceStore.getState();
+    const firstPane = dockLeaves(store.layout.root)[0];
+    const secondPaneId = store.splitPane(firstPane.id, "right");
+    if (!secondPaneId) throw new Error("Expected second pane");
+    const rightTab = store.openSurface({
+      ...browserRequest,
+      paneId: secondPaneId,
+      forceNew: true,
+      title: "Right Browser",
+    });
+    const secondPane = findDockLeaf(useWorkspaceStore.getState().layout.root, secondPaneId)!;
+    const extraInSecond = secondPane.tabs.filter((t) => t.id !== rightTab.id);
+    for (const t of extraInSecond) {
+      store.closeTab(t.id, secondPaneId);
+    }
+
+    const panesBefore = dockLeaves(useWorkspaceStore.getState().layout.root);
+    expect(panesBefore).toHaveLength(2);
+
+    expect(store.closeTab(rightTab.id, secondPaneId)).toBe(true);
+    const panesAfter = dockLeaves(useWorkspaceStore.getState().layout.root);
+    expect(panesAfter).toHaveLength(1);
+    expect(panesAfter[0].id).toBe(firstPane.id);
+    expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(firstPane.id);
+  });
+
+  it("switches to another window when closing the last tab of a multi-window workspace", () => {
+    const store = useWorkspaceStore.getState();
+    const firstWindowId = store.activeVirtualWindowId;
+    store.createVirtualWindow("Second Window");
+    const onlyTabInSecond = dockTabs(useWorkspaceStore.getState().layout.root)[0];
+
+    expect(store.closeTab(onlyTabInSecond.id)).toBe(true);
+    expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(firstWindowId);
+    expect(useWorkspaceStore.getState().closedTabs[0]?.tab.id).toBe(onlyTabInSecond.id);
+  });
+
+  it("starts the global workspace on Home", () => {
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { surfaceId: "home", title: "Home", route: "/home" },
+    ]);
   });
 
   it("lets a tool be opened in an empty workspace", () => {
@@ -63,6 +124,7 @@ describe("desktop dock store", () => {
       instancePolicy: "single",
     });
     expect(dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId)).toEqual([
+      "home",
       "terminal",
     ]);
   });
@@ -74,8 +136,24 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().openSurface(inbox!);
 
     expect(
-      dockTabs(useWorkspaceStore.getState().layout.root).filter((tab) => tab.surfaceId === "inbox"),
+      dockTabs(useWorkspaceStore.getState().layout.root).filter(
+        (tab) => tab.groupKey === "app:inbox",
+      ),
     ).toHaveLength(1);
+  });
+
+  it("adds repeated app launches to their existing group", () => {
+    const files = workspaceSurfaceFromRoute("/files");
+    if (!files) throw new Error("Expected a Files workspace surface");
+
+    const first = useWorkspaceStore.getState().addSurface(files);
+    const second = useWorkspaceStore.getState().addSurface(files);
+    const fileTabs = dockTabs(useWorkspaceStore.getState().layout.root).filter(
+      (tab) => tab.groupKey === "app:files",
+    );
+
+    expect(second.id).not.toBe(first.id);
+    expect(fileTabs.map((tab) => tab.id)).toEqual([first.id, second.id]);
   });
 
   it("treats singleton policy as one instance per pane", () => {
@@ -89,7 +167,11 @@ describe("desktop dock store", () => {
     const second = useWorkspaceStore.getState().openSurface(inboxRequest);
 
     expect(second.id).not.toBe(first.id);
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
+    expect(
+      dockTabs(useWorkspaceStore.getState().layout.root).filter(
+        (tab) => tab.groupKey === "app:inbox",
+      ),
+    ).toHaveLength(2);
     expect(useWorkspaceStore.getState().openSurface(inboxRequest).id).toBe(second.id);
   });
 
@@ -117,7 +199,7 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(secondWindow.id);
   });
 
-  it("can focus an empty pane without opening a tab", () => {
+  it("can focus a new pane on its default tab", () => {
     const first = useWorkspaceStore.getState().openSurface(browserRequest);
     const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     const secondPaneId = useWorkspaceStore.getState().splitPane(firstPane.id, "right");
@@ -148,7 +230,9 @@ describe("desktop dock store", () => {
     });
 
     useWorkspaceStore.getState().setScope("space:work");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toEqual([]);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { surfaceId: "space", title: "Home", route: "/spaces/work/home" },
+    ]);
 
     useWorkspaceStore.getState().setScope("space:family");
     expect(
@@ -204,8 +288,9 @@ describe("desktop dock store", () => {
 
     const restored = dockTabs(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
-    expect(restored[0].surfaceId).toBe("transfers");
-    expect(restored[0].route).toBe("/transfers");
+    expect(restored[0].surfaceId).toBe("official-app");
+    expect(restored[0].route).toBe("/apps/files?view=transfers");
+    expect(restored[0].groupKey).toBe("app:files");
   });
 
   it("restores a legacy Space tab as its concrete tool tab", () => {
@@ -234,14 +319,17 @@ describe("desktop dock store", () => {
 
     expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]).toMatchObject({
       id: legacyTab.id,
-      groupKey: "space:one:social",
-      instanceKey: "one:social",
+      groupKey: "app:chat",
+      instanceKey: "chat",
       title: "Social",
     });
   });
 
   it("opens a browser tab on the default homepage when no URL is requested", () => {
     const tab = useWorkspaceStore.getState().openBrowserTab();
+    expect(tab.surfaceId).toBe("official-app");
+    expect(tab.groupKey).toBe("app:browser");
+    expect(new URL(tab.route, "https://misty.local").pathname).toBe("/apps/browser");
     expect(parseBrowserTabState(tab.state).url).toBe(defaultBrowserHomeUrl);
     expect(tab.title).toBe("google.com");
   });
@@ -332,22 +420,24 @@ describe("desktop dock store", () => {
     const planner = useWorkspaceStore.getState().openSurface(plannerRequest!);
 
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:one");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { id: journal.id, groupKey: "space:one:journal", title: "Journal" },
-      { id: planner.id, groupKey: "space:one:planner", title: "Planner" },
-    ]);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: journal.id, groupKey: "app:journal", title: "Journal" }),
+        expect.objectContaining({ id: planner.id, groupKey: "app:planner", title: "Planner" }),
+      ]),
+    );
     const rememberedJournal = useWorkspaceStore
       .getState()
       .openSurface(workspaceSurfaceFromRoute("/spaces/one/drawings/drawing-2?view=list")!);
     expect(rememberedJournal.id).toBe(journal.id);
-    expect(rememberedJournal.route).toBe("/spaces/one/drawings/drawing-2?view=list");
+    expect(rememberedJournal.route).toBe("/apps/journal?space=one&view=drawings&drawing=drawing-2");
 
     useWorkspaceStore.getState().focusTab(planner.id);
     useWorkspaceStore.getState().focusTab(journal.id);
     expect(
       dockTabs(useWorkspaceStore.getState().layout.root).find((tab) => tab.id === journal.id)
         ?.route,
-    ).toBe("/spaces/one/drawings/drawing-2?view=list");
+    ).toBe("/apps/journal?space=one&view=drawings&drawing=drawing-2");
   });
 
   it("does not reuse a Space tool tab as the Space Home tab", () => {
@@ -361,8 +451,8 @@ describe("desktop dock store", () => {
 
     expect(home.id).not.toBe(journal.id);
     expect(tabs.find((tab) => tab.id === journal.id)).toMatchObject({
-      groupKey: "space:one:journal",
-      route: "/spaces/one/notes",
+      groupKey: "app:journal",
+      route: "/apps/journal?space=one&view=notes",
     });
     expect(tabs.find((tab) => tab.id === home.id)).toMatchObject({
       groupKey: "space:one",
@@ -387,7 +477,7 @@ describe("desktop dock store", () => {
     }
   });
 
-  it("opens an empty workspace panel when splitting a tool", () => {
+  it("opens the default tab when splitting a tool", () => {
     const browser = useWorkspaceStore.getState().openBrowserTab({
       url: "https://example.com/watch",
     });
@@ -398,8 +488,8 @@ describe("desktop dock store", () => {
 
     expect(splitId).toBeTruthy();
     expect(leaves).toHaveLength(2);
-    expect(leaves[0].tabs.map((tab) => tab.surfaceId)).toEqual([browser.surfaceId]);
-    expect(leaves[1].tabs).toHaveLength(0);
+    expect(leaves[0].tabs.map((tab) => tab.surfaceId)).toEqual(["home", browser.surfaceId]);
+    expect(leaves[1].tabs).toMatchObject([{ surfaceId: "home", title: "Home" }]);
   });
 
   it("opens a tool tab into an empty split panel", () => {
@@ -413,7 +503,8 @@ describe("desktop dock store", () => {
     });
 
     const newPane = findDockLeaf(useWorkspaceStore.getState().layout.root, newPaneId);
-    expect(newPane?.tabs.map((tab) => tab.id)).toEqual([second.id]);
+    expect(newPane?.tabs.map((tab) => tab.id)).toContain(second.id);
+    expect(newPane?.tabs.map((tab) => tab.surfaceId)).toContain("home");
     expect(dockTabs(useWorkspaceStore.getState().layout.root).map((tab) => tab.id)).toContain(
       first.id,
     );
@@ -436,14 +527,45 @@ describe("desktop dock store", () => {
       sourceTabId: source.id,
     });
     const leaves = dockLeaves(useWorkspaceStore.getState().layout.root);
-    expect(leaves.find((pane) => pane.id === sourcePaneId)?.tabs.map((tab) => tab.id)).toEqual([
-      source.id,
-      popup.id,
-    ]);
-    expect(leaves.find((pane) => pane.id === otherPaneId)?.tabs).toHaveLength(1);
+    expect(
+      leaves
+        .find((pane) => pane.id === sourcePaneId)
+        ?.tabs.filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([source.id, popup.id]);
+    expect(
+      leaves.find((pane) => pane.id === otherPaneId)?.tabs.filter((tab) => tab.id !== source.id),
+    ).toHaveLength(2);
   });
 
-  it("keeps legacy empty split leaves available for a new tool", () => {
+  it("closes a tab in its source pane without changing the other pane", () => {
+    const store = useWorkspaceStore.getState();
+    const leftTab = store.openBrowserTab({ url: "https://left.example" });
+    const leftPaneId = dockLeaves(useWorkspaceStore.getState().layout.root)[0].id;
+    const rightPaneId = store.splitPane(leftPaneId, "right")!;
+    const rightTab = store.openBrowserTab({
+      url: "https://right.example",
+      paneId: rightPaneId,
+    });
+    store.focusPane(rightPaneId);
+
+    expect(store.closeTab(leftTab.id, leftPaneId)).toBe(true);
+
+    const current = useWorkspaceStore.getState();
+    expect(findDockLeaf(current.layout.root, rightPaneId)?.tabs.map((tab) => tab.id)).toContain(
+      rightTab.id,
+    );
+    expect(findDockLeaf(current.layout.root, leftPaneId)?.tabs.map((tab) => tab.id)).not.toContain(
+      leftTab.id,
+    );
+    expect(current.layout.focusedPaneId).toBe(leftPaneId);
+  });
+
+  it("repairs legacy empty split leaves with the default tab", () => {
     const browser = useWorkspaceStore.getState().openBrowserTab({ url: "https://example.com" });
     const pane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     const empty = createDockLeaf();
@@ -459,7 +581,8 @@ describe("desktop dock store", () => {
     const leaves = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(leaves).toHaveLength(2);
     expect(leaves.flatMap((leaf) => leaf.tabs).map((tab) => tab.id)).toContain(browser.id);
-    expect(leaves.some((leaf) => leaf.tabs.length === 0)).toBe(true);
+    expect(leaves.every((leaf) => leaf.tabs.length > 0)).toBe(true);
+    expect(leaves.flatMap((leaf) => leaf.tabs).map((tab) => tab.surfaceId)).toContain("home");
   });
 
   it("rejects split geometry that would violate either widget minimum", () => {
@@ -480,7 +603,15 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().closeTab(second.id);
     const remaining = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(remaining).toHaveLength(1);
-    expect(remaining[0].tabs.map((tab) => tab.id)).toEqual([first.id]);
+    expect(
+      remaining[0].tabs
+        .filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([first.id]);
   });
 
   it("returns to the previously visited tab when the active tab closes", () => {
@@ -526,9 +657,16 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().moveTab(first.id, destination.id);
     const leaves = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(leaves).toHaveLength(2);
-    expect(leaves.find((pane) => pane.id === source.id)?.tabs.map((tab) => tab.id)).toEqual([
-      third.id,
-    ]);
+    expect(
+      leaves
+        .find((pane) => pane.id === source.id)
+        ?.tabs.filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([third.id]);
     expect(leaves.find((pane) => pane.id === destination.id)?.tabs.map((tab) => tab.id)).toEqual([
       second.id,
       first.id,
@@ -559,13 +697,26 @@ describe("desktop dock store", () => {
     store.closePane(middlePaneId);
     const panes = dockLeaves(useWorkspaceStore.getState().layout.root);
     expect(panes).toHaveLength(2);
-    expect(panes.find((pane) => pane.id === leftPaneId)?.tabs.map((tab) => tab.id)).toEqual([
-      first.id,
-    ]);
-    expect(panes.find((pane) => pane.id === rightPaneId)?.tabs.map((tab) => tab.id)).toEqual([
-      right.id,
-      middle.id,
-    ]);
+    expect(
+      panes
+        .find((pane) => pane.id === leftPaneId)
+        ?.tabs.filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([first.id]);
+    expect(
+      panes
+        .find((pane) => pane.id === rightPaneId)
+        ?.tabs.filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([right.id, middle.id]);
     expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(rightPaneId);
   });
 
@@ -575,13 +726,17 @@ describe("desktop dock store", () => {
     const snapshot = useWorkspaceStore.getState().createSnapshot("account-1", "device-1");
     expect(snapshot.version).toBe(3);
     expect(
-      findDockLeaf(snapshot.layout.root, snapshot.layout.focusedPaneId)?.tabs[0]?.sidebarVisible,
+      findDockLeaf(snapshot.layout.root, snapshot.layout.focusedPaneId)?.tabs.find(
+        (candidate) => candidate.id === tab.id,
+      )?.sidebarVisible,
     ).toBe(false);
     useWorkspaceStore.getState().reset();
     useWorkspaceStore.getState().replaceSnapshot(snapshot);
-    expect(dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0]?.sidebarVisible).toBe(
-      false,
-    );
+    expect(
+      dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs.find(
+        (candidate) => candidate.id === tab.id,
+      )?.sidebarVisible,
+    ).toBe(false);
   });
 
   it("opens browser pages adjacently and updates their metadata", () => {
@@ -591,7 +746,15 @@ describe("desktop dock store", () => {
       sourceTabId: first.id,
     });
     const tabs = dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs;
-    expect(tabs.map((tab) => tab.id)).toEqual([first.id, second.id]);
+    expect(
+      tabs
+        .filter(
+          (tab) =>
+            tab.surfaceId === "browser" ||
+            (tab.surfaceId === "official-app" && tab.groupKey === "app:browser"),
+        )
+        .map((tab) => tab.id),
+    ).toEqual([first.id, second.id]);
     useWorkspaceStore
       .getState()
       .updateBrowserTab(second.id, { url: "https://misty.com", title: "Misty" });

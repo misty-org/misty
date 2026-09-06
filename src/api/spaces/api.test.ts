@@ -57,6 +57,12 @@ describe("spaceErrorMessage", () => {
     expect(spaceErrorMessage("space_storage_quota_exceeded", "fallback")).toBe(expected);
     expect(expected).not.toContain("1 GB");
   });
+
+  it("explains why the default Space cannot be removed", () => {
+    expect(spaceErrorMessage("default_space_protected", "fallback")).toBe(
+      "Your default Space can’t be deleted or transferred. It keeps your account usable.",
+    );
+  });
 });
 
 describe("spaceRequest account isolation", () => {

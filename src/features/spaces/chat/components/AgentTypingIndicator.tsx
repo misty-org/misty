@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import { avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, Button } from "@/shared/ui";
 import { Bot, Square } from "lucide-react";

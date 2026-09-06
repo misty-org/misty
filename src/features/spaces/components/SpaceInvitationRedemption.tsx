@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "@/features/auth";
-import { spaceNotesEnabled } from "@/features/notes";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitationPreview } from "@/api/spaces/dto/interfaces/types";
 import { Button, Card } from "@/shared/ui";

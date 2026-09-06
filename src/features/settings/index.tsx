@@ -1,10 +1,10 @@
 import { lazy, Suspense } from "react";
 
-export * from "./components/DesktopSettingsUI";
 export * from "./hooks/useDocumentAppAppearance";
 export * from "./store/extensionTheme";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";
+export { settingsBoolean } from "./store/preferences";
 export type { SettingsSection } from "./settingsTypes";
 
 const SettingsWorkspaceImplementation = lazy(() =>
@@ -12,7 +12,7 @@ const SettingsWorkspaceImplementation = lazy(() =>
 );
 
 export type SettingsWorkspaceProps = {
-  presentation?: "page" | "overlay";
+  presentation?: "page" | "overlay" | "mobile";
   onClose?: () => void;
 };
 

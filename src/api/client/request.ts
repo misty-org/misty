@@ -3,6 +3,7 @@ import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { ApiRequestError, decodeApiError } from "./errors";
 import { httpRequest } from "./http";
 import {
+  apiRequestCredentials,
   isApiSessionTransitioning,
   notifyApiSessionInvalid,
   readApiAuthToken,
@@ -35,7 +36,7 @@ async function authenticatedResponse(
 ): Promise<{ response: Response; accountGeneration: number }> {
   const accountGeneration = readApiSessionGeneration();
   assertStableApiSession(accountGeneration);
-  const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken()]);
+  const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken(path)]);
   assertStableApiSession(accountGeneration);
 
   const headers = new Headers(init.headers);
@@ -48,7 +49,7 @@ async function authenticatedResponse(
   let response: Response;
   try {
     response = await httpRequest(`${base}${path}`, {
-      credentials: "include",
+      credentials: apiRequestCredentials(),
       ...init,
       headers,
     });

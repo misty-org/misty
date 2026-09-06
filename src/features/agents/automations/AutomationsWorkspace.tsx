@@ -1,6 +1,7 @@
-import { ApiRequestError } from "@/api/client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
-import { automationsApi } from "./api";
+import {runtimeAutomationsApi as automationsApi} from "@/features/agents/agentsRuntime";
+
 import { AutomationEditor } from "./AutomationEditor";
 import { AutomationListings } from "./AutomationListings";
 import { normalizeActivepiecesFlows, type AutomationFlow } from "./normalizeFlows";
@@ -87,7 +88,7 @@ export function AutomationsWorkspace(props: {
       setFlows((current) => [flow, ...current.filter((item) => item.id !== flow.id)]);
       props.onSelectedFlowChange(flow.id);
     } catch (error) {
-      if (error instanceof ApiRequestError && error.code === "activepieces_not_connected") {
+      if (error && typeof error === "object" && "code" in error && error.code === "activepieces_not_connected") {
         setConnected(false);
         setFlowError("The built-in automation engine is not ready. Refresh and try again.");
         return;

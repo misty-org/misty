@@ -10,6 +10,8 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
 }));
 
 vi.mock("@/features/files/native", () => ({
+  explorerPrepareDragItems: vi.fn(),
+  explorerCancelDragPreparation: vi.fn(),
   archiveList: vi.fn(),
   archiveCreate: vi.fn(),
   archiveExtract: backendMocks.archiveExtract,

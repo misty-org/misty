@@ -1,13 +1,11 @@
-import { spacesApi } from "@/api/spaces/api";
+import { useRoadmapRuntime, useRoadmapCommand as useShortcutHandler } from "./roadmapRuntime";
 import type {
   SpaceRoadmapSaveState,
   SpaceRoadmapSnapshot,
 } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
 import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import { SystemErrorActivity } from "@/features/activity";
-import { Button } from "@/shared/ui";
-import { useShortcutHandler } from "@/features/shortcuts";
-import { useWorkspaceTabFocused } from "@/features/workspace";
+import { Button, cn } from "@/shared/ui";
+import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import {
   ArrowLeft,
   Check,
@@ -94,6 +92,8 @@ export function RoadmapEditor(props: {
     setNodeDrawerOpen,
     setPlacementRequest,
   } = props;
+  const presentation = useSurfacePresentation();
+  const mobile = presentation !== "desktop";
   const [inspectorAnchor, setInspectorAnchor] = useState<{ x: number; y: number }>();
   const [dailyPlanOpen, setDailyPlanOpen] = useState(true);
   const [focusRequest, setFocusRequest] = useState<{ id: string; token: string }>();
@@ -106,7 +106,16 @@ export function RoadmapEditor(props: {
     width: typeof window === "undefined" ? 1440 : window.innerWidth,
     height: typeof window === "undefined" ? 900 : window.innerHeight,
   }));
-  const workspaceFocused = useWorkspaceTabFocused();
+  const { api: spacesApi, focused: workspaceFocused } = useRoadmapRuntime();
+  const backToRoadmaps = useCallback(
+    () => navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`),
+    [navigate, spaceId],
+  );
+  useMobileSurfaceChrome({
+    title: snapshot.roadmap.name,
+    level: "detail",
+    onBack: backToRoadmaps,
+  });
   useShortcutHandler(
     "roadmap.create",
     () => setNodeDrawerOpen(true),
@@ -160,203 +169,227 @@ export function RoadmapEditor(props: {
   );
   return (
     <div ref={editorRef} className="flex h-full min-h-0 flex-col bg-charcoal-bg">
-      <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 px-2 text-cream-muted hover:text-cream-bright"
-          onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`)}
-        >
-          <ArrowLeft className="size-4" />
-          <span className="text-xs font-medium">Roadmaps</span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-8 min-w-0 max-w-md justify-start px-2 text-left"
-          onClick={(event) =>
-            selectForEditing(snapshot.roadmap.id, { x: event.clientX, y: event.clientY })
-          }
-        >
-          <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">
-            {snapshot.roadmap.name}
-          </h1>
-        </Button>
-        <span className="hidden text-[11px] tabular-nums text-cream-muted lg:inline">
-          {snapshot.goal_done}/{snapshot.goal_total} goals · {snapshot.progress_percentage}%
-        </span>
-        <SaveStatus state={saveState} />
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label={
-            saveState === "unsaved" || saveState === "conflict"
-              ? "Retry saving roadmap"
-              : "Refresh roadmap"
-          }
-          title={
-            saveState === "unsaved" || saveState === "conflict" ? "Retry saving" : "Refresh roadmap"
-          }
-          onClick={() =>
-            void (saveState === "unsaved" || saveState === "conflict" ? retrySave() : load())
-          }
-        >
-          <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
-        </Button>
-      </header>
+      {!mobile ? (
+        <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-cream-muted hover:text-cream-bright"
+            onClick={() => navigate(`/spaces/${encodeURIComponent(spaceId)}/planner/roadmaps`)}
+          >
+            <ArrowLeft className="size-4" />
+            <span className="text-xs font-medium">Roadmaps</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-8 min-w-0 max-w-md justify-start px-2 text-left"
+            onClick={(event) =>
+              selectForEditing(snapshot.roadmap.id, { x: event.clientX, y: event.clientY })
+            }
+          >
+            <h1 className="m-0 truncate text-sm font-semibold text-cream-bright">
+              {snapshot.roadmap.name}
+            </h1>
+          </Button>
+          <span className="hidden text-[11px] tabular-nums text-cream-muted lg:inline">
+            {snapshot.goal_done}/{snapshot.goal_total} goals · {snapshot.progress_percentage}%
+          </span>
+          <SaveStatus state={saveState} />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8"
+            aria-label={
+              saveState === "unsaved" || saveState === "conflict"
+                ? "Retry saving roadmap"
+                : "Refresh roadmap"
+            }
+            title={
+              saveState === "unsaved" || saveState === "conflict"
+                ? "Retry saving"
+                : "Refresh roadmap"
+            }
+            onClick={() =>
+              void (saveState === "unsaved" || saveState === "conflict" ? retrySave() : load())
+            }
+          >
+            <RefreshCcw className={`size-4 ${saveState === "saving" ? "animate-spin" : ""}`} />
+          </Button>
+        </header>
+      ) : null}
       {error ? (
         <ErrorBanner message={error} onRetry={() => void retrySave()} retryLabel="Retry saving" />
       ) : null}
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
-        <RoadmapNodeDrawer
-          open={nodeDrawerOpen}
-          canManage={canManage}
-          definitions={snapshot.node_definitions}
-          onClose={() => setNodeDrawerOpen(false)}
-          onAdd={(item) => setPlacementRequest({ paletteId: item.id, token: crypto.randomUUID() })}
-          onCreateDefinition={async (definition) => {
-            await spacesApi.createRoadmapNodeDefinition(spaceId, definition);
-            await load();
-          }}
-          onUpdateDefinition={async (definition) => {
-            await spacesApi.updateRoadmapNodeDefinition(spaceId, definition);
-            await load();
-          }}
-          onArchiveDefinition={async (definition) => {
-            await spacesApi.archiveRoadmapNodeDefinition(spaceId, definition);
-            await load();
-          }}
-        />
-        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
-          <RoadmapCanvas
-            snapshot={snapshot}
-            selectedId={selectedId}
+        {!mobile ? (
+          <RoadmapNodeDrawer
+            open={nodeDrawerOpen}
             canManage={canManage}
-            expandedGoalIds={expandedGoalIds}
-            focusRequest={focusRequest}
-            placementRequest={placementRequest}
-            onPlacementHandled={() => setPlacementRequest(undefined)}
-            onToggleGoal={toggleGoal}
-            onOpenTask={(taskId) =>
-              navigate(
-                `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
-              )
+            definitions={snapshot.node_definitions}
+            onClose={() => setNodeDrawerOpen(false)}
+            onAdd={(item) =>
+              setPlacementRequest({ paletteId: item.id, token: crypto.randomUUID() })
             }
-            onSelect={selectForEditing}
-            onLayout={saveLayout}
-            onAddAt={(paletteId, position) => {
-              const item = palette.find((candidate) => candidate.id === paletteId);
-              if (item) addPaletteItem(item, position);
+            onCreateDefinition={async (definition) => {
+              await spacesApi.createRoadmapNodeDefinition(spaceId, definition);
+              await load();
             }}
-            onConnect={(connection, edgeType) => {
-              const source = roadmapEndpoint(snapshot, connection.source);
-              const target = roadmapEndpoint(snapshot, connection.target);
-              if (source && target)
-                void mutate(
-                  (version) =>
-                    spacesApi.saveRoadmapEdge(
+            onUpdateDefinition={async (definition) => {
+              await spacesApi.updateRoadmapNodeDefinition(spaceId, definition);
+              await load();
+            }}
+            onArchiveDefinition={async (definition) => {
+              await spacesApi.archiveRoadmapNodeDefinition(spaceId, definition);
+              await load();
+            }}
+          />
+        ) : null}
+        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,1fr)_auto]">
+          {mobile ? (
+            <RoadmapOutline
+              mobile
+              snapshot={snapshot}
+              selectedId={selectedId}
+              onSelect={(id) => selectForEditing(id)}
+              onOpenTask={(taskId) =>
+                navigate(
+                  `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
+                )
+              }
+            />
+          ) : (
+            <RoadmapCanvas
+              snapshot={snapshot}
+              selectedId={selectedId}
+              canManage={canManage}
+              expandedGoalIds={expandedGoalIds}
+              focusRequest={focusRequest}
+              placementRequest={placementRequest}
+              onPlacementHandled={() => setPlacementRequest(undefined)}
+              onToggleGoal={toggleGoal}
+              onOpenTask={(taskId) =>
+                navigate(
+                  `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
+                )
+              }
+              onSelect={selectForEditing}
+              onLayout={saveLayout}
+              onAddAt={(paletteId, position) => {
+                const item = palette.find((candidate) => candidate.id === paletteId);
+                if (item) addPaletteItem(item, position);
+              }}
+              onConnect={(connection, edgeType) => {
+                const source = roadmapEndpoint(snapshot, connection.source);
+                const target = roadmapEndpoint(snapshot, connection.target);
+                if (source && target)
+                  void mutate(
+                    (version) =>
+                      spacesApi.saveRoadmapEdge(
+                        spaceId,
+                        snapshot.roadmap.id,
+                        {
+                          source,
+                          target,
+                          edge_type: edgeType,
+                          label: "",
+                        },
+                        version,
+                      ),
+                    (current, result) => ({
+                      ...current,
+                      roadmap: { ...current.roadmap, graph_version: result.graph_version },
+                      edges: [...current.edges, result.edge],
+                    }),
+                  );
+              }}
+              onDuplicate={(id) => {
+                const goal = snapshot.goals.find((item) => item.id === id);
+                const milestone = snapshot.milestones.find((item) => item.id === id);
+                const supportNode = snapshot.nodes.find((item) => item.id === id);
+                if (goal)
+                  void mutate((version) =>
+                    spacesApi.createRoadmapGoal(
                       spaceId,
                       snapshot.roadmap.id,
                       {
-                        source,
-                        target,
-                        edge_type: edgeType,
-                        label: "",
+                        milestone_id: goal.milestone_id,
+                        title: `${goal.title} copy`,
+                        description: goal.description,
+                        target_date: goal.target_date,
+                        position_x: goal.position_x + 32,
+                        position_y: goal.position_y + 32,
                       },
                       version,
                     ),
-                  (current, result) => ({
-                    ...current,
-                    roadmap: { ...current.roadmap, graph_version: result.graph_version },
-                    edges: [...current.edges, result.edge],
-                  }),
-                );
-            }}
-            onDuplicate={(id) => {
-              const goal = snapshot.goals.find((item) => item.id === id);
-              const milestone = snapshot.milestones.find((item) => item.id === id);
-              const supportNode = snapshot.nodes.find((item) => item.id === id);
-              if (goal)
-                void mutate((version) =>
-                  spacesApi.createRoadmapGoal(
-                    spaceId,
-                    snapshot.roadmap.id,
-                    {
-                      milestone_id: goal.milestone_id,
-                      title: `${goal.title} copy`,
-                      description: goal.description,
-                      target_date: goal.target_date,
-                      position_x: goal.position_x + 32,
-                      position_y: goal.position_y + 32,
-                    },
-                    version,
-                  ),
-                );
-              else if (milestone)
-                void mutate((version) =>
-                  spacesApi.createRoadmapMilestone(
-                    spaceId,
-                    snapshot.roadmap.id,
-                    {
-                      title: `${milestone.title} copy`,
-                      description: milestone.description,
-                      target_date: milestone.target_date,
-                      position_x: milestone.position_x + 48,
-                      position_y: milestone.position_y + 48,
-                      width: milestone.width,
-                      height: milestone.height,
-                    },
-                    version,
-                  ),
-                );
-              else if (supportNode)
-                void mutate((version) =>
-                  spacesApi.createRoadmapNode(
-                    spaceId,
-                    snapshot.roadmap.id,
-                    {
-                      ...supportNode,
-                      id: undefined,
-                      title: `${supportNode.title} copy`,
-                      position_x: supportNode.position_x + 32,
-                      position_y: supportNode.position_y + 32,
-                    },
-                    version,
-                  ),
-                );
-            }}
-            onDelete={(id) => {
-              const goal = snapshot.goals.find((item) => item.id === id);
-              const milestone = snapshot.milestones.find((item) => item.id === id);
-              const supportNode = snapshot.nodes.find((item) => item.id === id);
-              const edge = snapshot.edges.find((item) => item.id === id);
-              if (goal)
-                void mutate((version) => spacesApi.archiveRoadmapGoal(spaceId, goal, version));
-              else if (milestone)
-                void mutate((version) =>
-                  spacesApi.archiveRoadmapMilestone(spaceId, milestone, version),
-                );
-              else if (supportNode)
-                void mutate((version) =>
-                  spacesApi.archiveRoadmapNode(spaceId, supportNode, version),
-                );
-              else if (edge)
-                void mutate((version) => spacesApi.deleteRoadmapEdge(spaceId, edge, version));
-            }}
-          />
-          <RoadmapOutline
-            snapshot={snapshot}
-            selectedId={selectedId}
-            onSelect={(id) => selectForEditing(id)}
-            onOpenTask={(taskId) =>
-              navigate(
-                `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
-              )
-            }
-          />
+                  );
+                else if (milestone)
+                  void mutate((version) =>
+                    spacesApi.createRoadmapMilestone(
+                      spaceId,
+                      snapshot.roadmap.id,
+                      {
+                        title: `${milestone.title} copy`,
+                        description: milestone.description,
+                        target_date: milestone.target_date,
+                        position_x: milestone.position_x + 48,
+                        position_y: milestone.position_y + 48,
+                        width: milestone.width,
+                        height: milestone.height,
+                      },
+                      version,
+                    ),
+                  );
+                else if (supportNode)
+                  void mutate((version) =>
+                    spacesApi.createRoadmapNode(
+                      spaceId,
+                      snapshot.roadmap.id,
+                      {
+                        ...supportNode,
+                        id: undefined,
+                        title: `${supportNode.title} copy`,
+                        position_x: supportNode.position_x + 32,
+                        position_y: supportNode.position_y + 32,
+                      },
+                      version,
+                    ),
+                  );
+              }}
+              onDelete={(id) => {
+                const goal = snapshot.goals.find((item) => item.id === id);
+                const milestone = snapshot.milestones.find((item) => item.id === id);
+                const supportNode = snapshot.nodes.find((item) => item.id === id);
+                const edge = snapshot.edges.find((item) => item.id === id);
+                if (goal)
+                  void mutate((version) => spacesApi.archiveRoadmapGoal(spaceId, goal, version));
+                else if (milestone)
+                  void mutate((version) =>
+                    spacesApi.archiveRoadmapMilestone(spaceId, milestone, version),
+                  );
+                else if (supportNode)
+                  void mutate((version) =>
+                    spacesApi.archiveRoadmapNode(spaceId, supportNode, version),
+                  );
+                else if (edge)
+                  void mutate((version) => spacesApi.deleteRoadmapEdge(spaceId, edge, version));
+              }}
+            />
+          )}
+          {!mobile ? (
+            <RoadmapOutline
+              snapshot={snapshot}
+              selectedId={selectedId}
+              onSelect={(id) => selectForEditing(id)}
+              onOpenTask={(taskId) =>
+                navigate(
+                  `/spaces/${encodeURIComponent(spaceId)}/planner/tasks/board?task=${encodeURIComponent(taskId)}`,
+                )
+              }
+            />
+          ) : null}
         </div>
-        {dailyPlanOpen ? (
+        {dailyPlanOpen && !mobile ? (
           <RoadmapExecutionRail
             snapshot={snapshot}
             selectedId={selectedId}
@@ -374,60 +407,90 @@ export function RoadmapEditor(props: {
           />
         ) : null}
       </div>
-      <footer className="flex h-10 shrink-0 items-center border-t border-charcoal-border bg-charcoal-bg px-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={nodeDrawerOpen ? "secondary" : "ghost"}
-          className="h-8 gap-1.5 px-2.5 text-xs"
-          aria-label={nodeDrawerOpen ? "Hide node tools" : "Show node tools"}
-          aria-pressed={nodeDrawerOpen}
-          onClick={() => setNodeDrawerOpen((open) => !open)}
-        >
-          {nodeDrawerOpen ? (
-            <PanelLeftClose className="size-4" />
-          ) : (
-            <PanelLeftOpen className="size-4" />
-          )}
-          Nodes
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={dailyPlanOpen ? "secondary" : "ghost"}
-          className="ml-auto h-8 gap-1.5 px-2.5 text-xs"
-          aria-label={dailyPlanOpen ? "Hide daily plan" : "Show daily plan"}
-          aria-pressed={dailyPlanOpen}
-          onClick={() => setDailyPlanOpen((open) => !open)}
-        >
-          Daily plan
-          {dailyPlanOpen ? (
-            <PanelRightClose className="size-4" />
-          ) : (
-            <PanelRightOpen className="size-4" />
-          )}
-        </Button>
-      </footer>
+      {!mobile ? (
+        <footer className="flex h-10 shrink-0 items-center border-t border-charcoal-border bg-charcoal-bg px-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={nodeDrawerOpen ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            aria-label={nodeDrawerOpen ? "Hide node tools" : "Show node tools"}
+            aria-pressed={nodeDrawerOpen}
+            onClick={() => setNodeDrawerOpen((open) => !open)}
+          >
+            {nodeDrawerOpen ? (
+              <PanelLeftClose className="size-4" />
+            ) : (
+              <PanelLeftOpen className="size-4" />
+            )}
+            Nodes
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={dailyPlanOpen ? "secondary" : "ghost"}
+            className="ml-auto h-8 gap-1.5 px-2.5 text-xs"
+            aria-label={dailyPlanOpen ? "Hide daily plan" : "Show daily plan"}
+            aria-pressed={dailyPlanOpen}
+            onClick={() => setDailyPlanOpen((open) => !open)}
+          >
+            Daily plan
+            {dailyPlanOpen ? (
+              <PanelRightClose className="size-4" />
+            ) : (
+              <PanelRightOpen className="size-4" />
+            )}
+          </Button>
+        </footer>
+      ) : (
+        <footer className="flex min-h-14 shrink-0 items-center gap-2 border-t border-charcoal-border bg-charcoal-bg px-3 pb-[env(safe-area-inset-bottom)]">
+          <Button
+            className="min-h-11 flex-1"
+            variant="outline"
+            onClick={() => setSelectedId(snapshot.roadmap.id)}
+          >
+            Roadmap settings
+          </Button>
+          <SaveStatus state={saveState} />
+          <Button
+            className="size-11"
+            size="icon"
+            variant="ghost"
+            aria-label="Refresh roadmap"
+            onClick={() => void load()}
+          >
+            <RefreshCcw className={cn("size-4", saveState === "saving" && "animate-spin")} />
+          </Button>
+        </footer>
+      )}
       {selectedId ? (
         <div
-          className={[
-            "fixed z-50 overflow-auto rounded-xl bg-charcoal-card",
-            "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))]",
-            "shadow-xl ring-1 ring-cream/10",
-          ].join(" ")}
-          style={{
-            left: inspectorLeft,
-            top: inspectorTop,
-            width: inspectorWidth,
-            maxHeight: inspectorHeight,
-          }}
+          className={cn(
+            "fixed z-50 overflow-auto bg-charcoal-card",
+            mobile
+              ? "inset-0 h-dvh w-screen pt-[env(safe-area-inset-top)]"
+              : "max-h-[min(540px,calc(100vh-32px))] w-[min(344px,calc(100vw-32px))] rounded-xl shadow-xl ring-1 ring-cream/10",
+          )}
+          style={
+            mobile
+              ? undefined
+              : {
+                  left: inspectorLeft,
+                  top: inspectorTop,
+                  width: inspectorWidth,
+                  maxHeight: inspectorHeight,
+                }
+          }
           role="dialog"
           aria-label="Edit roadmap selection"
         >
           <Button
             size="icon"
             variant="ghost"
-            className="absolute right-2 top-2 z-10 size-7 rounded-full"
+            className={cn(
+              "absolute right-2 z-10 rounded-full",
+              mobile ? "top-[max(8px,env(safe-area-inset-top))] size-11" : "top-2 size-7",
+            )}
             aria-label="Close editor"
             onClick={() => selectForEditing("")}
           >
@@ -662,7 +725,5 @@ export function ErrorBanner({
   onRetry: () => void;
   retryLabel?: string;
 }) {
-  return (
-    <SystemErrorActivity error={message} scope="planner:roadmap" title="Roadmap needs attention" />
-  );
+  return useRoadmapRuntime().renderError(message);
 }

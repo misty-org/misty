@@ -8,6 +8,7 @@ import {
   navigationTreeBranchClass,
   navigationTreeContentInsetClass,
   navigationTreeGroupClass,
+  navigationTreeIconClass,
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
 } from "@/shared/ui";
@@ -45,8 +46,8 @@ const SIDEBAR_COLLAPSE_STORAGE_KEY = "misty.explorer.sidebar.collapsed";
 const QUICK_ACCESS_HIDDEN_STORAGE_KEY = "misty.explorer.sidebar.quickAccessHidden";
 
 export const sidebarStyles = {
-  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-3 py-3 text-cream-muted [overscroll-behavior:contain] max-[980px]:hidden",
-  section: "grid gap-1 [&+&]:mt-3",
+  root: "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto bg-charcoal-sidebar px-3 py-3 text-cream-muted [overscroll-behavior:contain]",
+  section: `${navigationTreeGroupClass} [&+&]:mt-3`,
   sectionTitle: "group/section-title flex h-9 min-w-0 items-center gap-1 px-2.5",
   sectionToggle:
     "misty-navigator-row-target h-9 min-w-0 flex-1 justify-start gap-1 rounded-md px-0 text-left text-[13px] font-semibold text-cream-bright shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright focus-visible:!bg-transparent aria-expanded:!bg-transparent aria-expanded:text-cream-bright",
@@ -62,15 +63,14 @@ export const sidebarStyles = {
   treeBranch: navigationTreeBranchClass,
   treeSurface: `${navigationTreeSurfaceClass} h-auto min-h-7 gap-0 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card`,
   quickAccessSurface:
-    "group-hover/tree-row:bg-charcoal-hover group-hover/tree-row:text-cream-bright",
-  itemIcon: "grid size-7 flex-none place-items-center text-cream-bright [&_svg]:!size-5",
-  itemButton: `h-7 min-w-0 flex-1 justify-start gap-2.5 rounded-md bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
-  itemSelected: "bg-charcoal-card/80 text-cream-bright",
-  remoteIcon:
-    "grid size-7 flex-none place-items-center text-cream-bright [&_img]:!size-5 [&_svg]:!size-5",
+    "group-hover/tree-row:bg-charcoal-card group-hover/tree-row:text-cream-bright",
+  itemIcon: navigationTreeIconClass,
+  itemButton: `h-7 min-w-0 flex-1 justify-start gap-2 rounded-md border-0 bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  itemSelected: "bg-charcoal-active text-cream-bright",
+  remoteIcon: navigationTreeIconClass,
   pinnedRow:
     "group/pin flex min-h-7 min-w-0 items-center rounded-md text-cream-muted transition-colors",
-  pinnedButton: `h-7 min-w-0 flex-1 justify-start gap-2.5 text-left text-[13px] font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright active:translate-y-0 aria-expanded:!bg-transparent ${navigationTreeContentInsetClass}`,
+  pinnedButton: `h-7 min-w-0 flex-1 justify-start gap-2 border-0 text-left text-[13px] font-medium text-inherit shadow-none !bg-transparent hover:!bg-transparent hover:text-cream-bright active:translate-y-0 aria-expanded:!bg-transparent ${navigationTreeContentInsetClass}`,
   pinnedUnpinButton:
     "mr-0.5 size-7 flex-none !bg-transparent text-inherit opacity-0 shadow-none hover:!bg-transparent hover:text-cream-bright hover:opacity-100 focus-visible:opacity-100 active:translate-y-0 aria-expanded:!bg-transparent",
   workspaceSelect:
@@ -78,8 +78,8 @@ export const sidebarStyles = {
   workspaceSelectLabel: "ml-0 min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
   list: navigationTreeGroupClass,
   muted: "ml-6 mr-2 px-2 py-1 text-[13px] text-cream-muted",
-  deviceButton: `h-auto min-h-12 min-w-0 flex-1 items-start justify-start gap-2.5 rounded-md bg-transparent py-1.5 text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
-  deviceIcon: "grid size-7 flex-none place-items-center pt-px text-cream-bright [&_svg]:!size-5",
+  deviceButton: `h-auto min-h-12 min-w-0 flex-1 items-start justify-start gap-2 rounded-md border-0 bg-transparent py-1.5 text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-charcoal-card hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
+  deviceIcon: cn(navigationTreeIconClass, "pt-px"),
   deviceRow: "grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] items-stretch",
   deviceCopy: "grid min-w-0 flex-1 gap-0.5",
   deviceName:
@@ -88,10 +88,13 @@ export const sidebarStyles = {
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-cream-muted",
   deviceMeter: "mt-0.5 h-1 overflow-hidden rounded-full bg-charcoal-card",
   deviceMeterFill: "block h-full bg-cream-bright/70",
-  deviceGroup: "grid gap-1",
+  deviceGroup: navigationTreeGroupClass,
   deviceGroupTreeRow: `${navigationTreeRowClass} mr-0 h-7`,
   deviceNestedTreeRow: `${navigationTreeRowClass} ml-12 mr-0 h-auto min-h-7`,
-  deviceGroupHeader: `${navigationTreeSurfaceClass} h-7 gap-1 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card`,
+  deviceGroupHeader: cn(
+    navigationTreeSurfaceClass,
+    "h-7 grid-cols-[minmax(0,1fr)_auto] gap-1 pl-0 pr-0 group-hover/tree-row:bg-charcoal-card",
+  ),
   deviceGroupToggle: `h-7 min-w-0 flex-1 justify-start gap-1 bg-transparent text-left text-[13px] font-medium text-cream-muted shadow-none hover:bg-transparent hover:text-cream-bright active:translate-y-0 ${navigationTreeContentInsetClass}`,
   deviceGroupLabel:
     "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium",

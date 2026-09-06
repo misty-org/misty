@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useWorkspaceTabFocused } from "@/features/workspace";
+import { useLibraryFocused as useWorkspaceTabFocused } from "@/features/spaces/library/libraryRuntime";
 
 const TEXT_ENTRY_SELECTOR = "input, textarea, select, [contenteditable='true']";
 

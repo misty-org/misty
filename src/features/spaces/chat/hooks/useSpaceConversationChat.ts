@@ -1,4 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
+import { socialEvents } from "../socialRuntime";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import type {
   SpaceConversation,
   SpaceEvent,
@@ -134,12 +135,12 @@ export function useSpaceConversationChat(
         }),
       );
     };
-    window.addEventListener("misty:space-message-event", reload);
-    window.addEventListener("misty:space-agent-run-event", updateAgentRun);
+    socialEvents.addEventListener("misty:space-message-event", reload);
+    socialEvents.addEventListener("misty:space-agent-run-event", updateAgentRun);
     return () => {
       active = false;
-      window.removeEventListener("misty:space-message-event", reload);
-      window.removeEventListener("misty:space-agent-run-event", updateAgentRun);
+      socialEvents.removeEventListener("misty:space-message-event", reload);
+      socialEvents.removeEventListener("misty:space-agent-run-event", updateAgentRun);
     };
   }, [canRead, conversationId, loadConversationsWithoutSelection, reloadRevision, spaceId]);
   return {

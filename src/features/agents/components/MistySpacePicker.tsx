@@ -1,4 +1,5 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
+import { spaceNavigationName } from "@/features/spaces/defaultSpace";
 import {
   Button,
   DropdownMenu,
@@ -22,7 +23,7 @@ export function MistySpacePicker({
   onSelect: (spaceId: string) => void;
 }) {
   const activeSpace = spaces.find((space) => space.id === activeSpaceId);
-  const label = activeSpace?.name ?? "Choose Space";
+  const label = activeSpace ? spaceNavigationName(activeSpace) : "Choose Space";
 
   return (
     <DropdownMenu>
@@ -52,7 +53,7 @@ export function MistySpacePicker({
             onSelect={() => onSelect(space.id)}
           >
             <PanelsTopLeft size={14} className="shrink-0 text-cream-muted" />
-            <span className="min-w-0 flex-1 truncate">{space.name}</span>
+            <span className="min-w-0 flex-1 truncate">{spaceNavigationName(space)}</span>
             {space.id === activeSpaceId ? <Check size={14} className="shrink-0" /> : null}
           </DropdownMenuItem>
         ))}

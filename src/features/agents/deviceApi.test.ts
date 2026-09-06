@@ -23,6 +23,19 @@ describe("device request signing", () => {
     );
   });
 
+  it("uses the configured versioned API base when signing hosted requests", () => {
+    expect(
+      deviceSignaturePayload(
+        "post",
+        "/devices/device_123/presence",
+        "1900000000",
+        "bm9uY2U=",
+        "E3B0C442",
+        "/v1",
+      ),
+    ).toBe("POST\n/v1/devices/device_123/presence\n1900000000\nbm9uY2U=\ne3b0c442");
+  });
+
   it("does not reopen a denied device-identity Keychain request during the same session", async () => {
     vi.mocked(invoke).mockRejectedValue(new Error("Keychain access denied"));
     const deviceId = "device_keychain_denied_for_this_session";

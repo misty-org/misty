@@ -1,10 +1,12 @@
-import { useBrowserRuntimeStore } from "@/features/browser";
 import {
   parseBrowserTabState,
+  spaceWorkspaceToolFromRoute,
   type WorkspaceGroupKey,
   type WorkspaceSurfaceId,
   type WorkspaceTab,
 } from "@/features/workspace";
+import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
+import { useBrowserRuntimeStore } from "@/features/browser/browserRuntime";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,17 +14,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import {
-  Blocks,
-  BookOpenText,
-  CheckSquare2,
-  ChevronDown,
-  LoaderCircle,
-  MessagesSquare,
-  Notebook,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { Blocks, ChevronDown, LoaderCircle, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 let draggingWorkspaceTabId: string | null = null;
@@ -53,15 +45,22 @@ interface Props {
   paneTabs?: WorkspaceTab[];
 }
 
-function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
-  if (tab?.surfaceId === "space") {
-    const section = tab.route.split("/").filter(Boolean)[2];
-    if (section === "notes" || section === "drawings") return Notebook;
-    if (section === "planner") return CheckSquare2;
-    if (section === "social" || section === "chat") return MessagesSquare;
-    if (section === "library") return BookOpenText;
+function getTabAppId(tab: WorkspaceTab | undefined): string {
+  if (!tab) return "";
+  if (tab.surfaceId === "official-app" || tab.surfaceId === "extension") {
+    const parts = tab.route.split(/[?#]/)[0].split("/").filter(Boolean);
+    const appId = parts[0] === "apps" ? parts[1] : tab.groupKey.replace(/^app:/, "");
+    return appId === "chat" ? "social" : appId;
   }
-  return fallback;
+  if (tab.surfaceId === "space") {
+    const tool = spaceWorkspaceToolFromRoute(tab.route);
+    return tool === "space" ? "home" : tool;
+  }
+  return tab.surfaceId;
+}
+
+function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
+  return workspaceAppIcon(getTabAppId(tab)) ?? fallback;
 }
 
 function TabIcon({
@@ -76,23 +75,20 @@ function TabIcon({
   isActive?: boolean;
 }) {
   const [faviconFailed, setFaviconFailed] = useState(false);
-  const isBrowser = tab?.surfaceId === "browser";
+  const isBrowser = getTabAppId(tab) === "browser";
   const browserState = isBrowser && tab ? parseBrowserTabState(tab.state) : null;
   const isLoading = useBrowserRuntimeStore((state) =>
     tab?.id ? Boolean(state.loading[tab.id]) : false,
   );
-
   const faviconUrl = browserState?.faviconUrl;
 
-  useEffect(() => {
-    setFaviconFailed(false);
-  }, [faviconUrl]);
+  useEffect(() => setFaviconFailed(false), [faviconUrl]);
 
   if (isBrowser && isLoading) {
     return (
       <LoaderCircle
-        size={size}
         className={cn("shrink-0 animate-spin", isActive ? "text-cream-bright" : "text-cream-muted")}
+        size={size}
         strokeWidth={2}
       />
     );
@@ -101,16 +97,16 @@ function TabIcon({
   if (isBrowser && faviconUrl && !faviconFailed) {
     return (
       <img
-        key={faviconUrl}
-        src={faviconUrl}
         alt=""
-        decoding="async"
-        draggable={false}
         className={cn(
           "shrink-0 select-none rounded-sm object-contain [image-rendering:auto]",
           size === 13 ? "size-3.5" : "size-4",
         )}
+        decoding="async"
+        draggable={false}
+        key={faviconUrl}
         onError={() => setFaviconFailed(true)}
+        src={faviconUrl}
       />
     );
   }
@@ -169,7 +165,7 @@ export function WorkspaceTabGroupButton({
     <div
       draggable={displayTab !== undefined}
       className={cn(
-        "group/tab flex h-7 min-w-[36px] max-w-[200px] flex-1 items-center",
+        "group/tab flex h-7 min-w-[36px] max-w-[160px] flex-[1_1_120px] items-center",
         "rounded-md border text-xs",
         "transition-colors duration-150 select-none",
         "focus-within:ring-1 focus-within:ring-cream-muted/50",
@@ -233,7 +229,12 @@ export function WorkspaceTabGroupButton({
           {displayLabel}
         </span>
         {group.tabs.length > 1 ? (
-          <span className="ml-0.5 shrink-0 rounded bg-charcoal-card px-1 text-[10px] leading-4 text-cream-muted">
+          <span
+            className={cn(
+              "ml-0.5 inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded",
+              "bg-charcoal-card px-1 text-center text-[10px] leading-none tabular-nums text-cream-muted",
+            )}
+          >
             {group.tabs.length}
           </span>
         ) : null}

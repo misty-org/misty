@@ -1,6 +1,6 @@
 import type { MailAccount } from "@/api/mail";
 import { useInboxStore } from "@/features/inbox";
-import { MailProviderIcon } from "@/shared/ui";
+import { MailProviderIcon } from "@/shared/ui/mail-provider-icon";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
 type InboxProvider = "google" | "microsoft";

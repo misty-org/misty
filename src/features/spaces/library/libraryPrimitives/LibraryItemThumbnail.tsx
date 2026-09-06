@@ -1,4 +1,4 @@
-import { spacesApi } from "@/api/spaces/api";
+import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import { File } from "lucide-react";
 import { useEffect, useState } from "react";

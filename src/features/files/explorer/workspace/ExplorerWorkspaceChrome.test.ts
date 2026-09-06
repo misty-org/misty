@@ -5,8 +5,8 @@ import {
 } from "../workspace/ExplorerWorkspaceChrome";
 
 describe("Explorer workspace chrome", () => {
-  it("leaves the bottom bar to the host when embedded", () => {
-    expect(resolveExplorerBottomBarRenderer(true)).toBeUndefined();
+  it("keeps Files panel controls when the host owns the tabs", () => {
+    expect(resolveExplorerBottomBarRenderer(true)).toBe(renderExplorerBottomBar);
   });
 
   it("keeps the bottom bar in standalone mode", () => {

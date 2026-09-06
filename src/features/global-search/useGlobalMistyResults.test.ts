@@ -151,19 +151,15 @@ describe("useGlobalMistyResults", () => {
     await result.current.openResult(fileResult);
 
     expect(closePanel).toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledWith("/files");
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/apps/files?path=%2Fhome%2Fuser%2Fdocs%2Fmy-file.pdf",
+    );
 
     // The files workspace surface should be focused
     const currentTab = dockTabs(useWorkspaceStore.getState().layout.root).find(
-      (tab) => tab.surfaceId === "files",
+      (tab) => tab.surfaceId === "official-app" && tab.groupKey === "app:files",
     );
     expect(currentTab).toBeDefined();
-
-    // Explorer should navigate to the parent folder
-    expect(useExplorerStore.getState().navigatePane).toHaveBeenCalledWith(
-      "explorer-pane-0",
-      "/home/user/docs",
-    );
   });
 
   it("navigates to route directly when clicking non-file result", async () => {

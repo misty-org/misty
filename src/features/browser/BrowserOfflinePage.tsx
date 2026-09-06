@@ -1,4 +1,4 @@
-import { blankBrowserUrl } from "@/features/workspace";
+import { blankBrowserUrl } from "@/features/workspace/model";
 import { cn } from "@/shared/ui";
 import { AlertCircle, ArrowLeft, Globe, RotateCw, WifiOff } from "lucide-react";
 import { useState } from "react";

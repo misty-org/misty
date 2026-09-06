@@ -1,30 +1,33 @@
+import { NativeAppView } from "@/features/apps/NativeAppView";
+import { useNativeAppPermissions } from "@/features/apps/useNativeAppPermissions";
+import { useAuth } from "@/features/auth";
 import { extensionCommandRun, pluginPanelRender } from "@/features/files/native";
 import { SystemErrorActivity } from "@/features/activity";
-import {
-  extensionThemeChangedEvent,
-  extensionThemeSnapshot,
-  revertExtensionThemePreview,
-  runExtensionThemeCommand,
-} from "@/features/settings";
-import type { PluginPanelEntry, PluginPanelRenderResult } from "@/native/contracts";
+import { extensionThemeChangedEvent, extensionThemeSnapshot } from "@/features/settings";
+import type {
+  PluginPanelElement,
+  PluginPanelEntry,
+  PluginPanelRenderResult,
+} from "@/native/contracts";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { errorText } from "@/shared/lib/format";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui";
-import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { Puzzle, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { selectedPathsForPane, useExplorerStore } from "../../store";
 import { pluginTabHostStyles } from "../ExplorerDesktopPluginStyles";
 import { PluginPanelElementView } from "./PluginPanelElementView";
 import { monitorExtensionJob } from "./extensionJobs";
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 
 export function ExplorerPluginPanelHost(props: {
   panel: PluginPanelEntry;
   selectedPath: string;
   mode?: "embedded" | "app";
 }) {
-  if (props.panel.webEntry)
+  if (props.panel.webEntry && props.panel.declarativeUi == null)
     return (
       <ExplorerWebPluginPanelHost
         mode={props.mode}
@@ -46,16 +49,65 @@ export function ExplorerNativePluginPanelHost(props: {
   selectedPath: string;
   mode?: "embedded" | "app";
 }) {
+  const { user } = useAuth();
+  const accountId = user?.id;
+  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+  const spaceId = activeScopeKey.startsWith("space:")
+    ? activeScopeKey.slice("space:".length)
+    : undefined;
+  const permission = useNativeAppPermissions(props.panel.title);
+  const permissionActions = useRef(permission);
+  permissionActions.current = permission;
+  const [widgetInstance, setWidgetInstance] = useState("");
+  const [actionResult, setActionResult] = useState("");
   const [rendered, setRendered] = useState<PluginPanelRenderResult | null>(null);
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState("");
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [refreshSpinning, startRefreshSpin] = useMinimumSpin(rendering);
 
+  const runWidgetAction = useCallback(
+    async (instance: string, action: NonNullable<PluginPanelElement["action"]>) => {
+      const execute = permissionActions.current.execute;
+      if (action.method === "clipboard.writeText") {
+        await execute(instance, action.method, { text: action.value });
+        return "Copied to the clipboard.";
+      }
+      if (action.method === "clipboard.readText") {
+        const result = (await execute(instance, action.method, {})) as { text?: string };
+        return (result.text ?? "").slice(0, 4096) || "The clipboard contains no text.";
+      }
+      if (action.method === "network.fetch") {
+        const result = (await execute(instance, action.method, {
+          url: action.value,
+          method: "GET",
+        })) as { status?: number };
+        return `Request completed with status ${result.status ?? "unknown"}.`;
+      }
+      if (action.method === "files.readText") {
+        const chosen = (await execute(instance, "files.pick", {})) as
+          | { handle: string; name: string }
+          | null;
+        if (!chosen) return "No file was chosen.";
+        try {
+          const result = (await execute(instance, "files.readText", {
+            handle: chosen.handle,
+          })) as { text?: string };
+          return (result.text ?? "").slice(0, 4096) || `${chosen.name} contains no text.`;
+        } finally {
+          await execute(instance, "files.release", { handle: chosen.handle });
+        }
+      }
+      throw new Error("Unsupported widget action.");
+    },
+    [],
+  );
+
   const renderPanel = useCallback(
     (clickedButton = "") => {
       setRendering(true);
       setRenderError("");
+      setActionResult("");
       void pluginPanelRender({
         panelId: props.panel.id,
         pluginId: props.panel.pluginId,
@@ -65,12 +117,49 @@ export function ExplorerNativePluginPanelHost(props: {
       })
         .then((result) => {
           setRendered(result);
+          const action = result.elements.find((element) => element.id === clickedButton)?.action;
+          if (action) {
+            if (!widgetInstance) throw new Error("Widget permission session is not ready.");
+            return runWidgetAction(widgetInstance, action).then(setActionResult);
+          }
         })
         .catch((error) => setRenderError(errorText(error)))
         .finally(() => setRendering(false));
     },
-    [inputs, props.panel.id, props.panel.pluginId, props.selectedPath],
+    [
+      inputs,
+      props.panel.id,
+      props.panel.pluginId,
+      props.selectedPath,
+      runWidgetAction,
+      widgetInstance,
+    ],
   );
+
+  useEffect(() => {
+    if (props.panel.declarativeUi == null) return;
+    let disposed = false;
+    let instance = "";
+    setWidgetInstance("");
+    setActionResult("");
+    void invoke<string>("mini_widget_open", {
+      request: {
+        root: props.panel.pluginDir,
+        owner: accountId ? { accountId, spaceId } : null,
+      },
+    })
+      .then((opened) => {
+        instance = opened;
+        if (disposed) void invoke("mini_app_close", { instance: opened });
+        else setWidgetInstance(opened);
+      })
+      .catch((caught) => !disposed && setRenderError(errorText(caught)));
+    return () => {
+      disposed = true;
+      permissionActions.current.reset();
+      if (instance) void invoke("mini_app_close", { instance }).catch(() => undefined);
+    };
+  }, [accountId, props.panel.declarativeUi, props.panel.pluginDir, spaceId]);
 
   useEffect(() => {
     setInputs({});
@@ -109,7 +198,7 @@ export function ExplorerNativePluginPanelHost(props: {
             startRefreshSpin();
             renderPanel();
           }}
-          disabled={rendering}
+          disabled={rendering || (props.panel.declarativeUi != null && !widgetInstance)}
         >
           <RefreshCcw className={refreshSpinning ? "animate-spin" : undefined} size={13} />
           Refresh
@@ -145,13 +234,15 @@ export function ExplorerNativePluginPanelHost(props: {
               key={element.id}
               element={element}
               value={inputs[element.id] ?? element.text}
-              disabled={rendering}
+              disabled={rendering || (element.action != null && !widgetInstance)}
               onInput={(value) => setInputs((current) => ({ ...current, [element.id]: value }))}
               onButton={() => renderPanel(element.id)}
             />
           ))}
         </div>
       ) : null}
+      {actionResult ? <div className={pluginTabHostStyles.notice}>{actionResult}</div> : null}
+      {permission.controls}
     </section>
   );
 }
@@ -189,11 +280,12 @@ export function ExplorerWebPluginPanelHost(props: {
   selectedPath: string;
   mode?: "embedded" | "app";
 }) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const [hostState, setHostState] = useState<"loading" | "ready" | "failed">("loading");
+  const { user } = useAuth();
+  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+  const spaceId = activeScopeKey.startsWith("space:")
+    ? activeScopeKey.slice("space:".length)
+    : undefined;
   const [theme, setTheme] = useState(extensionThemeSnapshot);
-  const timeoutRef = useRef<number | null>(null);
   const source = useMemo(() => webPanelUrl(props.panel), [props.panel]);
   const currentSelection = useCallback(() => {
     const selections = Object.values(useExplorerStore.getState().panes)
@@ -201,134 +293,32 @@ export function ExplorerWebPluginPanelHost(props: {
       .find((paths) => paths.includes(props.selectedPath));
     return selections?.length ? selections : props.selectedPath ? [props.selectedPath] : [];
   }, [props.selectedPath]);
-
-  const postContext = useCallback(() => {
-    if (hostState !== "ready") return;
-    iframeRef.current?.contentWindow?.postMessage(
-      {
-        channel: "misty-host",
-        kind: "context",
-        pluginId: props.panel.pluginId,
-        selectedPaths: currentSelection(),
-        theme,
-      },
-      "*",
-    );
-  }, [currentSelection, hostState, props.panel.pluginId, theme]);
-
-  const beginHandshake = useCallback(() => {
-    setHostState("loading");
-    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-    timeoutRef.current = window.setTimeout(() => setHostState("failed"), 8_000);
-  }, []);
-
+  const context = useMemo(
+    () => ({
+      channel: "misty-host",
+      kind: "context",
+      pluginId: props.panel.pluginId,
+      selectedPaths: [
+        "storage_report",
+        "themes",
+        "image_optimizer",
+        "quick_convert",
+        "backups",
+        "ytdlp",
+      ].includes(props.panel.pluginId)
+        ? []
+        : currentSelection(),
+      theme,
+    }),
+    [currentSelection, props.panel.pluginId, theme],
+  );
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
-      const request = event.data as {
-        channel?: string;
-        kind?: string;
-        requestId?: string;
-        pluginId?: string;
-        protocolVersion?: number;
-        command?: string;
-        payload?: Record<string, unknown>;
-      } | null;
-      if (
-        !request ||
-        request.channel !== "misty-plugin" ||
-        request.pluginId !== props.panel.pluginId
-      )
-        return;
-      if (request.kind === "ready" && request.protocolVersion === 1) {
-        if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-        setHostState("ready");
-        return;
-      }
-      if (
-        request.kind !== "request" ||
-        typeof request.requestId !== "string" ||
-        typeof request.command !== "string"
-      )
-        return;
-      const command = request.command;
-      const respond = (ok: boolean, result?: unknown, error?: string) =>
-        iframeRef.current?.contentWindow?.postMessage(
-          {
-            channel: "misty-host",
-            kind: "response",
-            requestId: request.requestId,
-            ok,
-            result,
-            error,
-          },
-          "*",
-        );
-      const payload = request.payload ?? {};
-      if (request.command === "host.selectedPaths") {
-        respond(true, { ok: true, selectedPaths: currentSelection() });
-        return;
-      }
-      if (request.command === "host.pickFolders" && props.panel.pluginId === "backups") {
-        void open({
-          directory: true,
-          multiple: payload.multiple !== false,
-          title: typeof payload.title === "string" ? payload.title : "Choose folders",
-        })
-          .then((value) =>
-            respond(true, {
-              ok: true,
-              paths: value == null ? [] : Array.isArray(value) ? value : [value],
-            }),
-          )
-          .catch((error) => respond(false, undefined, errorText(error)));
-        return;
-      }
-      if (request.command === "host.notify") {
-        const level =
-          payload.level === "success" || payload.level === "error" ? payload.level : "info";
-        const message =
-          typeof payload.message === "string"
-            ? payload.message.slice(0, 500)
-            : "Extension notification";
-        useExplorerStore.getState().pushNotification(message, level, 4500);
-        respond(true, { ok: true });
-        return;
-      }
-      if (props.panel.pluginId === "themes" && request.command.startsWith("themes.")) {
-        respond(true, runExtensionThemeCommand(request.command, payload));
-        return;
-      }
-      void extensionCommandRun({ pluginId: props.panel.pluginId, command, payload })
-        .then((result) => {
-          const started = result as { jobId?: string };
-          if (typeof started.jobId === "string" && started.jobId)
-            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
-          respond(true, result);
-        })
-        .catch((error) => respond(false, undefined, errorText(error)));
-      return;
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [currentSelection, postContext, props.panel.pluginId, props.panel.pluginName]);
-
-  useEffect(postContext, [postContext]);
-  useEffect(() => {
-    const handleThemeChange = () => setTheme(extensionThemeSnapshot());
-    window.addEventListener(extensionThemeChangedEvent, handleThemeChange);
+    const changed = () => setTheme(extensionThemeSnapshot());
+    window.addEventListener(extensionThemeChangedEvent, changed);
     return () => {
-      window.removeEventListener(extensionThemeChangedEvent, handleThemeChange);
-      if (props.panel.pluginId === "themes") revertExtensionThemePreview();
+      window.removeEventListener(extensionThemeChangedEvent, changed);
     };
   }, [props.panel.pluginId]);
-  useEffect(() => {
-    beginHandshake();
-    return () => {
-      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-    };
-  }, [beginHandshake, reloadKey]);
   return (
     <section
       className={
@@ -337,51 +327,62 @@ export function ExplorerWebPluginPanelHost(props: {
           : `${pluginTabHostStyles.panel} relative min-h-[360px] overflow-hidden p-0`
       }
     >
-      {hostState !== "ready" ? (
-        <div className="absolute inset-0 z-10 grid content-center justify-items-center gap-3 bg-charcoal-bg p-5 text-center text-sm text-cream-muted">
-          {hostState === "loading" ? (
-            <>
-              <RefreshCcw className="animate-spin" size={20} />
-              <span>{props.mode === "app" ? "Loading app…" : "Loading extension…"}</span>
-            </>
-          ) : (
-            <>
-              <Puzzle size={24} />
-              <strong className="text-cream">
-                {props.mode === "app" ? "App did not start" : "Extension did not start"}
-              </strong>
-              <span>
-                The panel bundle may be missing, outdated, or incompatible with this Misty version.
-              </span>
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button
-                  className={pluginTabHostStyles.button}
-                  type="button"
-                  onClick={() => setReloadKey((value) => value + 1)}
-                >
-                  <RefreshCcw size={13} />
-                  Retry
-                </Button>
-              </div>
-              <code className="max-w-full overflow-hidden text-ellipsis text-[10px] text-cream-muted">
-                {props.panel.webEntry}
-              </code>
-            </>
-          )}
-        </div>
-      ) : null}
-      <iframe
-        key={reloadKey}
-        ref={iframeRef}
-        className={
-          props.mode === "app"
-            ? "h-full min-h-0 w-full border-0 bg-charcoal-bg"
-            : "h-full min-h-[420px] w-full border-0 bg-charcoal-bg"
-        }
-        src={source}
-        title={`${props.panel.title} app`}
-        sandbox="allow-scripts allow-same-origin"
-        onLoad={beginHandshake}
+      <NativeAppView
+        key={`${user?.id ?? "signed-out"}:${spaceId ?? "global"}:${props.panel.pluginId}:${props.panel.id}`}
+        source={source}
+        owner={user ? { accountId: user.id, spaceId } : undefined}
+        title={props.panel.title}
+        context={context}
+        onRequest={async (message) => {
+          if (
+            [
+              "storage_report",
+              "themes",
+              "image_optimizer",
+              "quick_convert",
+              "backups",
+              "ytdlp",
+            ].includes(props.panel.pluginId)
+          )
+            throw new Error("This app uses the capability API. Update or reopen this app.");
+          if (
+            message.channel !== "misty-plugin" ||
+            message.kind !== "request" ||
+            typeof message.command !== "string"
+          )
+            throw new Error("Unsupported extension request.");
+          const command = message.command;
+          const payload =
+            message.payload && typeof message.payload === "object"
+              ? (message.payload as Record<string, unknown>)
+              : {};
+          // Identity comes from this panel's native registration, never message.pluginId.
+          if (command === "host.selectedPaths")
+            return { ok: true, selectedPaths: currentSelection() };
+          if (command === "host.notify") {
+            const level =
+              payload.level === "success" || payload.level === "error" ? payload.level : "info";
+            useExplorerStore
+              .getState()
+              .pushNotification(
+                typeof payload.message === "string"
+                  ? payload.message.slice(0, 500)
+                  : "Extension notification",
+                level,
+                4500,
+              );
+            return { ok: true };
+          }
+          const result = await extensionCommandRun({
+            pluginId: props.panel.pluginId,
+            command,
+            payload,
+          });
+          const started = result as { jobId?: string };
+          if (typeof started.jobId === "string" && started.jobId)
+            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
+          return result;
+        }}
       />
     </section>
   );

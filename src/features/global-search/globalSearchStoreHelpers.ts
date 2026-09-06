@@ -1,8 +1,9 @@
-import { agentsApi } from "@/api/agents/api";
+import { runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
+
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId, normalizeActionState } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
-import { globalSearchContext } from "./globalSearchDocuments";
+import { globalSearchContext } from "./globalSearchContext";
 import type { GlobalSearchState } from "./globalSearchState";
 import type {
   GlobalAiActionProposal,

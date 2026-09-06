@@ -6,6 +6,7 @@ import {
   memo,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -64,11 +65,11 @@ const multiPanelStyles = {
     "bottom-0 top-0 w-[11px] -translate-x-[5px] cursor-col-resize after:bottom-0 after:left-[5px] after:top-0 after:w-px",
   splitterHorizontal:
     "left-0 right-0 h-[11px] -translate-y-[5px] cursor-row-resize after:left-0 after:right-0 after:top-[5px] after:h-px",
-  aside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar max-[980px]:hidden",
-  asideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
+  aside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar",
+  asideResizer: paneResizeDividerClass,
   asideResizerActive: paneResizeDividerActiveClass,
-  navigationAside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar max-[980px]:hidden",
-  navigationAsideResizer: `${paneResizeDividerClass} max-[980px]:hidden`,
+  navigationAside: "min-h-0 min-w-0 overflow-hidden bg-charcoal-sidebar",
+  navigationAsideResizer: paneResizeDividerClass,
   asideResizerGrip: [
     "pointer-events-none absolute left-1/2 top-1/2 z-[1] grid size-5 -translate-x-1/2 -translate-y-1/2",
     "place-items-center rounded-md bg-charcoal-card text-cream-muted",
@@ -171,6 +172,33 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  const sideResizeCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => sideResizeCleanup.current?.(), []);
+  const beginSidePanelResize = (
+    event: PointerEvent<HTMLDivElement>,
+    resizeBy: ((delta: number) => void) | undefined,
+    direction: number,
+  ) => {
+    if (!resizeBy || event.button !== 0) return;
+    event.preventDefault();
+    sideResizeCleanup.current?.();
+    let previousX = event.clientX;
+    const onMove = (move: globalThis.PointerEvent) => {
+      const delta = (move.clientX - previousX) * direction;
+      previousX = move.clientX;
+      if (delta) resizeBy(delta);
+    };
+    const finish = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      sideResizeCleanup.current = null;
+    };
+    sideResizeCleanup.current = finish;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("pointercancel", finish, { once: true });
+  };
   const handleCloseTab = useCallback(
     (tab: MultiPanelTab) => {
       if (canCloseTab && !canCloseTab(tab)) return;
@@ -231,8 +259,8 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
   if (!activeTab) return null;
   // A split pane can be narrow even when the application window is wide.
   // Adapt side panels to this workspace's real container, not the viewport.
-  const hasNavigationAside = Boolean(renderNavigationAside) && !compactSidePanels;
-  const hasAside = Boolean(renderAside) && !compactSidePanels;
+  const hasNavigationAside = Boolean(renderNavigationAside);
+  const hasAside = Boolean(renderAside);
   const bodyClassName = multiPanelStyles.body;
   const bodyStyle = sidePanelGridStyle({
     asideWidth,
@@ -356,7 +384,10 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
                 aria-label="Resize file explorer sidebar"
                 aria-orientation="vertical"
                 tabIndex={0}
-                onPointerDown={onNavigationAsideResizeStart}
+                onPointerDown={
+                  onNavigationAsideResizeStart ??
+                  ((event) => beginSidePanelResize(event, onNavigationAsideResizeBy, 1))
+                }
                 onKeyDown={(event) => resizeSidePanelFromKeyboard(event, onNavigationAsideResizeBy)}
               >
                 <div className={multiPanelStyles.asideResizerGrip}>
@@ -465,7 +496,10 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
                 aria-label="Resize preview panel"
                 aria-orientation="vertical"
                 tabIndex={0}
-                onPointerDown={onAsideResizeStart}
+                onPointerDown={
+                  onAsideResizeStart ??
+                  ((event) => beginSidePanelResize(event, onAsideResizeBy, -1))
+                }
                 onKeyDown={(event) => resizeSidePanelFromKeyboard(event, onAsideResizeBy)}
               >
                 <div className={multiPanelStyles.asideResizerGrip}>

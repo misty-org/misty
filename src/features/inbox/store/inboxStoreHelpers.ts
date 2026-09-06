@@ -1,8 +1,6 @@
 import type { MailAccount, MailThreadAction } from "@/api/mail";
-import { ApiRequestError } from "@/api/client";
 import type { InboxThread } from "../model";
-import { persistInboxCache } from "./inboxCache";
-import type { InboxStore, InboxSet } from "./useInboxStore";
+import type { InboxStore, InboxSet } from "./inboxStore";
 
 export function mergeSummariesWithCached(
   current: InboxThread[],
@@ -27,18 +25,6 @@ export function threadHasDetail(thread: InboxThread): boolean {
       message.body.truncated ||
       message.attachments.length > 0,
   );
-}
-
-export function persistCurrentInbox(state: InboxStore): void {
-  if (!state.accountId) return;
-  persistInboxCache(state.accountId, {
-    accounts: state.accounts,
-    foldersByConnection: state.foldersByConnection,
-    threadsByConnection: state.threadsByConnection,
-    nextPageByConnection: state.nextPageByConnection,
-    estimatedTotalByConnection: state.estimatedTotalByConnection,
-    detailFetchedAtByThread: state.detailFetchedAtByThread,
-  });
 }
 
 export function retainConnectionRecords<T>(
@@ -76,7 +62,9 @@ export function reportAccountError(set: InboxSet, connectionId: string, error: u
     accountErrors: { ...state.accountErrors, [connectionId]: errorText(error) },
     accountErrorCodes: {
       ...state.accountErrorCodes,
-      ...(error instanceof ApiRequestError && error.code ? { [connectionId]: error.code } : {}),
+      ...(error && typeof error === "object" && "code" in error && typeof error.code === "string"
+        ? { [connectionId]: error.code }
+        : {}),
     },
   }));
 }

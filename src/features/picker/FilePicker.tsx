@@ -62,7 +62,7 @@ export function MistyFilePicker({
 }: MistyFilePickerProps) {
   const activePaneId = useMultiPanelStore((state) => state.activePaneId);
   const pane = useExplorerStore(useShallow((state) => state.panes[activePaneId]));
-  const remotes = useProvidersStore((state) => state.providers?.remotes ?? []);
+  const remotes = useProvidersStore(useShallow((state) => state.providers?.remotes ?? []));
 
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);

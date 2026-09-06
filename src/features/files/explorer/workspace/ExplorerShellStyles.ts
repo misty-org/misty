@@ -4,7 +4,7 @@ export const explorerShellStyles = {
   workspaceCollapsed: "sidebar-collapsed grid-cols-[minmax(0,1fr)]",
   main: "col-start-1 col-end-2 row-start-1 min-h-0 min-w-0 overflow-hidden max-[980px]:row-start-1 max-[980px]:min-w-0",
   bottomBar:
-    "grid min-h-[28px] min-w-0 grid-cols-[auto_auto] items-center justify-between gap-2 border-t border-charcoal-border/60 bg-charcoal-sidebar px-2 max-[720px]:hidden",
+    "grid min-h-[28px] min-w-0 grid-cols-[auto_auto] items-center justify-between gap-2 border-t border-charcoal-border/60 bg-charcoal-sidebar px-2",
   bottomBarGroup: "grid grid-flow-col auto-cols-max items-center gap-1",
   bottomButton:
     "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",

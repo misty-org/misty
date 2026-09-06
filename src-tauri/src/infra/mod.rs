@@ -6,14 +6,17 @@ pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
-#[cfg(desktop)]
+#[cfg(target_os = "ios")]
+#[path = "browser_ios.rs"]
+pub mod browser;
+#[cfg(any(desktop, target_os = "ios"))]
 mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 mod browser_scripts;
 pub mod browser_shortcuts;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 mod browser_theme;
 pub mod claude;
 pub(crate) mod cloud_handoff;
@@ -25,9 +28,11 @@ pub mod code_watcher;
 pub mod code_workspace;
 pub mod command_defaults;
 pub mod commands;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 pub mod connected_devices;
 pub mod credential_store;
+#[cfg(desktop)]
+mod declarative_panel;
 #[cfg(desktop)]
 pub mod desktop_pet;
 pub mod devices;
@@ -53,12 +58,13 @@ pub mod media_search;
 pub mod metadata;
 pub mod misty;
 pub mod misty_template;
+pub mod mobile_cache;
 pub mod native_clipboard;
 pub mod operation_queue;
 pub mod paths;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 pub mod peer_files;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "ios"))]
 pub mod peer_identity;
 #[cfg(desktop)]
 pub mod plugin_commands;
@@ -84,3 +90,5 @@ pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;
 pub mod workspaces;
+
+mod browser_profile;

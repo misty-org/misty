@@ -1,4 +1,4 @@
-import { selectAppearancePreferences, useSettingsStore } from "@/features/settings";
+import { useFileBrowserRuntime } from "./FileBrowserRuntime";
 import type { DirectoryListing, FileEntry } from "@/native/contracts";
 import type { CSSProperties, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,12 +25,7 @@ import {
  * , so scrolling always outranks background prewarming.
  */
 export function FileGrid(props: FileBrowserProps & { listing: DirectoryListing }) {
-  const compactModeEnabled = useSettingsStore(
-    (state) => selectAppearancePreferences(state.settings?.document).compactModeEnabled,
-  );
-  const thumbnailPreviewsEnabled = useSettingsStore(
-    (state) => selectAppearancePreferences(state.settings?.document).thumbnailPreviewsEnabled,
-  );
+  const { compactModeEnabled, thumbnailPreviewsEnabled } = useFileBrowserRuntime();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);

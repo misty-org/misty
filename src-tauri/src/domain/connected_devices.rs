@@ -53,6 +53,9 @@ pub enum PeerRequest {
         offset: u64,
         length: Option<u64>,
     },
+    OpenWorkspaceRoute {
+        request: OpenWorkspaceRouteRequest,
+    },
     Ping {
         nonce: u64,
     },
@@ -102,9 +105,48 @@ pub enum PeerResponse {
         offset: u64,
         length: u64,
     },
+    WorkspaceRoute {
+        result: OpenWorkspaceRouteResult,
+    },
     Pong {
         nonce: u64,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWorkspaceRouteRequest {
+    pub request_id: String,
+    pub route: String,
+    pub surface: WorkspaceRouteSurface,
+    pub sent_at: String,
+    pub source_device_id: String,
+    pub source_device_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceRouteSurface {
+    Code,
+    Terminal,
+    Transfers,
+    Files,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWorkspaceRouteResult {
+    pub request_id: String,
+    pub status: OpenWorkspaceRouteStatus,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenWorkspaceRouteStatus {
+    Opened,
+    Rejected,
+    Expired,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -1,4 +1,4 @@
-import { EmbeddedUniversalPreview } from "@/features/files/explorer";
+import { LibraryPreview as EmbeddedUniversalPreview } from "@/features/spaces/library/libraryRuntime";
 import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
 import { Button } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";

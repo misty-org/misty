@@ -2,7 +2,7 @@ import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
 import type { ReactNode } from "react";
 import type { PassiveRenameDraft } from "../../model/types/components/FileBrowserInline";
 import type { ExplorerInlineEditState } from "../../store";
-import { directorySizeRecordForPath } from "../../store";
+import { directorySizeRecordForPath } from "../../utils/entrySize";
 import { formatBytes } from "../../utils/fileFormat";
 import { fileBrowserStyles } from "../FileBrowserStyles";
 

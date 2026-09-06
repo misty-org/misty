@@ -1,4 +1,5 @@
-import { spacesApi } from "@/api/spaces/api";
+import { socialEvents } from "../socialRuntime";
+import { socialApi as spacesApi } from "@/features/spaces/chat/socialRuntime";
 import type { SpaceActionSuggestionBatch } from "@/api/spaces/dto/interfaces/types";
 import { useCallback, useEffect, useState } from "react";
 
@@ -40,9 +41,9 @@ export function useSpaceActionSuggestions(spaceId: string, conversationId: strin
       if (eventConversationId !== conversationId) return;
       void refresh();
     };
-    window.addEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
+    socialEvents.addEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
     return () =>
-      window.removeEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
+      socialEvents.removeEventListener("misty:space-action-suggestion-event", onSuggestionEvent);
   }, [conversationId, enabled, refresh, spaceId]);
 
   return { items, refresh };

@@ -4,44 +4,17 @@ import { resolveSpacesLandingRoute } from "./spacesShell/SpacesIndexRedirect";
 import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
 
 describe("Spaces landing route", () => {
-  it("opens Misty instead of a previously remembered Space", () => {
+  it("opens the designated default instead of the first listed Space", () => {
     const teamSpace = spaceFixture({ id: "team-space", name: "Family" });
-    const mistySpace = spaceFixture({ id: "misty-space", name: "Misty" });
+    const homeSpace = spaceFixture({ id: "home-space", name: "Personal", is_default: true });
 
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(
-      defaultSpaceRoute("misty-space"),
-    );
+    expect(resolveSpacesLandingRoute([teamSpace, homeSpace])).toBe(defaultSpaceRoute("home-space"));
   });
 
-  it("opens the first available Space while Misty provisioning catches up", () => {
+  it("opens the first available Space while onboarding is finishing", () => {
     const space = spaceFixture({ id: "team-space" });
 
     expect(resolveSpacesLandingRoute([space])).toBe(defaultSpaceRoute("team-space"));
-  });
-
-  it("uses Misty when there is no active or remembered Space", () => {
-    const teamSpace = spaceFixture({ id: "team-space" });
-    const mistySpace = spaceFixture({ id: "misty", kind: "misty" });
-
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe("/spaces/misty/home");
-  });
-
-  it("prefers the canonical kind even when its display name changes", () => {
-    const teamSpace = spaceFixture({ id: "misty", name: "Personal Misty" });
-    const canonical = spaceFixture({ id: "space_misty_canonical", kind: "misty", name: "Support" });
-
-    expect(resolveSpacesLandingRoute([teamSpace, canonical])).toBe(
-      "/spaces/space_misty_canonical/home",
-    );
-  });
-
-  it("recognizes the Misty home Space even when its id is server-generated", () => {
-    const teamSpace = spaceFixture({ id: "team-space", name: "Family" });
-    const mistySpace = spaceFixture({ id: "space-home", name: "Misty" });
-
-    expect(resolveSpacesLandingRoute([teamSpace, mistySpace])).toBe(
-      defaultSpaceRoute("space-home"),
-    );
   });
 
   it("leaves an empty account on the first-Space screen", () => {
@@ -52,6 +25,7 @@ describe("Spaces landing route", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",

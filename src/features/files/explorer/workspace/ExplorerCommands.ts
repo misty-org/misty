@@ -92,7 +92,7 @@ export function runExplorerCommand(
       navigateRoute("/settings");
       break;
     case "app.toggle_plugin_launcher":
-      navigateRoute(routes.store);
+      navigateRoute(routes.discover);
       break;
     case "clipboard.publish_shared":
       void publishSharedClipboard();

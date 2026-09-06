@@ -547,20 +547,12 @@ impl PowerPackService {
     }
 }
 
-fn archive_list_blocking(request: ArchiveListRequest) -> ApiResult<ArchiveListResult> {
-    let archive_path = PathBuf::from(require_path(&request.path, "Archive path")?);
-    let format = archive_format(&archive_path);
-    if format == "zip" {
-        let file = File::open(&archive_path).map_err(|err| {
-            ApiError::Message(format!(
-                "Could not open archive {}: {err}",
-                archive_path.display()
-            ))
-        })?;
-        let mut archive = ZipArchive::new(file)
+/// The host explorer and SDK preview share the same ZIP metadata reader.
+pub(crate) fn archive_zip_entries<R: Read + io::Seek>(file: R, limit: usize) -> ApiResult<Vec<ArchiveEntry>> {
+    let mut archive = ZipArchive::new(file)
             .map_err(|err| ApiError::Message(format!("Could not read ZIP archive: {err}")))?;
         let mut entries = Vec::new();
-        for index in 0..archive.len() {
+        for index in 0..archive.len().min(limit) {
             let entry = archive
                 .by_index(index)
                 .map_err(|err| ApiError::Message(format!("Could not read ZIP entry: {err}")))?;
@@ -571,6 +563,20 @@ fn archive_list_blocking(request: ArchiveListRequest) -> ApiResult<ArchiveListRe
                 uncompressed_size: entry.size(),
             });
         }
+    Ok(entries)
+}
+
+fn archive_list_blocking(request: ArchiveListRequest) -> ApiResult<ArchiveListResult> {
+    let archive_path = PathBuf::from(require_path(&request.path, "Archive path")?);
+    let format = archive_format(&archive_path);
+    if format == "zip" {
+        let file = File::open(&archive_path).map_err(|err| {
+            ApiError::Message(format!(
+                "Could not open archive {}: {err}",
+                archive_path.display()
+            ))
+        })?;
+        let entries = archive_zip_entries(file, usize::MAX)?;
         return Ok(ArchiveListResult {
             archive_path: archive_path.display().to_string(),
             format,
