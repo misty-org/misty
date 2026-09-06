@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -21,4 +22,12 @@ export function verifyChecksums(directory) {
     if (!match || match[2].split('/').includes('..') || match[2].startsWith('/')) throw new Error('Invalid checksum manifest.');
     if (sha256(resolve(directory,match[2])) !== match[1]) throw new Error(`Checksum mismatch: ${match[2]}`);
   }
+}
+
+// zlib versions can encode identical tar bytes differently on macOS and Linux.
+// Verify all tar bytes, including names and modes, then distribute the frozen archive.
+export function verifyRepackedArchive(pinned, rebuilt) {
+  const options = {maxOutputLength:64*1024*1024};
+  if (!gunzipSync(readFileSync(pinned),options).equals(gunzipSync(readFileSync(rebuilt),options)))
+    throw new Error('SDK source does not reproduce the pinned archive contents. Refresh the SDK snapshot.');
 }
