@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { preserveAppAssets } from './preserve-app-assets.mjs';
 const tag = process.env.RELEASE_TAG, phase = process.env.RELEASE_PHASE;
 if (!/^v\d+\.\d+\.\d+-beta\.\d+$/.test(tag ?? '') || !['assets','feeds'].includes(phase)) throw new Error('Invalid beta promotion.');
 const directory = resolve('artifacts/promotion'); mkdirSync(directory,{recursive:true});
@@ -24,6 +25,7 @@ for (const relative of ['updates/beta/latest.json','official-app-catalog.json'])
   if (!response.ok) throw new Error(`Cannot preserve the live ${relative}: ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   const data = JSON.parse(bytes.toString('utf8'));
+  if (relative === 'official-app-catalog.json') await preserveAppAssets(data, output);
   if (relative.includes('latest.json') && data.version !== manifest.version && `v${data.version}` !== manifest.source.previousRelease)
     throw new Error('A different beta is already live. Prepare a successor from that release before promotion.');
   mkdirSync(resolve(output,'updates/beta'),{recursive:true});
