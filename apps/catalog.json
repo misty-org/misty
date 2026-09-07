@@ -52,8 +52,8 @@
       "name": "Journal",
       "publisher": "Misty",
       "description": "Notes and drawings for ideas worth keeping.",
-      "version": "1.1.0",
-      "permission_version": 3,
+      "version": "1.1.0-beta.2",
+      "permission_version": 4,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
@@ -76,20 +76,22 @@
         "profile.read",
         "spaces.read",
         "storage.read",
-        "storage.write"
+        "storage.write",
+        "network.fetch"
       ],
       "desktop": {
         "runtime": "downloaded",
-        "entry": "https://apps.mistysys.com/official-apps/journal/1.1.0/desktop.zip",
-        "sha256": "b6f1eba2a41fcc6c69fa3683afe3e68f3eeafb006c1df1c30643bb8017fe540b",
-        "signature": "hP3QNaZy2EVkqurMZBrzAbS6VZElfhitnvhmllV+9At1a2uwOiMU8SqS8rGJc0todWF696xAJtAR1qoJImz6AA==",
+        "entry": "https://apps.mistysys.com/official-apps/journal/1.1.0-beta.2/desktop.zip",
+        "sha256": "8a3c2d944de6d522993dff43596b00695d8223b1f3008a9cd04fcf9a163aa577",
+        "signature": "L9T1lkccsWRfpuljkrkU/eocZSdNMgvxritORSkkqAZXJnFmRrgB45YeFWKlurH0w9Qt58SEtYG82V8lFN60Dg==",
         "signature_key_id": "misty-development-2026-01",
-        "download_bytes": 15386467,
-        "additional_storage_bytes": 25535465
+        "download_bytes": 2612321,
+        "additional_storage_bytes": 8722930
       },
       "mobile": {
         "runtime": "embedded"
-      }
+      },
+      "minimum_host_version": "0.1.0-beta.1"
     },
     {
       "id": "planner",

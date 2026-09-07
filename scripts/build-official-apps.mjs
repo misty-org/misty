@@ -9,6 +9,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { deflateRawSync } from "node:zlib";
+import { packageOptionalAssets } from "./package-optional-assets.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // A candidate catalog lets integration probes verify a package before it is
@@ -69,6 +70,7 @@ for (const app of packagedApps) {
     "desktop",
   );
   assertBrowserRuntimeSafe(desktopAssets, app.id, "desktop");
+  const optionalAssets = await packageOptionalAssets(path.join(desktopBuildRoot, "../optional-assets"), publicRoot, app);
   const definition = (await import(pathToFileURL(path.join(desktopBuildRoot, "app.js")).href)).default;
   if (definition?.protocol !== 2 || definition.appId !== app.id || typeof definition.mount !== "function") {
     throw new Error(`${app.id} must export an SDK protocol 2 component before it can be signed.`);
@@ -88,6 +90,8 @@ for (const app of packagedApps) {
         platforms: ["desktop"],
         runtime: { type: "mini-app", entry: "web/index.html", sdk: "2", component: "web/app.js" },
         runtime_capabilities: app.scopes,
+        runtime_network_origins: optionalAssets?.origins,
+        optional_assets: optionalAssets?.assets,
         permission_version: app.permission_version,
         minimum_host_protocol: app.minimum_host_protocol,
         minimum_host_version: app.minimum_host_version,
@@ -123,6 +127,7 @@ for (const app of packagedApps) {
         where_it_appears: ["Desktop workspace"],
         permissions: app.scopes,
         runtime_capabilities: app.scopes,
+        runtime_network_origins: optionalAssets?.origins,
         getting_started: [`Open ${app.name} from Apps.`],
         changelog: [],
         links: [],
