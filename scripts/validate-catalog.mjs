@@ -224,7 +224,7 @@ async function validateOfficialApps(catalog) {
       !app.name ||
       app.publisher !== "Misty" ||
       app.official !== true ||
-      !/^\d+\.\d+\.\d+$/.test(app.version ?? "")
+      !/^\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(app.version ?? "")
     ) {
       fail(`Invalid official app identity for ${app.id}.`);
     }
