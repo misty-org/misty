@@ -17,6 +17,7 @@ import {
   workspaceTabsById,
   type WorkspaceDockNode,
 } from "@/features/workspace";
+import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
@@ -92,7 +93,24 @@ interface BrowserFocusEvent {
 }
 export function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
-  if (!tabId || !useWorkspaceStore.getState().focusView(tabId)) return false;
+  return tabId ? focusBrowserTab(tabId) : false;
+}
+
+/** The host reports a click on a native page before the page handles it; the
+ * page host under that point names the tab whose pane becomes active. */
+function focusBrowserPageAt(x: number, y: number): boolean {
+  for (const host of document.querySelectorAll<HTMLElement>("[data-browser-page-host]")) {
+    const rect = host.getBoundingClientRect();
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) continue;
+    const tabId = host.closest<HTMLElement>("[data-browser-workspace-tab]")?.dataset
+      .browserWorkspaceTab;
+    if (tabId) return focusBrowserTab(tabId);
+  }
+  return false;
+}
+
+function focusBrowserTab(tabId: string): boolean {
+  if (!useWorkspaceStore.getState().focusView(tabId)) return false;
   window.dispatchEvent(
     new CustomEvent("misty:focus-workspace-tab", {
       detail: {
@@ -383,6 +401,10 @@ export function BrowserRuntimeBridge() {
       }),
       listen<BrowserFocusEvent>("misty://browser-focus", ({ payload }) => {
         if (!disposed) focusBrowserRuntimeTab(payload.id);
+      }),
+      listen<{ x: number; y: number }>("misty://browser-page-pointer-down", ({ payload }) => {
+        const scale = getAppliedAppRenderScale();
+        if (!disposed) focusBrowserPageAt(payload.x / scale, payload.y / scale);
       }),
       listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
         if (disposed) return;

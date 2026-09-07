@@ -195,7 +195,7 @@ export function WorkspaceCanvas(props: {
   );
 
   useShortcutHandler("workspace.close_tab", closeActiveTab, canCloseActiveTab);
-  usePinTabShortcut();
+  const pinBlockedNotice = usePinTabShortcut();
   useShortcutHandler(
     "workspace.reopen_tab",
     useCallback(
@@ -491,6 +491,7 @@ export function WorkspaceCanvas(props: {
           if (closePeek()) navigateToActiveLayoutTab();
         }}
       />
+      {pinBlockedNotice}
     </div>
   );
 }

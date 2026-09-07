@@ -176,6 +176,35 @@ fn start_auto_connect(devices: ConnectedDevicesService, generation: u64) {
     });
 }
 
+/// The name people gave this computer ("Matthew's MBP"), so each device is
+/// recognizable in lists; "This Misty" only when the system has none.
+fn computer_name() -> String {
+    #[cfg(target_os = "macos")]
+    let name = std::process::Command::new("/usr/sbin/scutil")
+        .args(["--get", "ComputerName"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).into_owned());
+    #[cfg(target_os = "windows")]
+    let name = std::env::var("COMPUTERNAME").ok();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let name = std::fs::read_to_string("/etc/hostname").ok();
+    let name: String = name
+        .unwrap_or_default()
+        .trim()
+        .trim_end_matches(".local")
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(64)
+        .collect();
+    if name.is_empty() {
+        "This Misty".to_owned()
+    } else {
+        name
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn devices_start(
@@ -192,14 +221,11 @@ pub async fn devices_start(
     require_main(&webview)?;
     let local = local_device_id(&state).await?;
     let mut context = DeviceContext::open(&api_base, &account_id, &local)?;
-    admission::register(
-        &mut context,
-        name.trim(),
-        &platform,
-        &os_version,
-        &app_version,
-    )
-    .await?;
+    let name = match name.trim() {
+        "" => computer_name(),
+        given => given.to_owned(),
+    };
+    admission::register(&mut context, &name, &platform, &os_version, &app_version).await?;
     state
         .connected_devices
         .set_network_identity(context.server_device_id.clone())

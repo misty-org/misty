@@ -10,11 +10,13 @@ afterEach(async () => {
 function List({
   scope = "test",
   shown = true,
+  animate = false,
   drop = vi.fn(),
   click = vi.fn(),
 }: {
   scope?: string;
   shown?: boolean;
+  animate?: boolean;
   drop?: (id: string, target: string, after: boolean) => void;
   click?: () => void;
 }) {
@@ -22,6 +24,7 @@ function List({
   const drag = usePointerReorder({
     scope,
     axis: "y",
+    animate,
     getDrag: (id) => ({ id, label: id }),
     onDrop: (drag, target, after) => {
       drop(drag.id, target, after);
@@ -134,6 +137,25 @@ it("keeps ordinary clicks and controls intact, and supports keyboard reordering"
   expect(
     [...ui.getByTestId("list").children].map((item) => item.getAttribute("data-reorder-item")),
   ).toEqual(["b", "a", "c"]);
+});
+it("drops at the end when a quick drag overshoots past the last item", async () => {
+  bounds();
+  // The test DOM has no Web Animations; the reorder motion only needs a handle.
+  const animate = Element.prototype.animate;
+  Element.prototype.animate = () => ({ cancel() {} }) as unknown as Animation;
+  const drop = vi.fn();
+  try {
+    const ui = render(<List animate drop={drop} />);
+    pointer(ui.getByText("a"), "pointerdown", 10, 10);
+    pointer(window, "pointermove", 10, 150);
+    pointer(window, "pointerup", 10, 150);
+  } finally {
+    Element.prototype.animate = animate;
+  }
+  expect(drop).toHaveBeenCalledExactlyOnceWith("a", "c", true);
+  // The lifted preview settles on the next frame.
+  await act(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  expect(document.querySelector(".pointer-reorder-preview")).toBeNull();
 });
 it("ignores a second pointer and cancels when the held button is lost", () => {
   bounds();

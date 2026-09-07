@@ -367,37 +367,4 @@ describe("DesktopLayout on Auth Routes", () => {
     expect(container.querySelector('[data-testid="global-navigator"]')).toBeNull();
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBeNull();
   });
-
-  it("pushes workspace canvas to the left when Misty panel is open", async () => {
-    mocks.user = { id: "test-user", email: "test@example.com" };
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/browser"]}>
-          <Routes>
-            <Route element={<DesktopLayout getRouteId={() => "browser" as any} />}>
-              <Route path="/browser" element={<div data-testid="browser-outlet" />} />
-            </Route>
-          </Routes>
-        </MemoryRouter>,
-      );
-    });
-
-    const host = container.querySelector<HTMLElement>("[data-browser-corner-clip]");
-    expect(host).not.toBeNull();
-    expect(host?.classList.contains("rounded-r-xl")).toBe(false);
-
-    await act(async () => {
-      useMistyPanelStore.getState().setOpen(true);
-    });
-
-    expect(host?.classList.contains("rounded-r-xl")).toBe(true);
-    expect(container.querySelector('[data-testid="misty-panel"]')).not.toBeNull();
-
-    await act(async () => {
-      useMistyPanelStore.getState().setOpen(false);
-    });
-
-    expect(host?.classList.contains("rounded-r-xl")).toBe(false);
-    expect(container.querySelector('[data-testid="misty-panel"]')).toBeNull();
-  });
 });

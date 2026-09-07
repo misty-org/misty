@@ -190,6 +190,20 @@ impl Collection {
         self.pending.insert(key, record);
     }
 
+    /// Queues a write, except a delete of a record the server never had,
+    /// which is moot: the pending create (if any) is dropped instead.
+    /// `settled`: fully pulled, with no push in flight that could still land
+    /// a create. Returns whether anything was queued.
+    pub fn queue(&mut self, key: String, record: Option<ViewRecord>, settled: bool) -> bool {
+        let on_server = self.confirmed.get(&key).is_some_and(|c| c.record.is_some());
+        if record.is_none() && settled && !on_server {
+            self.pending.remove(&key);
+            return false;
+        }
+        self.write(key, record);
+        true
+    }
+
     pub fn outgoing(&self) -> Vec<Write> {
         self.pending
             .iter()
@@ -214,13 +228,27 @@ impl Collection {
         self.confirmed.insert(key, Confirmed { version, record });
     }
 
-    /// The server's answer to one write.
-    pub fn answered(&mut self, key: &str, applied: bool, version: u64, current: Option<Confirmed>) {
+    /// The server's answer to one write of `sent`. An edit made while the
+    /// write was in flight stays pending and goes next, on the new version.
+    pub fn answered(
+        &mut self,
+        key: &str,
+        sent: &Option<ViewRecord>,
+        applied: bool,
+        version: u64,
+        current: Option<Confirmed>,
+    ) {
         if applied {
-            if let Some(record) = self.pending.remove(key) {
-                self.confirmed
-                    .insert(key.to_owned(), Confirmed { version, record });
+            if self.pending.get(key) == Some(sent) {
+                self.pending.remove(key);
             }
+            self.confirmed.insert(
+                key.to_owned(),
+                Confirmed {
+                    version,
+                    record: sent.clone(),
+                },
+            );
             return;
         }
         // Lost: keep the server's copy and retry on it, unless someone

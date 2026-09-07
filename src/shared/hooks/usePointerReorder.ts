@@ -20,7 +20,16 @@ export type ReorderDrag = {
   paneId?: string;
   ids?: string[];
 };
-type Hit = { id: string; after: boolean; rect: DOMRect; previewRect?: DOMRect; axis: "x" | "y" };
+export type ReorderHit = {
+  id: string;
+  after: boolean;
+  rect: DOMRect;
+  previewRect?: DOMRect;
+  axis: "x" | "y";
+  /** Highlight the whole region (dropping into it) instead of an insertion line. */
+  box?: boolean;
+};
+type Hit = ReorderHit;
 type Target = {
   element: HTMLElement;
   scope: string;
@@ -217,7 +226,7 @@ function startGesture(
         const r = current.hit.previewRect ?? rect;
         Object.assign(
           indicator.style,
-          drag.scope === "workspace-panes"
+          drag.scope === "workspace-panes" || current.hit.box
             ? {
                 left: `${r.left}px`,
                 top: `${r.top}px`,

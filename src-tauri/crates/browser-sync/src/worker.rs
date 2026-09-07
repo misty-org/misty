@@ -134,7 +134,12 @@ enum Command {
         crate::store::DeviceSignin,
         oneshot::Sender<Result<()>>,
     ),
+    Flush(oneshot::Sender<Result<()>>),
 }
+
+/// Longest a flush waits for the server before answering anyway; queued
+/// edits stay stored and go out on the next connection.
+const FLUSH_DEADLINE: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct WorkerHandle {
@@ -446,15 +451,26 @@ impl WorkerHandle {
     /// Moves this device's sign-in lease to `workspace_id` (the machine most
     /// recently active on a device publishes its sign-ins). Requires a connection.
     pub async fn claim_workspace(&self, workspace_id: String) -> Result<()> {
+        // Sign-in writes queued under the current lease go before it moves.
+        let _ = self.flush().await;
         self.call(|reply| Command::WorkspaceClaim(workspace_id, reply))
             .await
     }
 
     /// Shows and edits `workspace_id` on this machine. Works offline; any number
-    /// of machines may be on one workspace at once.
+    /// of machines may be on one workspace at once. Edits still batched for
+    /// the workspace being left are sent first, since it stops being watched.
     pub async fn open_workspace(&self, workspace_id: String) -> Result<()> {
+        let _ = self.flush().await;
         self.call(|reply| Command::WorkspaceOpen(workspace_id, reply))
             .await
+    }
+
+    /// Sends every batched change now instead of when its batch is due, and
+    /// answers once the server has them or after a few seconds. Offline it
+    /// answers `Network` at once; the changes stay stored either way.
+    pub async fn flush(&self) -> Result<()> {
+        self.call(Command::Flush).await
     }
 
     /// Native-only: a pulled collection as shown here (pending writes on
@@ -578,6 +594,8 @@ pub struct Worker<F> {
     /// Consecutive workspaces dropped and refetched after failing to verify.
     workspace_refetches: u8,
     collections: collections::CollectionSync,
+    /// Flushes awaiting the server, with their deadlines.
+    flushes: Vec<(Instant, oneshot::Sender<Result<()>>)>,
 }
 
 impl<F> Worker<F>
@@ -660,6 +678,7 @@ where
                 claimed_requests: std::collections::HashSet::new(),
                 workspace_refetches: 0,
                 collections: collections::CollectionSync::default(),
+                flushes: Vec::new(),
             },
             handle,
         ))
@@ -944,6 +963,15 @@ where
                     if let Some(frame) = self.workspaces.read_signin(&workspace, slot, reply) {
                         self.workspace_outbox.push(frame);
                     }
+                } else {
+                    let _ = reply.send(Err(Error::Network));
+                }
+            }
+            Command::Flush(reply) => {
+                if self.connected_now {
+                    self.workspaces.flush();
+                    self.collections.flush();
+                    self.flushes.push((Instant::now() + FLUSH_DEADLINE, reply));
                 } else {
                     let _ = reply.send(Err(Error::Network));
                 }
@@ -1266,7 +1294,8 @@ where
                         },
                         ServerFrame::WorkspaceCurrent { workspace_id, version } => self.workspace_current(socket, &workspace_id, version).await?,
                         ServerFrame::WorkspaceAck { request_id, receipt } => self.workspace_ack(request_id.as_deref(), receipt)?,
-                        ServerFrame::WorkspaceError { code, request_id, operation_id, .. } => self.workspace_error(request_id.as_deref(), operation_id.as_deref(), &code)?,
+                        ServerFrame::WorkspaceError { code, request_id, operation_id, retry_after_ms, .. } => self.workspace_error(request_id.as_deref(), operation_id.as_deref(), &code, retry_after_ms.map(Duration::from_millis))?,
+                        ServerFrame::BatchPolicy { policy } => self.batch_policy(&policy),
                         ServerFrame::Slot { request_id, slot } => self.workspaces.on_slot(&self.root, &self.scope, request_id.as_deref(), slot),
                         ServerFrame::Blobs { .. } | ServerFrame::BlobAck { .. } => {},
                         ServerFrame::Records { request_id, listing } => self.records_listing(request_id.as_deref(), listing)?,
@@ -1294,6 +1323,7 @@ where
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
                     self.workspace_tick(socket).await?;
                     self.records_tick(socket).await?;
+                    self.settle_flushes()?;
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.
                     if in_flight.is_none() && self.devices.borrow().iter().any(|d| d.grant.device_id == self.store.grant().device_id && d.full_sync) && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {

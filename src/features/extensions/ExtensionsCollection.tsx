@@ -1,4 +1,12 @@
-import { Button, CollectionItems, CollectionViewToggle, Separator } from "@/shared/ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Button,
+  CollectionItems,
+  CollectionViewToggle,
+  IconButton,
+  Separator,
+  toolbarIconProps,
+} from "@/shared/ui";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
 import { AccountCollectionFilters } from "@/features/settings/AccountCollectionFilters";
@@ -23,6 +31,9 @@ const sections = [
   { value: "updated", label: "Recently updated" },
   { value: "installed", label: "Installed" },
 ];
+
+// Matches the page_size the native catalog requests from Firefox Add-ons.
+const catalogPageSize = 25;
 
 function status(item: Installation, state?: InstalledState) {
   if (state?.status === "enabled") return "Enabled";
@@ -71,10 +82,15 @@ export function ExtensionsCollection(props: {
           if (inInstalled) props.go("/extensions");
         }}
         actions={
-          <CollectionViewToggle
-            value={view}
-            onChange={(value) => void setPreference("view", value).catch(reportExtensionError)}
-          />
+          <>
+            {!inInstalled && catalog && (
+              <CatalogPager page={page} catalog={catalog} loading={loading} onPage={props.onPage} />
+            )}
+            <CollectionViewToggle
+              value={view}
+              onChange={(value) => void setPreference("view", value).catch(reportExtensionError)}
+            />
+          </>
         }
       />
       <Separator />
@@ -163,25 +179,6 @@ export function ExtensionsCollection(props: {
             : "No extensions found. Try another search."}
         </p>
       )}
-      {!inInstalled && catalog && (
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            variant="ghost"
-            disabled={page === 1 || loading}
-            onClick={() => props.onPage((v) => v - 1)}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-cream-muted">Page {page}</span>
-          <Button
-            variant="ghost"
-            disabled={!catalog.hasMore || loading}
-            onClick={() => props.onPage((v) => v + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
       {inInstalled && (
         <DesktopSettingsSection title="Agent access">
           <DesktopSettingsRow
@@ -199,5 +196,41 @@ export function ExtensionsCollection(props: {
         </DesktopSettingsSection>
       )}
     </>
+  );
+}
+
+/** Gmail-style pager: "26–50 of 1,234" between previous and next arrows. */
+function CatalogPager(props: {
+  page: number;
+  catalog: CatalogPage;
+  loading: boolean;
+  onPage(change: (page: number) => number): void;
+}) {
+  const { page, catalog, loading } = props;
+  const first = (page - 1) * catalogPageSize + 1;
+  const last = first + Math.max(catalog.entries.length, 1) - 1;
+  return (
+    <div className="flex items-center gap-1">
+      {catalog.entries.length > 0 && (
+        <span className="px-1 text-sm tabular-nums text-cream-muted">
+          {first.toLocaleString()}–{last.toLocaleString()} of{" "}
+          {Math.max(catalog.count, last).toLocaleString()}
+        </span>
+      )}
+      <IconButton
+        label="Previous page"
+        disabled={page === 1 || loading}
+        onClick={() => props.onPage((v) => v - 1)}
+      >
+        <ChevronLeft {...toolbarIconProps} />
+      </IconButton>
+      <IconButton
+        label="Next page"
+        disabled={!catalog.hasMore || loading}
+        onClick={() => props.onPage((v) => v + 1)}
+      >
+        <ChevronRight {...toolbarIconProps} />
+      </IconButton>
+    </div>
   );
 }

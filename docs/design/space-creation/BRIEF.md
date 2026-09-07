@@ -1,6 +1,6 @@
 # Create a Space
 
-Status: layout approved 2026-10-08 (horizontal dialog). Nothing here is implemented yet.
+Status: layout approved 2026-10-08; implemented 2026-10-09 (see Implementation below). Describe it remains deferred, and the delete-refresh requirement is still open.
 
 The current dialog is a two-step stepper (name, then template). It looks sparse, and choosing any template except Blank can fail to create the Space. This brief records what is broken, the proposed redesign, new features to choose from, and a related requirement for deleting a Space.
 
@@ -92,3 +92,21 @@ Suspects to check:
 - Whatever tears down the deleted Space's open tabs may rebuild more of the workspace than those tabs.
 
 The fix should remove the Space locally, close only its tabs, and revalidate in the background without blanking any surface.
+
+## Implementation (2026-10-09)
+
+**Server**
+- `CreateSpaceFromSource` (`server/internal/platform/postgres/space_templates_create_space_with_template_idempotent.go`) creates the Space, its tasks and collections in one transaction, then adds notes in a second one. Only notes count toward cloud storage, so a billing or storage failure now leaves the Space created with `seed_incomplete: true` instead of failing it. `POST /spaces` also accepts `source_space_id` to copy a Space's structure.
+- Built-in templates (`space_templates_space_template_seed_summary.go`) carry `icon`, `suggested_name` and `seed_preview`, and include Trip, Event, Client work, Household and Book club. The unused `app_ids` and `recommended_integrations` are gone.
+- Capturing structure (`space_template_capture.go`) takes task titles (with Planner access), outlines of notes the caller wrote, and collection names (with Library access). Files, messages and members never are.
+- Personal templates store that capture in a new `definition` column (migration `20271009020000_personal_space_template_definitions.sql`, which drops the old `apps` column). `POST /me/space-templates` accepts `include` to choose parts.
+- `GET /me/space-people` lists the people you share active Spaces with, for one-click invites.
+
+**Client**
+- `src/features/spaces/spacesShell/`: `CreateSpaceDialog`, `CreateSpaceTemplateGrid` (Templates and Mine), `CreateSpaceInvitePeople`, `CreateSpaceSeedPreview`, `useCreateSpaceDialog`, `templateIcons`. The stepper (`CreateSpaceSteps`) is removed. Blank is selected by default and always available.
+- Invitations send right after the Space is created. Unsent invitations or missing starter notes show one app notice.
+- Space settings has a Save as template card that opens `SaveSpaceTemplateDialog`.
+
+**Differences from the mockup**
+- Chat previews only "Everyone". Chat conversations need at least two participants, so a template can't pre-create channels in a one-person Space.
+- Personal templates can't be renamed or deleted from the UI yet (the API supports both).

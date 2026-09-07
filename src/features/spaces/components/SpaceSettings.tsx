@@ -21,13 +21,14 @@ import {
   WorkspaceOverlay,
   SkeletonList,
 } from "@/shared/ui";
-import { Settings2, Trash2, UsersRound } from "lucide-react";
+import { Bookmark, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
+import { SaveSpaceTemplateDialog } from "./SaveSpaceTemplateDialog";
 type SpaceSettingsSection = "general" | "members";
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   {
@@ -59,6 +60,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const [saving, setSaving] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [dangerBusy, setDangerBusy] = useState(false);
   const isOwner = space?.role === "owner";
@@ -235,6 +237,29 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                   ) : null}
                 </CardContent>
               </Card>
+
+              <Card aria-labelledby="space-template-heading">
+                <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p id="space-template-heading" className="m-0 text-sm font-medium">
+                      Save as template
+                    </p>
+                    <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
+                      Start future Spaces with this Space's tasks, note outlines and collections.
+                    </p>
+                  </div>
+                  <Button variant="outline" type="button" onClick={() => setTemplateOpen(true)}>
+                    <Bookmark className="size-4" />
+                    Save as template
+                  </Button>
+                </CardContent>
+              </Card>
+              <SaveSpaceTemplateDialog
+                spaceId={spaceId}
+                spaceName={space.name}
+                open={templateOpen}
+                onOpenChange={setTemplateOpen}
+              />
 
               {canDelete || canLeave ? (
                 <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">

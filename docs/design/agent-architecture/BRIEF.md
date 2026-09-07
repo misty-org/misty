@@ -565,3 +565,37 @@ The first live run on October 4, 2026 found and fixed:
   for cross-agent overviews; methods lists carry each workflow's schedule.
   Agent tools `workflows.schedule` and `workflows.unschedule` replaced
   `schedules.*`. Account event topic `workflows` replaced `scheduled-tasks`.
+
+### Text-first browser, skills, sub-agents and the notebook (October 10, 2026)
+
+Approved by the owner on October 10, 2026, in [the agentic browser plan](../../plans/agentic-browser.md);
+measured in [its results](../../plans/agentic-browser-results.md). It reverses the October 4 choice that
+routed every Misty-window action through `browser_act`: pages are read and acted on as text first, and
+Midscene stays for visual work.
+
+- **Page layer** (`src-tauri/src/infra/browser_page/`). `browser_snapshot` returns the page as an
+  accessibility tree with a ref on every control, in the shape of Playwright's aria snapshot. Refs
+  survive actions until that control changes or the page navigates. `browser_steps` runs up to ten
+  actions by ref (click, fill, select, check, hover, key, scroll, wait), stopping when one fails, the
+  page navigates or a dialog opens. `browser_fill_form` fills a whole form; `browser_find`,
+  `browser_extract` (structured data from page text, on the Browsing model) and `browser_wait_for`
+  avoid reading whole pages. On macOS the runtime lives in its own WKContentWorld, so page scripts
+  cannot read or forge its refs, and clicks and keys arrive as native, trusted input.
+- **Skills** (`page_skills.js`): grids, rich-text editors, forms, pickers, boards and Google Sheets
+  and Docs. A snapshot lists only the skills its page offers; `browser_skill` runs them. Skills that
+  click hand their steps back to the step runner, so input stays native and gated.
+- **Policy.** A click, Enter or submit whose control or form sends, posts, buys, deletes or shares is
+  refused unless the call sets `allowConsequential`, which goes through "Ask before acting". Password,
+  one-time-code and card fields have no ref and are never filled. Banking, crypto, payment and adult
+  sites, and any site the account adds, are read-only for agents (Settings → Agents → Sites agents
+  don't act on); the device refuses before any input.
+- **Replays.** A workflow run whose every effect was a browser action is saved with locators instead
+  of refs and replayed before any model call on the next run of that workflow; the agent takes over
+  at the first step the page no longer matches.
+- **Notebook and sub-agents.** `notebook_write`/`notebook_read` keep a plan and findings outside the
+  model's context, shown in the conversation and mirrored to a note. `agents_delegate` starts up to
+  four sub-agents, each an invocation under the parent's lease, agent and approval setting, with its
+  own tab whose grant the parent's device signs. Stopping the parent stops them.
+- **Runtime.** One MCP session and bearer per run, concurrent read-only server tools, an 8,192-token
+  output cap per turn, batched removal of stale snapshots and an Anthropic cache breakpoint on the
+  newest message.

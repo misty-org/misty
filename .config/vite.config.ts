@@ -99,6 +99,9 @@ export default defineConfig(({ command, mode }) => {
       // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;
       // opening Explorer then discovers dependencies late and reloads the host.
       entries: ["index.html"],
+      // Photon (Midscene's screenshot resizer) loads its .wasm next to its own
+      // module; pre-bundling moves the module and the file is no longer found.
+      exclude: ["@silvia-odwyer/photon"],
     },
     resolve: {
       alias: [

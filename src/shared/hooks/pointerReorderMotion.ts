@@ -82,14 +82,13 @@ export function startReorderMotion(surface: HTMLElement, ids: string[], axis: "x
       const horizontal = axis === "x";
       const along = horizontal ? point.x : point.y;
       const across = horizontal ? point.y : point.x;
-      const min = horizontal ? bounds.left : bounds.top;
-      const max = horizontal ? bounds.right : bounds.bottom;
       const crossMin = horizontal ? bounds.top : bounds.left;
       const crossMax = horizontal ? bounds.bottom : bounds.right;
       // Slight vertical drift should not lift a horizontal tab out of its row.
       // Leaving the strip deliberately still allows cross-pane drops/cancel.
-      if (along < min - 12 || along > max + 12 || across < crossMin - 40 || across > crossMax + 40)
-        return;
+      if (across < crossMin - 40 || across > crossMax + 40) return;
+      // A quick drag that overshoots either end means the first or last place;
+      // the lifted item stays clamped to the list below.
       const first = reorderLayoutRect(items[0]);
       const last = reorderLayoutRect(items[items.length - 1]);
       const edge = Math.max(

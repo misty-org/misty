@@ -1,3 +1,4 @@
+import { usageLimitText } from "./usageLimits";
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -48,7 +49,13 @@ export function apiErrorMessage(code: string | undefined, fallback: string): str
 
 export function decodeApiError(text: string): { code?: string; message: string } {
   try {
-    const decoded = JSON.parse(text) as { code?: unknown; message?: unknown; error?: unknown };
+    const decoded = JSON.parse(text) as {
+      code?: unknown;
+      message?: unknown;
+      error?: unknown;
+      limit?: unknown;
+      resets_at?: unknown;
+    };
     const code = typeof decoded.code === "string" ? decoded.code : undefined;
     const message =
       typeof decoded.message === "string"
@@ -56,6 +63,16 @@ export function decodeApiError(text: string): { code?: string; message: string }
         : typeof decoded.error === "string"
           ? decoded.error
           : "";
+    if (code === "usage_limit_reached") {
+      return {
+        code,
+        message: usageLimitText(
+          typeof decoded.limit === "string" ? decoded.limit : undefined,
+          typeof decoded.resets_at === "string" ? decoded.resets_at : undefined,
+          message,
+        ),
+      };
+    }
     return { code, message: apiErrorMessage(code, message) };
   } catch {
     return { message: apiErrorMessage(undefined, text) };
