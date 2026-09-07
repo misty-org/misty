@@ -126,7 +126,7 @@ export default defineConfig({
     // before it can register its Misty entry point.
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
-  plugins: [officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts()] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
+  plugins: [officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
   resolve: {
     alias: [{ find: "@", replacement: source }],
   },
