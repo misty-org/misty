@@ -6,6 +6,7 @@ import {
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId } from "./globalMistyActions";
 import type { GlobalSearchState } from "./globalSearchState";
+import { settleProgress, withToolEvent } from "@/features/agents";
 import type {
   GlobalAiCitation,
   GlobalAiContextRef,
@@ -183,6 +184,16 @@ export function applyGlobalInvocationEvent(
     useCollaborationStore.getState().applyEvent(conversationId, event as CollaborationEvent);
     return;
   }
+  if (event.type === "notebook.updated") {
+    patchConversationMessage(set, get, conversationId, messageId, { notebook: event.notebook });
+    return;
+  }
+  if (event.type === "delegation.updated") {
+    patchConversationMessage(set, get, conversationId, messageId, {
+      subagents: event.delegation.children,
+    });
+    return;
+  }
   if (event.type === "screen.request") {
     patchConversationMessage(set, get, conversationId, messageId, {
       screenRequest: { ...event.screenRequest, state: "pending" },
@@ -196,6 +207,19 @@ export function applyGlobalInvocationEvent(
     patchConversationMessage(set, get, conversationId, messageId, {
       citations: dedupeGlobalCitations([...(current?.citations ?? []), event.citation]),
     });
+    return;
+  }
+  if (
+    event.type === "tool.started" ||
+    event.type === "tool.completed" ||
+    event.type === "tool.failed" ||
+    event.type === "tool.detail"
+  ) {
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
+    if (current)
+      patchConversationMessage(set, get, conversationId, messageId, withToolEvent(current, event));
     return;
   }
   if (event.type === "assistant.status") {
@@ -221,8 +245,12 @@ export function applyGlobalInvocationEvent(
     activeGlobalInvocationStream = undefined;
     const content =
       event.type === "invocation.failed" ? event.error : "This Misty answer was canceled.";
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
     patchConversationMessage(set, get, conversationId, messageId, {
       content,
+      progress: settleProgress(current?.progress),
       state: event.type === "invocation.failed" ? "failed" : "canceled",
       retryable: event.type === "invocation.failed",
       activity: undefined,

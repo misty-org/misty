@@ -7,10 +7,10 @@ import { resolveApiBase } from "@/api/deployment/api";
 import { useSettingsProfiles } from "@/features/settings/sync";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { retryWorkspaceRecovery } from "@/features/workspace/useWorkspaceRecoveryRetry";
-import { lockNativeSync, unlockNativeSync, vaultAvailability } from "./native";
+import { flushNativeSync, lockNativeSync, unlockNativeSync, vaultAvailability } from "./native";
 import { useBrowserSyncStore } from "./store";
 import type { SyncActionKind } from "./syncStatus";
-export type RetrySyncResult = "complete" | "credentials" | "setup" | "sign-in" | "stale";
+export type RetrySyncResult = "complete" | "credentials" | "setup" | "sign-in" | "stale" | "sent";
 const attempts = new Map<string, Promise<RetrySyncResult>>();
 /** Every user-initiated sync recovery enters here, including settings-only retries. */
 export function retrySync(
@@ -29,6 +29,10 @@ export function retrySync(
     if (action === "setup") return "setup";
     const state = useBrowserSyncStore.getState();
     const session = state.session?.account_id === accountId ? state.session : null;
+    if (action === "sync-now" && session && !settingsOnly) {
+      await flushNativeSync(session.session_id);
+      return "sent";
+    }
     if (
       !settingsOnly &&
       (action === "reenroll" ||

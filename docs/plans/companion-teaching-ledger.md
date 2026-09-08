@@ -24,7 +24,7 @@ Raw coordinate accuracy is probably a real problem too, but nobody has measured 
 | L4 | P1 | Overlay | The bubble shows a random phrase, not the element or the action | Confirmed | Fixed: the bubble types the label, with the step during a walkthrough |
 | L5 | P0 | Prompt | The teaching persona is diluted by the execution prompt | Confirmed | Fixed: teaching turns use only the teaching prompt, with no tools |
 | L6 | P1 | Prompt | No teaching or pointing examples, and no encouragement to point | Confirmed | Fixed: Clicky's rules and examples, adapted |
-| L7 | P0 | Accuracy | No pointing eval, so hit rate is unknown | Confirmed | Built; needs fixtures and a run (see README) |
+| L7 | P0 | Accuracy | No pointing eval, so hit rate is unknown | Confirmed | Built. First run October 10 on 30 web-page fixtures (the browser benchmark's pages, rendered off screen): `openai/gpt-6-luna` hit 30/30, median miss under 1 px, 2.3 s. Native-app fixtures still need capturing on a Mac with Screen Recording |
 | L8 | P1 | Accuracy | Possible provider image resize breaks the coordinate space | Unmeasured | Fixed: captures stay inside the provider size limits; the eval measures the rest |
 | L9 | P1 | Teaching | One point per answer, with no step-by-step guide mode | Confirmed | Built: `[GUIDE:k/n]`, waits for the target click, then the next step |
 | L10 | P1 | Accuracy | No snap to real UI elements (Accessibility) | Confirmed | Built: macOS Accessibility snap (no Windows equivalent yet) |
@@ -153,6 +153,15 @@ Live checks on this Mac:
 - **Refine prompt.** On a 2× crop it returned the exact center (`[POINT:280,148]`) and `[POINT:none]` for a control that does not exist.
 - **Voice routing.** `TestVoiceConversationLiveRoutesScreenQuestions` (opt-in, `MISTY_REALTIME_CONVERSATION_LIVE=1`) runs the real realtime model through the server actor with typed turns. It sent "where's the push button on my screen?" and "walk me through committing…" to `show_on_screen`, "push my branch to github for me" to `start_task`, and small talk to no tool. First audio arrived in 0.5–1.2 s.
 - **Accessibility snap.** On the real desktop it snapped a point on the Apple menu, and one 14 pt away, to the menu bar item (matched). Points with an unmatched label over no control returned nothing, in 22–110 ms.
+
+In-app pass (2026-10-08 and 09, dev API rebuilt with these changes):
+
+- **Typed question.** "Where is the Apple menu? point at it" first answered that it could not see the screen. The companion prompt told runs without captures to give up even when `screen_look` was available. Fixed: a desktop run without captures now calls `screen_look` first. Afterwards the companion flew to the Apple menu, and to the View menu on a follow-up, with a ring exactly on the item, the character parked beside it, and the bubble reading "View menu".
+- **Walkthrough.** "Walk me through opening this app's Settings" first came back as "Still incomplete", because the general turn filed a partial task report for step 1 of 2. Fixed in the teaching prompt: each step is a complete reply. Afterwards step 1 held on the dev1 menu ("1 of 2 · open the app menu"). Clicking it captured the screen, and Misty answered "good, the app menu is open. click Settings…" with step 2 pointed.
+- **Voice.** You confirmed that "where's the Window menu?" pointed and read the answer. The server logs show the teaching turn (one capture), a refine and narration, at 0.7 s to first audio.
+- **Reasoning.** Teaching turns ran at `high`, because the catalog lists only the user-facing Thinking presets and the low-effort check always failed. Fixed: the teaching effort now applies after the account's choice is validated.
+- **Accessibility snap.** In the app the snap found nothing and the crop refine placed every point, about 3.5 s each. The snap itself works (see the probe above), so the `dev1` app most likely lacks Accessibility permission (System Settings › Privacy & Security › Accessibility).
+- **Quiet hand-off.** At your request, the voice no longer announces work ("let me take a look", "this will run as a task"). An admitted `show_on_screen` or `start_task` ends the spoken turn without another response, the companion keeps its spinner, and only the answer is read aloud. A refused admission is still explained. In the live routing test, screen and work requests said nothing in two runs out of two, and small talk still answers. This has not been tried by voice in the app yet.
 
 Server suite (`.githooks/server-tests.sh`, disposable database): everything passes except `TestScreenModelPassThroughForALiveActJob`. That one fails because another in-progress change raised `screenModelMaxCalls` from 40 to 80 without updating its test, and is unrelated to this work.
 

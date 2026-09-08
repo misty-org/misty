@@ -4,7 +4,7 @@ import {
   DesktopSettingsSection as Section,
   DesktopSettingsRow as Row,
 } from "@/features/settings/desktop";
-import { SettingsNote } from "@/features/settings/SettingsControls";
+import { ChoiceControl, SettingsNote, stringSetting } from "@/features/settings/SettingsControls";
 import type { SettingsContentProps } from "@/features/settings/settingsTypes";
 import { SettingsSyncSection, SyncRestoreSettings } from "@/features/settings/syncSettings";
 import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
@@ -40,6 +40,18 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
             onAction={() => void controller.retry()}
           />
         </div>
+        <Row label="Sync frequency">
+          <ChoiceControl
+            value={stringSetting(props.document, "sync", "sync_frequency", "balanced")}
+            disabled={props.working}
+            options={[
+              { value: "live", label: "Live" },
+              { value: "balanced", label: "Balanced" },
+              { value: "saver", label: "Saver" },
+            ]}
+            onValueChange={(value) => props.onSettingChange("sync", "sync_frequency", value)}
+          />
+        </Row>
       </Section>
       <Section title="Workspace devices">
         {session ? (
@@ -57,10 +69,7 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
           Sync cookies and sign-in keys so websites can recognize you on another device. Some
           websites may ask you to sign in again.
         </SettingsNote>
-        <Row
-          label="Publishing from"
-          description="The machine currently publishing website sign-ins."
-        >
+        <Row label="Publishing from">
           <span className="text-sm text-cream-muted">
             {session?.supports_cookie_handoff === false
               ? "Not supported on this device"

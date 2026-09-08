@@ -19,7 +19,7 @@ The overlay is an Operate surface. A person starts with the message field, switc
 - An input-led hierarchy with quiet icon controls and a compact agent identity.
 - Automatic current-view context and a detached bar containing only execution controls.
 
-Source authority is `GlobalMisty.tsx`, `GlobalMistyChrome.tsx`, `MistyComposer.tsx`, `MistyAgentPicker.tsx`, `MistyModelPicker.tsx`, `MistyOverlayControls.tsx`, `../misty/MistyContextBar.tsx`, and `../agents/WorkspaceAutopilotBar.tsx`.
+Source authority is `GlobalMisty.tsx`, `GlobalMistyChrome.tsx`, `MistyComposer.tsx`, `MistyAgentPicker.tsx`, `../agents/models/ReasoningPicker.tsx`, `../misty/MistyContextBar.tsx`, and `../agents/AgentControlIsland.tsx`.
 
 ## Colors
 
@@ -55,7 +55,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 
 - **Composer:** Reuse `Button` and the attachment menu. The plus trigger offers files and region capture when capture is available; otherwise retain the direct attachment action. Keep attachment and thinking-options triggers icon-only, with accessible names and the options trigger's expanded state. Preserve attachment previews, disabled send, and existing keyboard submission behavior.
 - **Agent switcher:** Make the header's active agent avatar, name, and chevron one trigger. Its menu lists enabled agents created for the account and marks the selected agent. Keep long names bounded. Loading and errors belong in the menu; switching is unavailable while work or an execution is active. Do not turn the header into an agent setup form.
-- **Thinking options:** Reuse shared buttons for only Normal and Deep thinking, with the selected choice exposed through `aria-pressed`. The compatibility component `MistyModelPicker` now presents thinking presets, not model or provider selection. Model choice remains server-managed; the presets map to high and xhigh effort. Keep those implementation labels out of the visible control. Disable changes while saving or working and show save failures beside the choices.
+- **Thinking options:** Reuse shared buttons for only Normal and Deep thinking, with the selected choice exposed through `aria-pressed`. `ReasoningPicker` presents only thinking presets; reasoning and model are separate choices, and changing one never changes the other. The presets map to high and xhigh effort. Keep those implementation labels out of the visible control. Disable changes while saving or working and show save failures beside the choices.
 - **Voice:** The microphone icon starts recording and changes to a stop control during recording. Its adjacent chevron opens the input-device menu; opening that menu must not start recording. Preserve recording, permission-request, and transcription restrictions, plus accessible names on both controls.
 - **Context and apps:** The overlay uses the current view automatically; users express another destination in the prompt. Do not add manual Space, screen, or workspace-context selectors. Installed and connected apps follow the automatic availability path, subject to existing capabilities and permissions; the overlay has no per-agent assignment setup. `MistyContextBar` is reserved for artifact review, undo, handoff notices, and errors, not context configuration.
 - **Connected-app confirmations:** When _Ask before acting for you_ is on, connect and confirm cards appear in the conversation. They are not a separate approval surface.

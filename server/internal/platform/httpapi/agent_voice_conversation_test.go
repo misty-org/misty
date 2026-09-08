@@ -326,3 +326,48 @@ func TestVoiceShowOnScreenNeedsTheQuestionAndAdmitsByKey(t *testing.T) {
 		t.Fatal("only admitting tools bind by idempotency key")
 	}
 }
+
+func TestVoiceConversationAdmittedWorkEndsTheTurnWithoutAnnouncingIt(t *testing.T) {
+	f := conversationFixture(t, nil)
+	conversationText(t, f)
+	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "show", Name: "show_on_screen", Arguments: `{"instruction":"where is commit?"}`}
+	f.responseDone("completed")
+	if e := f.read(t); e["type"] != "tool.call" {
+		t.Fatal(e)
+	}
+	conversationSend(t, f, map[string]string{"type": "tool.result", "callId": "show", "invocationId": "bound-task"})
+	// The model learns the task was admitted, but is not asked to say so.
+	if event := voiceSent(t, f, "conversation-item-create"); event["item"].(map[string]any)["callId"] != "show" {
+		t.Fatal(event)
+	}
+	if e := f.read(t); e["type"] != "audio.done" {
+		t.Fatal(e)
+	}
+	conversationSend(t, f, map[string]string{"type": "playback.done"})
+	if e := f.read(t); e["type"] != "turn.done" {
+		t.Fatal(e)
+	}
+	select {
+	case e := <-f.provider.sent:
+		t.Fatalf("unexpected provider event after admission: %v", e)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestVoiceConversationRefusedWorkIsStillExplained(t *testing.T) {
+	f := conversationFixture(t, func(h *conversationHooks) {
+		h.Bind = func(context.Context, string, string, string) (string, error) {
+			return `{"error":"The task was not admitted. Ask the user to check the conversation before retrying."}`, nil
+		}
+	})
+	conversationText(t, f)
+	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "task", Name: "start_task", Arguments: `{"instruction":"organize my files"}`}
+	f.responseDone("completed")
+	if e := f.read(t); e["type"] != "tool.call" {
+		t.Fatal(e)
+	}
+	conversationSend(t, f, map[string]string{"type": "tool.result", "callId": "task", "invocationId": ""})
+	voiceSent(t, f, "conversation-item-create")
+	voiceSent(t, f, "response-create")
+	conversationComplete(t, f)
+}

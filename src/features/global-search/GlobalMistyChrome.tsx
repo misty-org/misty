@@ -3,7 +3,7 @@ import { cn, IconButton } from "@/shared/ui";
 import { Mic, Square, X } from "lucide-react";
 import type { KeyboardEvent, RefObject } from "react";
 import { MistyComposer } from "./MistyComposer";
-import { MistyModelPicker } from "./MistyModelPicker";
+import { ReasoningPicker } from "@/features/agents";
 import type { GlobalAiConversation, GlobalAiMode, MistyImageAttachment } from "./types";
 
 type VoiceRecorder = ReturnType<typeof useAiVoiceRecorder>;
@@ -30,7 +30,7 @@ export function GlobalMistyComposerBar(props: {
   voice: VoiceRecorder;
   onError: (message: string) => void;
   onClose: () => void;
-  onModelChange: (settings: { modelId: string; reasoningEffort: "high" | "xhigh" }) => void;
+  onReasoningChange: (settings: { reasoningEffort: "high" | "xhigh" }) => void;
 }) {
   return (
     <div className="relative">
@@ -55,12 +55,12 @@ export function GlobalMistyComposerBar(props: {
         onError={props.onError}
         modelControl={
           props.mode !== "search" ? (
-            <MistyModelPicker
+            <ReasoningPicker
+              iconOnly
               conversationId={props.activeConversationId}
-              modelId={props.conversation?.modelId}
               reasoningEffort={props.reasoningEffort}
               disabled={props.working}
-              onChange={props.onModelChange}
+              onChange={props.onReasoningChange}
             />
           ) : undefined
         }

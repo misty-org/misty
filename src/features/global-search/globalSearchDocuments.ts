@@ -3,8 +3,30 @@ import { spaceChatPath, useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchDocument, GlobalSearchResult } from "./types";
 
+let lastIndex:
+  | {
+      accountId: string;
+      state: ReturnType<typeof useSpacesStore.getState>;
+      documents: GlobalSearchDocument[];
+    }
+  | undefined;
+
+/**
+ * Every local document, rebuilt only when the Spaces store changes. The address bar
+ * searches this on each keystroke, so building it every time stalled typing.
+ */
 export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
   const state = useSpacesStore.getState();
+  if (lastIndex?.accountId === accountId && lastIndex.state === state) return lastIndex.documents;
+  const documents = buildDocuments(accountId, state);
+  lastIndex = { accountId, state, documents };
+  return documents;
+}
+
+function buildDocuments(
+  accountId: string,
+  state: ReturnType<typeof useSpacesStore.getState>,
+): GlobalSearchDocument[] {
   const spacesById = new Map(state.spaces.map((space) => [space.id, space]));
   const documents: GlobalSearchDocument[] = state.spaces.map((space) => ({
     id: `space:${space.id}`,

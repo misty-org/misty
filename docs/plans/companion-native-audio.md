@@ -35,7 +35,10 @@ text chat takes no screenshots and does not require the native overlay to start.
    reasoning). Its answer is pointed at and read aloud. Work requests still call
    `start_task`; a task that needs the screen calls `screen_look`, and its
    continuation keeps the voice conversation open and is the answer read aloud
-   (updated October 8, 2026; ledger L1, L2, L12). Ordinary conversation takes no
+   (updated October 8, 2026; ledger L1, L2, L12). Hand-offs are silent: the
+   model calls the tool without announcing it, an admitted tool ends the spoken
+   turn without another response, and the companion shows progress until the
+   answer is read. A refused admission is still explained. Ordinary conversation takes no
    screenshots. Images and tool results are evidence, never permission. The voice
    model does not claim it has inspected the screen before verified results
    arrive.

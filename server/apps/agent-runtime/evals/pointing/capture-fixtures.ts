@@ -1,6 +1,7 @@
 // Makes pointing fixtures from the screen as it is now (macOS only).
 //
 //   node evals/pointing/capture-fixtures.ts --app Xcode --delay 5 --limit 25
+//   (add --image screen.png to use a screenshot of the main display made elsewhere)
 //
 // Bring the app to the front during the delay. The main display is captured
 // at the size the companion sends, and the app's named controls become
@@ -102,9 +103,12 @@ function main() {
   const size = captureSize(listed.width, listed.height);
   const scale = size.width / listed.width;
   mkdirSync(out, { recursive: true });
-  const raw = join(tmpdir(), `${prefix}.png`);
+  // --image takes a screenshot of the main display made another way, for a
+  // terminal without Screen Recording access.
+  const given = option("image", "");
+  const raw = given ? resolve(given) : join(tmpdir(), `${prefix}.png`);
   const image = `${prefix}.jpg`;
-  execFileSync("screencapture", ["-x", "-m", "-t", "png", raw]);
+  if (!given) execFileSync("screencapture", ["-x", "-m", "-t", "png", raw]);
   execFileSync(
     "sips",
     [
@@ -122,7 +126,7 @@ function main() {
       stdio: "ignore",
     },
   );
-  rmSync(raw, { force: true });
+  if (!given) rmSync(raw, { force: true });
   const seen = new Set<string>();
   const usable = listed.controls.filter((control) => {
     const ask = QUESTIONS[control.role];

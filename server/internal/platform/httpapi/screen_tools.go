@@ -27,6 +27,11 @@ type screenRequest struct {
 	URL      string `json:"url,omitempty"`
 	Reason   string `json:"reason"`
 	Location string `json:"location"`
+	// Chosen reports that the user's words named the place; otherwise the
+	// desktop reuses an open tab that matches before using Location.
+	Chosen bool `json:"chosen,omitempty"`
+	// Remote is a browser session another device opened for this request.
+	Remote *remoteScreen `json:"remote,omitempty"`
 }
 
 // screenToolRegistrations are offered to desktop runs only; other surfaces
@@ -43,7 +48,8 @@ func (s *SpacesService) screenToolRegistrations(record *db.AIInvocationRecord) [
 				"(\"this page\", \"this tab\", \"here\"); new_tab for a website in a new tab beside their work (\"in a new tab\"); window for "+
 				"a separate Misty window that leaves theirs alone (\"in a new window\", \"in the background\", \"on your own\"); desktop "+
 				"for other apps on their Mac or the whole screen, such as Numbers, Finder or Mail, where Misty works with its own cursor "+
-				"after they allow it. Omit target when they did not say; Misty uses their preferred place for new screens. "+
+				"after they allow it. Omit target when they did not say, or when they mean a site they already have open (\"my Gmail tab\"), "+
+				"and pass that site's url: Misty reuses an open tab that matches, otherwise opens one where they prefer. "+
 				"If such a screen is already attached, use browser_act with its scopeId instead. Otherwise this ends the current "+
 				"response; Misty opens the screen and continues this conversation with it attached. Do not ask the user where to work.",
 			map[string]any{"reason": reason,
@@ -108,6 +114,9 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 			default:
 				return nil, serveragent.ErrInvalidRequest("target must be current_tab, new_tab, window or desktop.")
 			}
+			if remote, err := s.remoteScreenOpen(ctx, record, body, request.ID, input.URL, input.Reason, desktop); remote != nil || err != nil {
+				return remote, err
+			}
 			if invocationHasDesktopControl(body) == desktop {
 				// Folders and the tab list are attached to most runs; only a scope
 				// browser_act can drive counts as an open screen.
@@ -124,7 +133,7 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 		if err != nil {
 			return nil, err
 		}
-		screen := &screenRequest{Kind: kind, URL: input.URL, Reason: strings.TrimSpace(input.Reason), Location: settings.ScreenLocation}
+		screen := &screenRequest{Kind: kind, URL: input.URL, Reason: strings.TrimSpace(input.Reason), Location: settings.ScreenLocation, Chosen: input.Target != ""}
 		// The user's words override where new screens usually open. Locations:
 		// current (their tab), window (a new tab in their window), separate.
 		switch input.Target {

@@ -1,12 +1,35 @@
 import { invokeShortcutCommand, shortcutCommandRegistry } from "@/features/shortcuts";
 import { launchSiteApp } from "@/features/bookmarks/siteApps";
-import { appsId, bookmarkTree } from "@/features/bookmarks/tree";
+import { appsId, bookmarkTree, type BookmarkNode } from "@/features/bookmarks/tree";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import type { ScopedSearchResult } from "./scopedSearchSources";
 
 /** The search box itself and keys that only make sense inside it. */
 const hidden = new Set(["search.toggle", "app.command_palette"]);
 const limit = 3;
+
+type WorkspaceState = ReturnType<typeof useWorkspaceStore.getState>;
+let lastApps:
+  | {
+      folders: WorkspaceState["bookmarkFolders"];
+      bookmarks: WorkspaceState["bookmarks"];
+      apps: { app: Extract<BookmarkNode, { kind: "bookmark" }>; text: string }[];
+    }
+  | undefined;
+
+/** Installed site apps with their lowercased search text, rebuilt only when bookmarks change. */
+function siteApps(state: WorkspaceState) {
+  if (lastApps?.folders !== state.bookmarkFolders || lastApps.bookmarks !== state.bookmarks)
+    lastApps = {
+      folders: state.bookmarkFolders,
+      bookmarks: state.bookmarks,
+      apps: bookmarkTree(state.bookmarkFolders, state.bookmarks)
+        .children(appsId)
+        .flatMap((node) => (node.kind === "bookmark" ? [node] : []))
+        .map((app) => ({ app, text: `${app.title} ${app.url}`.toLocaleLowerCase() })),
+    };
+  return lastApps.apps;
+}
 
 /**
  * Browser and app commands whose name or aliases match what was typed, so the
@@ -51,13 +74,10 @@ export function searchCommands(query: string): ScopedSearchResult[] {
 export function searchSiteApps(query: string): ScopedSearchResult[] {
   const needle = query.trim().toLocaleLowerCase();
   if (needle.length < 2) return [];
-  const state = useWorkspaceStore.getState();
-  return bookmarkTree(state.bookmarkFolders, state.bookmarks)
-    .children(appsId)
-    .flatMap((node) => (node.kind === "bookmark" ? [node] : []))
-    .filter((app) => `${app.title} ${app.url}`.toLocaleLowerCase().includes(needle))
+  return siteApps(useWorkspaceStore.getState())
+    .filter((entry) => entry.text.includes(needle))
     .slice(0, limit)
-    .map((app) => ({
+    .map(({ app }) => ({
       id: `app:${app.id}`,
       kind: "action" as const,
       title: `Open ${app.title}`,

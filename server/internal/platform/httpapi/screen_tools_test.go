@@ -57,7 +57,7 @@ func TestScreenGuidanceOffersOnDemandScreensInsteadOfAModeChoice(t *testing.T) {
 	}
 }
 
-func TestBrowserActIsTheOnlyWayToActOnAPage(t *testing.T) {
+func TestBrowserActActsWhenNoPageToolsAreGranted(t *testing.T) {
 	var act bool
 	for _, descriptor := range browserToolDescriptors() {
 		if descriptor.Name == screenActTool {

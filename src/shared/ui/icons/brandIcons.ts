@@ -96,6 +96,24 @@ import brand94 from "./brand-icons/vivaldi.svg?inline";
 import brand95 from "./brand-icons/opera.svg?inline";
 import brand96 from "./brand-icons/safari.svg?inline";
 import brand97 from "./brand-icons/chromium.svg?inline";
+import brand98 from "./brand-icons/qwen.svg?inline";
+import brand99 from "./brand-icons/arcee.svg?inline";
+import brand100 from "./brand-icons/cohere.svg?inline";
+import brand101 from "./brand-icons/fireworks.svg?inline";
+import brand102 from "./brand-icons/fish-audio.svg?inline";
+import brand103 from "./brand-icons/google-logo.svg?inline";
+import brand104 from "./brand-icons/inception.svg?inline";
+import brand105 from "./brand-icons/microsoft-logo.svg?inline";
+import brand106 from "./brand-icons/minimax.svg?inline";
+import brand107 from "./brand-icons/moonshot.svg?inline";
+import brand108 from "./brand-icons/poolside.svg?inline";
+import brand109 from "./brand-icons/sakana.svg?inline";
+import brand110 from "./brand-icons/stepfun.svg?inline";
+import brand111 from "./brand-icons/tencent.svg?inline";
+import brand112 from "./brand-icons/xai.svg?inline";
+import brand113 from "./brand-icons/zai.svg?inline";
+import brand114 from "./brand-icons/xiaomi.svg?inline";
+import brand115 from "./brand-icons/meituan.svg?inline";
 
 /** Canonical artwork shared by packages, navigation, tabs, Discover, and connections. */
 export const brandIcons = {
@@ -197,6 +215,24 @@ export const brandIcons = {
   opera: brand95,
   safari: brand96,
   chromium: brand97,
+  qwen: brand98,
+  arcee: brand99,
+  cohere: brand100,
+  fireworks: brand101,
+  "fish-audio": brand102,
+  "google-logo": brand103,
+  inception: brand104,
+  "microsoft-logo": brand105,
+  minimax: brand106,
+  moonshot: brand107,
+  poolside: brand108,
+  sakana: brand109,
+  stepfun: brand110,
+  tencent: brand111,
+  xai: brand112,
+  zai: brand113,
+  xiaomi: brand114,
+  meituan: brand115,
 } as const;
 
 export type BrandId = keyof typeof brandIcons;

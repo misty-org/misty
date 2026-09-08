@@ -6,6 +6,7 @@ import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/
 import { ensureServerAgentDevice, agentsDeviceSnapshot } from "@/features/agents";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { GlobalAiContextRef } from "./types";
+import { browserTabAgentCapabilities } from "@/features/agents/browserTabCapabilities";
 
 export interface BrowserAskSnapshot {
   id: string;
@@ -99,7 +100,7 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
         displayName: source.title,
         // A native menu supplies the source. Execution still requires the user's
         // submitted task and the existing run-bound native action checks.
-        capabilities: ["browser.inspect", "browser.visual", "browser.navigate", "browser.act"],
+        capabilities: browserTabAgentCapabilities,
         metadata: {
           origin: new URL(source.href!).origin,
           label: source.title,

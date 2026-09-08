@@ -45,6 +45,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         variant={variant}
         size="none"
         aria-label={ariaLabel ?? label}
+        data-icon-size={size}
         title={tooltip === false ? label : undefined}
         className={cn(
           "shrink-0 p-0 shadow-none",

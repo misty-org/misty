@@ -138,6 +138,8 @@ export function BrowserContextMenuView({
       </Portal>
       <DropdownMenuContent
         aria-label="Browser actions"
+        // Opens at the pointer, so it fades in place rather than sliding.
+        data-popup-at-pointer=""
         align="start"
         side="bottom"
         sideOffset={0}

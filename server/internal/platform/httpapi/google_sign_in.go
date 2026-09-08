@@ -39,7 +39,12 @@ type GoogleSignInService struct {
 	startURL string
 	validate func(context.Context, string, string) (*idtoken.Payload, error)
 	session  func(http.ResponseWriter, *http.Request, *db.User)
+	// verification marks Google accounts verified and records signup signals.
+	verification *AccountVerification
 }
+
+// SetVerification lets Google sign-ins mark their (Google-verified) email.
+func (s *GoogleSignInService) SetVerification(v *AccountVerification) { s.verification = v }
 
 func NewGoogleSignInService(database *db.Database) (*GoogleSignInService, error) {
 	s := &GoogleSignInService{store: database, validate: idtoken.Validate}
@@ -341,6 +346,7 @@ func (s *GoogleSignInService) Complete() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]string{"reauthentication_token": token})
 			return
 		}
+		s.verification.AfterSignup(r, user, true)
 		s.session(w, r, user)
 	}
 }

@@ -135,3 +135,15 @@ it("does not report settings as synced before the account record has loaded", ()
     selectSyncStatus({ ...base, preferences: { ...base.preferences!, synced: false } }).title,
   ).toBe("Loading settings");
 });
+
+it("offers Sync now while batched workspace edits wait to be sent", () => {
+  const waiting = syncSession();
+  waiting.sync = { pending: ["workspace"] } as unknown as typeof waiting.sync;
+  expect(selectSyncStatus({ ...base, session: waiting })).toMatchObject({
+    tone: "neutral",
+    title: "Syncing",
+    action: { kind: "sync-now", label: "Sync now" },
+  });
+  waiting.status.phase = "offline";
+  expect(selectSyncStatus({ ...base, session: waiting }).action?.kind).toBe("retry");
+});

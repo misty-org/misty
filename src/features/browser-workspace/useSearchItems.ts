@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useDeferredValue, useEffect, useMemo } from "react";
 import {
   createOmniboxProviders,
   liveOmniboxDeps,
+  warmOmniboxCaches,
   searchSuggestProvider,
   useOmniboxAutocomplete,
   type OmniboxInput,
@@ -58,6 +59,16 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
   const plainInput = useMemo(() => (plain === null ? null : omniboxInput(plain)), [plain]);
   const webInput = useMemo(() => (webText === null ? null : omniboxInput(webText)), [webText]);
   const matches = useOmniboxAutocomplete(plainInput, providers);
+  // Commands and site apps follow the deferred text, so typing paints before they are searched.
+  const deferredPlain = useDeferredValue(plain);
+  const commandResults = useMemo(
+    () =>
+      deferredPlain === null
+        ? []
+        : [...searchSiteApps(deferredPlain), ...searchCommands(deferredPlain)],
+    [deferredPlain],
+  );
+  useEffect(() => (open ? warmOmniboxCaches() : undefined), [open]);
   const webSuggestions = useOmniboxAutocomplete(webInput, suggestProviders);
 
   let items: SearchListItem[];
@@ -77,9 +88,10 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
     items = [
       ...matches.map((match) => ({ type: "match" as const, match })),
       // Matching commands follow the pages, so Enter still opens the typed address.
-      ...(plain === null ? [] : [...searchSiteApps(plain), ...searchCommands(plain)]).map(
-        (result) => ({ type: "result" as const, result }),
-      ),
+      ...(plain === null ? [] : commandResults).map((result) => ({
+        type: "result" as const,
+        result,
+      })),
     ];
 
   return {

@@ -66,6 +66,7 @@ export * from "./feedback/Banner";
 export * from "./feedback/LoadingScreen";
 export * from "./feedback/Notification";
 export * from "./feedback/Progress";
+export * from "./feedback/AnimatedEllipsis";
 export * from "./feedback/Skeleton";
 export * from "./feedback/Spinner";
 export * from "./feedback/StateView";

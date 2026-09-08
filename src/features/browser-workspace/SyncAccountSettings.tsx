@@ -81,10 +81,7 @@ export function SyncAccountSettings({ controller }: { controller: SyncController
         <SettingsNote>Open the Misty desktop app to manage your encrypted sync vault.</SettingsNote>
       ) : controller.session ? (
         <>
-          <Row
-            label="Sync vault"
-            description="Workspace content is encrypted on this device before upload."
-          >
+          <Row label="Sync vault" description="Encrypted on this device before upload.">
             <Button
               variant="outline"
               disabled={controller.busy}
@@ -93,10 +90,7 @@ export function SyncAccountSettings({ controller }: { controller: SyncController
               Lock sync
             </Button>
           </Row>
-          <Row
-            label="Saved device key"
-            description="Forget the saved key to require your sync password and secret next time."
-          >
+          <Row label="Saved device key">
             <Button
               variant="outline"
               disabled={controller.busy || !controller.vault?.local}
