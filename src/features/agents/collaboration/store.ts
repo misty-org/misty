@@ -32,7 +32,7 @@ interface CollaborationStore {
   setDefaultMode(mode: ConversationMode): void;
   error: string;
   /**
-   * A turn another surface (the Task drawer) wants sent in a conversation, such
+   * A turn another surface (the Goal dialog) wants sent in a conversation, such
    * as starting or resuming a goal. The open conversation sends it when idle.
    */
   queuedTurn?: { conversationId: string; prompt: string; nonce: number };

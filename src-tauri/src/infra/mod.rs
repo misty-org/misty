@@ -1,3 +1,4 @@
+pub mod agent_dock;
 pub mod agent_workspace;
 pub mod agents;
 #[cfg(target_os = "macos")]
@@ -8,7 +9,11 @@ pub mod browser;
 #[cfg(desktop)]
 pub mod browser_agent_control;
 pub mod default_browser;
+#[cfg(desktop)]
+pub mod power_keep_awake;
 
+#[cfg(all(desktop, target_os = "macos"))]
+pub(crate) mod browser_content_world;
 #[cfg(desktop)]
 pub mod browser_history;
 #[cfg(desktop)]
@@ -156,6 +161,9 @@ pub mod browser_content_blocking;
 
 #[cfg(desktop)]
 pub mod browser_site_style;
+
+#[cfg(desktop)]
+pub mod browser_night_light;
 
 pub mod settings_profile_store;
 

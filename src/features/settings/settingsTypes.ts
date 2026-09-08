@@ -28,6 +28,7 @@ export type SettingsSection =
   | "agents-connections"
   | "agents-permissions"
   | "agents-companion"
+  | "agents-usage"
   | "account"
   | "general"
   | "sync"

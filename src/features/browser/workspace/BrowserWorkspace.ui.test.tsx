@@ -141,8 +141,10 @@ describe("BrowserWorkspace", () => {
     act(() => root.render(view(browserTab)));
     const workspace = container.querySelector("[data-browser-workspace-tab]");
     expect(workspace).not.toBeNull();
-    expect(workspace?.classList.contains("grid-rows-[44px_minmax(0,1fr)]")).toBe(false);
-    expect(workspace?.classList.contains("grid-rows-[44px_auto_minmax(0,1fr)]")).toBe(true);
+    // Three rows: the toolbar, an optional bar, then the page.
+    expect((workspace as HTMLElement | null)?.style.gridTemplateRows).toMatch(
+      /^\d+px auto minmax\(0(px)?,\s?1fr\)$/,
+    );
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
@@ -233,8 +235,10 @@ describe("BrowserWorkspace", () => {
       await settleBrowserOverlay();
     });
     const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(focusedOptions.map((option) => option.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("youtube.com")]),
+    // Before typing the list is recent pages and tabs; the current page is not repeated.
+    expect(focusedOptions.length).toBeGreaterThan(0);
+    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(
+      false,
     );
     await act(async () => {
       fireEvent.change(input!, { target: { value: "vimeo.com" } });
@@ -244,9 +248,7 @@ describe("BrowserWorkspace", () => {
     expect(options.map((option) => option.textContent)).toEqual(
       expect.arrayContaining([expect.stringContaining("vimeo.com")]),
     );
-    expect(options.map((option) => option.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("Search with Google")]),
-    );
+    expect(options.some((option) => option.textContent?.includes("Search with"))).toBe(false);
   });
   it("opens a functional browser menu", async () => {
     await act(async () => root.render(view(browserTab)));

@@ -13,11 +13,11 @@ import {
   Button,
   IconButton,
 } from "@/shared/ui";
-import { AgentConversationActions } from "../components/AgentConversationActions";
 import { AgentFolderGroup } from "../folders/AgentFolderGroup";
 import { useAgentFoldersStore, type AgentConversationFolder } from "../folders/agentFoldersStore";
-import { FolderNameDialog } from "../folders/FolderNameDialog";
-import { RecentStatusBadge, type RecentStatus } from "./RecentStatusBadge";
+import { useConversationDrop, type ConversationDrop } from "../folders/useConversationDrop";
+import { AgentRecentRow } from "./AgentRecentRow";
+import type { RecentStatus } from "./RecentStatusBadge";
 
 export type { RecentStatus };
 
@@ -26,9 +26,10 @@ type Recent = { id: string; title?: string; folderId?: string };
 export type RecentFolder = { folder: AgentConversationFolder; conversations: Recent[] };
 
 /**
- * The sidebar's conversations: the agent's folders first, then unfiled Recents.
+ * The sidebar's conversations: the agent's projects (stored as folders) first, then
+ * unfiled Recents.
  * Cmd/Ctrl-click toggles a row and Shift-click selects a range across both, as in
- * Finder; a plain click just opens it.
+ * Finder; a plain click just opens it. Dragging rows onto a project or Recents files them.
  */
 /** Memoized: the open conversation's streaming updates must not re-render every row. */
 export const AgentRecentConversations = memo(function AgentRecentConversations({
@@ -39,6 +40,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   activeId,
   disabled,
   onConversation,
+  onNewProject,
 }: {
   agentId: string;
   folders?: RecentFolder[];
@@ -49,6 +51,8 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   activeId?: string;
   disabled: boolean;
   onConversation(id: string): void;
+  /** Opens the New project dialog, which the frame owns so Get started can open it too. */
+  onNewProject(): void;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const anchor = useRef<string | undefined>(undefined);
@@ -56,12 +60,52 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [params, setParams] = useSearchParams();
-  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const recentsRef = useRef<HTMLDivElement>(null);
   // Every listed row in screen order, so a Shift-click range can span folders and Recents.
   const visible = useMemo(
     () => [...folders.flatMap((group) => group.conversations), ...recent],
     [folders, recent],
   );
+  // Where each listed conversation is filed now; "" is Recents.
+  const placeOf = useMemo(
+    () =>
+      new Map([
+        ...folders.flatMap(({ folder, conversations }) =>
+          conversations.map((c) => [c.id, folder.id] as const),
+        ),
+        ...recent.map((c) => [c.id, ""] as const),
+      ]),
+    [folders, recent],
+  );
+  const drop: ConversationDrop = {
+    scope: `agent-conversations:${agentId}`,
+    folderOf: (id) => placeOf.get(id),
+    file: (ids, folderId) => {
+      const moving = ids.filter((id) => placeOf.has(id) && placeOf.get(id) !== folderId);
+      if (!moving.length) return;
+      setSelected([]);
+      void (async () => {
+        const store = useAgentFoldersStore.getState();
+        for (const id of moving) await store.file(id, folderId);
+      })().catch((failure) => useMistyStore.setState({ error: globalMistyError(failure) }));
+    },
+  };
+  useConversationDrop(recentsRef, drop, "");
+  // Alt+Shift+Up/Down steps a conversation through the projects, then Recents.
+  const places = useMemo(
+    () => [
+      ...folders.map(({ folder }) => ({ id: folder.id, name: folder.name })),
+      { id: "", name: "Recents" },
+    ],
+    [folders],
+  );
+  const step = (id: string, direction: -1 | 1) => {
+    const target = places[places.findIndex((place) => place.id === placeOf.get(id)) + direction];
+    if (!target) return;
+    drop.file([id], target.id);
+    setAnnouncement(`Moved to ${target.name}.`);
+  };
 
   // Drop selections whose conversations went away.
   useEffect(() => {
@@ -126,26 +170,23 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
 
   const count = selected.length;
   const row = (c: Recent) => (
-    <div
+    <AgentRecentRow
       key={c.id}
-      className="agent-studio-recent-row"
-      data-selected={selected.includes(c.id) || undefined}
-    >
-      <Button
-        data-agent-navigation-control
-        variant="ghost"
-        justify="start"
-        disabled={disabled}
-        title={c.title || "Untitled conversation"}
-        aria-current={activeId === c.id ? "page" : undefined}
-        aria-pressed={count ? selected.includes(c.id) : undefined}
-        onClick={(event) => click(event, c.id)}
-      >
-        <RecentStatusBadge status={statuses?.[c.id]} />
-        <span className="agent-studio-recent-title">{c.title || "Untitled conversation"}</span>
-      </Button>
-      <AgentConversationActions conversation={{ ...c, agentId }} disabled={disabled} />
-    </div>
+      conversation={c}
+      scope={drop.scope}
+      dragIds={
+        selected.includes(c.id)
+          ? visible.filter((v) => selected.includes(v.id)).map((v) => v.id)
+          : [c.id]
+      }
+      status={statuses?.[c.id]}
+      active={activeId === c.id}
+      selected={selected.includes(c.id)}
+      selecting={count > 0}
+      disabled={disabled}
+      onClick={(event) => click(event, c.id)}
+      onMove={(direction) => step(c.id, direction)}
+    />
   );
   return (
     <section
@@ -176,33 +217,37 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
           </IconButton>
         </div>
       ) : null}
+      <div className="agent-studio-recents-heading">
+        <h2>Projects</h2>
+        <IconButton label="New project" disabled={disabled} onClick={onNewProject}>
+          <FolderPlus size={15} />
+        </IconButton>
+      </div>
       {folders.map(({ folder, conversations }) => (
         <AgentFolderGroup
           key={folder.id}
           folder={folder}
           count={conversations.length}
           disabled={disabled}
+          drop={drop}
         >
           {conversations.map(row)}
         </AgentFolderGroup>
       ))}
-      <div className="agent-studio-recents-heading">
-        <h2>Recents</h2>
-        <IconButton label="New folder" disabled={disabled} onClick={() => setCreatingFolder(true)}>
-          <FolderPlus size={15} />
-        </IconButton>
+      <div
+        ref={recentsRef}
+        className="agent-studio-recents-group"
+        role="group"
+        aria-label="Recents"
+      >
+        <div className="agent-studio-recents-heading">
+          <h2>Recents</h2>
+        </div>
+        {recent.map(row)}
       </div>
-      {recent.map(row)}
-      <FolderNameDialog
-        open={creatingFolder}
-        title="New folder"
-        description="Group this agent's conversations. Move a conversation in from its menu."
-        submitLabel="Create"
-        onOpenChange={setCreatingFolder}
-        onSubmit={async (name) => {
-          await useAgentFoldersStore.getState().create(agentId, name);
-        }}
-      />
+      <span className="sr-only" role="status">
+        {announcement}
+      </span>
       <AlertDialog open={confirming} onOpenChange={(open) => !busy && setConfirming(open)}>
         <AlertDialogContent>
           <AlertDialogTitle>

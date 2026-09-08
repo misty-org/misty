@@ -34,7 +34,10 @@ extern "C" {
         task: *const std::ffi::c_char,
         ask: bool,
         callback: extern "C" fn(*const std::ffi::c_char),
+        island: extern "C" fn(*const std::ffi::c_char),
     );
+    fn misty_desktop_island(task: *const std::ffi::c_char, json: *const std::ffi::c_char);
+    fn misty_agent_mist_waiting(waiting: bool);
     fn misty_desktop_renew(task: *const std::ffi::c_char);
     fn misty_desktop_stop(task: *const std::ffi::c_char);
     fn misty_desktop_capture(task: *const std::ffi::c_char) -> *mut std::ffi::c_char;
@@ -52,6 +55,18 @@ extern "C" fn desktop_stopped(value: *const std::ffi::c_char) {
         unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
     if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
         let _ = app.emit_to("main", "misty://desktop-control-stopped", payload);
+    }
+}
+/// A press on the desktop control island: the in-app island performs it.
+#[cfg(target_os = "macos")]
+extern "C" fn desktop_island(value: *const std::ffi::c_char) {
+    if value.is_null() {
+        return;
+    }
+    let payload =
+        unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
+    if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
+        let _ = app.emit_to("main", "misty://agent-island", payload);
     }
 }
 pub fn renew(task: &str) {
@@ -120,7 +135,7 @@ pub fn agent_workspace_context(
             DESKTOP_APP.get_or_init(|| app.clone());
             let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
             unsafe {
-                misty_desktop_prepare(task.as_ptr(), ask, desktop_stopped);
+                misty_desktop_prepare(task.as_ptr(), ask, desktop_stopped, desktop_island);
             }
         }
     } else {
@@ -194,17 +209,41 @@ pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> 
                 let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
                 unsafe { misty_desktop_yield(task.as_ptr()) };
             }
-        } else {
-            if yielded {
-                unsafe { misty_autopilot_hide_cursor() };
-            }
-            let _ = webview.with_webview(move |platform| unsafe {
-                misty_agent_window_ring(platform.inner().cast(), !yielded);
-            });
+        } else if yielded {
+            unsafe { misty_autopilot_hide_cursor() };
         }
+        // The mist stays while the task waits for the person, thinner.
+        unsafe { misty_agent_mist_waiting(yielded) };
     }
     #[cfg(not(target_os = "macos"))]
     let _ = (desktop, yielded);
+    Ok(())
+}
+/// What the in-app island shows, mirrored on the desktop island while Misty
+/// controls the desktop: `status`, `meta` and, while waiting, `waiting`.
+#[tauri::command]
+pub fn agent_control_island(
+    webview: Webview,
+    task_id: String,
+    island: Value,
+) -> Result<(), String> {
+    if webview.label() != "main" || island.to_string().len() > 4000 {
+        return Err("Invalid control island update".into());
+    }
+    {
+        let state = session().lock().map_err(|_| "workspace_unavailable")?;
+        if state.task != task_id || state.context["desktopControl"] != true {
+            return Ok(());
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+        let json = std::ffi::CString::new(island.to_string()).map_err(|e| e.to_string())?;
+        unsafe { misty_desktop_island(task.as_ptr(), json.as_ptr()) };
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = island;
     Ok(())
 }
 pub fn stop(task: &str) {
@@ -218,6 +257,7 @@ pub fn stop(task: &str) {
     #[cfg(target_os = "macos")]
     unsafe {
         misty_agent_window_ring(std::ptr::null_mut(), false);
+        misty_agent_mist_waiting(false);
         misty_autopilot_hide_cursor();
         if let Ok(task) = std::ffi::CString::new(task) {
             misty_desktop_stop(task.as_ptr());

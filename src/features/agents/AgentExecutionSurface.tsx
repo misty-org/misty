@@ -1,28 +1,18 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { useMistyStore } from "@/features/misty/useMistyStore";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
-import {
-  finishLocalExecution,
-  routeLocalFollowup,
-  continueQueuedLocalWork,
-  pauseLocalExecution,
-  steerLocalExecution,
-  useLocalExecution,
-} from "./localExecution";
-import { Button, MessageComposer, MessageComposerSend, ViewportLayer } from "@/shared/ui";
+import { continueQueuedLocalWork, pauseLocalExecution, useLocalExecution } from "./localExecution";
+import { Button, ViewportLayer } from "@/shared/ui";
+import { AgentControlIsland } from "./AgentControlIsland";
 
 import { TaskArtifacts } from "./TaskArtifactList";
-import { releasePendingWait } from "@/features/agent-interventions/WaitingForYouCard";
 
 export function AgentExecutionSurface() {
   const execution = useLocalExecution((s) => s.execution);
   const agent = usePersonalAgentsStore((s) => s.agents.find((a) => a.id === execution?.agentId));
   const [active, setActive] = useState(0),
-    [steering, setSteering] = useState(""),
     [error, setError] = useState("");
-  const [routing, setRouting] = useState(false);
   useEffect(() => {
     if (execution?.state === "finished" && !execution.normalTabs)
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
@@ -84,165 +74,51 @@ export function AgentExecutionSurface() {
     window.addEventListener("pagehide", close);
     return () => window.removeEventListener("pagehide", close);
   }, [executionTaskId]);
-  if (!execution) return null;
-  if (execution.autopilot || execution.normalTabs) return null;
-  const action = (task: () => Promise<unknown>) => {
-    setError("");
-    void task().catch((e) => setError(String(e)));
-  };
+  // The island is the task's controls in every window, with or without this surface.
+  if (!execution || execution.autopilot || execution.normalTabs) return <AgentControlIsland />;
   return (
-    <ViewportLayer
-      layer="agent-surface"
-      role="region"
-      className="flex flex-col bg-charcoal-bg text-cream"
-      aria-label={`${agent?.name ?? "Agent"} workspace`}
-    >
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">
-        <strong className="mr-auto truncate text-sm">
-          {agent?.name ?? "Agent"} ·{" "}
-          {execution.state === "running"
-            ? "Working"
-            : execution.state === "waiting"
-              ? "Waiting for you — you can use this page"
-              : execution.state === "paused"
-                ? "Paused — you can use this page"
-                : "Task finished — review the result"}
-        </strong>
-        {execution.state === "running" ? (
-          <Button variant="outline" size="sm" onClick={() => action(pauseLocalExecution)}>
-            Take over
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={Boolean(execution.method) && execution.state !== "waiting"}
-            title={
-              execution.method && execution.state !== "waiting"
-                ? "Review this workflow’s results and explicitly start a new run. Automatic resume is unavailable."
-                : undefined
-            }
-            onClick={() =>
-              action(async () => {
-                // A run waiting for the person continues itself once released.
-                if (
-                  execution.state === "waiting" &&
-                  (await releasePendingWait(
-                    execution.accountId,
-                    useMistyStore.getState().invocationId,
-                  ))
-                )
-                  return;
-                await steerLocalExecution(
-                  "Continue the current task. Inspect the current state first; do not repeat completed or uncertain writes.",
-                );
-              })
-            }
-          >
-            Resume
-          </Button>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            action(async () => {
-              await pauseLocalExecution();
-              useMistyStore.setState({ error: "Stopped. Completed changes have not been undone." });
-            })
-          }
-        >
-          Stop
-        </Button>
-        {execution.state !== "running" && execution.state !== "waiting" && (
-          <Button variant="outline" size="sm" onClick={() => action(finishLocalExecution)}>
-            Close workspace
-          </Button>
-        )}
-      </header>
-      {execution.method && execution.state !== "running" && execution.state !== "waiting" && (
-        <p
-          role="status"
-          className="border-b border-charcoal-border px-4 py-3 text-sm text-cream-muted"
-        >
-          Workflow stopped. Review completed and uncertain results before explicitly starting a new
-          run. Automatic resume is unavailable.
-        </p>
-      )}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div ref={viewport} className="min-h-0 flex-1">
-            <p className="p-5 text-sm text-cream-muted">
-              {execution.views.length
-                ? "Browser workspace"
-                : "Working with native apps. Progress and results appear in chat."}
-            </p>
-          </div>
-          <TaskArtifacts agentId={execution.agentId} spaceId={execution.spaceId} />
-          <nav
-            className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-3"
-            aria-label="Task browser tabs"
-          >
-            {execution.context.map((view, index) => (
-              <Button
-                key={view.id}
-                variant="outline"
-                size="sm"
-                aria-pressed={active === index}
-                onClick={() => setActive(index)}
-              >
-                {view.title}
-              </Button>
-            ))}
-          </nav>
-        </div>
-      </div>
-      <form
-        className="flex shrink-0 gap-2 border-t border-charcoal-border p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (routing || !steering.trim()) return;
-          const prompt = steering;
-          setSteering("");
-          setRouting(true);
-          void routeLocalFollowup(prompt)
-            .then(setError)
-            .catch((e) => setError(String(e)))
-            .finally(() => setRouting(false));
-        }}
+    <>
+      <ViewportLayer
+        layer="agent-surface"
+        role="region"
+        className="flex flex-col bg-charcoal-bg text-cream"
+        aria-label={`${agent?.name ?? "Agent"} workspace`}
       >
-        <MessageComposer
-          className="w-full"
-          inputProps={{
-            id: "agent-steering",
-            "aria-label": "Message this agent",
-            value: steering,
-            onChange: (event) => setSteering(event.target.value),
-            placeholder: "Message this agent…",
-            disabled: routing,
-            onKeyDown: (event) => {
-              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            },
-          }}
-          actions={
-            <MessageComposerSend
-              type="submit"
-              label="Send message"
-              busy={routing}
-              disabled={!steering.trim()}
-            />
-          }
-        />
-      </form>
-      {error && (
-        <p role="alert" className="px-4 pb-3 text-sm text-cream-muted">
-          {error}
-        </p>
-      )}
-    </ViewportLayer>
+        <div className="flex min-h-0 flex-1 pb-36">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div ref={viewport} className="min-h-0 flex-1">
+              <p className="p-5 text-sm text-cream-muted">
+                {execution.views.length
+                  ? "Browser workspace"
+                  : "Working with native apps. Progress and results appear in chat."}
+              </p>
+            </div>
+            <TaskArtifacts agentId={execution.agentId} spaceId={execution.spaceId} />
+            <nav
+              className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-3"
+              aria-label="Task browser tabs"
+            >
+              {execution.context.map((view, index) => (
+                <Button
+                  key={view.id}
+                  variant="outline"
+                  size="sm"
+                  aria-pressed={active === index}
+                  onClick={() => setActive(index)}
+                >
+                  {view.title}
+                </Button>
+              ))}
+            </nav>
+          </div>
+        </div>
+        {error && (
+          <p role="alert" className="px-4 pb-3 text-sm text-cream-muted">
+            {error}
+          </p>
+        )}
+      </ViewportLayer>
+      <AgentControlIsland />
+    </>
   );
 }

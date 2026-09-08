@@ -160,7 +160,8 @@ export class CursorCompanionVoice {
       onDone: (saved) => {
         this.saveTurn(saved, scope.conversationId);
         if (s.conversationVoice === session && s.state.phase !== "listening") {
-          s.change({ phase: "idle" });
+          // Admitted work is not announced; its progress shows until the answer is read.
+          s.change({ phase: s.delegatedTask ? "processing" : "idle" });
           s.maybeHide();
         }
         queueMicrotask(() => this.settleDelegatedTask());

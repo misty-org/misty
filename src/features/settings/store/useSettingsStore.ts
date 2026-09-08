@@ -54,7 +54,6 @@ import {
 import { configureBrowserSiteZoom } from "@/features/webviews/siteZoom";
 import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
 import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
-import { applyAccentColor } from "./accentColor";
 import { configureBrowserTabSleep } from "@/features/webviews/tabSleepSettings";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
@@ -274,7 +273,6 @@ function applySettingsSideEffects(
     const autoHide = appearance.navigator_auto_hide;
     if (layout.autoHide !== autoHide) publishNavigatorLayout({ autoHide });
   }
-  applyAccentColor(settingsString(document, "appearance", "accent_color", ""));
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),

@@ -64,7 +64,7 @@ export function SettingsSearchResults(props: {
             className="grid gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-charcoal-hover focus-visible:bg-charcoal-hover"
             onClick={() => props.onSelect(result)}
           >
-            <span className="truncate text-[13px] text-cream">
+            <span className="truncate text-[14px] text-cream">
               <Highlighted text={result.label} query={props.query} />
             </span>
             {result.focus ? (

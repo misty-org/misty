@@ -57,16 +57,42 @@
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["system", "dark", "light", "scheduled"],
+    "enum": ["system", "dark", "light"],
     "keywords": ["dark mode", "light mode", "color scheme"]
   },
   {
-    "id": "app.appearance.theme_light_start",
-    "label": "Light from",
-    "keywords": ["schedule", "sunrise", "theme"],
+    "id": "app.appearance.night_light",
+    "label": "Night light",
+    "keywords": ["eye saver", "blue light", "warm", "night shift", "schedule"],
     "page": "appearance",
     "section": "appearance",
-    "key": "theme_light_start",
+    "key": "night_light_mode",
+    "default": "off",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["off", "on", "scheduled"]
+  },
+  {
+    "id": "app.appearance.night_light_start",
+    "label": "Turns on",
+    "keywords": ["night light", "schedule", "sunset", "evening"],
+    "page": "appearance",
+    "section": "appearance",
+    "key": "night_light_start",
+    "default": "21:00",
+    "owner": "account",
+    "type": "string",
+    "maxLength": 5,
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "app.appearance.night_light_end",
+    "label": "Turns off",
+    "keywords": ["night light", "schedule", "sunrise", "morning"],
+    "page": "appearance",
+    "section": "appearance",
+    "key": "night_light_end",
     "default": "07:00",
     "owner": "account",
     "type": "string",
@@ -74,30 +100,18 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "app.appearance.theme_dark_start",
-    "label": "Dark from",
-    "keywords": ["schedule", "sunset", "theme", "night"],
+    "id": "app.appearance.night_light_warmth",
+    "label": "Warmth",
+    "keywords": ["night light", "eye saver", "blue light", "strength"],
     "page": "appearance",
     "section": "appearance",
-    "key": "theme_dark_start",
-    "default": "19:00",
+    "key": "night_light_warmth",
+    "default": 0.5,
     "owner": "account",
-    "type": "string",
-    "maxLength": 5,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.appearance.accent",
-    "label": "Accent color",
-    "keywords": ["color", "theme", "accent", "tint"],
-    "page": "appearance",
-    "section": "appearance",
-    "key": "accent_color",
-    "default": "",
-    "owner": "account",
-    "type": "string",
-    "maxLength": 7,
-    "platforms": ["desktop"]
+    "type": "number",
+    "platforms": ["desktop"],
+    "min": 0.1,
+    "max": 1
   },
   {
     "id": "app.appearance.compact_mode_enabled",
@@ -464,6 +478,19 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "sync.frequency",
+    "label": "Sync frequency",
+    "keywords": ["batch", "battery", "data", "live", "saver", "requests"],
+    "page": "sync",
+    "section": "sync",
+    "key": "sync_frequency",
+    "default": "balanced",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["live", "balanced", "saver"]
+  },
+  {
     "id": "browser.privacy.page_state_excluded_sites",
     "label": "Don't capture page state on these sites",
     "page": "browser-privacy",
@@ -554,6 +581,43 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.web_search",
+    "label": "Search the web",
+    "keywords": ["internet", "research", "browse"],
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "web_search",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "agents.web_search_engine",
+    "label": "Search engine",
+    "keywords": ["web search", "parallel", "perplexity", "exa"],
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "web_search_engine",
+    "default": "parallel",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["parallel", "perplexity", "exa"]
+  },
+  {
+    "id": "agents.offer_search_apps",
+    "label": "Offer search apps",
+    "keywords": ["exa", "tavily", "serpapi", "connect", "apps"],
+    "page": "agents-defaults",
+    "section": "agent",
+    "key": "offer_search_apps",
+    "default": false,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "agents.panel_side",
     "label": "Misty panel side",
     "page": "agents-defaults",
@@ -576,19 +640,7 @@
     "type": "number",
     "platforms": ["desktop"],
     "min": 0,
-    "max": 0.4
-  },
-  {
-    "id": "app.appearance.pane_focus_indicator",
-    "label": "Active-pane indicator",
-    "page": "appearance",
-    "section": "appearance",
-    "key": "pane_focus_indicator",
-    "default": "none",
-    "owner": "account",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["none", "outline", "border"]
+    "max": 0.5
   },
   {
     "id": "app.shortcuts.bindings",

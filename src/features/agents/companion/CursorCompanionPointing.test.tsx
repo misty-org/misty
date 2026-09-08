@@ -96,10 +96,12 @@ it("answers a spoken screen question from fresh captures, then points and reads 
     mocks.conversationOptions!.onDone({
       id: "voice-1",
       prompt: "where do I commit?",
-      reply: "taking a look.",
+      reply: "",
       interrupted: false,
     }),
   );
+  // Admitted work is not announced; the companion shows progress instead.
+  expect(useCompanionState.getState().presentation.phase).toBe("processing");
   complete("teach", "it's in the toolbar. [POINT:640,360:click Commit:screen1]");
   await waitFor(() => expect(mocks.speech).toHaveBeenCalledWith("teach"));
   await waitFor(() =>

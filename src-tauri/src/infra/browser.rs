@@ -23,9 +23,26 @@ mod native_input;
 #[path = "browser_task_files.rs"]
 mod task_files;
 
+#[path = "browser_download_names.rs"]
+mod download_names;
+#[path = "browser_pane_dim.rs"]
+pub(crate) mod pane_dim;
+use download_names::{reserve_download_path, sanitize_download_name};
+
 #[path = "browser_host_messages.rs"]
 pub(crate) mod host_messages;
 pub(super) use host_messages::init as init_host_messages;
+
+#[cfg(target_os = "macos")]
+#[path = "browser_click_focus.rs"]
+mod click_focus;
+#[cfg(target_os = "macos")]
+pub(super) use click_focus::install as install_click_focus;
+#[cfg(target_os = "macos")]
+#[path = "browser_corner_scrollbars.rs"]
+mod corner_scrollbars;
+#[cfg(target_os = "macos")]
+pub(super) use corner_scrollbars::install as install_corner_scrollbars;
 
 #[cfg(target_os = "macos")]
 #[path = "browser_attachment_download_macos.rs"]
@@ -48,10 +65,15 @@ pub(crate) mod render_probe;
 #[path = "browser_context_menu.rs"]
 mod context_menu;
 
+#[cfg(all(desktop, debug_assertions))]
+#[path = "browser_eval_bridge.rs"]
+pub(crate) mod eval_bridge;
 #[cfg(all(debug_assertions, target_os = "macos"))]
 #[path = "browser_kiri_probe.rs"]
 pub(crate) mod kiri_probe;
 
+#[path = "browser_page/mod.rs"]
+mod page_agent;
 #[path = "browser_page_tools.rs"]
 pub(crate) mod page_tools;
 pub use page_tools::{
@@ -405,6 +427,10 @@ pub struct BrowserAgentExecuteRequest {
     pub operation: String,
     #[serde(default)]
     pub input: Value,
+    /// The account's sites agents may not act on, from the job's server config.
+    /// Absent means the safe default: sensitive categories blocked.
+    #[serde(default)]
+    pub site_blocks: Option<page_agent::SiteBlocks>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -1169,6 +1195,7 @@ pub async fn browser_webview_create(
                 }
                 apply_page_zoom_policy(&webview, &page_app, &page_id);
                 super::browser_site_style::apply(&webview);
+                super::browser_night_light::apply(&webview);
                 let _ = webview.eval("window.__MISTY_REPORT_BACKGROUND__?.()");
                 request_browser_favicon(&webview, &page_app, &page_id);
                 request_browser_compatibility(&webview, &page_app, &page_id);
@@ -1622,60 +1649,22 @@ fn finish_download(
     record
 }
 
-fn sanitize_download_name(value: &str) -> String {
-    let mut name = value
-        .chars()
-        .filter(|character| !character.is_control() && !matches!(character, '/' | '\\' | ':'))
-        .collect::<String>();
-    name = name.trim().trim_matches('.').to_owned();
-    if name.is_empty() {
-        name = "download".to_owned();
-    }
-    if name.chars().count() > 180 {
-        name = name.chars().take(180).collect();
-    }
-    name
-}
-
-fn reserve_download_path(state: &BrowserSessionState, directory: &Path, name: &str) -> PathBuf {
-    let mut reserved = state
-        .reserved_downloads
-        .lock()
-        .expect("download mutex poisoned");
-    let original = Path::new(name);
-    let stem = original
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("download");
-    let extension = original.extension().and_then(|value| value.to_str());
-    for index in 0..10_000 {
-        let candidate_name = if index == 0 {
-            name.to_owned()
-        } else if let Some(extension) = extension {
-            format!("{stem} ({index}).{extension}")
-        } else {
-            format!("{stem} ({index})")
-        };
-        let candidate = directory.join(candidate_name);
-        if !candidate.exists() && !reserved.contains(&candidate) {
-            reserved.insert(candidate.clone());
-            return candidate;
-        }
-    }
-    directory.join(format!("download-{}", uuid::Uuid::new_v4()))
-}
-
 #[tauri::command]
 pub fn browser_webview_set_bounds(
+    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewBoundsRequest,
 ) -> Result<(), String> {
     let webview = app
         .get_webview(&webview_label(&request.id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())?;
+    if detached_from(&caller, &webview) {
+        return Ok(());
+    }
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
-    set_webview_bounds_if_changed(&app, &webview, position, size)
+    set_webview_bounds_if_changed(&app, &webview, position, size)?;
+    pane_dim::apply(&webview, &request.id)
 }
 
 #[tauri::command]
@@ -1798,15 +1787,21 @@ pub async fn browser_webview_capture_region(
 
 #[tauri::command]
 pub fn browser_webview_reconcile(
+    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewBoundsRequest,
 ) -> Result<bool, String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(false);
     };
+    // Still running, in the agent's own window; never recreate it here.
+    if detached_from(&caller, &webview) {
+        return Ok(true);
+    }
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
+    pane_dim::apply(&webview, &request.id)?;
     #[cfg(target_os = "macos")]
     round_macos_webview_corners(&webview, request.corner_radii.unwrap_or_default())?;
     // Reconciliation owns geometry, visibility, and sibling order so a stale
@@ -1842,23 +1837,6 @@ pub fn browser_webview_navigate(
     })
 }
 
-/// Compatibility command for older clients. Remote pages own their presentation.
-/// Remove any layer left by an earlier client instead of injecting page styling.
-#[tauri::command]
-pub fn browser_webview_set_pane_dim(
-    app: AppHandle,
-    id: String,
-    strength: f64,
-    indicator: Option<String>,
-) -> Result<(), String> {
-    let _ = (strength, indicator);
-    with_webview(&app, &id, |webview| {
-        webview
-            .eval("document.getElementById('__misty_pane_dim__')?.remove();")
-            .map_err(|error| error.to_string())
-    })
-}
-
 #[tauri::command]
 pub fn browser_webview_set_theme(
     caller: Webview,
@@ -1883,6 +1861,12 @@ pub fn browser_webview_set_theme(
         }
     }
     Ok(())
+}
+
+/// The tab is in an agent's dock host, not the caller's window: the window it
+/// came from must leave its geometry and visibility alone until it returns.
+fn detached_from(caller: &Webview, webview: &Webview) -> bool {
+    super::agent_dock::hosted_elsewhere(caller.window().label(), webview.window().label())
 }
 
 fn with_webview(
@@ -1959,11 +1943,17 @@ pub fn browser_webview_reload(
 
 #[tauri::command]
 pub fn browser_webview_show(
+    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     super::extensions::native::tab_event(&app, &request.id, "activate");
-    with_webview(&app, &request.id, |webview| present_macos_webview(&webview))
+    with_webview(&app, &request.id, |webview| {
+        if detached_from(&caller, &webview) {
+            return Ok(());
+        }
+        present_macos_webview(&webview)
+    })
 }
 
 #[tauri::command]
@@ -2104,12 +2094,17 @@ pub fn browser_webviews_set_companion(
 
 #[tauri::command]
 pub fn browser_webview_hide(
+    caller: Webview,
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
+    // A hidden page stops painting; the agent's own window keeps it shown.
+    if detached_from(&caller, &webview) {
+        return Ok(());
+    }
     webview.hide().map_err(|error| error.to_string())?;
     refresh_browser_cursor_ownership(&webview)
 }
@@ -2283,6 +2278,9 @@ fn grant_acts(grant: &BrowserGrant) -> bool {
         "browser.type",
         "browser.upload",
         "browser.navigate",
+        "browser.steps",
+        "browser.fill_form",
+        "browser.skill",
     ]
     .iter()
     .any(|capability| grant.capabilities.contains(*capability))
@@ -2291,7 +2289,10 @@ fn grant_acts(grant: &BrowserGrant) -> bool {
 /// The control ring glows around a page while an agent controls it.
 fn sync_agent_ring(app: &AppHandle, id: &str, active: bool) {
     #[cfg(target_os = "macos")]
-    if let Some(webview) = webview_label(id).ok().and_then(|label| app.get_webview(&label)) {
+    if let Some(webview) = webview_label(id)
+        .ok()
+        .and_then(|label| app.get_webview(&label))
+    {
         let _ = webview.with_webview(move |platform| unsafe {
             misty_agent_page_ring(platform.inner().cast(), active);
         });
@@ -2406,6 +2407,13 @@ fn is_browser_capability(value: &str) -> bool {
             | "browser.interact"
             | "browser.upload"
             | "browser.downloads.list"
+            | "browser.snapshot"
+            | "browser.find"
+            | "browser.extract"
+            | "browser.wait_for"
+            | "browser.steps"
+            | "browser.fill_form"
+            | "browser.skill"
     )
 }
 
@@ -2490,12 +2498,21 @@ pub async fn browser_agent_execute(
             | "browser.interact"
             | "browser.upload"
             | "browser.request"
+            | "browser.steps"
+            | "browser.fill_form"
+            | "browser.skill"
     ) {
         let url = app
             .get_webview(&webview_label(&id)?)
             .ok_or("Browser tab is not running.")?
             .url()
             .map_err(|error| error.to_string())?;
+        // Nothing reaches a blocked site: the device refuses before any input.
+        if let Some(reason) =
+            page_agent::site_blocked(&url, &request.site_blocks.clone().unwrap_or_default())
+        {
+            return Err(reason);
+        }
         let sessions = state
             .sessions
             .lock()
@@ -2519,6 +2536,9 @@ pub async fn browser_agent_execute(
             "misty://agent-target",
             json!({"id":id}),
         );
+    }
+    if page_agent::handles(&request.operation) {
+        return page_agent::execute(&app, &state, &id, &request).await;
     }
     match request.operation.as_str() {
         "browser.inspect" => inspect_browser(&app, &state, &id, &request).await,
@@ -3241,6 +3261,10 @@ async fn upload_browser(
     {
         input["file"] = task_files::prepare_upload(app, state, request)?;
     }
+    if request.input.get("ref").and_then(Value::as_str).is_some() {
+        // A file input from browser_snapshot rather than browser_inspect.
+        return page_agent::upload(app, state, id, request, &input).await;
+    }
     let reference = request
         .input
         .get("elementRef")
@@ -3337,6 +3361,7 @@ pub(super) fn authorize_workspace_dispatch(
         grant_id: grant.into(),
         operation: "browser.workspace.interact".into(),
         input: json!({}),
+        site_blocks: None,
     };
     validate_browser_grant(session, &request)?;
     Ok(())

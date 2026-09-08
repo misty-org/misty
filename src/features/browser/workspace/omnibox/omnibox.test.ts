@@ -13,6 +13,7 @@ function deps(overrides: Partial<OmniboxDeps> = {}): OmniboxDeps {
     searchSuggestionsEnabled: () => false,
     fetchSearchSuggestions: async () => [],
     historySuggestions: async () => [],
+    recentVisits: async () => [],
     bookmarks: () => [],
     mistyContent: () => [],
     clipboardUrl: async () => null,
@@ -70,7 +71,8 @@ describe("omnibox ranking", () => {
     expect(matches.map((match) => match.kind)).toEqual(["url", "search"]);
     expect(matches[0].target).toEqual({ type: "navigate", url: "https://youtube.com/" });
     expect(matches[0].faviconUrl).toBeNull();
-    expect(matches[1].detail).toBe("Search with Google");
+    expect(matches[1].title).toBe("youtube.com");
+    expect(matches[1].detail).toBe("");
   });
 
   it("offers local development addresses directly", async () => {
@@ -152,10 +154,16 @@ describe("omnibox ranking", () => {
 });
 
 describe("before typing", () => {
-  it("defaults to the current page, then recent and top pages", async () => {
+  it("lists recent pages newest first, without the current page or a default", async () => {
     const matches = await suggest(
       "",
-      deps({ historySuggestions: async () => [visited("https://news.example/", 9, 2)] }),
+      deps({
+        recentVisits: async () => [
+          { url: "https://news.example/", title: "News" },
+          { url: "https://current.example/", title: "Current" },
+          { url: "https://news.example/", title: "News" },
+        ],
+      }),
       {
         sessionHistory: [
           "https://one.example/",
@@ -164,7 +172,9 @@ describe("before typing", () => {
         ],
       },
     );
-    expect(matches[0].target.url).toBe("https://current.example/");
+    expect(matches[0].target.url).toBe("https://news.example/");
+    expect(matches.some((match) => match.target.url === "https://current.example/")).toBe(false);
+    expect(matches.some((match) => match.allowedToBeDefault)).toBe(false);
     expect(matches.map((match) => match.detail)).toEqual(
       expect.arrayContaining(["news.example", "two.example/path", "one.example"]),
     );
@@ -176,6 +186,10 @@ describe("before typing", () => {
       "",
       deps({
         historySuggestions: async () => {
+          asked = true;
+          return [];
+        },
+        recentVisits: async () => {
           asked = true;
           return [];
         },

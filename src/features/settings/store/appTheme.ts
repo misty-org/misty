@@ -1,48 +1,8 @@
 import { useAppThemeStore, type ResolvedAppTheme } from "./useAppThemeStore";
 
-/** The account's Theme setting; "system" follows the OS appearance, "scheduled" the clock. */
-export type AppThemeMode = "system" | "scheduled" | ResolvedAppTheme;
+/** The account's Theme setting; "system" follows the OS appearance. */
+export type AppThemeMode = "system" | ResolvedAppTheme;
 
-/** When light and dark begin for the "scheduled" theme, as local "HH:MM". */
-export interface ThemeSchedule {
-  lightAt: string;
-  darkAt: string;
-}
-export const defaultThemeSchedule: ThemeSchedule = { lightAt: "07:00", darkAt: "19:00" };
-
-export function validThemeTime(value: string): boolean {
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
-
-function minutes(value: string): number {
-  const [hours, mins] = value.split(":").map(Number);
-  return hours * 60 + mins;
-}
-
-/** The theme the schedule calls for at `now`. */
-export function scheduledTheme(schedule: ThemeSchedule, now = new Date()): ResolvedAppTheme {
-  const light = minutes(
-    validThemeTime(schedule.lightAt) ? schedule.lightAt : defaultThemeSchedule.lightAt,
-  );
-  const dark = minutes(
-    validThemeTime(schedule.darkAt) ? schedule.darkAt : defaultThemeSchedule.darkAt,
-  );
-  const at = now.getHours() * 60 + now.getMinutes();
-  if (light === dark) return "dark";
-  // Light runs from its start until dark starts, across midnight when needed.
-  const inLight = light < dark ? at >= light && at < dark : at >= light || at < dark;
-  return inLight ? "light" : "dark";
-}
-
-/** Milliseconds until the schedule next switches, at least one minute. */
-export function msUntilNextThemeSwitch(schedule: ThemeSchedule, now = new Date()): number {
-  const at = now.getHours() * 60 + now.getMinutes();
-  const next = [schedule.lightAt, schedule.darkAt]
-    .filter(validThemeTime)
-    .map((time) => (minutes(time) - at + 1440) % 1440 || 1440)
-    .reduce((soonest, value) => Math.min(soonest, value), 1440);
-  return Math.max(60_000, next * 60_000 - now.getSeconds() * 1000 - now.getMilliseconds());
-}
 export type AppThemeTokens = {
   background: string;
   surface: string;
@@ -133,21 +93,14 @@ export function appThemeSnapshot(): AppThemeSnapshot {
   return current;
 }
 
-export function resolveAppTheme(
-  mode: AppThemeMode,
-  schedule: ThemeSchedule = defaultThemeSchedule,
-): ResolvedAppTheme {
-  if (mode === "scheduled") return scheduledTheme(schedule);
+export function resolveAppTheme(mode: AppThemeMode): ResolvedAppTheme {
   if (mode !== "system") return mode;
   return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
 /** Applies the resolved palette to the document and tells native chrome to follow. */
-export function applyAppTheme(
-  mode: AppThemeMode,
-  schedule: ThemeSchedule = defaultThemeSchedule,
-): AppThemeSnapshot {
-  const resolved = resolveAppTheme(mode, schedule);
+export function applyAppTheme(mode: AppThemeMode): AppThemeSnapshot {
+  const resolved = resolveAppTheme(mode);
   const changed = current.mode !== resolved;
   current = snapshotFor(resolved);
   applySnapshot(current);

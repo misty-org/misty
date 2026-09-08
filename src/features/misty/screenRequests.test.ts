@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
     accountId: "",
     submit: undefined as undefined | ((request: unknown) => Promise<void>),
   },
+  openTab: undefined as undefined | { id: string; title: string },
+}));
+vi.mock("@/features/agents/companion/normalTabs", () => ({
+  matchingBrowserTab: () => mocks.openTab,
 }));
 vi.mock("./screenContext", () => ({ captureMistyScreen: mocks.capture }));
 vi.mock("@/features/agents/workspaceAutopilot", () => ({
@@ -63,6 +67,41 @@ beforeEach(() => {
   submitAnswer.mockClear();
   mocks.capture.mockClear();
   mocks.companion = { accountId: "", submit: undefined };
+  mocks.openTab = undefined;
+});
+
+it("works in a matching open tab instead of opening another", async () => {
+  mocks.openTab = { id: "gmail-tab", title: "Inbox - Gmail" };
+  withRequest({
+    kind: "open",
+    reason: "Open the latest email from David in Gmail",
+    location: "window",
+    url: "https://mail.google.com",
+    state: "pending",
+  });
+  continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
+  expect(submitAnswer.mock.calls[0][0]).toContain('open tab "Inbox - Gmail"');
+  expect(submitAnswer.mock.calls[0][0]).not.toContain("Start at");
+  expect(submitAnswer.mock.calls[0][6]).toMatchObject({
+    executionMode: "agent",
+    openScreen: { tabId: "gmail-tab", place: "current" },
+  });
+});
+
+it("follows the place the user named even when a tab matches", async () => {
+  mocks.openTab = { id: "gmail-tab", title: "Inbox - Gmail" };
+  withRequest({
+    kind: "open",
+    reason: "Open Gmail in a new tab",
+    location: "window",
+    chosen: true,
+    url: "https://mail.google.com",
+    state: "pending",
+  });
+  continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(submitAnswer).toHaveBeenCalled());
+  expect(submitAnswer.mock.calls[0][6]).toMatchObject({ openScreen: { place: "new" } });
 });
 
 it("continues in a separate window by default, without a new user turn", async () => {
@@ -186,4 +225,58 @@ it("reports a failure on the card instead of starting work while another task ru
     error: expect.stringContaining("Another task"),
   });
   expect(submitAnswer).not.toHaveBeenCalled();
+});
+
+it("continues on the browser another device opened, with the tab that device signed", async () => {
+  withRequest({
+    kind: "open",
+    reason: "Fill in the form",
+    location: "remote",
+    chosen: true,
+    state: "pending",
+    remote: {
+      deviceId: "device-b",
+      deviceName: "Mac mini",
+      contexts: [
+        {
+          device_id: "device-b",
+          kind: "browser_tab",
+          opaque_ref: "agent-scope-b",
+          display_name: "Browser on Mac mini",
+          capabilities: ["browser.snapshot", "browser.steps"],
+          metadata: { app_id: "browser", remote_session: true, task_id: "hosted-task" },
+          run_grant: { payload: "p", signature: "s" },
+        },
+      ],
+    },
+  });
+  await continueAfterScreenRequest(set, get, "chat", "reply");
+  await vi.waitFor(() => expect(current()?.state).toBe("opened"));
+  const [prompt, , , , deviceContexts, origin, options] = submitAnswer.mock.calls[0]!;
+  expect(prompt).toContain("A browser on Mac mini is now attached");
+  expect(deviceContexts).toEqual([
+    {
+      deviceId: "device-b",
+      kind: "browser_tab",
+      opaqueRef: "agent-scope-b",
+      displayName: "Browser on Mac mini",
+      capabilities: ["browser.snapshot", "browser.steps"],
+      metadata: { app_id: "browser", remote_session: true, task_id: "hosted-task" },
+      runGrant: { payload: "p", signature: "s" },
+    },
+  ]);
+  // The server only admits a device tab that matches an attached reference.
+  expect(origin).toMatchObject({
+    conversationId: "chat",
+    context: [
+      expect.objectContaining({
+        kind: "browser-tab",
+        privacy: "device",
+        attached: true,
+        opaqueScopeId: "agent-scope-b",
+      }),
+    ],
+  });
+  expect(options).toEqual({ executionMode: "user", continuation: true });
+  expect(mocks.capture).not.toHaveBeenCalled();
 });

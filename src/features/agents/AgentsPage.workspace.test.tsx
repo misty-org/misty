@@ -17,7 +17,8 @@ it("opens straight into the agent's New task conversation without a directory", 
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
   expect(screen.getByRole("heading", { name: "What can I do for you?" })).toBeTruthy();
   const pages = screen.getByRole("navigation", { name: "Agent workspace pages" });
-  expect(within(pages).getByRole("button", { name: "Activity" })).toBeTruthy();
+  expect(within(pages).getByRole("button", { name: "Workflows" })).toBeTruthy();
+  expect(within(pages).queryByRole("button", { name: "Activity" })).toBeNull();
   expect(screen.getByRole("button", { name: "Switch agent: Communications" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Agent settings" })).toBeNull();
@@ -34,36 +35,10 @@ it("offers agent settings and new agents from the switcher, not a directory", ()
   expect(screen.queryByRole("option", { name: "Browse all agents" })).toBeNull();
 });
 
-it("opens Details on one section at a time without losing the conversation draft", () => {
+it("has no Details panel beside the conversation", () => {
   renderAgentsPage();
-  typeDraft("Keep my draft");
-  const toggle = screen.getByRole("button", { name: "Show details" });
-  expect(toggle.getAttribute("aria-pressed")).toBe("false");
-  fireEvent.click(toggle);
-  expect(screen.getByRole("button", { name: "Hide details" }).getAttribute("aria-pressed")).toBe(
-    "true",
-  );
-  const details = within(screen.getByRole("complementary", { name: "Details" }));
-  const chips = within(details.getByRole("group", { name: "Details sections" }));
-  const task = chips.getByRole("button", { name: /^Task/ });
-  const files = chips.getByRole("button", { name: /^Files/ });
-  expect(chips.getByRole("button", { name: /^Sources/ })).toBeTruthy();
-  expect(chips.queryByRole("button", { name: /^Apps/ })).toBeNull();
-  expect(task.getAttribute("aria-pressed")).toBe("true");
-  expect(details.getByRole("region", { name: "Task" })).toBeTruthy();
-  expect(details.getByRole("separator", { name: "Resize details" })).toBeTruthy();
-  fireEvent.click(files);
-  expect(files.getAttribute("aria-pressed")).toBe("true");
-  expect(task.getAttribute("aria-pressed")).toBe("false");
-  expect(details.getByRole("region", { name: "Files" })).toBeTruthy();
-  expect(details.queryByRole("region", { name: "Task" })).toBeNull();
-  fireEvent.click(details.getByRole("button", { name: "Close details" }));
+  expect(screen.queryByRole("button", { name: "Show details" })).toBeNull();
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
-  // Reopening returns to the section it was on.
-  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-  expect(screen.getByRole("region", { name: "Files" })).toBeTruthy();
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-  expect(composer().value).toBe("Keep my draft");
 });
 
 it("protects unsaved profile edits when closing settings while preserving the conversation draft", () => {
@@ -79,17 +54,6 @@ it("protects unsaved profile edits when closing settings while preserving the co
   fireEvent.click(screen.getByRole("button", { name: "Discard and switch" }));
   expect(screen.queryByLabelText("Name")).toBeNull();
   expect(composer().value).toBe("Unsent draft");
-});
-
-it("hides Details while agent settings are open", () => {
-  renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-  expect(screen.getByRole("complementary", { name: "Details" })).toBeTruthy();
-  openAgentSettings();
-  fireEvent.change(nameField(), { target: { value: "Keep this name" } });
-  expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Show details" })).toBeNull();
-  expect(nameField().value).toBe("Keep this name");
 });
 
 it("keeps the requested new task when discarding profile edits", () => {

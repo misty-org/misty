@@ -16,6 +16,13 @@ static CFRunLoopSourceRef inputSource;
 static NSPanel *controlPanel;
 static NSTimer *watchdog;
 static void (*notifyStopped)(const char *);
+// The control island: the in-app island's view outside Misty during desktop
+// control. Misty's island owns its state and actions; this panel shows them
+// and sends the person's presses back (docs/design/agents-at-cursor/BRIEF.md).
+static void (*notifyIsland)(const char *);
+static NSTextField *islandStatus, *islandMeta, *islandField;
+static NSButton *islandSend, *islandQueue, *islandTake, *islandDone;
+static NSString *islandStatusText, *islandMetaText, *islandWaitingText;
 @interface MistyDesktopAsk : NSPanel
 @property dispatch_semaphore_t answer;
 @property BOOL accepted, answered;
@@ -45,9 +52,11 @@ static char *DesktopJSON(NSDictionary *value) {
 static void onMain(void (^work)(void)) {
   if (NSThread.isMainThread) work(); else dispatch_sync(dispatch_get_main_queue(), work);
 }
-// Gives the desktop back without ending the task: no input tap, strip, cursor,
-// ring or capture. The next visual tool call enters control again.
-static void releaseControl(void) {
+static void islandMode(BOOL waiting);
+// Gives the desktop back without ending the task: no input tap, cursor or
+// capture. While the task waits for the person the island stays and the mist
+// thins; otherwise both go. The next visual tool call enters control again.
+static void releaseControl(BOOL waiting) {
   controlling = NO;
   if (inputTap) {
     CGEventTapEnable(inputTap, NO);
@@ -58,30 +67,128 @@ static void releaseControl(void) {
     CFRunLoopRemoveSource(CFRunLoopGetMain(), inputSource, kCFRunLoopCommonModes);
     CFRelease(inputSource); inputSource = NULL;
   }
-  [controlPanel orderOut:nil]; controlPanel = nil;
   misty_agent_pointer_hide();
-  misty_agent_ring_hide();
   MistyDesktopCaptureStop();
+  if (waiting && controlPanel) {
+    islandMode(YES);
+    misty_agent_mist_waiting(true);
+    return;
+  }
+  [controlPanel orderOut:nil]; controlPanel = nil;
+  misty_agent_ring_hide();
+  misty_agent_mist_waiting(false);
 }
 static void stopControl(NSString *reason) {
   BOOL announce = !stopped && reason.length;
   stopped = YES;
   [askPanel decline:nil]; askPanel = nil;
-  releaseControl();
+  releaseControl(NO);
   [watchdog invalidate]; watchdog = nil;
   if (announce && notifyStopped) {
     char *value = DesktopJSON(@{@"taskId": task ?: @"", @"reason": reason});
     notifyStopped(value); free(value);
   }
 }
+static void islandSendAction(NSString *action, NSString *text) {
+  if (!notifyIsland || !task.length) return;
+  char *value = DesktopJSON(@{@"taskId": task, @"action": action, @"text": text ?: @""});
+  notifyIsland(value); free(value);
+}
 @interface MistyDesktopPanel : NSPanel
 - (void)stopPressed:(id)sender;
 @end
 @implementation MistyDesktopPanel
-- (BOOL)canBecomeKeyWindow { return NO; }
+// Key only when the person clicks into the field, never by being shown; the
+// app they work in stays active. Agent input never reaches it: Accessibility
+// refuses Misty's own process and agent keys go to the other app's process.
+- (BOOL)canBecomeKeyWindow { return YES; }
 - (BOOL)canBecomeMainWindow { return NO; }
 - (void)stopPressed:(id)sender { stopControl(@"Desktop control stopped. You have control."); }
+- (void)submit:(NSString *)action {
+  NSString *text = [islandField.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+  if (!text.length) return;
+  islandField.stringValue = @"";
+  [self makeFirstResponder:nil];
+  islandSendAction(action, text);
+}
+- (void)sendPressed:(id)sender { [self submit:@"send"]; }
+- (void)queuePressed:(id)sender { [self submit:@"queue"]; }
+- (void)takeOverPressed:(id)sender { islandSendAction(@"takeover", nil); }
+- (void)donePressed:(id)sender { islandSendAction(@"done", nil); }
 @end
+
+static NSTextField *islandLabel(NSRect frame, CGFloat size, NSColor *color) {
+  NSTextField *label = [NSTextField labelWithString:@""];
+  label.frame = frame;
+  label.textColor = color;
+  label.font = [NSFont systemFontOfSize:size weight:NSFontWeightMedium];
+  label.lineBreakMode = NSLineBreakByTruncatingTail;
+  return label;
+}
+static NSButton *islandButton(NSString *title, SEL action, NSRect frame, NSPanel *panel) {
+  NSButton *button = [NSButton buttonWithTitle:title target:panel action:action];
+  button.frame = frame;
+  button.bezelStyle = NSBezelStyleRounded;
+  button.controlSize = NSControlSizeRegular;
+  [panel.contentView addSubview:button];
+  return button;
+}
+// Status, a field to steer or queue, Take over, Stop and Escape; Done while
+// the task waits for the person.
+static NSPanel *islandPanel(CGRect display) {
+  CGFloat top = CGDisplayBounds(CGMainDisplayID()).size.height, width = 560, height = 116;
+  NSRect frame = NSMakeRect(display.origin.x + (display.size.width - width) / 2,
+    top - CGRectGetMaxY(display) + 24, width, height);
+  MistyDesktopPanel *panel = [[MistyDesktopPanel alloc] initWithContentRect:frame
+    styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
+  panel.title = @"Misty desktop control";
+  panel.level = NSStatusWindowLevel;
+  panel.hidesOnDeactivate = NO;
+  panel.becomesKeyOnlyIfNeeded = YES;
+  panel.sharingType = NSWindowSharingNone;
+  panel.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+  panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
+  panel.backgroundColor = NSColor.clearColor;
+  panel.opaque = NO;
+  panel.hasShadow = YES;
+  NSView *content = panel.contentView;
+  content.wantsLayer = YES;
+  content.layer.backgroundColor = [NSColor colorWithWhite:0.08 alpha:0.96].CGColor;
+  content.layer.cornerRadius = 16;
+  content.layer.borderWidth = 1;
+  content.layer.borderColor = [NSColor colorWithWhite:1 alpha:0.12].CGColor;
+  islandStatus = islandLabel(NSMakeRect(16, 84, 392, 18), 12.5, NSColor.whiteColor);
+  islandMeta = islandLabel(NSMakeRect(412, 84, 132, 18), 12, [NSColor colorWithWhite:1 alpha:0.6]);
+  islandMeta.alignment = NSTextAlignmentRight;
+  [content addSubview:islandStatus];
+  [content addSubview:islandMeta];
+  islandField = [NSTextField textFieldWithString:@""];
+  islandField.frame = NSMakeRect(12, 47, 356, 28);
+  islandField.placeholderString = @"Tell Misty what to change, or ask for something new";
+  islandField.target = panel;
+  islandField.action = @selector(sendPressed:);
+  [content addSubview:islandField];
+  islandSend = islandButton(@"Send", @selector(sendPressed:), NSMakeRect(372, 44, 80, 34), panel);
+  islandQueue = islandButton(@"New task", @selector(queuePressed:), NSMakeRect(454, 44, 94, 34), panel);
+  islandTake = islandButton(@"Take over", @selector(takeOverPressed:), NSMakeRect(8, 6, 100, 34), panel);
+  NSTextField *escape = islandLabel(NSMakeRect(318, 15, 140, 16), 11.5, [NSColor colorWithWhite:1 alpha:0.55]);
+  escape.stringValue = @"Esc stops";
+  escape.alignment = NSTextAlignmentRight;
+  [content addSubview:escape];
+  islandDone = islandButton(@"Done", @selector(donePressed:), NSMakeRect(380, 6, 80, 34), panel);
+  NSButton *stop = islandButton(@"Stop", @selector(stopPressed:), NSMakeRect(462, 6, 86, 34), panel);
+  stop.keyEquivalent = @"";
+  return panel;
+}
+static void islandMode(BOOL waiting) {
+  islandStatus.stringValue = waiting
+    ? (islandWaitingText.length ? islandWaitingText : @"Misty is waiting for you. Press Done when you're finished.")
+    : (islandStatusText.length ? islandStatusText : @"Misty is working with its own cursor");
+  islandMeta.stringValue = waiting ? @"" : (islandMetaText ?: @"");
+  for (NSView *view in @[islandField, islandSend, islandQueue, islandTake]) view.hidden = waiting;
+  islandDone.hidden = !waiting;
+  if (waiting) islandDone.keyEquivalent = @"\r";
+}
 
 // Misty acts with its own cursor, so the person's input is never blocked. The
 // tap only listens for Escape and the voice shortcut, which stop the task.
@@ -118,39 +225,22 @@ static NSString *beginControl(CGDirectDisplayID displayID) {
   controlling = YES;
   controlledDisplay = displayID;
   CGRect display = CGDisplayBounds(displayID);
-  CGFloat top = CGDisplayBounds(CGMainDisplayID()).size.height;
-  NSRect frame = NSMakeRect(display.origin.x + (display.size.width - 420) / 2,
-    top - CGRectGetMaxY(display) + 24, 420, 44);
-  MistyDesktopPanel *panel = [[MistyDesktopPanel alloc] initWithContentRect:frame
-    styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
-  panel.title = @"Misty desktop control";
-  panel.level = NSStatusWindowLevel;
-  panel.hidesOnDeactivate = NO;
-  panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces | NSWindowCollectionBehaviorFullScreenAuxiliary;
-  panel.backgroundColor = [NSColor colorWithWhite:0.10 alpha:1];
-  panel.contentView.wantsLayer = YES;
-  panel.contentView.layer.cornerRadius = 10;
-  NSTextField *label = [NSTextField labelWithString:@"Misty is working with its own cursor · Esc to stop"];
-  label.frame = NSMakeRect(12, 13, 333, 18);
-  label.textColor = NSColor.whiteColor;
-  label.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
-  [panel.contentView addSubview:label];
-  NSButton *stop = [NSButton buttonWithTitle:@"Stop" target:panel action:@selector(stopPressed:)];
-  stop.frame = NSMakeRect(352, 8, 58, 28);
-  [panel.contentView addSubview:stop];
-  controlPanel = panel;
-  [panel orderFrontRegardless];
+  if (!controlPanel) controlPanel = islandPanel(display);
+  islandMode(NO);
+  [controlPanel orderFrontRegardless];
+  misty_agent_mist_waiting(false);
   misty_agent_ring_show(display);
   return nil;
 }
 
 // Registration does not capture or take input. The first visual tool call enters
 // control, so a question answered from its initial screenshot does not lock input.
-void misty_desktop_prepare(const char *taskID, bool ask, void (*callback)(const char *)) {
+void misty_desktop_prepare(const char *taskID, bool ask, void (*callback)(const char *), void (*island)(const char *)) {
   NSString *next = [NSString stringWithUTF8String:taskID];
   onMain(^{
     stopControl(nil);
-    task = next; stopped = NO; notifyStopped = callback; lastActionAt = 0;
+    task = next; stopped = NO; notifyStopped = callback; notifyIsland = island; lastActionAt = 0;
+    islandStatusText = islandMetaText = islandWaitingText = nil;
     askBeforeControl = ask;
     leaseUntil = NSProcessInfo.processInfo.systemUptime + 30;
     watchdog = [NSTimer timerWithTimeInterval:0.5 repeats:YES block:^(NSTimer *timer) {
@@ -215,7 +305,25 @@ void misty_desktop_renew(const char *taskID) {
 // The task waits for the person: hand the desktop back but keep the task.
 void misty_desktop_yield(const char *taskID) {
   NSString *expected = [NSString stringWithUTF8String:taskID];
-  onMain(^{ if (!stopped && [task isEqualToString:expected]) releaseControl(); });
+  onMain(^{ if (!stopped && [task isEqualToString:expected]) releaseControl(YES); });
+}
+// What Misty's island shows: a status line, a meta line (sub-agents, where)
+// and what the person needs to do while the task waits.
+void misty_desktop_island(const char *taskID, const char *json) {
+  NSString *expected = [NSString stringWithUTF8String:taskID];
+  NSDictionary *input = [NSJSONSerialization JSONObjectWithData:[[NSString stringWithUTF8String:json] dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
+  if (![input isKindOfClass:NSDictionary.class]) return;
+  NSString *(^text)(NSString *) = ^NSString *(NSString *key) {
+    id value = input[key];
+    return [value isKindOfClass:NSString.class] ? [value substringToIndex:MIN([value length], (NSUInteger)240)] : nil;
+  };
+  onMain(^{
+    if (stopped || ![task isEqualToString:expected]) return;
+    islandStatusText = text(@"status");
+    islandMetaText = text(@"meta");
+    islandWaitingText = text(@"waiting");
+    if (controlPanel) islandMode(!controlling);
+  });
 }
 void misty_desktop_stop(const char *taskID) {
   NSString *expected = [NSString stringWithUTF8String:taskID];

@@ -14,25 +14,16 @@ import { AgentConversationHeading } from "../page/AgentConversationHeading";
 import { AgentLanding } from "../page/AgentLanding";
 import { AgentNewChat } from "../page/AgentNewChat";
 import { usePersonalAgentsStore } from "../personalAgentsStore";
-import { useMistyPanelStore } from "./mistyPanelStore";
+import { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./mistyPanelStore";
 
 export type MistyPanelSide = "left" | "right";
-
-export const MISTY_PANEL_WIDTH = 400;
 
 /**
  * The Agents conversation beside the workspace, so Misty is one keystroke away from any
  * tool. It is the Agents page's own title bar, conversation and landing in one column;
  * anything beyond that (Activity, Templates, agent settings) opens the Agents page.
  */
-export function MistyPanel({
-  side: propSide,
-  background,
-}: {
-  side?: MistyPanelSide;
-  /** The adjacent page's color, so the panel reads as the page extended. */
-  background?: string;
-} = {}) {
+export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const settingsAgent = useSettingsStore((s) => s.settings?.document.agent) as
     { panel_side?: string } | undefined;
   const side = propSide ?? (settingsAgent?.panel_side === "left" ? "left" : "right");
@@ -101,7 +92,9 @@ export function MistyPanel({
     <aside
       ref={root}
       className="agents-workspace relative h-full shrink-0 overflow-hidden"
-      style={{ width: MISTY_PANEL_WIDTH, ...(background ? { background } : {}) }}
+      // The dock sets the width; it stays fixed while the dock slides, so the panel
+      // slides in from the edge instead of squeezing.
+      style={{ width: `var(--misty-panel-width, ${MISTY_PANEL_WIDTH}px)` }}
       aria-label="Misty"
       data-misty-panel={side}
       onKeyDown={(event) => {
@@ -177,7 +170,6 @@ export function MistyPanel({
                             agentId={profile.id}
                             onConversation={(id) => select(profile.id, false, id)}
                             onUseTemplate={(prompt) => select(profile.id, true, undefined, prompt)}
-                            onActivity={openInAgents}
                             onTemplates={openInAgents}
                           />
                         ) : undefined

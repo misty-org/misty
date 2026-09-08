@@ -12,7 +12,8 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
     id: "typed",
     start(input) {
       const text = input.text.trim();
-      if (!text) return currentPage(input.currentUrl);
+      // Before typing, the recent pages are the list; the current page is not repeated.
+      if (!text) return [];
       const matches: OmniboxMatch[] = [];
       const address = directWebUrl(text);
       const described = address ? describeUrl(address) : null;
@@ -33,7 +34,8 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
         id: `search:${text.toLowerCase()}`,
         kind: "search",
         title: text,
-        detail: `Search with ${deps.searchEngine().name}`,
+        // The search icon says what the row does; no "Search with" label.
+        detail: "",
         target: { type: "navigate", url: deps.searchUrl(text) },
         relevance: address ? relevance.typedSearchForAddress : relevance.typedSearch,
         allowedToBeDefault: true,
@@ -41,22 +43,4 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
       return matches;
     },
   };
-}
-
-/** Before typing, the page itself is the default, so Enter reloads it. */
-function currentPage(url: string): OmniboxMatch[] {
-  const described = describeUrl(url);
-  if (!described) return [];
-  return [
-    {
-      id: `url:${url}`,
-      kind: "url",
-      title: described.title,
-      detail: described.detail,
-      target: { type: "navigate", url },
-      relevance: relevance.typedUrl,
-      allowedToBeDefault: true,
-      faviconUrl: null,
-    },
-  ];
 }

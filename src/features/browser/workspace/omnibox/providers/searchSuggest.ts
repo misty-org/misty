@@ -32,7 +32,7 @@ export function searchSuggestProvider(deps: OmniboxDeps): OmniboxProvider {
         id: `search:${suggestion.toLowerCase()}`,
         kind: "suggestion" as const,
         title: suggestion,
-        detail: `Search with ${engine.name}`,
+        detail: "",
         target: { type: "navigate" as const, url: deps.searchUrl(suggestion) },
         relevance: relevance.suggestion - index,
         allowedToBeDefault: false,

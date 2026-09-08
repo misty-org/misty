@@ -7,7 +7,7 @@ import { mistyContentProvider } from "./mistyContent";
 import { mistyPagesProvider } from "./misty";
 import { openTabsProvider } from "./openTabs";
 import { searchSuggestProvider } from "./searchSuggest";
-import { topPagesProvider } from "./topPages";
+import { recentPagesProvider } from "./recentPages";
 import { typedProvider } from "./typed";
 
 export type { OmniboxDeps } from "./deps";
@@ -22,7 +22,7 @@ export function createOmniboxProviders(deps: OmniboxDeps): OmniboxProvider[] {
     mistyPagesProvider(),
     mistyContentProvider(deps),
     historyProvider(deps),
-    topPagesProvider(deps),
+    recentPagesProvider(deps),
     copiedLinkProvider(deps),
     searchSuggestProvider(deps),
   ];

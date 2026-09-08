@@ -47,9 +47,7 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
         return true;
     };
     let token = values.get("token").map(|s| s.as_ref()).unwrap_or("");
-    if !shortcut_token_matches(&state, id, token)
-        || page_signals::forward(app, id, url, &values)
-    {
+    if !shortcut_token_matches(&state, id, token) || page_signals::forward(app, id, url, &values) {
         return true;
     }
     let raw = values.get("payload").map(|s| s.as_ref()).unwrap_or("");

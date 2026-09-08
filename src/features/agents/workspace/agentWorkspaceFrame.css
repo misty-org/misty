@@ -8,7 +8,9 @@
   container: agent-studio / inline-size;
 }
 .agent-studio-sidebar {
-  width: 240px;
+  position: relative;
+  /* The chosen width (dragged at the trailing edge), never more than 40% of the studio. */
+  width: min(var(--agent-studio-sidebar-width, 240px), 40cqw);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -22,6 +24,13 @@
   gap: 8px;
   min-height: 36px;
   margin-bottom: 4px;
+}
+/* Where the sidebar meets the native window buttons, the identity drops below them
+   (like a Space's title row) rather than squeezing beside them in a narrow sidebar. */
+.agent-studio-sidebar > header[data-window-chrome="true"] {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: calc(var(--shell-titlebar, 38px) - 8px);
 }
 /* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
 /* The switcher hugs its name instead of spanning the sidebar. */
@@ -85,25 +94,43 @@
   padding-right: 10px;
   margin-right: -2px;
 }
+/* Section labels (Projects, Recents) are quiet: muted, regular weight, aligned with the
+   row labels' leading edge. */
 .agent-studio-recents h2 {
   display: flex;
   align-items: center;
   min-height: 24px;
   margin: 0;
-  padding-inline: 8px;
+  padding-inline: var(--misty-sidebar-row-padding);
   font-size: 12px;
-  font-weight: 500;
-  color: var(--color-cream);
+  font-weight: 400;
+  color: var(--color-cream-muted);
 }
 .agent-studio-recent-row > button:first-child {
   color: var(--color-cream-muted);
 }
-/* Recents heading carries the New folder action at its end. */
+/* Recents fills the rest of the list, so a drop anywhere below the folders files there. */
+.agent-studio-recents-group {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Rows lift with the shared pointer drag, never the native one. */
+.agent-studio-recent-row > [data-reorder-handle] {
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+/* A section heading; Projects carries New project at its end, shown with intent. */
 .agent-studio-recents-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 4px;
+  margin-top: 12px;
+}
+.agent-studio-recents > .agent-studio-recents-heading:first-child,
+.agent-studio-recents-selection + .agent-studio-recents-heading {
+  margin-top: 0;
 }
 .agent-studio-recents-heading > button {
   width: 24px;
@@ -111,36 +138,149 @@
   min-width: 24px;
   margin-right: 4px;
   color: var(--color-cream-muted);
+  opacity: 0;
 }
-/* A folder header reads as a label above its chats: brighter title, folder glyph in the
-   icon column, count and chevron at the end. */
+.agent-studio-recents-heading:is(:hover, :focus-within) > button {
+  opacity: 1;
+}
+/* A project reads as a label above its chats: brighter title, open or closed folder glyph
+   in the nav icon column, no count or chevron. */
 .agent-studio-folder-row > button:first-child {
   color: var(--color-cream);
 }
-.agent-studio-folder-row .agent-studio-recent-status > svg {
-  width: 16px;
-  height: 16px;
-  color: var(--color-cream-muted);
-}
-.agent-studio-folder-count {
-  font-size: 12px;
-  color: var(--color-cream-muted);
-}
-.agent-studio-sidebar .agent-studio-folder-chevron {
-  width: 14px;
-  height: 14px;
-  color: var(--color-cream-muted);
-  transition: transform 150ms ease;
-}
-.agent-studio-folder-row > [aria-expanded="true"] > .agent-studio-folder-chevron {
-  transform: rotate(90deg);
-}
+/* Long titles fade out at the trailing edge instead of ending in an ellipsis. When the
+   overflow button shows, the fade keeps its width and ends where the button begins. */
 .agent-studio-recent-title {
+  --agent-studio-title-fade: 24px;
+  --agent-studio-title-clear: 0px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-align: left;
+  text-overflow: clip;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--agent-studio-title-clear) - var(--agent-studio-title-fade)),
+    transparent calc(100% - var(--agent-studio-title-clear))
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--agent-studio-title-clear) - var(--agent-studio-title-fade)),
+    transparent calc(100% - var(--agent-studio-title-clear))
+  );
+}
+/* The button sits 4px from the row's edge and is 26px wide; the title already stops at
+   the row padding, so only the rest needs clearing. */
+.agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) .agent-studio-recent-title,
+.agent-studio-recent-row:has(> button[aria-current="page"], > [data-state="open"])
+  .agent-studio-recent-title {
+  --agent-studio-title-clear: calc(4px + 26px - var(--misty-sidebar-row-padding));
+}
+/* Get started: a quiet card at the foot of the sidebar until every step is done. */
+.agent-studio-get-started {
+  flex-shrink: 0;
+  margin-top: 8px;
+  padding: 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+}
+.agent-studio-get-started-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--misty-sidebar-label-size);
+  font-weight: 500;
+  color: var(--color-cream-bright);
+}
+.agent-studio-get-started-header > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-cream-muted);
+  transition: transform 150ms ease;
+}
+.agent-studio-get-started-header[aria-expanded="false"] > svg {
+  transform: rotate(-90deg);
+}
+.agent-studio-get-started ul {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-studio-get-started-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  text-align: left;
+  color: var(--color-cream);
+}
+.agent-studio-get-started-step > svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-get-started-step > span:not(.sr-only) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
+}
+:is(.agent-studio-get-started-header, button.agent-studio-get-started-step):hover {
+  background: var(--color-charcoal-hover);
+}
+:is(.agent-studio-get-started-header, button.agent-studio-get-started-step):focus-visible {
+  outline: 2px solid var(--color-cream-muted);
+  outline-offset: -2px;
+}
+/* A finished step stays listed, struck through, until the whole card leaves. */
+[data-done] > .agent-studio-get-started-step {
+  color: var(--color-cream-muted);
+  text-decoration: line-through;
+}
+[data-done] > .agent-studio-get-started-step > svg {
+  opacity: 0.6;
+}
+
+/* The trailing edge resizes the sidebar. A hairline shows while hovered, focused or
+   dragged; double-click restores the default width. */
+.agent-studio-resizer {
+  position: absolute;
+  inset-block: 0;
+  right: -6px;
+  z-index: 2;
+  width: 12px;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+.agent-studio-resizer::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 5px;
+  width: 2px;
+  background: var(--color-charcoal-active);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.agent-studio-resizer:is(:hover, :focus-visible)::after,
+.agent-studio-resizer[data-dragging]::after {
+  opacity: 1;
+}
+html:has(.agent-studio-resizer[data-dragging]) {
+  cursor: col-resize;
+  user-select: none;
 }
 /* The status dot sits in the nav icon column, centered under those icons. Colors come
    from the --misty-status-* tokens (App.css); the tooltip always names the state. */
@@ -152,31 +292,36 @@
   height: var(--misty-sidebar-icon-size);
 }
 .agent-studio-recent-dot {
+  --agent-studio-dot: var(--misty-status-idle);
   width: var(--misty-sidebar-badge-size);
   height: var(--misty-sidebar-badge-size);
   border-radius: 50%;
-  background: var(--misty-status-idle);
+  background: var(--agent-studio-dot);
 }
+/* Queued or waiting pulses gray; working pulses bright. */
 [data-status="working"] > .agent-studio-recent-dot {
-  background: var(--color-cream-bright);
+  --agent-studio-dot: var(--color-cream-bright);
+}
+[data-status="working"] > .agent-studio-recent-dot,
+[data-status="waiting"] > .agent-studio-recent-dot {
   animation: agent-studio-dot-pulse 1.4s ease-in-out infinite;
 }
-[data-status="waiting"] > .agent-studio-recent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--misty-status-idle);
-}
-[data-status="needs-you"] > .agent-studio-recent-dot {
-  background: var(--misty-status-attention);
-}
+[data-status="needs-you"] > .agent-studio-recent-dot,
 [data-status="partial"] > .agent-studio-recent-dot {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--misty-status-attention);
+  --agent-studio-dot: var(--misty-status-attention);
 }
 [data-status="failed"] > .agent-studio-recent-dot {
-  background: var(--misty-status-failed);
+  --agent-studio-dot: var(--misty-status-failed);
 }
 [data-status="canceled"] > .agent-studio-recent-dot {
   opacity: 0.45;
+}
+/* Read: a hollow gray ring whatever the outcome, meaning nothing new has happened there.
+   Declared after the status colors so it wins over them. */
+[data-read] > .agent-studio-recent-dot {
+  --agent-studio-dot: var(--misty-status-idle);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--agent-studio-dot);
 }
 @keyframes agent-studio-dot-pulse {
   50% {
@@ -184,7 +329,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-status="working"] > .agent-studio-recent-dot {
+  [data-status="working"] > .agent-studio-recent-dot,
+  [data-status="waiting"] > .agent-studio-recent-dot {
     animation: none;
   }
 }
@@ -242,9 +388,6 @@
   flex-shrink: 0;
 }
 @container agent-studio (max-width:1100px) {
-  .agent-studio-sidebar {
-    width: 190px;
-  }
   .agent-studio-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -260,8 +403,9 @@
   }
   .agent-studio-identity > :not(.agent-avatar),
   .agent-studio-sidebar button > span:not(.agent-studio-recent-status),
-  .agent-studio-sidebar .agent-studio-folder-chevron,
-  .agent-studio-recents-heading {
+  .agent-studio-recents-heading,
+  .agent-studio-resizer,
+  .agent-studio-get-started {
     display: none;
   }
   .agent-studio-sidebar nav > button,
@@ -282,39 +426,117 @@
   }
 }
 /*
- * Every Agents composer has two rows: the text on top, and one toolbar under it with
- * Attach and the mode on the left, the model, usage, voice and send on the right.
+ * Every Agents composer has two rows: the text in its own box on top, and one toolbar
+ * beneath the box with Attach and the mode on the left, the model, usage, voice and send
+ * on the right. Only the text (and any attachments) sits inside the box.
  */
+.agent-studio .agent-conversation [data-slot="message-composer"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 .agent-studio .agent-conversation [data-slot="message-composer"] > div:has(textarea) {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  /* Zero minimums let both groups shrink, so the row never overflows a narrow composer. */
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
   align-items: end;
-  row-gap: 6px;
-  padding: 10px;
+  row-gap: 8px;
+  padding: 0;
 }
 .agent-studio .agent-conversation [data-slot="message-composer"] > div > div:has(> textarea) {
   grid-column: 1 / -1;
   grid-row: 1;
+  padding: 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
 }
-/* Text starts where the + glyph starts: 10px card padding + 8px inset inside the 32px button. */
+/* Attachments share the box with the text: the strip is its top, the text its bottom. */
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:first-child:not(:has(textarea)) {
+  border: 1px solid var(--color-charcoal-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-charcoal-card);
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]:has(> div:first-child:not(:has(textarea)))
+  > div
+  > div:has(> textarea) {
+  border-top: 0;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-dragging="true"]
+  > div
+  > div:has(> textarea),
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-dragging="true"]
+  > div:first-child:not(:has(textarea)) {
+  border-color: var(--color-cream-muted);
+  background: var(--color-charcoal-hover);
+}
+/* Text starts where the + glyph starts: 10px box padding + 8px inset inside the 32px button. */
 .agent-studio .agent-conversation [data-slot="message-composer"] textarea {
   padding-inline: 8px;
+}
+/* Send (or Stop) sits in the box's bottom-right corner; the text wraps short of it. */
+.agent-studio .agent-conversation [data-slot="message-composer"] .misty-composer-send {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] textarea {
+  padding-right: 44px;
 }
 /* A new task's composer is roomier: a taller field in larger type. */
 .agent-studio .agent-conversation[data-empty="true"] [data-slot="message-composer"] textarea {
   min-height: 64px;
-  padding: 8px;
+  padding: 8px 44px 8px 8px;
   font-size: 16px;
 }
-.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:first-child {
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:first-child {
   grid-row: 2;
   /* The shared lift centers the buttons on a one-line input; here they have their own row. */
   margin-bottom: 0;
+  /* Inset like the box's padding, so the + glyph lines up with the text above it. */
+  padding-left: 10px;
 }
-.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:last-child {
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:last-child {
   grid-column: 3;
   grid-row: 2;
   margin-bottom: 0;
+  padding-right: 10px;
+}
+/* In a narrow composer (the Misty panel) the model and thinking pickers show only their
+   icons; each keeps its name for assistive technology and in its menu. */
+@container agent-studio (max-width: 520px) {
+  .agent-studio
+    .agent-conversation
+    [data-slot="message-composer"]
+    > div
+    > div:last-child
+    button
+    > span.truncate {
+    display: none;
+  }
 }
 /*
  * Control bar: a tab tucked behind the composer's top edge for active folder work and
@@ -363,6 +585,7 @@
 }
 
 .agent-studio-recent-row {
+  position: relative;
   display: flex;
   align-items: center;
   min-width: 0;
@@ -374,6 +597,7 @@
 }
 /* One surface per row: the title and its overflow menu highlight together. */
 .agent-studio-recent-row:hover,
+.agent-studio-recent-row[data-state="open"],
 .agent-studio-recent-row:has(> [data-state="open"]) {
   background: var(--color-charcoal-hover);
 }
@@ -389,11 +613,13 @@
 .agent-studio-recent-row:has(> button[aria-current="page"]) > button:first-child {
   color: var(--color-cream-bright);
 }
+/* The overflow button floats over the title's faded end instead of reserving its width. */
 .agent-studio-recent-row > :not(:first-child) {
+  position: absolute;
+  right: 4px;
   width: 26px;
   height: 26px;
   min-width: 26px;
-  margin-right: 4px;
   color: var(--color-cream-muted);
 }
 .agent-studio-recent-row > button:not(:first-child):is(:hover, [data-state="open"]) {
@@ -404,7 +630,7 @@
 .agent-studio-recent-row > :not(:first-child) {
   opacity: 0;
 }
-.agent-studio-recent-row:is(:hover, :focus-within) > :not(:first-child),
+.agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) > :not(:first-child),
 .agent-studio-recent-row:has(> button[aria-current="page"]) > :not(:first-child),
 .agent-studio-recent-row > [aria-expanded="true"],
 .agent-studio-recent-row > [data-state="open"] {
@@ -425,18 +651,14 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* The Working status and the Details toggle end the bar. */
+/* A quiet Working status ends the bar while a task runs. */
 .agent-heading-details {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 6px;
-}
-.agent-heading-details > button:last-child {
+  font-size: 12px;
   color: var(--color-cream-muted);
-}
-.agent-heading-details > button:last-child[aria-pressed="true"] {
-  color: var(--color-cream-bright);
 }
 
 /* Folder work joins the bar's controls; its receipt and errors span the row below. */

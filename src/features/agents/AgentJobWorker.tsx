@@ -4,8 +4,11 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { DesktopAgentJobWorker } from "./worker";
+import { endAllHostedSessions } from "./hostedSessions";
+import { watchLocalExecutionForKeepAwake } from "./keepAwake";
+import { useLocalExecution } from "./localExecution";
 
-export function AgentJobWorker(): null {
+export function AgentJobWorker() {
   const { user } = useAuth();
 
   useEffect(() => {
@@ -17,10 +20,21 @@ export function AgentJobWorker(): null {
       worker = new DesktopAgentJobWorker();
       worker.start(user.id);
     });
+    // This computer stays awake while its own agent task runs.
+    const unwatch = watchLocalExecutionForKeepAwake((listener) => {
+      const running = (state: ReturnType<typeof useLocalExecution.getState>) =>
+        state.execution?.state === "running" || state.execution?.state === "waiting";
+      listener(running(useLocalExecution.getState()));
+      return useLocalExecution.subscribe((state) => listener(running(state)));
+    });
     return () => {
       canceled = true;
       worker?.stop();
+      unwatch();
+      // Sessions for other devices end with this account here.
+      void endAllHostedSessions();
     };
   }, [user?.id]);
+  // Sessions it hosts show in the control island.
   return null;
 }

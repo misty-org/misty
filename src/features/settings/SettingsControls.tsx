@@ -28,7 +28,7 @@ function useSettingsControlLabel(fallback: string) {
 }
 export function SettingsNote(props: { children: ReactNode }) {
   return (
-    <p className="m-0 max-w-2xl border-t border-charcoal-border py-3 text-[13px] leading-[18px] text-cream-muted">
+    <p className="m-0 max-w-2xl border-t border-charcoal-border py-4 text-[15px] leading-6 text-cream-muted">
       {props.children}
     </p>
   );
@@ -50,8 +50,8 @@ export function SelectControl(props: {
   );
 }
 
-/** Shared checkmarked dropdown for choices with more than three options. */
-function DropdownControl(props: {
+/** Shared checkmarked dropdown for longer lists of choices. */
+export function DropdownControl(props: {
   value: string;
   label?: string;
   options: { value: string; label: string; disabled?: boolean }[];
@@ -61,7 +61,7 @@ function DropdownControl(props: {
   const label = useSettingsControlLabel("Setting");
   return (
     <Select value={props.value} disabled={props.disabled} onValueChange={props.onValueChange}>
-      <SelectTrigger aria-label={props.label ?? label} className="w-full min-w-0">
+      <SelectTrigger aria-label={props.label ?? label} className="w-[200px] max-w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -143,7 +143,7 @@ export function TextControl(props: {
     <Input
       aria-label={ariaLabel}
       key={props.value}
-      className={cn("w-full", settingsDisabledControlClass)}
+      className={cn("w-[240px] max-w-full", settingsDisabledControlClass)}
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -175,7 +175,7 @@ export function SliderControl(props: {
   const ariaLabel = useSettingsControlLabel("Setting");
   const format = props.format ?? ((value: number) => String(value));
   return (
-    <div className="flex w-full items-center gap-3">
+    <div className="flex w-[220px] max-w-full items-center gap-3">
       <Slider
         aria-label={ariaLabel}
         aria-valuetext={format(props.value)}
@@ -270,10 +270,10 @@ export function FilePathControl(props: {
   };
 
   return (
-    <div className="grid w-full min-w-0 justify-items-end gap-2">
+    <div className="grid w-[240px] min-w-0 max-w-full justify-items-end gap-2">
       <span
         className={cn(
-          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
+          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px]",
           props.disabled || !props.value ? "text-cream-muted" : "text-cream",
         )}
         title={props.value || props.emptyLabel || "None"}
@@ -315,10 +315,10 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
   };
 
   return (
-    <span className="flex w-full min-w-0 items-center justify-end gap-2">
+    <span className="flex min-w-0 max-w-[360px] items-center justify-end gap-2">
       <span
         className={cn(
-          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
+          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px]",
           props.disabled ? "text-cream-muted" : "text-cream",
         )}
         title={props.value}

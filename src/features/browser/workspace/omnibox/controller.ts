@@ -31,6 +31,8 @@ function merge(a: OmniboxMatch, b: OmniboxMatch): OmniboxMatch {
     inlineCompletion: completing?.inlineCompletion,
     removable: Boolean(a.removable || b.removable),
     bookmarked: [a, b].some((match) => match.bookmarked || match.kind === "bookmark"),
+    // A typed address carries no favicon of its own; take one from a page already visited.
+    faviconUrl: base.faviconUrl || other.faviconUrl || base.faviconUrl,
     switchViewId: page ? (viewIdOf(a) ?? viewIdOf(b)) : undefined,
   };
 }
@@ -50,12 +52,40 @@ export function mergeMatches(
     const existing = byKey.get(key);
     byKey.set(key, existing ? merge(existing, match) : match);
   }
-  const sorted = [...byKey.values()].sort(
+  const sorted = withKnownFavicons([...byKey.values()]).sort(
     (a, b) => b.relevance - a.relevance || a.title.localeCompare(b.title),
   );
   const defaultIndex = sorted.findIndex((match) => match.allowedToBeDefault);
   if (defaultIndex > 0) sorted.unshift(...sorted.splice(defaultIndex, 1));
   return sorted.slice(0, limit);
+}
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lends a site's favicon to its other rows that lack one, such as a typed address for a
+ * site in history. Only origins some provider already knows lend; a draft that matches
+ * nothing visited keeps the globe and never triggers a request to the typed host.
+ */
+function withKnownFavicons(matches: OmniboxMatch[]): OmniboxMatch[] {
+  const known = new Map<string, string>();
+  for (const match of matches) {
+    const origin = match.faviconUrl ? originOf(match.target.url) : null;
+    if (origin && !known.has(origin)) known.set(origin, match.faviconUrl!);
+  }
+  return matches.map((match) => {
+    if (match.faviconUrl || !["url", "history", "bookmark", "tab"].includes(match.kind))
+      return match;
+    const origin = originOf(match.target.url);
+    const faviconUrl = origin ? known.get(origin) : undefined;
+    return faviconUrl ? { ...match, faviconUrl } : match;
+  });
 }
 
 /**

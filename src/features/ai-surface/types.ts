@@ -11,8 +11,25 @@ export interface ScreenRequest {
   kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
-  /** current: the user's tab; window: a new tab in their window; separate: an agent window. */
-  location: "current" | "separate" | "window" | "ask";
+  /** current: the user's tab; window: a new tab in their window; separate: an agent window;
+   * remote: a browser another of the person's devices opened for this request. */
+  location: "current" | "separate" | "window" | "ask" | "remote";
+  /** The user named where to work; otherwise a matching open tab is reused first. */
+  chosen?: boolean;
+  /** The browser session another device opened, with the tab it signed for. */
+  remote?: {
+    deviceId: string;
+    deviceName: string;
+    contexts: Array<{
+      device_id: string;
+      kind: "browser_tab";
+      opaque_ref: string;
+      display_name?: string;
+      capabilities: string[];
+      metadata?: Record<string, string | number | boolean>;
+      run_grant?: { payload: string; signature: string };
+    }>;
+  };
   /** Client progress: waiting for a choice, opening, or done. */
   state?: "pending" | "opening" | "opened" | "declined" | "failed";
   error?: string;
@@ -36,7 +53,8 @@ export type AiSurfaceId =
   | "agents"
   | "settings";
 export type AiInvocationMode = "quick" | "drawer" | "companion";
-export type AiTrigger = "message" | "selection" | "object" | "schedule" | "event" | "handoff";
+export type AiTrigger =
+  "message" | "selection" | "object" | "schedule" | "event" | "handoff" | "continuation";
 export type AiPrivacyClass = "shared" | "private" | "device" | "provider";
 export type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
 export type AiApprovalPolicy =
@@ -262,6 +280,22 @@ export type AiInvocationState =
   | "completed"
   | "failed"
   | "canceled";
+/** A run's plan and findings, shown in the conversation as the run works. */
+export interface AgentNotebook {
+  plan: string;
+  findings: string;
+  /** The note it is mirrored to in the personal Space. */
+  noteId?: string;
+}
+
+/** One sub-agent a run started with agents_delegate. */
+export interface AgentSubagent {
+  invocationId: string;
+  goal: string;
+  state: string;
+  summary?: string;
+}
+
 export type AiInvocationEvent =
   | { id: string; type: "user.steering"; text: string }
   | ({ id: string } & CollaborationEvent)
@@ -313,6 +347,16 @@ export type AiInvocationEvent =
     }
   | {
       id: string;
+      type: "notebook.updated";
+      notebook: AgentNotebook;
+    }
+  | {
+      id: string;
+      type: "delegation.updated";
+      delegation: { children: AgentSubagent[] };
+    }
+  | {
+      id: string;
       type: "artifact.proposed";
       artifact: AiArtifact;
     }
@@ -342,6 +386,15 @@ export type AiInvocationEvent =
       type: "tool.started" | "tool.completed" | "tool.failed";
       toolCallId: string;
       toolName: string;
+      durationMs?: number;
+      error?: string;
+    }
+  | {
+      id: string;
+      type: "tool.detail";
+      toolCallId: string;
+      toolName: string;
+      activity: AiToolActivity;
     }
   | {
       id: string;
@@ -369,3 +422,28 @@ export interface AiTranscriptMessage {
   invocationId?: string;
   taskId?: string;
 }
+
+/**
+ * What a tool call targeted and got back, summarized by the server from known
+ * fields only: a short target, a short result, a few rows, or printed output.
+ */
+export interface AiToolActivity {
+  detail?: string;
+  result?: string;
+  rows?: { title: string; meta?: string }[];
+  output?: string;
+}
+
+/** One entry of a reply's work, in order: something Misty said while working, or a tool it ran. */
+export type AiProgressItem =
+  | { type: "note"; text: string }
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      state: "running" | "completed" | "failed";
+      activity?: AiToolActivity;
+      durationMs?: number;
+      /** Why it failed, in plain words. */
+      error?: string;
+    };

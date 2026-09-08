@@ -36,30 +36,21 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
 
       <div aria-hidden="true" className="bg-charcoal-border" />
 
-      <main className="flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
-        <header className="shrink-0 border-b border-charcoal-border">
-          <div className="flex min-h-12 min-w-0 items-center gap-3 px-5 py-2 max-[720px]:px-4">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <h1 className="min-w-0 truncate text-base font-semibold leading-6 text-cream">
-                {props.title}
-              </h1>
-              {props.titleAccessory}
-            </div>
-            {overlay ? (
-              <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
-                <X className="size-4" strokeWidth={1.8} />
-              </IconButton>
-            ) : null}
-          </div>
-        </header>
+      <main className="relative flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
+        {/* No title bar: section headers carry the page, as the sidebar already names the area. */}
+        <h1 className="sr-only">{props.title}</h1>
+        {overlay ? (
+          <IconButton
+            label={`Close ${props.ariaLabel.toLowerCase()}`}
+            className="absolute right-3 top-3 z-10"
+            onClick={props.onClose}
+          >
+            <X className="size-4" strokeWidth={1.8} />
+          </IconButton>
+        ) : null}
         {/* The scroller spans the full pane so its scrollbar sits at the panel edge. */}
         <div className="misty-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
-          <div
-            className={cn(
-              "mx-auto w-full p-5 max-[720px]:p-4",
-              overlay ? "max-w-[760px]" : "max-w-[860px]",
-            )}
-          >
+          <div className="w-full max-w-[960px] px-10 pb-12 pt-9 text-[15px] leading-6 max-[720px]:px-6">
             {props.contentHeader}
             {props.children}
           </div>
@@ -68,18 +59,21 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     </div>
   );
 }
-/** A group of rows under a small muted header. Rows draw their own hairlines; there is no card. */
+/**
+ * A group of rows under a plain header with an optional muted line of context. Rows draw
+ * hairlines between themselves; there is no card.
+ */
 export function DesktopSettingsSection(props: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section aria-label={props.title} className="@container/settings mb-8 min-w-0 last:mb-0">
-      <div className="mb-1.5 min-w-0">
-        <h2 className="text-[13px] font-medium leading-5 text-cream-muted">{props.title}</h2>
+    <section aria-label={props.title} className="@container/settings mb-12 min-w-0 last:mb-0">
+      <div className="mb-2 min-w-0">
+        <h2 className="text-[17px] font-semibold leading-7 text-cream">{props.title}</h2>
         {props.description ? (
-          <p className="mt-0.5 max-w-2xl text-[13px] leading-[18px] text-cream-muted">
+          <p className="mt-1 max-w-[680px] text-[15px] leading-6 text-cream-muted">
             {props.description}
           </p>
         ) : null}
@@ -89,8 +83,9 @@ export function DesktopSettingsSection(props: {
   );
 }
 /**
- * Label and description on the left, the control in one fixed 240px column on the right so every
- * page lines up. Reset appears after the description only while the value differs from default.
+ * Label and optional description on the left, the control right-aligned so every page
+ * shares one right edge. Reset appears after the description only while the value differs from
+ * its default.
  */
 export function DesktopSettingsRow(props: {
   label: string;
@@ -110,25 +105,22 @@ export function DesktopSettingsRow(props: {
       tabIndex={-1}
       aria-disabled={props.muted || undefined}
       className={cn(
-        "group/setting-row grid min-h-14 items-center gap-x-6 gap-y-2.5 border-t border-charcoal-border py-3 outline-none",
+        "group/setting-row grid min-h-16 items-center gap-x-10 gap-y-3 border-t border-charcoal-border py-4 outline-none first:border-t-0",
         "transition-colors duration-700 data-[setting-flash=true]:bg-charcoal-hover data-[setting-flash=true]:duration-0",
         props.stacked
           ? "grid-cols-1"
-          : "grid-cols-[minmax(0,1fr)_240px] @max-[560px]/settings:grid-cols-1",
+          : "grid-cols-[minmax(0,1fr)_auto] @max-[560px]/settings:grid-cols-1",
         props.indent && "pl-5",
       )}
     >
-      <div className="grid min-w-0 gap-0.5">
+      <div className="grid min-w-0 gap-1">
         <span
-          className={cn(
-            "text-sm font-medium leading-5",
-            props.muted ? "text-cream-muted" : "text-cream",
-          )}
+          className={cn("text-[15px] leading-6", props.muted ? "text-cream-muted" : "text-cream")}
         >
           {props.label}
         </span>
         {props.description || reset ? (
-          <p className="text-[13px] leading-[18px] text-cream-muted">
+          <p className="max-w-[680px] text-[15px] leading-6 text-cream-muted">
             {props.description}
             {reset ? (
               <>
@@ -138,7 +130,7 @@ export function DesktopSettingsRow(props: {
                   variant="link"
                   aria-label={`Reset ${props.label} to default`}
                   className={cn(
-                    "inline h-auto border-0 p-0 align-baseline text-[13px] leading-[18px]",
+                    "inline h-auto border-0 p-0 align-baseline text-[15px] leading-6",
                     "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
                   )}
                   onClick={reset}
@@ -169,7 +161,7 @@ export function DesktopSettingsNotice(props: { children: ReactNode; action?: Rea
   return (
     <div
       role="alert"
-      className="mb-5 flex min-w-0 items-center gap-2.5 rounded-lg border border-charcoal-border px-3 py-2 text-[13px] leading-[18px] text-cream"
+      className="mb-5 flex min-w-0 items-center gap-2.5 rounded-lg border border-charcoal-border px-3.5 py-2.5 text-[14px] leading-5 text-cream"
     >
       <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
       <span className="min-w-0 flex-1">{props.children}</span>
@@ -186,9 +178,8 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   onClose?: () => void;
   onSelect: (id: Id) => void;
   presentation?: "page" | "overlay";
+  /** Announced to screen readers; the sidebar already shows it. */
   title: ReactNode;
-  /** Sits beside the title, e.g. the page's storage scope. */
-  titleAccessory?: ReactNode;
   navigationHeader?: ReactNode;
   /** Replaces the section list, e.g. with search results while the user types. */
   navigationOverride?: ReactNode;

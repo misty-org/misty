@@ -16,8 +16,12 @@ export * from "./store/useAiServerStore";
 export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";
-export { MistyPanel, MISTY_PANEL_WIDTH, type MistyPanelSide } from "./panel/MistyPanel";
-export { useMistyPanelStore } from "./panel/mistyPanelStore";
+export { MistyPanel, type MistyPanelSide } from "./panel/MistyPanel";
+export { MistyPanelDock } from "./panel/MistyPanelDock";
+export { mistyPanelHost, useMistyPanelHost, useMistyPanelSide } from "./panel/mistyPanelHost";
+export { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./panel/mistyPanelStore";
+export { MistyPanelSprite } from "./panel/MistyPanelSprite";
+export { AgentTabAway, useTabAway } from "./dock/AgentTabAway";
 
 export type { AgentScope } from "./model/interfaces/types";
 
@@ -30,6 +34,8 @@ export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
 
 export { ModelPicker } from "./models/ModelPicker";
+export { ReasoningPicker } from "./models/ReasoningPicker";
+export { settleProgress, withToolEvent } from "./progress/progressTimeline";
 export { describeNextRun } from "./workflows/scheduleSummary";
 export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
