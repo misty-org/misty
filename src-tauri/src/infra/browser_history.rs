@@ -43,8 +43,7 @@ pub struct BrowserHistoryRecordRequest {
     pub typed: bool,
 }
 
-#[tauri::command]
-pub fn browser_history_record(
+fn browser_history_record_blocking(
     app: AppHandle,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
@@ -76,8 +75,7 @@ pub fn browser_history_record(
 }
 
 /// Titles often arrive after the page finishes loading.
-#[tauri::command]
-pub fn browser_history_set_title(
+fn browser_history_set_title_blocking(
     app: AppHandle,
     request: BrowserHistoryRecordRequest,
 ) -> Result<(), String> {
@@ -126,8 +124,7 @@ fn like_pattern(value: &str) -> String {
     format!("%{escaped}%")
 }
 
-#[tauri::command]
-pub fn browser_history_query(
+fn browser_history_query_blocking(
     app: AppHandle,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistoryVisit>, String> {
@@ -180,8 +177,7 @@ const TOP_PAGES_WINDOW_MS: i64 = 90 * 86_400_000;
 
 /// Address bar suggestions: pages matching the typed text, ranked by visits
 /// (typed visits count triple) decayed by age. Empty text returns top pages.
-#[tauri::command]
-pub fn browser_history_suggest(
+fn browser_history_suggest_blocking(
     app: AppHandle,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistorySuggestion>, String> {
@@ -238,8 +234,7 @@ pub struct BrowserHistoryDeleteRequest {
     pub ids: Vec<i64>,
 }
 
-#[tauri::command]
-pub fn browser_history_delete(
+fn browser_history_delete_blocking(
     app: AppHandle,
     request: BrowserHistoryDeleteRequest,
 ) -> Result<(), String> {
@@ -261,8 +256,7 @@ pub struct BrowserHistoryForgetRequest {
 }
 
 /// Removes every visit to one page, as when a suggestion is deleted from the address bar.
-#[tauri::command]
-pub fn browser_history_forget(
+fn browser_history_forget_blocking(
     app: AppHandle,
     request: BrowserHistoryForgetRequest,
 ) -> Result<(), String> {
@@ -294,8 +288,7 @@ pub struct BrowserHistoryClearRequest {
     pub since: Option<i64>,
 }
 
-#[tauri::command]
-pub fn browser_history_clear(
+fn browser_history_clear_blocking(
     app: AppHandle,
     request: BrowserHistoryClearRequest,
 ) -> Result<(), String> {
@@ -358,4 +351,72 @@ mod tests {
     fn like_pattern_escapes_wildcards() {
         assert_eq!(like_pattern("50%_off"), "%50\\%\\_off%");
     }
+}
+
+// Commands run on the main thread unless they are async, and the main thread
+// also delivers keystrokes. A history query over a large imported library held
+// typing in the address bar and search box until it finished, so every history
+// command does its SQLite work on a blocking worker instead.
+async fn off_main_thread<R: Send + 'static>(
+    work: impl FnOnce() -> Result<R, String> + Send + 'static,
+) -> Result<R, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn browser_history_record(
+    app: AppHandle,
+    request: BrowserHistoryRecordRequest,
+) -> Result<(), String> {
+    off_main_thread(move || browser_history_record_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_set_title(
+    app: AppHandle,
+    request: BrowserHistoryRecordRequest,
+) -> Result<(), String> {
+    off_main_thread(move || browser_history_set_title_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_query(
+    app: AppHandle,
+    request: BrowserHistoryQueryRequest,
+) -> Result<Vec<BrowserHistoryVisit>, String> {
+    off_main_thread(move || browser_history_query_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_suggest(
+    app: AppHandle,
+    request: BrowserHistoryQueryRequest,
+) -> Result<Vec<BrowserHistorySuggestion>, String> {
+    off_main_thread(move || browser_history_suggest_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_delete(
+    app: AppHandle,
+    request: BrowserHistoryDeleteRequest,
+) -> Result<(), String> {
+    off_main_thread(move || browser_history_delete_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_forget(
+    app: AppHandle,
+    request: BrowserHistoryForgetRequest,
+) -> Result<(), String> {
+    off_main_thread(move || browser_history_forget_blocking(app, request)).await
+}
+
+#[tauri::command]
+pub async fn browser_history_clear(
+    app: AppHandle,
+    request: BrowserHistoryClearRequest,
+) -> Result<(), String> {
+    off_main_thread(move || browser_history_clear_blocking(app, request)).await
 }
