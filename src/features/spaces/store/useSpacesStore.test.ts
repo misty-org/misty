@@ -91,17 +91,16 @@ const agent: SpaceStudioResource = {
 };
 
 describe("buildMessageSpans", () => {
-  it("stores person and Agent mentions as structured spans", () => {
-    expect(buildMessageSpans("Hi @Sam Lee, ask @Helper", [member], [agent])).toEqual([
+  it("stores human mentions while keeping retired agent names literal", () => {
+    expect(buildMessageSpans("Hi @Sam Lee, ask @Helper", [member])).toEqual([
       { type: "text", text: "Hi " },
       { type: "mention", user_id: "user-sam", label: "Sam Lee" },
-      { type: "text", text: ", ask " },
-      { type: "mention", agent_id: "agent-helper", label: "Helper" },
+      { type: "text", text: ", ask @Helper" },
     ]);
   });
 
   it("keeps unknown mentions as normal text", () => {
-    expect(buildMessageSpans("Hello @Unknown", [member], [agent])).toEqual([
+    expect(buildMessageSpans("Hello @Unknown", [member])).toEqual([
       { type: "text", text: "Hello @Unknown" },
     ]);
   });
@@ -109,25 +108,12 @@ describe("buildMessageSpans", () => {
   // Spans are only ever synthesized from a real member or agent record, never
   // from raw text that merely looks like a mention.
   it("keeps an unmatched agent-style mention literal instead of sending an invalid Agent span", () => {
-    expect(buildMessageSpans("@Nonexistent summarize these files", [member], [agent])).toEqual([
+    expect(buildMessageSpans("@Nonexistent summarize these files", [member])).toEqual([
       { type: "text", text: "@Nonexistent summarize these files" },
     ]);
   });
 
-  it("requires a picker selection when Agent names are ambiguous", () => {
-    const duplicate = { ...agent, id: "agent-helper-two" };
-    expect(buildMessageSpans("@Helper help", [], [agent, duplicate])).toEqual([
-      { type: "text", text: "@Helper help" },
-    ]);
-    expect(
-      buildMessageSpans("@Helper help", [], [agent, duplicate], {
-        helper: "agent-helper-two",
-      }),
-    ).toEqual([
-      { type: "mention", agent_id: "agent-helper-two", label: "Helper" },
-      { type: "text", text: " help" },
-    ]);
-  });
+
 });
 
 describe("Space loading access boundary", () => {
@@ -297,31 +283,7 @@ describe("Spaces mutations", () => {
     expect(useSpacesStore.getState().messagesBySpace[original.space_id]).toEqual([edited]);
   });
 
-  it("sends accessible Agent mentions as structured spans", async () => {
-    const sent = messageFixture({
-      content: [{ type: "mention", agent_id: agent.id, label: agent.name }],
-    });
-    apiMocks.sendMessage.mockResolvedValue({
-      message: sent,
-      triggered_runs: [],
-      agent_failures: [
-        {
-          agent_id: agent.id,
-          code: "integration_required",
-          message: "The run needs a required Space integration before it can start.",
-        },
-      ],
-    });
-    useSpacesStore.setState({ agentsBySpace: { [sent.space_id]: [agent] } });
 
-    await useSpacesStore.getState().sendMessage(sent.space_id, `@${agent.name}`);
-
-    expect(apiMocks.sendMessage.mock.calls[0]?.[1]).toEqual([
-      { type: "mention", agent_id: agent.id, label: agent.name },
-    ]);
-    expect(useSpacesStore.getState().messagesBySpace[sent.space_id]).toEqual([sent]);
-    expect(useSpacesStore.getState().error).toBeNull();
-  });
 
   it("shows a message immediately and reconciles it after the server confirms", async () => {
     const request = deferred<{ message: SpaceMessage; triggered_runs: never[] }>();
@@ -342,7 +304,7 @@ describe("Spaces mutations", () => {
 
     const send = useSpacesStore
       .getState()
-      .sendMessage(optimistic.space_id, "Fast hello", [], [], [], "", {}, optimistic);
+      .sendMessage(optimistic.space_id, "Fast hello", [], [], [], "", optimistic);
 
     expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([optimistic]);
     request.resolve({ message: confirmed, triggered_runs: [] });
@@ -365,7 +327,7 @@ describe("Spaces mutations", () => {
     await expect(
       useSpacesStore
         .getState()
-        .sendMessage(optimistic.space_id, "Please send", [], [], [], "", {}, optimistic),
+        .sendMessage(optimistic.space_id, "Please send", [], [], [], "", optimistic),
     ).rejects.toThrow("network unavailable");
 
     expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([
@@ -373,17 +335,7 @@ describe("Spaces mutations", () => {
     ]);
   });
 
-  it("treats closed-off chat Agents as optional suggestions", async () => {
-    apiMocks.chatAgents.mockRejectedValue(
-      new SpaceRequestError("You no longer have access to this Space.", 403, "forbidden"),
-    );
-    useSpacesStore.setState({ agentsBySpace: { "space-default": [agent] }, error: null });
 
-    await useSpacesStore.getState().loadChatAgents("space-default");
-
-    expect(useSpacesStore.getState().agentsBySpace["space-default"]).toEqual([]);
-    expect(useSpacesStore.getState().error).toBeNull();
-  });
 
   // Regression coverage: these actions previously had no error handling at all,
   // so a failed request left `error` untouched and the UI's error banner (which
@@ -400,15 +352,15 @@ describe("Spaces mutations", () => {
       () =>
         useSpacesStore
           .getState()
-          .saveStudio("space-default", "agents", { name: "Helper" } as never),
+          .saveStudio("space-default", "workflows", { name: "Helper" } as never),
     ],
     [
       "deleteStudio",
-      () => useSpacesStore.getState().deleteStudio("space-default", "agents", "agent-helper"),
+      () => useSpacesStore.getState().deleteStudio("space-default", "workflows", "agent-helper"),
     ],
     [
       "runStudio",
-      () => useSpacesStore.getState().runStudio("space-default", "agents", "agent-helper"),
+      () => useSpacesStore.getState().runStudio("space-default", "workflows", "agent-helper"),
     ],
   ] as const)(
     "%s records the failure on the shared store error and rethrows",

@@ -5,17 +5,15 @@ import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
-import { SiDiscord } from "react-icons/si";
+import { BrandIcon } from "../../../../../../misty-apps/apps/shared/BrandIcon";
 import { Link } from "react-router-dom";
-import { AgentRunInline } from "./AgentRunInline";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyPreview } from "./MessageReplyPreview";
-import { SuggestedActionsCard } from "./SuggestedActionsCard";
-import { initials, isAgentAuthoredMessage, isInFlightRun } from "./messageHelpers";
+import { initials, isAgentAuthoredMessage } from "./messageHelpers";
 import { InstagramBrandIcon } from "../../social/InstagramBrandIcon";
 import { MessengerBrandIcon, XBrandIcon } from "../../social/SocialProviderBrandIcons";
 
@@ -143,11 +141,6 @@ export function ChatMessageRow({
             onLibraryItem={props.onLibraryItem}
             onReload={props.onReload}
           />
-          {message.triggered_runs
-            ?.filter((run) => !isInFlightRun(run))
-            .map((run) => (
-              <AgentRunInline key={run.id} run={run} />
-            ))}
           <MessageReactions
             message={message}
             canWrite={props.canWrite}
@@ -167,16 +160,6 @@ export function ChatMessageRow({
           />
         ) : null}
       </article>
-      {props.actionSuggestions
-        ?.filter((batch) => batch.anchor_message_id === message.id)
-        .map((batch) => (
-          <SuggestedActionsCard
-            key={batch.id}
-            spaceId={props.spaceId}
-            batch={batch}
-            onChanged={props.onActionSuggestionsChanged ?? (() => {})}
-          />
-        ))}
     </Fragment>
   );
 }
@@ -194,22 +177,22 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
       ) : null}
       {message.social_provider === "instagram" ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <InstagramBrandIcon />
+          <InstagramBrandIcon size={12} />
           Instagram
         </Badge>
       ) : message.social_provider === "discord" ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <SiDiscord />
+          <BrandIcon brand="discord" size={12} />
           Discord
         </Badge>
       ) : message.social_provider === "messenger" ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <MessengerBrandIcon />
+          <MessengerBrandIcon size={12} />
           Messenger
         </Badge>
       ) : message.social_provider === "x" ? (
         <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
-          <XBrandIcon />X
+          <XBrandIcon size={12} />X
         </Badge>
       ) : null}
       <time className="text-[11px] tabular-nums text-cream-muted">

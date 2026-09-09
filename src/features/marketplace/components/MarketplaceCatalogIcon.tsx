@@ -2,6 +2,8 @@ import { isNavigatorAppId, WorkspaceAppIcon } from "@/features/workspace";
 import { Puzzle } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
+import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
+import { brandIconAsset } from "../../../../../misty-apps/apps/shared/brandIcons";
 
 type MarketplaceCatalogIconProps = {
   pluginId?: string;
@@ -38,6 +40,7 @@ export function MarketplaceCatalogIcon({
     logoSrc && !imgFailed ? `${logoSrc}${logoSrc.includes("?") ? "&" : "?"}t=${cacheBust}` : "";
   const sizedStyle = size ? { width: size, height: size, ...style } : style;
   const builtInAppId = pluginId?.startsWith("builtin:") ? pluginId.slice("builtin:".length) : "";
+  const brand = brandIconAsset(pluginId ?? "");
   if (isNavigatorAppId(builtInAppId)) {
     return <WorkspaceAppIcon appId={builtInAppId} className={className} size="marketplace" />;
   }
@@ -47,7 +50,13 @@ export function MarketplaceCatalogIcon({
       data-plugin-icon={normalizedMarketplaceCatalogIconId(pluginId)}
       style={sizedStyle}
     >
-      {src ? (
+      {brand ? (
+        <BrandIcon
+          brand={brand.id}
+          size={size ? Math.round(size * 0.72) : 28}
+          className={imageClassName}
+        />
+      ) : src ? (
         <img
           alt={`${pluginName || pluginId || "Extension"} logo`}
           className={imageClassName}

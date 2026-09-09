@@ -29,7 +29,6 @@ export type * from "./model/stores/spaces/interfaces/useSpacesStore";
 export type * from "./model/stores/spaces/types/useSpacesBackendStore";
 export type { Space } from "@/api/spaces/dto/interfaces/types";
 export { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
-export * from "./store/agent-run-events";
 export * from "./store/reference-cache";
 export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";

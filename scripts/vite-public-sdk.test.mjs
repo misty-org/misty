@@ -75,3 +75,33 @@ test(
     }
   },
 );
+
+test("excluded public contracts resolve their own schema dependency", async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "misty-sdk-schema-test-")));
+  try {
+    const contracts = join(root, "node_modules/@misty/contracts");
+    const nested = join(contracts, "node_modules/zod");
+    const host = join(root, "node_modules/zod");
+    for (const dir of [nested, host]) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "package.json"),
+        JSON.stringify({
+          name: "zod",
+          main: "index.js",
+          exports: { ".": { import: "./index.js" }, "./package.json": "./package.json" },
+        }),
+      );
+      await writeFile(join(dir, "index.js"), "module.exports = {};");
+    }
+    const plugin = publicSdkDevelopmentUpdates();
+    assert.equal(
+      plugin.resolveId("zod", join(contracts, "dist/models.js")),
+      join(nested, "index.js"),
+    );
+    assert.equal(plugin.resolveId("zod", join(root, "src/model.ts")), undefined);
+    assert.equal(plugin.resolveId("react", join(contracts, "dist/models.js")), undefined);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

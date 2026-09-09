@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadOfficialAppCatalog, officialAppRuntimeRequest, type OfficialApp } from "./api";
 import { apiRequest } from "@/api/client";
 import type * as ApiClient from "@/api/client";
+import { localDesktopComponentUrl } from "@/features/apps/localDesktopApp";
 
 vi.mock("@/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof ApiClient>()),
@@ -93,7 +94,10 @@ describe("loadOfficialAppCatalog", () => {
   beforeEach(() => {
     vi.mocked(apiRequest).mockReset().mockResolvedValue(serverCatalog);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   it("uses the server's grants and matching local artifacts without changing protocol or metadata", async () => {
     const request = vi.fn(async () =>
@@ -111,12 +115,27 @@ describe("loadOfficialAppCatalog", () => {
     );
   });
 
+  it("includes matching local app descriptions and source links", async () => {
+    const metadata = {
+      about: "Write notes together.",
+      repository_url: "https://github.com/misty-org/misty-apps",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => localResponse([{ ...localApp, ...metadata }])),
+    );
+    const result = await loadOfficialAppCatalog(true);
+    expect(result.apps[0]).toMatchObject({ ...serverApp, ...metadata, desktop: localApp.desktop });
+  });
+
   it.each([
     { permission_version: 3 },
     { version: "1.1.0" },
     { scopes: ["notes.read", "notes.write", "files.write"] },
     { network_origins: ["https://new-provider.example"] },
     { minimum_host_protocol: 3 },
+    { minimum_host_version: "2.0.0" },
+    { requires_apps: ["browser"] },
   ])("retains the server release when the local contract differs: %j", async (change) => {
     vi.stubGlobal(
       "fetch",
@@ -165,4 +184,51 @@ describe("loadOfficialAppCatalog", () => {
     await expect(loadOfficialAppCatalog(false)).resolves.toEqual(serverCatalog);
     expect(request).not.toHaveBeenCalled();
   });
+
+  it.each(["chat", "inbox"])(
+    "does not load newer local %s code under the running server's older permission contract",
+    async (id) => {
+      vi.stubEnv("DEV", true);
+      vi.stubEnv("VITE_MISTY_APPS_DIRECTORY", "/local/misty-apps");
+      const installed: OfficialApp = {
+        ...serverApp,
+        id,
+        app_id: id === "chat" ? "com.misty.social" : "com.misty.inbox",
+        version: "1.1.0-beta.1",
+        permission_version: 3,
+        scopes: id === "chat" ? ["messages.read"] : ["storage.read", "mail.read"],
+        desktop: { runtime: "downloaded", entry: `https://apps.mistysys.com/${id}/desktop.zip` },
+      };
+      const local: OfficialApp = {
+        ...installed,
+        version: "1.2.0-beta.1",
+        permission_version: 4,
+        scopes: [
+          ...installed.scopes,
+          "browser.navigate",
+          "browser.inspect",
+          "browser.interact",
+          "storage.write",
+        ],
+        requires_apps: ["browser"],
+        desktop: { runtime: "downloaded", entry: `/__misty-local-apps/${id}/desktop/app.js` },
+      };
+      vi.mocked(apiRequest).mockResolvedValue({ apps: [installed], host_protocol_version: 2 });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => localResponse([local])),
+      );
+      const catalog = await loadOfficialAppCatalog(true);
+      expect(catalog.apps[0]).toEqual(installed);
+      expect(localDesktopComponentUrl(catalog.apps[0])).toBeNull();
+
+      // Once the server offers the same contract, the local entry becomes eligible.
+      vi.mocked(apiRequest).mockResolvedValue({
+        apps: [{ ...local, desktop: installed.desktop }],
+        host_protocol_version: 2,
+      });
+      const matched = await loadOfficialAppCatalog(true);
+      expect(localDesktopComponentUrl(matched.apps[0])?.pathname).toBe(local.desktop.entry);
+    },
+  );
 });

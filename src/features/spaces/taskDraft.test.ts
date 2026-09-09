@@ -6,10 +6,8 @@ describe("Agent task drafts", () => {
     const input = createTaskInput({
       ...emptyDraft(),
       title: "Review the brief",
-      assignee_agent_id: "agent-a",
     });
 
-    expect(input).toMatchObject({ assignee_agent_id: "agent-a", source_refs: [] });
     expect(input).not.toHaveProperty("assignee_user_id");
   });
 

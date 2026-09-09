@@ -44,7 +44,7 @@ export function officialAppComponentFactory(appId, { framework = false, runtime 
             throw new Error("This App requires Misty's Yjs 13 component runtime.");
           }` : ""}
           ${chunk.code}
-          const definition = MistyComponentBundle;
+          const definition = MistyComponentBundle.default ?? MistyComponentBundle;
           if (definition?.appId !== ${JSON.stringify(appId)} || definition.protocol !== 2 ||
               typeof definition.mount !== "function") {
             throw new Error("The downloaded App has an incompatible component export.");

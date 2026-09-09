@@ -3,7 +3,6 @@ import { useConnectionsStore } from "@/features/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import type {
   Space,
-  SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
 } from "@/api/spaces/dto/interfaces/types";
@@ -28,7 +27,6 @@ import {
 import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 
 const emptyMembers: SpaceMember[] = [];
-const emptyAgents: SpaceAgentMembership[] = [];
 let refreshSocialConnectionsAfterAuthorization = false;
 
 export function SpacePanelContent(props: {
@@ -45,10 +43,9 @@ export function SpacePanelContent(props: {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
 
-  const { members, agents, snapshotReady, loadMembers } = useSpacesStore(
+  const { members, snapshotReady, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[activeSpaceId] ?? emptyMembers,
-      agents: state.agentMembershipsBySpace[activeSpaceId] ?? emptyAgents,
       snapshotReady: state.snapshotReady,
       loadMembers: state.loadMembers,
     })),
@@ -222,7 +219,6 @@ export function SpacePanelContent(props: {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         members={members}
-        agents={agents}
         currentUserId={user?.id}
         conversation={editingConversation}
         onSaved={handleConversationSaved}

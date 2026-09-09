@@ -37,6 +37,7 @@ export function mountAppComponent(options: {
   element.className = "h-full min-h-0 w-full";
   options.root.append(element);
   const sdk = createMistyAppSDK({
+    mountFileWorkspace: options.transport.mountFileWorkspace,
     registerSurface: options.transport.registerSurface
       ? async (adapter) => {
           scope.assert();

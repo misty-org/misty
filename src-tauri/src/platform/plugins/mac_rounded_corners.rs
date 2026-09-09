@@ -192,14 +192,16 @@ pub fn main_window_ready() -> bool {
 /// Completes window preparation after React, fonts, and saved zoom are ready.
 /// Native startup already shows the window independently of this callback.
 #[tauri::command]
-pub async fn reveal_main_window<R: Runtime>(window: WebviewWindow<R>) -> Result<(), String> {
-    if window.label() != "main" || main_window_ready() {
+pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
+    // The main window can already contain embedded provider views on reload.
+    // Command injection as WebviewWindow rejects any multi-webview window.
+    if webview.label() != "main" || main_window_ready() {
         return Ok(());
     }
     #[cfg(target_os = "macos")]
     {
         let (send, receive) = tokio::sync::oneshot::channel();
-        window
+        webview
             .with_webview(move |webview| unsafe {
                 if !main_window_ready() {
                     let ns_window = webview.ns_window() as id;

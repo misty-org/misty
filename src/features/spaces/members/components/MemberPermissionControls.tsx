@@ -331,19 +331,8 @@ const permissionGroups = [
     ],
   },
   {
-    title: "Agents",
-    items: [
-      {
-        id: "agents.run",
-        label: "Run Agents",
-        description: "Mention, message, or assign active Agents in this Space.",
-      },
-      {
-        id: "agents.manage",
-        label: "Manage Agents",
-        description: "Add, disable, configure, remove, and approve Agent versions.",
-      },
-    ],
+    title: "Misty Ask",
+    items: [{ id: "ask.run", label: "Use Misty Ask", description: "Let Misty work with this Space using your permissions." }],
   },
   {
     title: "Storage",

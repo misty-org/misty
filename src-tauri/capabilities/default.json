@@ -29,6 +29,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-unminimize",
     "core:webview:allow-set-webview-auto-resize",
+    "core:webview:allow-set-webview-focus",
     "core:webview:allow-set-webview-zoom",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",

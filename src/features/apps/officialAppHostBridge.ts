@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 
 export interface OfficialAppNativeAccess {
   readonly folders: Set<string>;
@@ -244,7 +244,7 @@ async function runBrowserCommand(
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("Only web addresses can be opened.");
   }
-  await openUrl(url.href);
+  await openExternalLink(url.href);
   return { url: url.href };
 }
 

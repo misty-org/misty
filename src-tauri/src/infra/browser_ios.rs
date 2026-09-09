@@ -66,6 +66,12 @@ pub struct BrowserCaptureRegionRequest {
 }
 
 #[derive(Deserialize)]
+pub struct BrowserZoomRequest {
+    id: String,
+    factor: f64,
+}
+
+#[derive(Deserialize)]
 pub struct BrowserWebviewIdRequest {
     id: String,
 }
@@ -128,6 +134,7 @@ extern "C" {
     ) -> bool;
     fn misty_ios_browser_set_bounds(id: *const c_char, x: f64, y: f64, width: f64, height: f64);
     fn misty_ios_browser_navigate(id: *const c_char, url: *const c_char);
+    fn misty_ios_browser_set_zoom(id: *const c_char, factor: f64);
     fn misty_ios_browser_action(id: *const c_char, action: *const c_char);
     fn misty_ios_browser_set_visible(id: *const c_char, visible: bool);
     fn misty_ios_browser_hide_all();
@@ -246,6 +253,16 @@ macro_rules! browser_action {
 browser_action!(browser_webview_back, "back");
 browser_action!(browser_webview_forward, "forward");
 browser_action!(browser_webview_reload, "reload");
+
+#[tauri::command]
+pub fn browser_webview_set_zoom(_app: AppHandle, request: BrowserZoomRequest) -> Result<(), String> {
+    if !request.factor.is_finite() || !(0.25..=5.0).contains(&request.factor) {
+        return Err("Page zoom must be between 25% and 500%.".into());
+    }
+    let id = c_string(&request.id)?;
+    unsafe { misty_ios_browser_set_zoom(id.as_ptr(), request.factor) };
+    Ok(())
+}
 
 #[tauri::command]
 pub fn browser_webview_show(

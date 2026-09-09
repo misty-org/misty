@@ -5,12 +5,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 
-let shouldOpenLinksExternally = () => false;
 let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
-
-export function configureExternalLinkPreference(getPreference: () => boolean): void {
-  shouldOpenLinksExternally = getPreference;
-}
 
 export function configureMistyBrowserLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
@@ -33,18 +28,12 @@ export async function openExternalLink(url: string): Promise<void> {
     return;
   }
 
-  if (shouldOpenLinksExternally()) {
-    try {
-      await openNativeUrl(href);
-      return;
-    } catch {}
-  }
-
   if (openInMistyBrowser) {
-    try {
-      await openInMistyBrowser(href);
-      return;
-    } catch {}
+    await openInMistyBrowser(href);
+    return;
+  }
+  if (hasTauriInternals()) {
+    throw new Error("Misty Browser is not ready. Try opening the link again.");
   }
 
   window.open(href, "_blank", "noopener,noreferrer");
@@ -53,6 +42,9 @@ export async function openExternalLink(url: string): Promise<void> {
 export async function openSystemExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
+
+  // Legacy callers share the same web routing policy, including SDK links.
+  if (isWebUrl(href)) return openExternalLink(href);
 
   try {
     await openNativeUrl(href);
@@ -110,36 +102,12 @@ export async function openProviderAuthorizationLink(
     }
   }
 
-  let mistyBrowserError: unknown;
-  if (openInMistyBrowser) {
-    try {
-      await openInMistyBrowser(href);
-      return {
-        strategy: "misty-browser",
-        platform: currentPlatform,
-        attemptedAt,
-      };
-    } catch (error) {
-      mistyBrowserError = error;
-    }
-  }
-
-  try {
-    await openSystemExternalLink(href);
-    return {
-      strategy: "system-browser",
-      platform: currentPlatform,
-      attemptedAt,
-      fallbackReason: mistyBrowserError ? errorTextForOpen(mistyBrowserError) : undefined,
-    };
-  } catch (error) {
-    if (mistyBrowserError) {
-      throw new Error(
-        `Misty Browser failed: ${errorTextForOpen(mistyBrowserError)}; system browser failed: ${errorTextForOpen(error)}`,
-      );
-    }
-    throw new Error(`system browser failed: ${errorTextForOpen(error)}`);
-  }
+  await openExternalLink(href);
+  return {
+    strategy: openInMistyBrowser ? "misty-browser" : "window-open",
+    platform: currentPlatform,
+    attemptedAt,
+  };
 }
 
 export function handleExternalLinkClick(
@@ -153,7 +121,7 @@ export function handleExternalLinkClick(
 
 export function installExternalLinkRouting(root: Document = document): () => void {
   const handleClick = (event: MouseEvent) => {
-    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.defaultPrevented || ![0, 1].includes(event.button)) return;
     const element =
       event.target instanceof Element
         ? event.target
@@ -161,11 +129,7 @@ export function installExternalLinkRouting(root: Document = document): () => voi
           ? event.target.parentElement
           : null;
     const anchor = element?.closest<HTMLAnchorElement>("a[href]");
-    if (
-      !anchor ||
-      anchor.hasAttribute("download") ||
-      anchor.dataset.openSystemExternal === "true"
-    ) {
+    if (!anchor || anchor.hasAttribute("download")) {
       return;
     }
     const rawHref = anchor.getAttribute("href")?.trim() ?? "";
@@ -175,7 +139,11 @@ export function installExternalLinkRouting(root: Document = document): () => voi
   };
 
   root.addEventListener("click", handleClick);
-  return () => root.removeEventListener("click", handleClick);
+  root.addEventListener("auxclick", handleClick);
+  return () => {
+    root.removeEventListener("click", handleClick);
+    root.removeEventListener("auxclick", handleClick);
+  };
 }
 
 function isWebUrl(url: string): boolean {

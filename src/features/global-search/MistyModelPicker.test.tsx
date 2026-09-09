@@ -1,3 +1,4 @@
+import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { assistantApi, type FrontierModelCatalog } from "@/api/assistant/api";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +36,8 @@ const mockCatalog: FrontierModelCatalog = {
     },
   ],
 };
+
+initializeHostAgentsRuntime();
 
 describe("MistyModelPicker", () => {
   beforeEach(() => {

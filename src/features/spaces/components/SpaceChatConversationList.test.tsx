@@ -92,7 +92,9 @@ describe("SpaceChatConversationList", () => {
     const instagramIcon = container.querySelector(
       'a[href*="conversation=instagram-launch"] [data-social-provider-icon="instagram"]',
     );
-    expect(instagramIcon?.querySelector("linearGradient")).not.toBeNull();
+    expect(instagramIcon?.tagName).toBe("IMG");
+    expect(instagramIcon?.getAttribute("data-brand-icon")).toBe("instagram");
+    expect(instagramIcon?.getAttribute("src")).toBeTruthy();
     expect(container.querySelector('a[href="/spaces/space-1/social/discord"]')).toBeNull();
     expect(
       container

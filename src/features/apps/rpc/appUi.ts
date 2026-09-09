@@ -180,6 +180,7 @@ export function createAppUiRpc(scope: AppRpcScope, backend: AppUiBackend) {
         const command = MistyAppCommandSchema.parse(topic.slice("shortcut:".length));
         if (!commandsForApp(scope.identity.appId).includes(command))
           throw new AppRpcError("capability_denied", "An App can only bind its own commands.");
+        if (["chat", "inbox"].includes(scope.identity.appId)) scope.assert("browser.navigate");
         remove = backend.registerShortcut(command, () => emit({ command }));
       } else throw new AppRpcError("unsupported_topic", "Unknown App UI event.");
       let removed = false;

@@ -1,6 +1,21 @@
 use tauri::Webview;
 
 #[cfg(target_os = "macos")]
+#[path = "browser_frame_rate_macos.rs"]
+mod frame_rate;
+
+pub(super) fn configure_browser_frame_rate(webview: &Webview) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return webview.with_webview(|platform| unsafe {
+        let view: &objc2_web_kit::WKWebView = &*platform.inner().cast();
+        frame_rate::prefer_display_refresh_rate(view);
+    }).map_err(|error| error.to_string());
+    #[cfg(not(target_os = "macos"))]
+    { let _ = webview; Ok(()) }
+}
+
+
+#[cfg(target_os = "macos")]
 pub(super) fn browser_requires_ephemeral_store() -> bool {
     use objc2_foundation::NSProcessInfo;
 
@@ -19,7 +34,7 @@ pub(super) fn browser_requires_ephemeral_store() -> bool {
 }
 
 #[cfg(target_os = "macos")]
-pub(super) async fn evaluate_browser_async_javascript(
+pub(crate) async fn evaluate_browser_async_javascript(
     webview: Webview,
     function_body: String,
 ) -> Result<String, String> {
@@ -136,23 +151,29 @@ pub(super) fn configure_browser_webview(
     webview: &Webview,
     native_live_resize: bool,
 ) -> Result<(), String> {
-    use objc2_app_kit::{NSAutoresizingMaskOptions, NSView};
+    use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSViewLayerContentsRedrawPolicy};
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            disable_scroll_elasticity(view);
             // A responsive Browser page is pinned to the top-left of its
             // measured host. Let AppKit grow its width and height during the
             // native live-resize loop, when WebKit pauses renderer resize
             // events. Fixed device previews remain explicitly positioned by
             // the workspace because their horizontal margins must stay equal.
-            view.setAutoresizingMask(if native_live_resize {
+            let mask = if native_live_resize {
                 NSAutoresizingMaskOptions::ViewWidthSizable
                     | NSAutoresizingMaskOptions::ViewHeightSizable
             } else {
                 NSAutoresizingMaskOptions::ViewNotSizable
-            });
-            configure_continuous_live_resize(view);
+            };
+            if view.autoresizingMask() != mask {
+                view.setAutoresizingMask(mask);
+            }
+            // Configure the backing hierarchy once. Reconciliation also calls
+            // this function for unchanged bounds; it must not force a repaint.
+            if view.layerContentsRedrawPolicy() != NSViewLayerContentsRedrawPolicy::DuringViewResize {
+                configure_continuous_live_resize(view);
+            }
             if let Some(parent) = view.superview() {
                 parent.setAutoresizesSubviews(true);
             }
@@ -224,21 +245,6 @@ pub(super) async fn evaluate_browser_async_javascript(
     Err("Browser region capture is not available on this platform yet.".to_owned())
 }
 
-#[cfg(target_os = "macos")]
-unsafe fn disable_scroll_elasticity(view: &objc2_app_kit::NSView) {
-    use objc2::runtime::AnyObject;
-    use objc2_app_kit::{NSScrollElasticity, NSScrollView};
-
-    let object: &AnyObject = view;
-    if let Some(scroll_view) = object.downcast_ref::<NSScrollView>() {
-        scroll_view.setHorizontalScrollElasticity(NSScrollElasticity::None);
-        scroll_view.setVerticalScrollElasticity(NSScrollElasticity::None);
-    }
-    for child in view.subviews().iter() {
-        disable_scroll_elasticity(&child);
-    }
-}
-
 #[cfg(not(target_os = "macos"))]
 pub(super) fn native_macos_safari_user_agent() -> Option<String> {
     None
@@ -282,4 +288,37 @@ mod tests {
         assert!(user_agent.contains("Version/26.5.2 Safari/605.1.15"));
         assert!(safari_user_agent("26.5.2\r\nUnsafe: yes").is_none());
     }
+}
+
+#[cfg(target_os = "macos")]
+pub(super) async fn remove_browser_data_store(app: &tauri::AppHandle, identifier: [u8; 16]) -> Result<(), String> {
+    use block2::RcBlock;
+    use objc2::MainThreadMarker;
+    use objc2_foundation::{NSDate, NSUUID};
+    use objc2_web_kit::WKWebsiteDataStore;
+    use std::sync::Mutex;
+    let (sender, receiver) = tokio::sync::oneshot::channel::<Result<(), String>>();
+    app.run_on_main_thread(move || {
+        let mtm = MainThreadMarker::new().expect("main thread");
+        let sender = Mutex::new(Some(sender));
+        unsafe {
+            // WebKit may retain a just-closed WKWebView. Clearing the named store
+            // works even then, whereas deleting its identifier reports "in use".
+            // Never touch the default store or another account's identifier.
+            let store = WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(identifier), mtm);
+            let retained_store = store.clone();
+            let handler = RcBlock::new(move || {
+                let _keep_alive = &retained_store;
+                if let Ok(mut sender) = sender.lock() { if let Some(sender) = sender.take() { let _ = sender.send(Ok(())); } }
+            });
+            store.removeDataOfTypes_modifiedSince_completionHandler(&WKWebsiteDataStore::allWebsiteDataTypes(mtm), &NSDate::distantPast(), &handler);
+        }
+    }).map_err(|error| error.to_string())?;
+    tokio::time::timeout(std::time::Duration::from_secs(30), receiver).await
+        .map_err(|_| "Website account removal timed out. Retry removal.".to_owned())?
+        .map_err(|_| "Website account removal was canceled.".to_owned())?
+}
+#[cfg(not(target_os = "macos"))]
+pub(super) async fn remove_browser_data_store(_: &tauri::AppHandle, _: [u8; 16]) -> Result<(), String> {
+    Err("Website accounts require Misty on a Mac.".into())
 }

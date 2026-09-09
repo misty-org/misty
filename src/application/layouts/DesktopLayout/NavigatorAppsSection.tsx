@@ -5,24 +5,18 @@ import {
   useAppsStore,
   usePinnedNavigatorAppIds,
 } from "@/features/apps";
-import { navigatorAppsCollapsedForAccount, useNavigatorAppsStore } from "@/features/workspace";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
   cn,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
+  navigationMenuActionClass,
 } from "@/shared/ui";
-import { Check, ChevronRight, Plus, Search } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
-import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -31,12 +25,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
   const installations = useAppsStore((state) => state.installations);
   const actionAppId = useAppsStore((state) => state.actionAppId);
   const setPinnedApp = useAppsStore((state) => state.setPinned);
-  const collapsed = useNavigatorAppsStore((state) =>
-    navigatorAppsCollapsedForAccount(state, props.accountId),
-  );
   const selectedAppIds = usePinnedNavigatorAppIds();
-  const setCollapsed = useNavigatorAppsStore((state) => state.setCollapsed);
-  const [open, setOpen] = useNavigatorDisclosureState(props.accountId, "apps", !collapsed);
   const normalizedQuery = query.trim().toLowerCase();
   const visibleApps = useMemo(
     () =>
@@ -55,65 +44,31 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
   );
 
   return (
-    <Collapsible
-      className="group/apps grid min-w-0 gap-0.5"
+    <div
+      className="grid min-w-0 gap-0.5"
       data-tour-target="apps-section"
-      onOpenChange={(nextOpen) => {
-        setCollapsed(props.accountId, !nextOpen);
-        setOpen(nextOpen);
-      }}
-      open={open}
       role="group"
       aria-label="Apps"
     >
       <div
-        className="sticky top-0 z-10 flex w-full min-w-0 items-center bg-charcoal-workspace pl-2.5 pr-0"
+        className="sticky top-0 z-10 flex w-full min-w-0 items-center bg-charcoal-workspace"
         role="group"
         aria-label="Apps controls"
       >
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              navigationDisclosureLabelClass,
-              "flex-1 rounded-md py-1 text-left",
-              "text-[13px] font-semibold text-cream-bright outline-none",
-              navigatorFocusRingClass,
-            )}
-            aria-label={open ? "Collapse Apps" : "Expand Apps"}
-          >
-            <span className="truncate">Apps</span>
-            <ChevronRight
-              className={cn(
-                navigationDisclosureChevronClass,
-                "transition-transform duration-150 motion-reduce:transition-none",
-                open && "rotate-90",
-              )}
-              size={16}
-              strokeWidth={2}
-              aria-hidden="true"
-              data-chevron-placement="inline"
-            />
-          </button>
-        </CollapsibleTrigger>
+        <h2 className="flex h-8 min-w-0 flex-1 items-center px-2.5 text-[13px] font-medium text-cream-muted">
+          Apps
+        </h2>
 
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
-              className={cn(
-                "misty-navigator-icon-target ml-auto grid size-7 shrink-0 place-items-center rounded-md",
-                "text-cream-muted opacity-0 outline-none transition-[color,background-color,opacity]",
-                "hover:bg-charcoal-card hover:text-cream-bright group-hover/apps:opacity-100",
-                "focus-visible:opacity-100 group-focus-within/apps:opacity-100",
-                "[@media(hover:none)]:opacity-100",
-                navigatorFocusRingClass,
-              )}
+              className={navigationMenuActionClass}
               aria-label="Add app"
               title="Add app"
               data-tour-target="nav-add-app-button"
             >
-              <Plus className="!size-3.5" size={14} strokeWidth={2} aria-hidden="true" />
+              <Plus className="size-4" size={16} strokeWidth={2} aria-hidden="true" />
             </button>
           </PopoverTrigger>
           <PopoverContent
@@ -149,7 +104,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                       key={app.id}
                       type="button"
                       className={cn(
-                        "grid min-h-11 w-full grid-cols-[20px_minmax(0,1fr)_18px] items-center gap-2.5",
+                        "grid min-h-12 w-full grid-cols-[36px_minmax(0,1fr)_18px] items-center gap-3",
                         "rounded-md px-2.5 py-1.5 text-left outline-none transition-colors",
                         "hover:bg-charcoal-hover focus-visible:bg-charcoal-hover",
                       )}
@@ -157,7 +112,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                       disabled={Boolean(actionAppId)}
                       onClick={() => void setPinnedApp(app.id, !installation.pinned)}
                     >
-                      <OfficialAppIcon appId={app.id} size={20} />
+                      <OfficialAppIcon appId={app.id} size={36} />
                       <span className="min-w-0">
                         <span className="block truncate text-sm text-cream">
                           {app.name === "Chat" ? "Social" : app.name}
@@ -202,7 +157,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
         </Popover>
       </div>
 
-      <CollapsibleContent className="grid gap-1">
+      <div className="grid gap-1">
         {selectedAppIds.length ? (
           props.children
         ) : (
@@ -214,7 +169,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
             No apps added. Choose an app
           </button>
         )}
-      </CollapsibleContent>
-    </Collapsible>
+      </div>
+    </div>
   );
 }

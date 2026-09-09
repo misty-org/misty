@@ -13,7 +13,7 @@ import {
   SquareStar,
   X,
 } from "lucide-react";
-import { useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { DiscoverAppDetails } from "./DiscoverAppDetails";
 import {
   discoverAppAction,
@@ -47,11 +47,13 @@ export interface DiscoverBrowserProps {
   actionAppId: string;
   mobile: boolean;
   selectedAppId: string;
+  requestedSection?: DiscoverSection;
+  requestKey?: string;
   onSelect: (id: string) => void;
   onRefresh: () => void;
-  onInstall: (app: OfficialApp) => void;
+  onInstall: (app: OfficialApp) => void | Promise<void>;
   onOpen: (app: OfficialApp) => void;
-  onRemove: (app: OfficialApp) => void;
+  onRemove: (app: OfficialApp) => void | Promise<void>;
 }
 
 export function DiscoverBrowser(props: DiscoverBrowserProps) {
@@ -60,9 +62,15 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
   const [sidebarWidth, setSidebarWidth] = useState(defaultSidebarWidth);
   const [resizingSidebar, setResizingSidebar] = useState(false);
   const sidebarDrag = useRef<{ x: number; width: number } | null>(null);
-  const [section, setSection] = useState<DiscoverSection>("apps");
+  const [section, setSection] = useState<DiscoverSection>(props.requestedSection ?? "apps");
   const [category, setCategory] = useState<DiscoverCategory>("All Apps");
   const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!props.requestedSection) return;
+    setSection(props.requestedSection);
+    setCategory("All Apps");
+    setQuery("");
+  }, [props.requestedSection, props.requestKey]);
   const searchRef = useRef<HTMLInputElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const installationById = useMemo(
@@ -323,10 +331,10 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                       <div className="discover-action-group">
                         <button
                           type="button"
-                          className={`discover-action ${action === "Add" ? "discover-action-primary" : ""}`}
+                          className={`discover-action ${action === "Install" ? "discover-action-primary" : ""}`}
                           disabled={Boolean(props.actionAppId) || action === "Unavailable"}
                           aria-label={`${action} ${discoverAppName(app)}`}
-                          onClick={() => (action === "Open" ? props.onOpen(app) : selectApp(app))}
+                          onClick={() => selectApp(app)}
                         >
                           {props.actionAppId === app.id
                             ? "Working…"
@@ -334,16 +342,6 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                               ? "Unavailable"
                               : action}
                         </button>
-                        {action === "Review" ? (
-                          <span className="discover-review-note">
-                            {app.scopes.some(
-                              (scope) =>
-                                !installationById.get(app.id)?.granted_scopes.includes(scope),
-                            )
-                              ? "New permissions"
-                              : "Access changed"}
-                          </span>
-                        ) : null}
                       </div>
                     </li>
                   );
@@ -410,7 +408,6 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
           if (target?.isConnected) target.focus();
           else searchRef.current?.focus();
         }}
-        onOpen={props.onOpen}
         onInstall={props.onInstall}
         onRemove={props.onRemove}
       />

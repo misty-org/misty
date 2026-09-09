@@ -1,3 +1,4 @@
+import { appSourceRoot } from "./app-source-paths.mjs";
 import { resolve } from "node:path";
 import ts from "typescript";
 
@@ -18,7 +19,7 @@ export function excalidrawSdkInterop() {
     },
     load(id) {
       if (id !== `\0${virtual}`) return;
-      return `import { createSdkDrawingInterop } from ${JSON.stringify(resolve(import.meta.dirname, "../src/features/drawings/sdkDrawingInterop.ts"))};
+      return `import { createSdkDrawingInterop } from ${JSON.stringify(resolve(appSourceRoot(resolve(import.meta.dirname, "..")), "apps/journal/drawings/sdkDrawingInterop.ts"))};
         export const interop = createSdkDrawingInterop(MistyComponentRuntime.sdk, MistyComponentRuntime.signal);`;
     },
     transform(code, id) {

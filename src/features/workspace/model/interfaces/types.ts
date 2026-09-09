@@ -15,6 +15,7 @@ export interface MultiPanelClosedPane {
 }
 
 export interface MultiPanelTab {
+  namingId?: string;
   id: string;
   title: string;
   path: string;

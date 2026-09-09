@@ -8,16 +8,16 @@ const appsRoot = resolve(root, '../misty-apps');
 const sdkRoot = resolve(root, '../misty-sdk/packages/sdk/src');
 const catalogApps = JSON.parse(readFileSync(resolve(appsRoot, 'apps/catalog.json'), 'utf8')).apps;
 const appIds = catalogApps.map(app => app.id);
-const entries = appIds.map(id => resolve(root, `src/features/apps/package/entries/${id}.tsx`));
+const entries = appIds.map(id => resolve(appsRoot, `apps/${id}/index.tsx`));
 const extensions = { quick_convert: 'quickConvert/QuickConvertPlugin.tsx', themes: 'themes/ThemesPlugin.tsx', storage_report: 'storageReport/StorageReportPlugin.tsx', image_optimizer: 'imageOptimizer/ImageOptimizerPlugin.tsx', backups: 'backups/BackupsPlugin.tsx', ytdlp: 'ytdlp/YtdlpPlugin.tsx' };
 for (const [id, file] of Object.entries(extensions)) { appIds.push(id); entries.push(resolve(appsRoot, 'src/plugins', file)); }
 const config = ts.readConfigFile(resolve(root, 'tsconfig.json'), ts.sys.readFile);
 const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
 // The Journal build injects this SDK adapter into the drawing dependency; include it explicitly.
-const injectedSources = { journal: [resolve(root, 'src/features/drawings/sdkDrawingInterop.ts')] };
+const injectedSources = { journal: [resolve(appsRoot, 'apps/journal/drawings/sdkDrawingInterop.ts')] };
 const program = ts.createProgram([...entries, ...Object.values(injectedSources).flat()], parsed.options);
 const checker = program.getTypeChecker();
-const projectSource = file => (file.startsWith(resolve(root, 'src') + '/') || file.startsWith(resolve(appsRoot, 'src') + '/') || file.startsWith(sdkRoot + '/')) && !/\.(test|spec)\./.test(file);
+const projectSource = file => (file.startsWith(resolve(root, 'src') + '/') || file.startsWith(resolve(appsRoot, 'src') + '/') || file.startsWith(resolve(appsRoot, 'apps') + '/') || file.startsWith(sdkRoot + '/')) && !/\.(test|spec)\./.test(file);
 const inventories = {};
 
 for (const [index, appId] of appIds.entries()) {

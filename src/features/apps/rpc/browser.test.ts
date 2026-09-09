@@ -27,6 +27,7 @@ function fixture(grants = ["browser.navigate"]) {
     back: vi.fn(async () => {}),
     forward: vi.fn(async () => {}),
     reload: vi.fn(async () => {}),
+    setZoom: vi.fn(async (_id: string, _factor: number) => {}),
     inspect: vi.fn<BrowserRpcBackend["inspect"]>(async () => ({
       url: "https://example.com",
       title: "Page",
@@ -36,6 +37,8 @@ function fixture(grants = ["browser.navigate"]) {
       contentTrust: "untrusted-web-page",
     })),
     click: vi.fn(async () => {}),
+    type: vi.fn(async () => ({ prepared: true as const })),
+    request: vi.fn(async () => ({ status: 200, body: "{}", truncated: false })),
     overlay: vi.fn(async () => {}),
     hide: vi.fn(async () => {}),
     close: vi.fn(async () => {}),
@@ -196,4 +199,66 @@ it("rejects inspection results that finish after navigation and invalidates prio
   f.emit({ type: "page", phase: "started", url: "https://example.com/new" });
   finish();
   await rejected;
+});
+
+it("keeps provider drafts and reads on their owned view and rejects stale, closed or unauthorized actions", async () => {
+  const a = fixture(["browser.navigate", "browser.inspect", "browser.interact"]),
+    b = fixture(["browser.navigate", "browser.inspect", "browser.interact"]);
+  const view = await a.sdk.browser.create({
+    bounds,
+    provider: { id: "instagram", accountId: "personal" },
+  });
+  expect(a.backend.create.mock.calls[0][0].provider).toEqual({
+    id: "instagram",
+    accountId: "personal",
+  });
+  const page = await a.sdk.browser.inspect(view.handle);
+  await expect(
+    b.sdk.browser.type(view.handle, page.documentId, "element-1-0", "Other account"),
+  ).rejects.toMatchObject({ code: "resource_denied" });
+  await expect(b.sdk.browser.request(view.handle, "/api/data")).rejects.toMatchObject({
+    code: "resource_denied",
+  });
+  await a.sdk.browser.type(view.handle, page.documentId, "element-1-0", "Draft");
+  expect(a.backend.type).toHaveBeenCalledWith(
+    a.backend.create.mock.calls[0][0].id,
+    "element-1-0",
+    "Draft",
+  );
+  await expect(
+    a.sdk.browser.type(view.handle, page.documentId, "element-1-0", "Stale draft"),
+  ).rejects.toThrow();
+  await a.sdk.browser.request(view.handle, "/api/data");
+  expect(a.backend.request).toHaveBeenCalledWith(a.backend.create.mock.calls[0][0].id, "/api/data");
+  a.scope.close();
+  await expect(a.sdk.browser.request(view.handle, "/api/data")).rejects.toMatchObject({
+    code: "app_closed",
+  });
+  const denied = fixture();
+  const deniedView = await denied.sdk.browser.create({ bounds });
+  await expect(denied.sdk.browser.request(deniedView.handle, "/api/data")).rejects.toThrow();
+  expect(denied.backend.request).not.toHaveBeenCalled();
+});
+
+it("zooms only the owned page and rejects invalid factors and foreign handles", async () => {
+  const a = fixture(),
+    b = fixture();
+  const view = await a.sdk.browser.create({ bounds });
+  const id = a.backend.create.mock.calls[0][0].id;
+  await a.sdk.browser.setZoom(view.handle, 1.25);
+  expect(a.backend.setZoom).toHaveBeenCalledExactlyOnceWith(id, 1.25);
+  for (const factor of [0, 0.24, 5.01, NaN, Infinity]) {
+    await expect(a.sdk.browser.setZoom(view.handle, factor)).rejects.toThrow();
+    await expect(
+      a.rpc.request({ method: "browser.setZoom", params: { handle: view.handle, factor } }),
+    ).rejects.toThrow();
+  }
+  await expect(b.sdk.browser.setZoom(view.handle, 2)).rejects.toMatchObject({
+    code: "resource_denied",
+  });
+  expect(b.backend.setZoom).not.toHaveBeenCalled();
+  expect(a.backend.setZoom).toHaveBeenCalledTimes(1);
+  await a.sdk.browser.setZoom(view.handle, 1);
+  expect(a.backend.setZoom).toHaveBeenLastCalledWith(id, 1);
+  expect(a.backend.layout).not.toHaveBeenCalled();
 });

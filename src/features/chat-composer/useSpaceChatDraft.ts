@@ -20,9 +20,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [replyToMessageId, setReplyToMessageId] = useState("");
-  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>(
-    {},
-  );
   const [attachmentUploading, setAttachmentUploading] = useState(false);
 
   useEffect(() => {
@@ -37,7 +34,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
         setSelectedLibraryIds(saved.selectedLibraryIds);
         setPendingAttachments(saved.pendingAttachments);
         setReplyToMessageId(saved.replyToMessageId);
-        setSelectedAgentIdsByLabel(saved.selectedAgentIdsByLabel);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -69,7 +65,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
         selectedLibraryIds,
         pendingAttachments,
         replyToMessageId,
-        selectedAgentIdsByLabel,
       };
       void mobileCacheWrite(accountId, recordKey, record);
     }, 250);
@@ -81,7 +76,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     pendingAttachments,
     recordKey,
     replyToMessageId,
-    selectedAgentIdsByLabel,
     selectedFileIds,
     selectedLibraryIds,
     spaceId,
@@ -99,7 +93,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     setSelectedLibraryIds([]);
     setPendingAttachments([]);
     setReplyToMessageId("");
-    setSelectedAgentIdsByLabel({});
   }, []);
 
   const uploadAttachments = useCallback(
@@ -134,8 +127,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       setPendingAttachments,
       replyToMessageId,
       setReplyToMessageId,
-      selectedAgentIdsByLabel,
-      setSelectedAgentIdsByLabel,
       attachmentUploading,
       attachmentSlotsLeft,
       isEmpty: !text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0,
@@ -148,7 +139,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       pendingAttachments,
       replyToMessageId,
       reset,
-      selectedAgentIdsByLabel,
       selectedFileIds,
       selectedLibraryIds,
       text,
