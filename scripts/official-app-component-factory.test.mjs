@@ -68,6 +68,23 @@ test("importing the package does not execute application initialization", async 
   assert.throws(() => definition.mount({}), /only at mount/);
 });
 
+test("an entry can export shared helpers alongside its default app without sharing mount state", async () => {
+  const { output } = await buildComponent(`
+    let mounts = 0;
+    export function sharedView() { return 'shared'; }
+    export default {appId:'terminal', protocol:2, mount({root}) {
+      root.mounts = ++mounts;
+      return {update(){}, unmount(){}};
+    }};
+  `, {}, {exports: 'named'});
+  const { default: definition } = await import(`data:text/javascript;base64,${Buffer.from(output[0].code).toString("base64")}`);
+  const first = {}, second = {};
+  definition.mount({root:first});
+  definition.mount({root:second});
+  assert.deepEqual(first, {mounts:1});
+  assert.deepEqual(second, {mounts:1});
+});
+
 test("rejects legacy exports and output that would share module state", async () => {
   const { output } = await buildComponent('export default {appId:"terminal", apiVersion:1, Component(){}}');
   const { default: definition } = await import(`data:text/javascript;base64,${Buffer.from(output[0].code).toString("base64")}`);

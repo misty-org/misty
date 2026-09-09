@@ -85,7 +85,6 @@ export interface AnalyticsEventProperties {
     surface: string;
     had_task: boolean;
   };
-  ai_companion_agent_switched: { agent_kind: "built_in" | "personal" };
   ai_companion_task_submitted: {
     surface: string;
     trigger: string;

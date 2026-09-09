@@ -1,32 +1,9 @@
-import {
-  Bot,
-  BookOpenText,
-  Code2,
-  FolderOpen,
-  Globe2,
-  Inbox,
-  Library,
-  ListTodo,
-  MessageCircle,
-  TerminalSquare,
-  type LucideIcon,
-} from "lucide-react";
-
-const icons: Record<string, LucideIcon> = {
-  chat: MessageCircle,
-  journal: BookOpenText,
-  planner: ListTodo,
-  library: Library,
-  inbox: Inbox,
-  agents: Bot,
-  files: FolderOpen,
-  browser: Globe2,
-  code: Code2,
-  terminal: TerminalSquare,
-};
+import { appIcon, appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
+import { BrandIcon } from "../../../../misty-apps/apps/shared/BrandIcon";
+import { brandIconAsset } from "../../../../misty-apps/apps/shared/brandIcons";
 
 export function OfficialAppIcon(props: { appId: string; size?: number }) {
-  const Icon = icons[props.appId] ?? Code2;
+  const Icon = appIcon(props.appId) ?? appIcons.code;
   const size = props.size ?? 38;
   return (
     <span
@@ -34,7 +11,11 @@ export function OfficialAppIcon(props: { appId: string; size?: number }) {
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <Icon size={Math.round(size * 0.48)} strokeWidth={1.7} />
+      {brandIconAsset(props.appId) ? (
+        <BrandIcon brand={props.appId} size={Math.round(size * 0.64)} />
+      ) : (
+        <Icon size={Math.round(size * 0.48)} strokeWidth={appIconStrokeWidth} />
+      )}
     </span>
   );
 }

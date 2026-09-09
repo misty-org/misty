@@ -257,7 +257,7 @@ function officialRuntimeEntry(app: OfficialApp): URL | null {
   if (!entry) return null;
   const configured = import.meta.env.VITE_MISTY_OFFICIAL_APPS_ORIGIN?.trim();
   const fallback =
-    import.meta.env.DEV && import.meta.env.VITE_MISTY_LOCAL_OFFICIAL_APPS === "true"
+    import.meta.env.DEV && !!import.meta.env.VITE_MISTY_APPS_DIRECTORY
       ? window.location.origin
       : "https://apps.mistysys.com";
   try {

@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { sourcePath } from "./repositoryPolicy";
 import { describe, expect, it } from "vitest";
 
-const repo = process.cwd();
-
 function source(path: string) {
-  return readFileSync(resolve(repo, path), "utf8");
+  return readFileSync(sourcePath(path), "utf8");
 }
 
 describe("Mini App shell boundary", () => {

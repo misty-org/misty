@@ -1,9 +1,23 @@
-import { defineConfig, loadEnv, type Plugin, type ResolvedConfig } from "vite";
+import {
+  appSourceAliases,
+  appSourceDependencies,
+  appSourceRoot,
+} from "./scripts/app-source-paths.mjs";
+import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "./scripts/app-env.mjs";
+import { localAppsDirectory } from "./scripts/local-apps-directory.mjs";
+import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { publicSdkDevelopmentUpdates } from "./scripts/vite-public-sdk.mjs";
-import { cpSync, createReadStream, existsSync, statSync } from "node:fs";
+import {
+  cpSync,
+  createReadStream,
+  existsSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import {
@@ -77,7 +91,11 @@ function materialIconThemeAssets(): Plugin {
 const officialAppsPublicPath = "/official-apps/";
 const officialAppsCatalogPath = `${officialAppsPublicPath}catalog.json`;
 
-function officialAppDevelopmentAssets(assetsRoot: string, catalogPath: string): Plugin {
+function officialAppDevelopmentAssets(
+  assetsRoot: string,
+  catalogPath: string,
+  appsDirectory = "",
+): Plugin {
   const normalizedRoot = resolve(assetsRoot);
 
   return {
@@ -101,7 +119,43 @@ function officialAppDevelopmentAssets(assetsRoot: string, catalogPath: string): 
         }
         const requestPath = request.url?.split("?", 1)[0];
         if (requestPath === officialAppsCatalogPath) {
+          if (appsDirectory) {
+            const catalog = JSON.parse(readFileSync(catalogPath, "utf8"));
+            for (const app of catalog.apps) {
+              if (app.desktop?.runtime === "downloaded" && /^[a-z0-9_-]+$/.test(app.id)) {
+                app.desktop.entry = `/__misty-local-apps/${app.id}/desktop/app.js`;
+              }
+            }
+            response.setHeader("Content-Type", "application/json");
+            response.setHeader("Cache-Control", "no-store");
+            response.end(request.method === "HEAD" ? undefined : JSON.stringify(catalog));
+            return;
+          }
           serveDevelopmentAsset(request.method, response, catalogPath, "application/json");
+          return;
+        }
+        if (appsDirectory && requestPath?.startsWith("/__misty-local-apps/")) {
+          let relative: string;
+          try {
+            relative = decodeURIComponent(requestPath.slice("/__misty-local-apps/".length));
+          } catch {
+            rejectDevelopmentAsset(response, 400, "Invalid local app asset path.");
+            return;
+          }
+          const root = resolve(appsDirectory, ".build/official-apps");
+          const file = resolve(root, relative);
+          if (!file.startsWith(`${root}${sep}`) || relative.split("/").includes("..")) {
+            rejectDevelopmentAsset(response, 404, "Local app asset not found.");
+            return;
+          }
+          try {
+            if (!realpathSync(file).startsWith(`${realpathSync(root)}${sep}`))
+              throw new Error("Outside local build");
+          } catch {
+            rejectDevelopmentAsset(response, 404, "Local app asset not found. Build it first.");
+            return;
+          }
+          serveDevelopmentAsset(request.method, response, file, assetContentType(file));
           return;
         }
         if (!requestPath?.startsWith(officialAppsPublicPath)) {
@@ -187,36 +241,47 @@ function assetContentType(filePath: string): string {
   }
 }
 
-const tauriDevHost = process.env.TAURI_DEV_HOST;
-const desktopDevPort = Number(process.env.MISTY_DESKTOP_DEV_PORT ?? 5173);
-const accountApiProxyTarget = process.env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
-
 export default defineConfig(({ command, mode }) => {
-  const modeEnv = loadEnv(mode, process.cwd(), "");
-  const analyticsEnv = loadEnv("analytics", process.cwd(), "");
-  const env = { ...analyticsEnv, ...modeEnv, ...process.env };
+  const env = loadAppEnv(process.cwd());
+  const tauriDevHost = env.TAURI_DEV_HOST;
+  const desktopDevPort = Number(env.MISTY_DESKTOP_DEV_PORT ?? 5173);
+  const accountApiProxyTarget = env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
   const posthogToken = env.POSTHOG_PROJECT_TOKEN?.trim();
   const posthogHost = env.POSTHOG_HOST?.trim();
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim();
+  const appsDirectory =
+    command === "serve" && mode === "desktop"
+      ? localAppsDirectory(env.VITE_MISTY_APPS_DIRECTORY ?? env.MISTY_APPS_DIRECTORY, process.cwd())
+      : "";
+  const localOfficialAppsEnabled = command === "serve" && (mode !== "desktop" || !!appsDirectory);
   const officialAppsCatalog = officialAppDevelopmentPath(
-    command === "serve" ? env.MISTY_OFFICIAL_APPS_CATALOG : undefined,
+    appsDirectory
+      ? resolve(appsDirectory, "apps/catalog.json")
+      : localOfficialAppsEnabled
+        ? env.MISTY_OFFICIAL_APPS_CATALOG
+        : undefined,
     process.cwd(),
     "apps/catalog.json",
   );
-  const officialAppsRequireAssets = officialAppCatalogRequiresAssets(officialAppsCatalog);
-  const officialAppsRoot = officialAppDevelopmentPath(
-    command === "serve" ? env.MISTY_OFFICIAL_APPS_DIR : undefined,
-    process.cwd(),
-    "public/official-apps",
-    // Generated downloads are optional at Host startup. A fresh checkout can
-    // still launch before local App packages have been built and signed.
-    { allowMissingGeneratedAssets: true },
-  );
+  const officialAppsRequireAssets =
+    !appsDirectory &&
+    localOfficialAppsEnabled &&
+    officialAppCatalogRequiresAssets(officialAppsCatalog);
+  const officialAppsRoot = appsDirectory
+    ? resolve(appsDirectory, "public/official-apps")
+    : officialAppDevelopmentPath(
+        localOfficialAppsEnabled ? env.MISTY_OFFICIAL_APPS_DIR : undefined,
+        process.cwd(),
+        "public/official-apps",
+        // Generated downloads are optional at Host startup. A fresh checkout can
+        // still launch before local App packages have been built and signed.
+        { allowMissingGeneratedAssets: true },
+      );
   const localOfficialAppsAvailable =
-    command === "serve" &&
+    localOfficialAppsEnabled &&
     existsSync(officialAppsCatalog) &&
     (!officialAppsRequireAssets || existsSync(officialAppsRoot));
   if (command === "build" && mode === "web" && !publicApiUrl) {
@@ -234,7 +299,10 @@ export default defineConfig(({ command, mode }) => {
       ? new URL("./src/application/store-page.mobile.tsx", import.meta.url).pathname
       : new URL("./src/application/store-page.tsx", import.meta.url).pathname;
   return {
+    envDir: false,
     plugins: [
+      appEnvironmentUpdates(process.cwd()),
+      appSourceDependencies(process.cwd()),
       publicSdkDevelopmentUpdates(),
       react(),
       tailwindcss(),
@@ -266,7 +334,7 @@ export default defineConfig(({ command, mode }) => {
           ]
         : []),
       ...(localOfficialAppsAvailable
-        ? [officialAppDevelopmentAssets(officialAppsRoot, officialAppsCatalog)]
+        ? [officialAppDevelopmentAssets(officialAppsRoot, officialAppsCatalog, appsDirectory)]
         : []),
       ...(uploadSourceMaps
         ? [
@@ -286,24 +354,37 @@ export default defineConfig(({ command, mode }) => {
         : []),
     ],
     define: {
+      ...publicAppEnv(env),
       "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
       "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
       // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
       // Vite's internal alias keeps non-VITE server secrets out of the bundle.
       "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
       "import.meta.env.VITE_MISTY_PUBLIC_URL": JSON.stringify(publicUrl ?? ""),
-      "import.meta.env.VITE_MISTY_LOCAL_OFFICIAL_APPS": JSON.stringify(
-        localOfficialAppsAvailable ? "true" : "",
+      "import.meta.env.VITE_MISTY_APPS_DIRECTORY": JSON.stringify(
+        appsDirectory || (localOfficialAppsAvailable ? dirname(dirname(officialAppsCatalog)) : ""),
       ),
     },
     clearScreen: false,
+    // Keep each app runtime separate from other Vite servers and temporary previews.
+    // Sharing optimized dependencies can invalidate imports in an already-open webview.
+    cacheDir: resolve(process.cwd(), "node_modules/.vite", `misty-${mode}`),
     optimizeDeps: {
+      // Scan the real app (including its lazy imports), not standalone HTML
+      // probes in scripts/. A probe-only unresolved import aborts Vite's scan;
+      // opening Explorer then discovers dependencies late and reloads the host.
+      entries: ["index.html"],
       // Local SDK snapshots change during development without a version bump.
       // Serve their ESM directly so WebKit cannot retain an older bundled API.
       exclude: ["@misty/sdk", "@misty/contracts"],
+      // The public contracts own Zod 4; host modules still use Zod 3. Preserve
+      // this nested dependency when serving excluded SDK modules directly.
+      include: ["@misty/contracts > zod"],
     },
     resolve: {
       alias: {
+        ...appSourceAliases(process.cwd()),
+        "@misty/browser-view": resolve(appSourceRoot(process.cwd()), "apps/browser/workspace/SDKBrowserView.tsx"),
         "@/features/apps/EmbeddedPlanner": new URL(
           mode === "mobile" || mode === "android"
             ? "./src/features/apps/EmbeddedPlanner.mobile.tsx"
@@ -320,6 +401,13 @@ export default defineConfig(({ command, mode }) => {
       sourcemap: uploadSourceMaps ? "hidden" : false,
     },
     server: {
+      fs: {
+        allow: [
+          process.cwd(),
+          appSourceRoot(process.cwd()),
+          resolve(process.cwd(), "../misty-sdk"),
+        ],
+      },
       host: tauriDevHost ?? "127.0.0.1",
       port: desktopDevPort,
       strictPort: true,

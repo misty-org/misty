@@ -1,3 +1,4 @@
+import { localDesktopComponentUrl } from "./localDesktopApp";
 import { styleComponentDefinition } from "./componentStyles";
 import type { OfficialApp } from "@/api/apps";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -8,6 +9,8 @@ import { isTrustedHostApp } from "./trustedHostApps";
 const modules = new Map<string, Promise<MistyComponentDefinition>>();
 
 export function desktopComponentUrl(app: OfficialApp): URL {
+  const local = localDesktopComponentUrl(app);
+  if (local) return local;
   if (!isTrustedHostApp(app) || app.desktop.runtime !== "downloaded" || !app.desktop.sha256)
     throw new Error("This App does not provide a signed desktop component.");
   const base = navigator.userAgent.includes("Windows")

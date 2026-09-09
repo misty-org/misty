@@ -70,7 +70,7 @@ use app::commands::{
     smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
     smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
     storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
-    workspaces_save, workspaces_snapshot,
+    workspaces_save, workspaces_snapshot, navigation_names_snapshot, navigation_names_update,
 };
 #[cfg(target_os = "android")]
 use app::commands::{
@@ -88,12 +88,14 @@ use app::runtime::MistyRuntime;
 use app::shortcut_commands::{
     shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
 };
+#[cfg(desktop)]
+use infra::browser_agent_control::{browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew, BrowserExecutionState};
 #[cfg(any(desktop, target_os = "ios"))]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
     browser_webview_create, browser_webview_forward, browser_webview_hide,
-    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload,
+    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload, browser_webview_set_zoom,
     browser_webview_set_bounds, browser_webview_set_theme, browser_webview_show,
     browser_webviews_hide_all, browser_webviews_park_all, browser_webviews_set_companion,
     browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
@@ -156,6 +158,13 @@ pub fn run() {
         }
     }));
 
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(
+        tauri::plugin::Builder::<tauri::Wry>::new("misty-context-menu")
+            .js_init_script_on_all_frames(include_str!("infra/browser_default_context_menu.js"))
+            .build(),
+    );
+
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_drag::init());
 
@@ -202,6 +211,8 @@ pub fn run() {
             app.manage(runtime);
             #[cfg(any(desktop, target_os = "ios"))]
             app.manage(BrowserSessionState::default());
+            #[cfg(desktop)]
+            app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
             // the first public beta. The in-app Misty panel remains available.
             #[cfg(desktop)]
@@ -431,6 +442,13 @@ pub fn run() {
                     code_lsp_stop,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_create,
+                    #[cfg(target_os = "macos")]
+                    crate::infra::browser::browser_context_menu_availability,
+                    #[cfg(target_os = "macos")]
+                    crate::infra::browser::browser_context_menu_select,
+                    #[cfg(desktop)]
+                    crate::infra::browser::browser_profile_persistence,
+                    crate::infra::browser::browser_profile_remove,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_shortcuts_update,
                     #[cfg(any(desktop, target_os = "ios"))]
@@ -449,6 +467,7 @@ pub fn run() {
                     browser_webview_forward,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_reload,
+                    browser_webview_set_zoom,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_show,
                     #[cfg(any(desktop, target_os = "ios"))]
@@ -471,6 +490,12 @@ pub fn run() {
                     browser_agent_grant_revoke,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_agent_execute,
+                    #[cfg(desktop)]
+                    browser_agent_execute_bounded,
+                    #[cfg(desktop)]
+                    browser_agent_execution_cancel,
+                    #[cfg(desktop)]
+                    browser_agent_execution_renew,
                     storage_snapshot,
                     clipboard_snapshot,
                     clipboard_set_local,
@@ -564,6 +589,8 @@ pub fn run() {
                     file_sync_pair_remove,
                     file_sync_compare,
                     file_sync_apply,
+                    navigation_names_snapshot,
+                    navigation_names_update,
                     workspaces_snapshot,
                     workspaces_save,
                     settings_snapshot,

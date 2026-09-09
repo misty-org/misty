@@ -29,6 +29,12 @@ npm ci
 The optional `misty` developer CLI now lives in the separate
 `misty-org/misty-cli` repository.
 
+The app reads only the root `.env` for every target, including native builds and
+local app preparation. Shell and CI variables override file values. Mode-specific
+and local override files are ignored. Only `VITE_` variables and the explicit
+public configuration aliases are exposed to the frontend. `MISTY_APPS_DIRECTORY`
+and `VITE_MISTY_APPS_DIRECTORY` both select the local Apps checkout.
+
 ## Common commands
 
 ```sh
@@ -40,6 +46,25 @@ npm run build:mobile
 npm run build:android
 npm run build:web
 ```
+
+Official app source lives in the adjacent `misty-apps/apps/<id>` folders. Each
+app has an `index.tsx` component entry and its view/runtime source. The host keeps
+shared UI, API adapters, native infrastructure, and integration tests; source
+aliases and TypeScript paths bridge the two checkouts. Run `npm run build:apps --
+<id>` from `misty-apps` to rebuild a local app with the host's shared tooling.
+
+Desktop development discovers `~/misty-org/misty-apps` (or an adjacent
+`misty-apps` checkout). Set `VITE_MISTY_APPS_DIRECTORY=~/path/to/misty-apps`
+in your environment or `.env` to select another checkout.
+Local desktop apps run directly from `.build/official-apps/<id>/desktop`;
+startup builds missing components without signing, zipping, or extracting them.
+Rebuild a changed app with `npm run build:official-apps -- <id>` and reload the
+host. The server still controls installation grants and permissions. In dev
+mode the local directory determines the component source, even when its version
+differs from the server catalog. A missing local build reports an error instead
+of falling back to a published download. Without a local repo, desktop uses
+published downloads from `https://apps.mistysys.com`. Production builds always
+use published packages and signature verification.
 
 The Store synchronizes its product-neutral extension contract and shared
 artwork/verification primitives from the adjacent `misty-apps/interface`

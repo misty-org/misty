@@ -21,9 +21,7 @@ const Library = lazy(() =>
 const Social = lazy(() =>
   import("@/features/spaces/chat/SpaceChatEntry").then((m) => ({ default: m.SpaceSocial })),
 );
-const Inbox = lazy(() =>
-  import("@/features/inbox/InboxWorkspace").then((m) => ({ default: m.InboxWorkspace })),
-);
+const Inbox = lazy(() => import("./EmbeddedInbox"));
 const Agents = lazy(() => import("@/features/agents/AgentsPage"));
 
 export interface TrustedAppSurfaceProps {
@@ -52,6 +50,7 @@ export function TrustedAppSurface(props: TrustedAppSurfaceProps) {
     </div>
   );
 }
+
 function TrustedFeature(props: TrustedAppSurfaceProps) {
   const location = useLocation();
   const { app, space, tab, active } = props;
@@ -71,7 +70,7 @@ function TrustedFeature(props: TrustedAppSurfaceProps) {
     };
     return <NativeAppSurface surface={app.id} tab={nativeTab} active={active} />;
   }
-  if (app.id === "inbox") return <Inbox workspaceId={workspaceId} initialRoute={props.route} />;
+  if (app.id === "inbox") return <Inbox />;
   if (app.id === "agents") return <Agents />;
   if (!space) return <div role="status">Choose a Space to open {app.name}.</div>;
   if (app.id === "planner")

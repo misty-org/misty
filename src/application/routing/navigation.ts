@@ -1,13 +1,13 @@
 import type { DesktopNavItem } from "@/application/layouts/model/types";
 import type { AppTab } from "@/features/app-shell";
 import { routes } from "@/features/app-shell";
-import { Bot, Compass, FolderOpen, House } from "lucide-react";
+import { appIcons } from "@/shared/ui/app-icons";
 
 export const desktopNavItems: DesktopNavItem[] = [
-  { id: "home", label: "Home", path: routes.home, icon: House, exact: true },
-  { id: "files", label: "Files", path: routes.files, icon: FolderOpen },
-  { id: "agents", label: "Agents", path: routes.agents, icon: Bot },
-  { id: "marketplace", label: "Discover", path: routes.discover, icon: Compass },
+  { id: "home", label: "Home", path: routes.home, icon: appIcons.home, exact: true },
+  { id: "files", label: "Files", path: routes.files, icon: appIcons.files },
+  { id: "agents", label: "Agents", path: routes.agents, icon: appIcons.agents },
+  { id: "marketplace", label: "Discover", path: routes.discover, icon: appIcons.marketplace },
 ];
 
 const deepLinkPrefixes = [

@@ -5,15 +5,6 @@ export function createAgentsApi(
   },
 ) {
   return {
-    list: <T>() => apiRequest<{ agents: T[] }>("/agents"),
-    avatar: (id: string, version: number) =>
-      apiBlobRequest(
-        `/agents/${encodeURIComponent(id)}/avatar?version=${encodeURIComponent(version)}`,
-      ),
-    activity: <T>(id: string, limit = 30) =>
-      apiRequest<T>(
-        `/agents/${encodeURIComponent(id)}/activity?limit=${encodeURIComponent(limit)}`,
-      ),
     run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
     cancelRun: <T>(runId: string) =>
       apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),

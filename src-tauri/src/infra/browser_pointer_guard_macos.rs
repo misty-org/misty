@@ -2,9 +2,8 @@
 //!
 //! WebKit can keep sending tracking-area callbacks to the main application
 //! `WKWebView` even when a sibling browser `WKWebView` is visibly above it.
-//! Keep this policy in Misty rather than patching Wry: only tracking owners
-//! discovered under the main renderer are filtered, and only inside a visible
-//! browser child's frame while that child is above the renderer.
+//! Filter tracking callbacks in both directions: the renderer beneath a browser
+//! page, and browser pages beneath renderer-owned menus and modal panels.
 
 use std::{
     cell::RefCell,
@@ -18,6 +17,7 @@ use objc2_app_kit::{NSEvent, NSView};
 
 static MAIN_WEBVIEW_VIEW: OnceLock<usize> = OnceLock::new();
 static MAIN_TRACKING_OWNERS: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
+static BROWSER_TRACKING_OWNERS: OnceLock<Mutex<HashMap<usize, usize>>> = OnceLock::new();
 static BROWSER_WEBVIEW_VIEWS: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
 static POINTER_EVENT_IMPLEMENTATIONS: OnceLock<Mutex<HashMap<(usize, Sel), usize>>> =
     OnceLock::new();
@@ -56,6 +56,7 @@ pub(super) unsafe fn refresh_browser_webview_guard(view: &NSView) {
     if let Ok(mut browser_views) = browser_webview_views().lock() {
         browser_views.insert(view as *const NSView as usize);
     }
+    discover_browser_tracking_owners(view, view as *const NSView as usize);
     if let Some(main) = MAIN_WEBVIEW_VIEW.get().copied() {
         discover_main_tracking_owners(&*(main as *const NSView));
     }
@@ -66,12 +67,67 @@ pub(super) unsafe fn refresh_browser_webview_guard(view: &NSView) {
 }
 
 pub(super) unsafe fn unregister_browser_webview(view: &NSView) {
+    if let Ok(mut owners) = browser_tracking_owners().lock() {
+        owners.retain(|_, root| *root != view as *const NSView as usize);
+    }
     if let Ok(mut browser_views) = browser_webview_views().lock() {
         browser_views.remove(&(view as *const NSView as usize));
     }
     if let Some(window) = view.window() {
         window.discardCursorRects();
         window.resetCursorRects();
+    }
+}
+
+fn browser_tracking_owners() -> &'static Mutex<HashMap<usize, usize>> {
+    BROWSER_TRACKING_OWNERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+unsafe fn discover_browser_tracking_owners(view: &NSView, root: usize) {
+    // WebKit creates tracking owners lazily, so rescan after layout and page loads.
+    for area in view.trackingAreas().iter() {
+        let Some(owner) = area.owner() else {
+            continue;
+        };
+        if let Ok(mut owners) = browser_tracking_owners().lock() {
+            owners.insert(&*owner as *const AnyObject as usize, root);
+        }
+        install_pointer_event_overrides(AnyObject::class(&*owner));
+    }
+    for child in view.subviews().iter() {
+        discover_browser_tracking_owners(&child, root);
+    }
+}
+
+// Tracking-area callbacks bypass ordinary view hit testing. Sibling ordering
+// must therefore gate them explicitly, including hover and cursor changes.
+fn browser_tracking_is_blocked(hidden: bool, browser_index: usize, main_index: usize) -> bool {
+    hidden || browser_index < main_index
+}
+
+unsafe fn browser_is_below_renderer(pointer: usize) -> bool {
+    let Some(main_pointer) = MAIN_WEBVIEW_VIEW.get().copied() else {
+        return false;
+    };
+    let browser = &*(pointer as *const NSView);
+    if browser.isHidden() {
+        return true;
+    }
+    let Some(parent) = browser.superview() else {
+        return false;
+    };
+    let siblings = parent.subviews();
+    let browser_index = siblings
+        .iter()
+        .position(|view| &*view as *const NSView as usize == pointer);
+    let main_index = siblings
+        .iter()
+        .position(|view| &*view as *const NSView as usize == main_pointer);
+    match (browser_index, main_index) {
+        (Some(browser_index), Some(main_index)) => {
+            browser_tracking_is_blocked(false, browser_index, main_index)
+        }
+        _ => false,
     }
 }
 
@@ -141,6 +197,13 @@ unsafe fn install_pointer_event_override(class: &AnyClass, selector: Sel) {
 }
 
 unsafe extern "C-unwind" fn pointer_event(this: &AnyObject, command: Sel, event: &NSEvent) {
+    let browser_root = browser_tracking_owners()
+        .lock()
+        .ok()
+        .and_then(|owners| owners.get(&(this as *const AnyObject as usize)).copied());
+    if browser_root.is_some_and(|root| browser_is_below_renderer(root)) {
+        return;
+    }
     let belongs_to_main = main_tracking_owners()
         .lock()
         .map(|owners| owners.contains(&(this as *const AnyObject as usize)))
@@ -241,4 +304,16 @@ fn original_pointer_event_implementation(
         class = current.superclass();
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::browser_tracking_is_blocked;
+
+    #[test]
+    fn modal_blocks_browser_tracking_until_page_is_above_renderer_again() {
+        assert!(browser_tracking_is_blocked(false, 0, 1));
+        assert!(!browser_tracking_is_blocked(false, 1, 0));
+        assert!(browser_tracking_is_blocked(true, 1, 0));
+    }
 }

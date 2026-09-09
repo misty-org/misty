@@ -12,9 +12,6 @@ export function useSdkSpaceChatDraft(spaceId: string, conversationId = "") {
   const [selectedLibraryIds, setSelectedLibraryIds] = useState<string[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [replyToMessageId, setReplyToMessageId] = useState("");
-  const [selectedAgentIdsByLabel, setSelectedAgentIdsByLabel] = useState<Record<string, string>>(
-    {},
-  );
   const [attachmentUploading, setAttachmentUploading] = useState(false);
 
   const attachmentSlotsLeft = Math.max(
@@ -28,7 +25,6 @@ export function useSdkSpaceChatDraft(spaceId: string, conversationId = "") {
     setSelectedLibraryIds([]);
     setPendingAttachments([]);
     setReplyToMessageId("");
-    setSelectedAgentIdsByLabel({});
   }, []);
 
   const uploadAttachments = useCallback(
@@ -63,8 +59,6 @@ export function useSdkSpaceChatDraft(spaceId: string, conversationId = "") {
       setPendingAttachments,
       replyToMessageId,
       setReplyToMessageId,
-      selectedAgentIdsByLabel,
-      setSelectedAgentIdsByLabel,
       attachmentUploading,
       attachmentSlotsLeft,
       isEmpty: !text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0,
@@ -77,7 +71,6 @@ export function useSdkSpaceChatDraft(spaceId: string, conversationId = "") {
       pendingAttachments,
       replyToMessageId,
       reset,
-      selectedAgentIdsByLabel,
       selectedFileIds,
       selectedLibraryIds,
       text,

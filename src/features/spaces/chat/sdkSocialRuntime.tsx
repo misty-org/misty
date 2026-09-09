@@ -5,7 +5,7 @@ import {
   type MistyComponentContext,
   type MistySocialOperation,
 } from "@misty/sdk";
-import { createSdkLibraryRuntime } from "../library/sdkLibraryRuntime";
+import { createSdkLibraryRuntime } from "@/features/spaces/library/sdkLibraryRuntime";
 import { MistyPickerShell } from "@/features/picker/MistyPickerShell";
 import { useSdkSpaceChatDraft } from "@/features/chat-composer/useSdkSpaceChatDraft";
 import {
@@ -76,7 +76,6 @@ export async function createSdkSocialRuntime(
         messageErrorsBySpace: {},
         membersBySpace: {},
         nodesBySpace: {},
-        agentsBySpace: {},
         presenceBySpace: {},
         loading: false,
         sending: false,
@@ -85,11 +84,6 @@ export async function createSdkSocialRuntime(
           const result = await api.members(id);
           assert();
           set((s) => ({ membersBySpace: { ...s.membersBySpace, [id]: result.members ?? [] } }));
-        },
-        loadChatAgents: async (id: string) => {
-          const result = await api.chatAgents(id);
-          assert();
-          set((s) => ({ agentsBySpace: { ...s.agentsBySpace, [id]: result.agents ?? [] } }));
         },
         loadMessages: async (id: string, before?: number) => {
           set((s) => ({ messageLoadingBySpace: { ...s.messageLoadingBySpace, [id]: true } }));
@@ -114,7 +108,6 @@ export async function createSdkSocialRuntime(
           attachmentIds = [],
           libraryIds = [],
           reply = "",
-          selected = {},
           optimistic,
         ) => {
           if (optimistic) merge([optimistic]);
@@ -125,8 +118,6 @@ export async function createSdkSocialRuntime(
               buildMessageSpans(
                 text,
                 get().membersBySpace[id] ?? [],
-                get().agentsBySpace[id] ?? [],
-                selected,
               ),
               fileIds,
               attachmentIds,
@@ -135,7 +126,6 @@ export async function createSdkSocialRuntime(
               optimistic?.client_nonce ?? "",
             );
             assert();
-            result.message.triggered_runs = result.triggered_runs as SpaceMessage["triggered_runs"];
             merge([result.message]);
             return;
           } catch (error) {
@@ -154,7 +144,7 @@ export async function createSdkSocialRuntime(
           const result = await api.updateMessage(
             id,
             message,
-            buildMessageSpans(text, get().membersBySpace[id] ?? [], get().agentsBySpace[id] ?? []),
+            buildMessageSpans(text, get().membersBySpace[id] ?? []),
             files,
           );
           merge([result]);
@@ -274,7 +264,6 @@ export async function createSdkSocialRuntime(
   const refresh = () => {
     if (!signal.aborted) {
       void store.getState().loadMembers(spaceId).catch(report);
-      void store.getState().loadChatAgents(spaceId).catch(report);
       void store.getState().loadMessages(spaceId).catch(report);
       void connections.getState().load();
       void api

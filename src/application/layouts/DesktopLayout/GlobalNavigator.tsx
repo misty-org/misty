@@ -1,3 +1,8 @@
+import { Renameable } from "@/features/navigation-names/Renameable";
+import { useNavigationName, sectionNameKey } from "@/features/navigation-names/store";
+import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
+import { useNavigatorOrder } from "./useNavigatorOrder";
+import { websiteNavigation } from "../../../../../misty-apps/apps/shared/websiteStore";
 import { navigationMenuPrimaryIconClass } from "@/shared/ui";
 import { routes } from "@/features/app-shell";
 import { reportSystemError } from "@/features/activity";
@@ -35,7 +40,11 @@ import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { PlannerNavigatorDisclosure } from "./PlannerNavigatorDisclosure";
 import { SocialNavigatorDisclosure } from "./SocialNavigatorDisclosure";
 import { navigatorRowClass, navigatorTitlebarStripClass } from "./styles";
-import { appNavigationFor, useAppNavigationStore } from "@/features/apps/appNavigation";
+import {
+  appNavigationFor,
+  savedProviderNavigation,
+  useAppNavigationStore,
+} from "@/features/apps/appNavigation";
 import { DownloadedAppNavigator } from "./DownloadedAppNavigator";
 
 type NavigatorToolItem = {
@@ -69,6 +78,7 @@ export function GlobalNavigator(props: {
   const accountId = user?.id ?? "";
   const selectedAppIds = usePinnedNavigatorAppIds();
   const appNavigation = useAppNavigationStore((state) => state.entries);
+  const providerCache = useAppNavigationStore((state) => state.providerCache);
   const inboxAccounts = useInboxStore((state) => state.accounts);
   // The rail marks what the workspace is actually showing, not the last thing
   // that was clicked, so it follows the focused pane's active tab.
@@ -143,6 +153,25 @@ export function GlobalNavigator(props: {
     const item = toolItemsById.get(id);
     return item ? [item] : [];
   });
+  const sectionOrder = useNavigatorOrder(
+    accountId,
+    "sections",
+    selectedTools.map((item) => item.id),
+  );
+  const orderedTools = sectionOrder.ids.flatMap((id) =>
+    selectedTools.filter((item) => item.id === id),
+  );
+  const sectionDrag = usePointerReorder({
+    scope: `navigator:${accountId}:sections`,
+    axis: "y",
+    hitArea: "header",
+    getDrag: (id) => {
+      const item = selectedTools.find((item) => item.id === id);
+      return item ? { id, label: item.label } : null;
+    },
+    onDrop: (drag, target, after) => sectionOrder.move(drag.id, target, after),
+    onKeyboardMove: sectionOrder.step,
+  });
   const hasUnavailableSpaceApps = !scopedSpace && selectedAppIds.some((id) => isSpaceToolId(id));
   const spaceStatusId = "navigator-space-status";
 
@@ -171,7 +200,7 @@ export function GlobalNavigator(props: {
 
       <div className="grid shrink-0 select-none gap-1 px-3 py-2" data-navigator-header="true">
         <div
-          className="flex h-9 w-full min-w-0 items-center justify-between gap-1"
+          className="flex min-h-8 w-full min-w-0 items-center justify-between gap-1"
           data-navigator-space-row="true"
         >
           <GlobalSpaceSwitcher
@@ -205,7 +234,13 @@ export function GlobalNavigator(props: {
                 error={Boolean(spacesError)}
               />
             ) : null}
-            {selectedTools.map(renderToolItem)}
+            <div {...sectionDrag} className="grid min-w-0 gap-0.5">
+              {orderedTools.map((item) => (
+                <div key={item.id} data-reorder-item={item.id}>
+                  {renderToolItem(item)}
+                </div>
+              ))}
+            </div>
           </NavigatorAppsSection>
         </NavigatorSection>
       </div>
@@ -221,7 +256,11 @@ export function GlobalNavigator(props: {
   );
 
   function toolIsActive(item: NavigatorToolItem): boolean {
-    return !item.disabled && activeGroupKey === `app:${officialAppIdForNavigator(item.id)}`;
+    const appGroup = `app:${officialAppIdForNavigator(item.id)}`;
+    return (
+      !item.disabled &&
+      (activeGroupKey === appGroup || workspaceSurfaceFromRoute(activeRoute)?.groupKey === appGroup)
+    );
   }
 
   function renderToolItem(item: NavigatorToolItem): ReactNode {
@@ -246,6 +285,49 @@ export function GlobalNavigator(props: {
           items={registration.items}
         />
       );
+
+    if (
+      !item.disabled &&
+      (item.id === "browser" ||
+        (/Mac/.test(navigator.platform) &&
+          ["social", "inbox", "planner", "journal", "library"].includes(item.id)))
+    ) {
+      const saved = savedProviderNavigation(providerCache, {
+        accountId,
+        spaceId: scopedSpace?.id,
+        appId: officialAppIdForNavigator(item.id),
+      });
+      const path = `/apps/${item.id}`;
+      const items =
+        saved?.items ??
+        (item.id === "planner" || item.id === "journal" || item.id === "library"
+          ? websiteNavigation(item.id, { services: [], accounts: [], pins: [] }, scopedSpace?.id)
+          : [
+              ...(item.id === "social"
+                ? [{ id: "misty", label: "Misty", route: `${path}?provider=misty` }]
+                : []),
+              ...(item.id === "inbox"
+                ? ["google", "microsoft"]
+                    .filter((id) => inboxAccounts.some((account) => account.provider === id))
+                    .map((id) => ({
+                      id,
+                      label: id === "google" ? "Gmail" : "Outlook",
+                      route: `${path}?provider=${id}`,
+                    }))
+                : []),
+            ]);
+      return (
+        <DownloadedAppNavigator
+          key={item.id}
+          accountId={accountId}
+          appId={item.id}
+          label={item.label}
+          active={active}
+          activeRoute={activeRoute}
+          items={items}
+        />
+      );
+    }
 
     if (item.id === "inbox") {
       return (
@@ -468,6 +550,7 @@ function NavigatorLink(props: {
   disabled?: boolean;
   disabledReasonId?: string;
 }) {
+  const label = useNavigationName(sectionNameKey(props.appId), props.label);
   const content = (
     <>
       <span className={navigationMenuPrimaryIconClass}>
@@ -477,7 +560,7 @@ function NavigatorLink(props: {
           size="nav"
         />
       </span>
-      <span className="min-w-0 flex-1 truncate">{props.label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </>
   );
   if (props.disabled) {
@@ -487,28 +570,38 @@ function NavigatorLink(props: {
           navigatorRowClass(false),
           "cursor-default text-cream-muted/55 hover:bg-transparent hover:text-cream-muted/55",
         )}
+        data-reorder-header="true"
+        data-reorder-handle="true"
+        data-misty-window-drag-block="true"
+        tabIndex={0}
         aria-disabled="true"
         aria-describedby={props.disabledReasonId}
-        aria-label={props.label}
+        aria-label={label}
       >
         {content}
       </div>
     );
   }
   return (
-    <Link
-      to={props.path}
-      onClick={() => {
-        const surface = workspaceSurfaceFromRoute(props.path);
-        if (surface) {
-          useWorkspaceStore.getState().openSurface(surface);
-        }
-      }}
-      className={navigatorRowClass(props.active)}
-      aria-current={props.active ? "page" : undefined}
-      aria-label={props.label}
-    >
-      {content}
-    </Link>
+    <Renameable nameKey={sectionNameKey(props.appId)} automatic={props.label}>
+      <Link
+        data-reorder-handle="true"
+        data-reorder-header="true"
+        data-misty-window-drag-block="true"
+        title="Drag to reorder · Alt+Shift+↑/↓"
+        to={props.path}
+        onClick={() => {
+          const surface = workspaceSurfaceFromRoute(props.path);
+          if (surface) {
+            useWorkspaceStore.getState().openSurface(surface);
+          }
+        }}
+        className={navigatorRowClass(props.active)}
+        aria-current={props.active ? "page" : undefined}
+        aria-label={label}
+      >
+        {content}
+      </Link>
+    </Renameable>
   );
 }

@@ -778,3 +778,22 @@ describe("desktop dock store", () => {
     expect(afterLoadingPlain.title).toBe("misty.com");
   });
 });
+
+it("reorders pane tabs without changing focus, native instance identities, or dropping concurrent tabs", () => {
+  const store = useWorkspaceStore.getState();
+  store.reset();
+  store.openSurface(browserRequest);
+  store.openSurface({...browserRequest, title:"Second"});
+  const before = useWorkspaceStore.getState().layout;
+  const pane = dockLeaves(before.root)[0];
+  const ids = pane.tabs.map(tab=>tab.id).reverse();
+  store.reorderPaneTabs(pane.id, ids);
+  const after = useWorkspaceStore.getState().layout;
+  expect(after.focusedPaneId).toBe(before.focusedPaneId);
+  const reordered = dockLeaves(after.root)[0];
+  expect(reordered.activeTabId).toBe(pane.activeTabId);
+  expect(reordered.tabs.map(tab=>tab.id)).toEqual(ids);
+  expect(reordered.tabs.every(tab=>pane.tabs.includes(tab))).toBe(true);
+  store.reorderPaneTabs(pane.id, ids.slice(1));
+  expect(useWorkspaceStore.getState().layout).toBe(after);
+});

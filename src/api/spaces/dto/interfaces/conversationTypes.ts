@@ -1,9 +1,7 @@
-export type SpaceActorRef =
-  | { kind: "person"; user_id: string; agent_id?: never }
-  | { kind: "agent"; agent_id: string; user_id?: never };
+export type SpaceActorRef = { kind: "person"; user_id: string };
 
 export interface SpaceParticipant {
-  kind: "person" | "agent";
+  kind: "person";
   user_id?: string;
   agent_id?: string;
   name: string;
@@ -18,16 +16,6 @@ export interface SpaceMessageSender {
   agent_id?: string;
   display_name: string;
   avatar_version?: number;
-}
-
-export interface SpaceMessageAgentRun {
-  id: string;
-  agent_id: string;
-  state:
-    "queued" | "working" | "awaiting_approval" | "completed" | "failed" | "canceled" | "retrying";
-  run_id?: string;
-  error_code?: string;
-  error_message?: string;
 }
 
 export interface SpaceConversation {

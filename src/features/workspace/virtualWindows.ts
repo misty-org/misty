@@ -1,3 +1,4 @@
+import { reconcileGroupIdentities } from "./groupIdentity";
 import {
   capDockLeaves,
   createDockLeaf,
@@ -43,12 +44,12 @@ export function normalizeWorkspaceLayout(
     ),
   );
   const panes = dockLeaves(root);
-  return {
+  return reconcileGroupIdentities({
     root,
     focusedPaneId: panes.some((pane) => pane.id === layout.focusedPaneId)
       ? layout.focusedPaneId
       : panes[0].id,
-  };
+  });
 }
 
 export function createWorkspaceVirtualWindow(

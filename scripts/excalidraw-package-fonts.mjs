@@ -1,3 +1,4 @@
+import { appSourceRoot } from "./app-source-paths.mjs";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createHash } from "node:crypto";
@@ -17,7 +18,7 @@ export function excalidrawPackageFonts({ assetDirectory } = {}) {
     },
     load(id) {
       if (id !== `\0${virtual}`) return;
-      return `import {createSdkDrawingFonts} from ${JSON.stringify(resolve(import.meta.dirname, "../src/features/drawings/sdkDrawingFonts.ts"))};
+      return `import {createSdkDrawingFonts} from ${JSON.stringify(resolve(appSourceRoot(resolve(import.meta.dirname, "..")), "apps/journal/drawings/sdkDrawingFonts.ts"))};
         export const fonts = createSdkDrawingFonts(MistyComponentRuntime.sdk, MistyComponentRuntime.signal);`;
     },
     async transform(code, id) {

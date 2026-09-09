@@ -70,6 +70,7 @@ export function createGlobalSearchPanelState(
         conversationsLoading: false,
         error: null,
         context: [],
+        browserRequest: undefined,
         conversations: [],
         activeConversationId: "",
         filters: { kinds: [], source: "all", intent: "all" },
@@ -99,7 +100,7 @@ export function createGlobalSearchPanelState(
     },
     closePanel: () => {
       announceGlobalPanel(false);
-      set({ panel: "closed" });
+      set({ panel: "closed", ...(get().browserRequest ? { context: [] } : {}), browserRequest: undefined });
     },
     setMode: (mode) => {
       writeLastMode(get().accountId, mode);
@@ -124,7 +125,10 @@ export function createGlobalSearchPanelState(
       set((state) => ({ filters, selectedCandidateId: "", requestId: state.requestId + 1 })),
     setSelectedCandidateId: (selectedCandidateId) => set({ selectedCandidateId }),
     setContext: (context) => set({ context: uniqueGlobalMistyContext(context) }),
-    removeContext: (id) => set({ context: get().context.filter((item) => item.id !== id) }),
+    removeContext: (id) => set({
+      context: get().context.filter((item) => item.id !== id),
+      ...(get().browserRequest?.context.some((item) => item.id === id) ? { browserRequest: undefined } : {}),
+    }),
     clear: () =>
       set((state) => ({
         query: "",

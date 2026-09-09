@@ -1,3 +1,6 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
+import { usePointerReorder, usePointerDropTarget, reorderIds } from "@/shared/hooks/usePointerReorder";
+import { appIcons } from "@/shared/ui/app-icons";
 import {
   canCloseWorkspaceTab,
   canCloseWorkspaceWindow,
@@ -20,26 +23,13 @@ import {
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
 import {
-  ArrowLeftRight,
   Blocks,
-  Bot,
-  Code2,
-  FolderOpen,
-  Globe2,
-  House,
-  Inbox,
-  BookOpenText,
-  CheckSquare2,
-  MessagesSquare,
-  Notebook,
   PanelBottomClose,
   PanelBottomDashed,
   PanelLeftClose,
   PanelRightClose,
   PanelRightDashed,
   PanelTopClose,
-  SquareTerminal,
-  Store,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
@@ -62,7 +52,6 @@ import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 import { dockHeaderPadding } from "./styles";
 import { useSpacesStore } from "@/features/spaces";
 import {
-  currentWorkspaceTabDragId,
   WorkspaceTabGroupButton,
   type TabGroup,
 } from "./WorkspaceTabGroupButton";
@@ -72,18 +61,18 @@ import {
 } from "./WindowsWorkspaceTitlebarControls";
 
 const surfaceIcons: Record<WorkspaceSurfaceId, LucideIcon> = {
-  home: House,
-  inbox: Inbox,
+  home: appIcons.home,
+  inbox: appIcons.inbox,
   space: Blocks,
-  browser: Globe2,
-  terminal: SquareTerminal,
-  code: Code2,
-  files: FolderOpen,
-  transfers: ArrowLeftRight,
-  agents: Bot,
+  browser: appIcons.browser,
+  terminal: appIcons.terminal,
+  code: appIcons.code,
+  files: appIcons.files,
+  transfers: appIcons.transfers,
+  agents: appIcons.agents,
   "official-app": Blocks,
   extension: Blocks,
-  marketplace: Store,
+  marketplace: appIcons.marketplace,
 };
 const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   home: "Home",
@@ -122,7 +111,8 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
       label = tool === "space" ? (isHome ? "Home" : "Space") : spaceToolLabel(tool);
       contextLabel = `${spaceName} · ${label}`;
     } else if (tab.surfaceId === "official-app") {
-      label = tab.title || "App";
+      const id = tab.groupKey.replace(/^app:/, "").split(":")[0];
+      label = ({chat:"Social",social:"Social",inbox:"Inbox",journal:"Journal",planner:"Planner",library:"Library",browser:"Browser",files:"Files",code:"Code",terminal:"Terminal",agents:"Agents",transfers:"Transfers"} as Record<string,string>)[id] ?? useAppsStore.getState().catalog.find(app=>app.id===id)?.name ?? "App";
       contextLabel = label;
     }
     const existing = map.get(key);
@@ -131,6 +121,7 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
     } else {
       map.set(key, {
         key,
+        instanceId: tab.groupInstanceId ?? `group:${tab.id}`,
         surfaceId: tab.surfaceId,
         label,
         contextLabel,
@@ -303,6 +294,40 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   // every tab switch. Closing the tab remains the lifecycle boundary.
   const mountedTabs = pane.tabs;
   const groups = groupTabs(pane.tabs);
+  const tabDrag = usePointerReorder({ scope: "workspace-tabs", axis: "x",
+    getDrag: (key, element) => {
+      const group = groups.find(group => group.key === key);
+      const tab = group?.tabs.find(tab => tab.id === element.dataset.reorderTabId) ?? group?.tabs[0];
+      return group && tab ? { id: tab.id, ids: group.tabs.map(tab => tab.id), label: tab.title, paneId: pane.id } : null;
+    },
+    onDrop: (drag, key, after) => {
+      const target = groups.find(group => group.key === key);
+      if (!target) return;
+      const anchor = after ? target.tabs[target.tabs.length - 1].id : target.tabs[0].id;
+      if (drag.paneId === pane.id) {
+        const latest = dockLeaves(useWorkspaceStore.getState().layout.root).find(leaf => leaf.id === pane.id);
+        if (latest) useWorkspaceStore.getState().reorderPaneTabs(pane.id, reorderIds(latest.tabs.map(tab => tab.id), drag.ids ?? [drag.id], anchor, after));
+      } else useWorkspaceStore.getState().dockTabGroup(drag.ids ?? [drag.id], pane.id, "center", pane.tabs.findIndex(tab => tab.id === anchor) + (after ? 1 : 0));
+    },
+    onKeyboardMove: (key, direction) => {
+      const from = groups.findIndex(group => group.key === key), target = groups[from + direction];
+      if (!target || from < 0) return;
+      const anchor = direction === 1 ? target.tabs[target.tabs.length - 1].id : target.tabs[0].id;
+      useWorkspaceStore.getState().reorderPaneTabs(pane.id, reorderIds(pane.tabs.map(tab => tab.id), groups[from].tabs.map(tab => tab.id), anchor, direction === 1));
+    },
+  });
+  usePointerDropTarget(sectionRef, { scope: "workspace-tabs",
+    hit(x, y, drag) {
+      if (!sectionRef.current) return null;
+      const rect = sectionRef.current.getBoundingClientRect(), zone = dropZoneAt(rect, x, y);
+      const moving = dockTabs(useWorkspaceStore.getState().layout.root).find(tab => tab.id === drag.id);
+      if (!moving || (zone !== "center" && !dockSplitFits(pane, paneSize, zone, moving))) return null;
+      const horizontal = zone === "left" || zone === "right";
+      return {id: zone, after: zone === "right" || zone === "down", rect, axis: horizontal ? "x" : "y"};
+    },
+    drop: (drag, hit) => { useWorkspaceStore.getState().dockTabGroup(drag.ids ?? [drag.id], pane.id, hit.id as DockDropZone); },
+  });
+
   const canCloseTab = pane.tabs.length > 0;
   const scopedTabs = useMemo(
     () => props.virtualWindows.flatMap((workspaceWindow) => dockTabs(workspaceWindow.layout.root)),
@@ -356,7 +381,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       event.clientX,
       event.clientY,
     );
-    const movingTabId = event.dataTransfer.getData(tabDragType) || currentWorkspaceTabDragId();
+    const movingTabId = event.dataTransfer.getData(tabDragType);
     const movingTab = dockTabs(useWorkspaceStore.getState().layout.root).find(
       (tab) => tab.id === movingTabId,
     );
@@ -371,7 +396,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
 
   const drop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
-    const tabId = event.dataTransfer.getData(tabDragType) || currentWorkspaceTabDragId();
+    const tabId = event.dataTransfer.getData(tabDragType);
     const zone = dropZone ?? "center";
     setDropZone(null);
     if (!tabId) return;
@@ -417,7 +442,8 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       >
         <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
           <div
-            className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden"
+            className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none]"
+            {...tabDrag}
             aria-label="Open apps"
             data-tour-target="workspace-tab-bar"
           >
@@ -742,10 +768,10 @@ const panelCloseIcons: Record<DockSplitDirection, LucideIcon> = {
 function spaceToolIcon(tab: WorkspaceTab | undefined): LucideIcon | null {
   if (tab?.surfaceId !== "space") return null;
   const section = tab.route.split("/").filter(Boolean)[2];
-  if (section === "notes" || section === "drawings") return Notebook;
-  if (section === "planner") return CheckSquare2;
-  if (section === "social" || section === "chat") return MessagesSquare;
-  if (section === "library") return BookOpenText;
+  if (section === "notes" || section === "drawings") return appIcons.journal;
+  if (section === "planner") return appIcons.planner;
+  if (section === "social" || section === "chat") return appIcons.social;
+  if (section === "library") return appIcons.library;
   return Blocks;
 }
 

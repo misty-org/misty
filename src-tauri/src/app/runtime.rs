@@ -24,6 +24,7 @@ use crate::infra::{
 };
 
 pub struct MistyRuntime {
+    pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
     pub storage_runtime: StorageRuntimeService,
@@ -133,6 +134,7 @@ impl MistyRuntime {
         let workspaces = WorkspaceService::new(environment.clone());
 
         Self {
+            navigation_names: crate::infra::navigation_names::NavigationNamesService::new(environment.config_dir().join("navigation.json")),
             environment,
             clipboard,
             storage_runtime,

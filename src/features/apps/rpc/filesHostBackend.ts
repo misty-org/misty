@@ -1,7 +1,8 @@
+import { reportSystemError } from "@/features/activity/systemActivity";
 import { createFileDropHost } from "./fileDropHost";
 import { invoke } from "@tauri-apps/api/core";
 import type {
-  AppSnapshot,
+  AppEnvironmentSnapshot,
   DeviceSnapshot,
   ProvidersSnapshot,
   ConnectedDevicesSnapshot,
@@ -29,6 +30,13 @@ export function createFilesHostBackend(
     scope.assert();
     return value;
   };
+  const unavailable = (service: string, error: unknown) =>
+    reportSystemError({
+      title: `Files could not load ${service}`,
+      error,
+      scope: `files-sources:${service}`,
+      accountId: scope.identity.accountId,
+    });
   const drops = createFileDropHost(scope, { root: options.root, native: options.native, file });
   return {
     subscribeDrop: drops.subscribe,
@@ -39,15 +47,24 @@ export function createFilesHostBackend(
     file,
     async sources() {
       await options.native("files.sources.list", {});
-      const [app, providers, devices, local] = await Promise.all([
-        invoke<AppSnapshot>("app_snapshot"),
-        invoke<ProvidersSnapshot>("providers_snapshot"),
-        invoke<ConnectedDevicesSnapshot>("connected_devices_snapshot"),
-        invoke<DeviceSnapshot>("devices_snapshot"),
+      // Local folders remain usable when optional remote/device services are unavailable.
+      const [environment, providers, devices, local] = await Promise.all([
+        invoke<AppEnvironmentSnapshot>("app_environment_snapshot"),
+        invoke<ProvidersSnapshot>("providers_snapshot").catch((error) => {
+          unavailable("remote sources", error);
+          return { remotes: [] };
+        }),
+        invoke<ConnectedDevicesSnapshot>("connected_devices_snapshot").catch((error) => {
+          unavailable("network devices", error);
+          return { peers: [] };
+        }),
+        invoke<DeviceSnapshot>("devices_snapshot").catch((error) => {
+          unavailable("volumes", error);
+          return { devices: [] };
+        }),
       ]);
       scope.assert("files.read");
-      if (providers.error) throw new Error(providers.error);
-      const root = app.environment.mountPath.replace(/\/$/, "");
+      const root = environment.mountPath.replace(/\/$/, "");
       const result: FilesHostSource[] = providers.remotes.map((remote) => {
         if (!remote.name || /[/\\\0]/.test(remote.name) || [".", ".."].includes(remote.name))
           throw new Error("A connected source has an invalid name.");
@@ -61,7 +78,7 @@ export function createFilesHostBackend(
           path: `${root}/${remote.name}`,
         };
       });
-      const home = app.environment.homeDir.replace(/\/$/, "");
+      const home = environment.homeDir.replace(/\/$/, "");
       for (const [id, name, suffix] of [
         ["home", "Home", ""],
         ["desktop", "Desktop", "/Desktop"],
@@ -106,6 +123,9 @@ export function createFilesHostBackend(
         }
         const roots = await invoke<PeerRoot[]>("connected_devices_roots", {
           deviceId: peer.deviceId,
+        }).catch((error) => {
+          unavailable("device folders", error);
+          return [];
         });
         scope.assert();
         for (const entry of roots)

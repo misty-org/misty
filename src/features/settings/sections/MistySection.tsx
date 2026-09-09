@@ -152,7 +152,6 @@ export function MistySection(_props: SettingsContentProps) {
     setWorking(true);
     try {
       const result = await aiSurfaceApi.updatePreference(surfaceId, {
-        pinned_agent_id: "",
         proactive_enabled: patch.proactive_enabled ?? current.proactive_enabled,
         saved_actions: patch.saved_actions ?? current.saved_actions,
       });

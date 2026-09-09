@@ -37,8 +37,6 @@ import {
   cacheHomeActivity,
   contributionDates,
   dateKey,
-  readHomeActivity,
-  recordHomeActivity,
   type HomeActivity,
 } from "./homeActivity";
 import {
@@ -49,8 +47,6 @@ import {
   formatRelativeDate,
   greetingForDate,
 } from "./homeFormat";
-
-type StreakView = "week" | "overview";
 
 const contributionWeeks = 40;
 const contributionDays = contributionWeeks * 7;
@@ -65,11 +61,16 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   const hydrateRecentTools = useRecentToolsStore((state) => state.hydrateRecentTools);
   const [agenda, setAgenda] = useState<SpaceAgendaEntry[]>([]);
   const [agendaState, setAgendaState] = useState<"loading" | "ready" | "error">("loading");
-  const [streakView, setStreakView] = useState<StreakView>("week");
   const [now] = useState(() => new Date());
-  const [activity, setActivity] = useState<HomeActivity>(() =>
-    readHomeActivity(user?.id ?? "", spaceId),
-  );
+  const activityScope = JSON.stringify([user?.id, spaceId]);
+  const [activityResult, setActivityResult] = useState<{
+    scope: string;
+    activity: HomeActivity;
+    state: "ready" | "error";
+  } | null>(null);
+  const [activityAttempt, setActivityAttempt] = useState(0);
+  const activity = activityResult?.scope === activityScope ? activityResult.activity : {};
+  const activityState = activityResult?.scope === activityScope ? activityResult.state : "loading";
   const space = spaces.find((candidate) => candidate.id === spaceId);
   const agendaPath = `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/day`;
 
@@ -111,33 +112,41 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
     const sessionKey = `misty:home-activity-session:${user?.id ?? "guest"}:${spaceId}:${todayKey}`;
     let recordedThisSession = false;
     try {
-      if (window.sessionStorage.getItem(sessionKey)) {
-        recordedThisSession = true;
-      } else {
-        window.sessionStorage.setItem(sessionKey, "1");
-      }
+      recordedThisSession = !!window.sessionStorage.getItem(sessionKey);
     } catch {
-      // Session storage is only used to avoid double-counting a mounted dashboard.
+      // The server remains authoritative when session storage is unavailable.
     }
     let cancelled = false;
+    setActivityResult(null);
     const request = recordedThisSession
       ? homeApi.snapshot(spaceId)
       : homeApi.recordVisit(spaceId, todayKey);
     void request
       .then((snapshot) => {
         if (cancelled) return;
-        setActivity(snapshot.activity);
+        setActivityResult({ scope: activityScope, activity: snapshot.activity, state: "ready" });
         cacheHomeActivity(user?.id ?? "", spaceId, snapshot.activity);
+        try {
+          window.sessionStorage.setItem(sessionKey, "1");
+        } catch {
+          // A successful database response does not depend on local storage.
+        }
         hydrateRecentTools(snapshot.recent_apps.filter(isWorkspaceToolId));
       })
       .catch(() => {
-        if (cancelled || recordedThisSession) return;
-        setActivity(recordHomeActivity(user?.id ?? "", spaceId, todayKey));
+        if (cancelled) return;
+        setActivityResult({ scope: activityScope, activity: {}, state: "error" });
       });
     return () => {
       cancelled = true;
     };
-  }, [hydrateRecentTools, spaceId, user?.id]);
+  }, [activityAttempt, activityScope, hydrateRecentTools, spaceId, user?.id]);
+
+  useEffect(() => {
+    const refresh = () => setActivityAttempt((value) => value + 1);
+    window.addEventListener("misty:refresh-focused-tool", refresh);
+    return () => window.removeEventListener("misty:refresh-focused-tool", refresh);
+  }, []);
 
   const jumpTools = useMemo(() => {
     const ordered = [...recentTools, ...fallbackTools];
@@ -165,14 +174,13 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   );
 
   const streak = activityStreak(activity, now);
-  const weekDates = contributionDates(now, 7);
   const overviewDates = contributionDates(now, contributionDays);
   useMobileSurfaceChrome({ title: space?.name || "Home", level: "root" });
 
   if (!space) return null;
 
   return (
-    <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright [@media(min-width:1024px)_and_(min-height:800px)]:overflow-y-hidden">
+    <main className="misty-transient-scrollbar h-full min-h-0 overflow-x-hidden overflow-y-auto bg-charcoal-bg text-cream selection:bg-avatar-yellow/25 selection:text-cream-bright">
       <div
         className={cn(
           "mx-auto w-full max-w-[1240px] [@media(min-width:1024px)_and_(min-height:800px)]:h-full",
@@ -264,39 +272,28 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
                   id="home-streak-title"
                   className="text-base font-semibold tracking-[-0.01em] text-cream-bright"
                 >
-                  {streak > 0 ? `${streak}-day streak` : "Start your streak"}
+                  {activityState === "loading"
+                    ? "Loading activity…"
+                    : activityState === "error"
+                      ? "Streak unavailable"
+                      : streak > 0
+                        ? `${streak}-day streak`
+                        : "Start your streak"}
                 </h2>
               </div>
-              <div
-                className="inline-flex rounded-lg border border-charcoal-border bg-charcoal-card p-0.5"
-                aria-label="Streak view"
-              >
-                {(["week", "overview"] as const).map((view) => (
-                  <button
-                    key={view}
-                    type="button"
-                    className={cn(
-                      "rounded-md px-2.5 py-1 text-xs font-medium capitalize outline-none transition-colors",
-                      "focus-visible:ring-2 focus-visible:ring-cream-bright/70",
-                      streakView === view
-                        ? "bg-charcoal-active text-cream-bright"
-                        : "text-cream-muted hover:text-cream",
-                    )}
-                    aria-pressed={streakView === view}
-                    onClick={() => setStreakView(view)}
-                  >
-                    {view}
-                  </button>
-                ))}
-              </div>
+              {activityState === "error" && (
+                <button
+                  type="button"
+                  className="text-xs text-cream-muted hover:text-cream-bright"
+                  onClick={() => setActivityAttempt((value) => value + 1)}
+                >
+                  Retry activity
+                </button>
+              )}
             </div>
 
             <div className="rounded-2xl border border-charcoal-border bg-charcoal-card/65 px-3 py-2.5 sm:px-4">
-              {streakView === "week" ? (
-                <WeekContributions dates={weekDates} activity={activity} today={now} />
-              ) : (
-                <OverviewContributions dates={overviewDates} activity={activity} />
-              )}
+              <OverviewContributions dates={overviewDates} activity={activity} />
             </div>
           </section>
         </div>
@@ -443,36 +440,6 @@ function SpaceRow(props: { space: Space; current: boolean }) {
         {props.current ? "Current" : "Open"}
       </span>
     </DashboardLink>
-  );
-}
-
-function WeekContributions(props: { dates: Date[]; activity: HomeActivity; today: Date }) {
-  const todayKey = dateKey(props.today);
-  return (
-    <div className="grid grid-cols-7 gap-2 sm:gap-3" aria-label="This week’s Home activity">
-      {props.dates.map((date) => {
-        const key = dateKey(date);
-        const count = props.activity[key] ?? 0;
-        const active = count > 0;
-        return (
-          <div key={key} className="flex min-w-0 flex-col items-center gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-cream-muted">
-              {new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date)}
-            </span>
-            <span
-              className={cn(
-                "grid aspect-square w-full max-w-12 place-items-center rounded-full text-xs font-semibold tabular-nums transition-colors",
-                active ? "bg-cream-bright text-charcoal-bg" : "bg-charcoal-bg text-cream-muted",
-                key === todayKey && !active && "ring-1 ring-cream-bright/70",
-              )}
-              title={`${count} ${count === 1 ? "visit" : "visits"} on ${date.toLocaleDateString()}`}
-            >
-              {date.getDate()}
-            </span>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 

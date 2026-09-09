@@ -59,7 +59,9 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).not.toBeNull();
     expect(view.container.querySelector(`[data-workspace-surface="${planner.id}"]`)).not.toBeNull();
 
-    const nextPane = { ...pane, activeTabId: planner.id };
+    const journalElement = view.container.querySelector(`[data-workspace-surface="${journal.id}"]`);
+    const plannerElement = view.container.querySelector(`[data-workspace-surface="${planner.id}"]`);
+    const nextPane = { ...pane, tabs: [planner, journal], activeTabId: planner.id };
     act(() => {
       view.rerender(
         <WorkspaceDockTree
@@ -73,6 +75,8 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     });
 
     expect(view.container.querySelectorAll("[data-workspace-surface]")).toHaveLength(2);
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(journalElement);
+    expect(view.container.querySelector(`[data-workspace-surface="${planner.id}"]`)).toBe(plannerElement);
     expect(
       view.container
         .querySelector(`[data-workspace-surface="${journal.id}"]`)

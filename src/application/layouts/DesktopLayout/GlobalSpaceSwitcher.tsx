@@ -21,11 +21,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
   cn,
-  navigationMenuPrimaryLayoutClass,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
+  navigationMenuRowClass,
+  navigationMenuDisclosureLayoutClass,
+  NavigationChevron,
 } from "@/shared/ui";
-import { ChevronDown, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
@@ -65,10 +65,9 @@ export function GlobalSpaceSwitcher(props: {
                   <button
                     type="button"
                     className={cn(
-                      "misty-navigator-row-target h-9 flex-1 max-w-[calc(100%_-_2.5rem)] min-w-0 items-center",
-                      navigationMenuPrimaryLayoutClass,
-                      "rounded-md border-0 bg-transparent px-2.5 text-left transition-colors",
-                      "hover:bg-charcoal-card/60",
+                      navigationMenuRowClass,
+                      navigationMenuDisclosureLayoutClass,
+                      "flex-1 max-w-[calc(100%_-_2.5rem)]",
                       navigatorFocusRingClass,
                     )}
                     aria-label={switcherLabel}
@@ -80,7 +79,7 @@ export function GlobalSpaceSwitcher(props: {
                         <>
                           <SpaceAvatar
                             space={props.activeSpace}
-                            className="size-7 rounded-md border-0 bg-transparent"
+                            className="size-[18px] rounded border-0 bg-transparent"
                           />
                           {activeUnread > 0 ? (
                             <span
@@ -91,31 +90,20 @@ export function GlobalSpaceSwitcher(props: {
                         </>
                       ) : (
                         <span
-                          className="size-7 rounded-md border border-charcoal-border bg-charcoal-card"
+                          className="size-[18px] rounded border border-charcoal-border bg-charcoal-card"
                           aria-hidden="true"
                         />
                       )}
                     </span>
-                    <span className={cn(navigationDisclosureLabelClass, "min-w-0")}>
+                    <span className="flex min-w-0 items-center gap-1">
                       <OverflowFadeText
-                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-base font-semibold text-cream"
+                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-[13px] font-medium text-cream"
                         data-active-space-name="true"
                         title={activeName}
                       >
                         {activeName}
                       </OverflowFadeText>
-                      <ChevronDown
-                        size={16}
-                        className={cn(
-                          navigationMenuPrimaryLayoutClass,
-                          navigationDisclosureChevronClass,
-                          "text-cream-muted transition-transform duration-150 motion-reduce:transition-none",
-                          menuOpen && "rotate-180",
-                        )}
-                        strokeWidth={2}
-                        aria-hidden="true"
-                        data-chevron-placement="inline"
-                      />
+                      <NavigationChevron open={menuOpen} />
                     </span>
                   </button>
                 </DropdownMenuTrigger>

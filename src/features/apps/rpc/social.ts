@@ -3,7 +3,6 @@ import { useSpacesStore } from "@/features/spaces";
 import { isMistySocialMethod, mistySocialContracts } from "@misty/sdk";
 import { createSpaceChatApi } from "@/api/spaces/chat";
 import { createSpaceConversationsApi } from "@/api/spaces/conversations";
-import { createSpaceActionSuggestionsApi } from "@/api/spaces/action-suggestions";
 import { readDownloadBlob } from "@/api/spaces/signed-download";
 import type { SpaceRequest } from "@/api/spaces/types";
 import { AppRpcError, type AppRpcScope } from "./session";
@@ -45,7 +44,6 @@ export function createSocialRpc(
   const api = {
     ...createSpaceChatApi(request),
     ...createSpaceConversationsApi(request),
-    ...createSpaceActionSuggestionsApi(request),
     nodes: (id: string) => request(`/spaces/${encodeURIComponent(id)}/nodes`),
     members: (id: string) => request(`/spaces/${encodeURIComponent(id)}/members`),
     roadmaps: (id: string) => request(`/spaces/${encodeURIComponent(id)}/roadmaps`),
@@ -107,7 +105,6 @@ export function createSocialRpc(
       const names = [
         "misty:space-message-event",
         "misty:space-agent-run-event",
-        "misty:space-action-suggestion-event",
       ];
       const handlers = names.map((name) => {
         const handler = (event: Event) => {

@@ -1,16 +1,13 @@
 export type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
 
-import { agentTeammatesV1Enabled } from "@/features/agents";
 import { SystemErrorActivity } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { useSpacesStore } from "@/features/spaces";
 import { Button } from "@/shared/ui";
 import { UserPlus } from "lucide-react";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { MemberActionDialog } from "./MemberActionDialog";
 import { MemberList } from "./MemberList";
 import { PendingInvitationsCard } from "./PendingInvitationsCard";
-import { TeamList } from "./TeamList";
 import { useMemberDialogs } from "./useMemberDialogs";
 import { useSpaceMembers } from "./useSpaceMembers";
 
@@ -24,8 +21,7 @@ export function SpaceMembers({
   const { user } = useAuth();
   const state = useSpaceMembers(spaceId);
   const dialogs = useMemberDialogs(spaceId, state);
-  const { space, members, agents, error } = state;
-  const teammatesEnabled = agentTeammatesV1Enabled();
+  const { space, members, error } = state;
 
   return (
     <div
@@ -38,13 +34,11 @@ export function SpaceMembers({
           <div>
             {!embedded ? (
               <h2 className="m-0 text-sm font-semibold text-cream">
-                {teammatesEnabled ? "Team" : "Members"}
+                Members
               </h2>
             ) : null}
             <p className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs text-cream-muted`}>
-              {teammatesEnabled
-                ? `${members.length + agents.length + 1} teammates`
-                : `${members.length} active member${members.length === 1 ? "" : "s"}`}
+              {`${members.length} active member${members.length === 1 ? "" : "s"}`}
               {space?.pending_count ? ` · ${space.pending_count} pending` : ""}
             </p>
           </div>
@@ -66,22 +60,6 @@ export function SpaceMembers({
           />
         ) : null}
 
-        {teammatesEnabled ? (
-          <TeamList
-            spaceId={spaceId}
-            members={members}
-            agents={agents}
-            loading={state.membersLoading}
-            owner={state.canManageMembers}
-            canTransferOwnership={state.canTransferOwnership}
-            canManageAgents={false}
-            currentUserId={user?.id}
-            onMemberAction={dialogs.setMemberAction}
-            onReload={() => useSpacesStore.getState().loadMembers(spaceId)}
-            onError={(message) => useSpacesStore.setState({ error: message || null })}
-          />
-        ) : (
-          <>
             <MemberList
               members={members}
               loading={state.membersLoading}
@@ -90,8 +68,6 @@ export function SpaceMembers({
               currentUserId={user?.id}
               onAction={dialogs.setMemberAction}
             />
-          </>
-        )}
 
         {state.canInvite ? (
           <PendingInvitationsCard

@@ -4,7 +4,6 @@ import type {
   SpaceMember,
   SpaceMessage,
   SpaceNode,
-  SpaceStudioResource,
 } from "@/api/spaces/dto/interfaces/types";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -12,7 +11,6 @@ import { useShallow } from "zustand/react/shallow";
 const emptyMessages: SpaceMessage[] = [];
 const emptyMembers: SpaceMember[] = [];
 const emptyNodes: SpaceNode[] = [];
-const emptyAgents: SpaceStudioResource[] = [];
 
 export function useSpaceChatStore() {
   return useSpacesStore(
@@ -22,7 +20,6 @@ export function useSpaceChatStore() {
       messageErrorsBySpace: state.messageErrorsBySpace,
       membersBySpace: state.membersBySpace,
       nodesBySpace: state.nodesBySpace,
-      agentsBySpace: state.agentsBySpace,
       loading: state.loading,
       sending: state.sending,
       referenceOnly: state.referenceOnly,
@@ -32,7 +29,6 @@ export function useSpaceChatStore() {
       toggleMessageReaction: state.toggleMessageReaction,
       markRead: state.markRead,
       loadMessages: state.loadMessages,
-      loadChatAgents: state.loadChatAgents,
       openNode: state.openNode,
       clearSpacesError: state.clearError,
     })),
@@ -90,13 +86,6 @@ export function useSpaceChatScope(options: {
     activeConversation,
     directRecipient,
     nodes,
-    agents: conversationId
-      ? (store.agentsBySpace[spaceId] ?? emptyAgents).filter((agent) =>
-          activeConversation?.participants.some(
-            (participant) => participant.kind === "agent" && participant.agent_id === agent.id,
-          ),
-        )
-      : (store.agentsBySpace[spaceId] ?? emptyAgents),
     members: conversationId
       ? allMembers.filter((member) => allowedMemberIds.has(member.user_id))
       : allMembers,

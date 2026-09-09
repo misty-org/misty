@@ -70,8 +70,7 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
               >
                 {suggestion.kind === "member" ? (
                   <Users />
-                ) : suggestion.kind === "agent" ? (
-                  <Bot />
+
                 ) : (
                   <LibraryBig />
                 )}

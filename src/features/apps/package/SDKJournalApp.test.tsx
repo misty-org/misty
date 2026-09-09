@@ -6,7 +6,7 @@ import {
   type MistyComponentContext,
 } from "@misty/sdk";
 import { expect, it, vi } from "vitest";
-import definition from "./SDKJournalApp";
+import definition from "@/features/apps/package/SDKJournalApp";
 
 it("mounts both Journal sections using the public SDK, preserves editor routes and releases every lease on unmount", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -36,7 +36,7 @@ it("mounts both Journal sections using the public SDK, preserves editor routes a
         user: { id: "user-a" },
         space: { id: "space-a", name: "Product" },
       };
-    if (message.method === "spaces.members.list") return { members: [], agents: [] };
+    if (message.method === "spaces.members.list") return { members: [] };
     if (message.method === "notes.list") return { notes: [] };
     if (message.method === "drawings.list") return { drawings: [...drawings] };
     if (message.method === "drawings.create") {

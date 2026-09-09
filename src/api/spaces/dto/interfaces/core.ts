@@ -9,7 +9,7 @@ import type {
 } from "../types/types";
 import type { SpaceTaskSourceRef } from "./agentTaskTypes";
 import type { MessageAttachment } from "./library";
-import type { SpaceMessageAgentRun, SpaceMessageSender } from "./conversationTypes";
+import type { SpaceMessageSender } from "./conversationTypes";
 export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
 export type * from "./agentTaskTypes";
@@ -196,7 +196,6 @@ export interface SpaceMessage {
   reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
   edited_at?: string;
-  triggered_runs?: SpaceMessageAgentRun[];
   origin?: {
     kind?: string;
     author_name?: string;

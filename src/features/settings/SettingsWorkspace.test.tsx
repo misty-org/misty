@@ -287,7 +287,7 @@ describe("SettingsWorkspace", () => {
 
     expect(classes).toContain("ml-[27px]");
     expect(classes).toContain("mr-2");
-    expect(classes).toContain("h-7");
+    expect(classes).toContain("h-8");
     expect(classes).toContain("text-[13px]");
     expect(surfaceClasses).toContain("ml-1");
     expect(surfaceClasses).toContain("gap-2");

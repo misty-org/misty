@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #181818;
+        color: white;
+        font: 16px system-ui;
+      }
+      main {
+        width: 2400px;
+        min-height: 4000px;
+      }
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 1400px;
+        height: 32px;
+        background: #333;
+        transform: translateY(4px);
+      }
+      .item {
+        height: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>Page-owned fixed header</header>
+    <main>
+      <p>Native horizontal and vertical scrolling</p>
+      <div id="items"></div>
+    </main>
+    <script>
+      const items = document.getElementById("items");
+      for (let i = 0; i < 1200; i++)
+        items.appendChild(document.createElement("div")).className = "item";
+      window.runScrollingProbe = async () => {
+        const nativeScroll = window.scrollTo.bind(window),
+          nativeStyle = window.getComputedStyle.bind(window);
+        const header = document.querySelector("header"),
+          item = items.firstElementChild;
+        let scrollWrites = 0,
+          styleQueries = 0,
+          frames = 0,
+          frame = 0,
+          running = true;
+        window.scrollTo = (...args) => {
+          scrollWrites++;
+          return nativeScroll(...args);
+        };
+        window.getComputedStyle = (...args) => {
+          styleQueries++;
+          return nativeStyle(...args);
+        };
+        const animate = () => {
+          if (!running) return;
+          frames++;
+          item.textContent = `Frame ${frames}`;
+          header.style.transform = `translateY(${frames % 12}px)`;
+          frame = requestAnimationFrame(animate);
+        };
+        try {
+          nativeScroll({ left: 0, top: 0, behavior: "instant" });
+          frame = requestAnimationFrame(animate);
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          nativeScroll({ left: 120, top: 2400, behavior: "smooth" });
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          return {
+            scrollX,
+            scrollY,
+            scrollWrites,
+            styleQueries,
+            frames,
+            transform: header.style.transform,
+            expectedTransform: `translateY(${frames % 12}px)`,
+            injectedScrollbar: !!document.getElementById("misty-browser-horizontal-scrollbar"),
+            injectedStyle: !!document.getElementById("misty-browser-viewport-style"),
+            pan: document.documentElement.hasAttribute("data-misty-horizontal-pan"),
+          };
+        } finally {
+          running = false;
+          cancelAnimationFrame(frame);
+          window.scrollTo = nativeScroll;
+          window.getComputedStyle = nativeStyle;
+        }
+      };
+    </script>
+  </body>
+</html>

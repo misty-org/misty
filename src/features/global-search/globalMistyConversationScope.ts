@@ -8,17 +8,12 @@ export async function conversationForGlobalPrompt(get: () => GlobalSearchState, 
   const spaces = useSpacesStore.getState().spaces;
   const current = state.conversations.find((item) => item.id === state.activeConversationId);
   const promptSpaceId = resolveMentionedAgentSpaceId(spaces, prompt);
-  const recentUserContext = current?.messages
-    .filter((message) => message.role === "user")
-    .slice(-6)
-    .map((message) => message.content)
-    .join("\n");
-  const mentionedSpaceId =
-    promptSpaceId || resolveMentionedAgentSpaceId(spaces, recentUserContext ?? "");
-  const contextualSpaceId = state.context.find((item) => item.spaceId)?.spaceId ?? "";
-  const targetSpaceId = mentionedSpaceId || current?.spaceId || contextualSpaceId;
+  const contextSpaces = [...new Set(state.context.map((item) => item.spaceId).filter(Boolean))];
+  if (contextSpaces.length > 1) throw new Error("Choose one Space for this request.");
+  const contextualSpaceId = contextSpaces[0] ?? "";
+  const targetSpaceId = promptSpaceId || contextualSpaceId || current?.spaceId || "";
 
-  if (!current || (current.spaceId && mentionedSpaceId && current.spaceId !== mentionedSpaceId)) {
+  if (!current || (current.spaceId && targetSpaceId && current.spaceId !== targetSpaceId)) {
     return state.newConversation(targetSpaceId || undefined);
   }
   if (!current.spaceId && targetSpaceId) {

@@ -210,6 +210,7 @@ extern "C" bool misty_ios_browser_create(const char *identifier, const char *raw
         configuration:configuration];
       webView.autoresizingMask = UIViewAutoresizingNone;
       webView.allowsBackForwardNavigationGestures = YES;
+      webView.scrollView.showsHorizontalScrollIndicator = YES;
       webView.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
       MistyBrowserDelegate *delegate = [[MistyBrowserDelegate alloc] init];
       delegate.browserId = browserId;
@@ -245,6 +246,14 @@ extern "C" void misty_ios_browser_navigate(const char *identifier, const char *r
     WKWebView *view = MistyBrowserViews()[MistyString(identifier)];
     NSURL *url = [NSURL URLWithString:MistyString(rawUrl)];
     if (view && url) [view loadRequest:[NSURLRequest requestWithURL:url]];
+  });
+}
+
+extern "C" void misty_ios_browser_set_zoom(const char *identifier, double factor) {
+  NSString *viewId = MistyString(identifier);
+  dispatch_async(dispatch_get_main_queue(), ^{
+    WKWebView *view = MistyBrowserViews()[viewId];
+    view.pageZoom = factor;
   });
 }
 

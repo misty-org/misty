@@ -3,7 +3,6 @@ import type { SpaceActionSuggestionBatch, SpaceMessage } from "@/api/spaces/dto/
 import type { RefObject, UIEventHandler } from "react";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { MessageEditingState } from "../hooks/useMessageEditing";
-import type { PendingAgentRun } from "../hooks/usePendingAgentRuns";
 import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChatData";
 import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
 import type { SpaceChatPermissions } from "../hooks/useSpaceChatPermissions";
@@ -28,9 +27,6 @@ export interface SpaceChatThreadProps {
   onBeginMention: () => void;
   onReply: (messageId: string) => void;
   onDelete: (message: SpaceMessage) => void;
-  pendingAgentRuns: PendingAgentRun[];
-  actionSuggestions: SpaceActionSuggestionBatch[];
-  onActionSuggestionsChanged: () => void;
   onReload: () => void;
 }
 
@@ -43,9 +39,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       error={props.error}
       loading={props.loading}
       messages={scope.messages}
-      pendingAgentRuns={props.pendingAgentRuns}
-      actionSuggestions={props.actionSuggestions}
-      onActionSuggestionsChanged={props.onActionSuggestionsChanged}
       currentUserId={props.currentUserId}
       isOwner={access.isOwner}
       canWrite={access.canWriteMessages}

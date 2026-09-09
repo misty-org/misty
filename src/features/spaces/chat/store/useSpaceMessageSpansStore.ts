@@ -45,12 +45,9 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
 export function buildMessageSpans(
   text: string,
   members: SpaceMember[],
-  agents: SpaceStudioResource[],
-  selectedAgentIdsByLabel: Record<string, string> = {},
 ): MessageSpan[] {
   const candidates = [
-    ...members.map((member) => ({ label: member.name, userId: member.user_id, agentId: "" })),
-    ...agents.map((agent) => ({ label: agent.name, userId: "", agentId: agent.id })),
+    ...members.map((member) => ({ label: member.name, userId: member.user_id })),
   ]
     .filter((item) => item.label.trim())
     .sort((left, right) => right.label.length - left.label.length);
@@ -68,16 +65,9 @@ export function buildMessageSpans(
     const matching = candidates.filter(
       (item) => item.label.toLocaleLowerCase() === label.toLocaleLowerCase(),
     );
-    const selectedAgentId = selectedAgentIdsByLabel[label.toLocaleLowerCase()];
-    const candidate = selectedAgentId
-      ? matching.find((item) => item.agentId === selectedAgentId)
-      : matching.length === 1
-        ? matching[0]
-        : undefined;
+    const candidate = matching.length === 1 ? matching[0] : undefined;
     if (candidate?.userId)
       spans.push({ type: "mention", user_id: candidate.userId, label: candidate.label });
-    else if (candidate?.agentId)
-      spans.push({ type: "mention", agent_id: candidate.agentId, label: candidate.label });
     else spans.push({ type: "text", text: match[0] });
     offset = index + match[0].length;
   }

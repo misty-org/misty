@@ -36,7 +36,6 @@ export function createSpaceContentActions(
       attachmentIds = [],
       libraryItemIds = [],
       replyToMessageId = "",
-      selectedAgentIdsByLabel = {},
       optimisticMessage,
     ) => {
       const trimmed = text.trim();
@@ -66,8 +65,6 @@ export function createSpaceContentActions(
             ? buildMessageSpans(
                 trimmed,
                 get().membersBySpace[spaceId] ?? [],
-                get().agentsBySpace[spaceId] ?? [],
-                selectedAgentIdsByLabel,
               )
             : []);
         await queueMobileChatSubmission({
@@ -90,8 +87,6 @@ export function createSpaceContentActions(
             ? buildMessageSpans(
                 trimmed,
                 get().membersBySpace[spaceId] ?? [],
-                get().agentsBySpace[spaceId] ?? [],
-                selectedAgentIdsByLabel,
               )
             : []);
         const response = await spacesApi.sendMessage(
@@ -106,7 +101,6 @@ export function createSpaceContentActions(
         if (optimisticMessage?.client_nonce) {
           response.message.client_nonce ||= optimisticMessage.client_nonce;
         }
-        response.message.triggered_runs = response.triggered_runs;
         set((state) => ({
           sending: false,
           error: null,
@@ -141,7 +135,6 @@ export function createSpaceContentActions(
         const spans = buildMessageSpans(
           text.trim(),
           get().membersBySpace[spaceId] ?? [],
-          get().agentsBySpace[spaceId] ?? [],
         );
         const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
         set((state) => ({

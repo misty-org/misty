@@ -5,8 +5,6 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
-import { createSpaceActionSuggestionsApi } from "@/api/spaces/action-suggestions";
-import { createSpaceAgentMembershipsApi } from "@/api/spaces/agent-memberships";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -14,12 +12,10 @@ import {
 } from "@/api/spaces/connectivity";
 import { createSpaceConversationsApi } from "@/api/spaces/conversations";
 import type {
-  AvailableProviderResource,
   CreateSpaceRequest,
   CreateSpaceResult,
   ProviderAuthorizationStart,
   ProviderConnectionAvailability,
-  ProviderSharedResource,
   Space,
   SpaceIntegration,
   SpaceInvitationPreview,
@@ -203,9 +199,7 @@ export const spacesApi = {
       body: JSON.stringify({ confirmation }),
     }),
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
-  ...createSpaceAgentMembershipsApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
-  ...createSpaceActionSuggestionsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   ...createSpaceTasksApi(spaceRequest),
   integrations: (spaceId: string) =>
@@ -235,23 +229,6 @@ export const spacesApi = {
     spaceRequest<void>(`/integrations/${encodeURIComponent(integrationId)}`, {
       method: "DELETE",
     }),
-  availableProviderResources: (spaceId: string, integrationId: string) =>
-    spaceRequest<{ resources: AvailableProviderResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
-    ),
-  sharedProviderResources: (spaceId: string) =>
-    spaceRequest<{ resources: ProviderSharedResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/provider-resources`,
-    ),
-  selectProviderResources: (
-    spaceId: string,
-    integrationId: string,
-    resources: Array<Pick<AvailableProviderResource, "resource_type" | "external_resource_id">>,
-  ) =>
-    spaceRequest<{ resources: ProviderSharedResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
-      { method: "PUT", body: JSON.stringify({ resources }) },
-    ),
   nodes: (spaceId: string) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
@@ -259,23 +236,23 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
       { method: "POST", body: JSON.stringify({ disposition }) },
     ),
-  studio: (spaceId: string, kind: "agents" | "workflows") =>
+  studio: (spaceId: string, kind: "workflows") =>
     spaceRequest<{ resources: SpaceStudioResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`,
     ),
-  saveStudio: (spaceId: string, kind: "agents" | "workflows", item: Partial<SpaceStudioResource>) =>
+  saveStudio: (spaceId: string, kind: "workflows", item: Partial<SpaceStudioResource>) =>
     spaceRequest<SpaceStudioResource>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`, {
       method: "POST",
       body: JSON.stringify(item),
     }),
-  deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) =>
+  deleteStudio: (spaceId: string, kind: "workflows", id: string) =>
     spaceRequest(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
   runStudio: (
     spaceId: string,
-    kind: "agents" | "workflows",
+    kind: "workflows",
     id: string,
     prompt = "",
     capabilityId = "",

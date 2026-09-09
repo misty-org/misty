@@ -307,67 +307,6 @@
   line-height: 1.5;
 }
 
-.discover-action {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  flex-shrink: 0;
-  min-width: 64px;
-  min-height: 32px;
-  padding: 5px 12px;
-  border: 1px solid var(--misty-theme-border);
-  border-radius: 6px;
-  background: var(--misty-theme-card);
-  color: var(--misty-theme-text-bright);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.5;
-}
-
-.discover-action-primary {
-  border-color: transparent;
-  background: var(--misty-theme-text-bright);
-  color: var(--misty-theme-bg);
-}
-
-.discover-surface button,
-.discover-details button {
-  cursor: pointer;
-  transition:
-    background-color 140ms ease-out,
-    color 140ms ease-out;
-}
-
-.discover-surface button:disabled,
-.discover-details button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.discover-surface button:focus-visible,
-.discover-details button:focus-visible,
-.discover-search:focus-within {
-  outline: 2px solid var(--misty-theme-text-muted);
-  outline-offset: 2px;
-}
-
-.discover-surface button:hover:not(:disabled):not(.discover-action-primary),
-.discover-details button:hover:not(:disabled):not(.discover-action-primary) {
-  color: var(--misty-theme-text-bright);
-}
-
-.discover-action:hover:not(:disabled),
-.discover-nav-item:hover:not(:disabled),
-.discover-filters button:hover:not(:disabled),
-.discover-refresh:hover:not(:disabled) {
-  background: var(--misty-theme-hover);
-}
-
-.discover-action-primary:hover:not(:disabled) {
-  background: var(--misty-theme-text);
-  color: var(--misty-theme-bg);
-}
-
 .discover-empty {
   display: flex;
   min-height: 280px;
@@ -388,136 +327,6 @@
 .discover-empty p {
   max-width: 48ch;
   line-height: 1.6;
-}
-
-.discover-error {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 0;
-  color: var(--misty-theme-danger);
-  font-size: 13px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-.discover-error button {
-  flex-shrink: 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.discover-details {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  max-width: 560px;
-  gap: 0;
-  text-align: left;
-}
-
-.discover-details-body {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.discover-details-heading {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding-right: 32px;
-}
-
-.discover-publisher {
-  margin-top: 5px;
-  color: var(--misty-theme-text-muted);
-  font-size: 13px;
-}
-
-.discover-publisher span {
-  margin: 0 6px;
-}
-
-.discover-details-summary {
-  flex-shrink: 0;
-  margin: 16px 0 20px;
-  color: var(--misty-theme-text-muted);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.discover-details-section {
-  padding: 20px 0;
-  border-top: 1px solid var(--misty-theme-border);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--misty-theme-text-muted);
-}
-
-.discover-details-section h3 {
-  margin-bottom: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--misty-theme-text-bright);
-}
-
-.discover-facts {
-  display: grid;
-  gap: 5px;
-}
-
-.discover-facts > div {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px;
-}
-
-.discover-facts dd {
-  color: var(--misty-theme-text);
-}
-
-.discover-permissions-intro {
-  margin-bottom: 12px;
-  color: var(--misty-theme-text-muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.discover-permissions {
-  display: grid;
-  gap: 10px;
-  padding-inline-start: 20px;
-  list-style-type: disc;
-}
-
-.discover-permissions li {
-  display: list-item;
-  padding-inline-start: 4px;
-  color: var(--misty-theme-text);
-  overflow-wrap: anywhere;
-}
-
-.discover-permissions li::marker {
-  color: var(--misty-theme-text-muted);
-}
-
-.discover-details-actions {
-  flex-shrink: 0;
-  border-top: 1px solid var(--misty-theme-border);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 16px;
-}
-
-.discover-remove {
-  margin-right: auto;
-  color: var(--misty-theme-text-muted);
 }
 
 .discover-title-line {
@@ -546,6 +355,12 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+}
+/* Keep catalog actions aligned when their label or installation state changes. */
+.discover-action-group .discover-action {
+  width: 96px;
+  min-width: 96px;
+  white-space: nowrap;
 }
 .discover-review-note {
   color: var(--misty-theme-text-muted);

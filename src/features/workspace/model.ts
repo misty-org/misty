@@ -288,6 +288,8 @@ export interface DockWidgetDescriptor<TState = unknown> {
 }
 
 export interface WorkspaceTab {
+  /** Stable identity of this pane’s app group, independent of its label. */
+  groupInstanceId?: string;
   id: string;
   surfaceId: WorkspaceSurfaceId;
   groupKey: WorkspaceGroupKey;

@@ -57,7 +57,6 @@ function ComposerHarness() {
   const suggestions = useChatSuggestions({
     spaceId: "space-1",
     members: [member],
-    agents: [],
     currentUserId: "current-user",
     canBrowseLibrary: false,
     canReadLibrary: false,
