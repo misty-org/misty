@@ -68,6 +68,9 @@ export function commandsForApp(appId: string): readonly MistyAppCommand[] {
       return mistyPlannerCommands;
     case "browser":
       return mistyBrowserCommands;
+    case "chat":
+    case "inbox":
+      return ["navigation.back", "navigation.forward", "navigation.refresh"];
     default:
       return [];
   }

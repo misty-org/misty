@@ -27,6 +27,9 @@ export function createBrowserSDK(
     ) as MistyBrowserResult<M>;
   };
   return Object.freeze({
+    availability: () => request("browser.availability", {}),
+    removeAccount: (provider: MistyBrowserParams<"browser.removeAccount">["provider"]) =>
+      request("browser.removeAccount", { provider }),
     create: (options: MistyBrowserParams<"browser.create">) =>
       request("browser.create", options),
     layout: (
@@ -38,10 +41,16 @@ export function createBrowserSDK(
     back: (handle: string) => request("browser.back", { handle }),
     forward: (handle: string) => request("browser.forward", { handle }),
     reload: (handle: string) => request("browser.reload", { handle }),
+    setZoom: (handle: string, factor: number) => request("browser.setZoom", { handle, factor }),
     close: (handle: string) => request("browser.close", { handle }),
     inspect: (handle: string) => request("browser.inspect", { handle }),
     click: (handle: string, documentId: string, elementRef: string) =>
       request("browser.click", { handle, documentId, elementRef }),
+    interact: (handle: string, documentId: string, action: MistyBrowserParams<"browser.interact">["action"]) =>
+      request("browser.interact", { handle, documentId, action }),
+    type: (handle: string, documentId: string, elementRef: string, text: string) =>
+      request("browser.type", { handle, documentId, elementRef, text }),
+    request: (handle: string, path: string) => request("browser.request", { handle, path }),
     overlay: (handle: string, reason: string, active: boolean) =>
       request("browser.overlay", { handle, reason, active }),
     subscribe: async (

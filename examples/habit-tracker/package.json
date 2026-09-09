@@ -1,0 +1,16 @@
+{
+  "name": "@example/misty-habit-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "test": "node --test adapter.node-test.mjs",
+    "start": "node server.mjs",
+    "manifest": "node sign-manifest.mjs"
+  },
+  "dependencies": {
+    "@misty/contracts": "file:../../packages/contracts",
+    "@misty/sdk": "file:../../packages/sdk"
+  }
+}

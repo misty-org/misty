@@ -114,3 +114,31 @@ Forgetting removes future saved access while already-open grants remain valid un
 Code uses `misty.code.lsp` with owned folder grants. `misty.code.rewrite` delegates model access to the host; the component never receives model credentials. `misty.code.cancelRewrite` cancels a request belonging to that view. Code preferences, model settings and Terminal placement use the scoped `misty.code` controls. These controls are restricted to the official Code app for v0.1.0.
 
 Editors call `misty.workspace.setUnsavedChanges(true)` while they have unsaved buffers and clear it after saving. Misty keeps executing app versions fixed until their views close; package and host updates require an explicit install action after closing app tabs.
+
+### Capability execution helpers
+
+`misty.capabilities.discoverAll()` iterates every authorized provider page. Use
+`invokeAndWait(invocation, { signal })` to submit a stable `requestId` and observe
+its result. It returns when work completes or needs approval, a device, or user
+intervention; it never grants approval itself. Reuse the original request ID when
+recovering a lost response.
+
+`waitForResult(requestId, { deadline, signal })` observes existing work without
+resubmitting it. Its abort signal stops observation only. Aborting
+`invokeAndWait` requests cancellation of the admitted work. A cancellation
+request or polling timeout does not prove that an external effect stopped: read
+the saved result and preserve `uncertain`, partial, and waiting outcomes.
+
+### Routine definitions
+
+`defineMistyRoutine` validates an immutable routine draft using the exported
+`MistyRoutineDefinitionSchema`. Drafts name exact capability, provider and target
+versions and use explicit literal/reference expressions; strings in reference
+paths select object keys and numbers select array indexes. Defining a draft does
+not save it, enable it or grant permissions.
+
+The contracts also export execution, draft, manual-run and outcome schemas for
+trusted Misty controls. Account routine controls are deliberately excluded from
+app RPC. The current execution adapter supports deterministic backend capability
+steps; agent steps, timed waits, automatic triggers and routine enablement remain
+host/control-plane work.

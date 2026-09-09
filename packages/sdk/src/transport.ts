@@ -1,6 +1,8 @@
+import type { MistyFileWorkspaceOptions, MistyFileWorkspaceMount } from "./file-system.js";
 import type { MistySurfaceAdapter } from "./surfaces.js";
 /** Host-owned transport injected into a component; never an account credential. */
 export interface MistyAppTransport {
+  mountFileWorkspace?(root: HTMLElement, options: MistyFileWorkspaceOptions): Promise<MistyFileWorkspaceMount>;
   /** Available only in trusted component runtimes; never exposes host stores. */
   registerSurface?(adapter: MistySurfaceAdapter): Promise<() => void>;
   request(message: { method: string; params?: unknown }): Promise<unknown>;

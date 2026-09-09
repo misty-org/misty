@@ -93,18 +93,6 @@ export type CreatorAgentContextReference = z.output<
 >;
 
 // space_tasks_space_task.go
-export const SpaceTaskAgentRunInputSchema = z.looseObject({
-  mode: z.string().optional(),
-  context_references: z
-    .array(CreatorAgentContextReferenceSchema)
-    .nullable()
-    .optional(),
-});
-export type SpaceTaskAgentRunInput = z.output<
-  typeof SpaceTaskAgentRunInputSchema
->;
-
-// space_tasks_space_task.go
 export const SpaceTaskSchema = z.looseObject({
   id: z.string(),
   space_id: z.string(),
@@ -116,8 +104,6 @@ export const SpaceTaskSchema = z.looseObject({
   priority: z.string(),
   rank: z.number().int(),
   assignee_user_id: z.string().optional(),
-  assignee_agent_id: z.string().optional(),
-  agent_run: SpaceTaskAgentRunInputSchema.nullable().optional(),
   due_at: z.string().nullable().optional(),
   due_timezone: z.string(),
   source_refs: z.json(),
@@ -337,30 +323,7 @@ export const JournalTicketSchema = z.looseObject({
 });
 export type JournalTicket = z.output<typeof JournalTicketSchema>;
 
-export const SpaceAgentMembershipSchema = z.looseObject({
-  id: z.string(),
-  space_id: z.string(),
-  agent_id: z.string(),
-  owner_user_id: z.string(),
-  can_control: z.boolean(),
-  name: z.string(),
-  description: z.string(),
-  icon: z.string(),
-  avatar: z.json(),
-  instructions: z.string().optional(),
-  model_id: z.string().optional(),
-  reasoning_effort: z.string().optional(),
-  default_run_mode: z.string(),
-  enabled: z.boolean(),
-  version: z.number().int(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  work_state: z.string(),
-  attention_count: z.number().int(),
-  last_activity_at: z.string().nullable().optional(),
-  current_task_id: z.string().optional(),
-});
-export type SpaceAgentMembership = z.output<typeof SpaceAgentMembershipSchema>;
+
 
 export const SpaceTaskActivitySchema = z.looseObject({
   id: z.string(),

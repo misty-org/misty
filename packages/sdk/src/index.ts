@@ -1,4 +1,9 @@
+import { createFileSystemSDK, type MistyFileSystemSDK } from "./file-system.js";
+export * from "./file-system.js";
 import { createCodeControlsSDK } from "./code-controls.js";
+import { createCapabilitiesSDK, type MistyCapabilitiesSDK } from "./capabilities.js";
+export * from "./capabilities.js";
+export * from "./routines.js";
 import {createAgentsSDK,type MistyAgentsSDK} from "./agents.js";
 import {createSocialSDK,type MistySocialSDK} from "./social.js";
 import {createLibrarySDK,type MistyLibrarySDK} from "./library.js";
@@ -84,6 +89,8 @@ export interface MistyAppRuntimeIdentity {
 }
 
 export interface MistyAppDefinition {
+  /** Declarative only; the verified installation must authorize these providers. */
+  capabilities?: import("@misty/contracts").MistyCapabilityManifest;
   mount(input: {
     readonly root: HTMLElement;
     readonly misty: MistyAppSDK;
@@ -148,6 +155,8 @@ export interface MistyDownloadJob {
   } | null;
 }
 export interface MistyAppSDK extends MistyAppUiSDK {
+  readonly fileSystem: MistyFileSystemSDK;
+ readonly capabilities: MistyCapabilitiesSDK;
  readonly agents:MistyAgentsSDK;
  readonly library:MistyLibrarySDK;
  readonly social:MistySocialSDK;
@@ -388,6 +397,8 @@ export function createMistyAppSDK(transport: MistyAppTransport): MistyAppSDK {
   });
   const server = createServerSDK(call);
   const sdk = Object.freeze({
+    fileSystem: createFileSystemSDK(call, transport),
+    capabilities: createCapabilitiesSDK(server),
     ...createAppUiSDK(call, transport),
     surfaces: {
       register: async (adapter: MistySurfaceAdapter) => {

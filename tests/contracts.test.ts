@@ -27,7 +27,8 @@ const note = {
 };
 describe("public app contracts", () => {
   it("preserves named protocol 2 methods and binds the Space on the server", () => {
-    expect(Object.keys(mistyServerMethods)).toHaveLength(74);
+    expect(Object.keys(mistyServerMethods)).toHaveLength(82);
+    expect(Object.keys(mistyServerMethods).some((method) => method.startsWith("sources."))).toBe(false);
     expect(
       parseAppRpcRequest(
         {

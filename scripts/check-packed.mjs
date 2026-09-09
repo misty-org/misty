@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -31,9 +31,15 @@ try {
     assert.equal(defineComponentApp({ appId: 'journal', protocol: 2, mount: () => ({ update() {}, unmount() {} }) }).appId, 'journal');
   `);
   execFileSync(process.execPath, ['check.mjs'], { cwd: directory, stdio: 'pipe' });
+  const sample = resolve(directory, 'habit-tracker');
+  mkdirSync(sample);
+  for (const file of readdirSync(resolve(root, 'examples/habit-tracker')).filter(file => file.endsWith('.mjs'))) {
+    copyFileSync(resolve(root, 'examples/habit-tracker', file), resolve(sample, file));
+  }
+  execFileSync(process.execPath, ['--test', 'adapter.node-test.mjs'], { cwd: sample, stdio: 'pipe' });
   const lock = readFileSync(resolve(directory, 'package-lock.json'), 'utf8');
   if (/misty-server|misty-apps|misty-org/.test(lock)) throw new Error('A packed consumer references private source');
-  console.log('Packed SDK and contracts work in an isolated consumer without private source or workspace links.');
+  console.log('Packed SDK, contracts and independent habit adapter pass in an isolated consumer without private source or workspace links.');
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }

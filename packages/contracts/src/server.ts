@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mistyCapabilityServerContracts } from "./capabilities.js";
 import { mistyJournalAssetServerContracts } from "./journal-assets.js";
 import { mistyPlannerContracts } from "./planner.js";
 import { mistyConnectionContracts } from "./connections.js";
@@ -27,6 +28,7 @@ const list = <K extends string, T extends z.ZodType>(key: K, schema: T) =>
 
 /** Only app capabilities belong here. Host credentials and administrative routes are excluded. */
 export const mistyServerContracts = {
+  ...mistyCapabilityServerContracts,
   ...mistyPlannerContracts,
   ...mistyJournalAssetServerContracts,
   ...mistyConnectionContracts,
@@ -43,7 +45,6 @@ export const mistyServerContracts = {
     params: input.EmptyParamsSchema,
     result: z.looseObject({
       members: z.array(model.SpaceMemberSchema).nullable(),
-      agents: z.array(model.SpaceAgentMembershipSchema).nullable(),
     }),
   },
   "notes.list": {
@@ -318,20 +319,23 @@ export function parseAppRpcRequest(value: unknown, boundSpaceId: string) {
   if (!isMistyServerMethod(method))
     throw new MistyContractError("unsupported_method", "Unknown Misty method.");
   const parsed = parseMethodParams(method, envelope.data.params);
-  const requestedSpaceId = parsed.path?.spaceID;
+  const path = "path" in parsed ? parsed.path : undefined;
+  const requestedSpaceId = path && "spaceID" in path ? path.spaceID : undefined;
   if (requestedSpaceId && requestedSpaceId !== boundSpaceId)
     throw new MistyContractError(
       "space_mismatch",
       "This method belongs to another Space.",
     );
-  if (!input.IdentifierSchema.safeParse(boundSpaceId).success)
+  if (mistyServerContracts[method].path.includes("{spaceID}") && !input.IdentifierSchema.safeParse(boundSpaceId).success)
     throw new MistyContractError(
       "invalid_params",
       "A Space-bound App session is required.",
     );
+  const normalizedPath: Record<string, string | undefined> = { ...path };
+  if (boundSpaceId) normalizedPath.spaceID = boundSpaceId;
   return {
     protocol: MISTY_APP_PROTOCOL_VERSION,
     method,
-    params: { ...parsed, path: { ...parsed.path, spaceID: boundSpaceId } },
+    params: { ...parsed, path: normalizedPath },
   };
 }
