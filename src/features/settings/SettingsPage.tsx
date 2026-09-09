@@ -14,6 +14,7 @@ import {
   Lock,
   MessageCircle,
   Rows3,
+  UserRound,
   Server,
   Settings2,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { ComingSoonSurface } from "@/shared/ui";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
 import { AdvancedSection } from "./sections/AdvancedSection";
+import { AccountSection } from "./sections/AccountSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { MistySection } from "./sections/MistySection";
@@ -83,6 +85,13 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     icon: Rows3,
     group: "preferences",
     Component: GeneralSection,
+  },
+  {
+    id: "account",
+    label: "Account",
+    icon: UserRound,
+    group: "preferences",
+    Component: AccountSection,
   },
   {
     id: "appearance",

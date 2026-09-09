@@ -1,7 +1,9 @@
-import type { AgentUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import type { AgentUsage, BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import { useEffect, useState } from "react";
 import {
   fetchAgentUsage,
+  fetchBillingUsage,
+  getCachedBillingUsage,
   getCachedAgentUsage,
   isAgentUsageStale,
   subscribeUsageCache,
@@ -53,6 +55,25 @@ export function useAgentUsage(ready: boolean): AgentUsage | null {
       unsubscribe();
       clearInterval(interval);
       window.removeEventListener("misty:space-agent-run-event", reloadWhenRunSettles);
+    };
+  }, [ready]);
+
+  return usage;
+}
+
+/** Full personal and per-Space quota response. */
+export function useBillingUsage(ready: boolean): BillingUsage | null {
+  const [usage, setUsage] = useState<BillingUsage | null>(() => getCachedBillingUsage());
+
+  useEffect(() => {
+    if (!ready) return;
+    const unsubscribe = subscribeUsageCache(() => setUsage(getCachedBillingUsage()));
+    if (isAgentUsageStale()) void fetchBillingUsage();
+    else setUsage(getCachedBillingUsage());
+    const interval = setInterval(() => void fetchBillingUsage(true), USAGE_CACHE_TTL_MS);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
     };
   }, [ready]);
 

@@ -13,6 +13,8 @@ export {
 export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
 export { canonicalSpaceRoute } from "./spaceRouteNormalization";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
+export { useBillingUsage } from "./components/spacePanel/useAgentUsage";
+export { formatStorageBytes } from "./components/spacePanel/storageFormat";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";
 export { SpaceSidebarSection } from "./components/SpaceSidebarSection";
