@@ -344,6 +344,7 @@ function deferred<T>() {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-default",
+    is_default: false,
     owner_user_id: "owner",
     name: "Default space",
     role: "owner",

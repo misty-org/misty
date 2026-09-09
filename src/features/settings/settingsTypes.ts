@@ -10,6 +10,7 @@ import type {
 import { type LucideIcon } from "lucide-react";
 
 export type SettingsSection =
+  | "account"
   | "general"
   | "appearance"
   | "notifications"

@@ -1,20 +1,12 @@
 import { useAuth } from "@/features/auth";
-import { SpaceDrawings } from "@/features/drawings";
 import { HomeDashboard } from "@/features/home";
-import { SpaceNotes } from "@/features/notes";
-import { SpaceLibrary } from "@/features/spaces/library";
-import { SpacePlanner } from "@/features/spaces/planner";
-import { isWebBuild } from "@/shared/platform/buildTarget";
-import { Button, DesktopAccessState, EmptyState, PermissionState } from "@/shared/ui";
+import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { SpaceSocial } from "./chat/SpaceChatEntry";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
-import { canOpenMistySpaceSection } from "./mistySpace";
 import { useSpacesStore } from "./store/useSpacesStore";
-import { socialProvider } from "./social/socialRoute";
 
 /**
  * One Space section, rendered from props rather than the router.
@@ -31,15 +23,14 @@ export function SpaceSectionView(props: {
   studioKind?: string;
   workspaceTabId?: string;
 }) {
-  const { spaceId, section, studioKind = "", workspaceTabId } = props;
+  const { spaceId, section, studioKind = "" } = props;
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { spaces, snapshotReady, referenceOnly, loading, error, load, loadSpace } = useSpacesStore(
+  const { spaces, snapshotReady, loading, error, load, loadSpace } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
       snapshotReady: state.snapshotReady,
-      referenceOnly: state.referenceOnly,
       loading: state.loading,
       error: state.error,
       load: state.load,
@@ -98,88 +89,23 @@ export function SpaceSectionView(props: {
     );
   }
 
-  if (!canOpenMistySpaceSection(space, section)) {
-    return (
-      <PermissionState
-        className="h-full"
-        title="Not available in this Space"
-        description="You do not have permission to open this section."
-      />
-    );
-  }
-
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       {section === "home" ? (
         <HomeDashboard key={`home:${spaceId}`} spaceId={spaceId} />
-      ) : section === "library" ? (
-        isWebBuild ? (
-          <DesktopAccessState feature="Space Library" />
-        ) : space.permissions?.["library.view"] === false ? (
-          <SpacePermissionDenied
-            title="Library access required"
-            detail="You do not have permission to view this Space's Library."
-          />
-        ) : (
-          <SpaceLibrary
-            key={`library:${spaceId}`}
-            spaceId={spaceId}
-            workspaceTabId={workspaceTabId}
-          />
-        )
-      ) : section === "planner" ? (
-        space.permissions?.["tasks.view"] === false ? (
-          <SpacePermissionDenied
-            title="Planner access required"
-            detail="Ask a Space owner to grant Planner access."
-          />
-        ) : (
-          <SpacePlanner
-            key={`planner:${spaceId}`}
-            spaceId={spaceId}
-            canManage={!referenceOnly && space.permissions?.["tasks.manage"] !== false}
-            canManageIntegrations={!referenceOnly && space.role === "owner"}
-            workspaceTabId={workspaceTabId}
-          />
-        )
-      ) : section === "notes" ? (
-        <SpaceNotes
-          key={`notes:${spaceId}`}
-          spaceId={spaceId}
-          spaceName={space.name}
-          workspaceTabId={workspaceTabId}
-        />
-      ) : section === "drawings" ? (
-        <SpaceDrawings
-          key={`drawings:${spaceId}`}
-          spaceId={spaceId}
-          drawingId={studioKind}
-          workspaceTabId={workspaceTabId}
-        />
       ) : section === "settings" ? (
         <SpaceSettings
           key={`settings:${spaceId}:${studioKind}`}
           spaceId={spaceId}
           section={studioKind}
         />
-      ) : space.permissions?.["messages.read"] === false ? (
-        <SpacePermissionDenied
-          title="Social access required"
-          detail="You do not have permission to read this Space's conversations."
-        />
       ) : (
-        <SpaceSocial
-          key={`social:${spaceId}:${socialProvider(studioKind) ?? "misty"}`}
-          spaceId={spaceId}
-          spaceName={space.name}
-          provider={socialProvider(studioKind) ?? "misty"}
-          workspaceTabId={workspaceTabId}
+        <EmptyState
+          className="h-full"
+          title="This view moved to Apps"
+          description="Open the corresponding App from the navbar or Discover. Legacy Space tool routes are no longer supported."
         />
       )}
     </div>
   );
-}
-
-function SpacePermissionDenied({ title, detail }: { title: string; detail: string }) {
-  return <PermissionState className="h-full" title={title} description={detail} />;
 }

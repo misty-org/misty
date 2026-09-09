@@ -4,7 +4,7 @@
 
 ## Platform
 
-web
+adaptive
 
 ## Users
 
@@ -20,23 +20,25 @@ Spaces are collaborative contexts where humans and agents cooperate through shar
 
 ## Positioning
 
-Misty holds a goal together across people, AI collaborators, shared context, and personal tools. Its differentiating mechanism is a unified, split-capable workspace in which collaborative Spaces and private execution surfaces coexist without obscuring their context or permission boundaries.
+Misty holds a goal together across people, AI collaborators, shared context, and personal tools. Its differentiating mechanism is one workspace model with platform-appropriate shells: a split-capable desktop workspace and a single-surface mobile projection that preserve the same collaborative context and permission boundaries.
 
 ## Operating Context
 
-People use Misty for schoolwork, creative projects, community or club coordination, planning with friends, client work, and everyday personal goals. A typical session moves between a Space and tools such as the Inbox, Browser, Files, Journal, Planner, Terminal, or Code, often with several resizable panes open for comparison and execution.
+People use Misty for schoolwork, creative projects, community or club coordination, planning with friends, client work, and everyday personal goals. A desktop session may compare several resizable panes. On iPhone and iPad, people move through the same Space and tabs one surface at a time, with Code, Terminal, and Transfers opened on a paired online desktop when needed.
 
 Users need a fast global launcher to find or open the right tool without reorganizing the left navigation. The Browser supports normal signed-in browsing and bounded delegation to an agent in the same session. Files combines local files with supported connected storage. Space Libraries contain intentionally shared project resources rather than acting as raw file browsers.
 
 ## Capabilities and Constraints
 
-- Misty is a React application rendered in a Tauri shell with a Rust core. The same interface targets desktop, iPad, and Android tablets; the browser build is a server-backed companion that gates local-device capabilities.
-- The workspace supports multiple simultaneous, resizable panes rather than a single fixed utility panel.
+- Misty is a React application rendered in a Tauri shell with a Rust core. Desktop and mobile share feature state and design tokens but use dedicated platform shells; the browser build is a server-backed companion that gates local-device capabilities.
+- Desktop supports simultaneous resizable panes and virtual windows. Native mobile shows one projected workspace tab at a time and never rewrites the desktop layout tree.
+- The universal iOS app supports iPhone and iPad on iOS 15+. iPad uses a persistent sidebar at wide multitasking widths and the compact bottom navigation at narrower widths.
+- Downloadable extensions, extension apps, and the Store are unavailable on native mobile. Their routes return to the active Space Home without loading extension APIs.
 - Browser, terminal, code, and Files are private by default. Sharing their output or context into a Space must be explicit.
 - Agents act only through granted capabilities and current user or Space permissions. Destructive, external, and sensitive actions require an inline approval associated with the triggering run.
 - Browser sessions may contain sensitive cookies, credentials, and personal data. Agent access must be scoped, visible, revocable, and auditable; authentication state must never be silently copied into a shared Space.
 - A quick-open launcher should switch to an existing surface or open a new one without requiring left-navigation changes.
-- Phone-sized iOS and Android devices are not supported.
+- iPhone is supported. Android phone packaging and Play Store hardening are not part of the Apple-first mobile release.
 
 ## Brand Commitments
 
@@ -66,4 +68,4 @@ No user research, testimonials, or measured evidence for the unified workspace m
 
 ## Accessibility & Inclusion
 
-Workspace switching and pane management must be fully keyboard operable, expose clear focus state and pane identity, preserve readable minimum sizes, and respect reduced-motion preferences. Desktop and tablet interaction must not rely on hover alone. Text and essential controls must retain usable contrast across the dark tonal hierarchy.
+Desktop workspace switching and pane management must be fully keyboard operable and expose clear focus state and pane identity. Mobile must provide at least 44×44px touch targets, 16px inputs, safe-area handling, rotation support, VoiceOver order and labels, large-text behavior, reduced motion, and no hover-only action. Text and essential controls must retain usable contrast across the dark tonal hierarchy.

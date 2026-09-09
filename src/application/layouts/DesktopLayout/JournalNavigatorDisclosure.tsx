@@ -1,4 +1,3 @@
-import { rememberedJournalRoute } from "@/features/spaces";
 import { DrawingsDestinationIcon, NotesDestinationIcon } from "./NavigatorDestinationIcons";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
@@ -16,13 +15,13 @@ export function JournalNavigatorDisclosure(props: {
       id: "notes" as const,
       label: "Notes",
       icon: NotesDestinationIcon,
-      path: rememberedJournalRoute(props.accountId, props.spaceId, "notes"),
+      path: appView(props.path, "notes"),
     },
     {
       id: "drawings" as const,
       label: "Drawings",
       icon: DrawingsDestinationIcon,
-      path: rememberedJournalRoute(props.accountId, props.spaceId, "drawings"),
+      path: appView(props.path, "drawings"),
     },
   ];
 
@@ -41,11 +40,16 @@ export function JournalNavigatorDisclosure(props: {
 
 function journalDestinationFromRoute(route: string): JournalDestinationId {
   try {
-    return new URL(route, "https://misty.local").pathname.split("/").filter(Boolean)[2] ===
-      "drawings"
+    return new URL(route, "https://misty.local").searchParams.get("view") === "drawings"
       ? "drawings"
       : "notes";
   } catch {
     return "notes";
   }
+}
+
+function appView(route: string, view: JournalDestinationId) {
+  const url = new URL(route, "https://misty.local");
+  url.searchParams.set("view", view);
+  return `${url.pathname}${url.search}`;
 }

@@ -74,6 +74,7 @@ describe("useWorkspaceStore - space scoping", () => {
       route: "/inbox",
     });
     expect(dockTabs(useWorkspaceStore.getState().layout.root).map((t) => t.surfaceId)).toEqual([
+      "space",
       "inbox",
     ]);
 
@@ -90,7 +91,7 @@ describe("useWorkspaceStore - space scoping", () => {
     // 3. Switch back to Space A
     useWorkspaceStore.getState().setScope("space:space-a");
     const tabsInA = dockTabs(useWorkspaceStore.getState().layout.root);
-    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["inbox"]);
-    expect(tabsInA[0].id).toBe(inboxTab.id);
+    expect(tabsInA.map((t) => t.surfaceId)).toEqual(["space", "inbox"]);
+    expect(tabsInA.find((tab) => tab.surfaceId === "inbox")?.id).toBe(inboxTab.id);
   });
 });

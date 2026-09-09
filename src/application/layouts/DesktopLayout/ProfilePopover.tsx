@@ -5,13 +5,17 @@ import { Button } from "@/shared/ui";
 import {
   Check,
   ChevronRight,
+  Compass,
   ExternalLink,
+  LogIn,
   LogOut,
   Plus,
   Repeat2,
   UserCircle,
   X,
 } from "lucide-react";
+import { routes } from "@/features/app-shell";
+import { useTourStore } from "@/features/tour";
 import type { CSSProperties, RefObject } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -256,53 +260,82 @@ export function ProfilePopover(props: {
           </span>
         </div>
         <div className="grid gap-1 py-2">
-          <Button
-            className={profileMenuItemClass}
-            type="button"
-            role="menuitem"
-            onClick={openAccountSettings}
-          >
-            <UserCircle size={18} strokeWidth={2} />
-            <span>Account settings</span>
-            {/* This leaves the app for the browser, so say so rather than
-                surprising people with a new window. */}
-            <ExternalLink size={13} className="ml-auto text-cream-muted" aria-hidden="true" />
-            <span className="sr-only">(opens in your browser)</span>
-          </Button>
-          <Button
-            ref={switchAccountsRef}
-            className={[
-              profileMenuItemClass,
-              accountChooserOpen ? "bg-charcoal-active text-cream" : "",
-            ].join(" ")}
-            type="button"
-            role="menuitem"
-            aria-haspopup="menu"
-            aria-expanded={accountChooserOpen}
-            disabled={transitioning}
-            onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
-          >
-            <Repeat2 size={18} strokeWidth={2} />
-            <span>Switch accounts</span>
-            <ChevronRight
-              size={14}
-              className={accountChooserOpen ? "text-cream" : "text-cream-muted"}
-            />
-          </Button>
-          <Button
-            className={[
-              profileMenuItemClass,
-              "text-cream-bright hover:text-cream-bright",
-              "hover:text-cream-bright",
-            ].join(" ")}
-            type="button"
-            role="menuitem"
-            disabled={transitioning}
-            onClick={signOut}
-          >
-            <LogOut size={18} strokeWidth={2} />
-            <span>Log out</span>
-          </Button>
+          {!account ? (
+            <Button
+              className={profileMenuItemClass}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                props.onClose();
+                navigate(routes.signIn);
+              }}
+            >
+              <LogIn size={18} strokeWidth={2} />
+              <span>Sign in</span>
+            </Button>
+          ) : (
+            <>
+              <Button
+                className={profileMenuItemClass}
+                type="button"
+                role="menuitem"
+                onClick={openAccountSettings}
+              >
+                <UserCircle size={18} strokeWidth={2} />
+                <span>Account settings</span>
+                {/* This leaves the app for the browser, so say so rather than
+                    surprising people with a new window. */}
+                <ExternalLink size={13} className="ml-auto text-cream-muted" aria-hidden="true" />
+                <span className="sr-only">(opens in your browser)</span>
+              </Button>
+              <Button
+                className={profileMenuItemClass}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  props.onClose();
+                  useTourStore.getState().resetTour(account?.id);
+                }}
+              >
+                <Compass size={18} strokeWidth={2} />
+                <span>Take app tour</span>
+              </Button>
+              <Button
+                ref={switchAccountsRef}
+                className={[
+                  profileMenuItemClass,
+                  accountChooserOpen ? "bg-charcoal-active text-cream" : "",
+                ].join(" ")}
+                type="button"
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={accountChooserOpen}
+                disabled={transitioning}
+                onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
+              >
+                <Repeat2 size={18} strokeWidth={2} />
+                <span>Switch accounts</span>
+                <ChevronRight
+                  size={14}
+                  className={accountChooserOpen ? "text-cream" : "text-cream-muted"}
+                />
+              </Button>
+              <Button
+                className={[
+                  profileMenuItemClass,
+                  "text-cream-bright hover:text-cream-bright",
+                  "hover:text-cream-bright",
+                ].join(" ")}
+                type="button"
+                role="menuitem"
+                disabled={transitioning}
+                onClick={signOut}
+              >
+                <LogOut size={18} strokeWidth={2} />
+                <span>Log out</span>
+              </Button>
+            </>
+          )}
         </div>
       </div>
       {accountChooserOpen ? (

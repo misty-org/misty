@@ -1,4 +1,5 @@
-import { assistantApi, type FrontierModel, type FrontierModelCatalog } from "@/api/assistant/api";
+import { runtimeAssistantApi as assistantApi } from "@/features/agents/agentsRuntime";
+import { type FrontierModel, type FrontierModelCatalog } from "@/api/assistant/api";
 import {
   Button,
   DropdownMenu,

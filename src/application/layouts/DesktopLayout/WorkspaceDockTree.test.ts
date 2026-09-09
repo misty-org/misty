@@ -7,7 +7,7 @@ describe("workspace tab groups", () => {
     const tabs = [
       spaceTab("journal", "Journal", "/spaces/one/notes"),
       spaceTab("planner", "Planner", "/spaces/one/planner/tasks/board"),
-      spaceTab("social", "Social", "/spaces/one/social"),
+      spaceTab("social", "Chat", "/spaces/one/social"),
       spaceTab("library", "Library", "/spaces/one/library"),
     ];
 
@@ -31,7 +31,7 @@ describe("workspace tab groups", () => {
         surfaceId: "space",
         label: "Social",
         contextLabel: "Space · Social",
-        tabs: [{ id: "tab:social", title: "Social" }],
+        tabs: [{ id: "tab:social", title: "Chat" }],
       },
       {
         key: "space:one:library",
@@ -47,7 +47,7 @@ describe("workspace tab groups", () => {
     const tabs = [
       spaceTab("journal", "Journal", "/spaces/one/notes"),
       spaceTab("planner", "Planner", "/spaces/one/planner/tasks/board"),
-      spaceTab("social", "Social", "/spaces/one/social"),
+      spaceTab("social", "Chat", "/spaces/one/social"),
       spaceTab("library", "Library", "/spaces/one/library"),
     ].map((tab) => ({ ...tab, groupKey: "space:one" as const }));
 
@@ -76,7 +76,7 @@ describe("workspace tab groups", () => {
     ]);
   });
 
-  it("labels persisted catalog tabs as Store", () => {
+  it("labels persisted catalog tabs as Discover", () => {
     const tabs: WorkspaceTab[] = [
       {
         ...browserTab("store", "Legacy catalog", ""),
@@ -88,8 +88,8 @@ describe("workspace tab groups", () => {
 
     expect(groupTabs(tabs)[0]).toMatchObject({
       surfaceId: "marketplace",
-      label: "Store",
-      contextLabel: "Store",
+      label: "Discover",
+      contextLabel: "Discover",
     });
   });
 

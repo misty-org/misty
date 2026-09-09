@@ -54,6 +54,7 @@ export const usePluginsStore = create<PluginsStore>((set, get) => ({
         url: plugin.artifact.url,
         platform: plugin.artifact.platform,
         sha256,
+        version: plugin.catalog_version ?? plugin.version,
       });
       set({ actionPluginId: "", notice: result });
       await rebuildCatalogState(set, get, {

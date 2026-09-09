@@ -237,15 +237,69 @@ export function prefer<T>(primary: T | undefined, fallback: T): T {
   return primary ?? fallback;
 }
 
+type ComparableVersion = {
+  core: number[];
+  prerelease: Array<number | string>;
+};
+
+function comparableVersion(value: string): ComparableVersion | null {
+  const match = value
+    .trim()
+    .match(
+      /^v?(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:\.(0|[1-9]\d*))?(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/,
+    );
+  if (!match) return null;
+  return {
+    core: [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)],
+    prerelease: match[4]
+      ? match[4].split(".").map((part) => (/^(0|[1-9]\d*)$/.test(part) ? Number(part) : part))
+      : [],
+  };
+}
+
+export function isCatalogVersionNewer(installed: string, catalog: string) {
+  const current = comparableVersion(installed);
+  const available = comparableVersion(catalog);
+  if (!current || !available) return false;
+
+  for (let index = 0; index < current.core.length; index += 1) {
+    if (available.core[index] !== current.core[index]) {
+      return available.core[index] > current.core[index];
+    }
+  }
+  if (current.prerelease.length === 0 || available.prerelease.length === 0) {
+    return current.prerelease.length > 0 && available.prerelease.length === 0;
+  }
+  const length = Math.max(current.prerelease.length, available.prerelease.length);
+  for (let index = 0; index < length; index += 1) {
+    const currentPart = current.prerelease[index];
+    const availablePart = available.prerelease[index];
+    if (currentPart === undefined) return true;
+    if (availablePart === undefined) return false;
+    if (currentPart === availablePart) continue;
+    if (typeof currentPart === "number" && typeof availablePart === "string") return true;
+    if (typeof currentPart === "string" && typeof availablePart === "number") return false;
+    return availablePart > currentPart;
+  }
+  return false;
+}
+
 export function toPluginEntry(
   catalog: PluginCatalogEntry,
   local: LocalPluginRecord | undefined,
   platform: string,
 ): PluginEntry {
+  const installedVersion = prefer(local?.version, catalog.version);
+  const artifact = defaultArtifact(catalog, platform);
+  const updateAvailable = Boolean(
+    local?.installed && artifact && isCatalogVersionNewer(installedVersion, catalog.version),
+  );
   return {
     id: catalog.id,
     name: prefer(local?.name, catalog.name),
-    version: prefer(local?.version, catalog.version),
+    version: installedVersion,
+    catalog_version: local ? catalog.version : undefined,
+    update_available: updateAvailable,
     author: prefer(local?.author, catalog.author),
     overview: prefer(local?.overview, catalog.overview),
     status: local ? (local.enabled ? "installed" : "disabled") : catalog.status,
@@ -271,6 +325,6 @@ export function toPluginEntry(
         local?.launcher.requires_selected_file ?? catalog.launcher.requires_selected_file,
       open_mode: prefer(local?.launcher.open_mode, catalog.launcher.open_mode),
     },
-    artifact: defaultArtifact(catalog, platform),
+    artifact,
   };
 }

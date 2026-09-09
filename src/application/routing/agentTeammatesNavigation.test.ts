@@ -6,7 +6,6 @@ describe("first-class Agent navigation", () => {
     expect(desktopNavItems.map((item) => item.id)).toEqual([
       "home",
       "files",
-      "transfers",
       "agents",
       "marketplace",
     ]);
@@ -19,9 +18,8 @@ describe("first-class Agent navigation", () => {
     expect(desktopRouteIdFromPath("/agents")).toBe("agents");
     expect(desktopRouteIdFromPath("/assistant")).toBe("agents");
     expect(desktopRouteIdFromPath("/code")).toBe("code");
-    expect(desktopRouteIdFromPath("/store")).toBe("marketplace");
-    expect(desktopRouteIdFromPath("/marketplace")).toBe("marketplace");
-    expect(desktopRouteIdFromPath("/transfers")).toBe("transfers");
+    expect(desktopRouteIdFromPath("/discover")).toBe("marketplace");
+    expect(desktopRouteIdFromPath("/transfers")).toBe("files");
   });
 });
 expect(desktopRouteIdFromPath("/home")).toBe("home");

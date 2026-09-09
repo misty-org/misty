@@ -1,14 +1,13 @@
-import { applyAgentRunEvent } from "./agent-run-events";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
-import { mergeSpaceMessages, messageFromSpaceEvent } from "@/features/spaces/chat";
+import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import type { SpaceEvent } from "@/api/spaces/dto/interfaces/types";
 import { readRealtimeCursor, writeRealtimeCursor } from "@/api/spaces/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
 import type { RealtimeEnvelope } from "../model/stores/spaces/types/useSpacesBackendStore";
-export { buildMessageSpans } from "@/features/spaces/chat";
+export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;
@@ -217,12 +216,7 @@ export async function applyRealtimeEvent(
       }));
       await get().loadInbox();
     } else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
-  } else if (event.type.startsWith("agent.run.")) {
-    applyAgentRunEvent(event, set);
-    window.dispatchEvent(new CustomEvent("misty:space-agent-run-event", { detail: event }));
-  } else if (event.type.startsWith("action_suggestion."))
-    window.dispatchEvent(new CustomEvent("misty:space-action-suggestion-event", { detail: event }));
-  else if (event.type.startsWith("conversation."))
+  } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
     await get().loadNodes(event.space_id);

@@ -82,6 +82,8 @@ export type PluginEntry = {
   id: string;
   name: string;
   version: string;
+  catalog_version?: string;
+  update_available: boolean;
   author: string;
   overview: string;
   status: string;

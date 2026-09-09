@@ -21,7 +21,7 @@ describe("SpaceNavRail", () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture(),
-        spaceFixture({ id: "misty", kind: "standard", name: "Misty" }),
+        spaceFixture({ id: "personal", is_default: true, name: "Personal" }),
         spaceFixture({ id: "space-2", name: "Chen family" }),
       ],
       invitations: [],
@@ -42,7 +42,7 @@ describe("SpaceNavRail", () => {
       ...container.querySelectorAll<HTMLAnchorElement>('[role="group"][aria-label="Spaces"] > a'),
     ];
     expect(links[0]?.getAttribute("aria-label")).toBe("Design team Space");
-    expect(links[1]?.getAttribute("aria-label")).toBe("Misty Space");
+    expect(links[1]?.getAttribute("aria-label")).toBe("Personal (default) Space");
   });
 
   afterEach(async () => {
@@ -148,6 +148,7 @@ describe("SpaceNavRail", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",

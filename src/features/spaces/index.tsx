@@ -5,10 +5,16 @@ export { SpaceAvatar } from "./components/SpaceAvatar";
 export { SpaceManagementNavigation } from "./components/SpaceManagementNavigation";
 export { SpaceRowActions } from "./components/SpaceRowActions";
 export { spaceDestination, spaceLandingRoute } from "./navigation";
-export { canOpenMistySpaceSection, preferredMistySpace } from "./mistySpace";
+export {
+  canManageSpaceLifecycle,
+  preferredDefaultSpace,
+  spaceNavigationName,
+} from "./defaultSpace";
 export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
 export { canonicalSpaceRoute } from "./spaceRouteNormalization";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
+export { useBillingUsage } from "./components/spacePanel/useAgentUsage";
+export { formatStorageBytes } from "./components/spacePanel/storageFormat";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";
 export { SpaceSidebarSection } from "./components/SpaceSidebarSection";
@@ -23,8 +29,8 @@ export {
 } from "./social/socialRoute";
 export type * from "./model/stores/spaces/interfaces/useSpacesStore";
 export type * from "./model/stores/spaces/types/useSpacesBackendStore";
+export type { Space } from "@/api/spaces/dto/interfaces/types";
 export { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
-export * from "./store/agent-run-events";
 export * from "./store/reference-cache";
 export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";
@@ -47,9 +53,6 @@ const LazySpaceInvitationRedemption = lazy(async () => ({
 }));
 const LazySpaceNavRail = lazy(async () => ({
   default: (await import("./components/SpaceNavRail")).SpaceNavRail,
-}));
-const LazyRoadmapDailyMockup = lazy(async () => ({
-  default: (await import("./roadmap/spaceRoadmap/RoadmapDailyMockup")).RoadmapDailyMockup,
 }));
 
 export function SpacesPage() {
@@ -101,14 +104,6 @@ export function SpaceNavRail() {
   return (
     <Suspense fallback={null}>
       <LazySpaceNavRail />
-    </Suspense>
-  );
-}
-
-export function RoadmapDailyMockup() {
-  return (
-    <Suspense fallback={null}>
-      <LazyRoadmapDailyMockup />
     </Suspense>
   );
 }

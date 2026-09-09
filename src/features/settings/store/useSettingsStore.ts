@@ -20,10 +20,11 @@ import type {
   UpdateShortcutRequest,
 } from "@/native/contracts";
 import { configureStartupPreference } from "@/features/app-shell";
-import { configureBrowserHomeUrl, configureBrowserSearchEngine } from "@/features/workspace";
+import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
+import { configureBrowserSearchEngine } from "@/features/workspace/browserSearchEngine";
+import { configureWorkspaceDefaultTab } from "@/features/workspace/workspaceDefaultTab";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
-import { configureExternalLinkPreference } from "@/shared/platform/openExternalLink";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
 import {
@@ -255,6 +256,9 @@ function applySettingsSideEffects(document: Record<string, unknown>): void {
   configureBrowserSearchEngine(
     settingsNumber(document, "general", "browser_search_engine_index", 0),
   );
+  configureWorkspaceDefaultTab(
+    settingsNumber(document, "general", "workspace_default_tab_index", 0),
+  );
   // Mirrored to localStorage: the index route redirects before this document
   // has loaded, so it cannot read the preference from here directly.
   configureStartupPreference({
@@ -281,8 +285,3 @@ export interface SettingsStore {
   reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;
   resetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;
 }
-
-configureExternalLinkPreference(
-  () =>
-    selectGeneralPreferences(useSettingsStore.getState().settings?.document).openLinksExternally,
-);

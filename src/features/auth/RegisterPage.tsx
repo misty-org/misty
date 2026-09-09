@@ -1,4 +1,5 @@
 import { fetchCurrentInstanceDescriptor } from "@/api/deployment/api";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
@@ -8,6 +9,7 @@ import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
+import { markAccountCreating } from "@/features/onboarding";
 import { accountRegister } from "./store/useAccountStore";
 
 export default function RegisterPage() {
@@ -15,7 +17,7 @@ export default function RegisterPage() {
   const location = useLocation();
   const { authenticateAccount } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || "/files";
+  const from = routeState?.from || (isNativeMobileBuild ? "/home" : "/files");
   const addingAccount = Boolean(routeState?.addingAccount);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -47,9 +49,12 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await authenticateAccount(() =>
+      const createdUser = await authenticateAccount(() =>
         accountRegister(name, normalizedUsername, email, password, selfHostToken),
       );
+      if (createdUser?.id) {
+        markAccountCreating(createdUser.id);
+      }
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
@@ -70,7 +75,7 @@ export default function RegisterPage() {
             : "Create an isolated account with an administrator enrollment invitation."
           : addingAccount
             ? "Your current account will remain signed in on this device."
-            : "Sign up to get started."
+            : "Your Misty workspace begins with an account."
       }
       onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
     >

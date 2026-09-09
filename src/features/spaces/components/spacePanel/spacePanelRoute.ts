@@ -1,5 +1,5 @@
 import type { SocialProviderId } from "@/api/social";
-import { spaceNotesEnabled } from "@/features/notes";
+import { spaceNotesEnabled } from "@/features/notes/availability";
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import {

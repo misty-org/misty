@@ -1,15 +1,9 @@
-import {
-  queryIndexedExplorerSearch,
-  querySemanticExplorerSearch,
-  useExplorerStore,
-} from "@/features/files/explorer";
 import { useSpacesStore } from "@/features/spaces";
 import { globalMistyError } from "./globalMistyActions";
 import { globalMistyApi } from "./globalMistyApi";
 import {
   buildLocalIndex,
   fuseRankedResults,
-  mapFileResults,
   searchDocuments,
   searchServerTasks,
 } from "./globalSearchDocuments";
@@ -39,19 +33,7 @@ export async function executeGlobalSearch(
     return;
   }
   const spaces = useSpacesStore.getState().spaces;
-  const explorer = useExplorerStore.getState();
-  const options = { scope: "everything" as const, currentPath: "", limit: 30 };
   const requests: Array<Promise<GlobalSearchDocument[]>> = [];
-  if (filters.source !== "cloud") {
-    requests.push(
-      queryIndexedExplorerSearch(trimmed, options, explorer.library).then((results) =>
-        mapFileResults(results, accountId),
-      ),
-      querySemanticExplorerSearch(trimmed, options).then((results) =>
-        mapFileResults(results, accountId),
-      ),
-    );
-  }
   if (filters.source !== "device") {
     requests.push(
       globalMistyApi

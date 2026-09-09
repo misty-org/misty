@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { compareActivityNewestFirst } from "./activityModel";
 import { publishNativeActivity, syncNativeBadge } from "./nativeNotifications";
 import type { ActivityItem, ActivityTarget, LocalActivityInput } from "./types";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 
 const maximumDeviceItems = 200;
 const maximumKnownSourceIdsPerAccount = 500;
@@ -195,7 +196,7 @@ export const useActivityStore = create<ActivityStore>()(
     {
       name: "misty:activity:v1",
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => (isNativeMobileBuild ? sessionStorage : localStorage)),
       partialize: (state) => ({
         localItems: state.localItems.slice(0, maximumDeviceItems),
         readAtByKey: state.readAtByKey,

@@ -5,7 +5,7 @@ import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
 import { navigatorFocusRingClass } from "./styles";
 
 const controlButtonClass = [
-  "misty-navigator-icon-target grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  "misty-navigator-icon-target grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   navigatorFocusRingClass,
 ].join(" ");

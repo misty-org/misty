@@ -1,8 +1,9 @@
 import { useId } from "react";
 
+import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { cn } from "./utils";
 
-export const mistyRoadmapUrl = "https://mistysys.com/roadmap";
+export const mistyRoadmapUrl = mistyPublicPage("/roadmap");
 
 export function ComingSoonSurface({ className }: { className?: string; feature?: string }) {
   const titleId = useId();

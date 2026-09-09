@@ -1,4 +1,4 @@
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace/core";
 
 const validSpaceSections = new Set([
   "home",

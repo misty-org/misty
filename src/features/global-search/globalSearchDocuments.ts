@@ -5,20 +5,7 @@ import type { SearchResult } from "@/native/contracts";
 import { spacesApi } from "@/api/spaces/api";
 import type { GlobalSearchContextItem, GlobalSearchDocument, GlobalSearchResult } from "./types";
 
-export function globalSearchContext(
-  results: GlobalSearchResult[],
-  limit = 12,
-): GlobalSearchContextItem[] {
-  return results.slice(0, limit).map((result) => ({
-    kind: result.kind,
-    title: result.title,
-    snippet: result.body.slice(0, 280),
-    href: result.href,
-    ...(result.spaceName ? { space: result.spaceName } : {}),
-    source: result.source,
-  }));
-}
-
+export {globalSearchContext} from "./globalSearchContext";
 export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
   const state = useSpacesStore.getState();
   const spacesById = new Map(state.spaces.map((space) => [space.id, space]));
@@ -108,12 +95,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
 
-  for (const [spaceId, resources] of Object.entries(state.agentsBySpace)) {
-    const space = spacesById.get(spaceId);
-    if (!space) continue;
-    for (const resource of resources)
-      documents.push(resourceDocument(accountId, spaceId, space.name, resource, "agent"));
-  }
   for (const [spaceId, resources] of Object.entries(state.workflowsBySpace)) {
     const space = spacesById.get(spaceId);
     if (!space) continue;

@@ -27,8 +27,8 @@ describe("WorkspaceWindowMenu", () => {
       button: 0,
       ctrlKey: false,
     });
-    expect(screen.getByRole("menuitem", { name: "1Writing" })).toBeTruthy();
-    expect(screen.getByRole("menuitem", { name: "2Research" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Writing" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Research" })).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: /New/ }));
     expect(onCreate).toHaveBeenCalledOnce();
 

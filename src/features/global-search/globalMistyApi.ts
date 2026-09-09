@@ -1,4 +1,5 @@
-import { assistantApi, safeAssistantTurnInput } from "@/api/assistant/api";
+import { runtimeAssistantApi as assistantApi } from "@/features/agents/agentsRuntime";
+import { safeAssistantTurnInput } from "@/api/assistant/api-core";
 import type {
   GlobalAiActionProposal,
   GlobalAiCitation,

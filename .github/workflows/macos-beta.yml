@@ -1,0 +1,160 @@
+name: Prepare macOS beta draft
+on:
+  push:
+    branches: [codex/macos-beta-release]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: macos-beta-${{ github.ref }}
+  # Finish architecture/signing evidence; finalization rejects superseded commits.
+  cancel-in-progress: false
+jobs:
+  packages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.pins.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: misty
+          submodules: true
+      - id: pins
+        working-directory: misty
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("release/pins.json")); for(const k of ["sdk","apps"])fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${p[k]}\n`);fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
+      - uses: actions/checkout@v4
+        with:
+          repository: misty-org/misty-sdk
+          ref: ${{ steps.pins.outputs.sdk }}
+          path: misty-sdk
+      - uses: actions/checkout@v4
+        with:
+          repository: misty-org/misty-apps
+          ref: ${{ steps.pins.outputs.apps }}
+          path: misty-apps
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci && npm run check && npm run test:packed
+        working-directory: misty-sdk
+      - run: npm ci
+        working-directory: misty-apps
+      - run: npm ci && npm run typecheck
+        working-directory: misty
+      - name: Verify Code, app installation, and release scripts
+        working-directory: misty
+        run: |
+          npm test -- src/features/coding-workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts src/features/apps/runtimeInspection.test.ts
+          node --test scripts/release/*.test.mjs
+      - name: Package and verify ten signed downloadable apps
+        working-directory: misty
+        env:
+          MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY: ${{ secrets.MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/package-apps.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beta-packages
+          path: misty/artifacts/v${{ steps.pins.outputs.version }}/*
+          if-no-files-found: error
+          retention-days: 30
+  macos:
+    needs: packages
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      MISTY_PUBLIC_API_URL: https://dev-api.mistysys.com/v1
+      MISTY_RELEASE_CHANNEL: beta
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Validate Apple notarization credentials before building
+        env:
+          APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --output-format json > "$RUNNER_TEMP/notary-history.json"
+          rm "$RUNNER_TEMP/notary-history.json"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@1.91.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+          key: beta-${{ matrix.target }}
+      - run: npm ci
+      - name: Load public release trust
+        run: |
+          node --input-type=module -e 'import fs from "node:fs";const t=JSON.parse(fs.readFileSync("release/trust.json"));fs.appendFileSync(process.env.GITHUB_ENV,`MISTY_OFFICIAL_APP_SIGNING_KEY_ID=${t.keyId}\nMISTY_OFFICIAL_APP_PUBLIC_KEY=${t.publicKey}\n`);'
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERT_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/misty-signing.keychain-db"
+          password="$(openssl rand -hex 32)"
+          printf '%s' "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/misty-cert.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/misty-cert.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          rm "$RUNNER_TEMP/misty-cert.p12"
+      - name: Build, sign, and notarize installer and updater
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID }}
+          APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          npm run tauri build -- --target ${{ matrix.target }} --bundles app,dmg --ci
+          node scripts/release/sign-dmg.mjs ${{ matrix.target }}
+      - run: node scripts/release/collect-macos.mjs ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: beta-${{ matrix.target }}
+          path: artifacts/v${{ needs.packages.outputs.version }}/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/misty-signing.keychain-db" || true
+  draft:
+    needs: [packages, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: beta-*
+          path: artifacts/v${{ needs.packages.outputs.version }}
+          merge-multiple: true
+      - name: Create immutable draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release/finalize-draft.mjs

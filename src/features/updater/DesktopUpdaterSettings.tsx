@@ -1,9 +1,11 @@
+import { reserveAppUpdate } from "@/features/apps/appUpdateSafety";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { DesktopSettingsRow, settingsBoolean, useSettingsStore } from "@/features/settings";
+import { settingsBoolean, useSettingsStore } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings/desktop";
 import { SystemErrorActivity } from "@/features/activity";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@/shared/ui";
@@ -85,7 +87,9 @@ export function DesktopUpdaterSettings() {
     setState("installing");
     setError("");
     setProgress(EMPTY_UPDATE_PROGRESS);
+    let releaseUpdate = () => {};
     try {
+      releaseUpdate = reserveAppUpdate();
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));
       });
@@ -94,6 +98,8 @@ export function DesktopUpdaterSettings() {
       setError(readableUpdateError(cause));
       setState("error");
       busyRef.current = false;
+    } finally {
+      releaseUpdate();
     }
   }
 
@@ -115,7 +121,7 @@ export function DesktopUpdaterSettings() {
   return (
     <>
       <DesktopSettingsRow label="Version">
-        <span className="font-mono text-xs text-cream-muted">v{version}-beta</span>
+        <span className="font-mono text-xs text-cream-muted">v{version}</span>
       </DesktopSettingsRow>
       <DesktopSettingsRow label="Release channel">
         <span className="text-sm text-cream">Beta</span>

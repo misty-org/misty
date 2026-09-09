@@ -1,4 +1,5 @@
-import { agentsApi } from "@/api/agents/api";
+import {runtimeAgentsApi as agentsApi} from "@/features/agents/agentsRuntime";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const voiceInputStorageKey = "misty.voice.input-device";
@@ -57,15 +58,6 @@ export function useAiVoiceRecorder({
       // Device discovery can be unavailable until microphone permission is granted.
     }
   }, [selectedInputDeviceId]);
-
-  useEffect(() => {
-    const mediaDevices = navigator.mediaDevices;
-    if (!mediaDevices) return;
-    void refreshInputDevices();
-    const onDeviceChange = () => void refreshInputDevices();
-    mediaDevices.addEventListener?.("devicechange", onDeviceChange);
-    return () => mediaDevices.removeEventListener?.("devicechange", onDeviceChange);
-  }, [refreshInputDevices]);
 
   useEffect(() => {
     mountedRef.current = true;

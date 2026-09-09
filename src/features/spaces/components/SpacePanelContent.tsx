@@ -3,7 +3,6 @@ import { useConnectionsStore } from "@/features/integrations";
 import { spacesApi } from "@/api/spaces/api";
 import type {
   Space,
-  SpaceAgentMembership,
   SpaceConversation,
   SpaceMember,
 } from "@/api/spaces/dto/interfaces/types";
@@ -14,7 +13,7 @@ import { cn } from "@/shared/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { preferredMistySpace } from "../mistySpace";
+import { preferredDefaultSpace } from "../defaultSpace";
 import { socialProvider, socialProviderPath } from "../social/socialRoute";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
@@ -28,7 +27,6 @@ import {
 import { useSpacePanelConversations } from "./spacePanel/useSpacePanelConversations";
 
 const emptyMembers: SpaceMember[] = [];
-const emptyAgents: SpaceAgentMembership[] = [];
 let refreshSocialConnectionsAfterAuthorization = false;
 
 export function SpacePanelContent(props: {
@@ -45,10 +43,9 @@ export function SpacePanelContent(props: {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingConversation, setEditingConversation] = useState<SpaceConversation | null>(null);
 
-  const { members, agents, snapshotReady, loadMembers } = useSpacesStore(
+  const { members, snapshotReady, loadMembers } = useSpacesStore(
     useShallow((state) => ({
       members: state.membersBySpace[activeSpaceId] ?? emptyMembers,
-      agents: state.agentMembershipsBySpace[activeSpaceId] ?? emptyAgents,
       snapshotReady: state.snapshotReady,
       loadMembers: state.loadMembers,
     })),
@@ -120,7 +117,7 @@ export function SpacePanelContent(props: {
   // Land on the first Space when the route points at one that is not loaded.
   useEffect(() => {
     if (!activeSpaceId || props.loading || activeSpace || props.spaces.length === 0) return;
-    const fallback = preferredMistySpace(props.spaces);
+    const fallback = preferredDefaultSpace(props.spaces);
     if (fallback) {
       const fallbackRoute =
         section === "social"
@@ -177,21 +174,16 @@ export function SpacePanelContent(props: {
       conversations={conversations}
       activeConversationId={route.conversationId}
       currentUserId={user?.id}
-      onCreateConversation={
-        activeSpace?.kind === "misty"
-          ? undefined
-          : () => {
-              setEditingConversation(null);
-              setDialogOpen(true);
-            }
-      }
+      onCreateConversation={() => {
+        setEditingConversation(null);
+        setDialogOpen(true);
+      }}
       onEditConversation={(conversation) => {
         setEditingConversation(conversation);
         setDialogOpen(true);
       }}
       onDeleteConversation={(conversation) => void handleConversationDeleted(conversation)}
       isSpaceOwner={activeSpace?.role === "owner"}
-      isMistySpace={activeSpace?.kind === "misty"}
       socialAccounts={connectedSocialAccounts}
       socialAccountsLoading={connectionsLoading}
       socialAuthorizingProvider={authorizingProvider}
@@ -227,7 +219,6 @@ export function SpacePanelContent(props: {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         members={members}
-        agents={agents}
         currentUserId={user?.id}
         conversation={editingConversation}
         onSaved={handleConversationSaved}

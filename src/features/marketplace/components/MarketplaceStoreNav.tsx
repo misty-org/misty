@@ -21,7 +21,7 @@ export function MarketplaceStoreNav(props: {
 }) {
   return (
     <aside
-      aria-label="Store navigation"
+      aria-label="Discover navigation"
       className={cn(
         "flex h-full min-h-0 w-full flex-col border-r border-charcoal-border",
         "bg-charcoal-workspace p-3 max-[860px]:w-full max-[860px]:border-r-0",
@@ -31,11 +31,11 @@ export function MarketplaceStoreNav(props: {
     >
       <div className="flex h-10 items-center gap-2 px-2 text-sm font-semibold text-cream-bright max-[860px]:hidden">
         <Store aria-hidden="true" size={18} strokeWidth={1.9} />
-        <span>Store</span>
+        <span>Discover</span>
       </div>
 
       <nav
-        aria-label="Store sections"
+        aria-label="Discover sections"
         className="mt-2 grid gap-1 max-[860px]:mt-0 max-[860px]:grid-cols-4"
       >
         {storeSections.map(({ id, label, icon: Icon }) => {

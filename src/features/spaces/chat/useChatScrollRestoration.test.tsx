@@ -23,7 +23,6 @@ function Probe({
     conversationId,
     ready: true,
     messages: revision,
-    pendingRunCount: 0,
   });
   return (
     <div

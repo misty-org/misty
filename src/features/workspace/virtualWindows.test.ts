@@ -50,14 +50,16 @@ describe("workspace virtual windows", () => {
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(secondWindow.id);
   });
 
-  it("creates a Space-local window starting with no tabs", () => {
+  it("creates a Space-local window with its own Home tab", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
     const second = useWorkspaceStore.getState().createVirtualWindow();
 
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toHaveLength(0);
+    expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
+      { surfaceId: "space", title: "Home", route: "/spaces/family/home" },
+    ]);
     expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
     expect(useWorkspaceStore.getState().switchVirtualWindow(second.id)).toBe(true);
   });
@@ -98,17 +100,12 @@ describe("workspace virtual windows", () => {
     expect(useWorkspaceStore.getState().closedVirtualWindowsByScope["space:work"]).toEqual([]);
   });
 
-  it("closes a virtual window when its final tab closes", () => {
+  it("closes a virtual window when its final tab closes and another window remains", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:work");
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
     const second = useWorkspaceStore.getState().createVirtualWindow("Second");
-    const onlyTab = store.openSurface({
-      surfaceId: "code",
-      groupKey: "tool:code",
-      title: "Code",
-      route: "/code",
-    });
+    const onlyTab = dockTabs(useWorkspaceStore.getState().layout.root)[0];
 
     expect(useWorkspaceStore.getState().closeTab(onlyTab.id)).toBe(true);
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(firstWindowId);

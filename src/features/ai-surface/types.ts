@@ -235,7 +235,7 @@ export interface AiRunCreated {
 }
 
 export type AiInvocationState =
-  "queued" | "running" | "awaiting_approval" | "completed" | "failed" | "canceled";
+  "queued" | "running" | "awaiting_approval" | "awaiting_device" | "awaiting_intervention" | "awaiting_timer" | "completed" | "failed" | "canceled";
 
 export type AiInvocationEvent =
   | { id: string; type: "invocation.started"; state: AiInvocationState }

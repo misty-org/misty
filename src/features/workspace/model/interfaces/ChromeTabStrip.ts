@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 export interface ChromeTabStripTab {
+  namingId?: string;
   id: string;
   title: string;
   path: string;

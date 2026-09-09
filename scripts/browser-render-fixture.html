@@ -1,0 +1,3 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#101014;color:white;font:32px system-ui;height:4000px}.header{position:sticky;top:12px;margin:12px;background:#222c;backdrop-filter:blur(16px);padding:20px;border-radius:16px}.hero{height:900px;display:grid;place-content:center}.animate{animation:slide 2s linear infinite alternate;will-change:transform}@keyframes slide{to{transform:translateX(240px)}}
+</style></head><body data-ready="true"><div class="header">Misty rendering fixture</div><section class="hero"><div class="animate">Slow scrolling and continuous animation</div></section><script>addEventListener('scroll',()=>document.querySelector('.hero').style.opacity=String(1-scrollY/2000),{passive:true})</script></body></html>

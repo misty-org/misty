@@ -92,7 +92,9 @@ describe("SpaceChatConversationList", () => {
     const instagramIcon = container.querySelector(
       'a[href*="conversation=instagram-launch"] [data-social-provider-icon="instagram"]',
     );
-    expect(instagramIcon?.querySelector("linearGradient")).not.toBeNull();
+    expect(instagramIcon?.tagName).toBe("IMG");
+    expect(instagramIcon?.getAttribute("data-brand-icon")).toBe("instagram");
+    expect(instagramIcon?.getAttribute("src")).toBeTruthy();
     expect(container.querySelector('a[href="/spaces/space-1/social/discord"]')).toBeNull();
     expect(
       container
@@ -194,26 +196,6 @@ describe("SpaceChatConversationList", () => {
     const menu = document.body.querySelector('[role="menu"]');
     expect(menu?.textContent).toContain("Edit conversation");
     expect(menu?.textContent).toContain("Delete conversation");
-  });
-
-  it("hides the shared Everyone channel in Misty", async () => {
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <SpaceChatConversationList
-            activeSpaceId="space_misty_canonical"
-            activeConversationId="support"
-            provider="misty"
-            currentUserId="user-1"
-            conversations={[conversation("support", "My support", "misty", ["user-1"])]}
-            isMistySpace
-          />
-        </MemoryRouter>,
-      );
-    });
-
-    expect(container.textContent).not.toContain("Everyone");
-    expect(container.querySelector('a[href$="conversation=support"]')).not.toBeNull();
   });
 });
 

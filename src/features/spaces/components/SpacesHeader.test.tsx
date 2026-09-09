@@ -52,7 +52,7 @@ describe("SpacesHeader", () => {
     expect(options.map((option) => option.textContent)).toEqual([
       "Journal",
       "Planner",
-      "Social",
+      "Chat",
       "Library",
     ]);
     await act(async () => {

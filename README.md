@@ -1,6 +1,6 @@
 # Misty
 
-Misty is a React product with a native Tauri shell for desktop, iPad, and Android tablets, plus a Rust core and an embedded direct cloud-storage library. Its browser build uses the same navigation, split-panel workspace, and cloud-backed features as the desktop app. Surfaces that require Tauri, local files, or operating-system access remain visible and lead to the desktop download instead of mounting native functionality. Phone-sized iOS and Android devices are not supported.
+Misty is a React product with native Tauri shells for desktop and Apple mobile devices, plus a Rust core and an embedded direct cloud-storage library. Desktop keeps the split-panel workspace; the universal iPhone/iPad app projects the same tabs into a touch-first, single-surface shell. Its browser build uses cloud-backed features while gating local-device capabilities. Android tablet packaging remains available, but Android phone hardening is outside the current mobile release.
 
 ## Repository layout
 
@@ -29,6 +29,12 @@ npm ci
 The optional `misty` developer CLI now lives in the separate
 `misty-org/misty-cli` repository.
 
+The app reads only the root `.env` for every target, including native builds and
+local app preparation. Shell and CI variables override file values. Mode-specific
+and local override files are ignored. Only `VITE_` variables and the explicit
+public configuration aliases are exposed to the frontend. `MISTY_APPS_DIRECTORY`
+and `VITE_MISTY_APPS_DIRECTORY` both select the local Apps checkout.
+
 ## Common commands
 
 ```sh
@@ -40,6 +46,32 @@ npm run build:mobile
 npm run build:android
 npm run build:web
 ```
+
+Official app source lives in the adjacent `misty-apps/apps/<id>` folders. Each
+app has an `index.tsx` component entry and its view/runtime source. The host keeps
+shared UI, API adapters, native infrastructure, and integration tests; source
+aliases and TypeScript paths bridge the two checkouts. Run `npm run build:apps --
+<id>` from `misty-apps` to rebuild a local app with the host's shared tooling.
+
+Desktop development discovers `~/misty-org/misty-apps` (or an adjacent
+`misty-apps` checkout). Set `VITE_MISTY_APPS_DIRECTORY=~/path/to/misty-apps`
+in your environment or `.env` to select another checkout.
+Local desktop apps run directly from `.build/official-apps/<id>/desktop`;
+startup builds missing components without signing, zipping, or extracting them.
+Rebuild a changed app with `npm run build:official-apps -- <id>` and reload the
+host. The server still controls installation grants and permissions. In dev
+mode the local directory determines the component source, even when its version
+differs from the server catalog. A missing local build reports an error instead
+of falling back to a published download. Without a local repo, desktop uses
+published downloads from `https://apps.mistysys.com`. Production builds always
+use published packages and signature verification.
+
+The Store synchronizes its product-neutral extension contract and shared
+artwork/verification primitives from the adjacent `misty-apps/interface`
+directory before every development or build target. If the repositories are not
+adjacent, set `MISTY_STORE_DIR`; otherwise the synchronizer reads the
+published interface from GitHub. Run `npm run check:extension-interface` to
+detect drift without changing generated files.
 
 The web build requires `MISTY_PUBLIC_API_URL` to point at the public
 Misty API base (for example, `https://api.mistysys.com/v1`). The browser sends
@@ -96,13 +128,15 @@ misty desktop dev --profile collaborator
 
 Each profile gets a separate app identifier, browser storage, and auth vault entry. The launcher also creates `~/.misty/cli/profiles/<profile>` for development-only session metadata, while Misty's normal files, notes, cache, and database stay rooted in `~/.misty`.
 
-The `mobile` build mode is the native iPad packaging target; it uses the same component tree and layout as desktop. Android packages require a 600dp smallest screen width, and the iOS target is restricted to the iPad device family.
+The existing `mobile` build mode is the universal iOS packaging target for iPhone and iPad on iOS 15+. It mounts `MobileLayout`, preserves desktop pane and virtual-window state, and presents one active workspace surface at a time. Downloadable extensions and the Store are desktop-only. Android packages currently retain their existing tablet-oriented packaging constraints.
 
 Browser agent access is device-local and opt-in per tab. Selecting an Agent creates a visible, revocable eight-hour grant for inspect, navigate, click, and download-status tools; grants never survive an app restart. External pages receive no Tauri API permissions, and downloads are assigned collision-safe names in the operating system Downloads folder by the native WebView handler.
 
 Desktop cleanup, icons, Windows staging, and manual releases are owned by the
-separate `misty-cli` repository. Tauri's native iOS and Android projects remain
-available through the standard Tauri CLI.
+separate `misty-cli` repository. Its Apple-first mobile commands cover Xcode
+readiness, device discovery, setup, development, device runs, simulator builds,
+and signed exports. Run `misty mobile --help` for the complete option reference.
+Android's native project remains available through the standard Tauri CLI.
 
 ## Quality checks
 

@@ -6,7 +6,7 @@ import type {
 } from "@/api/spaces/dto/interfaces/types";
 import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
 
-import { libraryReauthenticationHeaders } from "./library-upload";
+import { libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { SpaceRequest } from "./types";
 export function createSpaceLibraryEditsApi(spaceRequest: SpaceRequest) {
   return {

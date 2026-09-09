@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Misty SDK component verification</title>
+<link rel="stylesheet" href="/src/styles/styles.css">
+<script>
+if (!new URLSearchParams(location.search).has("package")) {
+  const style = document.createElement("link"); style.rel = "stylesheet";
+  style.href = "/node_modules/.cache/misty-terminal-component/app.css"; document.head.append(style);
+}
+</script>
+<style>html,body{margin:0;height:100%;background:#111;color:#eee}#panes{display:flex;height:90vh}#panes>div{width:50%;height:100%;min-width:0}#result{display:block;font:12px system-ui;padding:8px}</style>
+</head><body><div id="panes"><div id="a"></div><div id="b"></div></div><output id="result">Verifying two downloaded Terminal components…</output>
+<script>
+  const report = (message) => {
+    document.getElementById("result").textContent = message;
+    const invoke = window.__TAURI_INTERNALS__?.invoke;
+    if (invoke) void invoke("sdk_probe_complete", {
+      nonce:new URLSearchParams(location.search).get("nonce"), success:false, message,
+    });
+  };
+  window.addEventListener("error", event => report(event.message || "Component probe module failed to load"));
+  window.addEventListener("unhandledrejection", event => report(String(event.reason)));
+</script>
+<script type="module" src="./sdk-component-probe.ts"></script></body></html>

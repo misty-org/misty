@@ -1,4 +1,4 @@
-import { apiBlobRequest } from "@/api/client";
+import { readAgentsImage } from "@/features/agents/agentsRuntime";
 import { ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MistyImageAttachment } from "./types";
@@ -26,7 +26,7 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
     if (attachment.previewUrl.startsWith("blob:")) return;
     let active = true;
     let objectURL = "";
-    void apiBlobRequest(attachment.previewUrl)
+    void readAgentsImage(attachment.id)
       .then((blob) => {
         if (!active) return;
         objectURL = URL.createObjectURL(blob);

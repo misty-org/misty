@@ -1,4 +1,4 @@
-import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings";
+import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SystemErrorActivity } from "@/features/activity";
 import { SpaceMembers } from "@/features/spaces/members";
 import { spacesApi } from "@/api/spaces/api";
@@ -26,16 +26,15 @@ import { Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { canManageSpaceLifecycle, preferredMistySpace } from "../mistySpace";
+import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
 
-type SpaceSettingsSection = "general" | "members" | "suggestions";
+type SpaceSettingsSection = "general" | "members";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
-  { id: "suggestions", label: "Suggestions", icon: Lightbulb },
 ];
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
@@ -102,10 +101,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     try {
       await leaveSpace(spaceId);
       const remainingSpaces = useSpacesStore.getState().spaces;
-      const fallback = preferredMistySpace(remainingSpaces);
+      const fallback = preferredDefaultSpace(remainingSpaces);
       navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
         replace: true,
-        state: { mistySpaceSwitch: true },
+        state: { spaceSwitch: true },
       });
     } catch {
       /* The shared store error remains visible in the dialog. */
@@ -120,10 +119,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
     try {
       await deleteSpace(spaceId, deleteConfirmation);
       const remainingSpaces = useSpacesStore.getState().spaces;
-      const fallback = preferredMistySpace(remainingSpaces);
+      const fallback = preferredDefaultSpace(remainingSpaces);
       navigate(fallback ? defaultSpaceRoute(fallback.id) : "/spaces", {
         replace: true,
-        state: { mistySpaceSwitch: true },
+        state: { spaceSwitch: true },
       });
     } catch {
       /* The shared store error remains visible in the dialog. */
@@ -167,7 +166,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                       The name and access model shown across Misty.
                     </p>
                   </div>
-                  <Badge variant="outline">{space.is_shared ? "Shared" : "Private"}</Badge>
+                  <div className="flex items-center gap-2">
+                    {space.is_default ? <Badge variant="secondary">Default</Badge> : null}
+                    <Badge variant="outline">{space.is_shared ? "Shared" : "Private"}</Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <form className="flex max-w-lg gap-2" onSubmit={(event) => void saveName(event)}>
@@ -207,72 +209,77 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     <Fact label="Your role" value={isOwner ? "Owner" : "Member"} />
                     <Fact label="Access" value={space.is_shared ? "Shared" : "Private"} />
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">
-                <CardHeader>
-                  <CardTitle className="text-cream-bright" id="space-danger-heading">
-                    Danger zone
-                  </CardTitle>
-                  <p className="mb-0 mt-1 text-xs text-cream-muted">
-                    Actions here can remove access or permanently delete this Space.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {canDelete ? (
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="m-0 text-sm font-medium">Delete this Space</p>
-                        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
-                          Member access is removed immediately. Permanent deletion follows recovery
-                          and storage safety checks.
-                        </p>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        type="button"
-                        onClick={() => {
-                          clearError();
-                          setDeleteConfirmation("");
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                        Delete Space
-                      </Button>
-                    </div>
-                  ) : canLeave ? (
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="m-0 text-sm font-medium">Leave this Space</p>
-                        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
-                          You will immediately lose access to chat, Planner, and protected Library
-                          items.
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => {
-                          clearError();
-                          setLeaveOpen(true);
-                        }}
-                      >
-                        Leave Space
-                      </Button>
-                    </div>
+                  {space.is_default ? (
+                    <p className="mb-0 mt-4 text-xs leading-relaxed text-cream-muted">
+                      This is your default Space. You can rename it and invite people, but it stays
+                      with your account so you always have a Space available.
+                    </p>
                   ) : null}
                 </CardContent>
               </Card>
+
+              {canDelete || canLeave ? (
+                <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">
+                  <CardHeader>
+                    <CardTitle className="text-cream-bright" id="space-danger-heading">
+                      Danger zone
+                    </CardTitle>
+                    <p className="mb-0 mt-1 text-xs text-cream-muted">
+                      Actions here can remove access or permanently delete this Space.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {canDelete ? (
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="m-0 text-sm font-medium">Delete this Space</p>
+                          <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
+                            Member access is removed immediately. Permanent deletion follows
+                            recovery and storage safety checks.
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          type="button"
+                          onClick={() => {
+                            clearError();
+                            setDeleteConfirmation("");
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="size-4" />
+                          Delete Space
+                        </Button>
+                      </div>
+                    ) : canLeave ? (
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="m-0 text-sm font-medium">Leave this Space</p>
+                          <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
+                            You will immediately lose access to chat, Planner, and protected Library
+                            items.
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          type="button"
+                          onClick={() => {
+                            clearError();
+                            setLeaveOpen(true);
+                          }}
+                        >
+                          Leave Space
+                        </Button>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
             </div>
           ) : null}
 
           {activeSection === "members" ? <SpaceMembers embedded spaceId={spaceId} /> : null}
 
-          {activeSection === "suggestions" ? (
-            <SuggestionSettingsPanel spaceId={spaceId} isOwner={isOwner} />
-          ) : null}
         </DesktopSettingsFrame>
 
         <AlertDialog
@@ -367,94 +374,6 @@ function DangerError({ message }: { message: string }) {
       scope="spaces:settings:danger"
       title="Space action could not be completed"
     />
-  );
-}
-
-function SuggestionSettingsPanel({ spaceId, isOwner }: { spaceId: string; isOwner: boolean }) {
-  const [enabled, setEnabled] = useState(false);
-  const [usage, setUsage] = useState({ used: 0, limit: 0 });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let active = true;
-    void spacesApi
-      .actionSuggestionSettings(spaceId)
-      .then((settings) => {
-        if (!active) return;
-        setEnabled(settings.enabled);
-        setUsage({ used: settings.weekly_used, limit: settings.weekly_limit });
-        setLoading(false);
-      })
-      .catch((reason: unknown) => {
-        if (!active) return;
-        setError(
-          reason instanceof Error ? reason.message : "Suggestion settings could not be loaded.",
-        );
-        setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [spaceId]);
-  const change = async (next: boolean) => {
-    if (!isOwner || saving) return;
-    setSaving(true);
-    setError("");
-    try {
-      const settings = await spacesApi.updateActionSuggestionSettings(spaceId, next);
-      setEnabled(settings.enabled);
-      setUsage({ used: settings.weekly_used, limit: settings.weekly_limit });
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The setting could not be changed.");
-    } finally {
-      setSaving(false);
-    }
-  };
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Action suggestions</CardTitle>
-        <p className="mb-0 mt-1 text-xs leading-relaxed text-cream-muted">
-          When people explicitly agree on a plan, Misty may offer a private review card with tasks,
-          events, notes, roadmap items, or follow-ups. It never runs an action automatically.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-start justify-between gap-5">
-          <div>
-            <p className="m-0 text-sm font-medium">Suggest actions from agreements</p>
-            <p className="mb-0 mt-1 text-xs text-cream-muted">
-              Off by default. Any participant can veto analysis in a private conversation.
-            </p>
-          </div>
-          <Switch
-            aria-label="Suggest actions from agreements"
-            checked={enabled}
-            disabled={loading || saving || !isOwner}
-            onCheckedChange={(next) => void change(next)}
-          />
-        </div>
-        {enabled ? (
-          <p className="mb-0 mt-4 text-xs text-cream-muted">
-            This week: {usage.used} of {usage.limit} detector checks used.
-          </p>
-        ) : null}
-        {!isOwner ? (
-          <p className="mb-0 mt-4 text-xs text-cream-muted">
-            Only the Space owner can change this setting.
-          </p>
-        ) : null}
-        {error ? (
-          <SystemErrorActivity
-            error={error}
-            scope={`spaces:suggestions:${spaceId}`}
-            title="Action suggestions could not be updated"
-            target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}` }}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
   );
 }
 

@@ -430,7 +430,7 @@ function sanitizeTab(value: unknown, spaceId: string, index: number): SpacesTab 
 function workspaceToolTitle(kind: Exclude<WorkspaceTabKind, "space" | "file-manager">): string {
   if (kind === "agents") return "Agents";
   if (kind === "developer") return "Code";
-  return kind === "marketplace" ? "Store" : "Transfers";
+  return kind === "marketplace" ? "Discover" : "Transfers";
 }
 
 function migratePersistedTabs(

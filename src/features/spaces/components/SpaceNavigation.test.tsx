@@ -44,7 +44,7 @@ describe("SpaceSectionNavigation", () => {
     expect(links.map((link) => link.textContent?.trim())).toEqual([
       "Journal",
       "Planner",
-      "Social",
+      "Chat",
       "Library",
     ]);
     expect(container.querySelector("nav")?.className).toContain("grid");
@@ -124,7 +124,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect(container.querySelector('[aria-label="1 new"]')?.closest("a")?.textContent).toContain(
-      "Social",
+      "Chat",
     );
     expect(
       [...container.querySelectorAll("a")]
@@ -151,12 +151,11 @@ describe("SpaceSectionNavigation", () => {
     expect(labels).not.toContain("Library");
   });
 
-  it("shows only private Social in the canonical Misty Space", async () => {
+  it("keeps Journal and Social when Planner and Library are denied", async () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture({
-          id: "misty",
-          kind: "misty",
+          id: "restricted",
           permissions: {
             "messages.read": true,
             "tasks.view": false,
@@ -168,23 +167,23 @@ describe("SpaceSectionNavigation", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/notes"]}>
-          <SpaceSectionNavigation spaceId="misty" section="notes" />
+        <MemoryRouter initialEntries={["/spaces/restricted/notes"]}>
+          <SpaceSectionNavigation spaceId="restricted" section="notes" />
         </MemoryRouter>,
       );
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "Social",
+      "Journal",
+      "Chat",
     ]);
   });
 
-  it("restores every permitted work surface for a Misty operator", async () => {
+  it("shows every permitted work surface", async () => {
     useSpacesStore.setState({
       spaces: [
         spaceFixture({
-          id: "misty",
-          kind: "misty",
+          id: "space-full",
           permissions: {
             "messages.read": true,
             "tasks.view": true,
@@ -197,8 +196,8 @@ describe("SpaceSectionNavigation", () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/misty/notes"]}>
-          <SpaceSectionNavigation spaceId="misty" section="notes" />
+        <MemoryRouter initialEntries={["/spaces/space-full/notes"]}>
+          <SpaceSectionNavigation spaceId="space-full" section="notes" />
         </MemoryRouter>,
       );
     });
@@ -206,7 +205,7 @@ describe("SpaceSectionNavigation", () => {
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
       "Journal",
       "Planner",
-      "Social",
+      "Chat",
       "Library",
     ]);
   });
@@ -235,6 +234,7 @@ describe("SpaceSectionNavigation", () => {
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",
