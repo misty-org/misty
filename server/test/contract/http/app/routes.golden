@@ -656,6 +656,7 @@ POST /api/devices/{deviceID}/channel-ticket
 POST /api/devices/{deviceID}/heartbeat
 POST /api/devices/{deviceID}/remove-device
 POST /api/integrations/apps/connect
+POST /api/integrations/github/git
 POST /api/internal/journal/note-projections
 POST /api/login
 POST /api/logout
@@ -766,6 +767,7 @@ POST /devices/{deviceID}/channel-ticket
 POST /devices/{deviceID}/heartbeat
 POST /devices/{deviceID}/remove-device
 POST /integrations/apps/connect
+POST /integrations/github/git
 POST /internal/agent-runtime/runs/{runID}/activate
 POST /internal/agent-runtime/runs/{runID}/budget
 POST /internal/agent-runtime/runs/{runID}/complete
@@ -916,6 +918,7 @@ POST /v1/devices/{deviceID}/channel-ticket
 POST /v1/devices/{deviceID}/heartbeat
 POST /v1/devices/{deviceID}/remove-device
 POST /v1/integrations/apps/connect
+POST /v1/integrations/github/git
 POST /v1/internal/journal/note-projections
 POST /v1/login
 POST /v1/logout

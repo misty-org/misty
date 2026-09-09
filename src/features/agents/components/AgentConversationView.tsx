@@ -11,6 +11,7 @@ import { CalendarClock, Flag } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
+import { AnswerChanges } from "./changes/AnswerChanges";
 import { splitReplyQuote } from "./replyQuote";
 import { AgentProgress } from "../progress/AgentProgress";
 import { useMessageProgress } from "../progress/useMessageProgress";
@@ -248,6 +249,7 @@ function AgentMessageView(props: AgentMessageProps) {
             <MistyActivityStatus activity={message.activity} />
           </div>
         ) : null}
+        <AnswerChanges message={message} />
         {message.citations?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.citations.map((citation) => (

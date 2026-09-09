@@ -86,6 +86,14 @@
   gap: 5px;
   color: var(--color-cream-bright);
 }
+/* A setting that depends on the one above it. */
+.agent-integrations-row.agent-code-projects-indent {
+  padding-left: 80px;
+}
+/* A project's settings explain consequences, so their help text wraps. */
+.agent-integrations-row-text .agent-code-projects-help {
+  white-space: normal;
+}
 .agent-integrations-add {
   justify-self: start;
   margin-top: 4px;

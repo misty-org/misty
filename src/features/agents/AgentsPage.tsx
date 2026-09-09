@@ -15,6 +15,7 @@ import {
 } from "./components/AgentWorkspaceConversation";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { AgentDeviceTargets } from "./page/AgentDeviceTargets";
+import { ProjectReviewSheet } from "./components/changes/ProjectReviewSheet";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
 import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
 import { AgentLanding } from "./page/AgentLanding";
@@ -318,6 +319,8 @@ export default function NativeAgentsPage() {
   );
   return (
     <main ref={workspaceRef} className="agents-workspace" data-settings-open={settingsModalOpen}>
+      {/* Review panel for a project's changes, opened from answers and Projects. */}
+      <ProjectReviewSheet />
       {showWorkspace && profile ? (
         <AgentWorkspaceFrame
           key={`${user?.id}:${profile.id}`}

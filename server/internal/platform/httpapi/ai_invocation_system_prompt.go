@@ -154,6 +154,18 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 			guidance.WriteString(" For anything you would do with a mouse or keyboard (clicking, typing into forms, choosing options, dragging, drawing, playing a game), call browser_act with the whole goal and the visible result to reach. Misty's screen agent works through it on the device, waiting for the page when something else has to happen first, and reports where it stopped; check its final screenshot, and call it again with the same goal when it reports progress without finishing. Use browser_navigate to open pages and browser_inspect to read them.")
 		}
 	}
+	if has("code.run") {
+		// Code projects (docs/plans/agent-code-projects.md). Short on purpose:
+		// it rides along on every turn of every desktop chat with a project.
+		guidance.WriteString("\n\nProjects: the code_ tools work in a folder the user shared as a project on their computer. Look before changing: code_list or code_find, code_search rather than reading whole files, then code_read what you will edit. Change files with code_edit (line anchors like 12:k3f, or exact oldText) and create them with code_write; use the fresh anchors code_edit returns. Unless the project already uses a framework or the user asks for one, build websites with plain HTML, CSS and JavaScript, which need no install or build. Commands run sandboxed in the project: no network except package installs the user allowed for this project, no listening ports (so no dev servers: build, then preview the output folder), and no changes to .git or .env files. If an install fails with a network or proxy error, tell the user package installs are off for this project. After changes, run the project's build or tests if it has them. Always finish work on a website by calling code_preview: it opens the page for the user in a Misty tab, even when no browser is attached to this chat")
+		if has("browser.navigate") {
+			guidance.WriteString(" and check the page with the browser tools (browser_navigate to the address it returns)")
+		}
+		guidance.WriteString(" before you finish. Change only what the task needs, never write secrets into files, and tell the user they can undo a chat's changes in Integrations › Projects.")
+	}
+	if has("git.commit") {
+		guidance.WriteString("\n\nGit: in a project that is a Git repository (git_status says so), commit with git_commit when a piece of work is done and checked, with a short message that says what changed. Run git commands only through the git_ tools; shell commands can't change .git. Never rewrite history. To share work on GitHub, use git_push only if the person allowed it: create a branch with git_branch first unless they allowed pushing the default branch, push it, then open a pull request with git_pull_request and give the person its link. If a push is refused, tell the person why instead of retrying.")
+	}
 	if has("browser.request_user_action") {
 		guidance.WriteString("\n\nWaiting for the user: when the screen needs the person (a sign-in, a password or code, a CAPTCHA or verification, choosing an account, a permission dialog), or browser_act stops for one, call browser_request_user_action with that screen's scopeId and say in the reason exactly what they need to do. Misty hands them control, shows a Waiting for you card in the conversation and continues this run when they are done; do not end your response or ask in text instead. Afterwards look at the screen again before acting.")
 	}
@@ -164,6 +176,9 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 		guidance.WriteString("\n\nScreens: when the request refers to something on the user's screen, call screen_look; it ends this response and Misty continues with the screen image attached.")
 	case !hasPrefix("browser."):
 		guidance.WriteString("\n\nNo browser or screen is available in this run; website and on-screen work need the Misty desktop app. Never claim to have visited a site.")
+		if has("code.preview") {
+			guidance.WriteString(" Project previews are the exception: code_preview opens a project's pages for the user.")
+		}
 	}
 	return guidance.String()
 }

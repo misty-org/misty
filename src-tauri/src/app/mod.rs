@@ -1,6 +1,8 @@
 //! Application entry points: Tauri command handlers and shared runtime state.
 
 pub mod clipboard_commands;
+#[cfg(unix)]
+pub mod code_commands;
 pub mod commands;
 #[cfg(desktop)]
 pub mod device_admission_commands;

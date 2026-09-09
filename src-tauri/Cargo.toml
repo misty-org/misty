@@ -86,6 +86,10 @@ percent-encoding = "2"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 cap-std = "4.0.3"
 
+# Code projects: sandboxed commands and file tools (docs/plans/agent-code-projects.md).
+[target.'cfg(unix)'.dependencies]
+misty-agent-code = { path = "crates/agent-code" }
+
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 cpal = "0.16"
 xcap = "0.9"

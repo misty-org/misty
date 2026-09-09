@@ -28,6 +28,9 @@ pub struct MistyRuntime {
     pub explorer: ExplorerService,
     pub workspaces: WorkspaceService,
     pub agents: AgentService,
+    /// Code projects: file tools, sandboxed commands, undo and previews.
+    #[cfg(unix)]
+    pub code: Arc<misty_agent_code::CodeService>,
 }
 
 impl MistyRuntime {
@@ -78,6 +81,11 @@ impl MistyRuntime {
             explorer_library.clone(),
         );
         let agents = AgentService::new(environment.clone());
+        #[cfg(unix)]
+        let code = Arc::new(
+            misty_agent_code::CodeService::new(environment.agent_code_dir(), dirs::home_dir())
+                .with_protected(vec![environment.misty_dir()]),
+        );
         let workspaces = WorkspaceService::new(environment.clone());
 
         Self {
@@ -96,6 +104,8 @@ impl MistyRuntime {
             explorer,
             workspaces,
             agents,
+            #[cfg(unix)]
+            code,
         }
     }
 }

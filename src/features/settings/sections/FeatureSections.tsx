@@ -1,7 +1,7 @@
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
-  agentsRevokeFolderScope,
+  codeRemoveProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { useSpacesStore } from "@/features/spaces";
@@ -219,24 +219,32 @@ function AgentScopeList() {
   }, []);
   return (
     <Section
-      title="Folder access"
-      description="Agents use explicitly granted folders. External and destructive actions still require review."
+      title="Projects"
+      description="Folders on this computer agents can work in when a chat picks them. Add projects in Agents › Integrations."
     >
       {scopes.map((s) => (
-        <Row key={s.id} label={s.displayName}>
+        <Row
+          key={s.id}
+          label={s.displayName}
+          description={
+            s.kind === "project_folder"
+              ? "Agents can edit files and run sandboxed commands here."
+              : "Read only: agents can list and read files here."
+          }
+        >
           <Button
             variant="outline"
             onClick={() =>
               void (async () => {
                 if (
                   !(await confirmAction(
-                    `Remove access to “${s.displayName}”? Files remain on this device.`,
-                    "Remove folder access",
+                    `Stop using “${s.displayName}” as a project? Its files stay on this computer; undo history for it is deleted.`,
+                    "Remove project",
                   ))
                 )
                   return;
                 try {
-                  await agentsRevokeFolderScope(s.id);
+                  await codeRemoveProject(s.id);
                   await refresh();
                 } catch (e) {
                   setError(String(e));
@@ -250,7 +258,7 @@ function AgentScopeList() {
       ))}
       {!scopes.length && (
         <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No folders have been granted. Choose a folder when starting an agent task.
+          No projects yet. Add one in Agents › Integrations.
         </p>
       )}
       {error && (

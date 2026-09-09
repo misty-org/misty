@@ -67,6 +67,7 @@ export function AgentMessageActions(props: {
       {!user && message.invocationId ? (
         <FeedbackActions invocationId={message.invocationId} />
       ) : null}
+
       {!user && props.text ? <ReadAloudAction text={props.text} /> : null}
       {canRetry ? (
         <Action

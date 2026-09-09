@@ -52,11 +52,15 @@ func (s *SpacesService) deviceToolRegistrations(ctx context.Context, record *db.
 			names[device.ID] = device.Name
 		}
 	}
-	folders, workspaces, inboxes := []deviceGrant{}, []deviceGrant{}, []deviceInbox{}
+	folders, projects, workspaces, inboxes := []deviceGrant{}, []deviceGrant{}, []deviceGrant{}, []deviceInbox{}
 	for _, item := range contexts {
 		grant := deviceGrant{scopeID: item.OpaqueRef, name: item.DisplayName, deviceID: item.DeviceID, deviceName: names[item.DeviceID]}
 		switch item.Kind {
 		case "local_folder":
+			folders = append(folders, grant)
+		case "project_folder":
+			// A project also reads documents (PDFs, sheets) through the folder tools.
+			projects = append(projects, grant)
 			folders = append(folders, grant)
 		case "workspace":
 			workspaces = append(workspaces, grant)
@@ -70,6 +74,9 @@ func (s *SpacesService) deviceToolRegistrations(ctx context.Context, record *db.
 	registrations := []agenttools.Registration{}
 	if len(folders) > 0 {
 		registrations = append(registrations, s.folderToolRegistrations(folders, inboxes)...)
+	}
+	if len(projects) > 0 {
+		registrations = append(registrations, s.projectToolRegistrations(projects)...)
 	}
 	if len(workspaces) > 0 {
 		registrations = append(registrations, s.workspaceToolRegistrations(workspaces)...)
@@ -277,15 +284,16 @@ func (s *SpacesService) runDeviceTool(ctx context.Context, invocation agenttools
 // before any effect, so the call can be corrected or another tool used.
 func deviceToolFailure(code string) error {
 	message := map[string]string{
-		"invalid_scope":         "that path is outside the shared folder",
-		"unsupported_content":   "that file type cannot be read as text",
-		"device_unavailable":    "the user's computer is offline",
-		"device_timeout":        "the user's computer did not answer in time",
-		"invalid_url":           "use an http or https address",
-		"workspace_unavailable": "the Misty browser is not open on the user's computer",
-		"destination_unreachable": "the other computer is not on the same local network",
-		"destination_refused":   "the other computer did not accept the file",
-		"device_grant_invalid":  "the user's computer could not confirm this request",
+		"invalid_scope":            "that path is outside the shared folder",
+		"unsupported_content":      "that file type cannot be read as text",
+		"device_unavailable":       "the user's computer is offline",
+		"device_timeout":           "the user's computer did not answer in time",
+		"invalid_url":              "use an http or https address",
+		"workspace_unavailable":    "the Misty browser is not open on the user's computer",
+		"destination_unreachable":  "the other computer is not on the same local network",
+		"destination_refused":      "the other computer did not accept the file",
+		"device_grant_invalid":     "the user's computer could not confirm this request",
+		"code_sandbox_unavailable": "the user's computer can't run commands safely (code projects need macOS)",
 	}[code]
 	if message == "" {
 		message = "the user's computer could not do that (" + code + ")"

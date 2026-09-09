@@ -18,6 +18,7 @@ import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ConversationModelPicker } from "../models/ConversationModelPicker";
 import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
 import { AgentModeToggle } from "../collaboration/AgentModeToggle";
+import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
 import {
@@ -358,10 +359,13 @@ export function AgentWorkspaceConversation({
         <MistyComposer
           hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
-          // One toolbar under the text: Attach and the mode on the left; the model,
+          // One toolbar under the text: Attach, the mode and the project on the left; the model,
           // usage, voice and send on the right.
           leadingControl={
-            <AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />
+            <>
+              <AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />
+              <AgentProjectMenu conversationId={conversation?.id} />
+            </>
           }
           layout="conversation"
           value={draft}

@@ -22,6 +22,10 @@ func deviceContextSurface(kind string) string {
 	switch kind {
 	case "local_folder":
 		return "folders"
+	case "project_folder":
+		// No device policy offers this surface, so a project is reachable
+		// only from the computer it is on.
+		return "code"
 	case "workspace", "browser_tab":
 		return "browser"
 	case "terminal":

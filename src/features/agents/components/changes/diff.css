@@ -1,0 +1,177 @@
+/* Diffs, laid out like Claude Code and Codex: a header per file with its
+   counts, then hunks with old and new line numbers. Added and removed lines
+   carry green and red tints; this is the one place they appear (AGENTS.md,
+   diff exception). Everything else stays monochrome. */
+:root {
+  --misty-diff-add: rgb(46 160 67);
+  --misty-diff-del: rgb(218 54 51);
+  --misty-diff-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+
+.misty-diff {
+  display: grid;
+  gap: 8px;
+}
+
+.misty-diff-file {
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg, 10px);
+  background: var(--color-charcoal-card);
+}
+
+.misty-diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  color: var(--color-cream);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.misty-diff-file-header:hover {
+  background: var(--color-charcoal-hover);
+}
+
+.misty-diff-file-header:focus-visible {
+  outline: 2px solid var(--color-cream-muted);
+  outline-offset: -2px;
+}
+
+.misty-diff-chevron {
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+  transition: transform 120ms ease-out;
+}
+
+.misty-diff-file-header[aria-expanded="true"] .misty-diff-chevron {
+  transform: rotate(90deg);
+}
+
+.misty-diff-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--misty-diff-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.misty-diff-folder,
+.misty-diff-status {
+  color: var(--color-cream-muted);
+}
+
+.misty-diff-status {
+  flex-shrink: 0;
+  font-size: 11.5px;
+}
+
+.misty-diff-counts {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+  font-family: var(--misty-diff-mono);
+  font-size: 11.5px;
+}
+
+.misty-diff-plus {
+  color: var(--misty-diff-add);
+}
+
+.misty-diff-minus {
+  color: var(--misty-diff-del);
+}
+
+.misty-diff-body {
+  overflow-x: auto;
+  border-top: 1px solid var(--color-charcoal-border);
+  font-family: var(--misty-diff-mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.misty-diff-hunk {
+  padding: 2px 12px;
+  color: var(--color-cream-muted);
+  background: var(--color-charcoal-hover);
+  white-space: pre;
+}
+
+.misty-diff-line {
+  display: grid;
+  grid-template-columns: 3.25rem 3.25rem 1.25rem max-content;
+  min-width: 100%;
+  width: max-content;
+}
+
+.misty-diff-number {
+  padding-right: 8px;
+  color: var(--color-cream-muted);
+  text-align: right;
+  user-select: none;
+  opacity: 0.7;
+}
+
+.misty-diff-sign {
+  color: var(--color-cream-muted);
+  text-align: center;
+  user-select: none;
+}
+
+.misty-diff-code {
+  padding-right: 16px;
+  color: var(--color-cream);
+  white-space: pre;
+}
+
+.misty-diff-line[data-kind="add"] {
+  background: color-mix(in srgb, var(--misty-diff-add) 15%, transparent);
+}
+
+.misty-diff-line[data-kind="add"] .misty-diff-sign {
+  color: var(--misty-diff-add);
+}
+
+.misty-diff-line[data-kind="del"] {
+  background: color-mix(in srgb, var(--misty-diff-del) 15%, transparent);
+}
+
+.misty-diff-line[data-kind="del"] .misty-diff-sign {
+  color: var(--misty-diff-del);
+}
+
+.misty-diff-note {
+  padding: 8px 12px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+
+/* The changes under an answer. */
+.misty-changes {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.misty-changes-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-cream);
+  font-size: 13px;
+}
+
+.misty-changes-header > strong {
+  font-weight: 500;
+}
+
+.misty-changes-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
