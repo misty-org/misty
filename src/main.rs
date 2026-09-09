@@ -5,6 +5,8 @@ mod config;
 mod desktop;
 mod environment;
 mod home;
+mod mobile;
+mod official_apps;
 mod process;
 mod release;
 mod server;
