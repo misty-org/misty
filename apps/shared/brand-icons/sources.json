@@ -1,0 +1,344 @@
+{
+  "todoist": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/todoist-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "slack": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/slack-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "instagram": {
+    "url": "https://raw.githubusercontent.com/pheralb/svgl/main/static/library/instagram-icon.svg",
+    "collection": "SVGL",
+    "brandSource": "https://about.meta.com/brand/resources/instagram/instagram-brand/"
+  },
+  "messenger": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/messenger.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "discord": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/discord-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "notion": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/notion-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "trello": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/trello.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "asana": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/asana-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "jira": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/jira.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "obsidian": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/obsidian-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "figma": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/figma.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "airtable": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/airtable.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "linear": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/linear-icon.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "hubspot": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/hubspot.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.hubspot.com/style-guide",
+    "hex": "FF7A59"
+  },
+  "typeform": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/typeform-icon.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "stripe": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/stripe.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "gemini": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/google-gemini-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "anthropic": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/anthropic-icon.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "deepseek": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/deepseek-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "huggingface": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/hugging-face-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "meta": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/meta-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "mistral": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/mistral-ai-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "openai": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/openai-icon.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "perplexity": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/perplexity-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "vercel": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/vercel-icon.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "aws": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/aws.svg",
+    "collection": "gilbarbara/logos",
+    "adaptation": "White foreground variant on dark surfaces; colored elements preserved."
+  },
+  "azure": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/microsoft-azure.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "cloudinary": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/cloudinary-icon.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "google-cloud": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/google-cloud.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "gmail": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/gmail_2026/v2/web/192px.svg",
+    "collection": "Google product assets"
+  },
+  "google-drive": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/drive_2026/v2/web/192px.svg",
+    "collection": "Google product assets",
+    "adaptation": "Added viewBox matching the original 192 by 192 dimensions for proportional scaling."
+  },
+  "google-docs": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/docs_2026/v2/web/192px.svg",
+    "collection": "Google product assets"
+  },
+  "google-calendar": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/calendar_2026/v2/web/192px.svg",
+    "collection": "Google product assets",
+    "adaptation": "Added viewBox matching the original 192 by 192 dimensions for proportional scaling."
+  },
+  "google-sheets": {
+    "url": "https://www.gstatic.com/images/branding/productlogos/sheets_2026/v2/web/192px.svg",
+    "collection": "Google product assets"
+  },
+  "outlook": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/outlook_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "microsoft-word": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/word_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "microsoft-onenote": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/onenote_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "microsoft-teams": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/teams_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "microsoft-todo": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/todo_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "onedrive": {
+    "url": "https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/assets/brand-icons/product/svg/onedrive_48x1.svg",
+    "collection": "Microsoft product assets"
+  },
+  "dropbox": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/dropbox.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.dropbox.com/branding",
+    "hex": "0061FF"
+  },
+  "icloud": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/icloud.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://commons.wikimedia.org/wiki/File:ICloud_logo.svg",
+    "hex": "3693F3"
+  },
+  "x": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/x.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://x.com",
+    "hex": "000000",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "github": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/github.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://github.com/logos",
+    "hex": "181717",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "alibaba": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/alibabacloud.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.alibabagroup.com/en/ir/reports",
+    "hex": "FF6A00"
+  },
+  "bytedance": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/bytedance.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.bytedance.com",
+    "hex": "3C8CFF"
+  },
+  "nvidia": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/nvidia.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.nvidia.com/en-us",
+    "hex": "76B900"
+  },
+  "ollama": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/ollama.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://github.com/ollama/ollama/issues/2152#issuecomment-1905286922",
+    "hex": "000000",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "backblaze": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/backblaze.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.backblaze.com/company/news.html",
+    "hex": "E21E29"
+  },
+  "box": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/box.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.box.com/en-gb/about-us/press",
+    "hex": "0061D5"
+  },
+  "filen": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/filen.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://github.com/FilenCloudDienste/filen-drive-legacy/issues/166#issue-2139393162",
+    "hex": "000000",
+    "adaptation": "White foreground variant on dark surfaces; colored elements preserved."
+  },
+  "file-io": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/filedotio.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.file.io",
+    "hex": "3D3C9D"
+  },
+  "hadoop": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/apachehadoop.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://apache.org/logos",
+    "hex": "66CCFF"
+  },
+  "huawei": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/huawei.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://e.huawei.com/ph/material/partner/0a72728b864949c48b22106454352483",
+    "hex": "FF0000"
+  },
+  "internet-archive": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/internetarchive.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://archive.org",
+    "hex": "666666",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "mail-ru": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/maildotru.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://my.mail.ru",
+    "hex": "005FF9"
+  },
+  "mega": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/mega.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://mega.io/media",
+    "hex": "D9272E"
+  },
+  "openstack": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/openstack.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.openstack.org/brand/openstack-logo/",
+    "hex": "ED1944"
+  },
+  "proton-drive": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/protondrive.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://proton.me/media/kit",
+    "hex": "EB508D"
+  },
+  "seafile": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/seafile.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://de.seafile.com",
+    "hex": "FF9800"
+  },
+  "zoho": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/zoho.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.zoho.com/branding",
+    "hex": "E42527"
+  },
+  "filezilla": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/filezilla.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://commons.wikimedia.org/wiki/File:FileZilla_logo.svg",
+    "hex": "BF0000"
+  },
+  "akamai": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/akamai.svg",
+    "collection": "Simple Icons",
+    "brandSource": "https://www.akamai.com",
+    "hex": "0096D6"
+  },
+  "citrix": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/14.0.0/icons/citrix.svg",
+    "collection": "Simple Icons 14",
+    "hex": "452170"
+  },
+  "files-com": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/14.0.0/icons/files.svg",
+    "collection": "Simple Icons 14",
+    "hex": "000000",
+    "adaptation": "White monochrome variant under prefers-color-scheme: dark; original artwork otherwise."
+  },
+  "yahoo": {
+    "url": "https://raw.githubusercontent.com/simple-icons/simple-icons/9.0.0/icons/yahoo.svg",
+    "collection": "Simple Icons 9",
+    "hex": "6001D2"
+  },
+  "google-photos": {
+    "url": "https://raw.githubusercontent.com/gilbarbara/logos/main/logos/google-photos.svg",
+    "collection": "gilbarbara/logos"
+  },
+  "yandex": {
+    "collection": "Tabler brand SVG via existing react-icons",
+    "color": "#FC3F1D"
+  },
+  "storj": {
+    "collection": "Tabler brand SVG via existing react-icons",
+    "color": "#2683FF"
+  }
+}
