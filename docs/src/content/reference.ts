@@ -43,6 +43,21 @@ export const referencePages: DocPage[] = [
         ],
       },
       {
+        id: "apps",
+        title: "Apps",
+        blocks: [
+          table(
+            ["Command", "Purpose"],
+            [
+              [
+                "apps official build",
+                "Compile, development-sign, validate, and synchronize Misty's first-party Apps.",
+              ],
+            ],
+          ),
+        ],
+      },
+      {
         id: "desktop",
         title: "Desktop",
         blocks: [
@@ -61,6 +76,30 @@ export const referencePages: DocPage[] = [
         id: "website",
         title: "Website",
         blocks: [table(["Command", "Options"], [["website dev", "None"]])],
+      },
+      {
+        id: "mobile",
+        title: "Mobile",
+        blocks: [
+          table(
+            ["Command", "Options"],
+            [
+              ["mobile doctor", "None"],
+              ["mobile devices", "None"],
+              ["mobile open", "None"],
+              ["mobile setup", "--reinstall-deps, --skip-targets-install"],
+              [
+                "mobile dev",
+                "--device <NAME>, --open, --host <IP>, --release, --no-watch",
+              ],
+              ["mobile run", "--device <NAME>, --open, --release, --no-watch"],
+              [
+                "mobile build",
+                "--target device|simulator|intel-simulator, --debug, --open, --no-sign, --build-number <NUMBER>, --export-method app-store-connect|release-testing|debugging, --ci",
+              ],
+            ],
+          ),
+        ],
       },
       {
         id: "server",
@@ -364,7 +403,7 @@ export const referencePages: DocPage[] = [
         blocks: [
           code("misty configure --workspace ~/misty-org\nmisty doctor"),
           p(
-            "Confirm the workspace contains sibling misty/, misty-server/, misty-website/, misty-extensions/, and misty-cli/ repositories. Use --workspace to diagnose another root without changing saved configuration.",
+            "Confirm the workspace contains sibling misty/, misty-server/, misty-website/, misty-store/, and misty-cli/ repositories. Use --workspace to diagnose another root without changing saved configuration.",
           ),
         ],
       },

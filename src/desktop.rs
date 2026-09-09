@@ -47,7 +47,15 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
     let mut command = CommandSpec::new(npm())
         .args(["run", "tauri", "--", "dev", "--config"])
         .arg(config_path.as_os_str())
-        .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
+        .env("MISTY_DESKTOP_DEV_PORT", port.to_string())
+        .env(
+            "MISTY_OFFICIAL_APPS_DIR",
+            workspace.extensions.join("public/official-apps"),
+        )
+        .env(
+            "MISTY_OFFICIAL_APPS_CATALOG",
+            workspace.extensions.join("apps/catalog.json"),
+        );
     if let Some(profile) = profile {
         let profile_root = crate::home::default_root()?
             .join("cli/profiles")

@@ -29,7 +29,13 @@ impl Workspace {
             misty: root.join("misty"),
             server: root.join("misty-server"),
             website: root.join("misty-website"),
-            extensions: root.join("misty-extensions"),
+            extensions: if root.join("misty-apps/package.json").is_file()
+                || !root.join("misty-store/package.json").is_file()
+            {
+                root.join("misty-apps")
+            } else {
+                root.join("misty-store")
+            },
             cli: root.join("misty-cli"),
             root,
         })
@@ -74,7 +80,7 @@ fn is_repository_checkout(root: &Path) -> bool {
             root.join("package.json").is_file() && root.join("src-tauri/tauri.conf.json").is_file()
         }
         "misty-server" => root.join("go.mod").is_file(),
-        "misty-website" | "misty-extensions" => root.join("package.json").is_file(),
+        "misty-website" | "misty-apps" | "misty-store" => root.join("package.json").is_file(),
         "misty-cli" => root.join("Cargo.toml").is_file(),
         _ => false,
     }
@@ -110,7 +116,7 @@ mod tests {
             "misty/src-tauri/tauri.conf.json",
             "misty-server/go.mod",
             "misty-website/package.json",
-            "misty-extensions/package.json",
+            "misty-apps/package.json",
             "misty-cli/Cargo.toml",
         ] {
             let path = root.join(path);
@@ -123,20 +129,42 @@ mod tests {
         assert_eq!(workspace.misty, root.join("misty"));
         assert_eq!(workspace.server, root.join("misty-server"));
         assert_eq!(workspace.website, root.join("misty-website"));
-        assert_eq!(workspace.extensions, root.join("misty-extensions"));
+        assert_eq!(workspace.extensions, root.join("misty-apps"));
         assert_eq!(workspace.cli, root.join("misty-cli"));
 
         for repository in [
             "misty",
             "misty-server",
             "misty-website",
-            "misty-extensions",
+            "misty-apps",
             "misty-cli",
         ] {
             let from_checkout = Workspace::from_root(root.join(repository)).unwrap();
             assert_eq!(from_checkout.root, root);
             from_checkout.validate().unwrap();
         }
+    }
+
+    #[test]
+    fn prefers_apps_and_supports_the_old_store_checkout() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path();
+        fs::create_dir(root.join("misty-store")).unwrap();
+        fs::write(root.join("misty-store/package.json"), "").unwrap();
+        assert_eq!(
+            Workspace::from_root(root.join("misty-store"))
+                .unwrap()
+                .extensions,
+            root.join("misty-store"),
+        );
+        fs::create_dir(root.join("misty-apps")).unwrap();
+        fs::write(root.join("misty-apps/package.json"), "").unwrap();
+        assert_eq!(
+            Workspace::from_root(root.join("misty-apps"))
+                .unwrap()
+                .extensions,
+            root.join("misty-apps"),
+        );
     }
 
     #[test]

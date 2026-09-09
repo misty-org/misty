@@ -1,5 +1,6 @@
 import { desktopPages } from "./desktop";
 import { homePages } from "./home";
+import { mobilePages } from "./mobile";
 import { referencePages } from "./reference";
 import { releasePages } from "./release";
 import { serverPages } from "./server";
@@ -13,6 +14,7 @@ export const pages = [
   ...workspacePages,
   ...homePages,
   ...desktopPages,
+  ...mobilePages,
   ...websitePages,
   ...serverPages,
   ...releasePages,
@@ -49,6 +51,14 @@ export const navGroups: NavGroup[] = [
       { label: "desktop build", path: "/desktop/build", command: true },
       { label: "desktop clean", path: "/desktop/clean", command: true },
       { label: "icons sync", path: "/desktop/icons", command: true },
+    ],
+  },
+  {
+    title: "Mobile",
+    items: [
+      { label: "Overview", path: "/mobile" },
+      { label: "mobile dev", path: "/mobile/dev", command: true },
+      { label: "mobile build", path: "/mobile/build", command: true },
     ],
   },
   {
