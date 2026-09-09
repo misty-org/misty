@@ -22,10 +22,42 @@ export function createFileWorkspaceMount(
     ])
       scope.assert(capability);
   };
+  type Parser = NonNullable<MistyFileWorkspaceOptions["extractDocumentText"]>;
+  const parsers = new WeakMap<Parser, Parser>();
+  const scopedParser = (parse: Parser | undefined): Parser | undefined => {
+    if (!parse) return;
+    let scoped = parsers.get(parse);
+    if (!scoped) {
+      scoped = async (extension, bytes) => {
+        assert();
+        const result = await parse(extension, bytes);
+        assert();
+        return result;
+      };
+      parsers.set(parse, scoped);
+    }
+    return scoped;
+  };
   const validate = (options: MistyFileWorkspaceOptions) => {
     if (!options || !["explorer", "transfers"].includes(options.view))
       throw new AppRpcError("invalid_view", "Unknown file workspace.");
-    return { view: options.view, active: options.active !== false };
+    if (
+      [
+        options.renderPdf,
+        options.renderVideo,
+        options.renderPhoto,
+        options.extractDocumentText,
+      ].some((renderer) => renderer !== undefined && typeof renderer !== "function")
+    )
+      throw new AppRpcError("invalid_renderer", "The preview renderer is invalid.");
+    return {
+      view: options.view,
+      active: options.active !== false,
+      extractDocumentText: scopedParser(options.extractDocumentText),
+      renderPdf: options.renderPdf,
+      renderPhoto: options.renderPhoto,
+      renderVideo: options.renderVideo,
+    };
   };
   scope.signal.addEventListener(
     "abort",

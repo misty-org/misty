@@ -1,8 +1,8 @@
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 
 export function officialAppNeedsReview(
   app: OfficialApp,
-  installation: UserAppInstallation | undefined,
+  installation: SpaceAppInstallation | undefined,
 ): boolean {
   return Boolean(
     installation?.state === "installed" &&
@@ -14,7 +14,7 @@ export function officialAppNeedsReview(
 
 export function officialAppNeedsConsent(
   app: OfficialApp,
-  installation?: UserAppInstallation,
+  installation?: SpaceAppInstallation,
 ): boolean {
   return (
     installation?.state !== "installed" ||

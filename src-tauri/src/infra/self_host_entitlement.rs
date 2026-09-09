@@ -3,7 +3,7 @@ use crate::{
     infra::credential_store,
 };
 
-const SERVICE: &str = "misty.self-host.entitlement";
+const SERVICE: &str = "com.misty.self-host.entitlement";
 const ACCOUNT: &str = "current";
 const MAX_TOKEN_BYTES: usize = 8 * 1024;
 

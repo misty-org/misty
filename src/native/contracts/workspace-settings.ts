@@ -170,12 +170,6 @@ export interface PluginPanelEntry {
   launcherViews: string[];
 }
 
-export interface ExtensionCommandRequest {
-  pluginId: string;
-  command: string;
-  payload?: Record<string, unknown>;
-}
-
 export interface PluginCommandsSnapshot {
   roots: string[];
   commands: PluginCommandEntry[];

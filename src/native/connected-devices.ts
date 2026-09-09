@@ -8,6 +8,7 @@ import type {
 import { invoke } from "./invoke";
 
 export function connectedDevicesInitialize(request: {
+  instance?: string;
   accountId: string;
   deviceId: string;
   deviceName?: string;
@@ -25,6 +26,7 @@ export function connectedDevicesSubscribeDirectory(path: string): Promise<void> 
 }
 
 export function connectedDevicesConnect(request: {
+  instance?: string;
   deviceId: string;
   address: unknown;
   ticket: string;

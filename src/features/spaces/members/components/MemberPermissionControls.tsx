@@ -314,6 +314,11 @@ const permissionGroups = [
     title: "Planner and connections",
     items: [
       {
+        id: "apps.manage",
+        label: "Manage Space apps",
+        description: "Choose apps, review permissions, and change the shared app order.",
+      },
+      {
         id: "tasks.view",
         label: "View tasks and calendars",
         description: "See shared tasks and published events.",
@@ -332,7 +337,13 @@ const permissionGroups = [
   },
   {
     title: "Misty Ask",
-    items: [{ id: "ask.run", label: "Use Misty Ask", description: "Let Misty work with this Space using your permissions." }],
+    items: [
+      {
+        id: "ask.run",
+        label: "Use Misty Ask",
+        description: "Let Misty work with this Space using your permissions.",
+      },
+    ],
   },
   {
     title: "Storage",

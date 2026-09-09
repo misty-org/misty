@@ -4,6 +4,8 @@
 // failures.
 #![allow(dead_code, unused_imports, unused_variables)]
 
+#[cfg(not(target_os = "macos"))]
+use crate::app::commands::agents_prepare_document;
 mod app;
 mod domain;
 mod error;
@@ -23,7 +25,7 @@ use app::commands::{
     media_search_set_asset_state, media_search_snapshot,
 };
 use app::commands::{
-    agents_device_snapshot, agents_open_citation, agents_prepare_document,
+    agents_device_snapshot, agents_open_citation,
     agents_prepare_scoped_document, agents_register_folder_scope, app_configure_server,
     app_environment_snapshot, app_snapshot, archive_create, archive_extract, archive_list,
     claude_abort, claude_drain_events, claude_send_message, claude_status, clipboard_apply_shared,
@@ -42,17 +44,17 @@ use app::commands::{
     explorer_preview_item, explorer_queue_create_item, explorer_queue_delete_items,
     explorer_queue_paste_blob, explorer_queue_paste_items, explorer_queue_paste_text,
     explorer_queue_rename_item, explorer_queue_rename_items, explorer_rename_item,
-    explorer_save_preview_item, explorer_set_open_association, extension_command_run,
+    explorer_save_preview_item, explorer_set_open_association,
     file_metadata_snapshot, file_sync_apply, file_sync_compare, file_sync_pair_remove,
     file_sync_pair_save, file_sync_pairs_snapshot, file_tools_checksum, file_tools_chmod,
     file_tools_create_symlink, file_tools_read_symlink, file_tools_set_readonly, mail_cache_read,
     mail_cache_remove, mail_cache_write, mobile_cache_purge_account, mobile_cache_read,
-    mobile_cache_remove, mobile_cache_write, notes_store_asset, open_terminal_at_path,
-    operation_queue_cancel, operation_queue_cancel_batch, operation_queue_clear_terminal,
-    operation_queue_pause, operation_queue_pause_all, operation_queue_pause_batch,
-    operation_queue_redo, operation_queue_resolve_conflict, operation_queue_resume,
-    operation_queue_resume_all, operation_queue_resume_batch, operation_queue_retry,
-    operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
+    mobile_cache_remove, mobile_cache_write, navigation_names_snapshot, navigation_names_update,
+    notes_store_asset, open_terminal_at_path, operation_queue_cancel, operation_queue_cancel_batch,
+    operation_queue_clear_terminal, operation_queue_pause, operation_queue_pause_all,
+    operation_queue_pause_batch, operation_queue_redo, operation_queue_resolve_conflict,
+    operation_queue_resume, operation_queue_resume_all, operation_queue_resume_batch,
+    operation_queue_retry, operation_queue_retry_transfer, operation_queue_set_bandwidth_limit,
     operation_queue_set_transfer_profile, operation_queue_snapshot, operation_queue_undo,
     plugin_command_run, plugin_commands_snapshot, plugin_diagnostics_snapshot, plugin_panel_render,
     providers_backend_actions, providers_config_paths, providers_config_security,
@@ -70,7 +72,7 @@ use app::commands::{
     smart_library_prepare_previews, smart_library_resolve_assets, smart_library_scan,
     smart_library_search, smart_library_set_server_folder_id, smart_library_snapshot,
     storage_snapshot, transfers_delete_all, transfers_delete_selected, transfers_snapshot,
-    workspaces_save, workspaces_snapshot, navigation_names_snapshot, navigation_names_update,
+    workspaces_save, workspaces_snapshot,
 };
 #[cfg(target_os = "android")]
 use app::commands::{
@@ -88,47 +90,51 @@ use app::runtime::MistyRuntime;
 use app::shortcut_commands::{
     shortcuts_reassign, shortcuts_reset, shortcuts_snapshot, shortcuts_update,
 };
-#[cfg(desktop)]
-use infra::browser_agent_control::{browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew, BrowserExecutionState};
 #[cfg(any(desktop, target_os = "ios"))]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
     browser_webview_create, browser_webview_forward, browser_webview_hide,
-    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload, browser_webview_set_zoom,
-    browser_webview_set_bounds, browser_webview_set_theme, browser_webview_show,
-    browser_webviews_hide_all, browser_webviews_park_all, browser_webviews_set_companion,
-    browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
-    BrowserSessionState,
+    browser_webview_navigate, browser_webview_reconcile, browser_webview_reload,
+    browser_webview_set_bounds, browser_webview_set_theme, browser_webview_set_zoom,
+    browser_webview_show, browser_webviews_hide_all, browser_webviews_park_all,
+    browser_webview_set_pane_dim, browser_webviews_set_companion, browser_webviews_set_overlay_active,
+    browser_webviews_set_pointer_tracking, BrowserSessionState,
+};
+#[cfg(desktop)]
+use infra::browser_agent_control::{
+    browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew,
+    BrowserExecutionState,
 };
 #[cfg(any(desktop, target_os = "ios"))]
 use infra::browser_shortcuts::browser_shortcuts_update;
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 use infra::code_lsp::{code_lsp_send, code_lsp_start, code_lsp_stop};
-#[cfg(desktop)]
-use infra::code_watcher::{code_stop_watch, code_watch_dir};
-#[cfg(desktop)]
-use infra::code_workspace::{
-    code_create_file, code_create_folder, code_delete_path, code_find_in_files,
-    code_read_text_file, code_rename_path, code_walk_files, code_write_text_file,
-};
 #[cfg(desktop)]
 use infra::misty::fetch_plugin_bundle_checksum;
 use infra::misty::{
     check_system, ensure_local_access_token, fetch_misty_releases, finalize_official_app_install,
-    get_misty_process_status, install_plugin_bundle, launch_misty, official_app_package_ready,
-    official_app_resolve_granted_path, open_external_url, probe_paths, restart_misty,
-    save_authenticated_user, save_verified_license, scan_local_plugins, set_plugin_enabled,
-    sign_out_misty, stop_misty, uninstall_plugin,
+    get_misty_process_status, install_plugin_bundle, launch_misty, official_app_package_path,
+    official_app_package_ready, open_external_url, probe_paths,
+    restart_misty, save_authenticated_user, save_verified_license, scan_local_plugins,
+    set_plugin_enabled, sign_out_misty, stop_misty, uninstall_plugin,
 };
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 use infra::ssh_terminal::{
     terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
 };
-#[cfg(desktop)]
+#[cfg(target_os = "macos")]
+use platform::mini_app::permissions::mini_app_duplicate_file_grant;
+#[cfg(target_os = "macos")]
+use platform::mini_app::permissions::peer::{space_peer_local_identity,space_peer_start,space_peer_snapshot,space_peer_set_peers,space_peer_stop,space_peer_connect,space_peer_request,space_peer_read,space_peer_prepare};
+#[cfg(target_os = "macos")]
+use infra::terminal_service::{
+    terminal_service_call, terminal_service_close, terminal_service_create, terminal_service_request,
+};
+#[cfg(all(desktop, not(target_os = "macos")))]
 use infra::terminal::{
     terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
@@ -141,6 +147,8 @@ use telemetry::TelemetryReporter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Use one TLS provider for backend calls, updates and the peer transport.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     telemetry::initialize();
     let builder = tauri::Builder::default();
 
@@ -157,13 +165,6 @@ pub fn run() {
             let _ = window.set_focus();
         }
     }));
-
-    #[cfg(target_os = "macos")]
-    let builder = builder.plugin(
-        tauri::plugin::Builder::<tauri::Wry>::new("misty-context-menu")
-            .js_init_script_on_all_frames(include_str!("infra/browser_default_context_menu.js"))
-            .build(),
-    );
 
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_drag::init());
@@ -290,6 +291,9 @@ pub fn run() {
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
+                    crate::infra::misty_context::misty_workspace_focused,
+                    crate::infra::misty_context::misty_screen_status,
+                    crate::infra::misty_context::misty_screen_capture,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_open,
                     #[cfg(desktop)]
@@ -336,6 +340,7 @@ pub fn run() {
                     agents_device_snapshot,
                     agents_register_folder_scope,
                     agents_open_citation,
+                    #[cfg(not(target_os = "macos"))]
                     agents_prepare_document,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
@@ -388,8 +393,7 @@ pub fn run() {
                     install_plugin_bundle,
                     #[cfg(desktop)]
                     official_app_package_ready,
-                    #[cfg(desktop)]
-                    official_app_resolve_granted_path,
+                    official_app_package_path,
                     #[cfg(desktop)]
                     finalize_official_app_install,
                     #[cfg(desktop)]
@@ -398,47 +402,53 @@ pub fn run() {
                     uninstall_plugin,
                     get_misty_process_status,
                     open_external_url,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_create,
-                    #[cfg(desktop)]
+                    #[cfg(target_os = "macos")]
+                    terminal_service_create,
+                    #[cfg(target_os = "macos")]
+                    mini_app_duplicate_file_grant,
+                    space_peer_start,
+                    #[cfg(target_os = "macos")]
+                    space_peer_local_identity,
+                    #[cfg(target_os = "macos")]
+                    space_peer_snapshot,
+                    #[cfg(target_os = "macos")]
+                    space_peer_set_peers,
+                    #[cfg(target_os = "macos")]
+                    space_peer_stop,
+                    #[cfg(target_os = "macos")]
+                    space_peer_connect,
+                    #[cfg(target_os = "macos")]
+                    space_peer_request,
+                    #[cfg(target_os = "macos")]
+                    space_peer_read,
+                    space_peer_prepare,
+                    #[cfg(target_os = "macos")]
+                    terminal_service_call,
+                    #[cfg(target_os = "macos")]
+                    terminal_service_close,
+                    #[cfg(target_os = "macos")]
+                    terminal_service_request,
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_write,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_resize,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_interrupt,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_kill,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_ssh_environments,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_ssh_preflight,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     terminal_ssh_trust_host,
-                    #[cfg(desktop)]
-                    code_read_text_file,
-                    #[cfg(desktop)]
-                    code_write_text_file,
-                    #[cfg(desktop)]
-                    code_create_file,
-                    #[cfg(desktop)]
-                    code_create_folder,
-                    #[cfg(desktop)]
-                    code_rename_path,
-                    #[cfg(desktop)]
-                    code_delete_path,
-                    #[cfg(desktop)]
-                    code_walk_files,
-                    #[cfg(desktop)]
-                    code_find_in_files,
-                    #[cfg(desktop)]
-                    code_watch_dir,
-                    #[cfg(desktop)]
-                    code_stop_watch,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_start,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_send,
-                    #[cfg(desktop)]
+                    #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_stop,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_create,
@@ -455,6 +465,8 @@ pub fn run() {
                     browser_webview_set_bounds,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_capture_region,
+                    #[cfg(target_os = "macos")]
+                    infra::browser_macos::host_webview_capture_region,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_reconcile,
                     #[cfg(any(desktop, target_os = "ios"))]
@@ -475,6 +487,7 @@ pub fn run() {
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webviews_set_pointer_tracking,
                     #[cfg(any(desktop, target_os = "ios"))]
+                    browser_webview_set_pane_dim,
                     browser_webviews_set_companion,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_hide,
@@ -612,7 +625,6 @@ pub fn run() {
                     plugin_command_run,
                     #[cfg(desktop)]
                     plugin_panel_render,
-                    extension_command_run,
                     #[cfg(desktop)]
                     plugin_diagnostics_snapshot,
                     providers_snapshot,

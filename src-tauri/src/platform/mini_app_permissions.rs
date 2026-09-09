@@ -1,6 +1,14 @@
 //! Device grants are native-owned, scoped to one live App registration, and
 //! invalidated on close. The main Host is the only permission decision maker.
+#[cfg(target_os = "macos")]
+#[path = "mini_app_capability_worker.rs"]
+mod capability_worker;
+#[cfg(target_os = "macos")]
+#[path = "mini_app_file_index.rs"]
+mod file_index;
 use super::{require_host, MiniAppState};
+#[path = "mini_app_remembered_permissions.rs"]
+mod remembered_permissions;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -16,20 +24,16 @@ use tauri_plugin_dialog::DialogExt;
 mod backup_archive;
 #[path = "mini_app_backup_identity.rs"]
 mod backup_identity;
-#[path = "mini_app_backup_process.rs"]
-mod backup_process;
-#[path = "mini_app_backup_repository.rs"]
-mod backup_repository;
 #[path = "mini_app_backup_stream.rs"]
 mod backup_stream;
 #[path = "mini_app_backups.rs"]
 mod backups;
 #[path = "mini_app_binary_files.rs"]
 mod binary_files;
-#[path = "mini_app_file_trash.rs"]
-mod file_trash;
-#[path = "mini_app_directory_mutations.rs"]
-mod directory_mutations;
+#[path = "mini_app_clipboard.rs"]
+mod clipboard;
+#[path = "mini_app_directories.rs"]
+mod directories;
 #[cfg(target_os = "macos")]
 #[path = "mini_app_directory_bookmark_macos.rs"]
 mod directory_bookmark_macos;
@@ -38,12 +42,10 @@ mod directory_bookmark_macos;
 mod directory_bookmarks;
 #[path = "mini_app_directory_handoff.rs"]
 mod directory_handoff;
-#[path = "mini_app_directories.rs"]
-mod directories;
-#[path = "mini_app_file_transfers.rs"]
-mod file_transfers;
-#[path = "mini_app_clipboard.rs"]
-mod clipboard;
+#[path = "mini_app_directory_mutations.rs"]
+mod directory_mutations;
+#[path = "mini_app_document_processing.rs"]
+pub(crate) mod document_processing;
 #[path = "mini_app_download_process.rs"]
 mod download_process;
 #[path = "mini_app_download_proxy.rs"]
@@ -54,14 +56,18 @@ mod downloads;
 mod file_jobs;
 #[path = "mini_app_file_observation.rs"]
 mod file_observation;
-#[path = "mini_app_media.rs"]
-mod media;
-#[path = "mini_app_file_preview.rs"]
-mod file_preview;
 #[path = "mini_app_file_open.rs"]
 mod file_open;
+#[path = "mini_app_file_preview.rs"]
+mod file_preview;
+#[path = "mini_app_file_transfers.rs"]
+mod file_transfers;
+#[path = "mini_app_file_trash.rs"]
+mod file_trash;
 #[path = "mini_app_host_files.rs"]
 pub mod host_files;
+#[path = "mini_app_media.rs"]
+mod media;
 #[path = "mini_app_text_files.rs"]
 mod text_files;
 
@@ -73,12 +79,30 @@ pub(crate) struct MiniAppProbeDirectory(pub std::path::PathBuf);
 #[path = "mini_app_code_lsp.rs"]
 mod code_lsp;
 
+#[cfg(target_os = "macos")]
+#[path = "mini_app_peer.rs"]
+pub mod peer;
+
+#[cfg(target_os = "macos")]
+#[path = "mini_app_tree_drafts.rs"]
+mod tree_drafts;
+
 pub struct PermissionSet {
+    #[cfg(target_os = "macos")]
+    tree_drafts: HashMap<String, tree_drafts::TreeDraft>,
+    #[cfg(target_os = "macos")]
+    peer_runtime: Option<std::sync::Arc<peer::Runtime>>,
     archive_reads: HashMap<String, file_preview::ReadGuard>,
     #[cfg(target_os = "macos")]
     code_lsp: HashMap<String, code_lsp::ProjectProcess>,
     code_lsp_slots: std::sync::Arc<tokio::sync::Semaphore>,
+    #[cfg(target_os = "macos")]
+    folder_security_scopes: HashMap<String, Arc<directory_bookmark_macos::SecurityScope>>,
     pub(super) owner_namespace: Option<String>,
+    pub(super) native_owner: Option<super::NativeOwner>,
+    pub(super) space_owned: bool,
+    consent_declaration: String,
+    consent_loaded: bool,
     app_id: String,
     version: String,
     declared: HashSet<String>,
@@ -110,6 +134,7 @@ pub struct PermissionStatus {
     app_id: String,
     capability: String,
     granted: bool,
+    remembered: bool,
 }
 
 impl PermissionSet {
@@ -157,6 +182,26 @@ impl PermissionSet {
         document: &Value,
         limit: Option<&[String]>,
     ) -> Result<Self, String> {
+        use sha2::{Digest, Sha256};
+        let mut scopes: Vec<_> = strings(document.get("runtime_capabilities"))?
+            .into_iter()
+            .collect();
+        scopes.sort();
+        let mut network: Vec<_> = strings(document.get("runtime_network_origins"))?
+            .into_iter()
+            .collect();
+        network.sort();
+        let consent_declaration = hex::encode(Sha256::digest(
+            serde_json::to_vec(&json!([
+                app_id,
+                document.get("publisher"),
+                document.get("repository_url"),
+                document.get("permission_version"),
+                scopes,
+                network
+            ]))
+            .map_err(|e| e.to_string())?,
+        ));
         let declared = strings(document.get("runtime_capabilities"))?;
         let declared: HashSet<_> = declared
             .into_iter()
@@ -167,11 +212,21 @@ impl PermissionSet {
             .map(|value| origin(&value))
             .collect::<Result<HashSet<_>, _>>()?;
         Ok(Self {
+            #[cfg(target_os = "macos")]
+            tree_drafts: HashMap::new(),
+            #[cfg(target_os = "macos")]
+            peer_runtime: None,
             archive_reads: HashMap::new(),
             #[cfg(target_os = "macos")]
             code_lsp: HashMap::new(),
             code_lsp_slots: std::sync::Arc::new(tokio::sync::Semaphore::new(8)),
+            #[cfg(target_os = "macos")]
+            folder_security_scopes: HashMap::new(),
             owner_namespace: None,
+            native_owner: None,
+            space_owned: false,
+            consent_declaration,
+            consent_loaded: false,
             app_id: app_id.into(),
             version: document
                 .get("version")
@@ -228,16 +283,22 @@ impl PermissionSet {
             self.granted.remove(capability);
             self.denied.insert(capability.into());
             #[cfg(target_os = "macos")]
-            if capability.starts_with("files.") || capability == "code.execute" { self.code_lsp.clear(); }
+            if capability.starts_with("files.") || capability == "code.execute" {
+                self.code_lsp.clear();
+            }
             if capability.starts_with("files.") {
                 self.archive_reads.clear();
                 self.files.clear();
                 self.folders.clear();
+                #[cfg(target_os = "macos")]
+                self.folder_security_scopes.clear();
                 self.scans.clear();
                 self.directory_shares.clear();
                 self.directory_watches.clear();
                 self.transfers.clear();
                 self.outputs.clear();
+                #[cfg(target_os = "macos")]
+                self.tree_drafts.clear();
                 self.media.clear();
                 self.downloads.clear();
                 self.backup_jobs.clear();
@@ -246,6 +307,8 @@ impl PermissionSet {
             if capability == "media.convert" {
                 self.media.clear();
                 self.outputs.clear();
+                #[cfg(target_os = "macos")]
+                self.tree_drafts.clear();
             }
             if capability == "media.download" {
                 self.downloads.clear();
@@ -293,8 +356,18 @@ fn origin(value: &str) -> Result<String, String> {
 }
 fn capability(method: &str, params: &Value) -> Result<String, String> {
     Ok(match method {
+        "terminal.authorize" => "terminal.execute".into(),
+        "connections.authorize" => "connections.read".into(),
         "code.lsp.startProject" | "code.lsp.sendProject" => "code.execute".into(),
-        "files.sources.open" | "files.rememberDirectory" | "files.reopenDirectory" | "files.shareDirectory" | "files.adoptDirectory" | "files.pickDirectory" | "files.openEntry" if params.get("write") == Some(&Value::Bool(true)) => {
+        "files.sources.open"
+        | "files.rememberDirectory"
+        | "files.reopenDirectory"
+        | "files.shareDirectory"
+        | "files.adoptDirectory"
+        | "files.pickDirectory"
+        | "files.openEntry"
+            if params.get("write") == Some(&Value::Bool(true)) =>
+        {
             "files.write".into()
         }
         "files.createCopy" | "files.appendCopy" | "files.commitCopy" | "files.discardCopy" => {
@@ -320,11 +393,17 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
         | "backups.jobCancel"
         | "backups.jobClose" => "backups.manage".into(),
         "files.openExternal" => "files.open".into(),
-        "files.sources.list" | "files.sources.open" | "files.readBytes" | "files.listArchive" => "files.read".into(),
+        "files.index" | "files.sources.list" | "files.sources.open" | "files.readBytes"
+        | "files.listArchive" | "documents.prepare" => "files.read".into(),
         "files.pick" if params.get("write") == Some(&Value::Bool(true)) => "files.write".into(),
         "files.pick" | "files.pickMany" | "files.readText" => "files.read".into(),
-        "files.listSavedDirectories" | "files.rememberDirectory" | "files.reopenDirectory" | "files.forgetDirectory"
-        | "files.shareDirectory" | "files.adoptDirectory" | "files.cancelDirectoryShare"
+        "files.listSavedDirectories"
+        | "files.rememberDirectory"
+        | "files.reopenDirectory"
+        | "files.forgetDirectory"
+        | "files.shareDirectory"
+        | "files.adoptDirectory"
+        | "files.cancelDirectoryShare"
         | "files.pickDirectory"
         | "files.stat"
         | "files.watchDirectory"
@@ -336,8 +415,22 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
         | "files.scanStatus"
         | "files.scanCancel"
         | "files.scanClose" => "files.read".into(),
-        "files.openTrash" | "files.replaceCopy" | "files.writeText" | "files.createEntry" | "files.renameEntry" | "files.removeEntry"
-        | "files.transferStart" | "files.transferStatus" | "files.transferCancel" | "files.transferClose" => "files.write".into(),
+        "files.openTrash"
+        | "files.replaceCopy"
+        | "files.writeText"
+        | "files.createEntry"
+        | "files.renameEntry"
+        | "files.removeEntry"
+        | "files.treeBegin"
+        | "files.treeDirectory"
+        | "files.treeSymlink"
+        | "files.treeCommit"
+        | "files.treeDiscard"
+        | "files.transferStart"
+        | "files.transferPrepared"
+        | "files.transferStatus"
+        | "files.transferCancel"
+        | "files.transferClose" => "files.write".into(),
         "appearance.preview" | "appearance.apply" | "appearance.preset" | "appearance.revert" => {
             "appearance.write".into()
         }
@@ -359,7 +452,7 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn mini_app_permission_status(
+pub async fn mini_app_permission_status(
     webview: Webview,
     state: State<'_, MiniAppState>,
     instance: String,
@@ -368,21 +461,26 @@ pub fn mini_app_permission_status(
 ) -> Result<PermissionStatus, String> {
     require_host(&webview)?;
     let capability = capability(&method, &params)?;
-    let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-    let permissions = &registry.get(&instance).ok_or("App is closed.")?.permissions;
+    remembered_permissions::restore_instance(&state, &instance).await?;
+    let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+    let permissions = &mut registry
+        .get_mut(&instance)
+        .ok_or("App is closed.")?
+        .permissions;
     permissions.declaration(&capability)?;
     if permissions.denied.contains(&capability) {
         return Err("Permission was denied or revoked for this session. Reopen the App to request it again.".into());
     }
     Ok(PermissionStatus {
         app_id: permissions.app_id.clone(),
+        remembered: permissions.owner_namespace.is_some(),
         granted: permissions.granted.contains(&capability),
         capability,
     })
 }
 
 #[tauri::command]
-pub fn mini_app_permission_decide(
+pub async fn mini_app_permission_decide(
     app: AppHandle,
     webview: Webview,
     state: State<'_, MiniAppState>,
@@ -391,41 +489,23 @@ pub fn mini_app_permission_decide(
     allowed: bool,
 ) -> Result<(), String> {
     require_host(&webview)?;
-    state
-        .0
-        .lock()
-        .map_err(|_| "App registry unavailable.")?
-        .get_mut(&instance)
-        .ok_or("App is closed.")?
-        .permissions
-        .decide(&capability, allowed)?;
-    if !allowed {
-        app.emit_to(
-            tauri::EventTarget::webview("main"),
-            "misty:mini-app-revoked",
-            json!({"instance": instance, "capability": capability}),
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    remembered_permissions::decide_instance(&app, &state, &instance, &capability, allowed).await
 }
 
 #[tauri::command]
-pub fn mini_app_permission_list(
+pub async fn mini_app_permission_list(
     webview: Webview,
     state: State<'_, MiniAppState>,
     instance: String,
 ) -> Result<Vec<String>, String> {
     require_host(&webview)?;
-    let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-    let mut result: Vec<_> = registry
-        .get(&instance)
+    remembered_permissions::restore_instance(&state, &instance).await?;
+    let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+    let permissions = &mut registry
+        .get_mut(&instance)
         .ok_or("App is closed.")?
-        .permissions
-        .granted
-        .iter()
-        .cloned()
-        .collect();
+        .permissions;
+    let mut result: Vec<_> = permissions.granted.iter().cloned().collect();
     result.sort();
     Ok(result)
 }
@@ -460,14 +540,26 @@ pub async fn mini_app_device_call(
     params: Value,
 ) -> Result<Value, String> {
     require_host(&webview)?;
-    if method == "files.listArchive" { return file_preview::list_archive(&state, &instance, params).await; }
+    #[cfg(target_os = "macos")]
+    if method == "files.index" {
+        return file_index::execute(app, &state, &instance, params).await;
+    }
+    if method == "files.renderOwnedImage" {
+        return document_processing::image_preview(&state, &instance, params).await;
+    }
+    if method == "files.listArchive" {
+        return file_preview::list_archive(&state, &instance, params).await;
+    }
     #[cfg(target_os = "macos")]
     match method.as_str() {
         "code.lsp.startProject" => return code_lsp::start(app, &state, &instance, params).await,
         "code.lsp.sendProject" => return code_lsp::send(&state, &instance, params).await,
         "code.lsp.releaseProject" => {
             let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            let permissions = &mut registry.get_mut(&instance).ok_or("App is closed.")?.permissions;
+            let permissions = &mut registry
+                .get_mut(&instance)
+                .ok_or("App is closed.")?
+                .permissions;
             return code_lsp::release(permissions, params);
         }
         _ => {}
@@ -480,9 +572,24 @@ pub async fn mini_app_device_call(
         return Ok(media::availability());
     }
     if method == "backups.status" {
-        let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        if !registry.contains_key(&instance) {
-            return Err("App is closed.".into());
+        let (root, app_id, version) = {
+            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+            let app = registry.get(&instance).ok_or("App is closed.")?;
+            (
+                app.root.clone(),
+                app.permissions.app_id.clone(),
+                app.permissions.version.clone(),
+            )
+        };
+        let verified = tokio::task::spawn_blocking(move || {
+            document_processing::verified_service(&root, &app_id, &version, "backup-archive", 1)
+        })
+        .await
+        .map_err(|_| "Backup service verification stopped.")?;
+        if let Err(error) = verified {
+            return Ok(
+                json!({"available":false,"format":"misty-tar-v1","message":format!("Update Backups to install its archive service. {error}")}),
+            );
         }
         return Ok(backups::availability());
     }
@@ -493,13 +600,22 @@ pub async fn mini_app_device_call(
         }
         return Ok(downloads::availability());
     }
-    if matches!(method.as_str(), "files.listSavedDirectories" | "files.rememberDirectory" | "files.reopenDirectory" | "files.forgetDirectory") {
+    if matches!(
+        method.as_str(),
+        "files.listSavedDirectories"
+            | "files.rememberDirectory"
+            | "files.reopenDirectory"
+            | "files.forgetDirectory"
+    ) {
         #[cfg(target_os = "macos")]
         return directory_bookmarks::execute(&state, &instance, &method, &params).await;
         #[cfg(not(target_os = "macos"))]
         return Err("Saved folder access is not implemented on this platform yet.".into());
     }
-    if matches!(method.as_str(), "files.shareDirectory" | "files.adoptDirectory" | "files.cancelDirectoryShare") {
+    if matches!(
+        method.as_str(),
+        "files.shareDirectory" | "files.adoptDirectory" | "files.cancelDirectoryShare"
+    ) {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
         return directory_handoff::execute(&mut registry, &instance, &method, &params);
     }
@@ -519,17 +635,30 @@ pub async fn mini_app_device_call(
         return Ok(Value::Null);
     }
     let required = capability(&method, &params)?;
+    if method == "documents.prepare" {
+        return document_processing::execute(&state, &instance, params).await;
+    }
     let (epoch, mut cancellation) = {
         let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
         let permissions = &registry.get(&instance).ok_or("App is closed.")?.permissions;
         permissions.authorize(&required)?;
         (permissions.epoch, permissions.cancellation.subscribe())
     };
-    if matches!(method.as_str(), "files.listDirectory" | "files.openEntry" | "files.createEntry" | "files.renameEntry" | "files.removeEntry" | "files.watchDirectory") {
+    if matches!(
+        method.as_str(),
+        "files.listDirectory"
+            | "files.openEntry"
+            | "files.createEntry"
+            | "files.renameEntry"
+            | "files.removeEntry"
+            | "files.watchDirectory"
+    ) {
         let request = {
             let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
             let permissions = &registry.get(&instance).ok_or("App is closed.")?.permissions;
-            if permissions.epoch != epoch { return Err("Folder permission changed.".into()); }
+            if permissions.epoch != epoch {
+                return Err("Folder permission changed.".into());
+            }
             directories::prepare(permissions, &method, &params)?
         };
         let pending = tokio::task::spawn_blocking(move || {
@@ -542,10 +671,21 @@ pub async fn mini_app_device_call(
             result = pending => result.map_err(|_| "The folder operation failed.")?,
         };
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry.get_mut(&instance).ok_or("App is closed.")?.permissions;
+        let permissions = &mut registry
+            .get_mut(&instance)
+            .ok_or("App is closed.")?
+            .permissions;
         return request.commit(permissions, result?);
     }
     if method == "backups.repositoryOpen" {
+        let worker_lease = document_processing::ServiceLease::acquire_service(
+            &state,
+            &instance,
+            "backups",
+            "backup-archive",
+            1,
+        )
+        .await?;
         let handle = params
             .get("directory")
             .and_then(Value::as_str)
@@ -583,7 +723,15 @@ pub async fn mini_app_device_call(
             let _ = cancellation.changed().await;
             cancellation_flag.store(true, std::sync::atomic::Ordering::Release);
         });
-        let opened = backups::open(directory.clone(), owner, create, name, cancelled).await;
+        let opened = backups::open(
+            Arc::new(worker_lease),
+            directory.clone(),
+            owner,
+            create,
+            name,
+            cancelled,
+        )
+        .await;
         watcher.abort();
         let mut repository = opened?;
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -625,24 +773,49 @@ pub async fn mini_app_device_call(
                 let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
                 file_trash::prepare(&registry.get(&instance).ok_or("App is closed.")?.permissions)?
             };
-            let root = app.path().app_data_dir().map_err(|_| "App storage is unavailable.")?.join("app-trash");
+            let root = app
+                .path()
+                .app_data_dir()
+                .map_err(|_| "App storage is unavailable.")?
+                .join("app-trash");
             #[cfg(debug_assertions)]
-            let root = app.try_state::<MiniAppProbeDirectory>().map(|probe| probe.0.join(".misty-app-trash")).unwrap_or(root);
+            let root = app
+                .try_state::<MiniAppProbeDirectory>()
+                .map(|probe| probe.0.join(".misty-app-trash"))
+                .unwrap_or(root);
             let storage_owner = owner.clone();
-            let directory = tokio::task::spawn_blocking(move || file_trash::open_directory(&root, &storage_owner))
-                .await.map_err(|_| "Could not open App Trash.")??;
+            let directory = tokio::task::spawn_blocking(move || {
+                file_trash::open_directory(&root, &storage_owner)
+            })
+            .await
+            .map_err(|_| "Could not open App Trash.")??;
             let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            return file_trash::commit(&mut registry.get_mut(&instance).ok_or("App is closed.")?.permissions, &owner, epoch, directory);
+            return file_trash::commit(
+                &mut registry
+                    .get_mut(&instance)
+                    .ok_or("App is closed.")?
+                    .permissions,
+                &owner,
+                epoch,
+                directory,
+            );
         }
     }
     if method == "files.pickDirectory" {
         let (send, receive) = tokio::sync::oneshot::channel();
-        let picker = app.dialog().file().set_title("Choose a folder to share with this App");
+        let picker = app
+            .dialog()
+            .file()
+            .set_title("Choose a folder to share with this App");
         #[cfg(all(debug_assertions, target_os = "macos"))]
         let picker = if let Some(probe) = app.try_state::<MiniAppProbeDirectory>() {
             picker.set_directory(&probe.0)
-        } else { picker };
-        picker.pick_folder(move |folder| { let _ = send.send(folder); });
+        } else {
+            picker
+        };
+        picker.pick_folder(move |folder| {
+            let _ = send.send(folder);
+        });
         let path = tokio::select! {
             biased;
             _ = cancellation.changed() => return Err("Folder permission was revoked or the App closed.".into()),
@@ -657,8 +830,15 @@ pub async fn mini_app_device_call(
             .map_err(|_| "This folder location is not supported.")?;
         #[cfg(all(debug_assertions, target_os = "macos"))]
         if let Some(probe) = app.try_state::<MiniAppProbeDirectory>() {
-            let expected = probe.0.canonicalize().map_err(|_| "Disposable export folder is unavailable")?;
-            if path.canonicalize().map_err(|_| "Selected folder is unavailable")? != expected {
+            let expected = probe
+                .0
+                .canonicalize()
+                .map_err(|_| "Disposable export folder is unavailable")?;
+            if path
+                .canonicalize()
+                .map_err(|_| "Selected folder is unavailable")?
+                != expected
+            {
                 return Err("Native probe permits only its disposable export folder.".into());
             }
         }
@@ -697,19 +877,92 @@ pub async fn mini_app_device_call(
         );
         return Ok(json!({"handle":handle,"name":name}));
     }
-    if matches!(method.as_str(), "files.stat" | "files.watchStatus" | "files.watchClose") {
+    if matches!(
+        method.as_str(),
+        "files.stat" | "files.watchStatus" | "files.watchClose"
+    ) {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry.get_mut(&instance).ok_or("App is closed.")?.permissions;
+        let permissions = &mut registry
+            .get_mut(&instance)
+            .ok_or("App is closed.")?
+            .permissions;
         permissions.authorize(&required)?;
-        if permissions.epoch != epoch { return Err("App permission changed.".into()); }
+        if permissions.epoch != epoch {
+            return Err("App permission changed.".into());
+        }
         return file_observation::execute(permissions, &method, &params);
     }
+    #[cfg(target_os = "macos")]
+    if method.starts_with("files.tree") {
+        let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+        let p = &mut registry
+            .get_mut(&instance)
+            .ok_or("App is closed.")?
+            .permissions;
+        if p.epoch != epoch {
+            return Err("App permission changed.".into());
+        }
+        return tree_drafts::execute(p, &method, &params);
+    }
+    let operation_worker = if matches!(
+        method.as_str(),
+        "files.transferStart" | "files.transferPrepared" | "files.scanStart"
+    ) {
+        let app_id = {
+            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+            registry
+                .get(&instance)
+                .ok_or("App is closed.")?
+                .permissions
+                .app_id
+                .clone()
+        };
+        Some(Arc::new(
+            document_processing::ServiceLease::acquire_service(
+                &state,
+                &instance,
+                &app_id,
+                "file-operations",
+                1,
+            )
+            .await?,
+        ))
+    } else if matches!(
+        method.as_str(),
+        "backups.backupStart"
+            | "backups.restoreStart"
+            | "backups.snapshotsStart"
+            | "backups.checkStart"
+    ) {
+        Some(Arc::new(
+            document_processing::ServiceLease::acquire_service(
+                &state,
+                &instance,
+                "backups",
+                "backup-archive",
+                1,
+            )
+            .await?,
+        ))
+    } else {
+        None
+    };
     if method.starts_with("files.transfer") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry.get_mut(&instance).ok_or("App is closed.")?.permissions;
+        let permissions = &mut registry
+            .get_mut(&instance)
+            .ok_or("App is closed.")?
+            .permissions;
         permissions.authorize(&required)?;
-        if permissions.epoch != epoch { return Err("App permission changed.".into()); }
-        return file_transfers::execute(permissions, &method, &params);
+        if permissions.epoch != epoch {
+            return Err("App permission changed.".into());
+        }
+        return file_transfers::execute_with_worker(
+            permissions,
+            &method,
+            &params,
+            operation_worker,
+        );
     }
     if method.starts_with("files.scan") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -721,7 +974,7 @@ pub async fn mini_app_device_call(
         if permissions.epoch != epoch {
             return Err("App permission changed.".into());
         }
-        return file_jobs::execute(permissions, &method, &params);
+        return file_jobs::execute_with_worker(permissions, &method, &params, operation_worker);
     }
     if method.starts_with("backups.") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -733,7 +986,7 @@ pub async fn mini_app_device_call(
         if permissions.epoch != epoch {
             return Err("App permission changed.".into());
         }
-        return backups::execute(permissions, &method, &params);
+        return backups::execute_with_worker(permissions, &method, &params, operation_worker);
     }
     if method.starts_with("downloads.") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -876,12 +1129,17 @@ pub async fn mini_app_device_call(
         }
         "clipboard.writeImage" => {
             let image = clipboard::decode_png(&params)?;
-            arboard::Clipboard::new().map_err(|_| "The clipboard is unavailable.")?
-                .set_image(image).map_err(|_| "The image could not be copied.")?;
+            arboard::Clipboard::new()
+                .map_err(|_| "The clipboard is unavailable.")?
+                .set_image(image)
+                .map_err(|_| "The image could not be copied.")?;
             Ok(Value::Null)
         }
         "clipboard.readImage" => {
-            let image = match arboard::Clipboard::new().map_err(|_| "The clipboard is unavailable.")?.get_image() {
+            let image = match arboard::Clipboard::new()
+                .map_err(|_| "The clipboard is unavailable.")?
+                .get_image()
+            {
                 Ok(image) => image,
                 Err(arboard::Error::ContentNotAvailable) => return Ok(Value::Null),
                 Err(_) => return Err("The clipboard image could not be read.".into()),
@@ -891,7 +1149,10 @@ pub async fn mini_app_device_call(
         "files.openExternal" => file_open::execute(permissions, &params),
         // Source descriptors and paths remain in the compiled Host adapter. This
         // device handshake applies the same native revocable grant before access.
-        "files.sources.list" | "files.sources.open" => Ok(Value::Null),
+        "files.sources.list"
+        | "files.sources.open"
+        | "terminal.authorize"
+        | "connections.authorize" => Ok(Value::Null),
         "files.readText" | "files.writeText" => text_files::execute(permissions, &method, &params),
         _ => Err("This device operation is not implemented on this platform yet.".into()),
     }
@@ -1159,4 +1420,73 @@ mod tests {
         }
         assert!(public_address("8.8.8.8".parse().unwrap()));
     }
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn search_process_command(
+    executable: &std::path::Path,
+    work: &std::path::Path,
+    index: &std::path::Path,
+) -> std::io::Result<std::process::Command> {
+    media::process::command_with_storage(executable, work, Some(index))
+}
+
+/// Duplicate a read-only temporary file between two live views of the same
+/// Space installation. Package RPCs cannot choose either native instance.
+#[tauri::command]
+pub fn mini_app_duplicate_file_grant(
+    webview: Webview,
+    state: State<'_, MiniAppState>,
+    source_instance: String,
+    target_instance: String,
+    handle: String,
+) -> Result<Value, String> {
+    require_host(&webview)?;
+    let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+    let (file, owner, app, version) = {
+        let p = &registry
+            .get(&source_instance)
+            .ok_or("Source view closed.")?
+            .permissions;
+        p.authorize("files.read")?;
+        if !p.space_owned || p.native_owner.is_none() {
+            return Err("A Space app is required.".into());
+        }
+        let source = p
+            .files
+            .get(&handle)
+            .ok_or("Source file grant is unavailable.")?;
+        if source.writable {
+            return Err("Only read-only files may be handed to another view.".into());
+        }
+        (
+            source
+                .file
+                .try_clone()
+                .map_err(|_| "Could not duplicate the owned file.")?,
+            p.native_owner.clone(),
+            p.app_id.clone(),
+            p.version.clone(),
+        )
+    };
+    let p = &mut registry
+        .get_mut(&target_instance)
+        .ok_or("Target view closed.")?
+        .permissions;
+    p.authorize("files.read")?;
+    if !p.space_owned || p.native_owner != owner || p.app_id != app || p.version != version {
+        return Err("File grants cannot cross accounts, Spaces, apps, or releases.".into());
+    }
+    if p.files.len() >= 256 {
+        return Err("Close a file before opening another.".into());
+    }
+    let id = uuid::Uuid::new_v4().to_string();
+    p.files.insert(
+        id.clone(),
+        FileGrant {
+            file,
+            writable: false,
+        },
+    );
+    Ok(json!({"handle": id}))
 }

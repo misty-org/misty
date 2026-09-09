@@ -1,4 +1,5 @@
-import { act } from "react";
+import { act, useEffect } from "react";
+import { createRoot } from "react-dom/client";
 import { fireEvent, within, waitFor } from "@testing-library/react";
 import {
   createMistyAppSDK,
@@ -176,6 +177,19 @@ it("mounts the real Inbox screen through SDK mail/cache, emits its tab route and
     await act(async () => mounted!.update({ ...context, active: false, focused: false }));
     fireEvent.keyDown(document, { key: "c" });
     expect(within(document.body).queryByRole("dialog")).toBeNull();
+    // Match host teardown: the abort listener fires during another React root's commit.
+    const errors = vi.spyOn(console, "error");
+    const parentElement = document.createElement("div");
+    const parentRoot = createRoot(parentElement);
+    function Parent() {
+      useEffect(() => () => lifetime.abort(), []);
+      return null;
+    }
+    try {
+      await act(async () => parentRoot.render(<Parent />));
+      await act(async () => parentRoot.unmount());
+      expect(errors.mock.calls.some(args => String(args[0]).includes("synchronously unmount"))).toBe(false);
+    } finally { errors.mockRestore(); }
   } finally {
     await act(async () => {
       await mounted?.unmount();

@@ -2,7 +2,6 @@
 use super::{
     backup_archive::{Report, Source},
     backup_identity::{self, OsVault, RepositoryIdentity},
-    backup_repository::RepositoryServer,
     backup_stream, PermissionSet,
 };
 use cap_std::fs::Dir;
@@ -22,7 +21,6 @@ pub struct BackupRepository {
     directory: Arc<Dir>,
     name: String,
     password: Arc<Zeroizing<String>>,
-    server: RepositoryServer,
 }
 impl BackupRepository {
     pub(super) fn uses_handle(&self, handle: &str) -> bool {
@@ -69,6 +67,7 @@ pub fn availability() -> Value {
 }
 
 pub async fn open(
+    lease: Arc<super::document_processing::ServiceLease>,
     directory: Arc<Dir>,
     owner: String,
     create: bool,
@@ -84,13 +83,18 @@ pub async fn open(
         .await
         .map_err(|_| "Repository setup stopped unexpectedly.")??;
         let password = pending.password.clone();
-        let server = RepositoryServer::start(directory.clone()).await?;
-        let endpoint = server.endpoint().to_owned();
+        let repository_dir = directory.clone();
         let init_tool = executable.clone();
         let init_password = password.clone();
         let init_cancel = cancel.clone();
         tokio::task::spawn_blocking(move || {
-            backup_stream::initialize(&init_tool, &endpoint, &init_password, init_cancel)
+            backup_stream::initialize(
+                &lease,
+                &init_tool,
+                &repository_dir,
+                &init_password,
+                init_cancel,
+            )
         })
         .await
         .map_err(|_| "Repository initialization stopped unexpectedly.")??;
@@ -103,7 +107,7 @@ pub async fn open(
         })
         .await
         .map_err(|_| "Repository identity setup stopped unexpectedly.")??;
-        Ok(repository("", directory, identity, server))
+        Ok(repository("", directory, identity))
     } else {
         let identity_dir = directory.clone();
         let identity = tokio::task::spawn_blocking(move || {
@@ -111,20 +115,25 @@ pub async fn open(
         })
         .await
         .map_err(|_| "Repository opening stopped unexpectedly.")??;
-        let server = RepositoryServer::start(directory.clone()).await?;
         // Validate the repository and credential before returning a live handle.
-        let endpoint = server.endpoint().to_owned();
+        let repository_dir = directory.clone();
         let password = identity.password.clone();
         let validation_cancel = cancel.clone();
         tokio::task::spawn_blocking(move || {
-            backup_stream::snapshots(&executable, &endpoint, &password, validation_cancel)
+            backup_stream::snapshots(
+                &lease,
+                &executable,
+                &repository_dir,
+                &password,
+                validation_cancel,
+            )
         })
         .await
         .map_err(|_| "Repository validation stopped unexpectedly.")??;
         if cancel.load(Ordering::Acquire) {
             return Err("Backup permission was revoked while opening the repository.".into());
         }
-        Ok(repository("", directory, identity, server))
+        Ok(repository("", directory, identity))
     }
 }
 
@@ -132,14 +141,12 @@ fn repository(
     folder_handle: &str,
     directory: Arc<Dir>,
     identity: RepositoryIdentity,
-    server: RepositoryServer,
 ) -> BackupRepository {
     BackupRepository {
         folder_handle: folder_handle.into(),
         directory,
         name: identity.name,
         password: Arc::new(identity.password),
-        server,
     }
 }
 
@@ -267,6 +274,20 @@ pub fn execute(
     method: &str,
     params: &Value,
 ) -> Result<Value, String> {
+    #[cfg(all(test, target_os = "macos"))]
+    let lease = Some(super::document_processing::ServiceLease::fixture_worker(
+        "backup-archive",
+    ));
+    #[cfg(not(all(test, target_os = "macos")))]
+    let lease = None;
+    execute_with_worker(permissions, method, params, lease)
+}
+pub fn execute_with_worker(
+    permissions: &mut PermissionSet,
+    method: &str,
+    params: &Value,
+    worker_lease: Option<Arc<super::document_processing::ServiceLease>>,
+) -> Result<Value, String> {
     let repository_id = params
         .get("repository")
         .and_then(Value::as_str)
@@ -303,6 +324,8 @@ pub fn execute(
             Ok(Value::Null)
         }
         "backups.backupStart" => {
+            let worker_lease =
+                worker_lease.ok_or("Update Backups to install its archive service.")?;
             permissions.authorize("files.read")?;
             let source_ids = params
                 .get("sources")
@@ -329,9 +352,8 @@ pub fn execute(
                 .get(repository_id)
                 .ok_or("Open a backup repository first.")?;
             handles.push(repository.folder_handle.clone());
-            let endpoint = repository.server.endpoint().to_owned();
+            let repository_dir = repository.directory.clone();
             let password = repository.password.clone();
-            let commit = repository.server.snapshot_commit_permit();
             let executable = tool()?;
             let (id, state, cancel) = insert_job(
                 permissions,
@@ -342,12 +364,12 @@ pub fn execute(
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
                 let result = backup_stream::backup(
+                    worker_lease,
                     &executable,
-                    &endpoint,
+                    &repository_dir,
                     &password,
                     sources,
                     flag.clone(),
-                    commit,
                     Some(Box::new(permit)),
                 )
                 .map(report);
@@ -356,6 +378,8 @@ pub fn execute(
             Ok(json!({"jobId":id}))
         }
         "backups.restoreStart" => {
+            let worker_lease =
+                worker_lease.ok_or("Update Backups to install its archive service.")?;
             permissions.authorize("files.write")?;
             let snapshot = text(params, "snapshot", 128)?.to_owned();
             let destination_id = text(params, "destination", 128)?;
@@ -372,7 +396,7 @@ pub fn execute(
                 .get(repository_id)
                 .ok_or("Open a backup repository first.")?;
             let repository_folder = repository.folder_handle.clone();
-            let endpoint = repository.server.endpoint().to_owned();
+            let repository_dir = repository.directory.clone();
             let password = repository.password.clone();
             let executable = tool()?;
             let (destination, folder_name) = unique_destination(&parent)?;
@@ -385,8 +409,9 @@ pub fn execute(
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
                 let result = backup_stream::restore(
+                    worker_lease,
                     &executable,
-                    &endpoint,
+                    &repository_dir,
                     &password,
                     &snapshot,
                     destination,
@@ -399,13 +424,15 @@ pub fn execute(
             Ok(json!({"jobId":id}))
         }
         "backups.snapshotsStart" | "backups.checkStart" => {
+            let worker_lease =
+                worker_lease.ok_or("Update Backups to install its native service.")?;
             let permit = worker()?;
             let repository = permissions
                 .backup_repositories
                 .get(repository_id)
                 .ok_or("Open a backup repository first.")?;
             let repository_folder = repository.folder_handle.clone();
-            let endpoint = repository.server.endpoint().to_owned();
+            let repository_dir = repository.directory.clone();
             let password = repository.password.clone();
             let executable = tool()?;
             let initial = if method == "backups.checkStart" {
@@ -419,12 +446,24 @@ pub fn execute(
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
                 let result = if check {
-                    backup_stream::check_repository(&executable, &endpoint, &password, flag.clone())
-                        .map(|_| json!({"verified":true}))
+                    backup_stream::check_repository(
+                        &worker_lease,
+                        &executable,
+                        &repository_dir,
+                        &password,
+                        flag.clone(),
+                    )
+                    .map(|_| json!({"verified":true}))
                 } else {
-                    backup_stream::snapshots(&executable, &endpoint, &password, flag.clone())
-                        .and_then(|bytes| snapshots(&bytes))
-                        .map(|rows| json!({"snapshots":rows}))
+                    backup_stream::snapshots(
+                        &worker_lease,
+                        &executable,
+                        &repository_dir,
+                        &password,
+                        flag.clone(),
+                    )
+                    .and_then(|bytes| snapshots(&bytes))
+                    .map(|rows| json!({"snapshots":rows}))
                 };
                 drop(permit);
                 finish(&state, &flag, result);

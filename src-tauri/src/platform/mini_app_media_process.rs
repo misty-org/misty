@@ -26,12 +26,31 @@ const PROFILE: &str = r#"(version 1)
 
 #[cfg(target_os = "macos")]
 pub(crate) fn command(executable: &Path, work: &Path) -> std::io::Result<Command> {
+    command_with_storage(executable, work, None)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn command_with_storage(
+    executable: &Path,
+    work: &Path,
+    storage: Option<&Path>,
+) -> std::io::Result<Command> {
     use std::os::unix::process::CommandExt;
     let executable = executable.canonicalize()?;
     let work = work.canonicalize()?;
     let mut command = Command::new("/usr/bin/sandbox-exec");
+    let profile = if storage.is_some() {
+        format!("{PROFILE}\n(allow file-read* file-write* (subpath (param \"INDEX\")))")
+    } else {
+        PROFILE.to_string()
+    };
+    if let Some(storage) = storage {
+        command
+            .arg("-D")
+            .arg(format!("INDEX={}", storage.canonicalize()?.display()));
+    }
     command
-        .args(["-p", PROFILE, "-D"])
+        .args(["-p", &profile, "-D"])
         .arg(format!("TOOL={}", executable.display()))
         .arg("-D")
         .arg(format!("WORK={}", work.display()))

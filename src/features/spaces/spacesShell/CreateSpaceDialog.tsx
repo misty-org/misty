@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui";
+import { SpaceAppSelection } from "./SpaceAppSelection";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CreateSpaceNameStep, CreateSpaceTemplateStep } from "./CreateSpaceSteps";
 import { CREATE_STEP_COUNT, type useCreateSpaceDialog } from "./useCreateSpaceDialog";
@@ -51,6 +52,18 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
             />
           ) : null}
 
+          {dialog.step === 1 && (
+            <SpaceAppSelection
+              catalog={dialog.catalog}
+              selected={dialog.selectedApps}
+              onChange={dialog.setSelectedApps}
+            />
+          )}
+          {(dialog.loadError || dialog.createError) && (
+            <p role="alert" className="mt-3 text-sm text-cream-muted">
+              {dialog.loadError || dialog.createError}
+            </p>
+          )}
           <DialogFooter className="mt-5">
             <Button
               variant="outline"
@@ -77,7 +90,15 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
                 Continue <ChevronRight size={14} />
               </Button>
             ) : (
-              <Button type="submit" disabled={dialog.creating || !dialog.name.trim()}>
+              <Button
+                type="submit"
+                disabled={
+                  dialog.creating ||
+                  !dialog.name.trim() ||
+                  !dialog.selectionValid ||
+                  !!dialog.loadError
+                }
+              >
                 {dialog.creating ? "Creating..." : "Create Space"}
               </Button>
             )}

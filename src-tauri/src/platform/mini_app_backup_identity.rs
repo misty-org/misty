@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use zeroize::Zeroizing;
 const MARKER: &str = "misty-backup.json";
-const SERVICE: &str = "misty.native-app.backups";
+const SERVICE: &str = "com.misty.native-app.backups";
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Record {

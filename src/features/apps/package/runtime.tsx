@@ -319,7 +319,7 @@ function releaseRuntime(instanceId: string, root: Root) {
   sessions.delete(instanceId);
   if (sessions.size === 0) currentUser = null;
   generation += 1;
-  root.unmount();
+  queueMicrotask(() => root.unmount());
 }
 
 const officialAppSdkOrigin = "https://misty-sdk.local";

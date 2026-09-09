@@ -4,6 +4,7 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code?: string,
     readonly responseText = "",
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = "ApiRequestError";
@@ -57,4 +58,12 @@ export function decodeApiError(text: string): { code?: string; message: string }
   } catch {
     return { message: apiErrorMessage(undefined, text) };
   }
+}
+
+export function parseRetryAfter(value: string | null): number | undefined {
+  if (!value?.trim()) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }

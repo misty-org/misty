@@ -60,6 +60,34 @@ export function createAiControlsBackend(
     Date.parse(artifact.expiresAt) <= Date.now() ||
     owner.surface.canApply?.(artifact) === false;
   return {
+    async open(input) {
+      if (scope.identity.appId === "agents") {
+        scope.assert("ai.use");
+        const { openMisty } = await import("@/features/misty/handoff");
+        await openMisty({
+          accountId: scope.identity.accountId,
+          spaceId: scope.identity.spaceId,
+          prompt: input.prompt,
+          conversationId: input.conversationId,
+        });
+        return;
+      }
+      const owner = owned();
+      const selection = owner.surface.getSelection?.() ?? undefined;
+      if (input.selectionHash && selection?.contentHash !== input.selectionHash)
+        throw new AppRpcError("selection_changed", "The selection changed. Choose it again.");
+      const { openMisty } = await import("@/features/misty/handoff");
+      const { mistyContextRef } = await import("@/features/misty/context");
+      await openMisty({
+        accountId: scope.identity.accountId,
+        spaceId: scope.identity.spaceId,
+        paneId: owner.paneId,
+        surfaceId: owner.surface.surfaceId,
+        prompt: input.prompt,
+        selection,
+        context: owner.surface.getContext().map(mistyContextRef),
+      });
+    },
     snapshot(): MistyAiControlsSnapshot {
       let owner: ReturnType<typeof owned>;
       try {

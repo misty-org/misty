@@ -41,7 +41,9 @@ use crate::infra::connected_devices::{
 };
 use crate::infra::devices::{DeviceSnapshot, DeviceUnmountRequest};
 use crate::infra::directory_size::{DirectorySizeRecord, DirectorySizeRequest};
-use crate::infra::document_intelligence::{PrepareAgentDocumentRequest, PreparedAgentDocument};
+#[cfg(not(target_os = "macos"))]
+use crate::infra::document_intelligence::PrepareAgentDocumentRequest;
+use crate::infra::document_intelligence::PreparedAgentDocument;
 use crate::infra::environment::{AppEnvironmentSnapshot, ServerMode};
 use crate::infra::explorer::SavePreviewRequest;
 use crate::infra::explorer_library::{
@@ -264,6 +266,7 @@ pub async fn agents_open_citation(
     state.agents.open_citation(request).await
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_document(
     request: PrepareAgentDocumentRequest,
@@ -271,12 +274,54 @@ pub async fn agents_prepare_document(
     crate::infra::document_intelligence::prepare_document(request).await
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn agents_prepare_scoped_document(
+    webview: tauri::Webview,
+    instance: String,
+    request: PrepareScopedAgentDocumentRequest,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<PreparedAgentDocument> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can process approved device scopes.".into(),
+        ));
+    }
+    let lease = Arc::new(
+        crate::infra::document_intelligence::ServiceLease::acquire(&native, &instance, "files")
+            .await
+            .map_err(crate::error::ApiError::Message)?,
+    );
+    let _cancel = lease.cancel_on_drop();
+    let target = state.agents.scoped_document_path(request).await?;
+    let worker = lease.clone();
+    let result = tokio::task::spawn_blocking(move || worker.process(&target, "document"))
+        .await
+        .map_err(|_| crate::error::ApiError::Message("Document worker failed.".into()))?;
+    lease
+        .validate(&native, &instance)
+        .map_err(crate::error::ApiError::Message)?;
+    let response = result.map_err(crate::error::ApiError::Message)?;
+    serde_json::from_value(
+        response
+            .get("document")
+            .cloned()
+            .ok_or_else(|| crate::error::ApiError::Message("No document returned.".into()))?,
+    )
+    .map_err(|_| crate::error::ApiError::Message("Invalid document response.".into()))
+}
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
     request: PrepareScopedAgentDocumentRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedAgentDocument> {
-    state.agents.prepare_scoped_document(request).await
+    let target = state.agents.scoped_document_path(request).await?;
+    crate::infra::document_intelligence::prepare_document(PrepareAgentDocumentRequest {
+        path: target.to_string_lossy().into_owned(),
+    })
+    .await
 }
 
 #[cfg(desktop)]
@@ -805,16 +850,161 @@ pub async fn explorer_calculate_directory_sizes(
     state.directory_size.calculate(request).await
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn search_init(
+    webview: tauri::Webview,
+    instance: String,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<SearchStatus> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files search.".into(),
+        ));
+    }
+    let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+        &native,
+        &instance,
+        "files",
+        "file-search",
+        1,
+    )
+    .await
+    .map_err(crate::error::ApiError::Message)?;
+    let search = state.search.authorized(lease)?;
+    tokio::task::spawn_blocking(move || tauri::async_runtime::block_on(search.init()))
+        .await
+        .map_err(|e| crate::error::ApiError::Message(e.to_string()))?
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn search_get_status(
+    webview: tauri::Webview,
+    instance: String,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<SearchStatus> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files search.".into(),
+        ));
+    }
+    let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+        &native,
+        &instance,
+        "files",
+        "file-search",
+        1,
+    )
+    .await
+    .map_err(crate::error::ApiError::Message)?;
+    let search = state.search.authorized(lease)?;
+    tokio::task::spawn_blocking(move || tauri::async_runtime::block_on(search.status()))
+        .await
+        .map_err(|e| crate::error::ApiError::Message(e.to_string()))?
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn search_start_scan(
+    webview: tauri::Webview,
+    instance: String,
+    request: SearchScanRequest,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<SearchStatus> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files search.".into(),
+        ));
+    }
+    let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+        &native,
+        &instance,
+        "files",
+        "file-search",
+        1,
+    )
+    .await
+    .map_err(crate::error::ApiError::Message)?;
+    let search = state.search.authorized(lease)?;
+    tokio::task::spawn_blocking(move || tauri::async_runtime::block_on(search.start_scan(request)))
+        .await
+        .map_err(|e| crate::error::ApiError::Message(e.to_string()))?
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn search_cancel_scan(
+    webview: tauri::Webview,
+    instance: String,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<SearchStatus> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files search.".into(),
+        ));
+    }
+    let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+        &native,
+        &instance,
+        "files",
+        "file-search",
+        1,
+    )
+    .await
+    .map_err(crate::error::ApiError::Message)?;
+    let search = state.search.authorized(lease)?;
+    tokio::task::spawn_blocking(move || tauri::async_runtime::block_on(search.cancel_scan()))
+        .await
+        .map_err(|e| crate::error::ApiError::Message(e.to_string()))?
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn search_query(
+    webview: tauri::Webview,
+    instance: String,
+    request: SearchQueryRequest,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<Vec<SearchResult>> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files search.".into(),
+        ));
+    }
+    let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+        &native,
+        &instance,
+        "files",
+        "file-search",
+        1,
+    )
+    .await
+    .map_err(crate::error::ApiError::Message)?;
+    let search = state.search.authorized(lease)?;
+    tokio::task::spawn_blocking(move || tauri::async_runtime::block_on(search.query(request)))
+        .await
+        .map_err(|e| crate::error::ApiError::Message(e.to_string()))?
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn search_init(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
     state.search.init().await
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn search_get_status(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
     state.search.status().await
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn search_start_scan(
     request: SearchScanRequest,
@@ -823,11 +1013,13 @@ pub async fn search_start_scan(
     state.search.start_scan(request).await
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn search_cancel_scan(state: State<'_, MistyRuntime>) -> ApiResult<SearchStatus> {
     state.search.cancel_scan().await
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn search_query(
     request: SearchQueryRequest,
@@ -994,6 +1186,45 @@ pub async fn explorer_cancel_drag_preparation(
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn explorer_preview_item(
+    webview: tauri::Webview,
+    instance: String,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+    path: String,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ExplorerPreviewPayload> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files previews.".into(),
+        ));
+    }
+    let lease = std::sync::Arc::new(
+        crate::infra::document_intelligence::ServiceLease::acquire(&native, &instance, "files")
+            .await
+            .map_err(crate::error::ApiError::Message)?,
+    );
+    let _cancel = lease.cancel_on_drop();
+    let explorer = state.explorer.clone().with_image_service(lease.clone());
+    let result = async {
+        #[cfg(desktop)]
+        if path.starts_with("misty://device/") {
+            let materialized = state.connected_devices.materialize(&path).await?;
+            return explorer
+                .preview_item(&materialized.local_path.to_string_lossy())
+                .await;
+        }
+        explorer.preview_item(&path).await
+    }
+    .await;
+    lease
+        .validate(&native, &instance)
+        .map_err(crate::error::ApiError::Message)?;
+    result
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn explorer_preview_item(
     path: String,
@@ -1018,6 +1249,50 @@ pub async fn explorer_save_preview_item(
     state.explorer.save_preview_item(request).await
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn explorer_generate_image_thumbnail(
+    webview: tauri::Webview,
+    instance: String,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+    path: String,
+    max_dimension: u32,
+    modified_ms: Option<u64>,
+    remote_modified: Option<String>,
+    size_bytes: Option<u64>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<GeneratedImageThumbnail> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can access Files previews.".into(),
+        ));
+    }
+    let lease = std::sync::Arc::new(
+        crate::infra::document_intelligence::ServiceLease::acquire(&native, &instance, "files")
+            .await
+            .map_err(crate::error::ApiError::Message)?,
+    );
+    let _cancel = lease.cancel_on_drop();
+    let explorer = state.explorer.clone().with_image_service(lease.clone());
+    let result = async {
+        explorer
+            .generate_image_thumbnail(
+                &path,
+                max_dimension,
+                modified_ms,
+                remote_modified.as_deref(),
+                size_bytes,
+            )
+            .await
+    }
+    .await;
+    lease
+        .validate(&native, &instance)
+        .map_err(crate::error::ApiError::Message)?;
+    result
+}
+
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn explorer_generate_image_thumbnail(
     path: String,
@@ -1118,6 +1393,36 @@ pub async fn smart_library_preflight_import(
     state.smart_library.preflight_import(request).await
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn smart_library_prepare_previews(
+    webview: tauri::Webview,
+    instance: String,
+    request: PrepareSmartLibraryPreviewsRequest,
+    state: State<'_, MistyRuntime>,
+    native: State<'_, crate::platform::mini_app::MiniAppState>,
+) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can process approved Library files.".into(),
+        ));
+    }
+    let lease = Arc::new(
+        crate::infra::document_intelligence::ServiceLease::acquire(&native, &instance, "library")
+            .await
+            .map_err(crate::error::ApiError::Message)?,
+    );
+    let _cancel = lease.cancel_on_drop();
+    let result = state
+        .smart_library
+        .prepare_previews(request, lease.clone())
+        .await;
+    lease
+        .validate(&native, &instance)
+        .map_err(crate::error::ApiError::Message)?;
+    result
+}
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn smart_library_prepare_previews(
     request: PrepareSmartLibraryPreviewsRequest,
@@ -1528,21 +1833,6 @@ pub async fn plugin_panel_render(
     state.plugin_commands.render_panel(request).await
 }
 
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn extension_command_run(
-    request: crate::infra::extension_runtime::ExtensionCommandRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<serde_json::Value> {
-    state.extension_runtime.execute(request).await
-}
-
-#[cfg(mobile)]
-#[tauri::command]
-pub async fn extension_command_run(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
-    Err(mobile_plugins_unavailable())
-}
-
 #[cfg(mobile)]
 #[tauri::command]
 pub async fn plugin_panel_render(_request: serde_json::Value) -> ApiResult<serde_json::Value> {
@@ -1587,7 +1877,61 @@ pub async fn devices_unmount(
         .map_err(|err| ApiError::Message(format!("Device unmount failed: {err}")))?
 }
 
-#[cfg(any(desktop, target_os = "ios"))]
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn connected_devices_initialize(
+    request: InitializeConnectedDevicesRequest,
+    webview: tauri::Webview,
+    apps: State<'_, crate::platform::mini_app::MiniAppState>,
+    state: State<'_, MistyRuntime>,
+) -> ApiResult<ConnectedDevicesSnapshot> {
+    let device_id = request.device_id.clone();
+    let device_name = if request.device_name.trim().is_empty() {
+        "This Misty".to_owned()
+    } else {
+        request.device_name.clone()
+    };
+    #[cfg(target_os = "macos")]
+    let lease = {
+        if webview.label() != "main" {
+            return Err(ApiError::Unavailable(
+                "Only the Host can start device services.".into(),
+            ));
+        }
+        let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
+            &apps,
+            &request.instance,
+            "files",
+            "peer-transport",
+            2,
+        )
+        .await
+        .map_err(ApiError::Unavailable)?;
+        let owner = lease
+            .peer_identity(&request.device_id)
+            .map_err(ApiError::Unavailable)?;
+        if owner.account_id != request.account_id {
+            return Err(ApiError::Unavailable(
+                "The Files session belongs to another account.".into(),
+            ));
+        }
+        std::sync::Arc::new(lease)
+    };
+    let snapshot = state
+        .connected_devices
+        .initialize(
+            request,
+            #[cfg(target_os = "macos")]
+            lease,
+        )
+        .await?;
+    if snapshot.enabled {
+        state.clipboard.set_device_identity(device_id, device_name);
+    }
+    Ok(snapshot)
+}
+
+#[cfg(all(any(desktop, target_os = "ios"), not(target_os = "macos")))]
 #[tauri::command]
 pub async fn connected_devices_initialize(
     request: InitializeConnectedDevicesRequest,
@@ -2408,12 +2752,26 @@ pub async fn file_tools_read_symlink(
 struct Placeholder {}
 
 #[tauri::command]
-pub async fn navigation_names_snapshot(webview: tauri::Webview, state: State<'_, MistyRuntime>, account: String) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if webview.label() != "main" { return Err("Only the trusted Misty shell can read navigation names.".into()); }
+pub async fn navigation_names_snapshot(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
+    if webview.label() != "main" {
+        return Err("Only the trusted Misty shell can read navigation names.".into());
+    }
     Ok(state.navigation_names.snapshot(&account).await)
 }
 #[tauri::command]
-pub async fn navigation_names_update(webview: tauri::Webview, state: State<'_, MistyRuntime>, account: String, key: String, name: Option<String>) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if webview.label() != "main" { return Err("Only the trusted Misty shell can rename navigation.".into()); }
+pub async fn navigation_names_update(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    key: String,
+    name: Option<String>,
+) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
+    if webview.label() != "main" {
+        return Err("Only the trusted Misty shell can rename navigation.".into());
+    }
     state.navigation_names.update(account, key, name).await
 }

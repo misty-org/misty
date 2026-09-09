@@ -53,7 +53,7 @@ export function CreateSpaceTemplateStep({
     <section className="mt-5">
       <p className="m-0 text-sm font-medium">Choose a template</p>
       <p className="mb-3 mt-1 text-xs text-cream-muted">
-        Optional starter content—nothing is locked in.
+        Choose tools and starter material. You can adjust the apps below.
       </p>
       <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1">
         {(templates.length ? templates : blankTemplateFallback).map((template) => (
@@ -64,7 +64,10 @@ export function CreateSpaceTemplateStep({
             type="button"
             onClick={() => onTemplate(template.id)}
           >
-            <span className="block text-sm font-medium">{template.name}</span>
+            <span className="block text-sm font-medium">
+              {template.name}
+              {template.personal ? " · My templates" : ""}
+            </span>
             <span className="mt-1 block text-xs leading-relaxed text-cream-muted">
               {template.description}
             </span>

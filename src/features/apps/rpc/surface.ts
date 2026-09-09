@@ -33,7 +33,9 @@ export function createAppSurfaceBridge(
   return {
     read: () => published,
     async register(adapter: MistySurfaceAdapter) {
-      scope.assert("ai.use");
+      // Publishing an adapter does not execute AI or read its context. Keep the
+      // capability check on guarded callbacks so basic app rendering is independent.
+      scope.assert();
       if (
         !adapter ||
         !surfacesByApp[scope.identity.appId]?.includes(adapter.surfaceId) ||

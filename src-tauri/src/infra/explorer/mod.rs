@@ -15,6 +15,7 @@ use std::{
 #[cfg(target_os = "android")]
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
+#[cfg(not(target_os = "macos"))]
 use image::{
     codecs::{
         gif::GifDecoder,
@@ -67,8 +68,11 @@ const VIRTUAL_PATH_LOCAL: &str = "misty://local";
 const MAX_IMAGE_PREVIEW_DIMENSION: u32 = 1600;
 const DEFAULT_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
 const MAX_GENERATED_IMAGE_THUMBNAIL_DIMENSION: u32 = 384;
+#[cfg(not(target_os = "macos"))]
 const IMAGE_THUMBNAIL_RESIZE_FILTER: FilterType = FilterType::Triangle;
+#[cfg(not(target_os = "macos"))]
 const IMAGE_THUMBNAIL_PNG_COMPRESSION: CompressionType = CompressionType::Fast;
+#[cfg(not(target_os = "macos"))]
 const IMAGE_THUMBNAIL_PNG_FILTER: PngFilterType = PngFilterType::Adaptive;
 const REMOTE_INVENTORY_WAIT_ATTEMPTS: usize = 30;
 const REMOTE_INVENTORY_WAIT_INTERVAL: Duration = Duration::from_millis(100);
@@ -101,11 +105,27 @@ pub struct ExplorerService {
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
     image_thumbnail_cache_dir: PathBuf,
+    #[cfg(target_os = "macos")]
+    image_service: Option<Arc<crate::infra::document_intelligence::ServiceLease>>,
     #[cfg(test)]
     remote_job_cancellation_log: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl ExplorerService {
+    #[cfg(target_os = "macos")]
+    pub(crate) fn with_image_service(mut self, service: Arc<crate::infra::document_intelligence::ServiceLease>) -> Self {
+        let key=hex::encode(Sha256::digest(service.namespace.as_bytes()));
+        self.image_thumbnail_cache_dir=self.image_thumbnail_cache_dir.join("space-owned-v1").join(key);
+        self.image_service=Some(service);
+        self
+    }
+    #[cfg(target_os = "macos")]
+    fn image_service(&self)->ApiResult<Arc<crate::infra::document_intelligence::ServiceLease>> {
+        let service=self.image_service.as_ref().ok_or_else(||ApiError::Message("Open Files in this Space to use previews.".into()))?;
+        if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
+        Ok(service.clone())
+    }
+
     pub fn new(
         environment: AppEnvironmentService,
         proxy: StorageService,
@@ -136,6 +156,8 @@ impl ExplorerService {
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
             image_thumbnail_cache_dir: cache_dir.join("thumbnails"),
+            #[cfg(target_os = "macos")]
+            image_service: None,
             #[cfg(test)]
             remote_job_cancellation_log: None,
         }
