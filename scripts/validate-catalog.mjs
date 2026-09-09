@@ -224,7 +224,7 @@ async function validateOfficialApps(catalog) {
       !app.name ||
       app.publisher !== "Misty" ||
       app.official !== true ||
-      !/^\d+\.\d+\.\d+$/.test(app.version ?? "")
+      !/^\d+\.\d+\.\d+(?:-beta\.[1-9]\d*)?$/.test(app.version ?? "")
     ) {
       fail(`Invalid official app identity for ${app.id}.`);
     }
@@ -235,6 +235,16 @@ async function validateOfficialApps(catalog) {
       !Array.isArray(app.scopes)
     ) {
       fail(`Invalid official app protocol contract for ${app.id}.`);
+    }
+    if (app.about !== undefined && (typeof app.about !== "string" || !app.about.trim() || app.about.length > 2000)) {
+      fail(`${app.id} must have a short, readable About description.`);
+    }
+    if (app.repository_url !== undefined) {
+      let source;
+      try { source = new URL(app.repository_url); } catch { fail(`${app.id} has an invalid source URL.`); }
+      if (source?.protocol !== "https:" || source?.hostname !== "github.com" || source.username || source.password) {
+        fail(`${app.id} must link to an HTTPS GitHub repository.`);
+      }
     }
     if (app.desktop?.runtime === "downloaded") {
       if (app.minimum_host_protocol !== 2 ||
