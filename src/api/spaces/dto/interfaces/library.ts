@@ -206,14 +206,32 @@ export interface LibrarySharedReference {
   updated_at: string;
 }
 
+export interface StorageQuotaDimension {
+  used_bytes: number;
+  reserved_bytes: number;
+  limit_bytes: number;
+  remaining_bytes: number;
+  over_quota?: boolean;
+}
+
 export interface SpaceStorageUsage {
   space_id: string;
+  owner_user_id?: string;
   storage_available?: boolean;
-  /** Usage attributed to the selected Space. */
+  /** Explicit dimensions sent by current servers. */
+  personal?: StorageQuotaDimension;
+  space?: StorageQuotaDimension;
+  personal_used_bytes?: number;
+  personal_reserved_bytes?: number;
+  personal_limit_bytes?: number;
+  personal_remaining_bytes?: number;
+  personal_over_quota?: boolean;
   space_used_bytes?: number;
-  /** Pending storage attributed to the selected Space. */
   space_reserved_bytes?: number;
-  /** Usage across the Space owner's shared storage pool. */
+  space_limit_bytes?: number;
+  space_remaining_bytes?: number;
+  space_over_quota?: boolean;
+  /** Compatibility fields. Current servers mirror the personal dimension. */
   used_bytes?: number;
   reserved_bytes?: number;
   limit_bytes?: number;
