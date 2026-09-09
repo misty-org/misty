@@ -14,7 +14,6 @@ import type { SpaceRequest } from "./types";
 type TaskFilters = {
   status?: SpaceTaskStatus;
   assigneeUserId?: string;
-  assigneeAgentId?: string;
   priority?: SpaceTaskPriority;
   search?: string;
   dueFrom?: string;
@@ -31,7 +30,6 @@ export function createSpaceTasksApi(request: SpaceRequest) {
       const query = new URLSearchParams();
       if (filters.status) query.set("status", filters.status);
       if (filters.assigneeUserId) query.set("assignee_user_id", filters.assigneeUserId);
-      if (filters.assigneeAgentId) query.set("assignee_agent_id", filters.assigneeAgentId);
       if (filters.priority) query.set("priority", filters.priority);
       if (filters.search) query.set("q", filters.search);
       if (filters.dueFrom) query.set("due_from", filters.dueFrom);
@@ -48,7 +46,7 @@ export function createSpaceTasksApi(request: SpaceRequest) {
       spaceId: string,
       task: Pick<SpaceTask, "title" | "notes" | "status" | "priority" | "due_timezone"> &
         Partial<
-          Pick<SpaceTask, "assignee_user_id" | "assignee_agent_id" | "due_at" | "source_refs">
+          Pick<SpaceTask, "assignee_user_id" | "due_at" | "source_refs">
         >,
     ) =>
       request<SpaceTask>(`/spaces/${encodeURIComponent(spaceId)}/tasks`, {
@@ -66,7 +64,7 @@ export function createSpaceTasksApi(request: SpaceRequest) {
           | "status"
           | "priority"
           | "assignee_user_id"
-          | "assignee_agent_id"
+
           | "due_at"
           | "due_timezone"
           | "source_refs"

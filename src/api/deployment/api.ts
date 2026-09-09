@@ -35,6 +35,13 @@ export interface DeploymentTarget {
 export const selfHostedProtocolVersion = 1;
 const deploymentScopeKey = "misty:deployment-scope";
 let cachedTarget: Promise<DeploymentTarget> | null = null;
+let officialAppRuntimeApiBase = "";
+
+/** Configures the API origin for a separately packaged official app. */
+export function configureOfficialAppRuntimeApiBase(apiBase: string): void {
+  officialAppRuntimeApiBase = normalizeApiBaseUrl(apiBase) ?? "";
+  cachedTarget = null;
+}
 
 export function readDeploymentScope(): string {
   try {
@@ -70,6 +77,7 @@ export function resolveDeploymentTarget(): Promise<DeploymentTarget> {
 }
 
 export async function resolveApiBase(): Promise<string> {
+  if (officialAppRuntimeApiBase) return officialAppRuntimeApiBase;
   return (await resolveDeploymentTarget()).apiBase;
 }
 

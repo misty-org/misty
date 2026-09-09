@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Misty provider SDK verification</title>
+<link rel="stylesheet" href="/src/styles/styles.css">
+<style>html,body{margin:0;height:100%;color:#eee}#a{height:90vh;padding-top:32px;box-sizing:border-box}#result{display:block;background:#111;font:12px system-ui;padding:8px}</style>
+</head><body><div id="a"></div><output id="result">Verifying downloaded provider app…</output>
+<script>
+const report = message => { document.getElementById('result').textContent=message; void window.__TAURI_INTERNALS__?.invoke('sdk_probe_complete',{nonce:new URLSearchParams(location.search).get('nonce'),success:false,message}); };
+window.addEventListener('error', event=>report((document.getElementById('result').dataset.stage || 'bootstrap') + ': ' + event.message + ' ' + event.filename + ':' + event.lineno + ':' + event.colno + ' ' + (event.error?.stack || '')));
+window.addEventListener('unhandledrejection', event=>report((document.getElementById('result').dataset.stage || 'bootstrap') + ': ' + String(event.reason) + ' ' + (event.reason?.stack || '')));
+</script><script type="module" src="./sdk-provider-probe.ts"></script></body></html>

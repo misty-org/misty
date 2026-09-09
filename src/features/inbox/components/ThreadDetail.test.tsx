@@ -144,7 +144,7 @@ describe("ThreadDetail", () => {
 
     const iframe = document.querySelector("iframe");
     expect(iframe).not.toBeNull();
-    expect(iframe?.getAttribute("sandbox")).toBe("allow-same-origin allow-popups");
+    expect(iframe?.getAttribute("sandbox")).toBe("allow-same-origin");
     expect(iframe?.getAttribute("srcdoc")).toContain("Make Space");
     expect(iframe?.getAttribute("srcdoc")).toContain("https://fromspace.so");
 
@@ -166,6 +166,7 @@ describe("ThreadDetail", () => {
     const onReply = vi.fn();
     const onConvertToTask = vi.fn();
     const onClipToJournal = vi.fn();
+    const onSummarizeThread = vi.fn(async () => undefined);
 
     const sampleThread: InboxThread = {
       connectionId: "conn-1",
@@ -229,6 +230,7 @@ describe("ThreadDetail", () => {
           onReply={onReply}
           onConvertToTask={onConvertToTask}
           onClipToJournal={onClipToJournal}
+          onSummarizeThread={onSummarizeThread}
           onBack={vi.fn()}
         />,
       );
@@ -243,6 +245,9 @@ describe("ThreadDetail", () => {
     await act(async () => {
       summarizeBtn?.click();
     });
+
+    expect(onSummarizeThread).toHaveBeenCalledWith(sampleThread);
+    expect(container.textContent).not.toContain("AI Thread Summary");
 
     // Click Turn into Task
     const taskBtn = document.querySelector(

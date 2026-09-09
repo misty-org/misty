@@ -1,0 +1,11 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SDK browser fixture</title></head><body>
+<h1>Native Browser SDK fixture</h1><p>This page is local test content.</p>
+<button id="original" onclick="document.getElementById('status').textContent='Clicked original control'">Original control</button>
+<button id="insert" onclick="document.getElementById('original').insertAdjacentHTML('beforebegin','<button>Inserted control</button>')">Insert preceding control</button>
+<p id="status">Ready for inspection</p><a href="/scripts/sdk-browser-page.html?second=1">Next page</a>
+<button onclick="localStorage.setItem('sdk-profile-check','profile-a'); document.getElementById('profile').textContent='Profile: profile-a'">Store profile marker</button>
+<p id="profile"></p><script>document.getElementById('profile').textContent='Profile: '+(localStorage.getItem('sdk-profile-check') || 'empty');</script>
+<a href="/scripts/sdk-browser-page.html?popup=1" target="_blank">Open popup fixture</a>
+<a href="/scripts/sdk-browser-download.txt" download="misty-sdk-probe.txt">Download fixture</a>
+<input type="password" role="button" value="do-not-expose-this">
+</body></html>

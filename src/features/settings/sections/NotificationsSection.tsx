@@ -11,6 +11,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { booleanSetting, SwitchControl } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 
 export function NotificationsSection(props: SettingsContentProps) {
   const [permission, setPermission] = useState<NativeNotificationPermission>("prompt");
@@ -42,14 +43,16 @@ export function NotificationsSection(props: SettingsContentProps) {
     <>
       <SettingsSectionBlock title="Delivery">
         <SettingsRow
-          label="Desktop notifications"
+          label={isNativeMobileBuild ? "Push notifications" : "Desktop notifications"}
           muted={permission === "unsupported" || permission === "denied"}
           description={
             permission === "unsupported"
-              ? "Available in packaged desktop builds."
+              ? `Available in packaged ${isNativeMobileBuild ? "mobile" : "desktop"} builds.`
               : permission === "denied"
-                ? "Blocked by macOS. Allow Misty in System Settings to receive banners."
-                : "Show a native notification when Misty is running in the background."
+                ? `Blocked by ${isNativeMobileBuild ? "iOS" : "macOS"}. Allow Misty in System Settings to receive banners.`
+                : isNativeMobileBuild
+                  ? "Show private, count-only updates while Misty is in the background."
+                  : "Show a native notification when Misty is running in the background."
           }
         >
           <SwitchControl
@@ -77,7 +80,7 @@ export function NotificationsSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Badge count"
-          description="Show contextual counts in Misty and an attention count in the Dock."
+          description={`Show contextual counts in Misty and an attention count on the ${isNativeMobileBuild ? "app icon" : "Dock"}.`}
           last
         >
           <SwitchControl
@@ -93,7 +96,7 @@ export function NotificationsSection(props: SettingsContentProps) {
       <SettingsSectionBlock title="Attention">
         <SettingsRow
           label="Notification sound"
-          description="Play a system sound with background desktop notifications."
+          description={`Play a system sound with background ${isNativeMobileBuild ? "push" : "desktop"} notifications.`}
           muted={!desktopNotificationsActive}
         >
           <SwitchControl

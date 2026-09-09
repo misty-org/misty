@@ -8,7 +8,30 @@ use serde_json::{json, Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 4;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 5;
+
+/// Makes Misty's Browser the default destination for web links introduced by
+/// schema 5. Users can still opt back into the system browser afterward.
+pub(super) fn migrate_external_link_default(
+    root: &mut Map<String, Value>,
+    stored_version: i64,
+) -> bool {
+    if stored_version >= 5 {
+        return false;
+    }
+    let Some(value) = root
+        .get_mut("general")
+        .and_then(Value::as_object_mut)
+        .and_then(|general| general.get_mut("open_links_externally"))
+    else {
+        return false;
+    };
+    if value.as_bool() != Some(true) {
+        return false;
+    }
+    *value = json!(false);
+    true
+}
 
 /// Upgrades values whose old defaults would otherwise make the redesigned
 /// Code workspace look unchanged after installing the new interface.
@@ -182,5 +205,20 @@ mod tests {
         let mut root = object(json!({ "general": { "launch_on_login": true } }));
 
         assert!(!prune_retired_settings(&mut root));
+    }
+
+    #[test]
+    fn makes_in_app_links_the_schema_five_default_once() {
+        let mut root = object(json!({ "general": { "open_links_externally": true } }));
+
+        assert!(migrate_external_link_default(&mut root, 4));
+        assert_eq!(
+            root.get("general")
+                .and_then(Value::as_object)
+                .and_then(|general| general.get("open_links_externally"))
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+        assert!(!migrate_external_link_default(&mut root, 5));
     }
 }

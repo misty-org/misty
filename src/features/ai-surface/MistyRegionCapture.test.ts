@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { captureDataUrlByteLength, regionFromPoints } from "./MistyRegionCapture";
+import { captureDataUrlByteLength } from "./captureAttachment";
+import { regionFromPoints } from "./MistyRegionCapture";
 
 describe("Misty region capture", () => {
   it("normalizes a drag in every direction", () => {

@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Disposable sign-in fixture</title>
+  </head>
+  <body data-fixture="ready">
+    <h1>Sign-in fixture</h1>
+    <textarea aria-label="Draft"></textarea>
+    <script>
+      window.addEventListener("message", (event) => {
+        if (event.origin === location.origin && event.source === window.fixturePopup)
+          window.fixtureResult = event.data;
+      });
+      if (new URLSearchParams(location.search).has("callback")) {
+        window.opener.postMessage(
+          { account: localStorage.getItem("popup-account"), cookie: document.cookie },
+          location.origin,
+        );
+        window.close();
+      }
+    </script>
+  </body>
+</html>

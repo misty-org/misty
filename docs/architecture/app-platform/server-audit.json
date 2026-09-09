@@ -1,0 +1,1990 @@
+[
+  {
+    "verb": "GET",
+    "path": "/activity/inbox",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 171
+  },
+  {
+    "verb": "POST",
+    "path": "/activity/inbox/clear",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 173
+  },
+  {
+    "verb": "POST",
+    "path": "/activity/inbox/seen",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 172
+  },
+  {
+    "verb": "GET",
+    "path": "/agent-runs/{runID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 22
+  },
+  {
+    "verb": "POST",
+    "path": "/agent-runs/{runID}/approvals/{approvalID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 25
+  },
+  {
+    "verb": "POST",
+    "path": "/agent-runs/{runID}/cancel",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 23
+  },
+  {
+    "verb": "POST",
+    "path": "/agent-runs/{runID}/contexts",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 26
+  },
+  {
+    "verb": "POST",
+    "path": "/agent-runs/{runID}/retry",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 24
+  },
+  {
+    "verb": "POST",
+    "path": "/agent-voice/transcriptions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 246
+  },
+  {
+    "verb": "GET",
+    "path": "/agents",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 243
+  },
+  {
+    "verb": "GET",
+    "path": "/agents/{agentID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 244
+  },
+  {
+    "verb": "GET",
+    "path": "/agents/{agentID}/activity",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 21
+  },
+  {
+    "verb": "GET",
+    "path": "/agents/{agentID}/avatar",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 245
+  },
+  {
+    "verb": "POST",
+    "path": "/ai/runs",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 89
+  },
+  {
+    "verb": "GET",
+    "path": "/automations/flows",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 19
+  },
+  {
+    "verb": "POST",
+    "path": "/automations/tools/{toolName}",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 20
+  },
+  {
+    "verb": "GET",
+    "path": "/cloud/connections",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 42
+  },
+  {
+    "verb": "POST",
+    "path": "/cloud/connections/bind",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 45
+  },
+  {
+    "verb": "DELETE",
+    "path": "/cloud/connections/{connectionID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 51
+  },
+  {
+    "verb": "POST",
+    "path": "/cloud/connections/{connectionID}/handoff",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 46
+  },
+  {
+    "verb": "GET",
+    "path": "/cloud/connections/{connectionID}/token",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 49
+  },
+  {
+    "verb": "POST",
+    "path": "/cloud/connections/{provider}/authorize",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 43
+  },
+  {
+    "verb": "POST",
+    "path": "/cloud/handoffs/redeem",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 50
+  },
+  {
+    "verb": "GET",
+    "path": "/connections",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 29,
+    "sdkMethod": "connections.list"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/connections/{connectionID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 32,
+    "sdkMethod": "connections.remove"
+  },
+  {
+    "verb": "GET",
+    "path": "/connections/{connectionID}/social/resources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 33
+  },
+  {
+    "verb": "POST",
+    "path": "/connections/{provider}/authorize",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 30,
+    "sdkMethod": "connections.authorize"
+  },
+  {
+    "verb": "GET",
+    "path": "/devices",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 253
+  },
+  {
+    "verb": "POST",
+    "path": "/devices",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 252
+  },
+  {
+    "verb": "GET",
+    "path": "/devices/peer-ticket-keys",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 257
+  },
+  {
+    "verb": "DELETE",
+    "path": "/devices/{deviceID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 195
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/adopt-legacy",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 196
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/heartbeat",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 254
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/pairing-sessions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 258
+  },
+  {
+    "verb": "GET",
+    "path": "/devices/{deviceID}/pairing-sessions/{sessionID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 259
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/pairing-sessions/{sessionID}/confirm",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 260
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/pairing/redeem",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 261
+  },
+  {
+    "verb": "PUT",
+    "path": "/devices/{deviceID}/pairs/{pairID}/clipboard-consent",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 265
+  },
+  {
+    "verb": "PUT",
+    "path": "/devices/{deviceID}/pairs/{pairID}/name",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 264
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/pairs/{pairID}/revoke",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 266
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/peer-tickets",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 267
+  },
+  {
+    "verb": "GET",
+    "path": "/devices/{deviceID}/peers",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 263
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/presence",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 262
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/revoke",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 255
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/workflow-node-jobs/claim",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 272
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/workflow-node-jobs/{jobID}/complete",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 274
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/workflow-node-jobs/{jobID}/fail",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 275
+  },
+  {
+    "verb": "POST",
+    "path": "/devices/{deviceID}/workflow-node-jobs/{jobID}/lease",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 273
+  },
+  {
+    "verb": "GET",
+    "path": "/mail/accounts",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 34,
+    "sdkMethod": "mail.accounts.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/mail/drafts",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 39,
+    "sdkMethod": "mail.drafts.create"
+  },
+  {
+    "verb": "PUT",
+    "path": "/mail/drafts/{draftID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 40,
+    "sdkMethod": "mail.drafts.update"
+  },
+  {
+    "verb": "POST",
+    "path": "/mail/drafts/{draftID}/send",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 41,
+    "sdkMethod": "mail.drafts.send"
+  },
+  {
+    "verb": "GET",
+    "path": "/mail/folders",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 35,
+    "sdkMethod": "mail.folders.list"
+  },
+  {
+    "verb": "GET",
+    "path": "/mail/threads",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 36,
+    "sdkMethod": "mail.threads.list"
+  },
+  {
+    "verb": "GET",
+    "path": "/mail/threads/{threadID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 37,
+    "sdkMethod": "mail.threads.get"
+  },
+  {
+    "verb": "POST",
+    "path": "/mail/threads/{threadID}/actions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 38,
+    "sdkMethod": "mail.threads.action"
+  },
+  {
+    "verb": "POST",
+    "path": "/mcp",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 176
+  },
+  {
+    "verb": "GET",
+    "path": "/mcp/connections",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 10
+  },
+  {
+    "verb": "POST",
+    "path": "/mcp/connections",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 11
+  },
+  {
+    "verb": "DELETE",
+    "path": "/mcp/connections/{connectionID}",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 13
+  },
+  {
+    "verb": "GET",
+    "path": "/mcp/connections/{connectionID}",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 12
+  },
+  {
+    "verb": "POST",
+    "path": "/mcp/connections/{connectionID}/discover",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 15
+  },
+  {
+    "verb": "POST",
+    "path": "/mcp/connections/{connectionID}/test",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 14
+  },
+  {
+    "verb": "GET",
+    "path": "/mcp/connections/{connectionID}/tools",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 16
+  },
+  {
+    "verb": "POST",
+    "path": "/mcp/oauth/activepieces/authorize",
+    "file": "internal/app/server_mount_mcp_routes.go",
+    "line": 17
+  },
+  {
+    "verb": "GET",
+    "path": "/me",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 115
+  },
+  {
+    "verb": "GET",
+    "path": "/me/avatar",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 120
+  },
+  {
+    "verb": "PUT",
+    "path": "/me/avatar",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 121
+  },
+  {
+    "verb": "POST",
+    "path": "/misty/attachments",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 305
+  },
+  {
+    "verb": "DELETE",
+    "path": "/misty/attachments/{attachmentID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 307
+  },
+  {
+    "verb": "GET",
+    "path": "/misty/attachments/{attachmentID}/content",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 308
+  },
+  {
+    "verb": "PUT",
+    "path": "/misty/attachments/{attachmentID}/content",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 309
+  },
+  {
+    "verb": "POST",
+    "path": "/misty/attachments/{attachmentID}/finalize",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 306
+  },
+  {
+    "verb": "GET",
+    "path": "/misty/conversations",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 300
+  },
+  {
+    "verb": "POST",
+    "path": "/misty/conversations",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 301
+  },
+  {
+    "verb": "DELETE",
+    "path": "/misty/conversations/{conversationID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 302
+  },
+  {
+    "verb": "PATCH",
+    "path": "/misty/conversations/{conversationID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 303
+  },
+  {
+    "verb": "POST",
+    "path": "/misty/conversations/{conversationID}/turns",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 304
+  },
+  {
+    "verb": "POST",
+    "path": "/search",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 200
+  },
+  {
+    "verb": "GET",
+    "path": "/search/global",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 27
+  },
+  {
+    "verb": "POST",
+    "path": "/search/global/visual",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 28
+  },
+  {
+    "verb": "GET",
+    "path": "/search/spaces",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 192
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 52
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 53
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/invitations/{inviteID}/accept",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 98
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/invitations/{inviteID}/decline",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 99
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/resolve/{ticket}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 170
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 59
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 57,
+    "sdkMethod": "spaces.get"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 58
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/action-suggestion-settings",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 130
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/action-suggestion-settings",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 131
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/action-suggestions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 135
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/action-suggestions/{batchID}/accept",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 138
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/action-suggestions/{batchID}/dismiss",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 137
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/action-suggestions/{batchID}/review",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 136
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/agenda",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 62,
+    "sdkMethod": "agenda.list"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/agents",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 87
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/agents/{agentID}/runs",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 90
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/agents/{agentID}/toolbox",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 88
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/attachments/{attachmentID}/download",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 227
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/attachments/{attachmentID}/promote",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 228
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/calendar/events",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 151,
+    "sdkMethod": "calendar.events.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/calendar/events",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 152,
+    "sdkMethod": "calendar.events.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/calendar/events/{eventID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 154,
+    "sdkMethod": "calendar.events.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/calendar/events/{eventID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 153,
+    "sdkMethod": "calendar.events.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/calendar/google/calendars",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 158,
+    "sdkMethod": "calendar.google.calendars"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/calendar/sources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 155,
+    "sdkMethod": "calendar.sources.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/calendar/sources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 156,
+    "sdkMethod": "calendar.sources.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/calendar/sources/{sourceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 157,
+    "sdkMethod": "calendar.sources.delete"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/calendar/sync",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 159,
+    "sdkMethod": "calendar.sync"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/code/github/workspaces",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 15
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/code/github/workspaces",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 16
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/code/github/workspaces/{workspaceID}",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 17
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/code/github/workspaces/{workspaceID}/actions",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 20
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/code/github/workspaces/{workspaceID}/credential-handoff",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 21
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/code/github/workspaces/{workspaceID}/records",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 19
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/code/github/workspaces/{workspaceID}/sync",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 18
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/conversation-follow-ups/{followUpID}/cancel",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 139
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/conversation-follow-ups/{followUpID}/opt-out",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 140
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/conversations",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 108
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/conversations",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 109
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 122
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 121
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/action-suggestion-veto",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 133
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/action-suggestion-veto",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 134
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/action-suggestion-veto",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 132
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 123
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 124
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 126
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 125
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 128
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 127
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/conversations/{conversationID}/read",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 129
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 18,
+    "sdkMethod": "drawings.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 23,
+    "sdkMethod": "drawings.create"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 11
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 12
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 13
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}/comments",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 18
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}/context",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 17
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}/reconcile-webhooks",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 15
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}/records",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 16
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/figma/bindings/{bindingID}/sync",
+    "file": "internal/app/server_mount_figma_routes.go",
+    "line": 14
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 38,
+    "sdkMethod": "drawings.delete"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 28,
+    "sdkMethod": "drawings.get"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 33,
+    "sdkMethod": "drawings.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/assets",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 50
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/assets/uploads",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 55,
+    "sdkMethod": "drawings.assets.reserve"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/assets/uploads/{uploadID}/finalize",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 60,
+    "sdkMethod": "drawings.assets.finalize"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 68
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/assets/{assetID}/download",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 64,
+    "sdkMethod": "drawings.assets.download"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/drawings/{drawingID}/collaboration-ticket",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 43,
+    "sdkMethod": "drawings.collaboration.ticket"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/home",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 60
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/home/visits",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 61
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/integrations",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 179,
+    "sdkMethod": "integrations.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/integrations/github/install",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 10
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/integrations/github/installations",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 12
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/integrations/github/installations/{installationID}",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 13
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/integrations/github/installations/{installationID}/repositories",
+    "file": "internal/app/server_mount_github_code_routes.go",
+    "line": 14
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/integrations/{integrationID}/resources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 180
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/integrations/{integrationID}/resources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 181
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/integrations/{provider}/authorize",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 188
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/integrations/{provider}/bind",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 193,
+    "sdkMethod": "integrations.bind"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/invitations",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 94
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/invitations",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 95
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/invitations/{inviteID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 97
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/invitations/{inviteID}/resend",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 96
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/leave",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 103
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 193
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/album-folders",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 239
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/album-folders",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 240
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/album-folders/{folderID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 242
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/album-folders/{folderID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 241
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/albums",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 229
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/albums",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 230
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 233
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 231
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 232
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 236
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 237
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}/items/{itemID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 238
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}/order",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 235
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/library/albums/{albumID}/organization",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 234
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/asset-stacks",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 211
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/asset-stacks",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 212
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/asset-stacks/{stackID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 214
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/asset-stacks/{stackID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 213
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/discovery",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 196
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/discovery/memory/{memoryID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 198
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/discovery/{kind}/{groupID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 197
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/duplicates/merge",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 201
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/exports/download",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 202
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/facets",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 194
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/grants/{grantID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 208
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/groups",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 243
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/groups",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 244
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/groups/{groupID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 245
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/imports",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 203
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/imports/history",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 204
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/bulk",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 218
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/duplicate",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 219
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/items/{itemID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 220
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/items/{itemID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 221
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/download",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 223
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/preview",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 224
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/provider-import",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 222
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/restore",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 226
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/trash",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 225
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/versions",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 257
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/versions",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 258
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/versions/current",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 259
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/versions/{editID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 261
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/items/{itemID}/versions/{editID}/render",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 260
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/people",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 248
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/people",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 249
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/people/merge",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 250
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/people/policy",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 246
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/people/policy",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 247
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/people/{personID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 253
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/people/{personID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 251
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/library/people/{personID}",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 252
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/library/people/{personID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 256
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/people/{personID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 254
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/people/{personID}/items",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 255
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/pins",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 199
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/library/pins",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 200
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/reauthenticate",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 210
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/search/semantic",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 195
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/shared",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 205
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/shared",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 206
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/shared/{referenceID}/download",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 207
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/uploads",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 215
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/library/uploads/{uploadID}/content",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 216
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/library/uploads/{uploadID}/finalize",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 217
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/library/usage",
+    "file": "internal/app/server_mount_handlers.go",
+    "line": 209
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/members",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 86,
+    "sdkMethod": "spaces.members.list"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/members/{userID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 102
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/members/{userID}/avatar",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 91
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/members/{userID}/permissions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 92
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/members/{userID}/permissions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 93
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 107
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 105
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 106
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/messages/{messageID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 161
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/messages/{messageID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 160
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 163
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 162
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/nodes",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 165
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/nodes",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 166
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/nodes/{nodeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 168
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/nodes/{nodeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 167
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/nodes/{nodeID}/resolve",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 169
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/notes",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 77,
+    "sdkMethod": "notes.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/notes",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 78,
+    "sdkMethod": "notes.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/notes/{noteID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 80,
+    "sdkMethod": "notes.delete"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/notes/{noteID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 79,
+    "sdkMethod": "notes.get"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/notes/{noteID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 83,
+    "sdkMethod": "notes.archive"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/notes/{noteID}/assets",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 94
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/notes/{noteID}/assets/uploads",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 95,
+    "sdkMethod": "notes.assets.reserve"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/notes/{noteID}/assets/uploads/{uploadID}/finalize",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 96,
+    "sdkMethod": "notes.assets.finalize"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/notes/{noteID}/assets/{assetID}",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 98
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/notes/{noteID}/assets/{assetID}/download",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 97,
+    "sdkMethod": "notes.assets.download"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/notes/{noteID}/backlinks",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 85,
+    "sdkMethod": "notes.backlinks"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/notes/{noteID}/collaboration-ticket",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 87,
+    "sdkMethod": "notes.collaboration.ticket"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/notes/{noteID}/metadata",
+    "file": "internal/app/server_mount_drawing_routes.go",
+    "line": 84,
+    "sdkMethod": "notes.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/provider-resources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 182
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/provider-resources",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 183
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/provider-resources/{resourceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 184
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/read",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 164
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/resources/{resourceKind}/{resourceID}/share-with-space",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 141
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/roadmap-node-definitions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 63,
+    "sdkMethod": "roadmaps.nodeDefinitions.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmap-node-definitions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 64,
+    "sdkMethod": "roadmaps.nodeDefinitions.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmap-node-definitions/{definitionID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 66,
+    "sdkMethod": "roadmaps.nodeDefinitions.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmap-node-definitions/{definitionID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 65,
+    "sdkMethod": "roadmaps.nodeDefinitions.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/roadmaps",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 67,
+    "sdkMethod": "roadmaps.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmaps",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 68,
+    "sdkMethod": "roadmaps.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 71,
+    "sdkMethod": "roadmaps.delete"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 69,
+    "sdkMethod": "roadmaps.get"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 70,
+    "sdkMethod": "roadmaps.update"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/edges",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 82,
+    "sdkMethod": "roadmaps.edges.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/edges/{edgeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 84,
+    "sdkMethod": "roadmaps.edges.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/edges/{edgeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 83,
+    "sdkMethod": "roadmaps.edges.update"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/goals",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 75,
+    "sdkMethod": "roadmaps.goals.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 77,
+    "sdkMethod": "roadmaps.goals.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 76,
+    "sdkMethod": "roadmaps.goals.update"
+  },
+  {
+    "verb": "PUT",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/goals/{goalID}/tasks",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 78,
+    "sdkMethod": "roadmaps.goals.setTasks"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/layout",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 85,
+    "sdkMethod": "roadmaps.layout.update"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/milestones",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 72,
+    "sdkMethod": "roadmaps.milestones.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 74,
+    "sdkMethod": "roadmaps.milestones.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 73,
+    "sdkMethod": "roadmaps.milestones.update"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/nodes",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 79,
+    "sdkMethod": "roadmaps.nodes.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 81,
+    "sdkMethod": "roadmaps.nodes.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 80,
+    "sdkMethod": "roadmaps.nodes.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/setup",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 55
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/setup",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 56
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/social/authorities",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 114
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/social/authorities",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 115
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/social/automation-rules",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 116
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/social/automation-rules",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 117
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/social/bindings",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 111
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/social/bindings",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 112
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/social/bindings/{bindingID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 113
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/social/providers",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 110
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/social/scheduled-messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 118
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/social/scheduled-messages",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 119
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/social/scheduled-messages/{scheduledID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 120
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/studio/workflows",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 174
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/studio/workflows",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 175
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/studio/workflows/{resourceID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 176
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/studio/workflows/{workflowID}/versions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 177
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/studio/workflows/{workflowID}/versions",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 178
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/tasks",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 142,
+    "sdkMethod": "tasks.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/tasks",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 143,
+    "sdkMethod": "tasks.create"
+  },
+  {
+    "verb": "DELETE",
+    "path": "/spaces/{spaceID}/tasks/{taskID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 145,
+    "sdkMethod": "tasks.delete"
+  },
+  {
+    "verb": "PATCH",
+    "path": "/spaces/{spaceID}/tasks/{taskID}",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 144,
+    "sdkMethod": "tasks.update"
+  },
+  {
+    "verb": "GET",
+    "path": "/spaces/{spaceID}/tasks/{taskID}/activity",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 146,
+    "sdkMethod": "tasks.activity.list"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/tasks/{taskID}/move",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 147,
+    "sdkMethod": "tasks.move"
+  },
+  {
+    "verb": "POST",
+    "path": "/spaces/{spaceID}/transfer",
+    "file": "internal/app/server_mount_spaces_routes.go",
+    "line": 104
+  }
+]

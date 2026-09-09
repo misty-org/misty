@@ -6,6 +6,17 @@ const LazyProvidersWorkspace = lazy(async () => ({
 const LazyProvidersWorkspacePanel = lazy(async () => ({
   default: (await import("./ProvidersPage")).ProvidersWorkspacePanel,
 }));
+const LazyConnectedStoragePanel = lazy(async () => ({
+  default: (await import("./components/ConnectedStoragePanel")).ConnectedStoragePanel,
+}));
+
+export function ConnectedStoragePanel(props: { onClose(): void }) {
+  return (
+    <Suspense fallback={null}>
+      <LazyConnectedStoragePanel {...props} />
+    </Suspense>
+  );
+}
 
 export function ProvidersWorkspace(props: {
   presentation?: "page" | "overlay";

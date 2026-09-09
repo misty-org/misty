@@ -52,7 +52,6 @@ interface ChatScrollRestorationOptions {
   conversationId: string;
   ready: boolean;
   messages: readonly unknown[];
-  pendingRunCount: number;
   targetMessageId?: string;
 }
 
@@ -111,7 +110,7 @@ export function useChatScrollRestoration(options: ChatScrollRestorationOptions) 
       element.scrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
       writePosition(key, element);
     }
-  }, [key, options.messages, options.pendingRunCount, options.ready, options.targetMessageId]);
+  }, [key, options.messages, options.ready, options.targetMessageId]);
 
   return { scrollRef, onScroll };
 }

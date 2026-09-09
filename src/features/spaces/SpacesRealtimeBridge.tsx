@@ -1,4 +1,4 @@
-import { useExplorerStore } from "@/features/files/explorer";
+import { reportSystemError } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { useEffect, useRef } from "react";
 import { useSpacesStore } from "./store/useSpacesStore";
@@ -15,7 +15,6 @@ export function SpacesRealtimeBridge() {
   const loading = useSpacesStore((state) => state.loading);
   const error = useSpacesStore((state) => state.error);
   const clearError = useSpacesStore((state) => state.clearError);
-  const recordActivity = useExplorerStore((state) => state.recordActivity);
   const reportedErrorRef = useRef("");
 
   useEffect(() => {
@@ -52,10 +51,15 @@ export function SpacesRealtimeBridge() {
       const current = useSpacesStore.getState();
       if (current.error !== error || current.loading) return;
       reportedErrorRef.current = error;
-      recordActivity(spaceActivityMessage(error), "error");
+      reportSystemError({
+        accountId,
+        error,
+        scope: "spaces:realtime",
+        title: "Spaces needs attention",
+      });
     }, 1_200);
     return () => window.clearTimeout(timeout);
-  }, [clearError, error, loading, recordActivity, transitioning, user]);
+  }, [accountId, clearError, error, loading, transitioning, user]);
 
   return null;
 }
@@ -74,8 +78,4 @@ function isReconnectError(message: string): boolean {
     normalized.includes("network request failed") ||
     normalized.includes("while misty reconnects")
   );
-}
-
-function spaceActivityMessage(message: string): string {
-  return `Spaces needs attention: ${message.trim()}`;
 }

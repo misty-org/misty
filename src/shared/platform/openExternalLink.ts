@@ -1,32 +1,39 @@
 import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
-import type { MouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { hasTauriInternals } from "./tauri";
 export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
 
-let shouldOpenLinksExternally = () => false;
-let openProviderAuthorizationInMisty: ((url: string) => void | Promise<void>) | null = null;
+let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
 
-export function configureExternalLinkPreference(getPreference: () => boolean): void {
-  shouldOpenLinksExternally = getPreference;
+export function configureMistyBrowserLinkOpener(
+  opener: ((url: string) => void | Promise<void>) | null,
+): void {
+  openInMistyBrowser = opener;
 }
 
 export function configureProviderAuthorizationLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
 ): void {
-  openProviderAuthorizationInMisty = opener;
+  configureMistyBrowserLinkOpener(opener);
 }
 
 export async function openExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
 
-  if (shouldOpenLinksExternally() && isExternalUrl(href)) {
-    try {
-      await openNativeUrl(href);
-      return;
-    } catch {}
+  if (!isWebUrl(href)) {
+    await openSystemExternalLink(href);
+    return;
+  }
+
+  if (openInMistyBrowser) {
+    await openInMistyBrowser(href);
+    return;
+  }
+  if (hasTauriInternals()) {
+    throw new Error("Misty Browser is not ready. Try opening the link again.");
   }
 
   window.open(href, "_blank", "noopener,noreferrer");
@@ -35,6 +42,9 @@ export async function openExternalLink(url: string): Promise<void> {
 export async function openSystemExternalLink(url: string): Promise<void> {
   const href = normalizeExternalUrl(url);
   if (!href) return;
+
+  // Legacy callers share the same web routing policy, including SDK links.
+  if (isWebUrl(href)) return openExternalLink(href);
 
   try {
     await openNativeUrl(href);
@@ -92,49 +102,52 @@ export async function openProviderAuthorizationLink(
     }
   }
 
-  let mistyBrowserError: unknown;
-  if (openProviderAuthorizationInMisty) {
-    try {
-      await openProviderAuthorizationInMisty(href);
-      return {
-        strategy: "misty-browser",
-        platform: currentPlatform,
-        attemptedAt,
-      };
-    } catch (error) {
-      mistyBrowserError = error;
-    }
-  }
-
-  try {
-    await openSystemExternalLink(href);
-    return {
-      strategy: "system-browser",
-      platform: currentPlatform,
-      attemptedAt,
-      fallbackReason: mistyBrowserError ? errorTextForOpen(mistyBrowserError) : undefined,
-    };
-  } catch (error) {
-    if (mistyBrowserError) {
-      throw new Error(
-        `Misty Browser failed: ${errorTextForOpen(mistyBrowserError)}; system browser failed: ${errorTextForOpen(error)}`,
-      );
-    }
-    throw new Error(`system browser failed: ${errorTextForOpen(error)}`);
-  }
+  await openExternalLink(href);
+  return {
+    strategy: openInMistyBrowser ? "misty-browser" : "window-open",
+    platform: currentPlatform,
+    attemptedAt,
+  };
 }
 
 export function handleExternalLinkClick(
   url: string,
-): (event: MouseEvent<HTMLAnchorElement>) => void {
+): (event: ReactMouseEvent<HTMLAnchorElement>) => void {
   return (event) => {
     event.preventDefault();
     void openExternalLink(url);
   };
 }
 
-function isExternalUrl(url: string): boolean {
-  return url.startsWith("https://") || url.startsWith("http://") || url.startsWith("mailto:");
+export function installExternalLinkRouting(root: Document = document): () => void {
+  const handleClick = (event: MouseEvent) => {
+    if (event.defaultPrevented || ![0, 1].includes(event.button)) return;
+    const element =
+      event.target instanceof Element
+        ? event.target
+        : event.target instanceof Node
+          ? event.target.parentElement
+          : null;
+    const anchor = element?.closest<HTMLAnchorElement>("a[href]");
+    if (!anchor || anchor.hasAttribute("download")) {
+      return;
+    }
+    const rawHref = anchor.getAttribute("href")?.trim() ?? "";
+    if (!/^(?:https?:|mailto:|\/\/)/i.test(rawHref)) return;
+    event.preventDefault();
+    void openExternalLink(anchor.href);
+  };
+
+  root.addEventListener("click", handleClick);
+  root.addEventListener("auxclick", handleClick);
+  return () => {
+    root.removeEventListener("click", handleClick);
+    root.removeEventListener("auxclick", handleClick);
+  };
+}
+
+function isWebUrl(url: string): boolean {
+  return url.startsWith("https://") || url.startsWith("http://");
 }
 
 export function normalizeExternalUrl(value: string): string {

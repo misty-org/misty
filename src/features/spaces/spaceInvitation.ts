@@ -4,6 +4,7 @@ import type { Space, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 export function invitedSpacePreview(invitation: SpaceInvitation): Space {
   return {
     id: invitation.space_id,
+    is_default: false,
     owner_user_id: invitation.invited_by_user_id,
     name: invitation.space_name,
     role: "member",

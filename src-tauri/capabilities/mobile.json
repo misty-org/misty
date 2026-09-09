@@ -1,0 +1,45 @@
+{
+  "$schema": "../gen/schemas/ios-schema.json",
+  "identifier": "mobile",
+  "description": "Misty iPhone and iPad shell permissions",
+  "platforms": ["iOS"],
+  "webviews": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-is-focused",
+    "core:window:allow-set-badge-count",
+    "core:webview:allow-set-webview-position",
+    "core:webview:allow-set-webview-size",
+    "core:webview:allow-webview-hide",
+    "core:webview:allow-webview-show",
+    "deep-link:default",
+    "dialog:allow-message",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "keystore:default",
+    "notification:default",
+    "os:allow-arch",
+    "os:allow-platform",
+    "os:allow-version",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://*" },
+        { "url": "http://*" },
+        { "url": "mailto:*" }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$DOCUMENT/**" },
+        { "path": "$DOWNLOAD/**" },
+        { "path": "$TEMP/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOCALDATA/**" },
+        { "path": "$APPCACHE/**" }
+      ]
+    }
+  ]
+}

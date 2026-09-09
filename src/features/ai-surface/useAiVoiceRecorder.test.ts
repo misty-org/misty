@@ -79,6 +79,7 @@ describe("useAiVoiceRecorder", () => {
       useAiVoiceRecorder({ onTranscript: vi.fn(), onError: vi.fn() }),
     );
 
+    await act(async () => result.current.refreshInputDevices());
     await waitFor(() =>
       expect(result.current.inputDevices).toEqual([
         { deviceId: "built-in", label: "MacBook Pro Microphone" },
@@ -91,6 +92,13 @@ describe("useAiVoiceRecorder", () => {
       audio: { deviceId: { exact: "built-in" } },
     });
     expect(window.localStorage.getItem("misty.voice.input-device")).toBe("built-in");
+  });
+
+  it("does not inspect media devices before the user starts or refreshes voice input", () => {
+    renderHook(() => useAiVoiceRecorder({ onTranscript: vi.fn(), onError: vi.fn() }));
+
+    expect(navigator.mediaDevices.enumerateDevices).not.toHaveBeenCalled();
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   });
 });
 

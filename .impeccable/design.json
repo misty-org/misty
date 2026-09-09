@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-26T15:19:33Z",
+  "generatedAt": "2026-09-04T00:00:00Z",
   "title": "Design System: Misty Product Workspace",
   "extensions": {
     "colorMeta": {
@@ -294,8 +294,13 @@
       }
     ],
     "breakpoints": [
+      { "name": "phone-minimum", "value": "320px" },
+      { "name": "wide-ipad-shell", "value": "1024px" },
       { "name": "compact-desktop", "value": "1100px" },
-      { "name": "tablet", "value": "768px" }
+      { "name": "tablet", "value": "768px" },
+      { "name": "discover-metadata-container-max", "value": "1080px" },
+      { "name": "discover-horizontal-nav-container-max", "value": "820px" },
+      { "name": "discover-compact-row-container-max", "value": "440px" }
     ]
   },
   "components": [
@@ -359,17 +364,25 @@
       "description": "A short semantic label that uses one controlled accent and remains secondary to the task title.",
       "html": "<span class=\"ds-status-chip\">In progress</span>",
       "css": ".ds-status-chip { display: inline-flex; height: 22px; align-items: center; border: 1px solid color-mix(in srgb, var(--color-sage-fg, #a3bfab) 28%, transparent); border-radius: 999px; background: var(--color-sage-bg, #28312b); color: var(--color-sage-fg, #a3bfab); padding: 0 8px; font: 500 12px/1 system-ui, sans-serif; } .ds-status-chip:hover { border-color: color-mix(in srgb, var(--color-sage-fg, #a3bfab) 50%, transparent); } .ds-status-chip:focus-visible { outline: 2px solid var(--color-sage-fg, #a3bfab); outline-offset: 2px; }"
+    },
+    {
+      "name": "Discover App Row",
+      "kind": "custom",
+      "description": "Discover’s continuous catalog row: inspect app details, then add from the dialog; installed apps expose Open. Pane container thresholds compact metadata and navigation.",
+      "html": "<div class=\"ds-discover-row\"><button class=\"ds-discover-details\" aria-label=\"View app details\"><strong>App name</strong><span>Catalog description</span></button><button class=\"ds-discover-add\">Add</button></div>",
+      "css": ".ds-discover-row { display: flex; align-items: center; gap: 20px; min-height: 84px; padding: 10px 12px; border-bottom: 1px solid var(--misty-theme-border, #262626); color: var(--misty-theme-text, #e0e0e0); font-family: system-ui, sans-serif; } .ds-discover-row:hover, .ds-discover-row:focus-within { background: var(--misty-theme-card, #191919); border-radius: 8px; } .ds-discover-details { flex: 1; min-width: 0; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; } .ds-discover-details strong { display: block; color: var(--misty-theme-text-bright, #f1f1f1); font-size: 15px; font-weight: 600; line-height: 1.5; } .ds-discover-details span { display: block; margin-top: 3px; color: var(--misty-theme-text-muted, #8c8c8c); font-size: 13px; line-height: 1.5; } .ds-discover-add { min-width: 80px; min-height: 34px; padding: 6px 16px; border: 1px solid transparent; border-radius: 6px; background: var(--misty-theme-text-bright, #f1f1f1); color: var(--misty-theme-bg, #131313); font: 500 13px/1.5 system-ui, sans-serif; cursor: pointer; transition: background-color 140ms ease-out, color 140ms ease-out; } .ds-discover-add:hover { background: var(--misty-theme-text, #e0e0e0); color: var(--misty-theme-bg, #131313); } .ds-discover-details:focus-visible, .ds-discover-add:focus-visible { outline: 2px solid var(--misty-theme-text-muted, #8c8c8c); outline-offset: 2px; }"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Operating Desk",
-    "overview": "Misty should feel like a serious desktop environment that disappears behind the work. The supplied Inbox, Planner, and Files references establish an almost-monochrome charcoal field whose structure comes from alignment, narrow tonal steps, and fine dividers rather than decorative containers. The interface is compact and calm: a person can scan a great deal of information without feeling that every object is competing for attention. The workspace may contain many different tools, but all of them should feel built into the same operating environment. Shell chrome, sidebars, toolbars, tables, boards, empty states, and overlays share one density and one interaction language. Color appears only when it carries meaning—identity, status, unread activity, collaboration, or a file type—not as ambient decoration.",
+    "overview": "Misty should feel like a serious operating environment that disappears behind the work. The supplied Inbox, Planner, and Files references establish an almost-monochrome charcoal field whose structure comes from alignment, narrow tonal steps, and fine dividers rather than decorative containers. Desktop uses a dense split-capable shell; iPhone and iPad project the same workspace into one touch-first surface without rewriting desktop layout state. Shell chrome, navigation, toolbars, tables, boards, empty states, and overlays share one interaction language. Color appears only when it carries meaning—identity, status, unread activity, collaboration, or a file type—not as ambient decoration.",
     "keyCharacteristics": [
       "Dark, tonal, and low-glare rather than pure black and high-contrast.",
       "Dense desktop-tool rhythm with generous empty canvas where the task benefits from it.",
       "Hairline structure, compact controls, restrained rounding, and almost no ornament.",
       "Clear hierarchy through weight, alignment, and brightness before size.",
-      "Sparse, semantic color reserved for information and state."
+      "Sparse, semantic color reserved for information and state.",
+      "One workspace model expressed through dedicated desktop and safe-area-aware mobile shells."
     ],
     "rules": [
       {
@@ -410,7 +423,8 @@
       "Do keep controls compact, scannable, keyboard operable, and understandable without hover.",
       "Do make disabled controls visibly inert while keeping their labels readable and their original shape intact.",
       "Do use accent color only for identity, semantic status, file type, collaboration, or direct targeting.",
-      "Do let large working canvases remain open when empty space serves the task."
+      "Do let large working canvases remain open when empty space serves the task.",
+      "Do use 44px touch targets, 16px mobile inputs, safe areas, and one active surface on iPhone and iPad."
     ],
     "donts": [
       "Don't introduce gradients, glassmorphism, colorful ambient glows, or marketing-page aesthetics into product surfaces.",
@@ -419,7 +433,8 @@
       "Don't turn every control into a pill or apply large radii to small elements.",
       "Don't use pure black and white when the established charcoal and cream tokens provide the intended lower-glare contrast.",
       "Don't add color merely to make a monochrome page feel more exciting.",
-      "Don't rewrite factual product copy or invent integrations, proof, testimonials, or capabilities while polishing the UI."
+      "Don't rewrite factual product copy or invent integrations, proof, testimonials, or capabilities while polishing the UI.",
+      "Don't expose desktop splits, window chrome, extension storefronts, or hover-only actions in the mobile shell."
     ]
   }
 }

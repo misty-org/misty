@@ -134,7 +134,7 @@ export function MarketplaceHome({
         </section>
       ) : null}
 
-      <section aria-label="Browse Store categories" className="grid gap-3 md:grid-cols-2">
+      <section aria-label="Browse Discover categories" className="grid gap-3 md:grid-cols-2">
         <CategoryCard
           description="Built-in and installable tools that open in your Misty workspace."
           icon={LayoutGrid}

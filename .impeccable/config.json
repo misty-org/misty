@@ -39,6 +39,60 @@
         ],
         "createdAt": "2026-08-26T08:47:51.629Z",
         "reason": "Agent: the sandboxed renderer preserves externally-authored email document colors"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "9.2px",
+        "createdAt": "2026-09-02T06:54:42.708Z",
+        "reason": "Agent: exact 0.8x desktop code-editor interface scale derived from the user-selectable 13px base"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "16.9px",
+        "createdAt": "2026-09-02T06:54:42.801Z",
+        "reason": "Agent: exact 1.3x desktop code-editor interface scale derived from the user-selectable 13px base"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "19.5px",
+        "createdAt": "2026-09-02T06:54:42.894Z",
+        "reason": "Agent: exact 1.5x desktop code-editor interface scale derived from the user-selectable 13px base"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "17.3px",
+        "createdAt": "2026-09-02T06:54:42.991Z",
+        "reason": "Agent: exact 1.5x desktop code-editor small-text scale derived from the user-selectable 11.5px base"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "4px",
+        "createdAt": "2026-09-02T06:54:43.101Z",
+        "reason": "Agent: compact desktop code status action needs a sub-control radius at small scaled heights"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "3px",
+        "createdAt": "2026-09-02T06:54:43.197Z",
+        "reason": "Agent: inline LSP hint is editor annotation geometry, not a general control or container"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "2px",
+        "createdAt": "2026-09-02T06:54:43.295Z",
+        "reason": "Agent: document-highlight radius is editor text decoration, not a general control or container"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgb(0 0 0 / 28%)",
+        "createdAt": "2026-09-02T06:54:43.391Z",
+        "reason": "Agent: restrained offset shadow is reserved for the floating LSP signature-help overlay"
+      },
+      {
+        "rule": "design-system-font",
+        "value": "sfmono-regular",
+        "createdAt": "2026-09-02T06:54:43.489Z",
+        "reason": "Agent: DESIGN.md explicitly declares SFMono-Regular for code and terminal content"
       }
     ]
   }

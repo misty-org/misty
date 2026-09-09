@@ -56,25 +56,23 @@ describe("SpaceManagementNavigation", () => {
     expect(container.querySelector(".bg-status-green")).toBeNull();
   });
 
-  it("hides global management from ordinary Misty members", async () => {
+  it("keeps Space management available to members", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <SpaceManagementNavigation
-            space={spaceFixture({ kind: "misty", permissions: { "space.invite": false } })}
-            section="chat"
-          />
+          <SpaceManagementNavigation space={spaceFixture({ role: "member" })} section="chat" />
         </MemoryRouter>,
       );
     });
 
-    expect(container.querySelector('nav[aria-label="Space management"]')).toBeNull();
+    expect(container.querySelector('nav[aria-label="Space management"]')).not.toBeNull();
   });
 });
 
 function spaceFixture(patch: Partial<Space> = {}): Space {
   return {
     id: "space-1",
+    is_default: false,
     owner_user_id: "owner",
     name: "Design team",
     role: "owner",

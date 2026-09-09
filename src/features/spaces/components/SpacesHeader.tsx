@@ -1,4 +1,5 @@
-import { ChromeTabStrip, NewTabMenu } from "@/features/workspace";
+import { ChromeTabStrip } from "@/features/workspace/ChromeTabStrip";
+import { NewTabMenu } from "@/features/workspace/NewTabMenu";
 import { LibraryBig, ListChecks, MessageCircle, Notebook } from "lucide-react";
 import type { SpacesTab, SpacesTabsSession } from "../store/useSpacesTabsStore";
 
@@ -7,7 +8,7 @@ export type SpaceTabDestination = "journal" | "planner" | "social" | "library";
 const spaceTabOptions = [
   { id: "journal", label: "Journal", icon: Notebook },
   { id: "planner", label: "Planner", icon: ListChecks },
-  { id: "social", label: "Social", icon: MessageCircle },
+  { id: "social", label: "Chat", icon: MessageCircle },
   { id: "library", label: "Library", icon: LibraryBig },
 ] satisfies ReadonlyArray<{
   id: SpaceTabDestination;
@@ -65,7 +66,7 @@ function spaceTabTitle(route: string): string {
   const section = route.split(/[/?#]/).filter(Boolean)[2] ?? "space";
   if (section === "notes" || section === "drawings") return "Journal";
   if (section === "planner") return "Planner";
-  if (section === "social" || section === "chat") return "Social";
+  if (section === "social" || section === "chat") return "Chat";
   if (section === "library") return "Library";
   if (section === "settings") return "Settings";
   return "Space";

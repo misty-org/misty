@@ -17,12 +17,16 @@ export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<voi
   return invoke("telemetry_set_error_reporting_enabled", { enabled });
 }
 
+export function revealMainWindow(): Promise<void> {
+  return invoke("reveal_main_window");
+}
+
 export function enableModernWindowStyle(window: unknown): Promise<void> {
-  return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 5 });
+  return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 0 });
 }
 
 export function repositionTrafficLights(window: unknown): Promise<void> {
-  return invoke("reposition_traffic_lights", { window, offsetX: -4, offsetY: 5 });
+  return invoke("reposition_traffic_lights", { window, offsetX: -4, offsetY: 0 });
 }
 
 export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {

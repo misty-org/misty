@@ -1,22 +1,19 @@
-import gmailLogo from "@/shared/assets/mail-providers/gmail-user-supplied.svg";
-import outlookLogo from "@/shared/assets/mail-providers/outlook-user-supplied.svg";
-import { cn } from "./utils";
+import { BrandIcon } from "../../../../misty-apps/apps/shared/BrandIcon";
 
 export type MailProviderType = "google" | "microsoft";
 
 export function MailProviderIcon(props: {
   provider: MailProviderType | string;
   className?: string;
+  size?: number;
   "aria-hidden"?: boolean;
 }) {
-  const isGoogle = props.provider === "google";
   return (
-    <img
-      src={isGoogle ? gmailLogo : outlookLogo}
-      alt=""
+    <BrandIcon
+      brand={props.provider}
+      size={props.size ?? 18}
+      className={props.className}
       aria-hidden={props["aria-hidden"] ?? true}
-      className={cn("size-4 shrink-0 object-contain brightness-0 invert", props.className)}
-      data-mail-provider-icon={isGoogle ? "gmail" : "outlook"}
     />
   );
 }

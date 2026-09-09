@@ -14,41 +14,6 @@ export interface SpaceMember {
   read_message_seq: number;
 }
 
-export interface SpaceAgentMembership {
-  id: string;
-  space_id: string;
-  agent_id: string;
-  owner_user_id: string;
-  can_control: boolean;
-  name: string;
-  description: string;
-  icon: string;
-  avatar?: AgentAvatar;
-  model_id?: string;
-  reasoning_effort?: "" | "low" | "medium" | "high";
-  default_run_mode: "ask" | "auto" | "full";
-  enabled: boolean;
-  version: number;
-  created_at: string;
-  updated_at: string;
-  work_state?:
-    | "ready"
-    | "queued"
-    | "working"
-    | "awaiting_approval"
-    | "awaiting_device"
-    | "needs_approval"
-    | "retrying"
-    | "completed"
-    | "failed"
-    | "canceled"
-    | "disabled"
-    | "update_available";
-  attention_count?: number;
-  last_activity_at?: string;
-  current_task_id?: string;
-}
-
 export type SpaceActor =
   { kind: "person"; id: string } | { kind: "agent"; id: string } | { kind: "system" };
 

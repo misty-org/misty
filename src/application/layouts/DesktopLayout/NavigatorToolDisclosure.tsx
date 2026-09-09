@@ -1,3 +1,11 @@
+import { useNavigatorResume } from "./useNavigatorResume";
+import { Renameable } from "@/features/navigation-names/Renameable";
+import {
+  useNavigationNames,
+  navigationName,
+  sectionNameKey,
+  itemNameKey,
+} from "@/features/navigation-names/store";
 import {
   useWorkspaceStore,
   WorkspaceAppIcon,
@@ -7,25 +15,14 @@ import {
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
-  TreeBranch,
-  cn,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
-  navigationTreeBranchClass,
-  navigationTreeGroupClass,
-  navigationTreeItemIconClass,
-  navigationTreeRowClass,
-  navigationTreeSurfaceClass,
+  NavigationSectionButton,
+  NavigationTreeItem,
+  navigationMenuGroupClass,
 } from "@/shared/ui";
-import { ChevronRight, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, type ComponentType } from "react";
+import { type LucideIcon } from "lucide-react";
+import { useEffect, useId, useRef, type ComponentType } from "react";
 import { Link } from "react-router-dom";
-import {
-  navigatorFocusRingClass,
-  navigatorPrimaryRowLayoutClass,
-  navigatorSubsectionIconClass,
-} from "./styles";
+
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 type DestinationIcon = LucideIcon | ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -47,6 +44,8 @@ export function NavigatorToolDisclosure(props: {
   activeDestination: string | null;
   destinations: NavigatorToolDestination[];
 }) {
+  useNavigationNames();
+  const sectionLabel = navigationName(sectionNameKey(props.appId), props.label);
   const [open, setOpen] = useNavigatorDisclosureState(props.accountId, props.appId, props.active);
   const wasActiveRef = useRef(props.active);
 
@@ -56,85 +55,65 @@ export function NavigatorToolDisclosure(props: {
     if (becameActive) setOpen(true);
   }, [props.active, setOpen]);
 
+  const contentId = useId();
+  const resume = useNavigatorResume({
+    accountId: props.accountId,
+    key: props.appId,
+    fallbackRoute: props.path,
+  });
+  const activate = () => {
+    if (props.active && open) setOpen(false);
+    else {
+      setOpen(true);
+      resume();
+    }
+  };
+
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="grid w-full min-w-0 gap-1"
+      className={`${navigationMenuGroupClass} w-full min-w-0`}
       data-navigator-disclosure={props.appId}
     >
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "misty-navigator-row-target group/toggle box-border h-9 w-full rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
-            navigatorPrimaryRowLayoutClass,
-            "hover:bg-charcoal-card hover:text-cream-bright",
-            navigatorFocusRingClass,
-          )}
-          aria-label={props.label}
+      <Renameable nameKey={sectionNameKey(props.appId)} automatic={props.label}>
+        <NavigationSectionButton
+          icon={<WorkspaceAppIcon appId={props.appId} size="nav" />}
+          label={sectionLabel}
+          open={open}
+          aria-controls={contentId}
+          onClick={activate}
+          aria-label={sectionLabel}
           data-navigator-disclosure-trigger="true"
-          title={open ? `Collapse ${props.label}` : `Expand ${props.label}`}
-        >
-          <span className="grid size-7 shrink-0 place-items-center">
-            <WorkspaceAppIcon appId={props.appId} size="nav" />
-          </span>
-          <span className={navigationDisclosureLabelClass}>
-            <span className="min-w-0 truncate">{props.label}</span>
-            <ChevronRight
-              className={cn(
-                navigationDisclosureChevronClass,
-                "size-4 transition-transform duration-150 motion-reduce:transition-none group-data-[state=open]/toggle:rotate-90",
-              )}
-              aria-hidden="true"
-              data-chevron-placement="inline"
-            />
-          </span>
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
+          title={`${open ? "Collapse" : "Expand"} ${sectionLabel}`}
+        />
+      </Renameable>
+      <CollapsibleContent id={contentId}>
         <div
-          className={navigationTreeGroupClass}
+          className={navigationMenuGroupClass}
           role="group"
-          aria-label={`${props.label} destinations`}
+          aria-label={`${sectionLabel} destinations`}
         >
           {props.destinations.map(({ id, label, icon: Icon, path, onSelect }, index) => {
             const selected = id === props.activeDestination;
             return (
-              <Link
-                key={id}
-                to={path}
-                onClick={() => {
-                  onSelect?.();
-                  openWorkspaceRoute(path);
-                }}
-                aria-current={selected ? "page" : undefined}
-                className={cn(
-                  navigationTreeRowClass,
-                  "misty-navigator-row-target text-cream-muted no-underline outline-none transition-colors hover:text-cream-bright",
-                  navigatorFocusRingClass,
-                  selected && "text-cream-bright",
-                )}
-              >
-                <TreeBranch
-                  className={navigationTreeBranchClass}
-                  first={index === 0}
+              <Renameable key={id} nameKey={itemNameKey(props.appId, [id])} automatic={label}>
+                <NavigationTreeItem
+                  asChild
+                  icon={<Icon aria-hidden />}
+                  label={navigationName(itemNameKey(props.appId, [id]), label)}
+                  selected={selected}
                   last={index === props.destinations.length - 1}
-                />
-                <span
-                  className={cn(
-                    navigationTreeSurfaceClass,
-                    "group-hover/tree-row:bg-charcoal-hover",
-                    selected && "bg-charcoal-card/80",
-                  )}
-                  data-tree-row-surface="true"
                 >
-                  <span className={navigatorSubsectionIconClass}>
-                    <Icon className={navigationTreeItemIconClass} aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                </span>
-              </Link>
+                  <Link
+                    to={path}
+                    onClick={() => {
+                      onSelect?.();
+                      openWorkspaceRoute(path);
+                    }}
+                  />
+                </NavigationTreeItem>
+              </Renameable>
             );
           })}
         </div>

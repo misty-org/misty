@@ -3,7 +3,7 @@ import { ArrowUp, Camera, ImagePlus, Loader2, Plus, Search, X } from "lucide-rea
 import type { DragEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef, useState } from "react";
 import { SearchAskToggle } from "./GlobalMistySupport";
-import { validateMistyImage } from "./mistyImageAttachments";
+import { validateMistyImage } from "./mistyImageValues";
 import type { GlobalAiMode, MistyImageAttachment } from "./types";
 
 export function MistyComposer(props: {

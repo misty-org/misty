@@ -1,7 +1,7 @@
-import { useAuth } from "@/features/auth";
+import { useSocialAuth as useAuth } from "@/features/spaces/chat/socialRuntime";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
-import { useSpacesStore } from "@/features/spaces";
+import { useSocialSpaces as useSpacesStore } from "@/features/spaces/chat/socialRuntime";
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import {
   Avatar,

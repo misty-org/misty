@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Misty OAuth popup verification</title>
+  </head>
+  <body>
+    <p id="result">Verifying disposable sign-in windows…</p>
+    <script type="module">
+      import { invoke } from "@tauri-apps/api/core";
+      const nonce = new URLSearchParams(location.search).get("nonce");
+      try {
+        const message = await invoke("sdk_probe_oauth_popups", { nonce, origin: location.origin });
+        document.getElementById("result").textContent = message;
+        await invoke("sdk_probe_complete", { nonce, success: true, message });
+      } catch (error) {
+        const message = "FAIL native OAuth popup fixture: " + String(error);
+        document.getElementById("result").textContent = message;
+        await invoke("sdk_probe_complete", { nonce, success: false, message });
+      }
+    </script>
+  </body>
+</html>

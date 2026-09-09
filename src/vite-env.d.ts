@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly MISTY_OFFICIAL_APP_ID?: string;
   readonly VITE_AGENT_TEAMMATES_V1?: string;
   readonly VITE_POSTHOG_PROJECT_TOKEN?: string;
   readonly VITE_POSTHOG_HOST?: string;
@@ -12,6 +13,8 @@ interface ImportMetaEnv {
   readonly VITE_MISTY_DEMO_ACCOUNT?: string;
   /** Complete API base, including /api or a versioned path such as /api/v2. */
   readonly VITE_MISTY_PUBLIC_API_URL?: string;
+  /** Public Misty website origin used for product, download, and roadmap links. */
+  readonly VITE_MISTY_PUBLIC_URL?: string;
   /** Legacy alias; accepts the same complete API-base semantics. */
   readonly VITE_MISTY_SERVER_URL?: string;
   /** Legacy alias; accepts the same complete API-base semantics. */
@@ -23,4 +26,6 @@ interface ImportMetaEnv {
   readonly VITE_SECURITY_URL?: string;
   /** Optional loopback URL for an embedded Theia/OpenVSCode development workspace. */
   readonly VITE_MISTY_DEVELOPER_WORKSPACE_URL?: string;
+  /** Isolated origin that serves signed official mobile app packages. */
+  readonly VITE_MISTY_OFFICIAL_APPS_ORIGIN?: string;
 }

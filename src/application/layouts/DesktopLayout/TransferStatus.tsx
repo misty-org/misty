@@ -1,6 +1,6 @@
-import { useExplorerStore } from "@/features/files/explorer";
+import { useExplorerStore } from "@/features/files/explorer/store/useExplorerStore";
 import { useSetupStore } from "@/features/installer";
-import { useTransfersStore } from "@/features/transfers";
+import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
 import type { TransferRecord } from "@/native/contracts";
 import type { TransferStatus } from "@/native/contracts/primitives";
 import { isWebBuild } from "@/shared/platform/buildTarget";

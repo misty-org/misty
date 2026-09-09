@@ -1,0 +1,20 @@
+{
+  "features/notes": "journal/notes",
+  "features/drawings": "journal/drawings",
+  "features/spaces/planner": "planner/planner",
+  "features/spaces/roadmap": "planner/roadmap",
+  "features/spaces/library": "library/library",
+  "features/agents": "agents/workspace",
+  "features/files": "files/workspace",
+  "features/browser": "browser/workspace",
+  "features/coding-workspace": "code/workspace",
+  "features/terminal": "terminal/workspace",
+  "features/apps/package/SDKJournalApp": "journal/index",
+  "features/apps/package/SDKPlannerApp": "planner/index",
+  "features/apps/package/SDKLibraryApp": "library/index",
+  "features/apps/package/SDKAgentsApp": "agents/index",
+  "features/apps/package/SDKFilesApp": "files/index",
+  "features/apps/package/SDKBrowserApp": "browser/index",
+  "features/apps/package/SDKCodeApp": "code/index",
+  "features/apps/package/SDKTerminalApp": "terminal/index"
+}

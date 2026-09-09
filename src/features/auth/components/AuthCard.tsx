@@ -1,24 +1,21 @@
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/shared/ui";
 import type { ReactNode } from "react";
 
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
-    <Card className="bg-charcoal-card p-0 shadow-xl sm:rounded-xl">
+    <div className="w-full">
       {title || description ? (
-        <CardHeader className="p-6 pb-0 sm:p-8 sm:pb-0">
-          {title ? <CardTitle className="text-2xl">{title}</CardTitle> : null}
+        <div className="mb-6">
+          {title ? <h2 className="text-lg font-medium text-cream">{title}</h2> : null}
           {description ? (
             <p className="mt-2 text-sm leading-6 text-cream-muted">{description}</p>
           ) : null}
-        </CardHeader>
+        </div>
       ) : null}
 
-      <CardContent className="p-6 sm:p-8">{children}</CardContent>
+      <div>{children}</div>
 
-      {footer ? (
-        <CardFooter className="border-t border-charcoal-border p-6 sm:p-8">{footer}</CardFooter>
-      ) : null}
-    </Card>
+      {footer ? <div className="mt-7 border-t border-charcoal-border pt-6">{footer}</div> : null}
+    </div>
   );
 }
 

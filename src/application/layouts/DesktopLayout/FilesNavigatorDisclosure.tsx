@@ -1,4 +1,12 @@
-import { routes } from "@/features/app-shell";
+import { useNavigatorResume } from "./useNavigatorResume";
+import { Renameable } from "@/features/navigation-names/Renameable";
+import {
+  useNavigationNames,
+  navigationName,
+  sectionNameKey,
+  itemNameKey,
+} from "@/features/navigation-names/store";
+import { officialAppRoute } from "@/features/apps";
 import {
   useWorkspaceStore,
   WorkspaceAppIcon,
@@ -7,26 +15,14 @@ import {
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
-  TreeBranch,
-  cn,
-  navigationDisclosureChevronClass,
-  navigationDisclosureLabelClass,
-  navigationTreeBranchClass,
-  navigationTreeGroupClass,
-  navigationTreeItemIconClass,
-  navigationTreeRowClass,
-  navigationTreeSurfaceClass,
+  NavigationSectionButton,
+  NavigationTreeItem,
+  navigationMenuGroupClass,
 } from "@/shared/ui";
-import { ChevronRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Link } from "react-router-dom";
 import { ExplorerDestinationIcon, TransfersDestinationIcon } from "./NavigatorDestinationIcons";
-import {
-  navigatorFocusRingClass,
-  navigatorPrimaryRowLayoutClass,
-  navigatorSubsectionIconClass,
-} from "./styles";
+
 import { useNavigatorDisclosureState } from "./useNavigatorDisclosureState";
 
 type FilesDestinationId = "explorer" | "transfers";
@@ -36,22 +32,25 @@ const destinations = [
     id: "explorer" as const,
     label: "Explorer",
     icon: ExplorerDestinationIcon,
-    path: routes.files,
+    path: officialAppRoute("files"),
   },
   {
     id: "transfers" as const,
     label: "Transfers",
     icon: TransfersDestinationIcon,
-    path: routes.transfers,
+    path: officialAppRoute("transfers"),
   },
 ];
 
 export function FilesNavigatorDisclosure(props: {
   accountId: string;
   activeGroupKey: string | null;
+  activeRoute?: string;
 }) {
-  const activeDestination = filesDestinationFromGroup(props.activeGroupKey);
+  const activeDestination = filesDestinationFromGroup(props.activeGroupKey, props.activeRoute);
   const active = activeDestination !== null;
+  useNavigationNames();
+  const sectionLabel = navigationName(sectionNameKey("files"), "Files");
   const [open, setOpen] = useNavigatorDisclosureState(props.accountId, "files", active);
   const wasActiveRef = useRef(active);
 
@@ -61,82 +60,60 @@ export function FilesNavigatorDisclosure(props: {
     if (becameActive) setOpen(true);
   }, [active, setOpen]);
 
+  const contentId = useId();
+  const resume = useNavigatorResume({
+    accountId: props.accountId,
+    key: "files",
+    fallbackRoute: officialAppRoute("files"),
+  });
+  const activate = () => {
+    if (active && open) setOpen(false);
+    else {
+      setOpen(true);
+      resume();
+    }
+  };
+
   return (
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="grid w-full min-w-0 gap-1"
+      className={`${navigationMenuGroupClass} w-full min-w-0`}
       data-files-disclosure="true"
     >
-      <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "misty-navigator-row-target group/toggle box-border h-9 w-full rounded-md px-2.5 text-left text-sm text-cream-muted outline-none transition-colors",
-            navigatorPrimaryRowLayoutClass,
-            "hover:bg-charcoal-card hover:text-cream-bright",
-            navigatorFocusRingClass,
-          )}
-          aria-label="Files"
+      <Renameable nameKey={sectionNameKey("files")} automatic={"Files"}>
+        <NavigationSectionButton
+          icon={<WorkspaceAppIcon appId={"files"} size="nav" />}
+          label={sectionLabel}
+          open={open}
+          aria-controls={contentId}
+          onClick={activate}
+          aria-label={sectionLabel}
           data-navigator-disclosure-trigger="true"
-          title={open ? "Collapse Files" : "Expand Files"}
-        >
-          <span className="grid size-7 shrink-0 place-items-center">
-            <WorkspaceAppIcon appId="files" size="nav" />
-          </span>
-          <span className={navigationDisclosureLabelClass}>
-            <span className="min-w-0 truncate">Files</span>
-            <ChevronRight
-              className={cn(
-                navigationDisclosureChevronClass,
-                "size-4 transition-transform duration-150 motion-reduce:transition-none group-data-[state=open]/toggle:rotate-90",
-              )}
-              aria-hidden="true"
-              data-chevron-placement="inline"
-            />
-          </span>
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className={navigationTreeGroupClass} role="group" aria-label="Files destinations">
+          title={`${open ? "Collapse" : "Expand"} ${sectionLabel}`}
+        />
+      </Renameable>
+      <CollapsibleContent id={contentId}>
+        <div className={navigationMenuGroupClass} role="group" aria-label="Files destinations">
           {destinations.map(({ id, label, icon: Icon, path }, index) => {
             const selected = id === activeDestination;
             return (
-              <Link
-                key={id}
-                to={path}
-                onClick={() => openWorkspaceRoute(path)}
-                aria-current={selected ? "page" : undefined}
-                className={cn(
-                  navigationTreeRowClass,
-                  "misty-navigator-row-target rounded-md text-cream-muted no-underline outline-none transition-colors hover:text-cream-bright",
-                  navigatorFocusRingClass,
-                  selected && "text-cream-bright",
-                )}
-              >
-                <TreeBranch
-                  className={navigationTreeBranchClass}
-                  first={index === 0}
+              <Renameable key={id} nameKey={itemNameKey("files", [id])} automatic={label}>
+                <NavigationTreeItem
+                  asChild
+                  icon={<Icon aria-hidden />}
+                  label={navigationName(itemNameKey("files", [id]), label)}
+                  selected={selected}
                   last={index === destinations.length - 1}
-                />
-                <span
-                  className={cn(
-                    navigationTreeSurfaceClass,
-                    "group-hover/tree-row:bg-charcoal-hover",
-                    selected && "bg-charcoal-card/80",
-                  )}
-                  data-tree-row-surface="true"
                 >
-                  <span className={navigatorSubsectionIconClass}>
-                    <Icon
-                      className={navigationTreeItemIconClass}
-                      strokeWidth={1.85}
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                </span>
-              </Link>
+                  <Link
+                    to={path}
+                    onClick={() => {
+                      openWorkspaceRoute(path);
+                    }}
+                  />
+                </NavigationTreeItem>
+              </Renameable>
             );
           })}
         </div>
@@ -145,9 +122,12 @@ export function FilesNavigatorDisclosure(props: {
   );
 }
 
-function filesDestinationFromGroup(groupKey: string | null): FilesDestinationId | null {
-  if (groupKey === "tool:files") return "explorer";
-  if (groupKey === "tool:transfers") return "transfers";
+function filesDestinationFromGroup(groupKey: string | null, route = ""): FilesDestinationId | null {
+  if (groupKey === "app:files")
+    return new URL(route, "https://misty.local").searchParams.get("view") === "transfers"
+      ? "transfers"
+      : "explorer";
+  if (groupKey === "app:transfers") return "transfers";
   return null;
 }
 

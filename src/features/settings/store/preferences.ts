@@ -144,11 +144,12 @@ export function selectGeneralPreferences(
       "default_transfer_behavior_index",
       0,
     ),
-    openLinksExternally: settingsBoolean(source, "general", "open_links_externally", true),
+    openLinksExternally: settingsBoolean(source, "general", "open_links_externally", false),
     preferredWorkspaceRoot: settingsString(source, "general", "preferred_workspace_root", ""),
     reopenLastSession: settingsBoolean(source, "general", "reopen_last_session", true),
     searchEngineIndex: settingsNumber(source, "general", "browser_search_engine_index", 0),
     startupViewIndex: settingsNumber(source, "general", "startup_view_index", 0),
+    workspaceDefaultTabIndex: settingsNumber(source, "general", "workspace_default_tab_index", 0),
   };
 }
 
@@ -284,6 +285,7 @@ export interface GeneralPreferences {
   reopenLastSession: boolean;
   searchEngineIndex: number;
   startupViewIndex: number;
+  workspaceDefaultTabIndex: number;
 }
 
 export interface AgentPreferences {

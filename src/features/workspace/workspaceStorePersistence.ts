@@ -31,7 +31,9 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     const layoutsByScope = Object.fromEntries(
       Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
         scope,
-        layout ? normalizeWorkspaceLayout(migrateSpaceToolTabs(layout)) : layout,
+        layout
+          ? normalizeWorkspaceLayout(migrateSpaceToolTabs(layout), scope as WorkspaceScopeKey)
+          : layout,
       ]),
     ) as WorkspaceStore["layoutsByScope"];
     const activeScopeKey = state.activeScopeKey ?? "global";
@@ -39,11 +41,14 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
       migrateSpaceToolTabs(
         state.layout ?? layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(),
       ),
+      activeScopeKey,
     );
     layoutsByScope[activeScopeKey] = activeLayout;
     const virtualWindowsByScope = Object.fromEntries(
       Object.entries(layoutsByScope).flatMap(([scope, layout]) =>
-        layout ? [[scope, [createWorkspaceVirtualWindow(layout)]]] : [],
+        layout
+          ? [[scope, [createWorkspaceVirtualWindow(layout, undefined, scope as WorkspaceScopeKey)]]]
+          : [],
       ),
     ) as WorkspaceStore["virtualWindowsByScope"];
     const activeVirtualWindowIdByScope = Object.fromEntries(
@@ -68,7 +73,10 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
   const activeScopeKey = state.activeScopeKey ?? "global";
   const migrateLayout = (layout: WorkspaceStore["layout"], scopeKey: WorkspaceScopeKey) =>
-    normalizeWorkspaceLayout(migrateSpaceToolTabs(migrateRetiredWorkspaceTabs(layout, scopeKey)));
+    normalizeWorkspaceLayout(
+      migrateSpaceToolTabs(migrateRetiredWorkspaceTabs(layout, scopeKey)),
+      scopeKey,
+    );
   const migrateWindows = (
     windows: WorkspaceVirtualWindow[] | undefined,
     scopeKey: WorkspaceScopeKey,

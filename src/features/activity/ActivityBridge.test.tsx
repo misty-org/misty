@@ -7,11 +7,23 @@ vi.mock("@/features/auth", () => ({
   useAuth: () => ({ user: { id: "account-1" } }),
 }));
 
+vi.mock("@/features/capability-approvals/api", () => ({
+  capabilityApprovalsApi: { list: vi.fn(async () => ({ approvals: [] })) },
+}));
+
+vi.mock("@/features/agent-interventions/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/agent-interventions/api")>()),
+  agentInterventionsApi: { list: vi.fn(async () => ({ waits: [] })), decide: vi.fn() },
+}));
+
 vi.mock("./nativeNotifications", () => ({
   publishNativeActivity: vi.fn(async () => false),
   syncNativeBadge: vi.fn(async () => undefined),
 }));
 
+import { agentInterventionsApi } from "@/features/agent-interventions/api";
+import { useAgentInterventions } from "@/features/agent-interventions/store";
+import { publishNativeActivity } from "./nativeNotifications";
 import { useSpacesStore } from "@/features/spaces";
 import { ActivityBridge } from "./ActivityBridge";
 import { useActivityStore } from "./useActivityStore";
@@ -53,6 +65,48 @@ describe("ActivityBridge", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+  });
+
+  it("adds browser requests to global attention without opening Activity or notifying twice", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/"]}>
+          <ActivityBridge />
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+    const item = {
+      id: crypto.randomUUID(),
+      runId: "invocation_test",
+      scopeId: "original-scope",
+      deviceId: "device_test",
+      targetLabel: "Personal inbox",
+      action: "sign_in" as const,
+      reason: "Private website text",
+      state: "pending" as const,
+      expiresAt: "2099-01-01T00:00:00Z",
+    };
+    vi.mocked(publishNativeActivity).mockClear();
+    vi.mocked(agentInterventionsApi.list).mockResolvedValue({ waits: [item] });
+    await act(async () => {
+      await useAgentInterventions.getState().refresh();
+    });
+    expect(
+      useActivityStore.getState().attentionItems.some((activity) => activity.sourceId === item.id),
+    ).toBe(true);
+    expect(publishNativeActivity).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await useAgentInterventions.getState().refresh();
+    });
+    expect(publishNativeActivity).toHaveBeenCalledTimes(1);
+    vi.mocked(agentInterventionsApi.list).mockResolvedValue({ waits: [] });
+    await act(async () => {
+      await useAgentInterventions.getState().refresh();
+    });
+    expect(
+      useActivityStore.getState().attentionItems.some((activity) => activity.sourceId === item.id),
+    ).toBe(false);
   });
 
   it("renders no centralized UI and clears an update on its owning page", async () => {

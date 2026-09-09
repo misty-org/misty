@@ -56,12 +56,7 @@ export function useComposerInput(options: {
       draft.setText((current) => current.replace(/(^|\s)@[^\s@]*$/, "$1"));
     } else {
       draft.setText((current) => current.replace(/(^|\s)@[^\s@]*$/, `$1@${suggestion.label} `));
-      if (suggestion.kind === "agent") {
-        draft.setSelectedAgentIdsByLabel((current) => ({
-          ...current,
-          [suggestion.label.toLocaleLowerCase()]: suggestion.id,
-        }));
-      }
+
     }
     suggestions.close();
   };

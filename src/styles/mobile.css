@@ -1,0 +1,32 @@
+html[data-form-factor="mobile"] {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+html[data-form-factor="mobile"] body {
+  min-width: 320px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-form-factor="mobile"] :is(input, textarea, select) {
+  font-size: max(16px, 1em);
+}
+
+@media (pointer: coarse) {
+  html[data-form-factor="mobile"] :is(button, [role="button"], a) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-form-factor="mobile"] *,
+  html[data-form-factor="mobile"] *::before,
+  html[data-form-factor="mobile"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

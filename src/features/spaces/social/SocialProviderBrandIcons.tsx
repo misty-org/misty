@@ -1,14 +1,9 @@
-import { SiMessenger, SiX } from "react-icons/si";
+import { BrandIcon, type BrandIconProps } from "../../../../../misty-apps/apps/shared/BrandIcon";
 
-interface SocialProviderBrandIconProps {
-  className?: string;
-  "aria-hidden"?: boolean;
+export function MessengerBrandIcon(props: Omit<BrandIconProps, "brand">) {
+  return <BrandIcon {...props} brand="messenger" />;
 }
 
-export function MessengerBrandIcon(props: SocialProviderBrandIconProps) {
-  return <SiMessenger {...props} data-social-provider-icon="messenger" />;
-}
-
-export function XBrandIcon(props: SocialProviderBrandIconProps) {
-  return <SiX {...props} data-social-provider-icon="x" />;
+export function XBrandIcon(props: Omit<BrandIconProps, "brand">) {
+  return <BrandIcon {...props} brand="x" />;
 }

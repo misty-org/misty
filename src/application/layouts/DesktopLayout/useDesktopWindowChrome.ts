@@ -78,6 +78,29 @@ export function useDesktopWindowChrome() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasTauriInternals()) return;
+    let disposed = false;
+    let unlistenResize: (() => void) | undefined;
+    const window = getCurrentWindow();
+    const syncMaximizedState = async () => {
+      const maximized = await window.isMaximized();
+      if (!disposed) setIsWindowMaximized(maximized);
+    };
+    void syncMaximizedState().catch(() => undefined);
+    void window
+      .onResized(() => void syncMaximizedState().catch(() => undefined))
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else unlistenResize = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlistenResize?.();
+    };
+  }, []);
+
   const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || event.detail > 1) {
       return;
@@ -216,6 +239,17 @@ export function useDesktopWindowChrome() {
     setIsWindowMaximized(false);
   }, [animateWindowRect]);
 
+  const toggleTitlebarMaximize = useCallback(async () => {
+    if (!hasTauriInternals()) return;
+    if (desktopPlatform === "windows" || desktopPlatform === "linux") {
+      const window = getCurrentWindow();
+      await window.toggleMaximize();
+      setIsWindowMaximized(await window.isMaximized());
+      return;
+    }
+    await togglePseudoMaximize();
+  }, [desktopPlatform, togglePseudoMaximize]);
+
   // The native drag loop consumes the DOM dblclick event, so recognize the
   // second press here. Drive zoom/restore through explicit animation frames:
   // AppKit's built-in zoom snapshots WKWebView instead of giving WebKit each
@@ -242,11 +276,9 @@ export function useDesktopWindowChrome() {
     [togglePseudoMaximize],
   );
 
-  // Windows/Linux titlebar: drag on press, toggle maximize on a double-press.
-  // We detect the double-press by timing rather than the DOM `dblclick`, which
-  // the native drag loop (started on the first press) swallows. Uses the
-  // pseudo-maximize because native toggleMaximize() is unreliable on this
-  // borderless, transparent window.
+  // Windows/Linux titlebar: drag on press, toggle native maximize on a
+  // double-press. The native path preserves Windows snap behavior and its
+  // minimize/maximize/restore animations.
   const handleWindowsTitlebarPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (event.button !== 0) return;
@@ -257,14 +289,14 @@ export function useDesktopWindowChrome() {
       const isDoublePress = now - lastTitlebarPressRef.current <= 500;
       lastTitlebarPressRef.current = isDoublePress ? 0 : now;
       if (isDoublePress) {
-        void togglePseudoMaximize().catch(() => undefined);
+        void toggleTitlebarMaximize().catch(() => undefined);
         return;
       }
       void getCurrentWindow()
         .startDragging()
         .catch(() => undefined);
     },
-    [togglePseudoMaximize],
+    [toggleTitlebarMaximize],
   );
 
   const handleDesktopTitlebarPointerDown = useCallback(
@@ -311,7 +343,7 @@ export function useDesktopWindowChrome() {
     isWindowMaximized,
     startTitlebarDrag,
     handleDesktopTitlebarPointerDown,
-    togglePseudoMaximize,
+    toggleTitlebarMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
   };

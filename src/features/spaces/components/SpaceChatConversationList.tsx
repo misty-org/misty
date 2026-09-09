@@ -12,7 +12,7 @@ import {
   cn,
 } from "@/shared/ui";
 import { MessagesSquare, Pencil, Plus, Trash2, Users } from "lucide-react";
-import { SiDiscord } from "react-icons/si";
+import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
 import { Link } from "react-router-dom";
 import { InstagramBrandIcon } from "../social/InstagramBrandIcon";
 import { MessengerBrandIcon, XBrandIcon } from "../social/SocialProviderBrandIcons";
@@ -29,7 +29,6 @@ export function SpaceChatConversationList({
   onEditConversation,
   onDeleteConversation,
   isSpaceOwner = false,
-  isMistySpace = false,
   accounts = [],
   accountsLoading = false,
   authorizingProvider = null,
@@ -44,7 +43,6 @@ export function SpaceChatConversationList({
   onEditConversation?: (conversation: SpaceConversation) => void;
   onDeleteConversation?: (conversation: SpaceConversation) => void;
   isSpaceOwner?: boolean;
-  isMistySpace?: boolean;
   accounts?: AccountConnection[];
   accountsLoading?: boolean;
   authorizingProvider?: string | null;
@@ -54,7 +52,7 @@ export function SpaceChatConversationList({
     .filter((conversation) => !conversation.direct_agent_id)
     .filter((conversation) => conversation.origin === provider)
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at));
-  const showEveryone = !isMistySpace && provider === "misty";
+  const showEveryone = provider === "misty";
   const conversationCount = visibleConversations.length + (showEveryone ? 1 : 0);
   const providerAccounts =
     provider === "misty"
@@ -243,7 +241,7 @@ export function SpaceChatConversationList({
 
 function ConversationProviderIcon({ provider }: { provider?: string }) {
   if (provider === "discord") {
-    return <SiDiscord className="size-4 shrink-0 text-[#5865F2]" aria-hidden />;
+    return <BrandIcon brand="discord" className="size-4 shrink-0 text-[#5865F2]" aria-hidden />;
   }
   if (provider === "instagram") {
     return <InstagramBrandIcon className="size-4 shrink-0" aria-hidden />;

@@ -1,5 +1,8 @@
+import {mistyIntent} from "./mistyIntent";
+export {mistyIntent} from "./mistyIntent";
 import { shortcutCommandRegistry } from "@/features/shortcuts";
-import { dockTabs, useWorkspaceStore } from "@/features/workspace";
+import { dockTabs, useWorkspaceStore } from "@/features/workspace/core";
+import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { GlobalSearchFilters, GlobalSearchResult, UnifiedMistyCandidate } from "./types";
 
 const coreToolCommandIds = new Set([
@@ -67,6 +70,7 @@ export function buildUnifiedMistyCandidates(
   }
 
   for (const command of shortcutCommandRegistry) {
+    if (isNativeMobileBuild && !mobileCommandAllowed(command.id, command.category)) continue;
     const haystack = normalize(
       [command.label, command.description, command.category, ...command.aliases].join(" "),
     );
@@ -92,6 +96,7 @@ function emptyCandidates(): UnifiedMistyCandidate[] {
   const state = useWorkspaceStore.getState();
   const recent = (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
     .flatMap((window) => dockTabs(window.layout.root))
+    .filter((tab) => !isNativeMobileBuild || !["extension", "marketplace"].includes(tab.surfaceId))
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)
     .slice(0, 4)
     .map<UnifiedMistyCandidate>((tab, index) => ({
@@ -104,7 +109,11 @@ function emptyCandidates(): UnifiedMistyCandidate[] {
       ranking: ["recent"],
     }));
   const tools = shortcutCommandRegistry
-    .filter((command) => coreToolCommandIds.has(command.id))
+    .filter(
+      (command) =>
+        coreToolCommandIds.has(command.id) &&
+        (!isNativeMobileBuild || mobileCommandAllowed(command.id, command.category)),
+    )
     .slice(0, 8)
     .map<UnifiedMistyCandidate>((command, index) => ({
       id: `command:${command.id}`,
@@ -118,6 +127,12 @@ function emptyCandidates(): UnifiedMistyCandidate[] {
   return [...recent, ...tools];
 }
 
+export function mobileCommandAllowed(id: string, category = ""): boolean {
+  const normalized = `${id} ${category}`.toLowerCase();
+  if (id.startsWith("workspace.")) return false;
+  return !/(extension|plugin|marketplace|store|virtual window|split pane)/.test(normalized);
+}
+
 function matchesFilters(result: GlobalSearchResult, filters: GlobalSearchFilters) {
   if (filters.kinds.length && !filters.kinds.includes(result.kind)) return false;
   if (filters.spaceId && result.spaceId !== filters.spaceId) return false;
@@ -126,26 +141,6 @@ function matchesFilters(result: GlobalSearchResult, filters: GlobalSearchFilters
   return true;
 }
 
-export function mistyIntent(query: string): "answer" | "agent" | "search" {
-  const agentVerb =
-    "create|write|draft|draw|sketch|illustrate|organize|plan|research|build|make|" +
-    "send|schedule|delegate|handle|update|change|fix|prepare|collect|turn";
-  const agentRequest = new RegExp(
-    `^(?:(?:please|can you|could you|would you|will you|i need you to)\\s+)?(?:${agentVerb})\\b`,
-  );
-  if (agentRequest.test(query)) {
-    return "agent";
-  }
-  if (
-    /^(why|what|when|where|who|which|how|can you explain|tell me|compare|summari[sz]e|explain)\b/.test(
-      query,
-    ) ||
-    query.endsWith("?")
-  ) {
-    return "answer";
-  }
-  return "search";
-}
 
 function normalize(value: string) {
   return value

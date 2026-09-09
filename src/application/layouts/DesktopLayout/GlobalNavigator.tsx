@@ -1,19 +1,21 @@
+import { Renameable } from "@/features/navigation-names/Renameable";
+import { useNavigationName, sectionNameKey } from "@/features/navigation-names/store";
+import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
+import { useNavigatorOrder } from "./useNavigatorOrder";
+import { websiteNavigation } from "../../../../../misty-apps/apps/shared/websiteStore";
+import { navigationMenuPrimaryIconClass } from "@/shared/ui";
 import { routes } from "@/features/app-shell";
 import { reportSystemError } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { useInboxStore } from "@/features/inbox";
 import {
-  canOpenMistySpaceSection,
-  preferredMistySpace,
-  rememberedJournalRoute,
-  rememberedPlannerRoute,
-  socialProviderPath,
-  useSpacesStore,
-} from "@/features/spaces";
+  officialAppIdForNavigator,
+  officialAppRoute,
+  usePinnedNavigatorAppIds,
+} from "@/features/apps";
+import { useInboxStore } from "@/features/inbox";
+import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import {
   dockLeaves,
-  navigatorAppIdsForAccount,
-  useNavigatorAppsStore,
   useWorkspaceStore,
   WorkspaceAppIcon,
   workspaceSurfaceFromRoute,
@@ -31,13 +33,19 @@ import { LibraryNavigatorDisclosure } from "./LibraryNavigatorDisclosure";
 import { NavigatorAppsSection } from "./NavigatorAppsSection";
 import {
   NavigatorHeaderHomeButton,
-  NavigatorHeaderStoreButton,
+  NavigatorHeaderDiscoverButton,
   NavigatorHeaderSearchButton,
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { PlannerNavigatorDisclosure } from "./PlannerNavigatorDisclosure";
 import { SocialNavigatorDisclosure } from "./SocialNavigatorDisclosure";
 import { navigatorRowClass, navigatorTitlebarStripClass } from "./styles";
+import {
+  appNavigationFor,
+  savedProviderNavigation,
+  useAppNavigationStore,
+} from "@/features/apps/appNavigation";
+import { DownloadedAppNavigator } from "./DownloadedAppNavigator";
 
 type NavigatorToolItem = {
   id: NavigatorAppId;
@@ -46,12 +54,12 @@ type NavigatorToolItem = {
   disabled?: boolean;
 };
 const globalToolItems = {
-  inbox: { id: "inbox", label: "Inbox", path: routes.inbox },
-  agents: { id: "agents", label: "Agents", path: routes.agents },
-  browser: { id: "browser", label: "Browser", path: routes.browser },
-  files: { id: "files", label: "Files", path: routes.files },
-  code: { id: "code", label: "Code", path: routes.code },
-  terminal: { id: "terminal", label: "Terminal", path: routes.terminal },
+  inbox: { id: "inbox", label: "Inbox", path: officialAppRoute("inbox") },
+  agents: { id: "agents", label: "Agents", path: officialAppRoute("agents") },
+  browser: { id: "browser", label: "Browser", path: officialAppRoute("browser") },
+  files: { id: "files", label: "Files", path: officialAppRoute("files") },
+  code: { id: "code", label: "Code", path: officialAppRoute("code") },
+  terminal: { id: "terminal", label: "Terminal", path: officialAppRoute("terminal") },
 } satisfies Record<string, NavigatorToolItem>;
 
 export function GlobalNavigator(props: {
@@ -68,13 +76,9 @@ export function GlobalNavigator(props: {
   const location = useLocation();
   const { user } = useAuth();
   const accountId = user?.id ?? "";
-  const selectedAppIds = useNavigatorAppsStore((state) =>
-    navigatorAppIdsForAccount(state, accountId),
-  );
-  const adoptGuestApps = useNavigatorAppsStore((state) => state.adoptGuestApps);
-  useEffect(() => {
-    if (accountId) adoptGuestApps(accountId);
-  }, [accountId, adoptGuestApps]);
+  const selectedAppIds = usePinnedNavigatorAppIds();
+  const appNavigation = useAppNavigationStore((state) => state.entries);
+  const providerCache = useAppNavigationStore((state) => state.providerCache);
   const inboxAccounts = useInboxStore((state) => state.accounts);
   // The rail marks what the workspace is actually showing, not the last thing
   // that was clicked, so it follows the focused pane's active tab.
@@ -91,8 +95,8 @@ export function GlobalNavigator(props: {
   const spacesError = useSpacesStore((state) => state.error);
   // The workspace is always scoped to a Space. Before Spaces load there is
   // nothing to scope to, so the store starts on a bootstrap scope and adopts
-  // Misty — the home Space — the moment one is available.
-  const defaultSpaceId = preferredMistySpace(spaces)?.id;
+  // the account's default Space the moment one is available.
+  const defaultSpaceId = preferredDefaultSpace(spaces)?.id;
   useEffect(() => {
     if (!defaultSpaceId) return;
     useWorkspaceStore.getState().adoptDefaultScope(`space:${defaultSpaceId}`);
@@ -115,13 +119,15 @@ export function GlobalNavigator(props: {
   );
   const canAddSpace = !limits || limits.unlimited_spaces || spaces.length < limits.space_limit;
   const activeSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
-  // Space-scoped tools keep their slots during the first frames after launch
-  // or while a Space is loading; they become active once a real context exists.
-  const scopedSpace =
-    spaces.find((space) => space.id === activeSpaceId) ?? preferredMistySpace(spaces);
   const activeRoute = activeTab?.route ?? `${location.pathname}${location.search}`;
   const activeSpaceSection = spaceSectionFromRoute(activeRoute);
   const routeSpaceId = spaceIdFromRoute(activeRoute);
+  // Space-scoped tools keep their slots during the first frames after launch
+  // or while a Space is loading; they become active once a real context exists.
+  const scopedSpace =
+    spaces.find((space) => space.id === routeSpaceId) ??
+    spaces.find((space) => space.id === activeSpaceId) ??
+    preferredDefaultSpace(spaces);
   const homePath = scopedSpace
     ? `/spaces/${encodeURIComponent(scopedSpace.id)}/home`
     : routes.spaces;
@@ -147,6 +153,25 @@ export function GlobalNavigator(props: {
     const item = toolItemsById.get(id);
     return item ? [item] : [];
   });
+  const sectionOrder = useNavigatorOrder(
+    accountId,
+    "sections",
+    selectedTools.map((item) => item.id),
+  );
+  const orderedTools = sectionOrder.ids.flatMap((id) =>
+    selectedTools.filter((item) => item.id === id),
+  );
+  const sectionDrag = usePointerReorder({
+    scope: `navigator:${accountId}:sections`,
+    axis: "y",
+    hitArea: "header",
+    getDrag: (id) => {
+      const item = selectedTools.find((item) => item.id === id);
+      return item ? { id, label: item.label } : null;
+    },
+    onDrop: (drag, target, after) => sectionOrder.move(drag.id, target, after),
+    onKeyboardMove: sectionOrder.step,
+  });
   const hasUnavailableSpaceApps = !scopedSpace && selectedAppIds.some((id) => isSpaceToolId(id));
   const spaceStatusId = "navigator-space-status";
 
@@ -157,6 +182,7 @@ export function GlobalNavigator(props: {
         "overflow-hidden border-r border-charcoal-border bg-charcoal-workspace",
       )}
       aria-label="Primary"
+      data-tour-target="navigation"
       onPointerDown={props.onStartWindowDrag}
     >
       {props.onTitlebarPointerDown ? (
@@ -173,7 +199,10 @@ export function GlobalNavigator(props: {
       ) : null}
 
       <div className="grid shrink-0 select-none gap-1 px-3 py-2" data-navigator-header="true">
-        <div className="flex h-9 w-full min-w-0 items-center" data-navigator-space-row="true">
+        <div
+          className="flex min-h-8 w-full min-w-0 items-center justify-between gap-1"
+          data-navigator-space-row="true"
+        >
           <GlobalSpaceSwitcher
             activeSpace={scopedSpace}
             activeSpaceId={activeSpaceId}
@@ -181,6 +210,7 @@ export function GlobalNavigator(props: {
             spaces={visibleSpaces}
             userId={user?.id ?? ""}
           />
+          <NavigatorHeaderSearchButton />
         </div>
         <div
           className="grid w-full gap-1"
@@ -188,8 +218,7 @@ export function GlobalNavigator(props: {
           data-navigator-actions-row="true"
         >
           <NavigatorHeaderHomeButton path={homePath} active={homeActive} />
-          <NavigatorHeaderStoreButton path={routes.store} active={marketplaceActive} />
-          <NavigatorHeaderSearchButton />
+          <NavigatorHeaderDiscoverButton path={routes.discover} active={marketplaceActive} />
         </div>
       </div>
       <div
@@ -205,7 +234,13 @@ export function GlobalNavigator(props: {
                 error={Boolean(spacesError)}
               />
             ) : null}
-            {selectedTools.map(renderToolItem)}
+            <div {...sectionDrag} className="grid min-w-0 gap-0.5">
+              {orderedTools.map((item) => (
+                <div key={item.id} data-reorder-item={item.id}>
+                  {renderToolItem(item)}
+                </div>
+              ))}
+            </div>
           </NavigatorAppsSection>
         </NavigatorSection>
       </div>
@@ -221,17 +256,78 @@ export function GlobalNavigator(props: {
   );
 
   function toolIsActive(item: NavigatorToolItem): boolean {
-    return !item.disabled && isSpaceToolId(item.id)
-      ? Boolean(
-          activeTab?.surfaceId === "space" &&
-          activeTab.groupKey.startsWith(`space:${scopedSpace?.id ?? activeSpaceId}`) &&
-          spaceToolIsActive(item.id, activeSpaceSection),
-        )
-      : activeGroupKey === `tool:${item.id}`;
+    const appGroup = `app:${officialAppIdForNavigator(item.id)}`;
+    return (
+      !item.disabled &&
+      (activeGroupKey === appGroup || workspaceSurfaceFromRoute(activeRoute)?.groupKey === appGroup)
+    );
   }
 
   function renderToolItem(item: NavigatorToolItem): ReactNode {
     const active = toolIsActive(item);
+    const registration =
+      !item.disabled &&
+      appNavigationFor(appNavigation, {
+        accountId,
+        spaceId: scopedSpace?.id,
+        appId: officialAppIdForNavigator(item.id),
+        instanceId: activeTab?.id,
+      });
+    if (registration)
+      return (
+        <DownloadedAppNavigator
+          key={item.id}
+          accountId={accountId}
+          appId={item.id}
+          label={item.label}
+          active={active}
+          activeRoute={activeRoute}
+          items={registration.items}
+        />
+      );
+
+    if (
+      !item.disabled &&
+      (item.id === "browser" ||
+        (/Mac/.test(navigator.platform) &&
+          ["social", "inbox", "planner", "journal", "library"].includes(item.id)))
+    ) {
+      const saved = savedProviderNavigation(providerCache, {
+        accountId,
+        spaceId: scopedSpace?.id,
+        appId: officialAppIdForNavigator(item.id),
+      });
+      const path = `/apps/${item.id}`;
+      const items =
+        saved?.items ??
+        (item.id === "planner" || item.id === "journal" || item.id === "library"
+          ? websiteNavigation(item.id, { services: [], accounts: [], pins: [] }, scopedSpace?.id)
+          : [
+              ...(item.id === "social"
+                ? [{ id: "misty", label: "Misty", route: `${path}?provider=misty` }]
+                : []),
+              ...(item.id === "inbox"
+                ? ["google", "microsoft"]
+                    .filter((id) => inboxAccounts.some((account) => account.provider === id))
+                    .map((id) => ({
+                      id,
+                      label: id === "google" ? "Gmail" : "Outlook",
+                      route: `${path}?provider=${id}`,
+                    }))
+                : []),
+            ]);
+      return (
+        <DownloadedAppNavigator
+          key={item.id}
+          accountId={accountId}
+          appId={item.id}
+          label={item.label}
+          active={active}
+          activeRoute={activeRoute}
+          items={items}
+        />
+      );
+    }
 
     if (item.id === "inbox") {
       return (
@@ -303,6 +399,7 @@ export function GlobalNavigator(props: {
           key={item.id}
           accountId={accountId}
           activeGroupKey={activeGroupKey}
+          activeRoute={activeRoute}
         />
       );
     }
@@ -337,36 +434,34 @@ export function GlobalNavigator(props: {
 type SpaceToolId = "journal" | "planner" | "social" | "library";
 
 function spaceToolItems(space: { id: string }, accountId: string) {
-  const encodedSpaceId = encodeURIComponent(space.id);
   return [
     {
       id: "social" as const,
       label: "Social",
-      path: socialProviderPath(space.id, "misty"),
+      path: officialAppRoute("chat", space.id, accountId),
     },
     {
       id: "journal" as const,
       label: "Journal",
-      path: rememberedJournalRoute(accountId, space.id),
+      path: officialAppRoute("journal", space.id, accountId),
     },
     {
       id: "planner" as const,
       label: "Planner",
-      path: rememberedPlannerRoute(accountId, space.id),
+      path: officialAppRoute("planner", space.id, accountId),
     },
     {
       id: "library" as const,
       label: "Library",
-      path: `/spaces/${encodedSpaceId}/library`,
+      path: officialAppRoute("library", space.id, accountId),
     },
   ];
 }
 
 function canShowSpaceTool(
-  space: Parameters<typeof canOpenMistySpaceSection>[0],
+  space: { permissions?: Record<string, boolean> },
   id: SpaceToolId,
 ): boolean {
-  if (!canOpenMistySpaceSection(space, id)) return false;
   if (id === "social" && space.permissions?.["messages.read"] === false) return false;
   if (id === "planner" && space.permissions?.["tasks.view"] === false) return false;
   if (id === "library" && space.permissions?.["library.view"] === false) return false;
@@ -383,15 +478,14 @@ function spaceSectionFromRoute(route: string): string {
 
 function spaceIdFromRoute(route: string): string {
   try {
-    const segments = new URL(route, "https://misty.local").pathname.split("/").filter(Boolean);
-    return segments[0] === "spaces" && segments[1] ? decodeURIComponent(segments[1]) : "";
+    const parsed = new URL(route, "https://misty.local");
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const encodedSpaceId =
+      segments[0] === "spaces" && segments[1] ? segments[1] : parsed.searchParams.get("space");
+    return encodedSpaceId ? decodeURIComponent(encodedSpaceId) : "";
   } catch {
     return "";
   }
-}
-
-function spaceToolIsActive(id: SpaceToolId, section: string): boolean {
-  return id === "journal" ? section === "notes" || section === "drawings" : section === id;
 }
 
 function isSpaceToolId(id: string): id is SpaceToolId {
@@ -456,16 +550,17 @@ function NavigatorLink(props: {
   disabled?: boolean;
   disabledReasonId?: string;
 }) {
+  const label = useNavigationName(sectionNameKey(props.appId), props.label);
   const content = (
     <>
-      <span className="grid size-7 shrink-0 place-items-center">
+      <span className={navigationMenuPrimaryIconClass}>
         <WorkspaceAppIcon
           appId={props.appId}
           className={props.disabled ? "opacity-45 grayscale-[0.35]" : undefined}
           size="nav"
         />
       </span>
-      <span className="min-w-0 flex-1 truncate">{props.label}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </>
   );
   if (props.disabled) {
@@ -475,28 +570,38 @@ function NavigatorLink(props: {
           navigatorRowClass(false),
           "cursor-default text-cream-muted/55 hover:bg-transparent hover:text-cream-muted/55",
         )}
+        data-reorder-header="true"
+        data-reorder-handle="true"
+        data-misty-window-drag-block="true"
+        tabIndex={0}
         aria-disabled="true"
         aria-describedby={props.disabledReasonId}
-        aria-label={props.label}
+        aria-label={label}
       >
         {content}
       </div>
     );
   }
   return (
-    <Link
-      to={props.path}
-      onClick={() => {
-        const surface = workspaceSurfaceFromRoute(props.path);
-        if (surface) {
-          useWorkspaceStore.getState().openSurface(surface);
-        }
-      }}
-      className={navigatorRowClass(props.active)}
-      aria-current={props.active ? "page" : undefined}
-      aria-label={props.label}
-    >
-      {content}
-    </Link>
+    <Renameable nameKey={sectionNameKey(props.appId)} automatic={props.label}>
+      <Link
+        data-reorder-handle="true"
+        data-reorder-header="true"
+        data-misty-window-drag-block="true"
+        title="Drag to reorder · Alt+Shift+↑/↓"
+        to={props.path}
+        onClick={() => {
+          const surface = workspaceSurfaceFromRoute(props.path);
+          if (surface) {
+            useWorkspaceStore.getState().openSurface(surface);
+          }
+        }}
+        className={navigatorRowClass(props.active)}
+        aria-current={props.active ? "page" : undefined}
+        aria-label={label}
+      >
+        {content}
+      </Link>
+    </Renameable>
   );
 }

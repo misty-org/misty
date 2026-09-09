@@ -19,8 +19,6 @@ export function SpaceRowActions({ space }: { space: Space }) {
     spaceSettingsReturnTo: `${location.pathname}${location.search}${location.hash}`,
   };
 
-  if (space.kind === "misty" && space.permissions?.["space.invite"] !== true) return null;
-
   return (
     <div className="flex items-center gap-0.5">
       <SpaceUsagePopover

@@ -10,6 +10,7 @@ describe("workspace shortcut actions", () => {
 
   it("cycles only within the focused pane and wraps", () => {
     const store = useWorkspaceStore.getState();
+    const defaultTab = findDockLeaf(store.layout.root, store.layout.focusedPaneId)?.tabs[0];
     const first = store.openSurface({
       surfaceId: "files",
       groupKey: "tool:files",
@@ -17,7 +18,7 @@ describe("workspace shortcut actions", () => {
       route: "/files",
       instancePolicy: "single",
     });
-    const second = store.openSurface({
+    store.openSurface({
       surfaceId: "code",
       groupKey: "tool:code",
       title: "Code",
@@ -25,8 +26,9 @@ describe("workspace shortcut actions", () => {
       instancePolicy: "multiple",
       forceNew: true,
     });
+    expect(useWorkspaceStore.getState().cycleTab(1)?.id).toBe(defaultTab?.id);
     expect(useWorkspaceStore.getState().cycleTab(1)?.id).toBe(first.id);
-    expect(useWorkspaceStore.getState().cycleTab(-1)?.id).toBe(second.id);
+    expect(useWorkspaceStore.getState().cycleTab(-1)?.id).toBe(defaultTab?.id);
   });
 
   it("selects the last tab for slot nine", () => {

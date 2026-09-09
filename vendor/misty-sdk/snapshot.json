@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "name": "@misty/contracts",
+      "version": "0.1.0",
+      "sha256": "e889d4508bf5fb158c7d67c5eb4fba562bb1dc4c2094f411af6a6b16fdfcbaa5",
+      "filename": "misty-contracts-0.1.0-e889d4508bf5fb15.tgz"
+    },
+    {
+      "name": "@misty/sdk",
+      "version": "0.1.0",
+      "sha256": "b66d8dda8b2add399732ca1c7381d0e2dfe792efe0b0e542a200cf0ff204f038",
+      "filename": "misty-sdk-0.1.0-b66d8dda8b2add39.tgz"
+    }
+  ]
+}

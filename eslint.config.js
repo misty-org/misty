@@ -37,7 +37,9 @@ export default tseslint.config(
     ignores: [
       "**/node_modules/**",
       "dist/**",
+	  "dist-*/**",
       "build/**",
+	  "vendor/**",
       "src-tauri/**",
       // Tooling and scratch trees that are not application source.
       ".agents/**",
@@ -168,6 +170,35 @@ export default tseslint.config(
     files: ["src/application/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
+    },
+  },
+
+  // Mobile surfaces are a separate composition boundary. They may load a
+  // feature's dedicated entry directly, but can never reach desktop-only UI.
+  {
+    files: [
+      "src/application/layouts/MobileLayout/**/*.{ts,tsx}",
+      "src/features/**/mobile/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": restrict([
+        MODELS_BAN,
+        [
+          [
+            "@/application/layouts/DesktopLayout",
+            "@/application/layouts/DesktopLayout/*",
+            "@/features/extensions",
+            "@/features/extensions/*",
+            "@/features/marketplace",
+            "@/features/marketplace/*",
+            "@/features/terminal",
+            "@/features/terminal/*",
+            "@/features/developer-workspace",
+            "@/features/developer-workspace/*",
+          ],
+          "Mobile compositions must not import desktop layout, extension, marketplace, terminal, or code UI.",
+        ],
+      ]),
     },
   },
 

@@ -10,11 +10,13 @@ const appPageTitles = new Map<string, string>([
   [routes.code, "Misty - Code"],
   [routes.spaces, "Misty - Spaces"],
   [routes.agents, "Misty - Agents"],
+  [routes.activity, "Misty - Activity"],
   [routes.transfers, "Misty - Transfers"],
-  [routes.store, "Misty - Store"],
+  [routes.discover, "Misty - Discover"],
   [routes.changelog, "Misty - Changelog"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
+  [routes.profile, "Misty - Profile"],
   [routes.account, "Misty - Account"],
 ]);
 

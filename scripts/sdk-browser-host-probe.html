@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Misty Browser SDK verification</title>
+<link rel="stylesheet" href="/src/styles/styles.css">
+<style>html,body{margin:0;height:100%;color:#eee}#root{height:90vh}#result{display:block;background:#111;font:12px system-ui;padding:8px}</style>
+</head><body><div id="root"></div><output id="result">Verifying downloaded Browser…</output>
+<script>
+const report = message => { document.getElementById('result').textContent=message; void window.__TAURI_INTERNALS__?.invoke('sdk_probe_complete',{nonce:new URLSearchParams(location.search).get('nonce'),success:false,message}); };
+window.addEventListener('error', event=>report((event.error?.stack || event.message) || 'Browser probe failed to load'));
+window.addEventListener('unhandledrejection', event=>report(String(event.reason?.stack || event.reason)));
+</script><script type="module" src="./sdk-browser-host-probe.tsx"></script></body></html>

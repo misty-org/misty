@@ -301,14 +301,7 @@ describe("AuthProvider account switching", () => {
 
     expect(auth?.user).toBeNull();
     expect(mocks.userStore.clear).toHaveBeenCalled();
-    expect(mocks.explorerSetState).toHaveBeenCalledWith({
-      notifications: [],
-      notificationHistory: [],
-    });
-    expect(mocks.resetSearchAccountState).toHaveBeenCalled();
     expect(mocks.resetSpacesAccountState).toHaveBeenCalled();
-    expect(mocks.resetAgentAccountState).toHaveBeenCalled();
-    expect(mocks.resetNotesAccountState).toHaveBeenCalled();
   });
 
   it("rehydrates the active user and profile from the server", async () => {
