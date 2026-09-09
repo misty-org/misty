@@ -1,19 +1,35 @@
+import { useCapabilityApprovals } from "@/features/capability-approvals/store";
+import { CapabilityApprovals } from "@/features/capability-approvals/CapabilityApprovals";
+import { useAuth } from "@/features/auth";
 import { compareActivityNewestFirst, formatActivityBadge } from "./activityModel";
 import { activityTargetHref } from "./activityNavigation";
 import { useActivityStore } from "./useActivityStore";
 import { Bell, CheckCheck, CloudOff } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { AgentInterventions } from "@/features/agent-interventions/AgentInterventions";
 import { useMobileSurfaceChrome } from "@/shared/mobile";
 import { useNavigate } from "react-router-dom";
 
 export function ActivityPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [pendingInterventions, setPendingInterventions] = useState(0);
+  useEffect(() => setPendingInterventions(0), [user?.id]);
+  const pendingApprovals = useCapabilityApprovals((state) =>
+    state.accountId === user?.id ? state.items.length : 0,
+  );
   const items = useActivityStore((state) => state.allItems);
   const attentionCount = useActivityStore((state) => state.attentionCount);
   const offline = useActivityStore((state) => state.offline);
   const markAllRead = useActivityStore((state) => state.markAllRead);
   const openItem = useActivityStore((state) => state.openItem);
-  const ordered = useMemo(() => [...items].sort(compareActivityNewestFirst), [items]);
+  const ordered = useMemo(
+    () =>
+      items
+        .filter((item) => item.source !== "capabilities" && item.source !== "interventions")
+        .sort(compareActivityNewestFirst),
+    [items],
+  );
   const chromeConfig = useMemo(
     () => ({
       title: "Activity",
@@ -34,9 +50,13 @@ export function ActivityPage() {
   return (
     <section className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col bg-charcoal-bg">
       <p className="min-h-11 shrink-0 border-b border-charcoal-border px-4 py-3 text-sm text-cream-muted">
-        {attentionCount
-          ? `${formatActivityBadge(attentionCount)} need attention`
-          : "You're caught up"}
+        {pendingInterventions
+          ? `${pendingInterventions} browser requests need your attention`
+          : pendingApprovals
+            ? `${pendingApprovals} ${pendingApprovals === 1 ? "action is" : "actions are"} waiting for approval`
+            : attentionCount
+              ? `${formatActivityBadge(attentionCount)} need attention`
+              : "You're caught up"}
       </p>
       {offline ? (
         <p className="flex min-h-11 items-center gap-2 border-b border-charcoal-border bg-charcoal-card px-4 text-sm text-cream-muted">
@@ -45,6 +65,14 @@ export function ActivityPage() {
         </p>
       ) : null}
       <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
+        {user?.id ? (
+          <AgentInterventions
+            accountId={user.id}
+            key={`interventions:${user.id}`}
+            onCount={setPendingInterventions}
+          />
+        ) : null}
+        {user?.id ? <CapabilityApprovals key={user.id} /> : null}
         {ordered.length ? (
           <ul className="m-0 grid list-none gap-0 p-0">
             {ordered.map((item) => (
@@ -78,7 +106,7 @@ export function ActivityPage() {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : pendingApprovals || pendingInterventions ? null : (
           <div className="grid h-full min-h-56 place-items-center px-8 text-center">
             <div>
               <Bell className="mx-auto mb-3 text-cream-muted" size={24} aria-hidden="true" />

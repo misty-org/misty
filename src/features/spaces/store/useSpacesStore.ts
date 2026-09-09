@@ -38,12 +38,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   limits: null,
   ownerStorage: null,
   membersBySpace: {},
-  agentMembershipsBySpace: {},
   messagesBySpace: {},
   messageLoadingBySpace: {},
   messageErrorsBySpace: {},
   nodesBySpace: {},
-  agentsBySpace: {},
   workflowsBySpace: {},
   inbox: { unreads: [], mentions: [] },
   presenceBySpace: {},
@@ -120,20 +118,17 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     if (!space) {
       set((state) => {
         const membersBySpace = { ...state.membersBySpace };
-        const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
         const messagesBySpace = { ...state.messagesBySpace };
         const messageLoadingBySpace = { ...state.messageLoadingBySpace };
         const messageErrorsBySpace = { ...state.messageErrorsBySpace };
         const nodesBySpace = { ...state.nodesBySpace };
         delete membersBySpace[spaceId];
-        delete agentMembershipsBySpace[spaceId];
         delete messagesBySpace[spaceId];
         delete messageLoadingBySpace[spaceId];
         delete messageErrorsBySpace[spaceId];
         delete nodesBySpace[spaceId];
         return {
           membersBySpace,
-          agentMembershipsBySpace,
           messagesBySpace,
           messageLoadingBySpace,
           messageErrorsBySpace,
@@ -224,11 +219,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadMembers: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { members, agents } = await spacesApi.members(spaceId);
+      const { members } = await spacesApi.members(spaceId);
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({
         membersBySpace: { ...state.membersBySpace, [spaceId]: members },
-        agentMembershipsBySpace: { ...state.agentMembershipsBySpace, [spaceId]: agents ?? [] },
       }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
@@ -242,34 +236,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     try {
       const { resources } = await spacesApi.studio(spaceId, kind);
       if (generation !== spacesAccountGeneration) return;
-      set((state) =>
-        kind === "agents"
-          ? { agentsBySpace: { ...state.agentsBySpace, [spaceId]: resources }, error: null }
-          : { workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources }, error: null },
-      );
+      set((state) => ({ workflowsBySpace: { ...state.workflowsBySpace, [spaceId]: resources }, error: null }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
-      set({ error: errorText(error) });
-    }
-  },
-
-  loadChatAgents: async (spaceId) => {
-    const generation = spacesAccountGeneration;
-    try {
-      const { agents } = await spacesApi.chatAgents(spaceId);
-      if (generation !== spacesAccountGeneration) return;
-      set((state) => ({
-        agentsBySpace: { ...state.agentsBySpace, [spaceId]: agents },
-        error: null,
-      }));
-    } catch (error) {
-      if (generation !== spacesAccountGeneration) return;
-      if (error instanceof SpaceRequestError && (error.status === 403 || error.status === 404)) {
-        set((state) => ({
-          agentsBySpace: { ...state.agentsBySpace, [spaceId]: [] },
-        }));
-        return;
-      }
       set({ error: errorText(error) });
     }
   },
@@ -385,9 +354,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         delete nodesBySpace[spaceId];
         const membersBySpace = { ...state.membersBySpace };
         delete membersBySpace[spaceId];
-        const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
-        delete agentMembershipsBySpace[spaceId];
-        return { spaces, messagesBySpace, nodesBySpace, membersBySpace, agentMembershipsBySpace };
+        return { spaces, messagesBySpace, nodesBySpace, membersBySpace };
       });
       await get().load({ force: true });
     } catch (error) {
@@ -420,12 +387,10 @@ export function resetSpacesAccountState(): void {
     limits: null,
     ownerStorage: null,
     membersBySpace: {},
-    agentMembershipsBySpace: {},
     messagesBySpace: {},
     messageLoadingBySpace: {},
     messageErrorsBySpace: {},
     nodesBySpace: {},
-    agentsBySpace: {},
     workflowsBySpace: {},
     inbox: { unreads: [], mentions: [] },
     presenceBySpace: {},
@@ -450,20 +415,17 @@ async function recoverInaccessibleSpace(
   if (!accessErrors.isInaccessibleSpaceError(error)) return false;
   useSpacesStore.setState((state) => {
     const membersBySpace = { ...state.membersBySpace };
-    const agentMembershipsBySpace = { ...state.agentMembershipsBySpace };
     const messagesBySpace = { ...state.messagesBySpace };
     const messageLoadingBySpace = { ...state.messageLoadingBySpace };
     const messageErrorsBySpace = { ...state.messageErrorsBySpace };
     const nodesBySpace = { ...state.nodesBySpace };
     delete membersBySpace[spaceId];
-    delete agentMembershipsBySpace[spaceId];
     delete messagesBySpace[spaceId];
     delete messageLoadingBySpace[spaceId];
     delete messageErrorsBySpace[spaceId];
     delete nodesBySpace[spaceId];
     return {
       membersBySpace,
-      agentMembershipsBySpace,
       messagesBySpace,
       messageLoadingBySpace,
       messageErrorsBySpace,

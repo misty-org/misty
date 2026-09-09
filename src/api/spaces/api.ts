@@ -5,8 +5,6 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
-import { createSpaceActionSuggestionsApi } from "@/api/spaces/action-suggestions";
-import { createSpaceAgentMembershipsApi } from "@/api/spaces/agent-memberships";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -14,12 +12,10 @@ import {
 } from "@/api/spaces/connectivity";
 import { createSpaceConversationsApi } from "@/api/spaces/conversations";
 import type {
-  AvailableProviderResource,
   CreateSpaceRequest,
   CreateSpaceResult,
   ProviderAuthorizationStart,
   ProviderConnectionAvailability,
-  ProviderSharedResource,
   Space,
   SpaceIntegration,
   SpaceInvitationPreview,
@@ -108,6 +104,18 @@ export function assertStableSpaceAccount(generation: number): void {
 }
 
 export function spaceErrorMessage(code: string | undefined, fallback: string): string {
+  const reason = quotaReason(fallback) ?? code;
+  const quotaMessages: Record<string, string> = {
+    personal_storage_limit_reached:
+      "Your personal storage is full. Free some of your contributions or upgrade your plan. Existing files remain available.",
+    space_storage_limit_reached:
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+    personal_ai_limit_reached:
+      "Your personal weekly hosted AI allowance is used. Wait for it to reset or upgrade your plan.",
+    space_ai_limit_reached:
+      "This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or wait for the allowance to reset.",
+  };
+  if (reason && quotaMessages[reason]) return quotaMessages[reason];
   const messages: Record<string, string> = {
     not_authenticated:
       "Your Misty session is unavailable. Sign out, then sign in again before creating a Space.",
@@ -115,13 +123,17 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     not_found: "That Space item no longer exists.",
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
-      "You already own three Spaces. Delete one permanently before creating another.",
+      "You have reached your plan’s owned Space limit. Delete an owned Space permanently or upgrade your plan before creating another.",
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded:
-      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
     space_storage_quota_exceeded:
-      "This upload would exceed the Space owner’s shared storage pool. Existing files remain available.",
+      "This Space’s storage is full. Its owner must upgrade their plan, or someone must free Space capacity. Existing files remain available.",
+    storage_limit_reached:
+      "Storage is full. Free capacity or review your personal and Space limits before trying again.",
+    hosted_ai_limit_reached:
+      "Weekly hosted AI is unavailable. Review your personal and Space allowances before trying again.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     self_host_entitlement_required:
@@ -169,6 +181,15 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
   return code && messages[code] ? messages[code] : fallback.trim() || "The Space request failed.";
 }
 
+function quotaReason(responseText: string): string | undefined {
+  try {
+    const value = JSON.parse(responseText) as { reason?: unknown };
+    return typeof value.reason === "string" ? value.reason : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const spacesApi = {
   snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
   ...createSpacePlannerExpansionApi(spaceRequest),
@@ -203,9 +224,7 @@ export const spacesApi = {
       body: JSON.stringify({ confirmation }),
     }),
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
-  ...createSpaceAgentMembershipsApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
-  ...createSpaceActionSuggestionsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   ...createSpaceTasksApi(spaceRequest),
   integrations: (spaceId: string) =>
@@ -235,23 +254,6 @@ export const spacesApi = {
     spaceRequest<void>(`/integrations/${encodeURIComponent(integrationId)}`, {
       method: "DELETE",
     }),
-  availableProviderResources: (spaceId: string, integrationId: string) =>
-    spaceRequest<{ resources: AvailableProviderResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
-    ),
-  sharedProviderResources: (spaceId: string) =>
-    spaceRequest<{ resources: ProviderSharedResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/provider-resources`,
-    ),
-  selectProviderResources: (
-    spaceId: string,
-    integrationId: string,
-    resources: Array<Pick<AvailableProviderResource, "resource_type" | "external_resource_id">>,
-  ) =>
-    spaceRequest<{ resources: ProviderSharedResource[] }>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(integrationId)}/resources`,
-      { method: "PUT", body: JSON.stringify({ resources }) },
-    ),
   nodes: (spaceId: string) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
@@ -259,23 +261,23 @@ export const spacesApi = {
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
       { method: "POST", body: JSON.stringify({ disposition }) },
     ),
-  studio: (spaceId: string, kind: "agents" | "workflows") =>
+  studio: (spaceId: string, kind: "workflows") =>
     spaceRequest<{ resources: SpaceStudioResource[] }>(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`,
     ),
-  saveStudio: (spaceId: string, kind: "agents" | "workflows", item: Partial<SpaceStudioResource>) =>
+  saveStudio: (spaceId: string, kind: "workflows", item: Partial<SpaceStudioResource>) =>
     spaceRequest<SpaceStudioResource>(`/spaces/${encodeURIComponent(spaceId)}/studio/${kind}`, {
       method: "POST",
       body: JSON.stringify(item),
     }),
-  deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) =>
+  deleteStudio: (spaceId: string, kind: "workflows", id: string) =>
     spaceRequest(
       `/spaces/${encodeURIComponent(spaceId)}/studio/${kind}/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
   runStudio: (
     spaceId: string,
-    kind: "agents" | "workflows",
+    kind: "workflows",
     id: string,
     prompt = "",
     capabilityId = "",

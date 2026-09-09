@@ -15,7 +15,6 @@ export function useSpaceMembers(spaceId: string) {
   const store = useSpacesStore(
     useShallow((state) => ({
       membersBySpace: state.membersBySpace,
-      agentMembershipsBySpace: state.agentMembershipsBySpace,
       loading: state.loading,
       error: state.error,
       invite: state.invite,
@@ -26,7 +25,6 @@ export function useSpaceMembers(spaceId: string) {
     })),
   );
   const members = store.membersBySpace[spaceId] ?? emptyMembers;
-  const agents = store.agentMembershipsBySpace[spaceId] ?? emptyMembers;
   const [membersLoading] = useMinimumSpin(store.loading && members.length === 0);
   const owner = space?.role === "owner";
   const canManageMembers = space?.permissions?.["space.invite"] === true || owner;
@@ -51,13 +49,11 @@ export function useSpaceMembers(spaceId: string) {
     ...store,
     space,
     members,
-    agents,
     membersLoading,
     owner,
     canManageMembers,
     canTransferOwnership: owner && canManageSpaceLifecycle(space, "transfer"),
     canInvite: canManageMembers,
-    canManageAgents: owner || space?.permissions?.["agents.manage"] === true,
     pendingInvitations,
     loadPendingInvitations,
   };

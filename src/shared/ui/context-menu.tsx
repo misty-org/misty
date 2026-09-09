@@ -1,5 +1,7 @@
 "use client";
 
+import { menuContentClass, menuItemClass } from "./menu-styles";
+
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
 import { Check, ChevronRight, Circle } from "lucide-react";
 import * as React from "react";
@@ -61,10 +63,7 @@ const ContextMenuContent = React.forwardRef<
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
-      className={cn(
-        "z-[2147483400] max-h-[min(24rem,calc(100dvh-2rem))] min-w-[8rem] origin-center overflow-x-hidden overflow-y-auto rounded-lg bg-charcoal-card p-1.5 text-cream shadow-md ring-1 ring-cream/10 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className,
-      )}
+      className={cn(menuContentClass, className)}
       {...props}
     />
   </ContextMenuPrimitive.Portal>
@@ -79,11 +78,8 @@ const ContextMenuItem = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
-    className={cn(
-      "relative flex min-h-9 cursor-default select-none items-center gap-2.5 rounded-md px-2.5 py-2 text-sm outline-none focus:bg-charcoal-hover focus:text-cream data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-      inset && "pl-8",
-      className,
-    )}
+    data-slot="context-menu-item"
+    className={cn(menuItemClass, inset && "pl-8", className)}
     {...props}
   />
 ));

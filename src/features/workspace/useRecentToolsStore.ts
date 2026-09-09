@@ -1,22 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { homeApi } from "@/api/home/api";
-import {
-  ArrowLeftRight,
-  BookOpenText,
-  Bot,
-  CheckSquare2,
-  Code2,
-  FolderOpen,
-  Globe2,
-  House,
-  Inbox,
-  MessagesSquare,
-  Notebook,
-  SquareTerminal,
-  Store,
-  type LucideIcon,
-} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { appIcons } from "@/shared/ui/app-icons";
 import type { WorkspaceSurfaceId, WorkspaceTab } from "./model";
 import { spaceWorkspaceToolFromRoute } from "./routeSurface";
 
@@ -43,23 +29,28 @@ export interface WorkspaceToolMeta {
 }
 
 export const WORKSPACE_TOOLS_META: Record<WorkspaceToolId, WorkspaceToolMeta> = {
-  home: { id: "home", label: "Home", surfaceId: "home", icon: House },
-  journal: { id: "journal", label: "Journal", surfaceId: "space", icon: Notebook },
-  planner: { id: "planner", label: "Planner", surfaceId: "space", icon: CheckSquare2 },
-  social: { id: "social", label: "Social", surfaceId: "space", icon: MessagesSquare },
-  library: { id: "library", label: "Library", surfaceId: "space", icon: BookOpenText },
-  inbox: { id: "inbox", label: "Inbox", surfaceId: "inbox", icon: Inbox },
-  browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: Globe2 },
-  code: { id: "code", label: "Code", surfaceId: "code", icon: Code2 },
-  files: { id: "files", label: "Files", surfaceId: "files", icon: FolderOpen },
-  transfers: { id: "transfers", label: "Transfers", surfaceId: "transfers", icon: ArrowLeftRight },
-  terminal: { id: "terminal", label: "Terminal", surfaceId: "terminal", icon: SquareTerminal },
-  agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: Bot },
+  home: { id: "home", label: "Home", surfaceId: "home", icon: appIcons.home },
+  journal: { id: "journal", label: "Journal", surfaceId: "space", icon: appIcons.journal },
+  planner: { id: "planner", label: "Planner", surfaceId: "space", icon: appIcons.planner },
+  social: { id: "social", label: "Social", surfaceId: "space", icon: appIcons.social },
+  library: { id: "library", label: "Library", surfaceId: "space", icon: appIcons.library },
+  inbox: { id: "inbox", label: "Inbox", surfaceId: "inbox", icon: appIcons.inbox },
+  browser: { id: "browser", label: "Browser", surfaceId: "browser", icon: appIcons.browser },
+  code: { id: "code", label: "Code", surfaceId: "code", icon: appIcons.code },
+  files: { id: "files", label: "Files", surfaceId: "files", icon: appIcons.files },
+  transfers: {
+    id: "transfers",
+    label: "Transfers",
+    surfaceId: "transfers",
+    icon: appIcons.transfers,
+  },
+  terminal: { id: "terminal", label: "Terminal", surfaceId: "terminal", icon: appIcons.terminal },
+  agents: { id: "agents", label: "Agents", surfaceId: "agents", icon: appIcons.agents },
   marketplace: {
     id: "marketplace",
     label: "Discover",
     surfaceId: "marketplace",
-    icon: Store,
+    icon: appIcons.marketplace,
   },
 };
 

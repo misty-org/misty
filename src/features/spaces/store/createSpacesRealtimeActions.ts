@@ -1,4 +1,3 @@
-import { applyAgentRunEvent } from "./agent-run-events";
 import * as referenceMode from "./reference-mode";
 import * as accessErrors from "@/api/spaces/access-errors";
 import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
@@ -217,12 +216,7 @@ export async function applyRealtimeEvent(
       }));
       await get().loadInbox();
     } else await Promise.all([get().loadMessages(event.space_id), get().loadInbox()]);
-  } else if (event.type.startsWith("agent.run.")) {
-    applyAgentRunEvent(event, set);
-    window.dispatchEvent(new CustomEvent("misty:space-agent-run-event", { detail: event }));
-  } else if (event.type.startsWith("action_suggestion."))
-    window.dispatchEvent(new CustomEvent("misty:space-action-suggestion-event", { detail: event }));
-  else if (event.type.startsWith("conversation."))
+  } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("node.") && permissions?.["messages.read"] !== false)
     await get().loadNodes(event.space_id);

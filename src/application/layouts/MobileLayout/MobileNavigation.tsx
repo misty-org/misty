@@ -1,21 +1,7 @@
+import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
 import { spaceNavigationName, type Space } from "@/features/spaces";
 import { cn } from "@/shared/ui";
-import {
-  Bot,
-  BookOpenText,
-  ChevronRight,
-  FolderOpen,
-  Globe2,
-  House,
-  Inbox,
-  Library,
-  ListTodo,
-  MessageCircle,
-  Settings,
-  Store,
-  LayoutGrid,
-  UserRound,
-} from "lucide-react";
+import { ChevronRight, Settings, LayoutGrid, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 type Destination = { id: string; label: string; path: string; icon: LucideIcon };
@@ -152,24 +138,24 @@ function MobileNavButton(props: { item: Destination; active: boolean; onClick: (
       )}
       onClick={props.onClick}
     >
-      <Icon size={21} strokeWidth={props.active ? 2.1 : 1.8} aria-hidden="true" />
+      <Icon size={21} strokeWidth={appIconStrokeWidth} aria-hidden="true" />
       <span className="max-w-full truncate px-1">{props.item.label}</span>
     </button>
   );
 }
 
 export const mobileNavigationIcons = {
-  home: House,
+  home: appIcons.home,
   apps: LayoutGrid,
-  store: Store,
-  chat: MessageCircle,
-  planner: ListTodo,
-  inbox: Inbox,
-  journal: BookOpenText,
-  library: Library,
-  agents: Bot,
-  browser: Globe2,
-  files: FolderOpen,
+  store: appIcons.marketplace,
+  chat: appIcons.social,
+  planner: appIcons.planner,
+  inbox: appIcons.inbox,
+  journal: appIcons.journal,
+  library: appIcons.library,
+  agents: appIcons.agents,
+  browser: appIcons.browser,
+  files: appIcons.files,
   settings: Settings,
 };
 

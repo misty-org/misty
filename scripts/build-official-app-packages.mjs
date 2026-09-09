@@ -1,10 +1,13 @@
+import { loadAppEnv } from "./app-env.mjs";
+import { localAppsDirectory } from "./local-apps-directory.mjs";
 import { spawn } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { stagedAppBuild } from "./staged-app-build.mjs";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const appsRoot = resolve(process.env.MISTY_APPS_ROOT?.trim() || resolve(root, "../misty-apps"));
-const catalogPath = process.env.MISTY_OFFICIAL_APP_CATALOG_PATH || `${appsRoot}/apps/catalog.json`;
+const developmentEnv = loadAppEnv(root);
+const appsRoot = resolve(developmentEnv.MISTY_APPS_ROOT?.trim() || localAppsDirectory(developmentEnv.VITE_MISTY_APPS_DIRECTORY ?? developmentEnv.MISTY_APPS_DIRECTORY, root) || resolve(root, "../misty-apps"));
+const catalogPath = developmentEnv.MISTY_OFFICIAL_APP_CATALOG_PATH || `${appsRoot}/apps/catalog.json`;
 const catalog = await import(catalogPath, { with: { type: "json" } }).then(
   (module) => module.default,
 );
@@ -27,9 +30,7 @@ for (const app of apps) {
     if (platform === "desktop" && app.desktop.runtime !== "downloaded") continue;
     if (platform === "mobile" && app.mobile.runtime !== "hosted") continue;
     const output = resolve(appsRoot, ".build/official-apps", app.id, platform);
-    await rm(output, { recursive: true, force: true });
-    await mkdir(output, { recursive: true });
-    await runVite(app.id, platform, output);
+    await stagedAppBuild(output, (stagedOutput) => runVite(app.id, platform, stagedOutput));
   }
 }
 
@@ -48,7 +49,8 @@ function runVite(appId, platform, output) {
       {
         cwd: root,
         env: {
-          ...process.env,
+          ...developmentEnv,
+          MISTY_APPS_ROOT: appsRoot,
           MISTY_OFFICIAL_APP_ID: appId,
           MISTY_OFFICIAL_APP_PLATFORM: platform,
           MISTY_OFFICIAL_APP_OUT_DIR: output,

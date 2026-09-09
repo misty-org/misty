@@ -170,3 +170,24 @@ describe("App UI SDK methods", () => {
     other.scope.close();
   });
 });
+
+it.each(["chat", "inbox"])(
+  "allows %s provider navigation only with Browser access and keeps unrelated commands denied",
+  async (appId) => {
+    const denied = fixture(appId);
+    await expect(denied.sdk.shortcuts.register("navigation.back", () => {})).rejects.toThrow();
+    expect(denied.backend.registerShortcut).not.toHaveBeenCalled();
+    const allowed = fixture(appId, ["browser.navigate"]);
+    const stop = await allowed.sdk.shortcuts.register("navigation.refresh", () => {});
+    expect(allowed.backend.registerShortcut).toHaveBeenCalledOnce();
+    await expect(
+      allowed.sdk.shortcuts.register("browser.annotation_undo", () => {}),
+    ).rejects.toThrow("own commands");
+    await expect(allowed.sdk.shortcuts.register("code.save", () => {})).rejects.toThrow(
+      "own commands",
+    );
+    stop();
+    allowed.scope.close();
+    denied.scope.close();
+  },
+);

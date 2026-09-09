@@ -50,6 +50,7 @@ copyFileSync(catalogPath,resolve(apps,'dist/official-app-catalog.json'));
 const site = resolve(apps,'dist');
 rmSync(resolve(site,'official-apps'),{recursive:true,force:true});
 cpSync(resolve(output,'site-public/official-apps'),resolve(site,'official-apps'),{recursive:true});
+if (existsSync(resolve(output,'site-public/official-app-assets'))) cpSync(resolve(output,'site-public/official-app-assets'),resolve(site,'official-app-assets'),{recursive:true});
 rmSync(resolve(output,'site-public'),{recursive:true});
 if (pins.previousRelease) {
   if (!/^v\d+\.\d+\.\d+-beta\.\d+$/.test(pins.previousRelease)) throw new Error('Invalid previous beta tag.');
@@ -64,6 +65,7 @@ if (pins.previousRelease) {
     }
     cpSync(oldApps,resolve(site,'official-apps'),{recursive:true,force:false});
   }
+  if (existsSync(resolve(previous,'official-app-assets'))) cpSync(resolve(previous,'official-app-assets'),resolve(site,'official-app-assets'),{recursive:true,force:false});
   rmSync(previous,{recursive:true});
 }
 run('tar',['-czf',resolve(output,'beta-site.tar.gz'),'-C',site,'.']);

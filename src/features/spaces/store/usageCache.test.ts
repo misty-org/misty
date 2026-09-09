@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearUsageCache,
   fetchAgentUsage,
+  fetchBillingUsage,
   fetchSpaceStorageUsage,
   getCachedAgentUsage,
+  getCachedBillingUsage,
   getCachedSpaceStorageUsage,
   isAgentUsageStale,
   isSpaceStorageUsageStale,
@@ -72,6 +74,46 @@ describe("usageCache", () => {
 
       await fetchAgentUsage(true);
       expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it("prefers the new personal AI meter and retains per-Space usage", async () => {
+      const response = {
+        personal: {
+          ai: {
+            used: 25,
+            reserved: 0,
+            limit: 100,
+            remaining: 75,
+            used_ratio: 0.25,
+            available: true,
+            paused: false,
+          },
+        },
+        spaces: [
+          {
+            space_id: "space-1",
+            name: "Studio",
+            role: "member",
+            owner_user_id: "owner",
+            ai: {
+              used: 50,
+              reserved: 0,
+              limit: 100,
+              remaining: 50,
+              used_ratio: 0.5,
+              available: true,
+              paused: false,
+            },
+          },
+        ],
+        agent_usage: { percentage_used: 99, available: true, paused: false },
+      };
+      vi.spyOn(spacesApi, "agentUsage").mockResolvedValue(response);
+
+      await fetchBillingUsage();
+
+      expect(getCachedAgentUsage()?.percentage_used).toBe(25);
+      expect(getCachedBillingUsage()?.spaces?.[0]?.ai?.used_ratio).toBe(0.5);
     });
   });
 

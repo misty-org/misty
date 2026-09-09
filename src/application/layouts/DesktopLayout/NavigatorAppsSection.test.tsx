@@ -83,7 +83,9 @@ describe("NavigatorAppsSection", () => {
     );
     expect(browser?.getAttribute("aria-pressed")).toBe("false");
     await act(async () => browser?.click());
-    expect(useAppsStore.getState().installations.find((item) => item.app_id === "browser")?.pinned).toBe(true);
+    expect(
+      useAppsStore.getState().installations.find((item) => item.app_id === "browser")?.pinned,
+    ).toBe(true);
 
     await act(async () => {
       if (search) {
@@ -99,31 +101,18 @@ describe("NavigatorAppsSection", () => {
     expect(document.body.querySelector('a[href="/discover"]')?.textContent).toBe("Browse apps");
   });
 
-  it("collapses the app list and preserves the choice", async () => {
+  it("always shows its apps beneath a plain heading and keeps Add app available", async () => {
+    useNavigatorAppsStore.setState({ collapsedByAccount: { "account-1": true } });
     await renderSection();
     expect(container.textContent).toContain("Visible apps");
-
-    const controls = container.querySelector('[role="group"][aria-label="Apps controls"]');
-    expect(controls?.className).toContain("pl-2.5");
-    expect(controls?.className).toContain("pr-0");
-    expect(controls?.className).toContain("w-full");
-    expect(controls?.className).not.toContain("px-2.5");
-
+    expect(container.querySelector("h2")?.textContent).toBe("Apps");
+    expect(container.querySelector('button[aria-label="Collapse Apps"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Expand Apps"]')).toBeNull();
     const addAppButton = container.querySelector<HTMLButtonElement>('button[aria-label="Add app"]');
-    expect(addAppButton?.className).toContain("ml-auto");
-    expect(addAppButton?.querySelector("svg")?.classList.contains("!size-3.5")).toBe(true);
-
-    expect(
-      container.querySelector<HTMLButtonElement>('button[aria-label="Collapse Apps"]')?.className,
-    ).toContain("text-[13px]");
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Collapse Apps"]')?.click();
-    });
-
-    expect(container.textContent).not.toContain("Visible apps");
-    expect(useNavigatorAppsStore.getState().collapsedByAccount["account-1"]).toBe(true);
-    expect(container.querySelector('button[aria-label="Expand Apps"]')).not.toBeNull();
+    expect(addAppButton?.className).not.toContain("opacity-0");
+    expect(addAppButton?.className).not.toContain("group-hover");
+    await act(async () => addAppButton?.click());
+    expect(document.body.querySelector('input[aria-label="Search apps"]')).not.toBeNull();
   });
 
   async function renderSection() {

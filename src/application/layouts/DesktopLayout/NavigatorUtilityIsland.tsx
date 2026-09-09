@@ -3,17 +3,14 @@ import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
 import { useShortcutTitle } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
-import { Compass, House, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
+const { home: House, marketplace: Compass } = appIcons;
 import { Link } from "react-router-dom";
-import { navigationMenuPrimaryLayoutClass } from "@/shared/ui";
+import { navigationMenuLinkClass, navigationMenuActionClass } from "@/shared/ui";
 import { navigatorFocusRingClass } from "./styles";
 
-const navigatorHeaderActionClass = [
-  "misty-navigator-row-target h-9 w-full rounded-md px-2.5",
-  "text-sm text-cream-bright no-underline transition-colors hover:bg-charcoal-card",
-  navigationMenuPrimaryLayoutClass,
-  navigatorFocusRingClass,
-].join(" ");
+const navigatorHeaderActionClass = `${navigationMenuLinkClass} w-full`;
 
 export function NavigatorHeaderHomeButton(props: { path: string; active: boolean }) {
   return (
@@ -31,7 +28,12 @@ export function NavigatorHeaderHomeButton(props: { path: string; active: boolean
             aria-current={props.active ? "page" : undefined}
             data-misty-window-drag-block="true"
           >
-            <House className="shrink-0" size={18} strokeWidth={1.9} aria-hidden="true" />
+            <House
+              className="shrink-0"
+              size={18}
+              strokeWidth={appIconStrokeWidth}
+              aria-hidden="true"
+            />
             <span>Home</span>
           </Link>
         </TooltipTrigger>
@@ -57,7 +59,12 @@ export function NavigatorHeaderDiscoverButton(props: { path: string; active: boo
             aria-current={props.active ? "page" : undefined}
             data-misty-window-drag-block="true"
           >
-            <Compass className="shrink-0" size={18} strokeWidth={1.9} aria-hidden="true" />
+            <Compass
+              className="shrink-0"
+              size={18}
+              strokeWidth={appIconStrokeWidth}
+              aria-hidden="true"
+            />
             <span>Discover</span>
           </Link>
         </TooltipTrigger>
@@ -89,12 +96,7 @@ export function NavigatorHeaderSearchButton(props?: { className?: string }) {
         <TooltipTrigger asChild>
           <button
             type="button"
-            className={cn(
-              "misty-navigator-row-target grid size-9 shrink-0 place-items-center rounded-md border-0 bg-transparent text-cream-muted transition-colors",
-              "hover:bg-charcoal-card/60 hover:text-cream-bright",
-              navigatorFocusRingClass,
-              props?.className,
-            )}
+            className={cn(navigationMenuActionClass, navigatorFocusRingClass, props?.className)}
             onClick={() => void openSearchPanel()}
             aria-label="Search"
             data-misty-window-drag-block="true"

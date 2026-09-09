@@ -1,6 +1,6 @@
 import { InstagramBrandIcon, MessengerBrandIcon, XBrandIcon } from "@/features/spaces";
 import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
-import { SiDiscord } from "react-icons/si";
+import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
 type SocialDestinationId = "misty" | "instagram" | "discord" | "messenger" | "x";
@@ -10,7 +10,7 @@ function MistyNavigatorIcon(props: { className?: string; "aria-hidden"?: boolean
 }
 
 function DiscordNavigatorIcon(props: { className?: string; "aria-hidden"?: boolean }) {
-  return <SiDiscord {...props} data-social-provider-icon="discord" />;
+  return <BrandIcon brand="discord" {...props} data-social-provider-icon="discord" />;
 }
 
 export function SocialNavigatorDisclosure(props: {

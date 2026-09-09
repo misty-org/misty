@@ -95,12 +95,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
     });
   }
 
-  for (const [spaceId, resources] of Object.entries(state.agentsBySpace)) {
-    const space = spacesById.get(spaceId);
-    if (!space) continue;
-    for (const resource of resources)
-      documents.push(resourceDocument(accountId, spaceId, space.name, resource, "agent"));
-  }
   for (const [spaceId, resources] of Object.entries(state.workflowsBySpace)) {
     const space = spacesById.get(spaceId);
     if (!space) continue;

@@ -13,6 +13,8 @@ export {
 export { rememberedJournalRoute, rememberedPlannerRoute } from "./spacesShell/spaceSubpageMemory";
 export { canonicalSpaceRoute } from "./spaceRouteNormalization";
 export { spaceSectionPath, useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
+export { useBillingUsage } from "./components/spacePanel/useAgentUsage";
+export { formatStorageBytes } from "./components/spacePanel/storageFormat";
 export { SpaceSetupCards } from "./components/SpaceSetupCards";
 export { SpaceSidebarPageSection } from "./components/SpaceSidebarPageSection";
 export { SpaceSidebarSection } from "./components/SpaceSidebarSection";
@@ -29,7 +31,6 @@ export type * from "./model/stores/spaces/interfaces/useSpacesStore";
 export type * from "./model/stores/spaces/types/useSpacesBackendStore";
 export type { Space } from "@/api/spaces/dto/interfaces/types";
 export { SpacesRealtimeBridge } from "./SpacesRealtimeBridge";
-export * from "./store/agent-run-events";
 export * from "./store/reference-cache";
 export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";

@@ -5,12 +5,22 @@ import {
   MistyBrowserUrlSchema,
   MistyBrowserInspectionSchema,
   type MistyBrowserInspection,
+  type MistyBrowserProvider,
   type MistyBrowserBounds,
   type MistyBrowserEvent,
+  type MistyBrowserInteraction,
 } from "@misty/sdk";
 import { AppRpcError, type AppRpcScope } from "./session";
 
 export interface BrowserRpcBackend {
+  availability?(): Promise<{
+    available: boolean;
+    persistent: boolean;
+    reason?: string;
+    supportedProviders?: MistyBrowserProvider["id"][];
+    profileCleanup?: boolean;
+  }>;
+  removeAccount?(provider: MistyBrowserProvider): Promise<void>;
   initialUrl(): string;
   constrainBounds(bounds: MistyBrowserBounds): MistyBrowserBounds;
   create(input: {
@@ -19,6 +29,7 @@ export interface BrowserRpcBackend {
     url: string;
     bounds: MistyBrowserBounds;
     nativeLiveResize: boolean;
+    provider?: MistyBrowserProvider;
   }): Promise<void>;
   layout(input: {
     id: string;
@@ -30,8 +41,12 @@ export interface BrowserRpcBackend {
   back(id: string): Promise<void>;
   forward(id: string): Promise<void>;
   reload(id: string): Promise<void>;
+  setZoom?(id: string, factor: number): Promise<void>;
   inspect(id: string): Promise<Omit<MistyBrowserInspection, "documentId">>;
   click(id: string, elementRef: string): Promise<void>;
+  interact?(id: string, action: MistyBrowserInteraction): Promise<{ attempted: true }>;
+  type?(id: string, elementRef: string, text: string): Promise<{ prepared: true }>;
+  request?(id: string, path: string): Promise<{ status: number; body: string; truncated: boolean }>;
   overlay(id: string, reason: string, active: boolean): Promise<void>;
   hide(id: string): Promise<void>;
   close(id: string): Promise<void>;
@@ -148,6 +163,17 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
       const contract = mistyBrowserContracts[method];
       scope.assert(contract.capability);
       const input = contract.params.parse(message.params ?? {});
+      if (method === "browser.availability")
+        return contract.result.parse(
+          (await backend.availability?.()) ?? { available: true, persistent: true },
+        );
+      if (method === "browser.removeAccount") {
+        if (!backend.removeAccount)
+          throw new AppRpcError("unsupported_method", "Update Misty to remove website accounts.");
+        const { provider } = input as { provider: MistyBrowserProvider };
+        await backend.removeAccount(provider);
+        return undefined;
+      }
       if (method === "browser.create") {
         if (views.size || closing)
           throw new AppRpcError(
@@ -158,6 +184,7 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
           url?: string;
           bounds: MistyBrowserBounds;
           nativeLiveResize: boolean;
+          provider?: MistyBrowserProvider;
         };
         const bounds = backend.constrainBounds(options.bounds);
         const url = MistyBrowserUrlSchema.parse(options.url ?? backend.initialUrl());
@@ -184,6 +211,7 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
             url,
             bounds: backend.constrainBounds(bounds),
             nativeLiveResize: options.nativeLiveResize,
+            provider: options.provider,
           });
           assert();
         })();
@@ -205,6 +233,10 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
         elementRef?: string;
         reason?: string;
         active?: boolean;
+        text?: string;
+        action?: MistyBrowserInteraction;
+        path?: string;
+        factor?: number;
       };
       const view = owned(options.handle);
       if (method === "browser.close") {
@@ -246,7 +278,8 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
               result = inspection;
               break;
             }
-            case "browser.click": {
+            case "browser.click":
+            case "browser.type": {
               const inspection = view.inspection;
               if (
                 !inspection ||
@@ -260,9 +293,46 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
               // A click can change page meaning without navigation. Require a
               // fresh snapshot for the next action, including after failures.
               view.inspection = undefined;
-              await backend.click(view.nativeId, options.elementRef!);
+              if (method === "browser.type") {
+                if (!backend.type)
+                  throw new AppRpcError(
+                    "unsupported_method",
+                    "Text entry is unavailable on this device.",
+                  );
+                result = await backend.type(view.nativeId, options.elementRef!, options.text!);
+              } else await backend.click(view.nativeId, options.elementRef!);
               break;
             }
+            case "browser.interact": {
+              const action = options.action!;
+              const inspection = view.inspection;
+              if (
+                !inspection ||
+                inspection.documentId !== options.documentId ||
+                (action.elementRef &&
+                  !inspection.interactive.some((element) => element.ref === action.elementRef))
+              )
+                throw new AppRpcError(
+                  "document_changed",
+                  "Inspect this page again before interacting with it.",
+                );
+              if (!backend.interact)
+                throw new AppRpcError(
+                  "unsupported_method",
+                  "This browser runtime does not support this interaction.",
+                );
+              view.inspection = undefined;
+              result = await backend.interact(view.nativeId, action);
+              break;
+            }
+            case "browser.request":
+              if (!backend.request)
+                throw new AppRpcError(
+                  "unsupported_method",
+                  "Authenticated requests are unavailable on this device.",
+                );
+              result = await backend.request(view.nativeId, options.path!);
+              break;
             case "browser.overlay":
               await backend.overlay(view.nativeId, options.reason!, options.active!);
               break;
@@ -284,6 +354,15 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
               break;
             case "browser.forward":
               await backend.forward(view.nativeId);
+              break;
+            case "browser.setZoom":
+              if (!backend.setZoom)
+                throw new AppRpcError(
+                  "unsupported_method",
+                  "Page zoom is unavailable on this device.",
+                );
+              await backend.setZoom(view.nativeId, options.factor!);
+              view.inspection = undefined;
               break;
             case "browser.reload":
               await backend.reload(view.nativeId);

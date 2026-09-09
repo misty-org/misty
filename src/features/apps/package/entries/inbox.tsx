@@ -1,1 +1,1 @@
-export { default } from "../SDKInboxApp";
+export { default } from "../../../../../../misty-apps/apps/inbox";

@@ -1,4 +1,8 @@
-import type { Space, SpaceStorageUsage } from "@/api/spaces/dto/interfaces/types";
+import type {
+  Space,
+  SpaceStorageUsage,
+  StorageQuotaDimension,
+} from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useMemo, useState } from "react";
 import { useSpacesStore } from "../../store/useSpacesStore";
 import {
@@ -65,22 +69,58 @@ export function useSpaceLibraryUsage(options: {
     const spaceItem = ownerStorage?.spaces?.find((s) => s.space_id === activeSpaceId);
     if (!spaceItem && !usage && !ownerStorage) return null;
 
-    // The usage endpoint exposes both the owner's pooled totals (`used_bytes`)
-    // and the selected Space's contribution (`space_used_bytes`). Feeding the
-    // pooled field to the Space footer makes every Space appear identical.
-    const usedBytes = usage?.space_used_bytes ?? spaceItem?.used_bytes ?? 0;
-    const reservedBytes = usage?.space_reserved_bytes ?? spaceItem?.reserved_bytes ?? 0;
-    const limitBytes = usage?.limit_bytes ?? ownerStorage?.limit_bytes;
-    const remainingBytes = usage?.remaining_bytes ?? ownerStorage?.remaining_bytes;
+    const personal =
+      usage?.personal ??
+      storageDimension({
+        used: usage?.personal_used_bytes ?? usage?.used_bytes ?? ownerStorage?.used_bytes,
+        reserved:
+          usage?.personal_reserved_bytes ?? usage?.reserved_bytes ?? ownerStorage?.reserved_bytes,
+        limit: usage?.personal_limit_bytes ?? usage?.limit_bytes ?? ownerStorage?.limit_bytes,
+        remaining:
+          usage?.personal_remaining_bytes ??
+          usage?.remaining_bytes ??
+          ownerStorage?.remaining_bytes,
+        overQuota: usage?.personal_over_quota,
+      });
+    const space =
+      usage?.space ??
+      storageDimension({
+        used: usage?.space_used_bytes ?? spaceItem?.used_bytes,
+        reserved: usage?.space_reserved_bytes ?? spaceItem?.reserved_bytes,
+        // On older servers the flat limit represented the owner-plan pool.
+        limit: usage?.space_limit_bytes ?? usage?.limit_bytes ?? ownerStorage?.limit_bytes,
+        remaining: usage?.space_remaining_bytes ?? usage?.remaining_bytes,
+        overQuota: usage?.space_over_quota,
+      });
 
     return {
+      ...usage,
       space_id: activeSpaceId,
-      used_bytes: usedBytes,
-      reserved_bytes: reservedBytes,
-      limit_bytes: limitBytes,
-      remaining_bytes: remainingBytes,
+      personal,
+      space,
       storage_available:
-        usage?.storage_available ?? (remainingBytes !== undefined ? remainingBytes > 0 : true),
+        usage?.storage_available ??
+        ((personal?.remaining_bytes ?? 1) > 0 && (space?.remaining_bytes ?? 1) > 0),
     };
   }, [activeSpace, activeSpaceId, ownerStorage, usage]);
+}
+
+function storageDimension(values: {
+  used?: number;
+  reserved?: number;
+  limit?: number;
+  remaining?: number;
+  overQuota?: boolean;
+}): StorageQuotaDimension | undefined {
+  if (values.used === undefined && values.limit === undefined) return undefined;
+  const used = values.used ?? 0;
+  const reserved = values.reserved ?? 0;
+  const limit = values.limit ?? 0;
+  return {
+    used_bytes: used,
+    reserved_bytes: reserved,
+    limit_bytes: limit,
+    remaining_bytes: values.remaining ?? Math.max(0, limit - used - reserved),
+    over_quota: values.overQuota ?? used + reserved > limit,
+  };
 }

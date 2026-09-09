@@ -383,11 +383,20 @@ pub fn probe_paths(paths: Vec<String>) -> Result<Vec<PathProbe>, String> {
 }
 
 #[tauri::command]
-pub fn open_external_url(url: String) -> Result<(), String> {
+pub fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     if !can_open_external_url(&url) {
         return Err("Only http, https, and mailto links can be opened externally.".to_string());
     }
 
+    if url.starts_with("https://") || url.starts_with("http://") {
+        use tauri::Emitter;
+        let parsed = url::Url::parse(&url).map_err(|error| error.to_string())?;
+        if !parsed.username().is_empty() || parsed.password().is_some() {
+            return Err("Web addresses cannot contain credentials.".into());
+        }
+        return app.emit_to("main", "misty://open-web-url", parsed.as_str())
+            .map_err(|error| error.to_string());
+    }
     open_url_in_system_browser(&url)
         .map_err(|error| format!("Could not open {url} in the system browser: {error}"))
 }
@@ -813,8 +822,22 @@ fn official_app_public_key(key_id: &str) -> Result<&'static str, String> {
         }
     }
     #[cfg(debug_assertions)]
-    if key_id == DEVELOPMENT_OFFICIAL_APP_KEY_ID {
-        return Ok(DEVELOPMENT_OFFICIAL_APP_PUBLIC_KEY);
+    {
+        if key_id == DEVELOPMENT_OFFICIAL_APP_KEY_ID {
+            return Ok(DEVELOPMENT_OFFICIAL_APP_PUBLIC_KEY);
+        }
+        // Dev desktops also install published Apps. Trust only the release key
+        // pinned in this checkout, never a key supplied by the remote catalog.
+        static RELEASE_TRUST: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+        let trust = RELEASE_TRUST.get_or_init(|| {
+            serde_json::from_str(include_str!("../../../release/trust.json"))
+                .expect("committed release trust must be valid JSON")
+        });
+        if trust["keyId"].as_str() == Some(key_id) {
+            return trust["publicKey"]
+                .as_str()
+                .ok_or_else(|| "Committed official app public key is missing.".to_owned());
+        }
     }
     Err(format!("Official app signing key {key_id} is not trusted."))
 }
@@ -2942,6 +2965,25 @@ mod tests {
         .expect_err("removed extension should be rejected");
 
         assert!(error.contains("removed from Misty's app catalog"));
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    fn development_host_trusts_pinned_release_key_but_rejects_unknown_keys() {
+        let trust: serde_json::Value =
+            serde_json::from_str(include_str!("../../../release/trust.json")).unwrap();
+        let key_id = trust["keyId"].as_str().unwrap();
+        assert_eq!(
+            official_app_public_key(key_id).unwrap(),
+            trust["publicKey"].as_str().unwrap()
+        );
+        assert!(official_app_public_key("untrusted-catalog-key").is_err());
+        assert!(verify_official_app_signature(
+            b"tampered",
+            "5VZDAMNgrHKQhuLMgG6CioSHfx645dl02HPgZSJJAVVfuIIVkKM7rMYeOXAc+bRr0lv18FlbviRlUUFDjnoQCw==",
+            key_id,
+        )
+        .is_err());
     }
 
     #[test]

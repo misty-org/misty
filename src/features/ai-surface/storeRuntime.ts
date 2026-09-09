@@ -43,6 +43,11 @@ export function consumeInvocationEvent(
     return;
   }
   if (event.type === "assistant.status") {
+    if (event.phase === "awaiting_device" || event.phase === "device_resume_pending" || event.phase === "awaiting_intervention" || event.phase === "intervention_resume_pending" || event.phase === "awaiting_timer" || event.phase === "timer_resume_pending") {
+      patchSession(set, get, accountId, paneId, {
+        state: event.phase === "awaiting_device" ? "awaiting_device" : event.phase === "awaiting_intervention" ? "awaiting_intervention" : event.phase === "awaiting_timer" ? "awaiting_timer" : "running",
+      });
+    }
     set((state) => ({
       companion: {
         ...state.companion,

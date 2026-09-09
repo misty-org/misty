@@ -1,3 +1,5 @@
+import { appSourceAliases, appSourceDependencies } from "./scripts/app-source-paths.mjs";
+import { loadAppEnv, publicAppEnv } from "./scripts/app-env.mjs";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { createHash } from "node:crypto";
@@ -10,9 +12,10 @@ import { officialAppSDKBoundary } from "./scripts/official-app-sdk-boundary.mjs"
 import { excalidrawPackageFonts } from "./scripts/excalidraw-package-fonts.mjs";
 import { excalidrawSdkInterop } from "./scripts/excalidraw-sdk-interop.mjs";
 
-const appId = process.env.MISTY_OFFICIAL_APP_ID?.trim().toLowerCase() ?? "";
-const platform = process.env.MISTY_OFFICIAL_APP_PLATFORM === "mobile" ? "mobile" : "desktop";
-const outputDirectory = process.env.MISTY_OFFICIAL_APP_OUT_DIR?.trim();
+const env = loadAppEnv(process.cwd());
+const appId = env.MISTY_OFFICIAL_APP_ID?.trim().toLowerCase() ?? "";
+const platform = env.MISTY_OFFICIAL_APP_PLATFORM === "mobile" ? "mobile" : "desktop";
+const outputDirectory = env.MISTY_OFFICIAL_APP_OUT_DIR?.trim();
 const supportedApps = new Set([
   "chat",
   "journal",
@@ -30,6 +33,7 @@ if (!supportedApps.has(appId)) throw new Error(`Unsupported official app: ${appI
 if (!outputDirectory) throw new Error("MISTY_OFFICIAL_APP_OUT_DIR is required.");
 
 const source = resolve(process.cwd(), "src");
+const appsRoot = resolve(env.MISTY_APPS_ROOT || resolve(process.cwd(), "../misty-apps"));
 const mobile = platform === "mobile";
 const spaceApp = new Set(["chat", "journal", "planner", "library"]).has(appId);
 
@@ -37,7 +41,7 @@ function packageSizeReport(): Plugin {
   return {
     name: "misty-official-app-size-report",
     generateBundle(_options, bundle) {
-      if (process.env.MISTY_OFFICIAL_APP_REPORT !== "1") return;
+      if (env.MISTY_OFFICIAL_APP_REPORT !== "1") return;
       const modules = Object.values(bundle).flatMap((item) =>
         item.type === "chunk"
           ? Object.entries(item.modules).map(([id, details]) => ({
@@ -118,7 +122,9 @@ function compactExecutablePackage(): Plugin {
 }
 
 export default defineConfig({
+  envDir: false,
   define: {
+    ...publicAppEnv(env),
     "import.meta.env.MISTY_OFFICIAL_APP_ID": JSON.stringify(appId),
     // Official apps execute as browser scripts inside the Misty WebView. Some
     // CommonJS dependencies (notably React) branch on this exact expression;
@@ -126,9 +132,16 @@ export default defineConfig({
     // before it can register its Misty entry point.
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
-  plugins: [officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts()] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
+  plugins: [appSourceDependencies(process.cwd(), appsRoot), officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
   resolve: {
-    alias: [{ find: "@", replacement: source }],
+    alias: [
+      ...Object.entries(appSourceAliases(process.cwd(), appsRoot)).map(([find, replacement]) => ({ find, replacement })),
+      { find: "@", replacement: source },
+      { find: "@misty/browser-view", replacement: resolve(appsRoot, "apps/browser/workspace/SDKBrowserView.tsx") },
+      { find: "@misty/legacy-social", replacement: resolve(source, "features/apps/package/SDKSocialApp.tsx") },
+      { find: "@misty/legacy-inbox", replacement: resolve(source, "features/apps/package/SDKInboxApp.tsx") },
+    ],
+    dedupe: ["react", "react-dom", "@misty/sdk", "@misty/contracts"],
   },
   build: {
     outDir: resolve(outputDirectory),
@@ -136,7 +149,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     cssCodeSplit: false,
     lib: {
-      entry: resolve(source, `features/apps/package/entries/${appId}.tsx`),
+      entry: (!mobile || !["chat", "inbox"].includes(appId)) ? resolve(appsRoot, `apps/${appId}/index.tsx`) : resolve(source, `features/apps/package/entries/${appId}.tsx`),
       formats: mobile ? ["es"] : ["iife"],
       name: "MistyComponentBundle",
       fileName: () => "app.js",

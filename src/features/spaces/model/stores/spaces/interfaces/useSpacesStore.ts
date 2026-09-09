@@ -2,7 +2,6 @@ import type {
   CreateSpaceRequest,
   CreateSpaceResult,
   Space,
-  SpaceAgentMembership,
   SpaceInboxItem,
   SpaceInvitation,
   SpaceMember,
@@ -22,12 +21,10 @@ export interface SpacesStore {
   limits: SpacesSnapshot["entitlements"] | null;
   ownerStorage: SpacesSnapshot["owner_storage"] | null;
   membersBySpace: Record<string, SpaceMember[]>;
-  agentMembershipsBySpace: Record<string, SpaceAgentMembership[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   messageLoadingBySpace: Record<string, boolean>;
   messageErrorsBySpace: Record<string, string>;
   nodesBySpace: Record<string, SpaceNode[]>;
-  agentsBySpace: Record<string, SpaceStudioResource[]>;
   workflowsBySpace: Record<string, SpaceStudioResource[]>;
   inbox: Record<ActivityTab, SpaceInboxItem[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
@@ -43,8 +40,7 @@ export interface SpacesStore {
   loadMessages: (spaceId: string) => Promise<void>;
   loadNodes: (spaceId: string) => Promise<void>;
   loadMembers: (spaceId: string) => Promise<void>;
-  loadStudio: (spaceId: string, kind: "agents" | "workflows") => Promise<void>;
-  loadChatAgents: (spaceId: string) => Promise<void>;
+  loadStudio: (spaceId: string, kind: "workflows") => Promise<void>;
   loadInbox: () => Promise<void>;
   createSpace: (request: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
@@ -61,7 +57,6 @@ export interface SpacesStore {
     attachmentIds?: string[],
     libraryItemIds?: string[],
     replyToMessageId?: string,
-    selectedAgentIdsByLabel?: Record<string, string>,
     optimisticMessage?: SpaceMessage,
   ) => Promise<void>;
   updateMessage: (
@@ -81,13 +76,13 @@ export interface SpacesStore {
   openNode: (spaceId: string, nodeId: string, disposition?: "open" | "download") => Promise<void>;
   saveStudio: (
     spaceId: string,
-    kind: "agents" | "workflows",
+    kind: "workflows",
     item: Partial<SpaceStudioResource>,
   ) => Promise<SpaceStudioResource>;
-  deleteStudio: (spaceId: string, kind: "agents" | "workflows", id: string) => Promise<void>;
+  deleteStudio: (spaceId: string, kind: "workflows", id: string) => Promise<void>;
   runStudio: (
     spaceId: string,
-    kind: "agents" | "workflows",
+    kind: "workflows",
     id: string,
     prompt?: string,
     capabilityId?: string,

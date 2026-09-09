@@ -1,3 +1,7 @@
+import { createPortal } from "react-dom";
+import { FileWorkspaceSurface } from "./FileWorkspaceSurface";
+import { createFileWorkspaceMount, type FileWorkspaceRegistration } from "./rpc/fileWorkspace";
+import { createFileSystemRpc } from "./rpc/fileSystem";
 import { retainAppView } from "./appUpdateSafety";
 import { createCodeControlsRpc } from "./rpc/codeControls";
 import { isMistyCodeControlsMethod } from "@misty/sdk";
@@ -110,6 +114,7 @@ function ComponentInstance(props: Props) {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
+  const [fileWorkspace, setFileWorkspace] = useState<FileWorkspaceRegistration | null>(null);
   const [surface, setSurface] = useState<AiSurfaceAdapter | null>(null);
   useAiSurfaceAdapter(surface);
   const permissions = useNativeAppPermissions(props.app.name);
@@ -130,8 +135,9 @@ function ComponentInstance(props: Props) {
   useEffect(() => {
     const root = container.current!;
     let releaseView: () => void;
-    try { releaseView = retainAppView(props.app.id, instanceId); }
-    catch (caught) {
+    try {
+      releaseView = retainAppView(props.app.id, instanceId);
+    } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Wait for the current update to finish.");
       return;
     }
@@ -285,10 +291,13 @@ function ComponentInstance(props: Props) {
       },
       { once: true },
     );
+    const fileSystem = createFileSystemRpc(scope, nativeRpcBackend.invoke);
     const transport = {
+      mountFileWorkspace: createFileWorkspaceMount(scope, root, setFileWorkspace),
       registerSurface: surfaces.register,
       async request(message: { method: string; params?: unknown }) {
         scope.assert();
+        if (message.method.startsWith("fileSystem.")) return fileSystem(message);
         if (message.method === "lifecycle.ready") return undefined;
         if (isMistyCodeControlsMethod(message.method)) return codeControls.request(message);
         if (isMistyAgentsMethod(message.method)) return agents.request(message);
@@ -416,7 +425,9 @@ function ComponentInstance(props: Props) {
       window.removeEventListener(accountScopeResetEvent, resetAccount);
       scope.close();
       const closing = lifecycle.current?.close();
-      void Promise.resolve(closing).catch(() => undefined).finally(releaseView);
+      void Promise.resolve(closing)
+        .catch(() => undefined)
+        .finally(releaseView);
       lifecycle.current = null;
       release();
     };
@@ -460,6 +471,28 @@ function ComponentInstance(props: Props) {
         </div>
       ) : null}
       {notice ? <div role="status">{notice}</div> : null}
+      {fileWorkspace
+        ? createPortal(
+            <FileWorkspaceSurface
+              tab={
+                props.tab ?? {
+                  id: instanceId,
+                  surfaceId: "official-app",
+                  groupKey: "app:files",
+                  instanceKey: "files",
+                  title: "Explorer",
+                  route: props.route,
+                  sidebarVisible: true,
+                  state: null,
+                  createdAt: 0,
+                  lastFocusedAt: 0,
+                }
+              }
+              options={fileWorkspace.options}
+            />,
+            fileWorkspace.root,
+          )
+        : null}
       {permissions.controls}
     </div>
   );

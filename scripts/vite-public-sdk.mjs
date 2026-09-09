@@ -1,6 +1,7 @@
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 // sdk:sync publishes this manifest only after npm has installed both packages.
 // Its content also changes Vite's browser hash for excluded dependency URLs.
@@ -22,6 +23,17 @@ export function publicSdkDevelopmentUpdates() {
   return {
     name: "misty-public-sdk-updates",
     apply: "serve",
+    enforce: "pre",
+    resolveId(source, importer) {
+      // Excluded ESM can otherwise pick the optimizer's host-level Zod 3 entry.
+      // Resolve contracts' own version before Vite substitutes a bare dependency.
+      if (source !== "zod" || !importer?.includes("/node_modules/@misty/contracts/")) return;
+      const packagePath = createRequire(importer.split("?")[0]).resolve("zod/package.json");
+      const metadata = JSON.parse(readFileSync(packagePath, "utf8"));
+      const entry = metadata.exports?.["."]?.import;
+      if (typeof entry !== "string") throw new Error("Public contracts require Zod's ESM entry.");
+      return resolve(dirname(packagePath), entry);
+    },
     config(config) {
       root = resolve(config.root ?? process.cwd());
       revision = publicSdkRevision(root);

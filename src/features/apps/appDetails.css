@@ -1,0 +1,344 @@
+.discover-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+  color: var(--misty-theme-danger);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.discover-error button {
+  flex-shrink: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.discover-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-width: 560px;
+  gap: 0;
+  text-align: left;
+}
+
+.discover-details-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.discover-details-heading {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-right: 32px;
+}
+
+.discover-details-section {
+  padding: 20px 0;
+  border-top: 1px solid var(--misty-theme-border);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--misty-theme-text-muted);
+}
+
+.discover-details-section h3 {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--misty-theme-text-bright);
+}
+
+.discover-permissions-intro {
+  margin-bottom: 12px;
+  color: var(--misty-theme-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.discover-details-actions {
+  flex-shrink: 0;
+  border-top: 1px solid var(--misty-theme-border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+}
+
+.discover-action {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 64px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 6px;
+  background: var(--misty-theme-card);
+  color: var(--misty-theme-text-bright);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.discover-action-primary {
+  border-color: transparent;
+  background: var(--misty-theme-text-bright);
+  color: var(--misty-theme-bg);
+}
+
+.discover-surface button,
+.discover-details button {
+  cursor: pointer;
+  transition:
+    background-color 140ms ease-out,
+    color 140ms ease-out;
+}
+
+.discover-surface button:disabled,
+.discover-details button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.discover-surface button:focus-visible,
+.discover-details button:focus-visible,
+.discover-search:focus-within {
+  outline: 2px solid var(--misty-theme-text-muted);
+  outline-offset: 2px;
+}
+
+.discover-surface button:hover:not(:disabled):not(.discover-action-primary),
+.discover-details button:hover:not(:disabled):not(.discover-action-primary) {
+  color: var(--misty-theme-text-bright);
+}
+
+.discover-action:hover:not(:disabled),
+.discover-nav-item:hover:not(:disabled),
+.discover-filters button:hover:not(:disabled),
+.discover-refresh:hover:not(:disabled) {
+  background: var(--misty-theme-hover);
+}
+
+.discover-action-primary:hover:not(:disabled) {
+  background: var(--misty-theme-text);
+  color: var(--misty-theme-bg);
+}
+
+/* App details and consent share one modal and one action area. */
+.discover-details {
+  max-width: 640px;
+  padding: 28px;
+}
+.discover-details-heading {
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.discover-details-heading > :first-child {
+  flex-shrink: 0;
+}
+.discover-details-identity {
+  min-width: 0;
+  flex: 1;
+}
+.discover-details .discover-app-name {
+  font-size: 22px;
+  line-height: 1.25;
+  margin: 2px 0 10px;
+}
+.discover-app-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.discover-app-metadata > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+.discover-app-metadata dt {
+  color: var(--misty-theme-text-muted);
+}
+.discover-app-metadata dd {
+  color: var(--misty-theme-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.discover-app-metadata a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: underline;
+  text-decoration-color: var(--misty-theme-border);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.discover-app-metadata a:hover {
+  text-decoration-color: currentColor;
+}
+.discover-app-metadata a:focus-visible {
+  outline: 2px solid var(--misty-theme-text-muted);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.discover-app-platform {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--misty-theme-text-muted);
+  line-height: 1.6;
+}
+.discover-app-platform svg {
+  flex-shrink: 0;
+}
+.discover-about-summary,
+.discover-about-description {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--misty-theme-text);
+}
+.discover-about-description {
+  margin-top: 14px;
+}
+.discover-detail-note {
+  margin-top: 14px;
+  color: var(--misty-theme-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.discover-details-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  align-self: flex-start;
+  padding: 2px 4px;
+  margin: 0 32px 20px -4px;
+  font-size: 13px;
+  color: var(--misty-theme-text);
+  border-radius: 4px;
+}
+.discover-step-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: 8px;
+}
+.discover-details h2:focus {
+  outline: none;
+}
+.discover-permission-groups {
+  display: grid;
+  gap: 20px;
+  list-style: none;
+  padding: 10px 0 24px;
+}
+.discover-permission-groups > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.discover-permission-groups > li > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--misty-theme-text);
+}
+.discover-permission-groups h3 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--misty-theme-text-bright);
+}
+.discover-permission-groups p {
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--misty-theme-text-muted);
+}
+.discover-permission-new {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--misty-theme-text-muted);
+}
+.discover-consent-copy {
+  flex: 1 1 180px;
+  font-size: 12px;
+  color: var(--misty-theme-text-muted);
+  line-height: 1.5;
+}
+.discover-uninstall-copy {
+  margin: 8px 0 24px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.discover-operation {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--misty-theme-text-muted);
+}
+.discover-details-actions .discover-action {
+  min-width: 88px;
+  min-height: 36px;
+}
+.discover-uninstall {
+  color: var(--misty-theme-danger);
+}
+@media (max-width: 480px) {
+  .discover-details {
+    padding: 20px;
+    max-height: calc(100dvh - 2rem);
+  }
+  .discover-details-heading {
+    gap: 12px;
+    padding-right: 22px;
+  }
+  .discover-details-heading > :first-child {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .discover-app-metadata {
+    gap: 4px 10px;
+  }
+  .discover-details .discover-app-name,
+  .discover-step-title {
+    font-size: 20px;
+  }
+}
+
+@media (pointer: coarse) {
+  .discover-action,
+  .discover-details button,
+  .discover-details-actions .discover-action {
+    min-height: 44px;
+  }
+  .discover-details [data-slot="dialog-close"] {
+    min-width: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .discover-details,
+  .discover-details * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

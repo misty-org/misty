@@ -12,6 +12,7 @@ import type {
 export type MistySubmissionPresentation = "panel" | "workspace";
 
 export interface GlobalSearchState {
+  browserRequest?: import("./browserAskContext").BrowserAskRequest;
   accountId: string;
   panel: UnifiedMistyPanel;
   mode: GlobalAiMode;
@@ -55,6 +56,7 @@ export interface GlobalSearchState {
     selection?: AiSelectionSnapshot,
     presentation?: MistySubmissionPresentation,
     deviceContexts?: AiInvocationDeviceContext[],
+    origin?: { conversationId: string; context: GlobalAiContextRef[] },
   ) => Promise<void>;
   submitAgentTask: (
     prompt: string,

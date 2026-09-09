@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { openBrowserPopup } from "../src/features/browser/openBrowserPopup";
+import { openBrowserPopup } from "@/features/browser/openBrowserPopup";
 import { dockLeaves } from "../src/features/workspace/dockTree";
 import { invoke } from "@tauri-apps/api/core";
 import { loadDesktopApp } from "../src/features/apps/desktopAppLoader";

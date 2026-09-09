@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { OfficialAppDetails } from "@/features/apps/OfficialAppDetails";
 import { useState } from "react";
 import type { OfficialApp, UserAppInstallation } from "@/api/apps";
 import { DiscoverBrowser, type DiscoverBrowserProps } from "./components/DiscoverBrowser";
@@ -12,6 +13,8 @@ const catalog: OfficialApp[] = [
 ].map((app) => ({
   ...app,
   publisher: "Misty",
+  repository_url: "https://github.com/misty-org/misty-apps",
+  about: "A useful app alongside your work.",
   version: "1.0.0",
   permission_version: 2,
   minimum_host_protocol: 2,
@@ -83,63 +86,158 @@ describe("Discover compact catalog", () => {
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(4);
   });
 
-  it("shows only installed apps and opens them without an install", () => {
+  it("honors the Installed section requested by an update notice", () => {
+    setup({ requestedSection: "installed" });
+    expect(screen.getByRole("heading", { name: "Installed" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "View Browser details" })).toBeTruthy();
+  });
+
+  it("shows installed apps and opens details without launching or changing them", () => {
     const props = setup();
     fireEvent.click(screen.getByRole("button", { name: /Installed 1 installed apps/ }));
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Open Browser" }));
-    expect(props.onOpen).toHaveBeenCalledWith(catalog[2]);
-    expect(props.onInstall).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Uninstall Browser" }));
+    expect(screen.getByRole("dialog", { name: "Browser" })).toBeTruthy();
+    expect(props.onOpen).not.toHaveBeenCalled();
+    expect(props.onRemove).not.toHaveBeenCalled();
   });
 
-  it("opens a details dialog and requires an explicit permissions confirmation to install", async () => {
+  it("shows metadata above About and installs only after a separate Agree step", async () => {
     const props = setup();
-    const trigger = screen.getByRole("button", { name: "Add Journal" });
+    const trigger = screen.getByRole("button", { name: "Install Journal" });
     trigger.focus();
     fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: /Journal/ });
-    expect(within(dialog).getByText("Read files and folders you choose")).toBeTruthy();
-    expect(within(dialog).getByRole("heading", { name: "About" })).toBeTruthy();
-    expect(within(dialog).getByRole("heading", { name: "Where it appears" })).toBeTruthy();
+    const dialog = screen.getByRole("dialog", { name: "Journal" });
+    const ui = within(dialog);
+    expect(ui.getByText("Author")).toBeTruthy();
+    expect(ui.getByText("Version")).toBeTruthy();
+    expect(ui.getByRole("link", { name: "misty-org/misty-apps" }).getAttribute("href")).toBe(
+      catalog[1].repository_url,
+    );
+    expect(ui.queryByText("Where it appears")).toBeNull();
+    expect(ui.queryByText("Age rating")).toBeNull();
+    expect(ui.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(ui.queryByText(/Read files/)).toBeNull();
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(props.onInstall).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add to Misty" }));
-    expect(props.onInstall).toHaveBeenCalledWith(catalog[1]);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(ui.getByRole("heading", { name: "App permissions" })).toBeTruthy();
+    expect(ui.getByText("Read files and folders you choose.")).toBeTruthy();
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    await waitFor(() => expect(ui.getByRole("heading", { name: "Journal" })).toBeTruthy());
+    expect(props.onInstall).toHaveBeenCalledExactlyOnceWith(catalog[1]);
+    fireEvent.click(ui.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("routes an outdated installation through review instead of opening it", () => {
-    const props = setup({ installations: [{ ...installed, permission_version: 1 }] });
-    fireEvent.click(screen.getByRole("button", { name: "Review Browser" }));
-    expect(screen.queryByRole("button", { name: "Open Browser" })).toBeNull();
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", { name: "Approve update" }),
-    );
-    expect(props.onInstall).toHaveBeenCalledWith(catalog[2]);
-    expect(props.onOpen).not.toHaveBeenCalled();
-  });
-
-  it("uses Update for a version-only change and still requires confirmation", () => {
-    const props = setup({ installations: [{ ...installed, installed_version: "0.9.0" }] });
-    fireEvent.click(screen.getByRole("button", { name: "Update Browser" }));
+  it("requires new consent when an update adds access", async () => {
+    const changed = { ...catalog[2], scopes: ["files.read", "files.write"] };
+    const props = setup({ catalog: [changed] });
+    fireEvent.click(screen.getByRole("button", { name: "Install Browser" }));
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    expect(ui.getByText("New access")).toBeTruthy();
     expect(props.onInstall).not.toHaveBeenCalled();
-    expect(props.onOpen).not.toHaveBeenCalled();
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Update" }));
-    expect(props.onInstall).toHaveBeenCalledWith(catalog[2]);
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    await waitFor(() => expect(props.onInstall).toHaveBeenCalledExactlyOnceWith(changed));
   });
 
-  it("labels recovery Add and explains saved data before confirming", () => {
+  it.each([{ installed_version: "0.9.0" }, { permission_version: 1 }])(
+    "uses Install without renewed consent when access is unchanged (%j)",
+    async (previous) => {
+      const props = setup({ installations: [{ ...installed, ...previous }] });
+      fireEvent.click(screen.getByRole("button", { name: "Install Browser" }));
+      expect(props.onInstall).not.toHaveBeenCalled();
+      const ui = within(screen.getByRole("dialog"));
+      fireEvent.click(ui.getByRole("button", { name: "Install" }));
+      await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[2]));
+      expect(ui.queryByRole("button", { name: "Agree" })).toBeNull();
+    },
+  );
+
+  it("explains recovery and requests consent before reinstalling", async () => {
     const props = setup({
       installations: [{ ...installed, app_id: "journal", state: "recoverable" }],
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add Journal" }));
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/restores its recoverable saved data/)).toBeTruthy();
-    expect(screen.queryByText("Add again")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Install Journal" }));
+    const ui = within(screen.getByRole("dialog"));
+    expect(ui.getByText(/restores its recoverable saved data/)).toBeTruthy();
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(props.onInstall).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add to Misty" }));
-    expect(props.onInstall).toHaveBeenCalledWith(catalog[1]);
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[1]));
+  });
+
+  it("blocks unknown permissions without exposing scope identifiers", () => {
+    const props = setup({ catalog: [{ ...catalog[1], scopes: ["unknown.secret"] }] });
+    fireEvent.click(screen.getByRole("button", { name: "Install Journal" }));
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    expect(ui.getByRole("alert").textContent).toContain("cannot describe");
+    expect(ui.queryByText(/unknown.secret/)).toBeNull();
+    expect((ui.getByRole("button", { name: "Agree" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(props.onInstall).not.toHaveBeenCalled();
+  });
+
+  it("discards stale consent when the catalog changes while permissions are open", () => {
+    const onInstall = vi.fn();
+    const props = {
+      app: catalog[1],
+      actionAppId: "",
+      mobile: false,
+      error: "",
+      onClose: vi.fn(),
+      onRestoreFocus: vi.fn(),
+      onInstall,
+      onRemove: vi.fn(),
+    };
+    const view = render(<OfficialAppDetails {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    expect(screen.getByRole("button", { name: "Agree" })).toBeTruthy();
+    const changed = { ...catalog[1], scopes: ["files.read", "files.write"] };
+    view.rerender(<OfficialAppDetails {...props} app={changed} />);
+    expect(screen.queryByRole("button", { name: "Agree" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Install" }));
+    expect(
+      screen.getByText("Create, change, rename, and delete files and folders you choose."),
+    ).toBeTruthy();
+    expect(onInstall).not.toHaveBeenCalled();
+  });
+
+  it("dismisses a pending install without starting it twice", async () => {
+    let complete!: () => void;
+    const onInstall = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          complete = resolve;
+        }),
+    );
+    setup({ selectedAppId: "journal", onInstall });
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    expect(ui.getByRole("status").textContent).toBe("Installing…");
+    fireEvent.click(ui.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await act(async () => complete());
+    expect(onInstall).toHaveBeenCalledOnce();
+  });
+
+  it("keeps failed installs on permissions and allows retry", async () => {
+    const install = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Download failed"))
+      .mockResolvedValue(undefined);
+    setup({ onInstall: install, selectedAppId: "journal" });
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    await waitFor(() => expect(ui.getByRole("alert").textContent).toBe("Download failed"));
+    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    await waitFor(() => expect(ui.getByRole("heading", { name: "Journal" })).toBeTruthy());
+    expect(install).toHaveBeenCalledTimes(2);
   });
 
   it("uses catalog-backed previews that open details and disappear while filtering", () => {
@@ -148,7 +246,7 @@ describe("Discover compact catalog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview Journal" }));
     expect(screen.getByRole("dialog", { name: /Journal/ })).toBeTruthy();
     expect(props.onInstall).not.toHaveBeenCalled();
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Journal" } });
     expect(screen.queryByRole("button", { name: "Preview Journal" })).toBeNull();
     expect(screen.getByRole("button", { name: "View Journal details" })).toBeTruthy();
@@ -160,21 +258,24 @@ describe("Discover compact catalog", () => {
       (screen.getByRole("button", { name: "Unavailable Terminal" }) as HTMLButtonElement).disabled,
     ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "View Terminal details" }));
-    const action = within(screen.getByRole("dialog")).getByRole("button", { name: "Unavailable" });
+    const action = within(screen.getByRole("dialog")).getByRole("button", { name: "Install" });
     expect((action as HTMLButtonElement).disabled).toBe(true);
     expect(props.onInstall).not.toHaveBeenCalled();
   });
 
   it("offers removal from details and prevents concurrent operations", () => {
     const props = setup({ selectedAppId: "browser" });
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove app" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Uninstall" }));
+    expect(props.onRemove).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Uninstall Browser?" })).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Uninstall" }));
     expect(props.onRemove).toHaveBeenCalledWith(catalog[2]);
     cleanup();
     setup({ selectedAppId: "browser", actionAppId: "journal" });
     expect(
       (
         within(screen.getByRole("dialog")).getByRole("button", {
-          name: "Remove app",
+          name: "Uninstall",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
