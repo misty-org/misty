@@ -167,7 +167,7 @@ function DocumentPage({ page }: { page: DocsPage }) {
 
 const landingExamples = [
   { label: "CLI", filename: "Terminal", language: "shell", code: "cargo install --path ~/misty-org/misty-cli --locked --force\nmisty doctor\nmisty desktop dev" },
-  { label: "Extension", filename: "Terminal", language: "shell", code: "cd ~/misty-org/misty-extensions\nnpm install\nnpm run dev" },
+  { label: "App", filename: "Terminal", language: "shell", code: "cd ~/misty-org/misty-apps\nnpm install\nnpm run dev" },
   { label: "Server", filename: "Terminal", language: "shell", code: "misty env init dev\nmisty server up --detach\nmisty server url" },
 ] as const;
 
