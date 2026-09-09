@@ -28,15 +28,16 @@
     "validate": "node scripts/validate-catalog.mjs",
     "sync:server-apps": "node scripts/sync-server-official-apps.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
-    "package:official-apps": "node scripts/build-official-apps.mjs"
+    "package:official-apps": "node scripts/build-official-apps.mjs",
+    "build:apps": "node scripts/build-apps.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-dfaa2f6d310702ec.tgz",
-    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-06efa82248fa485d.tgz"
+    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-b66d8dda8b2add39.tgz",
+    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-e889d4508bf5fb15.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

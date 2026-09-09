@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2020"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -14,7 +18,391 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "../misty/src/*"
+      ],
+      "@misty/apps/*": [
+        "../misty/vendor/misty-apps/interface/*"
+      ],
+      "@misty/apps": [
+        "../misty/vendor/misty-apps/interface/store.tsx"
+      ],
+      "@/features/notes": [
+        "./apps/journal/notes"
+      ],
+      "@/features/notes/*": [
+        "./apps/journal/notes/*"
+      ],
+      "@/features/drawings": [
+        "./apps/journal/drawings"
+      ],
+      "@/features/drawings/*": [
+        "./apps/journal/drawings/*"
+      ],
+      "@/features/spaces/planner": [
+        "./apps/planner/planner"
+      ],
+      "@/features/spaces/planner/*": [
+        "./apps/planner/planner/*"
+      ],
+      "@/features/spaces/roadmap": [
+        "./apps/planner/roadmap"
+      ],
+      "@/features/spaces/roadmap/*": [
+        "./apps/planner/roadmap/*"
+      ],
+      "@/features/spaces/library": [
+        "./apps/library/library"
+      ],
+      "@/features/spaces/library/*": [
+        "./apps/library/library/*"
+      ],
+      "@/features/agents": [
+        "./apps/agents/workspace"
+      ],
+      "@/features/agents/*": [
+        "./apps/agents/workspace/*"
+      ],
+      "@/features/files": [
+        "./apps/files/workspace"
+      ],
+      "@/features/files/*": [
+        "./apps/files/workspace/*"
+      ],
+      "@/features/browser": [
+        "./apps/browser/workspace"
+      ],
+      "@/features/browser/*": [
+        "./apps/browser/workspace/*"
+      ],
+      "@/features/coding-workspace": [
+        "./apps/code/workspace"
+      ],
+      "@/features/coding-workspace/*": [
+        "./apps/code/workspace/*"
+      ],
+      "@/features/terminal": [
+        "./apps/terminal/workspace"
+      ],
+      "@/features/terminal/*": [
+        "./apps/terminal/workspace/*"
+      ],
+      "@/features/apps/package/SDKJournalApp": [
+        "./apps/journal/index"
+      ],
+      "@/features/apps/package/SDKPlannerApp": [
+        "./apps/planner/index"
+      ],
+      "@/features/apps/package/SDKLibraryApp": [
+        "./apps/library/index"
+      ],
+      "@/features/apps/package/SDKAgentsApp": [
+        "./apps/agents/index"
+      ],
+      "@/features/apps/package/SDKFilesApp": [
+        "./apps/files/index"
+      ],
+      "@/features/apps/package/SDKBrowserApp": [
+        "./apps/browser/index"
+      ],
+      "@/features/apps/package/SDKCodeApp": [
+        "./apps/code/index"
+      ],
+      "@/features/apps/package/SDKTerminalApp": [
+        "./apps/terminal/index"
+      ],
+      "react": [
+        "../misty/node_modules/@types/react"
+      ],
+      "react/*": [
+        "../misty/node_modules/@types/react/*"
+      ],
+      "react-dom": [
+        "../misty/node_modules/@types/react-dom"
+      ],
+      "react-dom/*": [
+        "../misty/node_modules/@types/react-dom/*"
+      ],
+      "react-dom/client": [
+        "../misty/node_modules/@types/react-dom/client.d.ts"
+      ],
+      "react-router-dom": [
+        "../misty/node_modules/react-router-dom/dist/index.d.mts"
+      ],
+      "@misty/sdk": [
+        "../misty/node_modules/@misty/sdk/dist/index.d.ts"
+      ],
+      "lucide-react": [
+        "../misty/node_modules/lucide-react/dist/lucide-react.d.ts"
+      ],
+      "vitest": [
+        "../misty/node_modules/vitest/dist/index.d.ts"
+      ],
+      "@xyflow/react": [
+        "../misty/node_modules/@xyflow/react/dist/esm/index.d.ts"
+      ],
+      "react-icons/fa6": [
+        "../misty/node_modules/react-icons/fa6/index.d.ts"
+      ],
+      "react-icons/bi": ["../misty/node_modules/react-icons/bi/index.d.ts"],
+      "react-icons/si": [
+        "../misty/node_modules/react-icons/si/index.d.ts"
+      ],
+      "react-markdown": [
+        "../misty/node_modules/react-markdown/index.d.ts"
+      ],
+      "@testing-library/react": [
+        "../misty/node_modules/@testing-library/react/types/index.d.ts"
+      ],
+      "zustand/react/shallow": [
+        "../misty/node_modules/zustand/esm/react/shallow.d.mts"
+      ],
+      "react-icons": [
+        "../misty/node_modules/react-icons/index.d.ts"
+      ],
+      "react-icons/tb": [
+        "../misty/node_modules/react-icons/tb/index.d.ts"
+      ],
+      "@tauri-apps/api/core": [
+        "../misty/node_modules/@tauri-apps/api/core.d.ts"
+      ],
+      "zustand": [
+        "../misty/node_modules/zustand/esm/index.d.mts"
+      ],
+      "@tauri-apps/plugin-clipboard-manager": [
+        "../misty/node_modules/@tauri-apps/plugin-clipboard-manager/dist-js/index.d.ts"
+      ],
+      "@tauri-apps/api/event": [
+        "../misty/node_modules/@tauri-apps/api/event.d.ts"
+      ],
+      "zustand/middleware": [
+        "../misty/node_modules/zustand/esm/middleware.d.mts"
+      ],
+      "@codemirror/state": [
+        "../misty/node_modules/@codemirror/state/dist/index.d.ts"
+      ],
+      "@codemirror/autocomplete": [
+        "../misty/node_modules/@codemirror/autocomplete/dist/index.d.ts"
+      ],
+      "@codemirror/commands": [
+        "../misty/node_modules/@codemirror/commands/dist/index.d.ts"
+      ],
+      "@codemirror/language": [
+        "../misty/node_modules/@codemirror/language/dist/index.d.ts"
+      ],
+      "@codemirror/lint": [
+        "../misty/node_modules/@codemirror/lint/dist/index.d.ts"
+      ],
+      "@codemirror/search": [
+        "../misty/node_modules/@codemirror/search/dist/index.d.ts"
+      ],
+      "@codemirror/view": [
+        "../misty/node_modules/@codemirror/view/dist/index.d.ts"
+      ],
+      "@codemirror/language-data": [
+        "../misty/node_modules/@codemirror/language-data/dist/index.d.ts"
+      ],
+      "@lezer/highlight": [
+        "../misty/node_modules/@lezer/highlight/dist/index.d.ts"
+      ],
+      "cmdk": [
+        "../misty/node_modules/cmdk/dist/index.d.ts"
+      ],
+      "react-resizable-panels": [
+        "../misty/node_modules/react-resizable-panels/dist/react-resizable-panels.cjs.d.mts"
+      ],
+      "@misty/contracts": [
+        "../misty/node_modules/@misty/contracts/dist/index.d.ts"
+      ],
+      "qrcode.react": [
+        "../misty/node_modules/qrcode.react/lib/index.d.mts"
+      ],
+      "material-icon-theme/dist/material-icons.json": [
+        "../misty/node_modules/material-icon-theme/dist/material-icons.json"
+      ],
+      "react-pdf": [
+        "../misty/node_modules/react-pdf/dist/esm/index.d.ts"
+      ],
+      "konva": [
+        "../misty/node_modules/konva/lib/index-types.d.ts"
+      ],
+      "react-konva": [
+        "../misty/node_modules/react-konva/ReactKonvaCore.d.ts"
+      ],
+      "@tauri-apps/plugin-dialog": [
+        "../misty/node_modules/@tauri-apps/plugin-dialog/dist-js/index.d.ts"
+      ],
+      "@tauri-apps/plugin-opener": [
+        "../misty/node_modules/@tauri-apps/plugin-opener/dist-js/index.d.ts"
+      ],
+      "@excalidraw/excalidraw/element/types": [
+        "../misty/node_modules/@excalidraw/excalidraw/dist/types/excalidraw/element/types.d.ts"
+      ],
+      "y-partyserver/provider": [
+        "../misty/node_modules/y-partyserver/dist/provider/index.d.ts"
+      ],
+      "yjs": [
+        "../misty/node_modules/yjs/dist/src/index.d.ts"
+      ],
+      "@excalidraw/excalidraw/types": [
+        "../misty/node_modules/@excalidraw/excalidraw/dist/types/excalidraw/types.d.ts"
+      ],
+      "@excalidraw/excalidraw": [
+        "../misty/node_modules/@excalidraw/excalidraw/dist/types/excalidraw/index.d.ts"
+      ],
+      "@excalidraw/excalidraw/data/reconcile": [
+        "../misty/node_modules/@excalidraw/excalidraw/dist/types/excalidraw/data/reconcile.d.ts"
+      ],
+      "@misty/sdk/yjs": [
+        "../misty/node_modules/@misty/sdk/dist/yjs.d.ts"
+      ],
+      "@tiptap/extension-collaboration": [
+        "../misty/node_modules/@tiptap/extension-collaboration/dist/index.d.ts"
+      ],
+      "@tiptap/extension-collaboration-caret": [
+        "../misty/node_modules/@tiptap/extension-collaboration-caret/dist/index.d.ts"
+      ],
+      "@tiptap/extension-drag-handle-react": [
+        "../misty/node_modules/@tiptap/extension-drag-handle-react/dist/index.d.ts"
+      ],
+      "@tiptap/extension-find-and-replace": [
+        "../misty/node_modules/@tiptap/extension-find-and-replace/dist/index.d.ts"
+      ],
+      "@tiptap/extension-highlight": [
+        "../misty/node_modules/@tiptap/extension-highlight/dist/index.d.ts"
+      ],
+      "@tiptap/extension-image": [
+        "../misty/node_modules/@tiptap/extension-image/dist/index.d.ts"
+      ],
+      "@tiptap/extension-list": [
+        "../misty/node_modules/@tiptap/extension-list/dist/index.d.ts"
+      ],
+      "@tiptap/extension-subscript": [
+        "../misty/node_modules/@tiptap/extension-subscript/dist/index.d.ts"
+      ],
+      "@tiptap/extension-superscript": [
+        "../misty/node_modules/@tiptap/extension-superscript/dist/index.d.ts"
+      ],
+      "@tiptap/extension-text-align": [
+        "../misty/node_modules/@tiptap/extension-text-align/dist/index.d.ts"
+      ],
+      "@tiptap/extension-typography": [
+        "../misty/node_modules/@tiptap/extension-typography/dist/index.d.ts"
+      ],
+      "@tiptap/extension-unique-id": [
+        "../misty/node_modules/@tiptap/extension-unique-id/dist/index.d.ts"
+      ],
+      "@tiptap/markdown": [
+        "../misty/node_modules/@tiptap/markdown/dist/index.d.ts"
+      ],
+      "@tiptap/react": [
+        "../misty/node_modules/@tiptap/react/dist/index.d.ts"
+      ],
+      "@tiptap/starter-kit": [
+        "../misty/node_modules/@tiptap/starter-kit/dist/index.d.ts"
+      ],
+      "y-protocols/awareness": [
+        "../misty/node_modules/y-protocols/awareness.d.ts"
+      ],
+      "@tiptap/core": [
+        "../misty/node_modules/@tiptap/core/dist/index.d.ts"
+      ],
+      "@uiw/react-md-editor": [
+        "../misty/node_modules/@uiw/react-md-editor/esm/index.d.ts"
+      ],
+      "@xterm/addon-clipboard": [
+        "../misty/node_modules/@xterm/addon-clipboard/typings/addon-clipboard.d.ts"
+      ],
+      "@xterm/addon-fit": [
+        "../misty/node_modules/@xterm/addon-fit/typings/addon-fit.d.ts"
+      ],
+      "@xterm/addon-image": [
+        "../misty/node_modules/@xterm/addon-image/typings/addon-image.d.ts"
+      ],
+      "@xterm/addon-search": [
+        "../misty/node_modules/@xterm/addon-search/typings/addon-search.d.ts"
+      ],
+      "@xterm/addon-serialize": [
+        "../misty/node_modules/@xterm/addon-serialize/typings/addon-serialize.d.ts"
+      ],
+      "@xterm/addon-unicode11": [
+        "../misty/node_modules/@xterm/addon-unicode11/typings/addon-unicode11.d.ts"
+      ],
+      "@xterm/addon-web-links": [
+        "../misty/node_modules/@xterm/addon-web-links/typings/addon-web-links.d.ts"
+      ],
+      "@xterm/addon-webgl": [
+        "../misty/node_modules/@xterm/addon-webgl/typings/addon-webgl.d.ts"
+      ],
+      "@xterm/xterm": [
+        "../misty/node_modules/@xterm/xterm/typings/xterm.d.ts"
+      ],
+      "@codemirror/lang-javascript": [
+        "../misty/node_modules/@codemirror/lang-javascript/dist/index.d.ts"
+      ],
+      "@codemirror/lang-json": [
+        "../misty/node_modules/@codemirror/lang-json/dist/index.d.ts"
+      ],
+      "@codemirror/lang-css": [
+        "../misty/node_modules/@codemirror/lang-css/dist/index.d.ts"
+      ],
+      "@codemirror/lang-html": [
+        "../misty/node_modules/@codemirror/lang-html/dist/index.d.ts"
+      ],
+      "@codemirror/lang-markdown": [
+        "../misty/node_modules/@codemirror/lang-markdown/dist/index.d.ts"
+      ],
+      "@codemirror/lang-rust": [
+        "../misty/node_modules/@codemirror/lang-rust/dist/index.d.ts"
+      ],
+      "@codemirror/lang-python": [
+        "../misty/node_modules/@codemirror/lang-python/dist/index.d.ts"
+      ],
+      "@codemirror/lang-go": [
+        "../misty/node_modules/@codemirror/lang-go/dist/index.d.ts"
+      ],
+      "@codemirror/lang-cpp": [
+        "../misty/node_modules/@codemirror/lang-cpp/dist/index.d.ts"
+      ],
+      "@codemirror/lang-java": [
+        "../misty/node_modules/@codemirror/lang-java/dist/index.d.ts"
+      ],
+      "@codemirror/lang-yaml": [
+        "../misty/node_modules/@codemirror/lang-yaml/dist/index.d.ts"
+      ],
+      "@codemirror/lang-sql": [
+        "../misty/node_modules/@codemirror/lang-sql/dist/index.d.ts"
+      ],
+      "@codemirror/lang-xml": [
+        "../misty/node_modules/@codemirror/lang-xml/dist/index.d.ts"
+      ],
+      "@codemirror/lang-php": [
+        "../misty/node_modules/@codemirror/lang-php/dist/index.d.ts"
+      ],
+      "mammoth": [
+        "../misty/node_modules/mammoth/lib/index.d.ts"
+      ],
+      "jszip": [
+        "../misty/node_modules/jszip/index.d.ts"
+      ],
+      "@crabnebula/tauri-plugin-drag": [
+        "../misty/node_modules/@crabnebula/tauri-plugin-drag/dist-js/index.d.ts"
+      ],
+      "@tauri-apps/api/webview": [
+        "../misty/node_modules/@tauri-apps/api/webview.d.ts"
+      ],
+      "@tauri-apps/api/window": [
+        "../misty/node_modules/@tauri-apps/api/window.d.ts"
+      ]
+    }
   },
-  "include": ["src", "interface", "vite.config.ts"]
+  "include": [
+    "src",
+    "interface",
+    "vite.config.ts",
+    "apps",
+    "../misty/src/vite-env.d.ts"
+  ]
 }

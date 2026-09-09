@@ -56,12 +56,15 @@ type App struct {
 \tName string \`json:"name"\`
 \tPublisher string \`json:"publisher"\`
 \tDescription string \`json:"description"\`
+\tAbout string \`json:"about,omitempty"\`
+\tRepositoryURL string \`json:"repository_url,omitempty"\`
 \tVersion string \`json:"version"\`
 \tPermissionVersion int \`json:"permission_version"\`
 \tMinimumHost int \`json:"minimum_host_protocol"\`
 \tMinimumHostVersion string \`json:"minimum_host_version,omitempty"\`
 \tOfficial bool \`json:"official"\`
 \tAgeRating string \`json:"age_rating"\`
+\tRequiresApps []string \`json:"requires_apps,omitempty"\`
 \tScopes []string \`json:"scopes"\`
 \tDesktop PlatformRuntime \`json:"desktop"\`
 \tMobile PlatformRuntime \`json:"mobile"\`
@@ -89,6 +92,7 @@ func All() []App {
 \tresult := make([]App, len(officialApps))
 \tcopy(result, officialApps)
 \tfor index := range result {
+\t\tresult[index].RequiresApps = append([]string(nil), result[index].RequiresApps...)
 \t\tresult[index].Scopes = append([]string(nil), result[index].Scopes...)
 \t}
 \treturn result
@@ -98,6 +102,7 @@ func Find(id string) (App, bool) {
 \tid = strings.TrimSpace(strings.ToLower(id))
 \tfor _, candidate := range officialApps {
 \t\tif candidate.ID == id {
+\t\t\tcandidate.RequiresApps = append([]string(nil), candidate.RequiresApps...)
 \t\t\tcandidate.Scopes = append([]string(nil), candidate.Scopes...)
 \t\t\treturn candidate, true
 \t\t}

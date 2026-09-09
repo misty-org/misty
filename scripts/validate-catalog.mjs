@@ -236,6 +236,16 @@ async function validateOfficialApps(catalog) {
     ) {
       fail(`Invalid official app protocol contract for ${app.id}.`);
     }
+    if (app.about !== undefined && (typeof app.about !== "string" || !app.about.trim() || app.about.length > 2000)) {
+      fail(`${app.id} must have a short, readable About description.`);
+    }
+    if (app.repository_url !== undefined) {
+      let source;
+      try { source = new URL(app.repository_url); } catch { fail(`${app.id} has an invalid source URL.`); }
+      if (source?.protocol !== "https:" || source?.hostname !== "github.com" || source.username || source.password) {
+        fail(`${app.id} must link to an HTTPS GitHub repository.`);
+      }
+    }
     if (app.desktop?.runtime === "downloaded") {
       if (app.minimum_host_protocol !== 2 ||
           app.desktop.entry !== `https://apps.mistysys.com/official-apps/${app.id}/${app.version}/desktop.zip` ||
