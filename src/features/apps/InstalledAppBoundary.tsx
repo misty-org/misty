@@ -2,8 +2,8 @@ import { useAuth } from "@/features/auth";
 import { Button, EmptyState } from "@/shared/ui";
 import { LoaderCircle } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAppsStore } from "./useAppsStore";
+import { useNavigate, useParams } from "react-router-dom";
+import { canManageSpaceApps, useAppsStore } from "./useAppsStore";
 
 export function InstalledAppBoundary(props: {
   appId: string;
@@ -12,11 +12,15 @@ export function InstalledAppBoundary(props: {
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const ready = useAppsStore((state) => state.ready);
+  const params = useParams();
+  const activeSpaceId = useAppsStore((state) => state.spaceId);
+  const spaceId = params.spaceId ?? activeSpaceId;
+  const ready = useAppsStore((state) => state.bySpace[spaceId] !== undefined);
+  const manager = canManageSpaceApps(spaceId);
   const loading = useAppsStore((state) => state.loading);
-  const error = useAppsStore((state) => state.error);
+  const error = useAppsStore((state) => state.bySpaceErrors[spaceId] ?? "");
   const installed = useAppsStore((state) =>
-    state.installations.some(
+    (state.bySpace[spaceId] ?? []).some(
       (installation) => installation.app_id === props.appId && installation.state === "installed",
     ),
   );
@@ -26,8 +30,9 @@ export function InstalledAppBoundary(props: {
   const appName = props.appName ?? catalogName ?? "This app";
 
   useEffect(() => {
-    if (user?.id && !ready && !loading) void useAppsStore.getState().load(user.id);
-  }, [loading, ready, user?.id]);
+    if (user?.id && !ready && !loading && !error)
+      void useAppsStore.getState().load(user.id, false, spaceId);
+  }, [loading, ready, user?.id, spaceId, error]);
 
   if (!ready) {
     if (error) {
@@ -37,7 +42,9 @@ export function InstalledAppBoundary(props: {
           title="Apps could not be checked"
           description={error}
           action={
-            <Button onClick={() => user?.id && void useAppsStore.getState().load(user.id, true)}>
+            <Button
+              onClick={() => user?.id && void useAppsStore.getState().load(user.id, true, spaceId)}
+            >
               Try again
             </Button>
           }
@@ -56,9 +63,15 @@ export function InstalledAppBoundary(props: {
     return (
       <EmptyState
         className="h-full"
-        title={`Add ${appName} to Misty to open it`}
-        description={`Add ${appName} from Discover when you want to use it.`}
-        action={<Button onClick={() => navigate("/discover")}>Open Discover</Button>}
+        title={`${appName} is not available in this Space`}
+        description={
+          manager
+            ? `Add ${appName} from Discover to use it here.`
+            : "A Space manager needs to add this app before members can use it."
+        }
+        action={
+          manager ? <Button onClick={() => navigate("/discover")}>Open Discover</Button> : undefined
+        }
       />
     );
   }

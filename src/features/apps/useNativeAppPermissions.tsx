@@ -14,6 +14,8 @@ const appearanceCommands: Record<string, string> = {
 };
 const methods = new Set([
   ...Object.keys(appearanceCommands),
+  "terminal.authorize",
+  "connections.authorize",
   "backups.status",
   "backups.repositoryOpen",
   "backups.repositoryClose",
@@ -30,6 +32,7 @@ const methods = new Set([
   "downloads.jobStatus",
   "downloads.jobCancel",
   "downloads.jobClose",
+  "files.index",
   "files.sources.list",
   "files.sources.open",
   "files.pick",
@@ -48,6 +51,7 @@ const methods = new Set([
   "files.replaceCopy",
   "files.openExternal",
   "files.listArchive",
+  "documents.prepare",
   "files.discardCopy",
   "files.listSavedDirectories",
   "files.rememberDirectory",
@@ -63,7 +67,13 @@ const methods = new Set([
   "files.watchDirectory",
   "files.watchStatus",
   "files.watchClose",
+  "files.treeBegin",
+  "files.treeDirectory",
+  "files.treeSymlink",
+  "files.treeCommit",
+  "files.treeDiscard",
   "files.transferStart",
+  "files.transferPrepared",
   "files.transferStatus",
   "files.transferCancel",
   "files.transferClose",
@@ -94,11 +104,13 @@ interface PermissionStatus {
   appId: string;
   capability: string;
   granted: boolean;
+  remembered?: boolean;
 }
 interface Prompt extends PermissionStatus {
   resolve: (allowed: boolean) => void;
 }
 const descriptions: Record<string, string> = {
+  "terminal.execute": "Run commands on this computer",
   "appearance.write": "Preview and save Misty’s appearance",
   "media.convert": "Convert chosen media using Misty’s isolated converter",
   "media.download": "Connect to public media sites and save downloads in a folder you choose",
@@ -136,6 +148,7 @@ export function useNativeAppPermissions(title: string) {
       (event) => {
         if (event.payload.instance === owner.current) {
           recording.current?.abort();
+          void refresh(owner.current).catch(() => undefined);
           if (event.payload.capability === "appearance.write")
             revertExtensionThemePreview(owner.current);
         }
@@ -342,14 +355,19 @@ export function useNativeAppPermissions(title: string) {
               {prompt ? description(prompt.capability).toLowerCase() : "use this feature"}?
             </DialogTitle>
             <DialogDescription>
-              App: {prompt?.appId}. Access lasts until you close this app. You can revoke it from
-              App permissions at any time.
+              App: {prompt?.appId}.{" "}
+              {prompt?.remembered
+                ? "Your approval is remembered for this app in this account and Space."
+                : "Access lasts until you close this app."}{" "}
+              You can revoke it from App permissions at any time.
             </DialogDescription>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => decide(false)}>
                 Don’t allow
               </Button>
-              <Button onClick={() => decide(true)}>Allow for this session</Button>
+              <Button onClick={() => decide(true)}>
+                {prompt?.remembered ? "Allow and remember" : "Allow for this session"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -357,8 +375,8 @@ export function useNativeAppPermissions(title: string) {
           <DialogContent>
             <DialogTitle>{title} permissions</DialogTitle>
             <DialogDescription>
-              These permissions apply to this open app. Closing it removes all access and selected
-              file handles.
+              Remembered approvals survive reopening this app. Closing it releases live file handles.
+              Revoking a permission removes its approval and access in all matching open app instances.
             </DialogDescription>
             {error ? <p role="alert">{error}</p> : null}
             {grants.length === 0 ? (

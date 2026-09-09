@@ -14,11 +14,24 @@ const pairPath = (deviceId: string, pairId: string) =>
 const workflowJobPath = (deviceId: string, jobId: string) =>
   `${devicePath(deviceId)}/workflow-node-jobs/${encodeURIComponent(jobId)}`;
 
+export interface SpaceDevicePresenceInput {
+  installedVersion: string;
+  authorityGeneration: number;
+  endpointId: string;
+  addressing: Record<string, unknown>;
+  protocolVersion: "misty-device/2";
+  connectionHint: "unknown" | "direct" | "relay";
+}
+const spaceDevicePath = (deviceId: string, spaceId: string) => {
+  if (!spaceId.trim()) throw new Error("A Space is required for peer access.");
+  return `${devicePath(deviceId)}/spaces/${encodeURIComponent(spaceId)}`;
+};
+
 export const devicesApi = {
   request: managedAiRequest,
   list: <T>() => managedAiRequest<T>("/devices"),
-  register: <T>(body: unknown) =>
-    managedAiRequest<T>("/devices", { method: "POST", body: JSON.stringify(body) }),
+  register: <T>(body: unknown, signal?: AbortSignal) =>
+    managedAiRequest<T>("/devices", { method: "POST", body: JSON.stringify(body), signal }),
   peerTicketKeys: <T>() => managedAiRequest<T>("/devices/peer-ticket-keys"),
   heartbeat: <T>(request: SignedDeviceRequest, localId: string, deviceId: string, body: unknown) =>
     signed<T>(request, localId, `${devicePath(deviceId)}/heartbeat`, "POST", body),
@@ -32,6 +45,30 @@ export const devicesApi = {
     deviceId: string,
     body: unknown,
   ) => signed<T>(request, localId, `${devicePath(deviceId)}/peer-tickets`, "POST", body),
+  spacePresence: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    spaceId: string,
+    body: SpaceDevicePresenceInput,
+  ) => signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/presence`, "POST", body),
+  spacePeers: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    spaceId: string,
+  ) => signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/peers`, "GET"),
+  issueSpacePeerTicket: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    spaceId: string,
+    targetDeviceId: string,
+  ) =>
+    signed<T>(request, localId, `${spaceDevicePath(deviceId, spaceId)}/peer-tickets`, "POST", {
+      targetDeviceId,
+      protocolVersion: "misty-device/2",
+    }),
   registerPushSubscription: (
     request: SignedDeviceRequest,
     localId: string,
@@ -84,11 +121,26 @@ export const devicesApi = {
   revokePair: (request: SignedDeviceRequest, localId: string, deviceId: string, pairId: string) =>
     signed(request, localId, `${pairPath(deviceId, pairId)}/revoke`, "POST", {}),
   claimWorkflowJob: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
-    signed<T>(request, localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, "POST", { protocolVersion: 2 }),
-  beginWorkflowJob: <T>(request: SignedDeviceRequest, localId: string, deviceId: string, jobId: string, leaseToken: string) =>
-    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/begin`, "POST", { leaseToken }),
-  uncertainWorkflowJob: (request: SignedDeviceRequest, localId: string, deviceId: string, jobId: string, body: unknown) =>
-    signed(request, localId, `${workflowJobPath(deviceId, jobId)}/uncertain`, "POST", body),
+    signed<T>(request, localId, `${devicePath(deviceId)}/workflow-node-jobs/claim`, "POST", {
+      protocolVersion: 2,
+    }),
+  beginWorkflowJob: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    jobId: string,
+    leaseToken: string,
+  ) =>
+    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/begin`, "POST", {
+      leaseToken,
+    }),
+  uncertainWorkflowJob: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    jobId: string,
+    body: unknown,
+  ) => signed(request, localId, `${workflowJobPath(deviceId, jobId)}/uncertain`, "POST", body),
   renewWorkflowJobLease: <T>(
     request: SignedDeviceRequest,
     localId: string,
@@ -96,7 +148,9 @@ export const devicesApi = {
     jobId: string,
     leaseToken: string,
   ) =>
-    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/lease`, "POST", { leaseToken }),
+    signed<T>(request, localId, `${workflowJobPath(deviceId, jobId)}/lease`, "POST", {
+      leaseToken,
+    }),
   completeWorkflowJob: (
     request: SignedDeviceRequest,
     localId: string,

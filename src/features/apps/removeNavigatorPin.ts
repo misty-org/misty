@@ -34,7 +34,7 @@ export async function removeNavigatorPin(
   assertStableApiSession(generation);
   if (useAppsStore.getState().accountId !== accountId)
     throw new Error("The account changed. Try again.");
-  const prefix = appLocalStoragePrefix(serverBase, accountId, app.app_id ?? app.id);
+  const prefix = appLocalStoragePrefix(serverBase, accountId, app.app_id ?? app.id, store.spaceId);
   const keys =
     officialId === "browser"
       ? [`browser-page-pin-v1:${pinId}`]

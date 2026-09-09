@@ -72,6 +72,7 @@ const MAX_INTERACTIVE_ELEMENTS: usize = 500;
 const MAX_DOWNLOAD_HISTORY: usize = 100;
 const AGENT_DOWNLOAD_WINDOW_SECONDS: i64 = 30;
 use super::browser_profile::data_store_identifier as browser_profile_identifier;
+#[cfg(not(target_os = "macos"))]
 const HTML2CANVAS_SOURCE: &str =
     include_str!("../../../node_modules/html2canvas/dist/html2canvas.min.js");
 #[cfg(any(target_os = "macos", windows))]
@@ -360,22 +361,12 @@ struct RawInteractiveElement {
 }
 
 #[cfg(target_os = "macos")]
-fn apply_macos_webview_theme(webview: &Webview, value: &str) -> Result<(), String> {
-    use objc2_app_kit::{
-        NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
-        NSView,
-    };
-    let dark = value != "light";
+fn apply_macos_webview_theme(webview: &Webview, _value: &str) -> Result<(), String> {
+    use objc2_app_kit::{NSAppearanceCustomization, NSView};
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            let name = if dark {
-                NSAppearanceNameDarkAqua
-            } else {
-                NSAppearanceNameAqua
-            };
-            let appearance = NSAppearance::appearanceNamed(name);
-            view.setAppearance(appearance.as_deref());
+            view.setAppearance(None);
         })
         .map_err(|error| error.to_string())
 }
@@ -1272,6 +1263,16 @@ pub async fn browser_webview_capture_region(
     let webview = app
         .get_webview(&webview_label(&request.id)?)
         .ok_or_else(|| "Browser page is unavailable.".to_owned())?;
+    #[cfg(target_os = "macos")]
+    {
+        // Hide only Misty's overlay; WebKit captures the actual rendered page.
+        evaluate_browser_async_javascript(webview.clone(), "const e = document.getElementById('misty-native-companion'); if (e) { e.dataset.mistyCaptureDisplay = e.style.display; e.style.display = 'none'; } return '';".into()).await?;
+        let result = super::browser_macos::capture_webview_region(webview.clone(), request.x, request.y, request.width, request.height).await;
+        let _ = evaluate_browser_async_javascript(webview, "const e = document.getElementById('misty-native-companion'); if (e) { e.style.display = e.dataset.mistyCaptureDisplay || ''; delete e.dataset.mistyCaptureDisplay; } return '';".into()).await;
+        result
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
     let options = json!({
         "x": request.x,
         "y": request.y,
@@ -1290,6 +1291,7 @@ pub async fn browser_webview_capture_region(
         return Err(format!("Browser capture failed: {error}"));
     }
     Ok(value)
+    }
 }
 
 #[tauri::command]
@@ -1329,6 +1331,17 @@ pub fn browser_webview_navigate(
     })
 }
 
+/// Compatibility command for older clients. Remote pages own their presentation.
+/// Remove any layer left by an earlier client instead of injecting page styling.
+#[tauri::command]
+pub fn browser_webview_set_pane_dim(app: AppHandle, id: String, strength: f64, indicator: Option<String>) -> Result<(), String> {
+    let _ = (strength, indicator);
+    with_webview(&app, &id, |webview| {
+        webview.eval("document.getElementById('__misty_pane_dim__')?.remove();")
+            .map_err(|error| error.to_string())
+    })
+}
+
 #[tauri::command]
 pub fn browser_webview_set_theme(
     app: AppHandle,
@@ -1343,6 +1356,12 @@ pub fn browser_webview_set_theme(
         .map_err(|error| error.to_string())?;
     for (label, webview) in app.webviews() {
         if label.starts_with("misty-browser-") {
+            // Update reused views as well as newly created ones. A transparent
+            // document must not inherit Misty's dark toolbar canvas.
+            webview.set_background_color(Some(browser_background(&request.theme)))
+                .map_err(|error| error.to_string())?;
+            webview.eval("document.getElementById('__misty_pane_dim__')?.remove();")
+                .map_err(|error| error.to_string())?;
             apply_macos_webview_theme(&webview, &request.theme)?;
         }
     }

@@ -1,11 +1,16 @@
+import { retainAppAccessRefresh } from "./appAccessRefresh";
+import { installedDevelopmentRelease } from "@/api/apps/developmentRelease";
+import { errorText } from "@/shared/lib/format";
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
+import { discoverAppName } from "./appDetailsModel";
+import { useAppDownloads } from "./useAppDownloads";
+import { appConsentKey, useAppConsent } from "./useAppConsent";
 import { assertAppCompatible } from "./appCompatibility";
 import { appsApi, type OfficialApp, type OfficialAppSession } from "@/api/apps";
 import { resolveRequiredApiBase } from "@/api/client";
 import { useAuth } from "@/features/auth";
-import {
-  installOfficialDesktopPackage,
-  officialDesktopPackageReady,
-} from "@/features/apps/desktop-package-runtime";
+import { officialDesktopPackageReady } from "@/features/apps/desktop-package-runtime";
 import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces/core";
 import type { WorkspaceTab } from "@/features/workspace/core";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
@@ -20,7 +25,7 @@ import { useAppsStore } from "./useAppsStore";
 import { canonicalAppRoute } from "./appRoute";
 import { isTrustedHostApp } from "./trustedHostApps";
 import { DownloadedAppSurface } from "./DownloadedAppSurface";
-import { TrustedAppSurface } from "./TrustedAppSurface";
+import { TrustedAppSurface } from "@/features/apps/TrustedAppSurface";
 
 const refreshBeforeExpiryMs = 45_000;
 
@@ -47,24 +52,62 @@ export function OfficialAppRuntimePage(
         }
       : props.tab;
   const catalog = useAppsStore((state) => state.catalog);
-  const installations = useAppsStore((state) => state.installations);
-  const appsReady = useAppsStore((state) => state.ready);
-  const appsLoading = useAppsStore((state) => state.loading);
+
+  const installationsBySpace = useAppsStore((state) => state.bySpace);
+
   const loadApps = useAppsStore((state) => state.load);
   const spaces = useSpacesStore((state) => state.spaces);
   const requestedSpaceId = props.spaceId ?? workspaceRoute.searchParams.get("space") ?? "";
   const space = requestedSpaceId
     ? spaces.find((candidate) => candidate.id === requestedSpaceId)
     : preferredDefaultSpace(spaces);
-  const offeredApp = catalog.find((candidate) => candidate.id === appId);
+  const appsReady = installationsBySpace[space?.id ?? ""] !== undefined;
+  const installation = (installationsBySpace[space?.id ?? ""] ?? []).find(
+    (candidate) => candidate.app_id === appId,
+  );
+  const appsError = useAppsStore((state) => state.bySpaceErrors[space?.id ?? ""] ?? "");
+  const savedRelease = installation?.release_metadata;
+  const offeredCandidate = useMemo(
+    () =>
+      savedRelease?.id === appId && savedRelease.version === installation?.installed_version
+        ? installedDevelopmentRelease(savedRelease, catalog)
+        : catalog.find(
+            (candidate) =>
+              candidate.id === appId && candidate.version === installation?.installed_version,
+          ),
+    [savedRelease, appId, installation?.installed_version, catalog],
+  );
+  // Failed/pending connections need stable release identity too, not just running apps.
+  const offeredSnapshot = useRef<
+    { key: string | undefined; app: OfficialApp | undefined } | undefined
+  >(undefined);
+  const offeredKey = JSON.stringify(offeredCandidate);
+  if (offeredSnapshot.current?.key !== offeredKey)
+    offeredSnapshot.current = { key: offeredKey, app: offeredCandidate };
+  const offeredApp = offeredSnapshot.current?.app;
   // Catalog refreshes must not replace an executing component or its permission ceiling.
   const pinnedApp = useRef<{ key: string; app: OfficialApp } | null>(null);
-  const pinnedKey = JSON.stringify([user?.id, appId, props.tab?.id]);
+  const pinnedKey = JSON.stringify([
+    user?.id,
+    space?.id,
+    appId,
+    props.tab?.id,
+    installationsBySpace[space?.id ?? ""]?.find((item) => item.app_id === appId)
+      ?.authority_generation,
+  ]);
   if (pinnedApp.current?.key !== pinnedKey) pinnedApp.current = null;
   const app = pinnedApp.current?.app ?? offeredApp;
+  const removed = useAppDownloads((state) => Boolean(state.removed[appId]));
+  const personalConsent = useAppConsent((state) =>
+    Boolean(app && user?.id && state.agreed[appConsentKey(user.id, app)]),
+  );
   const trustedHostApp = app ? isTrustedHostApp(app) : false;
-  const installation = installations.find((candidate) => candidate.app_id === appId);
-  const sessionContext = JSON.stringify([user?.id, appId, space?.id]);
+  const sessionContext = JSON.stringify([
+    user?.id,
+    appId,
+    space?.id,
+    installation?.authority_generation,
+  ]);
   const [connection, setConnection] = useState<{
     context: string;
     session: OfficialAppSession;
@@ -77,13 +120,16 @@ export function OfficialAppRuntimePage(
   const needsReview = app && !pinnedApp.current ? officialAppNeedsReview(app, installation) : false;
 
   useEffect(() => {
-    if (user?.id && !appsReady && !appsLoading) void loadApps(user.id);
-  }, [appsLoading, appsReady, loadApps, user?.id]);
+    if (!user?.id || !space?.id) return;
+    return retainAppAccessRefresh(user.id, space.id);
+  }, [loadApps, user?.id, space?.id]);
 
   const connect = useCallback(async () => {
     const runtime = isNativeMobileBuild ? app?.mobile.runtime : app?.desktop.runtime;
     if (
       !app ||
+      !personalConsent ||
+      removed ||
       (trustedHostApp && runtime === "embedded") ||
       installation?.state !== "installed" ||
       needsReview ||
@@ -96,21 +142,38 @@ export function OfficialAppRuntimePage(
     try {
       assertAppCompatible(app);
       if (!isNativeMobileBuild && !(await officialDesktopPackageReady(app))) {
-        await installOfficialDesktopPackage(app);
+        await useAppDownloads.getState().get(app, true);
       }
+      if (attempt !== connectionAttempt.current || useAppDownloads.getState().removed[app.id])
+        return;
       const [nextSession, nextServerBase] = await Promise.all([
-        appsApi.createSession(app.id, space?.id),
+        appsApi.createSession(app.id, space?.id, installation.authority_generation),
         resolveRequiredApiBase(),
       ]);
       if (attempt !== connectionAttempt.current) return;
+      if (
+        !Number.isFinite(Date.parse(nextSession.expires_at)) ||
+        Date.parse(nextSession.expires_at) <= Date.now()
+      )
+        throw new Error("The server returned an expired app session. Try again.");
       pinnedApp.current = { key: pinnedKey, app };
       setConnection({ context: sessionContext, session: nextSession });
       setServerBase(nextServerBase);
     } catch (caught) {
       if (attempt !== connectionAttempt.current) return;
-      setError(caught instanceof Error ? caught.message : "This app could not be opened.");
+      setError(errorText(caught).trim() || "This app could not be opened.");
     }
-  }, [app, installation?.state, needsReview, space?.id, sessionContext, trustedHostApp, pinnedKey]);
+  }, [
+    app,
+    installation?.state,
+    needsReview,
+    space?.id,
+    sessionContext,
+    trustedHostApp,
+    pinnedKey,
+    personalConsent,
+    removed,
+  ]);
 
   useEffect(() => {
     void connect();
@@ -129,13 +192,25 @@ export function OfficialAppRuntimePage(
     return () => window.clearTimeout(timer);
   }, [connect, session]);
 
+  if (!appsReady && appsError)
+    return (
+      <RuntimeState
+        icon={AlertCircle}
+        title="Apps could not be checked"
+        description={appsError}
+        action="Try again"
+        onAction={() => {
+          if (user?.id && space?.id) void loadApps(user.id, true, space.id);
+        }}
+      />
+    );
   if (!appsReady) return <RuntimeLoading label="Checking installed apps" />;
   if (!app || installation?.state !== "installed") {
     return (
       <RuntimeState
         icon={Store}
-        title="Add this App to Misty first"
-        description="You can add it from Discover and open it here right away."
+        title="This app is not available in this Space"
+        description="A Space manager can add or restore it from Discover."
         action="Open Discover"
         onAction={() => navigate("/discover")}
       />
@@ -146,8 +221,9 @@ export function OfficialAppRuntimePage(
     return (
       <RuntimeState
         icon={Store}
-        title={`Review ${app.name} update`}
-        description="This app needs broader permissions. Review the update in Discover before opening it."
+        app={app}
+        title={discoverAppName(app)}
+        description="Review the updated permissions in Discover to continue."
         action="Open Discover"
         onAction={() => navigate(`/discover?app=${encodeURIComponent(app.id)}`)}
       />
@@ -174,6 +250,36 @@ export function OfficialAppRuntimePage(
       />
     );
   }
+  if (removed)
+    return (
+      <RuntimeState
+        icon={Store}
+        app={app}
+        title={discoverAppName(app)}
+        description="Removed from this device. Get it again to use it in your Spaces."
+        action="Get app"
+        onAction={() => navigate(`/discover?app=${encodeURIComponent(app.id)}`)}
+      />
+    );
+  if (!personalConsent) {
+    return (
+      <RuntimeState
+        icon={Store}
+        app={app}
+        title={discoverAppName(app)}
+        description="Review and agree to the permissions to start using this app."
+        action="Review permissions"
+        onAction={() => {
+          const route = `/discover?app=${encodeURIComponent(app.id)}&review=permissions`;
+          if (props.tab) {
+            const surface = workspaceSurfaceFromRoute(route);
+            if (surface) useWorkspaceStore.getState().openSurface({ ...surface, route });
+          } else navigate(route);
+        }}
+      />
+    );
+  }
+
   if (trustedHostApp && runtime === "embedded" && user) {
     return (
       <TrustedAppSurface
@@ -272,6 +378,7 @@ function officialRuntimeEntry(app: OfficialApp): URL | null {
 }
 
 function RuntimeState(props: {
+  app?: OfficialApp;
   icon: typeof AlertCircle;
   title: string;
   description: string;
@@ -282,8 +389,19 @@ function RuntimeState(props: {
   return (
     <div className="grid h-full place-items-center px-8 text-center">
       <div className="max-w-xs">
-        <Icon className="mx-auto text-cream-muted" size={24} strokeWidth={1.6} aria-hidden="true" />
-        <h1 className="mt-4 text-lg font-semibold text-cream-bright">{props.title}</h1>
+        {props.app ? (
+          <h1 className="text-lg font-semibold text-cream-bright">{props.title}</h1>
+        ) : (
+          <>
+            <Icon
+              className="mx-auto text-cream-muted"
+              size={24}
+              strokeWidth={1.6}
+              aria-hidden="true"
+            />
+            <h1 className="mt-4 text-lg font-semibold text-cream-bright">{props.title}</h1>
+          </>
+        )}
         <p className="mt-2 text-sm leading-6 text-cream-muted">{props.description}</p>
         {props.action && props.onAction ? (
           <Button className="mt-5" variant="outline" onClick={props.onAction}>

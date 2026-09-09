@@ -1,3 +1,6 @@
+import { createPackagedTerminalBackend } from "./rpc/packagedTerminalBackend";
+import { supportsPackagedDocuments as supportsPackagedNativeServices } from "@/shared/platform/nativeServices";
+import { useAppsStore } from "./useAppsStore";
 import { createPortal } from "react-dom";
 import { FileWorkspaceSurface } from "./FileWorkspaceSurface";
 import { createFileWorkspaceMount, type FileWorkspaceRegistration } from "./rpc/fileWorkspace";
@@ -123,6 +126,7 @@ function ComponentInstance(props: Props) {
   const lifecycle = useRef<ReturnType<typeof mountAppComponent> | null>(null);
   const scopeRef = useRef<ReturnType<typeof createAppRpcScope> | null>(null);
   const context: MistyComponentContext = {
+    devicePlatform: supportsPackagedNativeServices() ? "macos" : undefined,
     instanceId,
     route: props.route,
     active: props.active ?? true,
@@ -153,7 +157,22 @@ function ComponentInstance(props: Props) {
       isCurrentAccount: (accountId) => readActiveSavedAccountSession()?.id === accountId,
     });
     scopeRef.current = scope;
-    const terminal = createTerminalRpc(scope, nativeRpcBackend);
+    const installationAtMount = useAppsStore
+      .getState()
+      .bySpace[props.session.space_id ?? ""]?.find((app) => app.app_id === props.app.id);
+    const installationCurrent = () => {
+      const next = useAppsStore
+        .getState()
+        .bySpace[props.session.space_id ?? ""]?.find((app) => app.app_id === props.app.id);
+      return (
+        !!installationAtMount &&
+        next?.state === "installed" &&
+        next.authority_generation === installationAtMount.authority_generation
+      );
+    };
+    const unsubscribeInstallation = useAppsStore.subscribe(() => {
+      if (!installationCurrent()) scope.close();
+    });
     const codeLsp = createCodeLspRpc(scope, nativeRpcBackend);
     const browser = createBrowserRpc(scope, createBrowserRpcBackend(scope, root, props.serverBase));
     const appUi = createAppUiRpc(scope, createAppUiBackend(scope));
@@ -194,18 +213,20 @@ function ComponentInstance(props: Props) {
     };
     const deviceInstance = () =>
       (nativeRegistration ??= (async () => {
-        const installed =
-          await nativeRpcBackend.invoke<Array<{ id: string; root: string; plugin_dir: string }>>(
-            "scan_local_plugins",
-          );
+        const packagePath = await nativeRpcBackend.invoke<string>("official_app_package_path", {
+          pluginId: props.app.id,
+          sha256: props.app.desktop.sha256,
+        });
         scope.assert();
-        const record = installed.find((item) => item.id === props.app.id && item.root === "public");
-        if (!record)
-          throw new AppRpcError("package_missing", "The installed App package is unavailable.");
         const instance = await nativeRpcBackend.invoke<string>("mini_widget_open", {
           request: {
-            root: record.plugin_dir,
-            owner: { accountId: props.user.id, spaceId: props.session.space_id },
+            root: packagePath,
+            owner: {
+              accountId: props.user.id,
+              spaceId: props.session.space_id,
+              deployment: props.serverBase,
+              authorityGeneration: props.session.authority_generation ?? 0,
+            },
             scopeLimit: current.current.props.session.scopes.filter((item) =>
               props.app.scopes.includes(item),
             ),
@@ -236,9 +257,22 @@ function ComponentInstance(props: Props) {
       scope.assert();
       return decodeNativeAppValue(result);
     };
+    const terminal = createTerminalRpc(
+      scope,
+      supportsPackagedNativeServices()
+        ? createPackagedTerminalBackend(nativeRpcBackend, {
+            instance: deviceInstance,
+            authorize: () => executeDevice("terminal.authorize", {}),
+          })
+        : nativeRpcBackend,
+    );
     const filesHost = createFilesHostRpc(
       scope,
       createFilesHostBackend(scope, {
+        peer: props.app.id === "files" && supportsPackagedNativeServices() ? {
+          installedVersion: props.app.version,
+          authorityGeneration: props.session.authority_generation ?? 0,
+        } : undefined,
         serverBase: props.serverBase,
         instance: deviceInstance,
         native: executeDevice,
@@ -422,6 +456,7 @@ function ComponentInstance(props: Props) {
     })();
     return () => {
       disposed = true;
+      unsubscribeInstallation();
       window.removeEventListener(accountScopeResetEvent, resetAccount);
       scope.close();
       const closing = lifecycle.current?.close();

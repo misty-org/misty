@@ -16,7 +16,10 @@ export function desktopComponentUrl(app: OfficialApp): URL {
   const base = navigator.userAgent.includes("Windows")
     ? "http://misty-extension.localhost"
     : "misty-extension://localhost";
-  const url = new URL(`/public/${encodeURIComponent(app.id)}/web/app.js`, base);
+  const url = new URL(
+    `/public/releases/${encodeURIComponent(app.desktop.sha256.toLowerCase())}/${encodeURIComponent(app.id)}/web/app.js`,
+    base,
+  );
   url.searchParams.set("version", app.desktop.sha256);
   return url;
 }

@@ -1,10 +1,8 @@
+import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import { isMistyCodeControlsMethod, mistyCodeControlsContracts, type MistyCodeControlsParams } from "@misty/sdk";
 import { AppRpcError, type AppRpcScope } from "./session";
 import { useSettingsStore } from "@/features/settings";
-import { useAiSettings } from "@/features/coding-workspace/ai/useAiSettings";
-import { readApiKey } from "@/features/coding-workspace/ai/keychain";
-import { streamRewrite } from "@/features/coding-workspace/ai/providers";
-import { useWorkspaceStore, dockLeaves } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace";
 import { officialAppRoute } from "../appRoute";
 
 /** Credentials and cross-app placement stay in the host, bound to the calling Code view. */
@@ -33,7 +31,7 @@ export function createCodeControlsRpc(scope: AppRpcScope) {
           const state = useWorkspaceStore.getState();
           if (state.activeScopeKey !== (scope.identity.spaceId ? `space:${scope.identity.spaceId}` : "global"))
             throw new AppRpcError("view_closed", "This Code Space is no longer active.");
-          const panes = dockLeaves(state.layout.root);
+          const panes = allLayoutPanes(state.layout);
           const pane = panes.find(p => p.tabs.some(t => t.id === scope.identity.instanceId && t.groupKey === "app:code"));
           if (!pane) throw new AppRpcError("view_closed", "This Code view is closed.");
           const existing = panes.flatMap(p => p.tabs).find(t => t.groupKey === "app:terminal" && (t.state as {codeTabId?:string})?.codeTabId === scope.identity.instanceId);
@@ -52,25 +50,7 @@ export function createCodeControlsRpc(scope: AppRpcScope) {
           break;
         case "code.rewrite": {
           scope.assert("ai.use");
-          const input = params as MistyCodeControlsParams<"code.rewrite">;
-          if (requests.size || requests.has(input.requestId)) throw new AppRpcError("busy", "A rewrite is already running.");
-          const controller = new AbortController();
-          requests.set(input.requestId, controller);
-          try {
-            const settings = useAiSettings.getState();
-            const apiKey = await readApiKey(settings.providerId);
-            scope.assert("ai.use");
-            if (!apiKey) throw new Error("Open AI settings to add a model API key.");
-            let text = "";
-            await streamRewrite({ ...input, settings, apiKey, signal: controller.signal, onDelta(delta) {
-              scope.assert("ai.use");
-              text += delta;
-              if (text.length > 512 * 1024) { controller.abort(); throw new Error("The rewrite is too large."); }
-            } });
-            if (controller.signal.aborted) throw new Error("Rewrite cancelled.");
-            result = text;
-          } finally { requests.delete(input.requestId); }
-          break;
+          throw new AppRpcError("misty_handoff_required", "Code rewrites now run in Misty. Update Code and use its Misty action.");
         }
       }
       scope.assert();

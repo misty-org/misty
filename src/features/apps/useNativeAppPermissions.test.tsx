@@ -242,3 +242,24 @@ it("an appearance revocation removes the preview without affecting other instanc
   mocks.revoked?.({ payload: { instance: "instance", capability: "appearance.write" } });
   expect(mocks.revertTheme).toHaveBeenCalledWith("instance");
 });
+
+
+it("shows remembered consent for identified apps and skips a prompt for restored grants", async () => {
+  mocks.invoke.mockImplementation(async (command, args) => {
+    if (command === "mini_app_permission_status")
+      return { appId: "example", capability: "clipboard.read", granted: mocks.granted, remembered: true };
+    if (command === "mini_app_permission_decide") { mocks.granted = args.allowed; return; }
+    if (command === "mini_app_permission_list") return ["clipboard.read"];
+    if (command === "mini_app_device_call") return { text: "Remembered" };
+  });
+  const view = render(<Harness />);
+  fireEvent.click(view.getByText("Read clipboard"));
+  fireEvent.click(await view.findByText("Allow and remember"));
+  await view.findByText(/Remembered/);
+  view.unmount();
+  const reopened = render(<Harness />);
+  fireEvent.click(reopened.getByText("Read clipboard"));
+  await reopened.findByText(/Remembered/);
+  expect(reopened.queryByRole("dialog")).toBeNull();
+  expect(mocks.invoke.mock.calls.filter(([command]) => command === "mini_app_permission_decide")).toHaveLength(1);
+});

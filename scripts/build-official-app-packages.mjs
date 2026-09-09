@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { loadAppEnv } from "./app-env.mjs";
 import { localAppsDirectory } from "./local-apps-directory.mjs";
 import { spawn } from "node:child_process";
@@ -25,8 +26,23 @@ if (!apps.length) {
   );
 }
 
+// Native services are package assets, never inputs to the Host frontend build.
+const { nativeServicesForApp } = await import(pathToFileURL(resolve(appsRoot, "scripts/package-native-services.mjs")).href);
+const nativeServices = new Set(apps
+  .filter(app => app.desktop.runtime === "downloaded")
+  .flatMap(app => nativeServicesForApp(app.id).map(([service]) => service)));
+if (process.platform === "darwin") {
+  for (const service of nativeServices) {
+    await new Promise((resolveRun, reject) => {
+      const child = spawn(process.execPath, [resolve(appsRoot, "scripts/build-native-services.mjs"), "", service], {cwd:appsRoot,env:developmentEnv,stdio:"inherit"});
+      child.on("error", reject);
+      child.on("close", code => code === 0 ? resolveRun() : reject(new Error(`Could not build the ${service} native service.`)));
+    });
+  }
+}
+
 for (const app of apps) {
-  for (const platform of ["desktop", "mobile"]) {
+  for (const platform of (process.argv.includes("--desktop-only") ? ["desktop"] : ["desktop", "mobile"])) {
     if (platform === "desktop" && app.desktop.runtime !== "downloaded") continue;
     if (platform === "mobile" && app.mobile.runtime !== "hosted") continue;
     const output = resolve(appsRoot, ".build/official-apps", app.id, platform);

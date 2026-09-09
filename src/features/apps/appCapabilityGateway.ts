@@ -276,6 +276,7 @@ function localStorageOperation(
     context.serverBase,
     context.user.id,
     context.app.app_id ?? context.app.id,
+    context.session.space_id ?? "",
   );
   if (operation === "keys") {
     return Object.keys(localStorage)

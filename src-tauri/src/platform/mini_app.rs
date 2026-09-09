@@ -54,12 +54,16 @@ pub struct OpenRequest {
     pub owner: Option<NativeOwner>,
 }
 /// Supplied only by the compiled main Host, never by package RPC payloads.
-#[derive(Deserialize)]
+#[derive(Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeOwner {
     pub account_id: String,
     #[serde(default)]
     pub space_id: Option<String>,
+    #[serde(default)]
+    pub deployment: Option<String>,
+    #[serde(default)]
+    pub authority_generation: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -83,11 +87,35 @@ impl NativeOwner {
         if !valid(&self.account_id) || self.space_id.as_deref().is_some_and(|space| !valid(space)) {
             return Err("Invalid Host account or Space identity.".into());
         }
+        if let Some(deployment) = &self.deployment {
+            let url = url::Url::parse(deployment).map_err(|_| "Invalid native deployment.")?;
+            if deployment.len() > 4096
+                || !matches!(url.scheme(), "https" | "http")
+                || url.host_str().is_none()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || url.query().is_some()
+                || url.fragment().is_some()
+            {
+                return Err("Invalid native deployment.".into());
+            }
+        }
+        if self
+            .authority_generation
+            .is_some_and(|generation| generation == 0 || generation > 9_007_199_254_740_991)
+        {
+            return Err("Invalid native authority generation.".into());
+        }
         use sha2::{Digest, Sha256};
         let mut digest = Sha256::new();
+        digest.update(b"misty-native-owner-v2");
+        if self.space_id.is_some() && self.deployment.is_none() {
+            return Err("A Space app must identify its deployment.".into());
+        }
         // The canonical installation root distinguishes private/public packages
         // and installations. Length prefixes avoid concatenation ambiguity.
         for part in [
+            self.deployment.as_deref().unwrap_or("").as_bytes(),
             root.to_string_lossy().as_bytes(),
             self.account_id.as_bytes(),
             self.space_id.as_deref().unwrap_or("").as_bytes(),
@@ -184,6 +212,11 @@ pub async fn mini_app_open(
     request.bounds.validate()?;
     let (root, entry, query) = package_source(&request.source)?;
     let mut permissions = permissions::PermissionSet::load(&root, request.scope_limit.as_deref())?;
+    permissions.native_owner = request.owner.clone();
+    permissions.space_owned = request
+        .owner
+        .as_ref()
+        .is_some_and(|owner| owner.space_id.is_some());
     permissions.owner_namespace = request
         .owner
         .as_ref()
@@ -296,6 +329,11 @@ pub fn mini_widget_open(
         return Err("Widget package is unavailable.".into());
     }
     let mut permissions = permissions::PermissionSet::load(&root, request.scope_limit.as_deref())?;
+    permissions.native_owner = request.owner.clone();
+    permissions.space_owned = request
+        .owner
+        .as_ref()
+        .is_some_and(|owner| owner.space_id.is_some());
     permissions.owner_namespace = request
         .owner
         .as_ref()
@@ -679,6 +717,8 @@ mod tests {
             NativeOwner {
                 account_id: account.into(),
                 space_id: space.map(str::to_owned),
+                deployment: Some("https://api.misty.example".into()),
+                authority_generation: None,
             }
             .namespace(Path::new(root))
         };
@@ -745,4 +785,13 @@ mod tests {
             assert!(package_source(url).is_err());
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn search_process_command(
+    executable: &std::path::Path,
+    work: &std::path::Path,
+    index: &std::path::Path,
+) -> std::io::Result<std::process::Command> {
+    permissions::search_process_command(executable, work, index)
 }

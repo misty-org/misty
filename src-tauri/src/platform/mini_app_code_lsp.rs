@@ -1,6 +1,6 @@
 //! Native process ownership for SDK Code projects. Native cwd/id stay inside the host.
 use super::{MiniAppState, PermissionSet};
-use crate::infra::code_lsp;
+use crate::infra::{document_intelligence::ServiceLease, native_process_worker::ProcessWorker};
 use cap_std::fs::Dir;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -8,9 +8,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use tauri::Emitter;
 
 pub struct ProjectProcess {
     id: String,
+    worker: Arc<ProcessWorker>,
+    lease: Arc<ServiceLease>,
     directory: Arc<Dir>,
     released: Arc<AtomicBool>,
     root: String,
@@ -18,7 +21,7 @@ pub struct ProjectProcess {
 }
 impl Drop for ProjectProcess {
     fn drop(&mut self) {
-        let _ = code_lsp::lsp_stop_blocking(self.id.clone());
+        self.worker.close();
     }
 }
 #[derive(Deserialize)]
@@ -34,6 +37,17 @@ struct Pending {
     language: String,
     slot: tokio::sync::OwnedSemaphorePermit,
     epoch: u64,
+}
+fn directory_path(directory: &Dir) -> Result<String, String> {
+    use std::os::fd::AsRawFd;
+    let mut bytes = [0 as libc::c_char; libc::PATH_MAX as usize];
+    if unsafe { libc::fcntl(directory.as_raw_fd(), libc::F_GETPATH, bytes.as_mut_ptr()) } == -1 {
+        return Err("The selected Code folder is unavailable.".into());
+    }
+    unsafe { std::ffi::CStr::from_ptr(bytes.as_ptr()) }
+        .to_str()
+        .map(str::to_owned)
+        .map_err(|_| "The selected Code folder path is not valid UTF-8.".into())
 }
 fn prepare(permissions: &PermissionSet, params: Value) -> Result<Pending, String> {
     permissions.authorize("code.execute")?;
@@ -56,7 +70,7 @@ fn prepare(permissions: &PermissionSet, params: Value) -> Result<Pending, String
         .try_acquire_owned()
         .map_err(|_| "Too many Code language servers in this view.")?;
     Ok(Pending {
-        root: code_lsp::directory_path(&folder.directory)?,
+        root: directory_path(&folder.directory)?,
         directory: folder.directory.clone(),
         released: folder.released.clone(),
         language: input.language,
@@ -65,10 +79,18 @@ fn prepare(permissions: &PermissionSet, params: Value) -> Result<Pending, String
     })
 }
 impl Pending {
-    fn finish(self, permissions: &mut PermissionSet, id: String) -> Result<Value, String> {
+    fn finish(
+        self,
+        permissions: &mut PermissionSet,
+        id: String,
+        worker: Arc<ProcessWorker>,
+        lease: Arc<ServiceLease>,
+    ) -> Result<Value, String> {
         // The guard stops the launched process on every rejected/late result.
         let process = ProjectProcess {
             id,
+            worker,
+            lease,
             directory: self.directory,
             released: self.released,
             root: self.root,
@@ -78,7 +100,7 @@ impl Pending {
         permissions.authorize("files.read")?;
         if permissions.epoch != self.epoch
             || process.released.load(Ordering::Acquire)
-            || code_lsp::directory_path(&process.directory)? != process.root
+            || directory_path(&process.directory)? != process.root
         {
             return Err(
                 "The Code project changed or its access was revoked while starting.".into(),
@@ -102,25 +124,44 @@ pub async fn start(
             params,
         )?
     };
+    let lease = Arc::new(ServiceLease::acquire_code_tools(state, instance).await?);
     let directory = pending.directory.clone();
     let language = pending.language.clone();
-    let id = tauri::async_runtime::spawn_blocking(move || {
-        code_lsp::start_in_directory(app, &language, directory)
+    let id = uuid::Uuid::new_v4().to_string();
+    let event_id = id.clone();
+    let event_lease = lease.clone();
+    let events = Arc::new(move |event: Value| {
+        if event["event"] == "message" && !event_lease.cancelled() {
+            let _ = app.emit_to(
+                "main",
+                "misty://code-lsp-message",
+                json!({"sessionId":event_id,"payload":event["payload"]}),
+            );
+        } else if event["event"] == "exit" {
+            let _ = app.emit_to(
+                "main",
+                "misty://code-lsp-exit",
+                json!({"sessionId":event_id,"reason":event["reason"]}),
+            );
+        }
+    });
+    let worker_lease = lease.clone();
+    let worker = tokio::task::spawn_blocking(move || {
+        let worker = Arc::new(ProcessWorker::launch_code(worker_lease, events, directory)?);
+        worker.call(json!({"operation":"start","language":language}))?;
+        Ok::<_, String>(worker)
     })
     .await
     .map_err(|e| e.to_string())??;
-    let mut registry = match state.0.lock() {
-        Ok(registry) => registry,
-        Err(_) => {
-            let _ = code_lsp::lsp_stop_blocking(id);
-            return Err("App registry unavailable.".into());
-        }
-    };
-    let Some(owner) = registry.get_mut(instance) else {
-        let _ = code_lsp::lsp_stop_blocking(id);
-        return Err("App closed while starting its language server.".into());
-    };
-    pending.finish(&mut owner.permissions, id)
+    if let Err(error) = lease.validate(state, instance) {
+        worker.close();
+        return Err(error);
+    }
+    let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+    let owner = registry
+        .get_mut(instance)
+        .ok_or("App closed while starting its language server.")?;
+    pending.finish(&mut owner.permissions, id, worker, lease)
 }
 
 #[derive(Deserialize)]
@@ -132,7 +173,10 @@ struct Send {
 pub async fn send(state: &MiniAppState, instance: &str, params: Value) -> Result<Value, String> {
     let input: Send =
         serde_json::from_value(params).map_err(|_| "Invalid language-server message.")?;
-    {
+    if input.payload.len() > 8 * 1024 * 1024 {
+        return Err("Language-server messages are limited to 8 MiB.".into());
+    }
+    let (worker, lease) = {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
         let permissions = &mut registry
             .get_mut(instance)
@@ -145,13 +189,20 @@ pub async fn send(state: &MiniAppState, instance: &str, params: Value) -> Result
             .get(&input.native_id)
             .ok_or("Language server is not owned by this view.")?;
         if process.released.load(Ordering::Acquire)
-            || code_lsp::directory_path(&process.directory)? != process.root
+            || directory_path(&process.directory)? != process.root
         {
             permissions.code_lsp.remove(&input.native_id);
             return Err("The Code folder moved or its access was released. Reopen the project language server.".into());
         }
-    }
-    code_lsp::code_lsp_send(input.native_id, input.payload).await?;
+        (process.worker.clone(), process.lease.clone())
+    };
+    lease.validate(state, instance)?;
+    tokio::task::spawn_blocking(move || {
+        worker.call(json!({"operation":"send","payload":input.payload}))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    lease.validate(state, instance)?;
     Ok(Value::Null)
 }
 pub fn release(permissions: &mut PermissionSet, params: Value) -> Result<Value, String> {
@@ -224,59 +275,165 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn actual_clangd_uses_owned_directory_and_is_stopped_on_release_or_late_revocation() {
+    #[ignore = "requires MISTY_TEST_CODE_WORKER and the macOS clangd"]
+    async fn signed_worker_uses_owned_directory_and_stops_on_release_or_late_revocation() {
+        use super::super::document_processing::tests::{
+            fixture as service_fixture, service_receipt,
+        };
+        let bytes = std::fs::read(std::env::var("MISTY_TEST_CODE_WORKER").unwrap()).unwrap();
+        let (state, root) = service_fixture();
         let (_dir, mut permissions) = fixture();
-        let pending =
-            prepare(&permissions, json!({"directory":"folder","language":"cpp"})).unwrap();
-        let root = pending.root.clone();
-        let (send, receive) = std::sync::mpsc::channel();
-        let id = code_lsp::test_start_in_directory(
-            "cpp",
-            pending.directory.clone(),
-            move |_, message| {
-                let _ = send.send(message);
-            },
-            |_, _| {},
-        )
-        .unwrap();
-        let result = pending.finish(&mut permissions, id.clone()).unwrap();
-        assert_eq!(result["nativeRoot"], root);
-        code_lsp::code_lsp_send(id.clone(), json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
-            "processId":null,"rootUri":url::Url::from_directory_path(&root).unwrap().as_str(),"capabilities":{}
-        }}).to_string()).await.unwrap();
-        let response: Value = serde_json::from_str(
-            &receive
-                .recv_timeout(std::time::Duration::from_secs(10))
+        permissions.version = "1".into();
+        permissions.space_owned = true;
+        permissions.owner_namespace = Some("member-family".into());
+        state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
+        service_receipt(root.path(), &bytes, "code", "code-tools", 1);
+        let lease = Arc::new(
+            ServiceLease::acquire_code_tools(&state, "test")
+                .await
                 .unwrap(),
+        );
+        let pending = prepare(
+            &state.0.lock().unwrap()["test"].permissions,
+            json!({"directory":"folder","language":"cpp"}),
         )
         .unwrap();
-        assert_eq!(response["id"], 1);
-        assert!(response.get("result").is_some());
-        release_folder(&mut permissions, "folder");
-        assert!(permissions.code_lsp.is_empty());
-        assert!(code_lsp::code_lsp_send(
-            id,
-            json!({"jsonrpc":"2.0","method":"initialized","params":{}}).to_string()
+        let project_root = pending.root.clone();
+        let (messages, receive) = std::sync::mpsc::channel();
+        let worker = Arc::new(
+            ProcessWorker::launch_code(
+                lease.clone(),
+                Arc::new(move |message| {
+                    let _ = messages.send(message);
+                }),
+                pending.directory.clone(),
+            )
+            .unwrap(),
+        );
+        worker
+            .call(json!({"operation":"start","language":"cpp"}))
+            .unwrap();
+        let id = "owned-server".to_string();
+        pending
+            .finish(
+                &mut state.0.lock().unwrap().get_mut("test").unwrap().permissions,
+                id.clone(),
+                worker.clone(),
+                lease.clone(),
+            )
+            .unwrap();
+        send(&state,"test",json!({"nativeId":id,"payload":json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"processId":null,"rootUri":url::Url::from_directory_path(&project_root).unwrap().as_str(),"capabilities":{}}}).to_string()})).await.unwrap();
+        let event = receive
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        let reply: Value = serde_json::from_str(event["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(reply["id"], 1);
+        assert!(reply["result"]["capabilities"].is_object());
+        // A second Space uses its own package receipt, directory, and process.
+        let (second_state, second_root) = service_fixture();
+        let (_second_dir, mut second_permissions) = fixture();
+        second_permissions.version = "1".into();
+        second_permissions.space_owned = true;
+        second_permissions.owner_namespace = Some("member-work".into());
+        second_state
+            .0
+            .lock()
+            .unwrap()
+            .get_mut("test")
+            .unwrap()
+            .permissions = second_permissions;
+        service_receipt(second_root.path(), &bytes, "code", "code-tools", 1);
+        assert!(lease.validate(&second_state, "test").is_err());
+        let second_lease = Arc::new(
+            ServiceLease::acquire_code_tools(&second_state, "test")
+                .await
+                .unwrap(),
+        );
+        let second_pending = prepare(
+            &second_state.0.lock().unwrap()["test"].permissions,
+            json!({"directory":"folder","language":"cpp"}),
         )
-        .await
-        .is_err());
-
-        let pending =
-            prepare(&permissions, json!({"directory":"folder","language":"cpp"})).unwrap();
+        .unwrap();
+        let second_path = second_pending.root.clone();
+        let (second_messages, second_receive) = std::sync::mpsc::channel();
+        let second_worker = Arc::new(
+            ProcessWorker::launch_code(
+                second_lease.clone(),
+                Arc::new(move |event| {
+                    let _ = second_messages.send(event);
+                }),
+                second_pending.directory.clone(),
+            )
+            .unwrap(),
+        );
+        second_worker
+            .call(json!({"operation":"start","language":"cpp"}))
+            .unwrap();
+        second_pending
+            .finish(
+                &mut second_state
+                    .0
+                    .lock()
+                    .unwrap()
+                    .get_mut("test")
+                    .unwrap()
+                    .permissions,
+                "second".into(),
+                second_worker.clone(),
+                second_lease,
+            )
+            .unwrap();
+        release_folder(
+            &mut state.0.lock().unwrap().get_mut("test").unwrap().permissions,
+            "folder",
+        );
+        assert!(worker
+            .call(json!({"operation":"send","payload":"{}"}))
+            .is_err());
+        assert!(send(&state, "test", json!({"nativeId":id,"payload":"{}"}))
+            .await
+            .is_err());
+        // A startup that finishes after revocation is never retained.
+        let pending = prepare(
+            &state.0.lock().unwrap()["test"].permissions,
+            json!({"directory":"folder","language":"cpp"}),
+        )
+        .unwrap();
+        let other = Arc::new(
+            ProcessWorker::launch_code(lease.clone(), Arc::new(|_| {}), pending.directory.clone())
+                .unwrap(),
+        );
+        other
+            .call(json!({"operation":"start","language":"cpp"}))
+            .unwrap();
+        let mut registry = state.0.lock().unwrap();
+        let permissions = &mut registry.get_mut("test").unwrap().permissions;
         permissions.decide("code.execute", false).unwrap();
-        let id = code_lsp::test_start_in_directory(
-            "cpp",
-            pending.directory.clone(),
-            |_, _| {},
-            |_, _| {},
-        )
-        .unwrap();
-        assert!(pending.finish(&mut permissions, id.clone()).is_err());
-        assert!(code_lsp::code_lsp_send(
-            id,
-            json!({"jsonrpc":"2.0","method":"initialized","params":{}}).to_string()
-        )
-        .await
-        .is_err());
+        assert!(pending
+            .finish(permissions, "late".into(), other.clone(), lease)
+            .is_err());
+        assert!(other
+            .call(json!({"operation":"send","payload":"{}"}))
+            .is_err());
+        drop(registry);
+        send(&second_state,"test",json!({"nativeId":"second","payload":json!({"jsonrpc":"2.0","id":2,"method":"initialize","params":{"processId":null,"rootUri":url::Url::from_directory_path(&second_path).unwrap().as_str(),"capabilities":{}}}).to_string()})).await.unwrap();
+        let event = second_receive
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        let reply: Value = serde_json::from_str(event["payload"].as_str().unwrap()).unwrap();
+        assert_eq!(reply["id"], 2);
+        assert!(reply["result"]["capabilities"].is_object());
+        second_state
+            .0
+            .lock()
+            .unwrap()
+            .get_mut("test")
+            .unwrap()
+            .permissions
+            .decide("files.read", false)
+            .unwrap();
+        assert!(second_worker
+            .call(json!({"operation":"send","payload":"{}"}))
+            .is_err());
     }
 }

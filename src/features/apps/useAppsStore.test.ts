@@ -1,25 +1,26 @@
+import { ApiRequestError } from "@/api/client/errors";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { useAppsStore } from "./useAppsStore";
 const mocks = vi.hoisted(() => ({
   catalog: vi.fn(),
   installations: vi.fn(),
   install: vi.fn(),
-  setPinned: vi.fn(),
   uninstall: vi.fn(),
-  ready: vi.fn(),
-  stage: vi.fn(),
-  finalize: vi.fn(),
-  remove: vi.fn(),
+  reorder: vi.fn(),
   generation: 0,
+  manager: true,
 }));
-vi.mock("@/api/apps", () => ({
-  appsApi: {
-    catalog: mocks.catalog,
-    installations: mocks.installations,
-    install: mocks.install,
-    setPinned: mocks.setPinned,
-    uninstall: mocks.uninstall,
+vi.mock("@/api/apps", () => ({ appsApi: mocks }));
+vi.mock("@/features/spaces/core", () => ({
+  useSpacesStore: {
+    getState: () => ({
+      spaces: ["family", "research"].map((id) => ({
+        id,
+        role: mocks.manager ? "owner" : "member",
+        permissions: {},
+      })),
+    }),
   },
 }));
 vi.mock("@/api/client", () => ({
@@ -28,25 +29,19 @@ vi.mock("@/api/client", () => ({
     if (value !== mocks.generation) throw new Error("account changed");
   },
 }));
-vi.mock("@/shared/platform/buildTarget", () => ({ isNativeMobileBuild: false, isWebBuild: false }));
-vi.mock("./desktop-package-runtime", () => ({
-  officialDesktopPackageReady: mocks.ready,
-  stageOfficialDesktopPackage: mocks.stage,
-  finalizeOfficialDesktopPackageInstall: mocks.finalize,
-  uninstallOfficialDesktopPackage: mocks.remove,
-}));
-const app = {
-  id: "planner",
-  name: "Planner",
-  permission_version: 4,
-  desktop: { runtime: "downloaded" },
-} as OfficialApp;
-const installation = {
-  app_id: "planner",
+const app = { id: "journal", name: "Journal", version: "1", permission_version: 1 } as OfficialApp;
+const installation = (spaceId: string): SpaceAppInstallation => ({
+  app_id: "journal",
+  space_id: spaceId,
   state: "installed",
-  pinned: true,
-  pin_rank: 1,
-} as UserAppInstallation;
+  installed_version: "1",
+  permission_version: 1,
+  authority_generation: 1,
+  granted_scopes: [],
+  pin_rank: 1024,
+  installed_at: "now",
+  updated_at: "now",
+});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -54,146 +49,196 @@ function deferred<T>() {
   });
   return { resolve, promise };
 }
-const switchAccount = (accountId = "account-b") => {
-  mocks.generation++;
-  useAppsStore.getState().reset();
-  useAppsStore.setState({ accountId, ready: true });
-};
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  mocks.manager = true;
   mocks.generation = 0;
   useAppsStore.getState().reset();
-  useAppsStore.setState({ accountId: "account-a", ready: true });
-  mocks.ready.mockResolvedValue(false);
-  mocks.stage.mockResolvedValue("operation-a");
-  mocks.finalize.mockResolvedValue(undefined);
-  mocks.remove.mockResolvedValue(undefined);
-  mocks.install.mockResolvedValue(installation);
-  mocks.uninstall.mockResolvedValue({ ...installation, state: "recoverable" });
-  mocks.setPinned.mockResolvedValue(installation);
+  mocks.catalog.mockResolvedValue({ apps: [app] });
+  mocks.installations.mockImplementation(async (id: string) => ({ apps: [installation(id)] }));
 });
-
-it("rolls back a staged download when the account changes before server installation", async () => {
-  const staged = deferred<string>();
-  mocks.stage.mockReturnValue(staged.promise);
-  const pending = useAppsStore.getState().install(app);
-  const rejected = expect(pending).rejects.toThrow(/account changed/);
-  await vi.waitFor(() => expect(mocks.stage).toHaveBeenCalledOnce());
-  switchAccount();
-  staged.resolve("operation-a");
-  await rejected;
-  expect(mocks.install).not.toHaveBeenCalled();
-  expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith("planner", "operation-a", false);
-  expect(useAppsStore.getState()).toMatchObject({
-    accountId: "account-b",
-    installations: [],
-    error: "",
-    actionAppId: "",
-  });
+it("keeps the active Space independent of a late background Space response", async () => {
+  const family = deferred<{ apps: SpaceAppInstallation[] }>();
+  mocks.installations.mockImplementation((id: string) =>
+    id === "family" ? family.promise : Promise.resolve({ apps: [installation(id)] }),
+  );
+  useAppsStore.getState().selectSpace("one", "family");
+  useAppsStore.getState().selectSpace("one", "research");
+  await vi.waitFor(() =>
+    expect(useAppsStore.getState().installations[0]?.space_id).toBe("research"),
+  );
+  family.resolve({ apps: [installation("family")] });
+  await vi.waitFor(() => expect(useAppsStore.getState().bySpace.family).toHaveLength(1));
+  expect(useAppsStore.getState().installations[0].space_id).toBe("research");
 });
-
-it("does not publish an installation returned after switching away and back to the same account", async () => {
-  const installed = deferred<UserAppInstallation>();
-  mocks.install.mockReturnValue(installed.promise);
-  const pending = useAppsStore.getState().install(app);
-  const rejected = expect(pending).rejects.toThrow(/account changed/);
-  await vi.waitFor(() => expect(mocks.install).toHaveBeenCalledOnce());
-  switchAccount();
-  switchAccount("account-a");
-  installed.resolve(installation);
-  await rejected;
-  expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith("planner", "operation-a", false);
-  expect(useAppsStore.getState().installations).toEqual([]);
+it("adds to the Space without performing a personal installation or download", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  await useAppsStore.getState().install(app);
+  expect(mocks.install).toHaveBeenCalledExactlyOnceWith("family", "journal", 1);
 });
-
-it("retains server installation truth if local activation fails, allowing download repair", async () => {
-  mocks.finalize.mockImplementation(async (_id, _operation, commit) => {
-    if (commit) throw new Error("activation failed");
-  });
-  await expect(useAppsStore.getState().install(app)).rejects.toThrow("activation failed");
-  expect(useAppsStore.getState()).toMatchObject({
-    installations: [installation],
-    error: "activation failed",
-    actionAppId: "",
-  });
-  expect(mocks.finalize).toHaveBeenLastCalledWith("planner", "operation-a", false);
+it("rejects a member's app changes", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  mocks.manager = false;
+  await expect(useAppsStore.getState().uninstall("journal")).rejects.toThrow(/Space manager/);
+  expect(mocks.uninstall).not.toHaveBeenCalled();
 });
-
-it("does not remove shared package files or mutate the next account after an old uninstall returns", async () => {
-  const removed = deferred<UserAppInstallation>();
-  mocks.uninstall.mockReturnValue(removed.promise);
-  const pending = useAppsStore.getState().uninstall("planner");
-  const rejected = expect(pending).rejects.toThrow(/account changed/);
-  switchAccount();
-  removed.resolve({ ...installation, state: "recoverable" });
-  await rejected;
-  expect(mocks.remove).not.toHaveBeenCalled();
-  expect(useAppsStore.getState()).toMatchObject({ installations: [], error: "" });
+it("keeps pins personal and scoped to the Space", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  await useAppsStore.getState().setPinned("journal", false);
+  expect(useAppsStore.getState().installations[0].pinned).toBe(false);
+  useAppsStore.getState().selectSpace("one", "research");
+  await useAppsStore.getState().load("one");
+  expect(useAppsStore.getState().installations[0].pinned).toBe(true);
+  expect(mocks.reorder).not.toHaveBeenCalled();
 });
-
-it("loads a new account even while the old account's catalog request is outstanding", async () => {
-  const oldCatalog = deferred<{ apps: OfficialApp[] }>();
-  mocks.catalog.mockReturnValueOnce(oldCatalog.promise).mockResolvedValueOnce({ apps: [app] });
-  mocks.installations
-    .mockResolvedValueOnce({ apps: [] })
-    .mockResolvedValueOnce({ apps: [installation] });
-  const old = useAppsStore.getState().load("account-a", true);
+it("discards installation responses after an account switch", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  const pending = deferred<unknown>();
+  mocks.install.mockReturnValue(pending.promise);
+  const action = useAppsStore.getState().install(app);
+  const rejection = expect(action).rejects.toThrow(/account changed/i);
+  useAppsStore.getState().reset();
   mocks.generation++;
-  await useAppsStore.getState().load("account-b");
-  oldCatalog.resolve({ apps: [] });
-  await old;
-  expect(useAppsStore.getState()).toMatchObject({
-    accountId: "account-b",
-    ready: true,
-    loading: false,
-    catalog: [app],
-    installations: [installation],
-  });
+  useAppsStore.getState().selectSpace("two", "research");
+  pending.resolve({});
+  await rejection;
+  expect(useAppsStore.getState().accountId).toBe("two");
+  expect(useAppsStore.getState().bySpace.family).toBeUndefined();
+});
+it("withdraws cached local authority when a refresh cannot verify the Space", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  mocks.installations.mockRejectedValueOnce(new ApiRequestError("Access unavailable", 403));
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().bySpace.family).toBeUndefined();
+  expect(useAppsStore.getState().installations).toHaveLength(0);
+  expect(useAppsStore.getState().ready).toBe(false);
+});
+it("rechecks a change notification arriving during an older list request", async () => {
+  const first = deferred<{ apps: SpaceAppInstallation[] }>();
+  mocks.installations.mockReturnValueOnce(first.promise).mockResolvedValue({ apps: [] });
+  useAppsStore.getState().selectSpace("one", "family");
+  const refresh = useAppsStore.getState().invalidate("one", "family");
+  first.resolve({ apps: [installation("family")] });
+  await refresh;
+  expect(mocks.installations).toHaveBeenCalledTimes(2);
+  expect(useAppsStore.getState().bySpace.family).toEqual([]);
 });
 
-it("rejects overlapping App mutations while preserving the first operation", async () => {
-  const installed = deferred<UserAppInstallation>();
-  mocks.install.mockReturnValue(installed.promise);
-  const first = useAppsStore.getState().install(app);
-  await expect(useAppsStore.getState().setPinned("journal", true)).rejects.toThrow(
-    "current App change",
+it("changes a chosen Space without switching the active Space", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  await useAppsStore.getState().setSpaceEnabled(app, "research", true);
+  expect(mocks.install).toHaveBeenCalledExactlyOnceWith("research", "journal", 1);
+  expect(useAppsStore.getState().spaceId).toBe("family");
+  expect(useAppsStore.getState().installations[0].space_id).toBe("family");
+  expect(useAppsStore.getState().bySpace.research[0].space_id).toBe("research");
+});
+
+it("checks authority on the target Space before changing its access", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  await expect(useAppsStore.getState().setSpaceEnabled(app, "unknown-space", true)).rejects.toThrow(
+    /Space manager/,
   );
-  installed.resolve(installation);
-  await first;
-  expect(mocks.setPinned).not.toHaveBeenCalled();
-  expect(useAppsStore.getState().installations).toEqual([installation]);
+  expect(mocks.install).not.toHaveBeenCalled();
 });
 
-it("refreshes permissions after a server conflict without retrying installation or approving new access", async () => {
-  const changed = { ...app, permission_version: 5 };
-  const conflict = Object.assign(new Error("Permissions changed"), {
-    code: "app_permissions_changed",
-  });
-  mocks.install.mockRejectedValue(conflict);
-  mocks.catalog.mockResolvedValue({ apps: [changed] });
-  await expect(useAppsStore.getState().install(app)).rejects.toThrow("Permissions changed");
-  expect(mocks.install).toHaveBeenCalledExactlyOnceWith(app.id, 4);
-  expect(mocks.finalize).toHaveBeenCalledExactlyOnceWith(app.id, "operation-a", false);
-  expect(useAppsStore.getState()).toMatchObject({
-    catalog: [changed],
-    installations: [],
-    actionAppId: "",
-    loading: false,
-    error: expect.stringContaining("Choose Install to see its current permissions"),
-  });
+it("prefetches missing Space access once and reuses it across dropdowns", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  mocks.installations.mockClear();
+  await Promise.all([
+    useAppsStore.getState().prefetchSpaceAccess(),
+    useAppsStore.getState().prefetchSpaceAccess(),
+  ]);
+  await useAppsStore.getState().prefetchSpaceAccess();
+  expect(mocks.installations).toHaveBeenCalledExactlyOnceWith("research");
+});
+it("retains failed prefetch status until explicit retry", async () => {
+  useAppsStore.setState({ accountId: "one", spaceId: "family" });
+  mocks.installations.mockRejectedValue(new Error("offline"));
+  await useAppsStore.getState().prefetchSpaceAccess();
+  await useAppsStore.getState().prefetchSpaceAccess();
+  expect(mocks.installations).toHaveBeenCalledTimes(2);
+  mocks.installations.mockResolvedValue({ apps: [] });
+  await useAppsStore.getState().prefetchSpaceAccess(true);
+  expect(useAppsStore.getState().bySpace.research).toEqual([]);
+  expect(useAppsStore.getState().bySpaceErrors.research).toBe("");
 });
 
-it("discards a permission refresh if the account changes while it is loading", async () => {
-  const catalog = deferred<{ apps: OfficialApp[] }>();
-  mocks.install.mockRejectedValue(
-    Object.assign(new Error("Permissions changed"), { code: "app_permissions_changed" }),
+it("keeps installed apps visible when a background refresh fails", async () => {
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  const saved = useAppsStore.getState().installations;
+  mocks.installations.mockRejectedValueOnce(new Error("Network unavailable"));
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().installations).toBe(saved);
+  expect(useAppsStore.getState().bySpace.family).toBe(saved);
+  expect(useAppsStore.getState().ready).toBe(true);
+  expect(useAppsStore.getState().error).toBe("Network unavailable");
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().error).toBe("");
+});
+
+it("clears cached apps when the server explicitly revokes access", async () => {
+  const { ApiRequestError } = await import("@/api/client/errors");
+  useAppsStore.getState().selectSpace("one", "family");
+  await useAppsStore.getState().load("one");
+  mocks.installations.mockRejectedValueOnce(new ApiRequestError("Access denied", 403));
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().installations).toEqual([]);
+  expect(useAppsStore.getState().bySpace.family).toBeUndefined();
+});
+
+it("shares concurrent polling and catalog requests across views and Spaces", async () => {
+  const first = deferred<{ apps: SpaceAppInstallation[] }>();
+  mocks.installations.mockReturnValueOnce(first.promise).mockResolvedValue({ apps: [] });
+  const loads = Array.from({ length: 20 }, () =>
+    useAppsStore.getState().load("one", true, "family"),
   );
-  mocks.catalog.mockReturnValue(catalog.promise);
-  const pending = useAppsStore.getState().install(app);
-  const rejected = expect(pending).rejects.toThrow("Permissions changed");
-  await vi.waitFor(() => expect(mocks.catalog).toHaveBeenCalledOnce());
-  switchAccount();
-  catalog.resolve({ apps: [{ ...app, permission_version: 5 }] });
-  await rejected;
-  expect(useAppsStore.getState()).toMatchObject({ accountId: "account-b", catalog: [], error: "" });
+  await useAppsStore.getState().load("one", true, "research");
+  expect(mocks.catalog).toHaveBeenCalledTimes(1);
+  expect(useAppsStore.getState().catalog).toEqual([app]);
+  first.resolve({ apps: [] });
+  await Promise.all(loads);
+  expect(mocks.installations).toHaveBeenCalledTimes(2);
+});
+it("honors throttling cooldown even for forced refreshes", async () => {
+  const now = vi.spyOn(Date, "now").mockReturnValue(1000);
+  try {
+    await useAppsStore.getState().load("one", true, "family");
+    mocks.installations.mockRejectedValueOnce(
+      new ApiRequestError("too many requests", 429, undefined, "", 120000),
+    );
+    await useAppsStore.getState().load("one", true, "family");
+    expect(useAppsStore.getState().bySpace.family).toHaveLength(1);
+    now.mockReturnValue(61000);
+    await useAppsStore.getState().load("one", true, "family");
+    expect(mocks.installations).toHaveBeenCalledTimes(2);
+    now.mockReturnValue(121001);
+    await useAppsStore.getState().load("one", true, "family");
+    expect(mocks.installations).toHaveBeenCalledTimes(3);
+  } finally {
+    now.mockRestore();
+  }
+});
+
+it("preserves unchanged catalog and Space references across authority polling", async () => {
+  await useAppsStore.getState().load("one", true, "family");
+  const before = useAppsStore.getState();
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().catalog).toBe(before.catalog);
+  expect(useAppsStore.getState().bySpace.family).toBe(before.bySpace.family);
+  mocks.installations.mockResolvedValue({
+    apps: [{ ...installation("family"), authority_generation: 2 }],
+  });
+  await useAppsStore.getState().load("one", true, "family");
+  expect(useAppsStore.getState().bySpace.family).not.toBe(before.bySpace.family);
+  expect(useAppsStore.getState().bySpace.family[0].authority_generation).toBe(2);
 });

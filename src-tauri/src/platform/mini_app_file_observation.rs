@@ -76,6 +76,9 @@ impl DirectoryWatch {
         let failed = Arc::new(AtomicBool::new(false));
         let changes = revision.clone();
         let errors = failed.clone();
+        // Use the FSEvents backend on macOS (see Cargo features). A recursive
+        // kqueue watch walks and opens every descendant, prompting for unrelated
+        // protected folders and exhausting descriptors for large folder trees.
         let mut watcher =
             notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
                 match event {
@@ -134,7 +137,7 @@ impl DirectoryWatch {
         )
     }
 }
-fn milliseconds(value: std::io::Result<SystemTime>) -> Option<i64> {
+pub(super) fn milliseconds(value: std::io::Result<SystemTime>) -> Option<i64> {
     let value = value.ok()?;
     let result = match value.duration_since(UNIX_EPOCH) {
         Ok(duration) => i64::try_from(duration.as_millis()).ok()?,
@@ -309,6 +312,25 @@ mod tests {
         .unwrap();
         assert!(permissions.directory_watches.is_empty());
     }
+    #[test]
+    fn watching_a_folder_does_not_traverse_unreadable_children_or_symlink_loops() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let root = tempfile::tempdir().unwrap();
+        let private = root.path().join("private");
+        std::fs::create_dir(&private).unwrap();
+        symlink(root.path(), root.path().join("loop")).unwrap();
+        std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let permissions = fixture(root.path());
+        let result = DirectoryWatch::start(
+            permissions.folders["folder"].directory.clone(),
+            Arc::new(AtomicBool::new(false)),
+        );
+        // Restore permissions even if setup failed so temporary cleanup succeeds.
+        std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let mut watcher = result.expect("Observation must not enumerate descendants");
+        assert_eq!(watcher.status().unwrap()["active"], true);
+    }
+
     #[test]
     fn moved_roots_stop_observation_and_can_be_reopened_from_the_grant() {
         let parent = tempfile::tempdir().unwrap();

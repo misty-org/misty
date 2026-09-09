@@ -1,3 +1,6 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
+import { withNativeDocumentService } from "@/features/apps/nativeDocumentService";
+import { platform } from "@tauri-apps/plugin-os";
 import {
   connectedDevicesConnect,
   connectedDevicesInitialize,
@@ -50,6 +53,42 @@ export interface PairingView {
 const refreshIntervalMs = 30_000;
 
 export function useConnectedDevices() {
+  const spaceId = useAppsStore(state => state.spaceId);
+  const installation = useAppsStore(state => state.bySpace[state.spaceId]?.find(app => app.app_id === "files"));
+  const accountId = useAppsStore(state => state.accountId);
+  const packaged = hasTauriInternals() && platform() === "macos";
+  const [deviceInstance, setDeviceInstance] = useState("");
+  const [serviceError, setServiceError] = useState("");
+  useEffect(() => {
+    if (!packaged) return;
+    const controller = new AbortController();
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    setDeviceInstance("");
+    const start = async () => {
+      let detach = () => {};
+      try {
+        setServiceError("");
+        if (!spaceId || installation?.state !== "installed") throw new Error("Add Files to this Space to connect devices.");
+        await withNativeDocumentService("files", spaceId, instance => new Promise<void>(resolve => {
+          if (controller.signal.aborted) { resolve(); return; }
+          setDeviceInstance(instance);
+          const stop = () => resolve();
+          controller.signal.addEventListener("abort", stop, {once:true});
+          detach = () => { controller.signal.removeEventListener("abort", stop); resolve(); };
+        }), controller.signal, "devices");
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setDeviceInstance("");
+          setServiceError(error instanceof Error ? error.message : "Files device service is unavailable.");
+        }
+      } finally {
+        detach();
+        if (!controller.signal.aborted) retry = setTimeout(() => void start(), refreshIntervalMs);
+      }
+    };
+    void start();
+    return () => { controller.abort(); clearTimeout(retry); };
+  }, [packaged, accountId, spaceId, installation?.state, installation?.installed_version, installation?.authority_generation]);
   const [snapshot, setSnapshot] = useState<ConnectedDevicesSnapshot | null>(null);
   const [peers, setPeers] = useState<ServerConnectedPeer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +97,8 @@ export function useConnectedDevices() {
   const [pairing, setPairing] = useState<PairingView | null>(null);
   const localRef = useRef<{ localId: string; serverId: string; name: string } | null>(null);
   const refreshInFlight = useRef(false);
+  const currentScope = useRef("");
+  currentScope.current = JSON.stringify([accountId, spaceId, deviceInstance]);
 
   const refresh = useCallback(async () => {
     if (refreshInFlight.current) return;
@@ -67,10 +108,19 @@ export function useConnectedDevices() {
       setError("Network devices are available in the Misty desktop app.");
       return;
     }
+    if (packaged && !deviceInstance) {
+      localRef.current = null;
+      setSnapshot(null); setPeers([]); setReady(false); setLoading(false);
+      setError(serviceError || "Starting the Files device service…");
+      return;
+    }
     refreshInFlight.current = true;
+    const origin = currentScope.current;
+    const check = () => { if (origin !== currentScope.current) throw new Error("Device session changed."); };
     try {
       const account = readActiveSavedAccountSession();
       const localSnapshot = await agentsDeviceSnapshot();
+      check();
       const local = localSnapshot.device;
       if (!account || !local) {
         localRef.current = null;
@@ -82,12 +132,15 @@ export function useConnectedDevices() {
         algorithm: "Ed25519";
         keys: Record<string, string>;
       }>();
+      check();
       const native = await connectedDevicesInitialize({
+        instance: deviceInstance || undefined,
         accountId: account.id,
         deviceId: local.id,
         deviceName: local.displayName,
         developmentTicketKeys: keyResponse.keys,
       });
+      check();
       if (!native.enabled || !native.endpointId || !native.addressing) {
         setSnapshot(native);
         setReady(false);
@@ -97,6 +150,7 @@ export function useConnectedDevices() {
         endpointId: native.endpointId,
         platform: connectedDevicePlatform(),
       });
+      check();
       localRef.current = { localId: local.id, serverId: server.id, name: local.displayName };
       // Pairing only needs the initialized native endpoint and registered server
       // device. Do not keep it blocked behind presence or peer discovery, which
@@ -109,12 +163,15 @@ export function useConnectedDevices() {
         connectionHint: "unknown",
         addressing: native.addressing,
       });
+      check();
       const response = await devicesApi.peers<{ peers: ServerConnectedPeer[] }>(
         signedAgentDeviceRequest,
         local.id,
         server.id,
       );
+      check();
       let currentNative = await connectedDevicesSnapshot();
+      check();
       const connectedIds = new Set(
         currentNative.peers.filter((peer) => peer.state === "online").map((peer) => peer.deviceId),
       );
@@ -130,7 +187,9 @@ export function useConnectedDevices() {
               protocolVersion: "misty-device/1",
             },
           );
+          check();
           currentNative = await connectedDevicesConnect({
+            instance: deviceInstance || undefined,
             deviceId: peer.deviceId,
             address: peer.addressing,
             ticket: issued.ticket,
@@ -140,16 +199,17 @@ export function useConnectedDevices() {
           // the next heartbeat will retry without turning Files into an error state.
         }
       }
+      check();
       setSnapshot(currentNative);
       setPeers(response.peers);
       setError(null);
     } catch (cause) {
-      setError(connectedDevicesErrorMessage(cause));
+      if (origin === currentScope.current) setError(connectedDevicesErrorMessage(cause));
     } finally {
       refreshInFlight.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [packaged, deviceInstance, serviceError]);
 
   useEffect(() => {
     void refresh();
