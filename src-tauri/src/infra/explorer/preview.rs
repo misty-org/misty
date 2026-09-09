@@ -55,6 +55,8 @@ impl ExplorerService {
     }
 
     pub async fn preview_item(&self, path: &str) -> ApiResult<ExplorerPreviewPayload> {
+        #[cfg(target_os = "macos")]
+        self.image_service()?;
         if let Some(source) = self.remote_target(path) {
             let parent = RemoteBrowseTarget {
                 provider_type: source.provider_type.clone(),
@@ -101,6 +103,8 @@ impl ExplorerService {
         remote_modified: Option<&str>,
         size_bytes: Option<u64>,
     ) -> ApiResult<GeneratedImageThumbnail> {
+        #[cfg(target_os = "macos")]
+        self.image_service()?;
         if let Some(source) = self.remote_target(path) {
             let (cache_size_bytes, prepare_size_bytes, remote_modified) =
                 if let Some(size_bytes) = size_bytes {
@@ -217,7 +221,12 @@ impl ExplorerService {
         }
         let source_path = path.to_path_buf();
         let output_path = thumbnail_path.clone();
+        #[cfg(target_os = "macos")]
+        let service=self.image_service()?;
         let rendered = tokio::task::spawn_blocking(move || {
+            #[cfg(target_os = "macos")]
+            return render_packaged_image_thumbnail(&source_path,&output_path,max_dimension,&service);
+            #[cfg(not(target_os = "macos"))]
             render_image_thumbnail_file_blocking(&source_path, &output_path, format, max_dimension)
         })
         .await
@@ -253,7 +262,12 @@ impl ExplorerService {
             }
             PreviewFormat::Image(image_format) => {
                 let path = path.to_path_buf();
+                #[cfg(target_os = "macos")]
+                let service=self.image_service()?;
                 let bytes = tokio::task::spawn_blocking(move || {
+                    #[cfg(target_os = "macos")]
+                    return service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message);
+                    #[cfg(not(target_os = "macos"))]
                     render_image_preview_png_blocking(&path, image_format)
                 })
                 .await
@@ -274,7 +288,12 @@ impl ExplorerService {
             }
             PreviewFormat::TranscodeImage(image_format) => {
                 let path = path.to_path_buf();
+                #[cfg(target_os = "macos")]
+                let service=self.image_service()?;
                 let bytes = tokio::task::spawn_blocking(move || {
+                    #[cfg(target_os = "macos")]
+                    return service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message);
+                    #[cfg(not(target_os = "macos"))]
                     render_image_preview_png_blocking(&path, image_format)
                 })
                 .await
@@ -287,7 +306,16 @@ impl ExplorerService {
                 })
             }
             PreviewFormat::Psd => {
+                #[cfg(target_os = "macos")]
+                {
+                    let service=self.image_service()?;
+                    let path=path.to_path_buf();
+                    let bytes=tokio::task::spawn_blocking(move ||service.process_explorer_image(&path,MAX_IMAGE_PREVIEW_DIMENSION).map_err(ApiError::Message)).await.map_err(|e|ApiError::Message(e.to_string()))??;
+                    return Ok(ExplorerPreviewPayload{mime_type:"image/png".into(),bytes});
+                }
+                #[cfg(not(target_os = "macos"))]
                 let bytes = read_preview_file(path).await?;
+                #[cfg(not(target_os = "macos"))]
                 Ok(ExplorerPreviewPayload {
                     mime_type: "image/png".to_string(),
                     bytes: transcode_psd_preview_png(&bytes, path)?,

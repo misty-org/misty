@@ -2,7 +2,7 @@
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
 
-use tauri::{AppHandle, Runtime, WebviewWindow};
+use tauri::{AppHandle, Runtime, Webview};
 
 #[cfg(target_os = "macos")]
 use cocoa::{
@@ -65,7 +65,7 @@ impl Default for TrafficLightsConfig {
 #[tauri::command]
 pub fn enable_rounded_corners<R: Runtime>(
     _app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window: Webview<R>,
     offset_x: Option<f64>,
     offset_y: Option<f64>,
 ) -> Result<(), String> {
@@ -115,7 +115,7 @@ pub fn enable_rounded_corners<R: Runtime>(
 #[tauri::command]
 pub fn enable_modern_window_style<R: Runtime>(
     _app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window: Webview<R>,
     corner_radius: Option<f64>,
     offset_x: Option<f64>,
     offset_y: Option<f64>,
@@ -221,14 +221,14 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
 /// Opts a Windows 11 window into the system's rounded-corner treatment. No-op on
 /// Windows 10 (the DWM attribute is simply ignored there).
 #[cfg(windows)]
-fn apply_windows_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
+fn apply_windows_rounded_corners<R: Runtime>(window: &Webview<R>) {
     use windows_sys::Win32::Foundation::HWND;
     use windows_sys::Win32::Graphics::Dwm::{
         DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
         DWM_WINDOW_CORNER_PREFERENCE,
     };
 
-    if let Ok(hwnd) = window.hwnd() {
+    if let Ok(hwnd) = window.window().hwnd() {
         let preference: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
         unsafe {
             let _ = DwmSetWindowAttribute(
@@ -246,7 +246,7 @@ fn apply_windows_rounded_corners<R: Runtime>(window: &WebviewWindow<R>) {
 #[tauri::command]
 pub fn enable_custom_titlebar_window_style<R: Runtime>(
     _app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window: Webview<R>,
     corner_radius: Option<f64>,
 ) -> Result<(), String> {
     let radius = corner_radius.unwrap_or(10.0);
@@ -284,7 +284,7 @@ pub fn enable_custom_titlebar_window_style<R: Runtime>(
 #[tauri::command]
 pub fn reposition_traffic_lights<R: Runtime>(
     _app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window: Webview<R>,
     offset_x: Option<f64>,
     offset_y: Option<f64>,
 ) -> Result<(), String> {
@@ -323,7 +323,7 @@ pub fn reposition_traffic_lights<R: Runtime>(
 #[tauri::command]
 pub fn set_native_wallpaper_video<R: Runtime>(
     _app: AppHandle<R>,
-    window: WebviewWindow<R>,
+    window: Webview<R>,
     path: Option<String>,
 ) -> Result<bool, String> {
     #[cfg(target_os = "macos")]

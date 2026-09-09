@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/auth";
-import { preferredDefaultSpace, spaceNavigationName, useSpacesStore } from "@/features/spaces/core";
+import { spaceNavigationName, useSpacesStore } from "@/features/spaces/core";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { Button, Separator, cn } from "@/shared/ui";
 import { ChevronRight, Pin, Settings, Store, UserRound } from "lucide-react";
@@ -17,7 +17,8 @@ export function AppsLibraryPage() {
   const installations = useAppsStore((state) => state.installations);
   const actionAppId = useAppsStore((state) => state.actionAppId);
   const setPinned = useAppsStore((state) => state.setPinned);
-  const activeSpace = preferredDefaultSpace(spaces);
+  const activeSpaceId = useAppsStore((state) => state.spaceId);
+  const activeSpace = spaces.find((space) => space.id === activeSpaceId);
   const installed = useMemo(
     () =>
       installations
@@ -42,9 +43,7 @@ export function AppsLibraryPage() {
         {!isNativeMobileBuild ? (
           <header className="mb-5">
             <h1 className="text-xl font-semibold tracking-tight text-cream-bright">Apps</h1>
-            <p className="mt-1 text-sm text-cream-muted">
-              The tools installed for your Misty account.
-            </p>
+            <p className="mt-1 text-sm text-cream-muted">The tools available in this Space.</p>
           </header>
         ) : null}
 

@@ -6,6 +6,7 @@ use std::{
     time::{Duration, UNIX_EPOCH},
 };
 
+#[cfg(not(target_os = "macos"))]
 use image::{codecs::jpeg::JpegEncoder, imageops::FilterType, ImageReader, Limits};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -422,6 +423,7 @@ impl SmartLibraryService {
     pub async fn prepare_previews(
         &self,
         request: PrepareSmartLibraryPreviewsRequest,
+        #[cfg(target_os = "macos")] service: std::sync::Arc<crate::infra::document_intelligence::ServiceLease>,
     ) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
         if request.asset_ids.is_empty() {
             return Ok(Vec::new());
@@ -439,7 +441,7 @@ impl SmartLibraryService {
         tokio::time::timeout(
             PREPARE_TIMEOUT,
             tokio::task::spawn_blocking(move || {
-                prepare_previews(&db_path, &request.asset_ids, dimension)
+                prepare_previews(&db_path, &request.asset_ids, dimension, #[cfg(target_os = "macos")] Some(&service))
             }),
         )
         .await
@@ -1257,6 +1259,7 @@ fn prepare_previews(
     db_path: &Path,
     asset_ids: &[String],
     dimension: u32,
+    #[cfg(target_os = "macos")] service: Option<&crate::infra::document_intelligence::ServiceLease>,
 ) -> ApiResult<Vec<PreparedSmartLibraryPreview>> {
     let conn = open_database(db_path)?;
     let mut previews = Vec::new();
@@ -1288,7 +1291,7 @@ fn prepare_previews(
         if kind == SemanticAssetKind::Image
             && RENDERABLE_IMAGE_EXTENSIONS.contains(&extension.as_str())
         {
-            if let Ok(rendered) = render_private_image_preview(Path::new(&path), dimension) {
+            if let Ok(rendered) = render_private_image_preview(Path::new(&path), dimension, #[cfg(target_os = "macos")] service) {
                 (bytes, width, height) = rendered;
                 payload_mime = "image/jpeg".to_owned();
             } else {
@@ -1298,7 +1301,7 @@ fn prepare_previews(
                 );
             }
         } else {
-            match smart_library_ingestion::extract(Path::new(&path), &extension, kind) {
+            match smart_library_ingestion::extract(Path::new(&path), &extension, kind, #[cfg(target_os = "macos")] service) {
                 Ok(extracted) => {
                     extracted_text = extracted.text;
                     metadata.extend(extracted.metadata);
@@ -1498,6 +1501,7 @@ fn load_assets_page(
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 fn render_private_image_preview(path: &Path, dimension: u32) -> ApiResult<(Vec<u8>, u32, u32)> {
     let mut reader = ImageReader::open(path)
         .map_err(|error| ApiError::Message(format!("Could not open image preview: {error}")))?
@@ -1522,6 +1526,20 @@ fn render_private_image_preview(path: &Path, dimension: u32) -> ApiResult<(Vec<u
             ApiError::Message(format!("Could not encode private image preview: {error}"))
         })?;
     Ok((bytes, width, height))
+}
+
+#[cfg(target_os = "macos")]
+fn render_private_image_preview(path:&Path,dimension:u32,service:Option<&crate::infra::document_intelligence::ServiceLease>)->ApiResult<(Vec<u8>,u32,u32)> {
+    let service=service.ok_or_else(||ApiError::Message("Open Library to prepare its images.".into()))?;
+    let response=service.process_image(path,dimension).map_err(ApiError::Message)?;
+    #[derive(Deserialize)]
+    #[serde(rename_all="camelCase",deny_unknown_fields)]
+    struct Preview {bytes:Vec<u8>,width:u32,height:u32,mime_type:String}
+    let preview:Preview=serde_json::from_value(response.get("image").cloned().ok_or_else(||ApiError::Message("Missing image preview.".into()))?)?;
+    if preview.width==0 || preview.height==0 || preview.width>dimension || preview.height>dimension || preview.mime_type!="image/jpeg" || !preview.bytes.starts_with(&[0xff,0xd8]) {
+        return Err(ApiError::Message("Invalid image preview.".into()));
+    }
+    Ok((preview.bytes,preview.width,preview.height))
 }
 
 fn open_database(path: &Path) -> ApiResult<Connection> {
@@ -1954,6 +1972,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
 
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn prepared_text_payload_is_path_free_and_resolvable_only_on_device() {
         let root = std::env::temp_dir().join(format!("misty-payload-{}", Uuid::new_v4()));
@@ -1970,7 +1989,7 @@ mod tests {
         )
         .unwrap();
         let asset_id = status.assets[0].asset_id.clone();
-        let prepared = prepare_previews(&db, std::slice::from_ref(&asset_id), 512).unwrap();
+        let prepared = prepare_previews(&db, std::slice::from_ref(&asset_id), 512, #[cfg(target_os = "macos")] None).unwrap();
         assert_eq!(prepared[0].asset_kind, SemanticAssetKind::Text);
         assert_eq!(
             prepared[0].extracted_text.as_deref(),

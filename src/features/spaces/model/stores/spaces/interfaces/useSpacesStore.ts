@@ -29,6 +29,7 @@ export interface SpacesStore {
   inbox: Record<ActivityTab, SpaceInboxItem[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
   snapshotReady: boolean;
+  inboxError?: string | null;
   referenceOnly: boolean;
   lastSyncedAt: string | null;
   loading: boolean;

@@ -6,14 +6,18 @@ mod frame_rate;
 
 pub(super) fn configure_browser_frame_rate(webview: &Webview) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    return webview.with_webview(|platform| unsafe {
-        let view: &objc2_web_kit::WKWebView = &*platform.inner().cast();
-        frame_rate::prefer_display_refresh_rate(view);
-    }).map_err(|error| error.to_string());
+    return webview
+        .with_webview(|platform| unsafe {
+            let view: &objc2_web_kit::WKWebView = &*platform.inner().cast();
+            frame_rate::prefer_display_refresh_rate(view);
+        })
+        .map_err(|error| error.to_string());
     #[cfg(not(target_os = "macos"))]
-    { let _ = webview; Ok(()) }
+    {
+        let _ = webview;
+        Ok(())
+    }
 }
-
 
 #[cfg(target_os = "macos")]
 pub(super) fn browser_requires_ephemeral_store() -> bool {
@@ -171,7 +175,8 @@ pub(super) fn configure_browser_webview(
             }
             // Configure the backing hierarchy once. Reconciliation also calls
             // this function for unchanged bounds; it must not force a repaint.
-            if view.layerContentsRedrawPolicy() != NSViewLayerContentsRedrawPolicy::DuringViewResize {
+            if view.layerContentsRedrawPolicy() != NSViewLayerContentsRedrawPolicy::DuringViewResize
+            {
                 configure_continuous_live_resize(view);
             }
             if let Some(parent) = view.superview() {
@@ -291,7 +296,10 @@ mod tests {
 }
 
 #[cfg(target_os = "macos")]
-pub(super) async fn remove_browser_data_store(app: &tauri::AppHandle, identifier: [u8; 16]) -> Result<(), String> {
+pub(super) async fn remove_browser_data_store(
+    app: &tauri::AppHandle,
+    identifier: [u8; 16],
+) -> Result<(), String> {
     use block2::RcBlock;
     use objc2::MainThreadMarker;
     use objc2_foundation::{NSDate, NSUUID};
@@ -305,20 +313,117 @@ pub(super) async fn remove_browser_data_store(app: &tauri::AppHandle, identifier
             // WebKit may retain a just-closed WKWebView. Clearing the named store
             // works even then, whereas deleting its identifier reports "in use".
             // Never touch the default store or another account's identifier.
-            let store = WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(identifier), mtm);
+            let store =
+                WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(identifier), mtm);
             let retained_store = store.clone();
             let handler = RcBlock::new(move || {
                 let _keep_alive = &retained_store;
-                if let Ok(mut sender) = sender.lock() { if let Some(sender) = sender.take() { let _ = sender.send(Ok(())); } }
+                if let Ok(mut sender) = sender.lock() {
+                    if let Some(sender) = sender.take() {
+                        let _ = sender.send(Ok(()));
+                    }
+                }
             });
-            store.removeDataOfTypes_modifiedSince_completionHandler(&WKWebsiteDataStore::allWebsiteDataTypes(mtm), &NSDate::distantPast(), &handler);
+            store.removeDataOfTypes_modifiedSince_completionHandler(
+                &WKWebsiteDataStore::allWebsiteDataTypes(mtm),
+                &NSDate::distantPast(),
+                &handler,
+            );
         }
-    }).map_err(|error| error.to_string())?;
-    tokio::time::timeout(std::time::Duration::from_secs(30), receiver).await
+    })
+    .map_err(|error| error.to_string())?;
+    tokio::time::timeout(std::time::Duration::from_secs(30), receiver)
+        .await
         .map_err(|_| "Website account removal timed out. Retry removal.".to_owned())?
         .map_err(|_| "Website account removal was canceled.".to_owned())?
 }
 #[cfg(not(target_os = "macos"))]
-pub(super) async fn remove_browser_data_store(_: &tauri::AppHandle, _: [u8; 16]) -> Result<(), String> {
+pub(super) async fn remove_browser_data_store(
+    _: &tauri::AppHandle,
+    _: [u8; 16],
+) -> Result<(), String> {
     Err("Website accounts require Misty on a Mac.".into())
+}
+
+/// WebKit owns rasterization; the shell does not need a second DOM renderer.
+#[cfg(target_os = "macos")]
+pub(crate) async fn capture_webview_region(
+    webview: Webview,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<serde_json::Value, String> {
+    use base64::Engine;
+    use block2::RcBlock;
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};
+    use objc2_foundation::{NSDictionary, NSError, NSNumber, NSPoint, NSRect, NSSize};
+    use objc2_web_kit::{WKSnapshotConfiguration, WKWebView};
+    use std::{sync::Mutex, time::Duration};
+    if ![x, y, width, height].iter().all(|n| n.is_finite())
+        || x < 0.0
+        || y < 0.0
+        || width < 8.0
+        || height < 8.0
+        || width > 10_000.0
+        || height > 10_000.0
+    {
+        return Err("Capture region is invalid.".into());
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let sender = Mutex::new(Some(sender));
+    webview.with_webview(move |platform| unsafe {
+        let setup = || -> Result<(), String> {
+            let _mtm = MainThreadMarker::new().ok_or("Capture must run on the main thread.")?;
+            let view: &WKWebView = &*platform.inner().cast();
+            let bounds = view.bounds();
+            if x + width > bounds.size.width + 1.0 || y + height > bounds.size.height + 1.0 {
+                return Err("The selected region is outside the current view.".into());
+            }
+            Ok(())
+        };
+        if let Err(error) = setup() {
+            if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) { let _ = sender.send(Err(error)); }
+            return;
+        }
+        let mtm = MainThreadMarker::new().unwrap();
+        let view: &WKWebView = &*platform.inner().cast();
+        let config = WKSnapshotConfiguration::new(mtm);
+        config.setRect(NSRect::new(NSPoint::new(x,y), NSSize::new(width,height)));
+        config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (640.0 / width.max(height)).min(1.0))));
+        config.setAfterScreenUpdates(true);
+        let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
+            let result = (|| -> Result<serde_json::Value, String> {
+                if !error.is_null() || image.is_null() { return Err("WebKit could not capture that region.".into()); }
+                let data = (&*image).TIFFRepresentation().ok_or("Capture returned no image.")?;
+                let bitmap = NSBitmapImageRep::imageRepWithData(&data).ok_or("Capture image is unavailable.")?;
+                let jpeg = bitmap.representationUsingType_properties(NSBitmapImageFileType::JPEG, &NSDictionary::new())
+                    .ok_or("Capture could not be encoded.")?;
+                Ok(serde_json::json!({"dataUrl":format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(jpeg.to_vec())),
+                    "width":bitmap.pixelsWide(), "height":bitmap.pixelsHigh()}))
+            })();
+            if let Some(sender) = sender.lock().ok().and_then(|mut sender| sender.take()) { let _ = sender.send(result); }
+        });
+        view.takeSnapshotWithConfiguration_completionHandler(Some(&config), &handler);
+    }).map_err(|error| error.to_string())?;
+    tokio::time::timeout(Duration::from_secs(15), receiver)
+        .await
+        .map_err(|_| "Capture timed out.")?
+        .map_err(|_| "Capture was cancelled.")?
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn host_webview_capture_region(
+    webview: Webview,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+) -> Result<serde_json::Value, String> {
+    if webview.label() != "main" {
+        return Err("Only the Host can capture its view.".into());
+    }
+    capture_webview_region(webview, x, y, width, height).await
 }

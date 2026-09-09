@@ -1,37 +1,5 @@
 use super::*;
 
-#[cfg(target_os = "macos")]
-pub(super) fn render_image_thumbnail_with_system_tool(
-    path: &Path,
-    thumbnail_path: &Path,
-    max_dimension: u32,
-) -> ApiResult<bool> {
-    let status = Command::new("/usr/bin/sips")
-        .arg("-s")
-        .arg("format")
-        .arg("png")
-        .arg("-Z")
-        .arg(normalize_image_thumbnail_dimension(max_dimension).to_string())
-        .arg(path)
-        .arg("--out")
-        .arg(thumbnail_path)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-
-    if let Ok(status) = status {
-        if status.success()
-            && std::fs::metadata(thumbnail_path)
-                .is_ok_and(|metadata| metadata.is_file() && metadata.len() > 0)
-        {
-            return Ok(true);
-        }
-    }
-
-    let _ = std::fs::remove_file(thumbnail_path);
-    Ok(false)
-}
-
 #[cfg(not(target_os = "macos"))]
 pub(super) fn render_image_thumbnail_with_system_tool(
     _path: &Path,
@@ -41,6 +9,7 @@ pub(super) fn render_image_thumbnail_with_system_tool(
     Ok(false)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn render_image_thumbnail_file_blocking(
     path: &Path,
     output_path: &Path,
@@ -126,6 +95,7 @@ pub(super) fn render_image_thumbnail_file_blocking(
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn render_image_preview_png_blocking(
     path: &Path,
     image_format: image::ImageFormat,
@@ -137,6 +107,7 @@ pub(super) fn render_image_preview_png_blocking(
     )
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn render_image_preview_png_with_dimension_blocking(
     path: &Path,
     _image_format: image::ImageFormat,
@@ -146,6 +117,7 @@ pub(super) fn render_image_preview_png_with_dimension_blocking(
     encode_preview_image_png_with_dimension(image, path, max_dimension)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn encode_preview_image_png(
     image: image::DynamicImage,
     path: &Path,
@@ -153,6 +125,7 @@ pub(super) fn encode_preview_image_png(
     encode_preview_image_png_with_dimension(image, path, MAX_IMAGE_PREVIEW_DIMENSION)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn encode_preview_image_png_with_dimension(
     image: image::DynamicImage,
     path: &Path,
@@ -184,10 +157,12 @@ pub(super) async fn read_preview_file(path: &Path) -> ApiResult<Vec<u8>> {
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn transcode_psd_preview_png(bytes: &[u8], path: &Path) -> ApiResult<Vec<u8>> {
     transcode_psd_preview_png_with_dimension(bytes, path, MAX_IMAGE_PREVIEW_DIMENSION)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn transcode_psd_preview_png_with_dimension(
     bytes: &[u8],
     path: &Path,
@@ -244,6 +219,7 @@ pub(super) fn transcode_psd_preview_png_with_dimension(
     )
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn psd_pixels_to_rgba8(
     pixels: &[u8],
     color_space: zune_psd::zune_core::colorspace::ColorSpace,
@@ -337,4 +313,20 @@ pub(super) fn pdf_preview_path(path: &Path, metadata: &std::fs::Metadata) -> Pat
     }
     let digest = hasher.finalize();
     std::env::temp_dir().join(format!("misty-preview-{}.png", hex::encode(&digest[..16])))
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn render_packaged_image_thumbnail(path:&Path,output:&Path,dimension:u32,service:&crate::infra::document_intelligence::ServiceLease)->ApiResult<GeneratedImageThumbnail> {
+    let bytes=service.process_explorer_image(path,dimension).map_err(ApiError::Message)?;
+    if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
+    let temp=temporary_image_thumbnail_path(output);
+    std::fs::write(&temp,bytes).map_err(|e|ApiError::Message(e.to_string()))?;
+    let result=(|| {
+        let _lock=IMAGE_THUMBNAIL_CACHE_FILE_LOCK.lock().map_err(|e|ApiError::Message(e.to_string()))?;
+        if service.cancelled() {return Err(ApiError::Message("Files preview access changed.".into()));}
+        if !output.exists() {std::fs::rename(&temp,output).map_err(|e|ApiError::Message(e.to_string()))?;}
+        Ok(GeneratedImageThumbnail{path:display_path(output),mime_type:"image/png".into()})
+    })();
+    let _=std::fs::remove_file(temp);
+    result
 }

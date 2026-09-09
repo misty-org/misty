@@ -12,7 +12,7 @@ pub mod browser;
 #[path = "browser_ios.rs"]
 pub mod browser;
 #[cfg(any(desktop, target_os = "ios"))]
-mod browser_macos;
+pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
 #[cfg(any(desktop, target_os = "ios"))]
@@ -22,12 +22,8 @@ pub mod browser_shortcuts;
 mod browser_theme;
 pub mod claude;
 pub(crate) mod cloud_handoff;
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 pub mod code_lsp;
-#[cfg(desktop)]
-pub mod code_watcher;
-#[cfg(desktop)]
-pub mod code_workspace;
 pub mod command_defaults;
 pub mod commands;
 #[cfg(any(desktop, target_os = "ios"))]
@@ -45,12 +41,6 @@ pub mod document_intelligence;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
-#[cfg(desktop)]
-pub mod extension_reporting;
-#[cfg(desktop)]
-pub mod extension_runtime;
-#[cfg(desktop)]
-pub mod extension_tools;
 pub mod file_sync;
 pub mod keychain;
 mod macos_privacy;
@@ -80,13 +70,13 @@ pub mod settings;
 mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 pub mod ssh_terminal;
 pub mod storage;
 pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
-#[cfg(desktop)]
+#[cfg(all(desktop, not(target_os = "macos")))]
 pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]
@@ -103,3 +93,19 @@ pub(crate) async fn evaluate_probe_javascript(webview: tauri::Webview, script: S
 }
 
 pub mod navigation_names;
+
+#[cfg(target_os = "macos")]
+pub(crate) mod native_process_worker;
+#[cfg(target_os = "macos")]
+pub(crate) mod peer_transport_worker;
+#[cfg(target_os = "macos")]
+pub(crate) mod space_peer_session;
+#[cfg(target_os = "macos")]
+pub(crate) mod space_peer_roots;
+#[cfg(target_os = "macos")]
+pub(crate) mod space_peer_files;
+
+#[cfg(target_os = "macos")]
+pub(crate) mod terminal_service;
+
+pub mod misty_context;

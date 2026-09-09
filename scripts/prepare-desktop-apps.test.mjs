@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { test } from "node:test";
@@ -37,7 +37,15 @@ test("builds missing components directly without signing or packaging", () => {
       for (const file of ["app.js", "app.css"]) writeFileSync(resolve(output, file), "fixture");
     });
     assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].slice(1), ["planner"]);
-    prepareDesktopApps(root, env, () => assert.fail("Existing components need no build"));
+    assert.deepEqual(calls[0].slice(1), ["planner", "--desktop-only"]);
+    prepareDesktopApps(root, env, () => assert.fail("Unchanged components need no build"));
+    const source = resolve(apps, "apps/planner/index.tsx");
+    mkdirSync(resolve(apps, "apps/planner"), { recursive: true });
+    writeFileSync(source, "changed source");
+    const future = new Date(Date.now() + 2000);
+    utimesSync(source, future, future);
+    let rebuilt = false;
+    prepareDesktopApps(root, env, () => { rebuilt = true; });
+    assert.equal(rebuilt, true, "Existing bundles must rebuild after source changes");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

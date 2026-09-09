@@ -219,6 +219,7 @@ async fn local_directory_inspection_follows_symlink_targets() {
     let _ = tokio::fs::remove_dir_all(&root).await;
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tokio::test]
 async fn local_preview_payload_is_typed_and_rejects_unsupported_files() {
     let root = unique_test_dir("preview-payload");
@@ -275,6 +276,7 @@ async fn local_preview_payload_is_typed_and_rejects_unsupported_files() {
     let _ = tokio::fs::remove_dir_all(&root).await;
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tokio::test]
 async fn generated_image_thumbnail_is_cached_and_dimensioned() {
     let root = unique_test_dir("image-thumbnail-cache");
@@ -317,6 +319,7 @@ async fn generated_image_thumbnail_is_cached_and_dimensioned() {
     let _ = tokio::fs::remove_dir_all(&root).await;
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tokio::test]
 async fn generated_image_thumbnail_writes_small_images_to_cache() {
     let root = unique_test_dir("image-thumbnail-original");

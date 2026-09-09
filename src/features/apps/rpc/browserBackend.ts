@@ -1,3 +1,4 @@
+import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import {
   browserProviders,
   providerUrlAllowed,
@@ -15,8 +16,9 @@ import type {
 } from "@misty/sdk";
 import { MistyBrowserEventSchema, MistyBrowserUrlSchema } from "@misty/sdk";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { dockLeaves } from "@/features/workspace/dockTree";
 import { parseBrowserTabState, type WorkspaceTab } from "@/features/workspace/model";
+import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
+import { useSettingsStore } from "@/features/settings";
 import { useAppThemeStore } from "@/features/settings";
 import { appZoomChangedEvent, getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
 import {
@@ -56,9 +58,27 @@ export function createBrowserRpcBackend(
     }
   >();
   const nativeKeys = new Map<string, string>();
+  const syncPaneDim = (id: string) => {
+    const workspace = useWorkspaceStore.getState();
+    const pane = allLayoutPanes(workspace.layout).find((pane) =>
+      pane.tabs.some((view) => view.id === scope.identity.instanceId),
+    );
+    const preferences = selectPaneFocusPreferences(useSettingsStore.getState().settings?.document);
+    const strength =
+      preferences.dim && pane && pane.id !== workspace.layout.focusedPaneId
+        ? preferences.strength
+        : 0;
+    return nativeRpcBackend
+      .invoke("browser_webview_set_pane_dim", {
+        id: nativeId(id),
+        strength,
+        indicator: pane?.id === workspace.layout.focusedPaneId ? preferences.indicator : "none",
+      })
+      .catch(() => undefined);
+  };
   const ownedTab = () => {
     scope.assert();
-    const tab = dockLeaves(useWorkspaceStore.getState().layout.root)
+    const tab = allLayoutPanes(useWorkspaceStore.getState().layout)
       .flatMap((pane) => pane.tabs)
       .find(
         (tab) =>
@@ -289,6 +309,7 @@ export function createBrowserRpcBackend(
         theme: useAppThemeStore.getState().resolvedTheme,
         nativeLiveResize: input.nativeLiveResize,
       });
+      await syncPaneDim(input.id);
       if (inherited?.popupInstanceKey) consumePopupBrowserInstance(tab.id);
     },
     async layout(input) {
@@ -303,6 +324,7 @@ export function createBrowserRpcBackend(
         theme: useAppThemeStore.getState().resolvedTheme,
         nativeLiveResize: input.nativeLiveResize,
       });
+      await syncPaneDim(input.id);
     },
     async navigate(id, url) {
       const item = record(id);
@@ -433,6 +455,7 @@ export function createBrowserRpcBackend(
             if (parsed.data.type === "page") {
               const item = records.get(id);
               if (item) item.url = parsed.data.url;
+              void syncPaneDim(id);
             }
             send(parsed.data);
           }),
@@ -496,6 +519,15 @@ export function createBrowserRpcBackend(
             .catch(() => undefined);
         }),
       );
+      removers.push(
+        useWorkspaceStore.subscribe((state, previous) => {
+          if (state.layout.focusedPaneId !== previous.layout.focusedPaneId) void syncPaneDim(id);
+        }),
+        useSettingsStore.subscribe((state, previous) => {
+          if (state.settings?.document !== previous.settings?.document) void syncPaneDim(id);
+        }),
+      );
+      void syncPaneDim(id);
       sendState();
       return () => {
         if (closed) return;

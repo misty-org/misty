@@ -6,7 +6,7 @@ const PET_LABEL: &str = "misty-bot-pet";
 
 pub fn setup(app: &mut App<Wry>) -> tauri::Result<()> {
     if app.get_webview_window(PET_LABEL).is_none() {
-        // One native surface grows into Misty Search, then settles back at the orb's saved point.
+        // One native surface grows into the Misty conversation, then settles back at the orb's saved point.
         WebviewWindowBuilder::new(
             app,
             PET_LABEL,
@@ -27,5 +27,6 @@ pub fn setup(app: &mut App<Wry>) -> tauri::Result<()> {
         .build()?;
     }
 
+    crate::infra::misty_context::setup(app.handle());
     Ok(())
 }

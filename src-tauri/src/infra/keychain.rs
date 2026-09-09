@@ -8,7 +8,7 @@ use crate::{
 
 pub fn backup_repository_password(repository_id: &str) -> ApiResult<Option<String>> {
     let account = format!("repository:{repository_id}");
-    credential_store::load("misty.backups", &account).map_err(|error| {
+    credential_store::load("com.misty.backups", &account).map_err(|error| {
         ApiError::Message(format!("Could not read the backup credential: {error}"))
     })
 }
@@ -20,7 +20,7 @@ pub fn store_backup_repository_password(repository_id: &str, password: &str) -> 
         ));
     }
     credential_store::store(
-        "misty.backups",
+        "com.misty.backups",
         &format!("repository:{repository_id}"),
         password,
     )
@@ -37,7 +37,7 @@ fn generate_password() -> String {
     STANDARD_NO_PAD.encode(bytes)
 }
 
-const CODING_AI_KEY_SERVICE: &str = "misty.coding-ai.api-key";
+const CODING_AI_KEY_SERVICE: &str = "com.misty.coding-ai.api-key";
 
 pub fn read_coding_ai_key(provider_id: &str) -> ApiResult<Option<String>> {
     credential_store::load(CODING_AI_KEY_SERVICE, provider_id)

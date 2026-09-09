@@ -48,9 +48,24 @@ it.each(["browser", "chat", "inbox", "planner", "journal", "library"])(
         : appId === "chat" || appId === "inbox"
           ? "provider-page-pin-v1:page-1"
           : "website-integration-v1:pin:page-1";
-    const own = appLocalStoragePrefix("https://example.test/v1", "one", app.app_id!);
-    const other = appLocalStoragePrefix("https://example.test/v1", "two", app.app_id!);
-    const server = appLocalStoragePrefix("https://other.test/v1", "one", app.app_id!);
+    const own = appLocalStoragePrefix(
+      "https://example.test/v1",
+      "one",
+      app.app_id!,
+      useAppsStore.getState().spaceId,
+    );
+    const other = appLocalStoragePrefix(
+      "https://example.test/v1",
+      "two",
+      app.app_id!,
+      useAppsStore.getState().spaceId,
+    );
+    const server = appLocalStoragePrefix(
+      "https://other.test/v1",
+      "one",
+      app.app_id!,
+      useAppsStore.getState().spaceId,
+    );
     for (const prefix of [own, other, server])
       localStorage.setItem(prefix + key, JSON.stringify({ id: "page-1" }));
     localStorage.setItem(own + "unrelated", "keep");

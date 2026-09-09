@@ -11,6 +11,7 @@ use std::{
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_os = "macos"))]
 use tantivy::{
     collector::TopDocs,
     doc,
@@ -52,10 +53,15 @@ const SEARCH_MANIFEST_FILE: &str = "manifest.sqlite3";
 #[derive(Clone)]
 pub struct SearchService {
     inner: Arc<SearchInner>,
+    #[cfg(target_os = "macos")]
+    engine: Option<Arc<crate::infra::document_intelligence::ServiceLease>>,
+    #[cfg(target_os = "macos")]
+    scopes: Arc<Mutex<std::collections::HashMap<String, Arc<SearchInner>>>>,
 }
 
 struct SearchInner {
     index_root: PathBuf,
+    excluded_index_root: PathBuf,
     live_index_dir: PathBuf,
     mount_root: PathBuf,
     home_dir: PathBuf,
@@ -73,6 +79,7 @@ struct SearchState {
     fields: Option<SearchIndexFields>,
 }
 
+#[cfg(not(target_os = "macos"))]
 #[derive(Debug, Clone, Copy)]
 struct SearchIndexFields {
     path: Field,
@@ -255,7 +262,7 @@ struct SearchMeta {
     last_scan_unchanged_item_count: u64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct SearchDoc {
     path: String,
     name: String,
@@ -345,7 +352,12 @@ impl SearchService {
             last_scan_unchanged_item_count: 0,
         };
         Self {
+            #[cfg(target_os = "macos")]
+            engine: None,
+            #[cfg(target_os = "macos")]
+            scopes: Default::default(),
             inner: Arc::new(SearchInner {
+                excluded_index_root: index_root.clone(),
                 index_root,
                 live_index_dir,
                 mount_root: environment.mount_root(),
@@ -367,6 +379,83 @@ impl SearchService {
         }
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn authorized(
+        &self,
+        lease: crate::infra::document_intelligence::ServiceLease,
+    ) -> ApiResult<Self> {
+        use sha2::{Digest, Sha256};
+        let key = format!("{:x}", Sha256::digest(lease.namespace.as_bytes()));
+        let mut scopes = self
+            .scopes
+            .lock()
+            .map_err(|e| ApiError::Message(e.to_string()))?;
+        let inner = scopes
+            .entry(key.clone())
+            .or_insert_with(|| {
+                let root = self.inner.index_root.join("space-owned-v1").join(key);
+                Arc::new(SearchInner {
+                    excluded_index_root: self.inner.excluded_index_root.clone(),
+                    live_index_dir: root.join("index"),
+                    index_root: root,
+                    mount_root: self.inner.mount_root.clone(),
+                    home_dir: self.inner.home_dir.clone(),
+                    providers: self.inner.providers.clone(),
+                    proxy: self.inner.proxy.clone(),
+                    listing_cache: self.inner.listing_cache.clone(),
+                    state: RwLock::new(SearchState {
+                        status: self.inner.state.read().unwrap().status.clone(),
+                        index: None,
+                        reader: None,
+                        fields: None,
+                    }),
+                    cancel_flag: Arc::new(AtomicBool::new(false)),
+                })
+            })
+            .clone();
+        Ok(Self {
+            inner,
+            engine: Some(Arc::new(lease)),
+            scopes: self.scopes.clone(),
+        })
+    }
+    fn open_index(&self, path: &Path) -> ApiResult<(Index, IndexReader, SearchIndexFields)> {
+        #[cfg(target_os = "macos")]
+        {
+            remote_engine::open(
+                path,
+                self.engine
+                    .clone()
+                    .ok_or_else(|| ApiError::Message("Open Files in a Space to search.".into()))?,
+            )
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            open_or_create_index(path)
+        }
+    }
+    fn fresh_index(&self, path: &Path) -> ApiResult<(Index, SearchIndexFields)> {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = fs::remove_dir_all(path);
+            let (index, _, fields) = self.open_index(path)?;
+            Ok((index, fields))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            create_fresh_index(path)
+        }
+    }
+    fn access_cancelled(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            self.engine.as_ref().is_none_or(|engine| engine.cancelled())
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            false
+        }
+    }
     pub async fn init(&self) -> ApiResult<SearchStatus> {
         tokio::fs::create_dir_all(&self.inner.index_root)
             .await
@@ -376,8 +465,17 @@ impl SearchService {
                     self.inner.index_root.display()
                 ))
             })?;
-        cleanup_staging_dirs(&self.inner.index_root);
-        let (index, reader, fields) = open_or_create_index(&self.inner.live_index_dir)?;
+        if self
+            .inner
+            .state
+            .read()
+            .map_err(|e| ApiError::Message(e.to_string()))?
+            .index
+            .is_none()
+        {
+            cleanup_staging_dirs(&self.inner.index_root);
+        }
+        let (index, reader, fields) = self.open_index(&self.inner.live_index_dir)?;
         let meta = read_meta(&self.inner.index_root);
         let indexed_item_count = reader.searcher().num_docs();
         let mut state = self
@@ -438,8 +536,10 @@ impl SearchService {
         }
 
         let service = self.clone();
-        tokio::spawn(async move {
-            service.run_scan(request).await;
+        // Scanning and the confined worker protocol use blocking filesystem I/O.
+        // Keep runtime threads available for permission revocation and provider I/O.
+        tokio::task::spawn_blocking(move || {
+            tauri::async_runtime::block_on(service.run_scan(request));
         });
         self.status().await
     }
@@ -488,19 +588,9 @@ impl SearchService {
             let fields = *state.fields.as_ref().ok_or_else(|| {
                 ApiError::Message("Search index fields are unavailable.".to_string())
             })?;
-            let searcher = reader.searcher();
-            let query = build_query(fields, &query_text);
-            let top_docs = searcher
-                .search(&query, &TopDocs::with_limit(10_000))
-                .map_err(|error| ApiError::Message(error.to_string()))?;
+            let documents = query_documents(reader, fields, &query_text)?;
             let mut results = Vec::new();
-            for (_tantivy_score, doc_address) in top_docs {
-                let retrieved = searcher
-                    .doc::<TantivyDocument>(doc_address)
-                    .map_err(|error| ApiError::Message(error.to_string()))?;
-                let Some(doc) = doc_from_tantivy(fields, &retrieved) else {
-                    continue;
-                };
+            for doc in documents {
                 if !request.include_hidden && doc.hidden {
                     continue;
                 }
@@ -559,7 +649,7 @@ impl SearchService {
             Ok(state) => state,
             Err(_) => return,
         };
-        let canceled = self.inner.cancel_flag.load(Ordering::SeqCst);
+        let canceled = self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled();
         state.status.scan_in_progress = false;
         state.status.scan_phase = SearchScanPhase::Idle;
         state.status.current_source = None;
@@ -623,10 +713,10 @@ impl SearchService {
             .exists();
         let (index, fields, existing_reader) = if reuse_existing {
             copy_index(&self.inner.live_index_dir, staging_dir)?;
-            let (index, reader, fields) = open_or_create_index(staging_dir)?;
+            let (index, reader, fields) = self.open_index(staging_dir)?;
             (index, fields, Some(reader))
         } else {
-            let (index, fields) = create_fresh_index(staging_dir)?;
+            let (index, fields) = self.fresh_index(staging_dir)?;
             (index, fields, None)
         };
         let manifest = Mutex::new(open_search_manifest(staging_dir)?);
@@ -645,7 +735,7 @@ impl SearchService {
         let mut writer = index
             .writer_with_num_threads(1, INDEX_MEMORY_BUDGET_BYTES)
             .map_err(|error| ApiError::Message(error.to_string()))?;
-        let ignored = ignored_paths(&request.ignored_paths, &self.inner.index_root);
+        let ignored = ignored_paths(&request.ignored_paths, &self.inner.excluded_index_root);
         let mut count = 0u64;
         let mut local_count = 0u64;
         let mut remote_count = 0u64;
@@ -656,7 +746,7 @@ impl SearchService {
         if request.include_local {
             let roots = local_roots(request, &self.inner.home_dir);
             for root in roots {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) {
+                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                     return Err(ApiError::Message("Search scan canceled.".to_string()));
                 }
                 self.set_scan_progress(Some("Local".to_string()), Some(display_path(&root)));
@@ -686,7 +776,7 @@ impl SearchService {
         if request.include_remotes {
             let remotes = self.selected_remotes(request).await;
             for remote in remotes {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) {
+                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                     return Err(ApiError::Message("Search scan canceled.".to_string()));
                 }
                 self.set_scan_progress(
@@ -745,8 +835,11 @@ impl SearchService {
         drop(index);
         let (local_count, remote_count) = manifest_source_counts(&manifest)?;
         drop(manifest);
+        if self.access_cancelled() || self.inner.cancel_flag.load(Ordering::SeqCst) {
+            return Err(ApiError::Message("Search scan canceled.".into()));
+        }
         replace_index(staging_dir, &self.inner.live_index_dir)?;
-        let (index, reader, fields) = open_or_create_index(&self.inner.live_index_dir)?;
+        let (index, reader, fields) = self.open_index(&self.inner.live_index_dir)?;
         let count = reader.searcher().num_docs();
         Ok(CompletedSearchScan {
             index,
@@ -788,7 +881,7 @@ impl SearchService {
                     && !privacy_excluded(entry.path(), &self.inner.home_dir)
             })
         {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) {
+            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                 return Err(ApiError::Message("Search scan canceled.".to_string()));
             }
             let Ok(entry) = entry else {
@@ -875,7 +968,7 @@ impl SearchService {
         let mut pending = VecDeque::new();
         pending.push_back(("/".to_string(), 0usize));
         while let Some((remote_path, depth)) = pending.pop_front() {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) {
+            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                 return Err(ApiError::Message("Search scan canceled.".to_string()));
             }
             if depth > max_depth.unwrap_or(DEFAULT_REMOTE_MAX_DEPTH).max(1) {
@@ -899,7 +992,7 @@ impl SearchService {
             };
             let items = self.fetch_remote_items(&target).await?;
             for item in items {
-                if self.inner.cancel_flag.load(Ordering::SeqCst) {
+                if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                     return Err(ApiError::Message("Search scan canceled.".to_string()));
                 }
                 let child_remote_path = target.child_remote_path(&item)?;
@@ -997,7 +1090,7 @@ impl SearchService {
 
     async fn wait_for_remote_job(&self, job_id: &str) -> ApiResult<RemoteJobStatus> {
         for _ in 0..1_200 {
-            if self.inner.cancel_flag.load(Ordering::SeqCst) {
+            if self.inner.cancel_flag.load(Ordering::SeqCst) || self.access_cancelled() {
                 let _ = self
                     .inner
                     .proxy
@@ -1060,6 +1153,7 @@ impl SearchService {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn build_schema() -> (Schema, SearchIndexFields) {
     let mut builder = Schema::builder();
     let name_indexing = TextFieldIndexing::default()
@@ -1104,6 +1198,7 @@ fn build_schema() -> (Schema, SearchIndexFields) {
     )
 }
 
+#[cfg(not(target_os = "macos"))]
 fn open_or_create_index(path: &Path) -> ApiResult<(Index, IndexReader, SearchIndexFields)> {
     fs::create_dir_all(path).map_err(|error| {
         ApiError::Message(format!(
@@ -1134,6 +1229,7 @@ fn open_or_create_index(path: &Path) -> ApiResult<(Index, IndexReader, SearchInd
     Ok((index, reader, fields))
 }
 
+#[cfg(not(target_os = "macos"))]
 fn create_fresh_index(path: &Path) -> ApiResult<(Index, SearchIndexFields)> {
     let _ = fs::remove_dir_all(path);
     fs::create_dir_all(path).map_err(|error| {
@@ -1218,6 +1314,7 @@ fn commit_manifest_update(manifest: &Mutex<Connection>) -> ApiResult<()> {
         .map_err(search_manifest_error)
 }
 
+#[cfg(not(target_os = "macos"))]
 fn seed_search_manifest(
     manifest: &Mutex<Connection>,
     reader: &IndexReader,
@@ -1334,7 +1431,7 @@ fn upsert_search_doc(
             changes.unchanged += 1;
         }
         Some(existing) => {
-            writer.delete_term(Term::from_field_text(fields.path, &existing.path));
+            delete_doc(writer, fields, &existing.path)?;
             add_doc(writer, fields, doc)?;
             persist_manifest_doc(&manifest, doc, generation)?;
             changes.updated += 1;
@@ -1391,7 +1488,7 @@ fn remove_missing_manifest_docs(context: ManifestCleanup<'_>) -> ApiResult<()> {
         if !covered {
             continue;
         }
-        writer.delete_term(Term::from_field_text(fields.path, &doc.path));
+        delete_doc(writer, fields, &doc.path)?;
         manifest
             .execute("DELETE FROM search_docs WHERE doc_key=?1", params![key])
             .map_err(search_manifest_error)?;
@@ -1446,6 +1543,7 @@ fn replace_index(staging: &Path, live: &Path) -> ApiResult<()> {
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn add_doc(
     writer: &IndexWriter,
     fields: &SearchIndexFields,
@@ -1472,6 +1570,7 @@ fn add_doc(
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn build_query(fields: SearchIndexFields, query: &str) -> Box<dyn Query> {
     let tokens = split_tokens(query);
     if tokens.is_empty() {
@@ -1490,6 +1589,7 @@ fn build_query(fields: SearchIndexFields, query: &str) -> Box<dyn Query> {
     Box::new(BooleanQuery::from(queries))
 }
 
+#[cfg(not(target_os = "macos"))]
 fn doc_from_tantivy(fields: SearchIndexFields, doc: &TantivyDocument) -> Option<SearchDoc> {
     let path = text_field(doc, fields.path)?;
     let name = text_field(doc, fields.name)?;
@@ -1514,12 +1614,14 @@ fn doc_from_tantivy(fields: SearchIndexFields, doc: &TantivyDocument) -> Option<
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 fn text_field(doc: &TantivyDocument, field: Field) -> Option<String> {
     doc.get_first(field)
         .and_then(|value| value.as_str())
         .map(ToOwned::to_owned)
 }
 
+#[cfg(not(target_os = "macos"))]
 fn u64_field(doc: &TantivyDocument, field: Field) -> u64 {
     doc.get_first(field)
         .and_then(|value| value.as_u64())
@@ -1987,6 +2089,7 @@ mod incremental_tests {
             hidden: false,
         }
     }
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn manifest_refresh_reuses_unchanged_docs_and_removes_missing_docs() {
         let root = std::env::temp_dir().join(format!(
@@ -2041,6 +2144,7 @@ mod incremental_tests {
         drop(index);
         let _ = fs::remove_dir_all(root);
     }
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn existing_pre_manifest_catalog_is_reused_on_the_first_incremental_refresh() {
         let root = std::env::temp_dir().join(format!(
@@ -2079,3 +2183,38 @@ mod incremental_tests {
         let _ = fs::remove_dir_all(root);
     }
 }
+
+#[cfg(not(target_os = "macos"))]
+fn delete_doc(writer: &IndexWriter, fields: &SearchIndexFields, path: &str) -> ApiResult<()> {
+    writer.delete_term(Term::from_field_text(fields.path, path));
+    Ok(())
+}
+#[cfg(not(target_os = "macos"))]
+fn query_documents(
+    reader: &IndexReader,
+    fields: SearchIndexFields,
+    text: &str,
+) -> ApiResult<Vec<SearchDoc>> {
+    let searcher = reader.searcher();
+    let hits = searcher
+        .search(&build_query(fields, text), &TopDocs::with_limit(10_000))
+        .map_err(|e| ApiError::Message(e.to_string()))?;
+    hits.into_iter()
+        .filter_map(
+            |(_, address)| match searcher.doc::<TantivyDocument>(address) {
+                Ok(doc) => doc_from_tantivy(fields, &doc).map(Ok),
+                Err(e) => Some(Err(ApiError::Message(e.to_string()))),
+            },
+        )
+        .collect()
+}
+#[cfg(target_os = "macos")]
+#[path = "search_remote_engine.rs"]
+mod remote_engine;
+#[cfg(target_os = "macos")]
+pub(crate) use remote_engine::execute_package_index;
+#[cfg(target_os = "macos")]
+use remote_engine::{
+    add_doc, delete_doc, query_documents, seed_search_manifest, Index, IndexReader, IndexWriter,
+    SearchIndexFields,
+};

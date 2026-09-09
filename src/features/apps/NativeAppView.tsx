@@ -1,3 +1,4 @@
+import { resolveApiBase, readDeploymentScope } from "@/api/deployment/api";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
@@ -56,7 +57,7 @@ export function NativeAppView(props: NativeAppViewProps) {
     requestEmbeddedBrowserSuspension(permissions.active, reason);
     return () => requestEmbeddedBrowserSuspension(false, reason);
   }, [permissions.active]);
-  const ownerKey = JSON.stringify([props.owner?.accountId ?? null, props.owner?.spaceId ?? null]);
+  const ownerKey = JSON.stringify([readDeploymentScope(), props.owner?.accountId ?? null, props.owner?.spaceId ?? null]);
   const scopeKey = JSON.stringify(props.scopeLimit?.slice().sort() ?? null);
 
   useEffect(() => {
@@ -176,10 +177,12 @@ export function NativeAppView(props: NativeAppViewProps) {
         unlistenCancelled();
         return;
       }
+      const deployment = await resolveApiBase();
+      if (disposed) return;
       label = await invoke<string>("mini_app_open", {
         request: {
           source: props.source,
-          owner: current.current.owner ?? null,
+          owner: current.current.owner ? { ...current.current.owner, deployment } : null,
           scopeLimit: current.current.scopeLimit ?? null,
           bounds: { x: 0, y: 0, width: 1, height: 1 },
         },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { officialAppNeedsReview } from "./appInstallationStatus";
 
 const app = {
@@ -8,10 +8,12 @@ const app = {
   permission_version: 2,
 } as OfficialApp;
 
-function installation(overrides: Partial<UserAppInstallation> = {}): UserAppInstallation {
+function installation(overrides: Partial<SpaceAppInstallation> = {}): SpaceAppInstallation {
   return {
     app_id: "journal",
     state: "installed",
+    space_id: "space-a",
+    authority_generation: 1,
     installed_version: "1.1.0",
     permission_version: 2,
     granted_scopes: [],
@@ -25,7 +27,12 @@ function installation(overrides: Partial<UserAppInstallation> = {}): UserAppInst
 
 describe("officialAppNeedsReview", () => {
   it("requires review for a new package version", () => {
-    expect(officialAppNeedsReview(app, installation({ installed_version: "1.0.0" }))).toBe(true);
+    expect(
+      officialAppNeedsReview(
+        app,
+        installation({ space_id: "space-a", authority_generation: 1, installed_version: "1.0.0" }),
+      ),
+    ).toBe(true);
   });
 
   it("requires review when declared permissions change", () => {

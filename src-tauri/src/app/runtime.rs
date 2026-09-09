@@ -7,8 +7,6 @@ use crate::domain::file_sync::FileSyncPairStore;
 #[cfg(any(desktop, target_os = "ios"))]
 use crate::infra::connected_devices::ConnectedDevicesService;
 #[cfg(desktop)]
-use crate::infra::extension_runtime::ExtensionRuntimeService;
-#[cfg(desktop)]
 use crate::infra::media_search::MediaSearchService;
 #[cfg(desktop)]
 use crate::infra::plugin_commands::PluginCommandService;
@@ -42,8 +40,6 @@ pub struct MistyRuntime {
     pub metadata: MetadataService,
     #[cfg(desktop)]
     pub plugin_commands: PluginCommandService,
-    #[cfg(desktop)]
-    pub extension_runtime: ExtensionRuntimeService,
     pub power_pack: PowerPackService,
     pub search: SearchService,
     pub explorer: ExplorerService,
@@ -100,11 +96,6 @@ impl MistyRuntime {
         let metadata = MetadataService::new();
         #[cfg(desktop)]
         let plugin_commands = PluginCommandService::new(environment.clone());
-        #[cfg(desktop)]
-        let extension_runtime = ExtensionRuntimeService::new_with_storage_runtime(
-            environment.clone(),
-            storage_runtime.clone(),
-        );
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let search = SearchService::new(environment.clone(), providers.clone(), storage.clone());
         let explorer = ExplorerService::new(
@@ -134,7 +125,9 @@ impl MistyRuntime {
         let workspaces = WorkspaceService::new(environment.clone());
 
         Self {
-            navigation_names: crate::infra::navigation_names::NavigationNamesService::new(environment.config_dir().join("navigation.json")),
+            navigation_names: crate::infra::navigation_names::NavigationNamesService::new(
+                environment.config_dir().join("navigation.json"),
+            ),
             environment,
             clipboard,
             storage_runtime,
@@ -152,8 +145,6 @@ impl MistyRuntime {
             metadata,
             #[cfg(desktop)]
             plugin_commands,
-            #[cfg(desktop)]
-            extension_runtime,
             power_pack,
             search,
             explorer,

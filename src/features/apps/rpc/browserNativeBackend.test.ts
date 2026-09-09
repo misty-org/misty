@@ -355,3 +355,32 @@ it("keeps the Outlook account when its SDK Open in browser action opens a Browse
     url: "https://login.microsoftonline.com/common/oauth2/authorize",
   });
 });
+
+it("dims an unfocused native pane without hiding or suspending the browser", async () => {
+  const f = await fixture();
+  const sourcePane = useWorkspaceStore.getState().layout.focusedPaneId;
+  useWorkspaceStore.getState().splitPane(sourcePane, "right");
+  invoke.mockClear();
+  const layout = {
+    id: f.id,
+    visible: true,
+    bounds: { x: 0, y: 50, width: 500, height: 300 },
+    nativeLiveResize: false,
+  };
+  await f.backend.layout(layout);
+  expect(invoke).toHaveBeenCalledWith(
+    "browser_webview_set_pane_dim",
+    expect.objectContaining({ strength: 0.15, indicator: "none" }),
+  );
+  expect(
+    invoke.mock.calls.some(
+      ([command]) => command === "browser_webview_hide" || command === "browser_webviews_hide_all",
+    ),
+  ).toBe(false);
+  useWorkspaceStore.getState().focusPane(sourcePane);
+  await f.backend.layout(layout);
+  expect(invoke).toHaveBeenLastCalledWith(
+    "browser_webview_set_pane_dim",
+    expect.objectContaining({ strength: 0 }),
+  );
+});

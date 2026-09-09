@@ -14,6 +14,14 @@ pub struct ReadGuard {
     pub handle: String,
     cancel: Arc<AtomicBool>,
 }
+impl ReadGuard {
+    pub(super) fn new(handle: String, cancel: Arc<AtomicBool>) -> Self {
+        Self { handle, cancel }
+    }
+    pub(super) fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Acquire)
+    }
+}
 impl Drop for ReadGuard {
     fn drop(&mut self) {
         self.cancel.store(true, Ordering::Release);
@@ -111,6 +119,9 @@ impl Request {
     #[cfg(target_os = "macos")]
     fn run(self) -> Result<Value, String> {
         use std::io::{Read, Write};
+        if self.cancel.load(Ordering::Acquire) {
+            return Err("Archive preview cancelled.".into());
+        }
         let before = self
             .file
             .metadata()

@@ -1,6 +1,7 @@
+import { appIcons } from "@/shared/ui/app-icons";
 import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { BookOpenText, CheckSquare2, MessagesSquare, Notebook } from "lucide-react";
+import { BookOpenText, MessagesSquare, Notebook } from "lucide-react";
 import { rememberedJournalRoute, rememberedPlannerRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
@@ -8,7 +9,7 @@ import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 // Work surfaces only. Management controls live at the opposite end of the top bar.
 const sections = [
   { id: "journal", label: "Journal", icon: Notebook },
-  { id: "planner", label: "Planner", icon: CheckSquare2 },
+  { id: "planner", label: "Planner", icon: appIcons.planner },
   { id: "social", label: "Chat", icon: MessagesSquare },
   { id: "library", label: "Library", icon: BookOpenText },
 ] as const;

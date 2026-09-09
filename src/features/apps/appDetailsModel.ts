@@ -1,4 +1,4 @@
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { officialAppNeedsReview } from "./appInstallationStatus";
 
 export function discoverAppName(app: OfficialApp) {
@@ -7,7 +7,7 @@ export function discoverAppName(app: OfficialApp) {
 
 export function discoverAppAction(
   app: OfficialApp,
-  installation: UserAppInstallation | undefined,
+  installation: SpaceAppInstallation | undefined,
   mobile: boolean,
 ) {
   if ((mobile ? app.mobile : app.desktop).runtime === "unsupported") return "Unavailable";

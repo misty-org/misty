@@ -229,6 +229,13 @@ pub fn browser_webview_navigate(
     Ok(())
 }
 
+// Mobile projects one pane at a time, so it is always undimmed.
+#[tauri::command]
+pub fn browser_webview_set_pane_dim(_app: AppHandle, id: String, strength: f64, indicator: Option<String>) -> Result<(), String> {
+    let _ = (id, strength, indicator);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn browser_webview_set_theme(
     _app: AppHandle,

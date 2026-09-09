@@ -9,6 +9,7 @@ import {
   type MistyDataDomain,
   type MistyAppCommand,
   type MistyAppSettings,
+  type MistyActivityOperation,
   type MistyWorkspaceOpen,
   type MistyWorkspaceSnapshot,
   type MistyWorkspaceUpdate,
@@ -34,6 +35,7 @@ export interface AppUiBackend {
   registerShortcut(command: MistyAppCommand, listener: () => void): () => void;
   openExternal(url: string): Promise<void>;
   reportError(message: string): void;
+  reportOperation?(event: MistyActivityOperation): void;
   confirm?(message: string, title?: string): Promise<boolean>;
 }
 /** Intrinsic methods affect only the calling App's view; links require a grant. */
@@ -119,6 +121,13 @@ export function createAppUiRpc(scope: AppRpcScope, backend: AppUiBackend) {
           scope.assert("links.open");
           await backend.openExternal((params as { url: string }).url);
           break;
+        case "activity.operation": {
+          if (!backend.reportOperation) throw new AppRpcError("unsupported_method", "Activity operations are unavailable.");
+          const event = params as MistyActivityOperation;
+          const route = appOwnedRoute(event.route ?? `/apps/${encodeURIComponent(officialAppSlug(scope.identity.appId))}`, officialAppSlug(scope.identity.appId), scope.identity.spaceId);
+          backend.reportOperation({ ...event, route });
+          break;
+        }
         case "activity.report":
           backend.reportError((params as { message: string }).message);
           break;

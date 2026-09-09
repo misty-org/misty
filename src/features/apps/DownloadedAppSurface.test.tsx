@@ -46,6 +46,7 @@ const session = {
   app_id: "terminal",
   space_id: "space-a",
   token: "host-only",
+  authority_generation: 7,
   expires_at: "2099-01-01T00:00:00Z",
   scopes: ["terminal.execute"],
   sdk_base_url: "/app-runtime",
@@ -68,6 +69,76 @@ beforeEach(() => {
   mocks.listen.mockResolvedValue(vi.fn());
 });
 describe("downloaded SDK component host", () => {
+  it("routes the Mac Terminal through its Space-owned package and device grant", async () => {
+    const previousPlatform = Object.getOwnPropertyDescriptor(
+      window,
+      "__TAURI_OS_PLUGIN_INTERNALS__",
+    );
+    Object.defineProperty(window, "__TAURI_OS_PLUGIN_INTERNALS__", {
+      configurable: true,
+      value: { platform: "macos" },
+    });
+    mocks.invoke.mockImplementation(
+      async (command: string) =>
+        ({
+          official_app_package_path: "/verified/terminal",
+          mini_widget_open: "space-terminal-instance",
+          terminal_service_create: "worker-session",
+        })[command],
+    );
+    mocks.execute.mockResolvedValue(null);
+    mocks.load.mockResolvedValue({
+      appId: "terminal",
+      protocol: 2,
+      mount: async ({ root, misty }: { root: HTMLElement; misty: MistyAppSDK }) => {
+        await misty.terminal.create();
+        root.textContent = "Packaged Mac terminal";
+        return { unmount: vi.fn() };
+      },
+    });
+    const view = render(<DownloadedAppSurface {...props} />);
+    try {
+      await screen.findByText("Packaged Mac terminal");
+      expect(mocks.execute).toHaveBeenCalledWith(
+        "space-terminal-instance",
+        "terminal.authorize",
+        {},
+        expect.any(Function),
+        expect.any(AbortSignal),
+      );
+      expect(mocks.invoke).toHaveBeenCalledWith("mini_widget_open", {
+        request: expect.objectContaining({
+          owner: {
+            accountId: "user-a",
+            spaceId: "space-a",
+            deployment: "https://misty.example/v1",
+            authorityGeneration: 7,
+          },
+          scopeLimit: ["terminal.execute"],
+        }),
+      });
+      expect(mocks.invoke).toHaveBeenCalledWith("terminal_service_create", {
+        instance: "space-terminal-instance",
+        request: { env: {} },
+      });
+      expect(mocks.invoke.mock.calls.some(([command]) => command === "terminal_create")).toBe(
+        false,
+      );
+      view.unmount();
+      await waitFor(() =>
+        expect(mocks.invoke).toHaveBeenCalledWith("terminal_service_close", {
+          instance: "space-terminal-instance",
+          sessionId: "worker-session",
+        }),
+      );
+    } finally {
+      view.unmount();
+      if (previousPlatform)
+        Object.defineProperty(window, "__TAURI_OS_PLUGIN_INTERNALS__", previousPlatform);
+      else Reflect.deleteProperty(window, "__TAURI_OS_PLUGIN_INTERNALS__");
+    }
+  });
+
   it("keeps raw collaboration join tickets out of downloaded component transports", async () => {
     let sdk!: MistyAppSDK;
     mocks.load.mockResolvedValue({
@@ -223,8 +294,7 @@ describe("downloaded SDK component host", () => {
   it("decodes native binary data for SDK components and binds device grants to the owner", async () => {
     let bytes: ArrayBuffer | undefined;
     mocks.invoke.mockImplementation(async (command: string) => {
-      if (command === "scan_local_plugins")
-        return [{ id: "terminal", root: "public", plugin_dir: "/installed/terminal" }];
+      if (command === "official_app_package_path") return "/installed/terminal";
       if (command === "mini_widget_open") return "device-instance";
       return undefined;
     });
@@ -245,7 +315,12 @@ describe("downloaded SDK component host", () => {
     expect(mocks.invoke).toHaveBeenCalledWith("mini_widget_open", {
       request: {
         root: "/installed/terminal",
-        owner: { accountId: "user-a", spaceId: "space-a" },
+        owner: {
+          accountId: "user-a",
+          spaceId: "space-a",
+          deployment: "https://misty.example/v1",
+          authorityGeneration: 7,
+        },
         scopeLimit: ["terminal.execute"],
       },
     });
