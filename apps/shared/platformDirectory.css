@@ -1,0 +1,156 @@
+/* Social/Inbox's catalog layout, owned by PlatformDirectory in every app.
+   Embedded changes only the outer frame; rows and controls remain identical. */
+.provider-workspace.provider-directory {
+  display: block;
+  overflow: auto;
+  padding: 32px 28px;
+  scrollbar-color: var(--misty-theme-border, #393939) transparent;
+}
+.provider-directory > * {
+  max-width: 760px;
+  margin-inline: auto;
+}
+.provider-directory h1 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+  margin: 0 0 24px;
+}
+.provider-directory header p {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--misty-theme-text-muted, #a0a0a0);
+}
+.provider-workspace.provider-directory[data-embedded="true"] {
+  height: auto;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+.provider-directory button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--misty-theme-border, #393939);
+  border-radius: 6px;
+  background: var(--misty-theme-card, #191919);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.provider-directory .website-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 16px;
+  color: var(--misty-theme-text-muted, #a0a0a0);
+}
+.provider-directory .website-search > svg {
+  position: absolute;
+  inset-inline-start: 10px;
+  pointer-events: none;
+}
+.provider-directory .website-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding-inline-start: 36px;
+  color: var(--misty-theme-text, #e0e0e0);
+  caret-color: currentColor;
+}
+.provider-directory .website-search input::placeholder {
+  color: var(--misty-theme-text-muted, #a0a0a0);
+  opacity: 1;
+}
+.provider-integration-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--misty-theme-border, #262626);
+}
+.provider-directory .platform-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+.provider-integration-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  flex: none;
+}
+.provider-integration-icon :is(svg, img) {
+  width: 22px;
+  height: 22px;
+}
+.provider-integration-copy {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.provider-integration-copy :is(strong, h2, h3) {
+  display: block;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.provider-integration-copy :is(small, p) {
+  display: block;
+  margin: 4px 0 0;
+  color: var(--misty-theme-text-muted, #a0a0a0);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.provider-directory .platform-action {
+  flex: none;
+  margin-left: auto;
+}
+.provider-integration-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+.provider-directory .provider-secondary {
+  border-color: transparent;
+  background: transparent;
+}
+.provider-directory .provider-directory-footnote {
+  margin-top: 24px;
+  line-height: 1.6;
+  color: var(--misty-theme-text-muted, #a0a0a0);
+}
+.provider-directory-error {
+  line-height: 1.5;
+  padding-block: 12px;
+}
+.provider-directory-error button {
+  margin-left: 8px;
+}
+.provider-directory ::selection {
+  color: var(--misty-theme-bg, #131313);
+  background: var(--misty-theme-text, #e0e0e0);
+}
+@media (max-width: 520px) {
+  .provider-workspace.provider-directory {
+    padding: 24px 16px;
+  }
+}
+@media (pointer: coarse) {
+  .provider-directory button,
+  .provider-directory .website-search input {
+    min-height: 44px;
+  }
+}

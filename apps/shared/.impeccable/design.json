@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-08T01:07:15.886398+00:00",
+  "title": "Design System: Misty Provider Directory",
+  "extensions": {
+    "breakpoints": [
+      {
+        "name": "compact-directory",
+        "value": "520px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Directory action",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Connect, Finish setup, Open, and Retry use the same compact bordered action.",
+      "html": "<button class=\"ds-action\">Connect</button>",
+      "css": ".ds-action { min-height:36px; padding:6px 14px; border:1px solid var(--misty-theme-border, #393939); border-radius:6px; background:var(--misty-theme-card, #191919); color:var(--misty-theme-text, #e0e0e0); font:13px system-ui; cursor:pointer; } .ds-action:hover { background:var(--misty-theme-hover, #2b2b2b); } .ds-action:focus-visible { outline:2px solid var(--misty-theme-text-muted, #8c8c8c); outline-offset:2px; } .ds-action:disabled { opacity:0.5; cursor:default; }"
+    },
+    {
+      "name": "Shortcut visibility action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Hide or show an added account in the sidebar without removing its session.",
+      "html": "<button class=\"ds-action ds-secondary\">Hide</button>",
+      "css": ".ds-action { min-height:36px; padding:6px 14px; border:1px solid var(--misty-theme-border, #393939); border-radius:6px; background:var(--misty-theme-card, #191919); color:var(--misty-theme-text, #e0e0e0); font:13px system-ui; cursor:pointer; } .ds-action:hover { background:var(--misty-theme-hover, #2b2b2b); } .ds-action:focus-visible { outline:2px solid var(--misty-theme-text-muted, #8c8c8c); outline-offset:2px; } .ds-action:disabled { opacity:0.5; cursor:default; } .ds-action.ds-secondary { border-color:transparent; background:transparent; } .ds-action.ds-secondary:hover { background:var(--misty-theme-hover, #2b2b2b); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Operating Desk",
+    "overview": "Scoped to the Social and Inbox provider directory. Inherits Misty’s compact dark desktop UI, continuous lists, restrained separators, and existing theme-tinted brand assets.",
+    "keyCharacteristics": [
+      "Compact system controls",
+      "Continuous integration list",
+      "Theme-bound identity assets"
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve native Misty messaging and existing provider assets.",
+      "Do distinguish setup, added accounts, and hidden shortcuts."
+    ],
+    "donts": [
+      "Don’t introduce card grids, gradients, or ambient glows.",
+      "Don’t imply website sign-in provides mail search authorization."
+    ]
+  }
+}
