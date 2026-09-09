@@ -391,7 +391,7 @@ export const pages: DocsPage[] = [
         id: "development",
         title: "Development",
         blocks: [
-          { type: "code", filename: "Terminal", language: "shell", code: "cd ~/misty-org/misty-extensions\nnpm install\nnpm run dev" },
+          { type: "code", filename: "Terminal", language: "shell", code: "cd ~/misty-org/misty-apps\nnpm install\nnpm run dev" },
           { type: "p", text: "Open a panel with the `plugin` query parameter. Add one or more `selected` values to simulate file selection." },
           { type: "code", filename: "Browser", language: "text", code: "http://127.0.0.1:5174/?plugin=quick_convert\nhttp://127.0.0.1:5174/?plugin=quick_convert&selected=/Users/me/Desktop/demo.mov" },
         ],
