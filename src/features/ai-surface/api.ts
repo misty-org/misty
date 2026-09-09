@@ -5,6 +5,7 @@ import {
   readApiAuthToken,
   resolveRequiredApiBase,
 } from "@/api/client";
+import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import type {
   AiArtifact,
   AiInvocationCreated,
@@ -100,16 +101,7 @@ export interface AiProviderStatus {
   model_name: string;
 }
 
-export interface AiBillingUsage {
-  plan: string;
-  agent_usage?: {
-    percentage_used: number;
-    available: boolean;
-    paused: boolean;
-    reset_at?: string;
-    plan?: string;
-  };
-}
+export type AiBillingUsage = BillingUsage;
 
 export const aiSurfaceApi = {
   status: () => apiRequest<AiProviderStatus>("/ai/status"),
