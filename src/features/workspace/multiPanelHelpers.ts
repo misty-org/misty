@@ -19,6 +19,7 @@ export function createTab(id: string, paneId: string, path: string, title: strin
   const normalizedPath = normalizeExplorerPath(path);
   return {
     id,
+    namingId: crypto.randomUUID(),
     title,
     path: normalizedPath,
     panes: [createPane(paneId, normalizedPath, title)],
@@ -87,6 +88,7 @@ export function normalizeTab(tab: MultiPanelTab): MultiPanelTab | null {
   const orientation: SplitOrientation = lanes.length > 1 ? "vertical" : "horizontal";
   return {
     ...tab,
+    namingId: tab.namingId || crypto.randomUUID(),
     mode: "browse",
     title: tab.title || activePane.title,
     path: normalizeExplorerPath(tab.path || activePane.path),

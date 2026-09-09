@@ -153,6 +153,7 @@ The palette is a compressed charcoal ladder with warm off-white text, softened a
 ### Brand identity
 
 - **Misty Logo**: Always monochrome. Use warm white on dark surfaces and near-black on light surfaces, inheriting the surrounding foreground color so the mark stays consistent across themes. Keep the original silhouette unchanged.
+- **Integration logos**: Use the original brand SVG colors and gradients in navigation, tabs, Discover, connection screens, and app views. Reuse `misty-apps/apps/shared/brandIcons.ts` everywhere. Preserve brand colors on inactive rows; show selection through the surrounding neutral background. Inherently monochrome brands use their light or dark foreground variant. Misty tool icons remain monochrome.
 
 ### Primary
 

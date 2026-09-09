@@ -2,7 +2,7 @@ import { act } from "react";
 import { within, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { isMistyServerMethod, type MistyComponentContext } from "@misty/sdk";
-import definition from "./SDKPlannerApp";
+import definition from "@/features/apps/package/SDKPlannerApp";
 import { mountAppComponent } from "../rpc/component";
 import { createAppRpcScope } from "../rpc/session";
 import { createServerRpc } from "../rpc/server";
@@ -59,7 +59,7 @@ function fixture(spaceId: string) {
     const { method } = JSON.parse(String(init?.body));
     const results: Record<string, unknown> = {
       "spaces.get": space,
-      "spaces.members.list": { members: [], agents: [] },
+      "spaces.members.list": { members: [] },
       "tasks.list": { tasks: [], status_totals: null },
       "agenda.list": { entries: [] },
       "calendar.sources.list": { sources: [] },

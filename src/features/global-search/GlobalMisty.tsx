@@ -102,6 +102,7 @@ export function GlobalMisty(props: {
     searching,
     working,
     error,
+    browserNotice,
     context,
     conversations,
     conversationsLoading,
@@ -137,6 +138,7 @@ export function GlobalMisty(props: {
       searching: state.searching,
       working: state.working,
       error: state.error,
+      browserNotice: state.browserRequest?.notice,
       context: state.context,
       conversations: state.conversations,
       conversationsLoading: state.conversationsLoading,
@@ -173,7 +175,8 @@ export function GlobalMisty(props: {
     () => aiRegistration?.adapter.getContext() ?? [],
     [aiRegistration],
   );
-  const registeredAiSelection = aiRegistration?.adapter.getSelection?.() ?? null;
+  const browserRequest = useGlobalSearchStore((state) => state.browserRequest);
+  const registeredAiSelection = browserRequest?.selection ?? aiRegistration?.adapter.getSelection?.() ?? null;
   const currentContext = useMemo(
     () =>
       !includeCurrentContext
@@ -234,7 +237,9 @@ export function GlobalMisty(props: {
   useEffect(() => setAccount(props.accountId), [props.accountId, setAccount]);
   useEffect(() => {
     if (!open) return;
-    setContext(mergeGlobalMistyContext(useGlobalSearchStore.getState().context, currentContext));
+    if (!useGlobalSearchStore.getState().browserRequest) {
+      setContext(mergeGlobalMistyContext(useGlobalSearchStore.getState().context, currentContext));
+    }
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(focusTimer);
   }, [currentContext, open, setContext]);
@@ -482,6 +487,11 @@ export function GlobalMisty(props: {
                 data-misty-conversation={conversationActive ? "true" : undefined}
                 data-misty-content={contentVisible ? "true" : "false"}
               >
+                {browserNotice ? (
+                  <p role="status" className="border-b border-white/10 px-4 py-3 text-sm text-cream/70">
+                    {browserNotice} You can still ask about the attached content.
+                  </p>
+                ) : null}
                 {conversationActive ? (
                   <>
                     <ContextReceipt

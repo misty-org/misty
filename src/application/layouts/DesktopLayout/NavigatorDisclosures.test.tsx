@@ -239,8 +239,8 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.className).toContain("w-full");
     expect(trigger?.title).toBe("Collapse Planner");
     expect(
-      trigger?.querySelector('[data-chevron-placement="inline"]')?.parentElement?.className,
-    ).toContain("gap-1");
+      trigger?.lastElementChild?.lastElementChild?.getAttribute("data-chevron-placement"),
+    ).toBe("inline");
 
     const destinations = container.querySelector(
       '[role="group"][aria-label="Planner destinations"]',
@@ -297,6 +297,8 @@ describe("GlobalNavigator disclosures", () => {
     ).not.toBeNull();
 
     await act(async () => trigger?.click());
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(container.querySelector('[role="group"][aria-label="Planner destinations"]')).toBeNull();
   });
@@ -318,13 +320,15 @@ describe("GlobalNavigator disclosures", () => {
     );
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(destinations).not.toBeNull();
-    expect(destinations?.querySelector('a[aria-current="page"]')).toBeNull();
+    expect(destinations?.querySelector('a[aria-current="page"]')).not.toBeNull();
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
+    const planner = navigation?.querySelector('[data-planner-disclosure="true"]');
+    const library = navigation?.querySelector('[data-navigator-disclosure="library"]');
+    expect(planner).not.toBeNull();
+    expect(library).not.toBeNull();
     expect(
-      navigation
-        ?.querySelector('[data-planner-disclosure="true"]')
-        ?.nextElementSibling?.getAttribute("data-navigator-disclosure"),
-    ).toBe("library");
+      planner!.compareDocumentPosition(library!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("moves Social, Journal, and Library destinations into inline disclosures", async () => {
@@ -436,6 +440,8 @@ describe("GlobalNavigator disclosures", () => {
     ).toEqual(["notes", "drawings"]);
 
     await act(async () => socialTrigger?.click());
+    expect(socialTrigger?.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => socialTrigger?.click());
     expect(socialTrigger?.getAttribute("aria-expanded")).toBe("false");
 
     const libraryTrigger = container.querySelector<HTMLButtonElement>(
@@ -497,7 +503,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(items[1]?.getAttribute("aria-current")).toBe("page");
     expect(featureIconNames(destinations)).toEqual(["explorer", "transfers"]);
     expect(destinations?.className).toContain("gap-[var(--navigation-tree-gap)]");
-    expect(items.every((item) => item.className.includes("h-7"))).toBe(true);
+    expect(items.every((item) => item.className.includes("h-8"))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-branch="true"]'))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
     expect(
@@ -549,6 +555,8 @@ describe("GlobalNavigator disclosures", () => {
     });
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
 
+    await act(async () => trigger?.click());
+    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(container.querySelector('[role="group"][aria-label="Files destinations"]')).toBeNull();

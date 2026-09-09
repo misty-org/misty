@@ -343,6 +343,7 @@ export const MultiPanelWorkspace = memo(function MultiPanelWorkspace(
           <ChromeTabStrip
             tabs={tabs.map((tab) => ({
               id: tab.id,
+              namingId: tab.namingId,
               title: tab.title,
               path: tab.path,
               paneId: tab.activePaneId,

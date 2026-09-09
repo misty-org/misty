@@ -179,7 +179,7 @@ it("refreshes permissions after a server conflict without retrying installation 
     installations: [],
     actionAppId: "",
     loading: false,
-    error: expect.stringContaining("Review the refreshed permissions"),
+    error: expect.stringContaining("Choose Install to see its current permissions"),
   });
 });
 

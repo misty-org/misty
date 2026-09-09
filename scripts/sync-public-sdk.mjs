@@ -30,6 +30,8 @@ for (const consumer of consumers) {
 }
 run(["run", "check"], source);
 run(["run", "test:packed"], source);
+const { mistyBrowserProviders } = await import(resolve(source, "packages/contracts/dist/index.js"));
+writeFileSync(resolve(host, "src-tauri/src/infra/browser-providers.json"), JSON.stringify(mistyBrowserProviders, null, 2) + "\n");
 const temporary = mkdtempSync(resolve(tmpdir(), "misty-sdk-snapshot-"));
 try {
   const packages = ["contracts", "sdk"].map((name) => {

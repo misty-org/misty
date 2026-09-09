@@ -28,8 +28,6 @@ import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
 import { useComposerInput } from "./hooks/useComposerInput";
 import { useMessageEditing } from "./hooks/useMessageEditing";
-import { usePendingAgentRuns } from "./hooks/usePendingAgentRuns";
-import { useSpaceActionSuggestions } from "./hooks/useSpaceActionSuggestions";
 import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
@@ -62,7 +60,9 @@ export function SpaceSocial({
   const lastReadReceiptRef = useRef("");
 
   const initialAccess = useSpaceChatPermissions(spaceId, conversationId);
-  const resolvesProviderLanding = true;
+  // Misty opens the Space's Everyone chat. Only external providers need a
+  // conversation selected before they can show their landing page.
+  const resolvesProviderLanding = provider !== "misty";
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(
     spaceId,
@@ -110,11 +110,7 @@ export function SpaceSocial({
     accountConnections.some(
       (connection) => normalizeSocialProvider(connection.provider) === provider,
     );
-  const actionSuggestions = useSpaceActionSuggestions(
-    spaceId,
-    conversationId,
-    !scope.activeConversation?.direct_agent_id,
-  );
+
 
   useEffect(() => {
     if (conversationId || !resolvesProviderLanding || !landingConversation) return;
@@ -142,13 +138,11 @@ export function SpaceSocial({
     }
   };
 
-  const agentTurns = usePendingAgentRuns(spaceId, conversationId);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
   const suggestions = useChatSuggestions({
     spaceId,
     members: scope.members,
-    agents: scope.agents,
     currentUserId: user?.id,
     canBrowseLibrary: access.canBrowseLibrary,
     canReadLibrary: access.permissions?.["library.view"] !== false,
@@ -158,36 +152,11 @@ export function SpaceSocial({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
   const [messageToDelete, setMessageToDelete] = useState<SpaceMessage | null>(null);
-  const [suggestionVeto, setSuggestionVeto] = useState(false);
   const resetDraft = draft.reset;
   const resetEditing = editing.reset;
   const closeSuggestions = suggestions.setOpen;
   const clearSpacesError = store.clearSpacesError;
-  const loadChatAgents = store.loadChatAgents;
   const markRead = store.markRead;
-  useEffect(() => {
-    if (!conversationId || scope.activeConversation?.direct_agent_id) {
-      setSuggestionVeto(false);
-      return;
-    }
-    let active = true;
-    void spacesApi
-      .conversationSuggestionVeto(spaceId, conversationId)
-      .then(({ veto }) => {
-        if (active) setSuggestionVeto(veto);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [conversationId, scope.activeConversation?.direct_agent_id, spaceId]);
-  const toggleSuggestionVeto = async () => {
-    if (!conversationId) return;
-    const next = !suggestionVeto;
-    await spacesApi.setConversationSuggestionVeto(spaceId, conversationId, next);
-    setSuggestionVeto(next);
-    if (next) void actionSuggestions.refresh();
-  };
   const openPicker = (source: MistyPickerSource) => {
     setPickerSource(source);
     setPickerOpen(true);
@@ -203,9 +172,8 @@ export function SpaceSocial({
   const mentionNames = useMemo(
     () => [
       ...scope.members.map((member) => member.name),
-      ...scope.agents.map((agent) => agent.name),
     ],
-    [scope.members, scope.agents],
+    [scope.members],
   );
 
   const actions = useSpaceChatMessageActions({
@@ -214,7 +182,6 @@ export function SpaceSocial({
     currentUser: user ? { id: user.id, name: user.name } : undefined,
     activeConversation: scope.activeConversation,
     members: scope.members,
-    agents: scope.agents,
     draft,
     editing,
     setGroupMessages: conversationChat.setMessages,
@@ -223,7 +190,6 @@ export function SpaceSocial({
     storeUpdateMessage: store.updateMessage,
     storeDeleteMessage: store.deleteMessage,
     storeToggleReaction: store.toggleMessageReaction,
-    onAgentRunsQueued: agentTurns.track,
   });
 
   const messagesLoading = conversationId
@@ -349,7 +315,6 @@ export function SpaceSocial({
       !messagesLoading &&
       (!conversationId || conversationChat.loadedConversationId === conversationId),
     messages: scope.messages,
-    pendingRunCount: agentTurns.pending.length,
     targetMessageId: searchParams.get("message") ?? undefined,
   });
 
@@ -360,13 +325,9 @@ export function SpaceSocial({
     closeSuggestions(false);
     setPickerOpen(false);
     clearSpacesError();
-    if (!store.referenceOnly) {
-      void loadChatAgents(spaceId);
-    }
   }, [
     clearSpacesError,
     closeSuggestions,
-    loadChatAgents,
     resetDraft,
     resetEditing,
     spaceId,
@@ -430,7 +391,7 @@ export function SpaceSocial({
         />
       );
     }
-    if (provider !== "misty" && connectionsError) {
+    if (connectionsError) {
       return (
         <ErrorState
           className="h-full bg-charcoal-bg"
@@ -448,11 +409,7 @@ export function SpaceSocial({
         />
       );
     }
-    if (
-      provider !== "misty" &&
-      user?.id &&
-      (connectionsAccountId !== user.id || connectionsLoading)
-    ) {
+    if (user?.id && (connectionsAccountId !== user.id || connectionsLoading)) {
       return (
         <LoadingState
           className="h-full bg-charcoal-bg"
@@ -465,25 +422,17 @@ export function SpaceSocial({
       <EmptyState
         className="h-full bg-charcoal-bg"
         title={
-          provider === "misty"
-            ? "No Misty conversations yet"
-            : providerConnected
-              ? `No ${socialProviderLabel(provider)} conversations yet`
-              : `Connect ${socialProviderLabel(provider)}`
+          providerConnected
+            ? `No ${socialProviderLabel(provider)} conversations yet`
+            : `Connect ${socialProviderLabel(provider)}`
         }
         description={
-          provider === "misty"
-            ? "Private support conversations will appear here when they’re available."
-            : providerConnected
-              ? "New synced conversations will open here when they arrive."
-              : `Connect your ${socialProviderLabel(provider)} account to bring its conversations into Social.`
+          providerConnected
+            ? "New synced conversations will open here when they arrive."
+            : `Connect your ${socialProviderLabel(provider)} account to bring its conversations into Social.`
         }
         action={
-          provider === "misty" ? (
-            <Button type="button" variant="outline" onClick={conversationChat.reload}>
-              Refresh
-            </Button>
-          ) : providerConnected ? (
+          providerConnected ? (
             <Button type="button" variant="outline" onClick={conversationChat.reload}>
               Refresh
             </Button>
@@ -561,27 +510,6 @@ export function SpaceSocial({
         </h1>
 
         <div className="ml-auto flex items-center gap-3">
-          {conversationId && !scope.activeConversation?.direct_agent_id ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 text-cream-muted"
-              aria-label={
-                suggestionVeto
-                  ? "Resume action suggestions"
-                  : "Pause action suggestions in this conversation"
-              }
-              title={suggestionVeto ? "Resume suggestions" : "Pause suggestions"}
-              onClick={() => void toggleSuggestionVeto()}
-            >
-              {suggestionVeto ? (
-                <LightbulbOff className="size-4" />
-              ) : (
-                <Lightbulb className="size-4" />
-              )}
-            </Button>
-          ) : null}
           <ChatPresencePill spaceId={spaceId} />
         </div>
       </header>
@@ -614,9 +542,6 @@ export function SpaceSocial({
         onBeginMention={input.beginMention}
         onReply={draft.setReplyToMessageId}
         onDelete={setMessageToDelete}
-        pendingAgentRuns={agentTurns.pending}
-        actionSuggestions={actionSuggestions.items}
-        onActionSuggestionsChanged={() => void actionSuggestions.refresh()}
         onReload={() => {
           if (conversationId) conversationChat.reload();
           else void store.loadMessages(spaceId);

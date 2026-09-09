@@ -18,7 +18,7 @@ const makeScope = (instanceId: string, spaceId = "one") => {
 };
 afterEach(() => {
   scopes.splice(0).forEach((scope) => scope.close());
-  useAppNavigationStore.setState({ entries: [] });
+  useAppNavigationStore.setState({ entries: [], providerCache: [] });
 });
 it("prefers the focused instance, isolates Spaces and retains the surviving registration", () => {
   const a = makeScope("a"),
@@ -46,3 +46,53 @@ it("prefers the focused instance, isolates Spaces and retains the surviving regi
   expect(selected()).toBeUndefined();
   expect(useAppNavigationStore.getState().entries).toHaveLength(1);
 });
+
+it("retains provider shortcuts when a view closes, scoped to the account and Space", async () => {
+  const { savedProviderNavigation } = await import("./appNavigation");
+  const scope = createAppRpcScope({
+    identity: { appId: "inbox", accountId: "mail-user", instanceId: "mail-tab" },
+    scopes: ["navigation.write"],
+    expiresAt: "2099-01-01T00:00:00Z",
+    isCurrentAccount: () => true,
+  });
+  const items = [
+    { id: "integrations", label: "Integrations", route: "/apps/inbox" },
+    { id: "google", label: "Gmail", route: "/apps/inbox?provider=google" },
+  ];
+  createAppNavigationRegistration(scope).setItems(items);
+  scope.close();
+  const cached = useAppNavigationStore.getState().providerCache;
+  expect(
+    savedProviderNavigation(cached, { accountId: "mail-user", appId: "inbox" })?.items,
+  ).toEqual(items);
+  expect(
+    savedProviderNavigation(cached, { accountId: "other-user", appId: "inbox" }),
+  ).toBeUndefined();
+  expect(
+    savedProviderNavigation(cached, {
+      accountId: "mail-user",
+      appId: "inbox",
+      spaceId: "other-space",
+    }),
+  ).toBeUndefined();
+  useAppNavigationStore.setState({ providerCache: [] });
+});
+
+it.each(["browser", "chat", "inbox", "planner", "journal", "library"])(
+  "retains %s destinations without a gallery navigation row",
+  (appId) => {
+    const scope = createAppRpcScope({
+      identity: { appId, accountId: "test", instanceId: "tab" },
+      scopes: ["navigation.write"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      isCurrentAccount: () => true,
+    });
+    const items = [{ id: "misty", label: "Misty", route: `/apps/${appId}?provider=misty` }];
+    createAppNavigationRegistration(scope).setItems(items);
+    scope.close();
+    expect(
+      useAppNavigationStore.getState().providerCache.find((entry) => entry.identity.appId === appId)
+        ?.items,
+    ).toEqual(items);
+  },
+);

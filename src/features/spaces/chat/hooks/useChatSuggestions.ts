@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 const MAX_SUGGESTIONS = 24;
 
 /**
- * The `@` autocomplete: Agents, people, then unattached Library items.
+ * The `@` autocomplete: People, then unattached Library items.
  *
  * Library items are only offered while there is room left in the attachment
  * budget, so the list never suggests something that cannot be added.
@@ -18,14 +18,13 @@ const MAX_SUGGESTIONS = 24;
 export function useChatSuggestions(options: {
   spaceId: string;
   members: SpaceMember[];
-  agents: SpaceStudioResource[];
   currentUserId: string | undefined;
   canBrowseLibrary: boolean;
   canReadLibrary: boolean;
   selectedLibraryIds: string[];
   attachmentSlotsLeft: number;
 }) {
-  const { members, agents, currentUserId, canBrowseLibrary, selectedLibraryIds } = options;
+  const { members, currentUserId, canBrowseLibrary, selectedLibraryIds } = options;
   const [libraryItems, setLibraryItems] = useState<SpaceLibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -60,12 +59,6 @@ export function useChatSuggestions(options: {
         label: member.name,
         detail: member.email,
       }));
-    const agentSuggestions: ChatComposerSuggestion[] = agents.map((agent) => ({
-      kind: "agent",
-      id: agent.id,
-      label: agent.name,
-      detail: agent.creator_user_id === currentUserId ? "Your Agent" : "Shared Agent",
-    }));
     const library: ChatComposerSuggestion[] =
       canBrowseLibrary && options.attachmentSlotsLeft > 0
         ? libraryItems
@@ -78,13 +71,12 @@ export function useChatSuggestions(options: {
               item,
             }))
         : [];
-    return [...agentSuggestions, ...people, ...library]
+    return [...people, ...library]
       .filter(
         (item) => !needle || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(needle),
       )
       .slice(0, MAX_SUGGESTIONS);
   }, [
-    agents,
     canBrowseLibrary,
     currentUserId,
     libraryItems,

@@ -1,3 +1,5 @@
+import { localDesktopComponentUrl } from "./localDesktopApp";
+import { localAppComponentReady } from "@/api/apps/api";
 import { assertAppCompatible } from "./appCompatibility";
 import type { OfficialApp } from "@/api/apps";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -10,6 +12,8 @@ interface LocalAppRecord {
 
 export async function officialDesktopPackageReady(app: OfficialApp): Promise<boolean> {
   if (!hasTauriInternals() || app.desktop.runtime !== "downloaded") return false;
+  const local = localDesktopComponentUrl(app);
+  if (local) return localAppComponentReady(local);
   const sha256 = app.desktop.sha256?.trim();
   const signature = app.desktop.signature?.trim();
   const signatureKeyId = app.desktop.signature_key_id?.trim();
@@ -26,6 +30,11 @@ export async function officialDesktopPackageReady(app: OfficialApp): Promise<boo
 export async function stageOfficialDesktopPackage(app: OfficialApp): Promise<string | null> {
   if (!hasTauriInternals() || app.desktop.runtime !== "downloaded") return null;
   assertAppCompatible(app);
+  if (localDesktopComponentUrl(app)) {
+    if (!(await officialDesktopPackageReady(app)))
+      throw new Error(`Build ${app.name} in the local Apps repository first.`);
+    return null;
+  }
   const entry = app.desktop.entry?.trim();
   const sha256 = app.desktop.sha256?.trim();
   const signature = app.desktop.signature?.trim();
@@ -36,7 +45,7 @@ export async function stageOfficialDesktopPackage(app: OfficialApp): Promise<str
   return invoke<string>("install_plugin_bundle", {
     pluginId: app.id,
     root: "public",
-    url: desktopArtifactUrl(app, entry),
+    url: entry,
     platform: "desktop-web",
     sha256,
     official: true,
@@ -70,14 +79,4 @@ export async function uninstallOfficialDesktopPackage(
   assertCurrent();
   if (!records.some((record) => record.id === appId && record.root === "public")) return;
   await invoke<string>("uninstall_plugin", { pluginId: appId, root: "public" });
-}
-
-function desktopArtifactUrl(app: OfficialApp, publishedUrl: string): string {
-  if (!import.meta.env.DEV || import.meta.env.VITE_MISTY_LOCAL_OFFICIAL_APPS !== "true") {
-    return publishedUrl;
-  }
-  return new URL(
-    `/official-apps/${encodeURIComponent(app.id)}/${encodeURIComponent(app.version)}/desktop.zip`,
-    window.location.origin,
-  ).href;
 }

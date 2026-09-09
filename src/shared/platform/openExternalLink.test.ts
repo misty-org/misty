@@ -6,17 +6,16 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.openUrl }));
 vi.mock("@tauri-apps/plugin-os", () => ({ platform: () => "windows" }));
 
 import {
-  configureExternalLinkPreference,
   configureMistyBrowserLinkOpener,
   configureProviderAuthorizationLinkOpener,
   installExternalLinkRouting,
   normalizeExternalUrl,
   openExternalLink,
+  openSystemExternalLink,
   openProviderAuthorizationLink,
 } from "@/shared/platform/openExternalLink";
 
 afterEach(() => {
-  configureExternalLinkPreference(() => false);
   configureProviderAuthorizationLinkOpener(null);
   mocks.openUrl.mockClear();
   document.body.replaceChildren();
@@ -76,14 +75,36 @@ describe("openExternalLink", () => {
     uninstall();
   });
 
-  it("honors the system-browser preference", async () => {
+  it("routes legacy system-browser callers through Misty too", async () => {
     const openInMisty = vi.fn();
     configureMistyBrowserLinkOpener(openInMisty);
-    configureExternalLinkPreference(() => true);
+    await openSystemExternalLink("https://example.com/system");
+    expect(openInMisty).toHaveBeenCalledWith("https://example.com/system");
+    expect(mocks.openUrl).not.toHaveBeenCalled();
+  });
 
-    await openExternalLink("https://example.com/system");
+  it("does not escape to the system browser when Misty fails", async () => {
+    configureMistyBrowserLinkOpener(async () => {
+      throw new Error("view unavailable");
+    });
+    await expect(openSystemExternalLink("https://example.com")).rejects.toThrow("view unavailable");
+    await expect(
+      openProviderAuthorizationLink("https://login.microsoftonline.com"),
+    ).rejects.toThrow("view unavailable");
+    expect(mocks.openUrl).not.toHaveBeenCalled();
+  });
 
-    expect(mocks.openUrl).toHaveBeenCalledWith("https://example.com/system");
-    expect(openInMisty).not.toHaveBeenCalled();
+  it("routes middle-clicks and former system-link overrides into Misty", async () => {
+    const openInMisty = vi.fn();
+    configureMistyBrowserLinkOpener(openInMisty);
+    const uninstall = installExternalLinkRouting();
+    document.body.innerHTML =
+      '<a href="https://example.com/help" data-open-system-external="true">Help</a>';
+    document
+      .querySelector("a")!
+      .dispatchEvent(new MouseEvent("auxclick", { button: 1, bubbles: true, cancelable: true }));
+    expect(openInMisty).toHaveBeenCalledWith("https://example.com/help");
+    expect(mocks.openUrl).not.toHaveBeenCalled();
+    uninstall();
   });
 });

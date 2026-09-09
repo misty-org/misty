@@ -167,7 +167,7 @@ export const useAppsStore = create<AppsState>((set, get) => {
                 loading: false,
               });
               message =
-                "This app’s permissions changed. Review the refreshed permissions, then choose Add or Approve update.";
+                "This app’s access changed. Choose Install to see its current permissions and agree again.";
             }
           } catch {
             if (action.current() && sequence === loadSequence) set({ loading: false });

@@ -1,3 +1,4 @@
+import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -18,6 +19,8 @@ vi.mock("@/api/agents/api", () => ({
 }));
 
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
+
+initializeHostAgentsRuntime();
 
 describe("Global Misty durable Agent progress", () => {
   beforeEach(() => {

@@ -1,59 +1,20 @@
 import { cn } from "@/shared/ui";
-import {
-  ArrowLeftRight,
-  BookOpenText,
-  Bot,
-  CheckSquare2,
-  Code2,
-  FolderOpen,
-  Globe2,
-  House,
-  Inbox,
-  MessagesSquare,
-  Notebook,
-  SquareTerminal,
-  Store,
-  type LucideIcon,
-} from "lucide-react";
+import { appIcon, appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
 import type { WorkspaceToolId } from "./useRecentToolsStore";
 
 type WorkspaceAppIconSize = "picker" | "nav" | "marketplace";
 
-const appIconDetails: Record<WorkspaceToolId, { icon: LucideIcon }> = {
-  home: { icon: House },
-  inbox: { icon: Inbox },
-  social: { icon: MessagesSquare },
-  journal: { icon: Notebook },
-  files: { icon: FolderOpen },
-  agents: { icon: Bot },
-  planner: { icon: CheckSquare2 },
-  library: { icon: BookOpenText },
-  browser: { icon: Globe2 },
-  code: { icon: Code2 },
-  terminal: { icon: SquareTerminal },
-  transfers: { icon: ArrowLeftRight },
-  marketplace: { icon: Store },
-};
-
-/** Shared by navbar entries and workspace tabs so app identity stays consistent. */
-export function workspaceAppIcon(appId: string): LucideIcon | undefined {
-  return Object.prototype.hasOwnProperty.call(appIconDetails, appId)
-    ? appIconDetails[appId as WorkspaceToolId].icon
-    : undefined;
-}
+export { appIcon as workspaceAppIcon };
 
 /** Keeps top-level app identity neutral across navigation, Settings, and Discover. */
 export function workspaceAppIconColorClass(_appId: WorkspaceToolId): string {
   return "text-cream-bright";
 }
 
-const sizeDetails: Record<
-  WorkspaceAppIconSize,
-  { tileClass: string; iconSize: number; strokeWidth: number }
-> = {
-  picker: { tileClass: "size-5", iconSize: 15, strokeWidth: 2 },
-  nav: { tileClass: "size-7", iconSize: 20, strokeWidth: 2 },
-  marketplace: { tileClass: "size-10", iconSize: 22, strokeWidth: 1.9 },
+const sizeDetails: Record<WorkspaceAppIconSize, { tileClass: string; iconSize: number }> = {
+  picker: { tileClass: "size-5", iconSize: 15 },
+  nav: { tileClass: "size-7", iconSize: 20 },
+  marketplace: { tileClass: "size-10", iconSize: 22 },
 };
 
 export function WorkspaceAppIcon(props: {
@@ -61,10 +22,9 @@ export function WorkspaceAppIcon(props: {
   size?: WorkspaceAppIconSize;
   className?: string;
 }) {
-  const details = appIconDetails[props.appId];
   const size = props.size ?? "nav";
   const sizing = sizeDetails[size];
-  const Icon = details.icon;
+  const Icon = appIcons[props.appId];
 
   return (
     <span
@@ -80,7 +40,7 @@ export function WorkspaceAppIcon(props: {
       <Icon
         className={size === "nav" ? "!size-5" : undefined}
         size={sizing.iconSize}
-        strokeWidth={sizing.strokeWidth}
+        strokeWidth={appIconStrokeWidth}
       />
     </span>
   );

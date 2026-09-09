@@ -38,7 +38,6 @@ export interface MobileChatDraftRecord extends VersionedMobileRecord {
   selectedLibraryIds: string[];
   pendingAttachments: MobileMessageAttachment[];
   replyToMessageId: string;
-  selectedAgentIdsByLabel: Record<string, string>;
 }
 
 export interface MobileQueuedChatSubmissionRecord extends VersionedMobileRecord {

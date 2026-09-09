@@ -1,6 +1,9 @@
+import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
+import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import type { DesktopNavItem } from "@/application/layouts/model/types";
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { ActivityBridge } from "@/features/activity";
+import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { BrowserRuntimeBridge, setBrowserWebviewsSuspended } from "@/features/browser";
@@ -415,7 +418,7 @@ export function DesktopLayout(props: {
     />
   );
   return (
-    <main
+    <NavigationNamesBoundary userId={user?.id ?? ""}><main
       className={cn(
         frameClass,
         "transition-[grid-template-columns] duration-300 ease-in-out",
@@ -628,11 +631,13 @@ export function DesktopLayout(props: {
         />
       ) : null}
       <BrowserRuntimeBridge />
+      <BrowserContextMenuBridge />
       <MediaSearchViewer />
       <SpacesRealtimeBridge />
       <ActivityBridge />
+      <AgentJobWorker />
       <AppTour />
-    </main>
+    </main></NavigationNamesBoundary>
   );
 }
 

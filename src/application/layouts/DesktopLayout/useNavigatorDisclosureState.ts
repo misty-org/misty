@@ -2,7 +2,7 @@ import { useSettingsStore } from "@/features/settings";
 import { isNavigatorAppId, type NavigatorAppId } from "@/features/workspace";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type NavigatorDisclosureId = NavigatorAppId | "apps";
+export type NavigatorDisclosureId = NavigatorAppId | "apps" | `item:${NavigatorAppId}:${string}`;
 
 const guestAccountKey = "guest";
 const disclosureSettingsKey = "disclosures_by_account";
@@ -48,7 +48,12 @@ function disclosuresByAccount(
       const disclosures = Object.fromEntries(
         Object.entries(account).filter((entry): entry is [string, boolean] => {
           const [id, open] = entry;
-          return typeof open === "boolean" && (id === "apps" || isNavigatorAppId(id));
+          return (
+            typeof open === "boolean" &&
+            (id === "apps" ||
+              isNavigatorAppId(id) ||
+              (id.startsWith("item:") && isNavigatorAppId(id.split(":")[1])))
+          );
         }),
       ) as Partial<Record<NavigatorDisclosureId, boolean>>;
       return [[accountKey(key), disclosures] as const];

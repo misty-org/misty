@@ -11,7 +11,6 @@ export interface SpaceChatMessagesProps {
   loading: boolean;
   messages: SpaceMessage[];
   /** Agent turns still in flight; drives the typing indicator. */
-  pendingAgentRuns?: { triggerId: string; runId: string; agentId: string }[];
   actionSuggestions?: SpaceActionSuggestionBatch[];
   onActionSuggestionsChanged?: () => void;
   currentUserId?: string;

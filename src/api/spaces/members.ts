@@ -1,5 +1,5 @@
 import type {
-  SpaceAgentMembership,
+
   SpaceInvitation,
   SpaceMember,
 } from "@/api/spaces/dto/interfaces/types";
@@ -16,7 +16,7 @@ export function createSpaceMembersApi(
 
   return {
     members: (spaceId: string) =>
-      request<{ members: SpaceMember[]; agents: SpaceAgentMembership[] }>(
+      request<{ members: SpaceMember[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/members`,
       ),
     memberAvatar: (spaceId: string, userId: string) =>

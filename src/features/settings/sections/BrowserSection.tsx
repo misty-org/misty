@@ -7,14 +7,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import {
-  booleanSetting,
-  numberSetting,
-  SelectControl,
-  stringSetting,
-  SwitchControl,
-  TextControl,
-} from "../settingsControls";
+import { numberSetting, SelectControl, stringSetting, TextControl } from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function BrowserSection(props: SettingsContentProps) {
@@ -49,17 +42,6 @@ export function BrowserSection(props: SettingsContentProps) {
               value.trim() ? normalizeBrowserHomeUrl(value) : "",
             )
           }
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Open links externally"
-        description="Send external links to the system browser instead of handling them in-app."
-        last
-      >
-        <SwitchControl
-          checked={booleanSetting(props.document, "general", "open_links_externally", false)}
-          disabled={props.working}
-          onChange={(value) => props.onSettingChange("general", "open_links_externally", value)}
         />
       </SettingsRow>
     </SettingsSectionBlock>

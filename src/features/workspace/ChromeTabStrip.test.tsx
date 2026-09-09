@@ -123,7 +123,7 @@ describe("ChromeTabStrip", () => {
     });
 
     const tab = container.querySelector<HTMLElement>('.chrome-tab[data-tab-id="tab-1"]');
-    expect(tab?.getAttribute("draggable")).toBe("true");
+    expect(tab?.getAttribute("draggable")).toBe("false");
     expect(tab?.dataset.reorderDragSource).toBe("true");
     expect(tab?.dataset.mistyWindowDragBlock).toBe("true");
   });

@@ -1,16 +1,15 @@
-import type { OfficialApp } from "@/api/apps";
 import { useAuth } from "@/features/auth";
 import { officialAppRoute, useAppsStore } from "@/features/apps";
 import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { DiscoverBrowser } from "./components/DiscoverBrowser";
-import { OfficialAppReviewDialogs } from "./components/OfficialAppReviewDialogs";
 
 export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const spaces = useSpacesStore((state) => state.spaces);
   const catalog = useAppsStore((state) => state.catalog);
@@ -23,7 +22,6 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const add = useAppsStore((state) => state.install);
   const remove = useAppsStore((state) => state.uninstall);
   const [embeddedAppId, setEmbeddedAppId] = useState("");
-  const [removing, setRemoving] = useState<OfficialApp | null>(null);
   const activeSpace = preferredDefaultSpace(spaces);
   const requestedAppId = searchParams.get("app") ?? "";
 
@@ -34,7 +32,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   // A Discover pane keeps its local selection independent of other workspace tabs.
   useEffect(() => {
     if (embedded && requestedAppId) setEmbeddedAppId(requestedAppId);
-  }, [embedded, requestedAppId]);
+  }, [embedded, requestedAppId, location.key]);
 
   const selectApp = (id: string) => {
     if (embedded) {
@@ -63,24 +61,15 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
         actionAppId={actionAppId}
         mobile={isNativeMobileBuild}
         selectedAppId={embedded ? embeddedAppId : requestedAppId}
+        requestKey={location.key}
+        requestedSection={searchParams.get("section") === "installed" ? "installed" : undefined}
         onSelect={selectApp}
         onRefresh={() => {
           if (user?.id) void load(user.id, true);
         }}
-        onInstall={(app) => void add(app).catch(() => undefined)}
+        onInstall={add}
         onOpen={(app) => navigate(officialAppRoute(app.id, activeSpace?.id, user?.id ?? ""))}
-        onRemove={setRemoving}
-      />
-      <OfficialAppReviewDialogs
-        installApp={null}
-        uninstallApp={removing}
-        onCloseInstall={() => undefined}
-        onCloseUninstall={() => setRemoving(null)}
-        onInstall={() => undefined}
-        onUninstall={(app) => {
-          setRemoving(null);
-          void remove(app.id).catch(() => undefined);
-        }}
+        onRemove={(app) => remove(app.id)}
       />
     </>
   );

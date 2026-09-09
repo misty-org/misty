@@ -1,3 +1,11 @@
+import { useNavigatorResume } from "./useNavigatorResume";
+import { Renameable } from "@/features/navigation-names/Renameable";
+import {
+  useNavigationNames,
+  navigationName,
+  sectionNameKey,
+  itemNameKey,
+} from "@/features/navigation-names/store";
 import {
   useWorkspaceStore,
   WorkspaceAppIcon,
@@ -6,12 +14,11 @@ import {
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
   NavigationSectionButton,
   NavigationTreeItem,
   navigationMenuGroupClass,
 } from "@/shared/ui";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
   AgendaDestinationIcon,
@@ -36,6 +43,8 @@ export function PlannerNavigatorDisclosure(props: {
   activeRoute: string;
   path: string;
 }) {
+  useNavigationNames();
+  const sectionLabel = navigationName(sectionNameKey("planner"), "Planner");
   const [open, setOpen] = useNavigatorDisclosureState(props.accountId, "planner", props.active);
   const wasActiveRef = useRef(props.active);
   const activeDestination = props.active ? plannerDestinationFromRoute(props.activeRoute) : null;
@@ -50,6 +59,20 @@ export function PlannerNavigatorDisclosure(props: {
     if (becameActive) setOpen(true);
   }, [props.active, setOpen]);
 
+  const contentId = useId();
+  const resume = useNavigatorResume({
+    accountId: props.accountId,
+    key: "planner",
+    fallbackRoute: props.path,
+  });
+  const activate = () => {
+    if (props.active && open) setOpen(false);
+    else {
+      setOpen(true);
+      resume();
+    }
+  };
+
   return (
     <Collapsible
       open={open}
@@ -57,36 +80,39 @@ export function PlannerNavigatorDisclosure(props: {
       className={`${navigationMenuGroupClass} w-full min-w-0`}
       data-planner-disclosure="true"
     >
-      <CollapsibleTrigger asChild>
+      <Renameable nameKey={sectionNameKey("planner")} automatic={"Planner"}>
         <NavigationSectionButton
           icon={<WorkspaceAppIcon appId={"planner"} size="nav" />}
-          label={"Planner"}
+          label={sectionLabel}
           open={open}
-          aria-label={"Planner"}
+          aria-controls={contentId}
+          onClick={activate}
+          aria-label={sectionLabel}
           data-navigator-disclosure-trigger="true"
-          title={`${open ? "Collapse" : "Expand"} ${"Planner"}`}
+          title={`${open ? "Collapse" : "Expand"} ${sectionLabel}`}
         />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
+      </Renameable>
+      <CollapsibleContent id={contentId}>
         <div className={navigationMenuGroupClass} role="group" aria-label="Planner destinations">
           {destinations.map(({ id, label, icon: Icon, path }, index) => {
             const active = id === activeDestination;
             return (
-              <NavigationTreeItem
-                key={id}
-                asChild
-                icon={<Icon aria-hidden />}
-                label={label}
-                selected={active}
-                last={index === destinations.length - 1}
-              >
-                <Link
-                  to={path}
-                  onClick={() => {
-                    openWorkspaceRoute(path);
-                  }}
-                />
-              </NavigationTreeItem>
+              <Renameable key={id} nameKey={itemNameKey("planner", [id])} automatic={label}>
+                <NavigationTreeItem
+                  asChild
+                  icon={<Icon aria-hidden />}
+                  label={navigationName(itemNameKey("planner", [id]), label)}
+                  selected={active}
+                  last={index === destinations.length - 1}
+                >
+                  <Link
+                    to={path}
+                    onClick={() => {
+                      openWorkspaceRoute(path);
+                    }}
+                  />
+                </NavigationTreeItem>
+              </Renameable>
             );
           })}
         </div>

@@ -1,5 +1,4 @@
 import type {
-  SpaceAgentMembership,
   SpaceMessage,
   SpaceRun,
   SpaceRunDetail,
@@ -14,29 +13,6 @@ export function createSpaceChatApi(request: SpaceRequest) {
       request<{ messages: SpaceMessage[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,
       ),
-    chatAgents: (spaceId: string) =>
-      request<{ agents: SpaceAgentMembership[] }>(
-        `/spaces/${encodeURIComponent(spaceId)}/agents`,
-      ).then(({ agents }) => ({
-        agents: agents
-          .filter((agent) => agent.enabled)
-          .map((agent) => ({
-            id: agent.agent_id,
-            space_id: agent.space_id,
-            creator_user_id: agent.owner_user_id,
-            kind: "agent" as const,
-            name: agent.name,
-            description: agent.description,
-            icon: agent.icon,
-            model_id: agent.model_id,
-            enabled: agent.enabled,
-            status: agent.work_state,
-            version: agent.version,
-            schedules_enabled: false,
-            created_at: agent.created_at,
-            updated_at: agent.updated_at,
-          })),
-      })),
     sendMessage: (
       spaceId: string,
       content: MessageSpan[],
@@ -48,18 +24,6 @@ export function createSpaceChatApi(request: SpaceRequest) {
     ) =>
       request<{
         message: SpaceMessage;
-        triggered_runs: Array<{
-          id: string;
-          agent_id: string;
-          state:
-            | "queued"
-            | "working"
-            | "awaiting_approval"
-            | "completed"
-            | "failed"
-            | "canceled"
-            | "retrying";
-        }>;
       }>(`/spaces/${encodeURIComponent(spaceId)}/messages`, {
         method: "POST",
         body: JSON.stringify({
@@ -69,7 +33,6 @@ export function createSpaceChatApi(request: SpaceRequest) {
           library_item_ids: libraryItemIds,
           reply_to_message_id: replyToMessageId,
           client_nonce: clientNonce,
-          agent_invocations: agentInvocations(content),
         }),
       }),
     runDetail: (runId: string) => request<SpaceRunDetail>(`/runs/${encodeURIComponent(runId)}`),
@@ -112,12 +75,4 @@ export function createSpaceChatApi(request: SpaceRequest) {
         body: JSON.stringify({ seq }),
       }),
   };
-}
-
-function agentInvocations(content: MessageSpan[]) {
-  const ids = new Set<string>();
-  for (const span of content) {
-    if (span.type === "mention" && "agent_id" in span && span.agent_id) ids.add(span.agent_id);
-  }
-  return [...ids].map((agent_id) => ({ agent_id }));
 }

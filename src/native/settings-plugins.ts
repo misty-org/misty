@@ -1,3 +1,4 @@
+import { openExternalLink } from "@/shared/platform/openExternalLink";
 import type {
   CloudConfigPaths,
   ExtensionCommandRequest,
@@ -167,7 +168,7 @@ export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> 
 }
 
 export function openExternalUrl(url: string): Promise<void> {
-  return invoke("open_external_url", { url });
+  return openExternalLink(url);
 }
 
 export function providersSnapshot(): Promise<ProvidersSnapshot> {

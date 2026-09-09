@@ -13,7 +13,6 @@ import {
 import { Button } from "@/shared/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
-import { AgentTypingIndicator } from "./AgentTypingIndicator";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
@@ -23,7 +22,6 @@ import { SpaceDirectMessageIntro } from "./DirectMessageIntro";
 export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   const displayRows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
   const memberAvatarUrls = useMemberAvatarUrls(props.spaceId, props.messages);
-  const pendingRun = props.pendingAgentRuns?.[0];
 
   const avatarFor = (message: {
     origin?: { author_avatar_url?: string };
@@ -97,7 +95,6 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
           })
         )}
 
-        {pendingRun ? <AgentTypingIndicator runId={pendingRun.runId || undefined} /> : null}
 
         <div ref={props.endRef} />
       </div>

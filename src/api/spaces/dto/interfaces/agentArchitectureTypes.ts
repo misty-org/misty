@@ -255,23 +255,3 @@ export interface ProviderConnectionAvailability {
   provider: string;
   configured: boolean;
 }
-
-export interface AvailableProviderResource {
-  provider: string;
-  resource_type: string;
-  external_resource_id: string;
-  display_name: string;
-  configuration: Record<string, unknown>;
-}
-
-export interface ProviderSharedResource extends AvailableProviderResource {
-  id: string;
-  space_id: string;
-  integration_id: string;
-  published_by_user_id: string;
-  permission_scope: string;
-  status: "active" | "needs_attention" | "disabled";
-  last_error_code?: string;
-  created_at: string;
-  updated_at: string;
-}

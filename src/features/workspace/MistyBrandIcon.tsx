@@ -15,7 +15,7 @@ export function MistyBrandIcon(props: {
       data-social-provider-icon="misty"
       style={{ width: size, height: size }}
     >
-      <AssetIcon src={mistyLogo} size={size} />
+      <AssetIcon src={mistyLogo} size={size} color />
     </span>
   );
 }

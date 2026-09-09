@@ -5,6 +5,14 @@ import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { activityItemsFromSpaces, activityTargetMatchesLocation } from "./activityModel";
 import { syncNativeBadge } from "./nativeNotifications";
+import {
+  capabilityApprovalActivities,
+  useCapabilityApprovals,
+} from "@/features/capability-approvals/store";
+import {
+  agentInterventionActivities,
+  useAgentInterventions,
+} from "@/features/agent-interventions/store";
 import { useActivityStore } from "./useActivityStore";
 
 /**
@@ -15,6 +23,8 @@ export function ActivityBridge() {
   const location = useLocation();
   const { user } = useAuth();
   const accountId = user?.id ?? "";
+  const approvals = useCapabilityApprovals();
+  const interventions = useAgentInterventions();
   const [sourceReadyAccount, setSourceReadyAccount] = useState("");
   const { inbox, invitations } = useSpacesStore(
     useShallow((state) => ({ inbox: state.inbox, invitations: state.invitations })),
@@ -34,6 +44,27 @@ export function ActivityBridge() {
     );
 
   useEffect(() => {
+    const store = useCapabilityApprovals.getState();
+    store.setAccount(accountId);
+    useAgentInterventions.getState().setAccount(accountId);
+    const refresh = () => {
+      void useCapabilityApprovals.getState().refresh();
+      void useAgentInterventions.getState().refresh();
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      useCapabilityApprovals.getState().setAccount("");
+      useAgentInterventions.getState().setAccount("");
+    };
+  }, [accountId]);
+
+  useEffect(() => {
     let active = true;
     setSourceReadyAccount("");
     setAccount(accountId);
@@ -49,8 +80,26 @@ export function ActivityBridge() {
 
   useEffect(() => {
     if (!accountId || sourceReadyAccount !== accountId) return;
-    syncSources(accountId, activityItemsFromSpaces(accountId, inbox, invitations));
-  }, [accountId, inbox, invitations, sourceReadyAccount, syncSources]);
+    syncSources(accountId, [
+      ...activityItemsFromSpaces(accountId, inbox, invitations),
+      ...(interventions.accountId === accountId
+        ? agentInterventionActivities(accountId, interventions.items)
+        : []),
+      ...(approvals.accountId === accountId
+        ? capabilityApprovalActivities(accountId, approvals.items)
+        : []),
+    ]);
+  }, [
+    accountId,
+    inbox,
+    invitations,
+    sourceReadyAccount,
+    syncSources,
+    interventions.accountId,
+    interventions.items,
+    approvals.accountId,
+    approvals.items,
+  ]);
 
   useEffect(() => {
     const online = () => {
