@@ -54,7 +54,7 @@ pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
     if ensure_connected_devices_development_config(&devices)? {
         println!("Configured Connected Devices for local development.");
     }
-    let worker = workspace.server.join("cloudflare/journal-collab");
+    let worker = workspace.server.join("apps/journal-collab");
     let dev_vars = worker.join(".dev.vars");
     let server_env = worker.join(".secrets/server.env");
     match (dev_vars.is_file(), server_env.is_file()) {
@@ -189,7 +189,11 @@ fn development_up_command(detach: bool, build: bool) -> CommandSpec {
     if build {
         command = command.arg("--build");
     }
-    command = command.args(["--force-recreate", "--remove-orphans"]);
+    // Compose already recreates services whose image or configuration changed.
+    // Avoid forcing the stable Cloudflare connector down during every API
+    // rebuild: doing so leaves the named hostname with no connector and turns
+    // one backend restart into a burst of misleading 530/CORS failures.
+    command = command.arg("--remove-orphans");
     if detach {
         command = command.arg("--detach");
     }
@@ -387,7 +391,7 @@ pub fn build_image(workspace: &Workspace, tag: &str) -> Result<()> {
 }
 
 pub fn generate_worker_secrets(workspace: &Workspace) -> Result<()> {
-    let worker = workspace.server.join("cloudflare/journal-collab");
+    let worker = workspace.server.join("apps/journal-collab");
     let development_environment =
         environment::root(workspace, Target::Dev).join("crypto/journal.env");
     let mut random = OsRng;
@@ -417,7 +421,7 @@ pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
         environment::root(workspace, Target::Prod).join("crypto/journal.env");
     let worker_environment = workspace
         .server
-        .join("cloudflare/journal-collab/.secrets/worker.prod.env");
+        .join("apps/journal-collab/.secrets/worker.prod.env");
     let existing = fs::read_to_string(&production_environment)
         .with_context(|| format!("could not read {}", production_environment.display()))?;
     validate_room_salt(&existing, &production_environment)?;
@@ -446,7 +450,7 @@ pub fn generate_production_worker_secrets(workspace: &Workspace) -> Result<()> {
 pub fn deploy_production_worker(workspace: &Workspace, dry_run: bool) -> Result<()> {
     let production_environment =
         environment::root(workspace, Target::Prod).join("crypto/journal.env");
-    let worker = workspace.server.join("cloudflare/journal-collab");
+    let worker = workspace.server.join("apps/journal-collab");
     let worker_environment = worker.join(".secrets/worker.prod.env");
     require_private_file(&production_environment)?;
     require_private_file(&worker_environment)?;
@@ -891,7 +895,7 @@ pub fn configure_r2_cors(workspace: &Workspace, apply: bool) -> Result<()> {
         .tempdir()?;
     let policy_path = temporary.path().join("cors.json");
     fs::write(&policy_path, serde_json::to_vec_pretty(&policy)?)?;
-    let worker = workspace.server.join("cloudflare/journal-collab");
+    let worker = workspace.server.join("apps/journal-collab");
     let wrangler = worker.join("node_modules/.bin").join(if cfg!(windows) {
         "wrangler.cmd"
     } else {
@@ -969,12 +973,9 @@ mod tests {
         let up = development_up_command(true, true).display();
         assert!(up.contains("--env-file .env/dev/runtime.env"));
         assert!(up.contains("--env-file .env/dev/integrations/discord.env"));
-        assert!(up.ends_with(
-            "--file compose.dev.yml up --build --force-recreate --remove-orphans --detach"
-        ));
+        assert!(up.ends_with("--file compose.dev.yml up --build --remove-orphans --detach"));
         let up_without_build = development_up_command(true, false).display();
-        assert!(up_without_build
-            .ends_with("--file compose.dev.yml up --force-recreate --remove-orphans --detach"));
+        assert!(up_without_build.ends_with("--file compose.dev.yml up --remove-orphans --detach"));
         let down = development_down_command(true).display();
         assert!(down.ends_with("--file compose.dev.yml down --volumes --remove-orphans"));
         let logs = development_compose().args(["logs", "--follow"]).display();
@@ -1140,7 +1141,7 @@ mod tests {
 
         let production = fs::read_to_string(&production_path).unwrap();
         let worker =
-            fs::read_to_string(server.join("cloudflare/journal-collab/.secrets/worker.prod.env"))
+            fs::read_to_string(server.join("apps/journal-collab/.secrets/worker.prod.env"))
                 .unwrap();
         assert!(production.contains(&format!("{ROOM_SALT}={room_salt}\n")));
         assert!(!production.contains("replace-"));
@@ -1154,7 +1155,7 @@ mod tests {
         }
         assert!(generate_production_worker_secrets(&workspace).is_err());
         let production_values = read_environment(&production_path).unwrap();
-        let worker_path = server.join("cloudflare/journal-collab/.secrets/worker.prod.env");
+        let worker_path = server.join("apps/journal-collab/.secrets/worker.prod.env");
         let worker_values = read_environment(&worker_path).unwrap();
         validate_production_worker_bundle(
             &production_values,
@@ -1172,7 +1173,7 @@ mod tests {
                 0o600
             );
             assert_eq!(
-                fs::metadata(server.join("cloudflare/journal-collab/.secrets/worker.prod.env"))
+                fs::metadata(server.join("apps/journal-collab/.secrets/worker.prod.env"))
                     .unwrap()
                     .permissions()
                     .mode()

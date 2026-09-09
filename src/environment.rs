@@ -57,6 +57,8 @@ const FILES: &[FileSpec] = &[
             "MISTY_INSTANCE_NAME",
             "MISTY_OPERATOR_USER_ID",
             "MISTY_PUBLIC_API_URL",
+            "MISTY_SDK_EXECUTION_ENABLED",
+            "MISTY_SDK_PROVIDERS_ENABLED",
             "MISTY_WEBSITE_URL",
             "PASSWORD_RESET_START_URL",
             "PASSWORD_RESET_URL",

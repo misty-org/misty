@@ -106,24 +106,24 @@ export const serverPages: DocPage[] = [
             [
               [
                 "server up",
-                "docker compose [scoped dev env files] -f compose.dev.yml up --build --force-recreate --remove-orphans",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --build --remove-orphans",
               ],
               [
                 "server up --detach",
-                "docker compose [scoped dev env files] -f compose.dev.yml up --build --force-recreate --remove-orphans --detach",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --build --remove-orphans --detach",
               ],
               [
                 "server up --no-build",
-                "docker compose [scoped dev env files] -f compose.dev.yml up --force-recreate --remove-orphans",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --remove-orphans",
               ],
               [
                 "server up --detach --no-build",
-                "docker compose [scoped dev env files] -f compose.dev.yml up --force-recreate --remove-orphans --detach",
+                "docker compose [scoped dev env files] -f compose.dev.yml up --remove-orphans --detach",
               ],
             ],
           ),
           p(
-            "Every invocation force-recreates the full development stack and removes orphaned containers. --build also rebuilds buildable service images from the current source. --no-build is faster when the existing images are already correct, but it does not skip container recreation.",
+            "Every invocation reconciles the full development stack and removes orphaned containers. Compose recreates services whose image or configuration changed while keeping unchanged infrastructure, including the Cloudflare connector, online. --build also rebuilds buildable service images from the current source; --no-build is faster when the existing images are already correct.",
           ),
           p(
             "Detached startup waits for the collaboration Worker deployment to finish successfully before it prints the public dev-api.mistysys.com URL and returns to the shell.",
@@ -334,11 +334,11 @@ export const serverPages: DocPage[] = [
             ["File", "Contents"],
             [
               [
-                "cloudflare/journal-collab/.dev.vars",
+                "apps/journal-collab/.dev.vars",
                 "Public ticket key, control secret, and projection secret for the local Worker.",
               ],
               [
-                "cloudflare/journal-collab/.secrets/server.env",
+                "apps/journal-collab/.secrets/server.env",
                 "Private signing key and matching control/projection secrets for the server.",
               ],
               [
@@ -350,7 +350,7 @@ export const serverPages: DocPage[] = [
                 "For the production target, the three first-use placeholders are replaced while the existing room salt is preserved.",
               ],
               [
-                "cloudflare/journal-collab/.secrets/worker.prod.env",
+                "apps/journal-collab/.secrets/worker.prod.env",
                 "Production public ticket key and matching control/projection secrets for Wrangler.",
               ],
             ],

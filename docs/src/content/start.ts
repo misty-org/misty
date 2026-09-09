@@ -28,6 +28,10 @@ export const startPages: DocPage[] = [
                 "Desktop",
                 "Tauri development, native builds, safe cleanup, icon generation, and Windows asset staging.",
               ],
+              [
+                "Mobile",
+                "Apple toolchain diagnostics, device discovery, iOS development, simulator builds, and signed exports.",
+              ],
               ["Website", "Vite development for the public website."],
               [
                 "Server",
@@ -67,7 +71,7 @@ export const startPages: DocPage[] = [
         title: "Command families",
         blocks: [
           code(
-            "misty configure --workspace ~/misty-org\nmisty doctor\nmisty check <app|server|website|extensions|cli|all>\nmisty desktop <command>\nmisty website <command>\nmisty server <command>\nmisty release <command>",
+            "misty configure --workspace ~/misty-org\nmisty doctor\nmisty check <app|server|website|extensions|cli|all>\nmisty desktop <command>\nmisty mobile <command>\nmisty website <command>\nmisty server <command>\nmisty release <command>",
           ),
           list([
             "Use --help or -h at any level to inspect available commands and options.",
@@ -104,7 +108,7 @@ export const startPages: DocPage[] = [
         title: "Before you begin",
         blocks: [
           p(
-            "The default workspace is ~/misty-org. It contains sibling misty/, misty-server/, misty-website/, misty-extensions/, and misty-cli/ repositories, and misty validates their project markers before running a workflow.",
+            "The default workspace is ~/misty-org. It contains sibling misty/, misty-server/, misty-website/, misty-store/, and misty-cli/ repositories, and misty validates their project markers before running a workflow.",
           ),
           table(
             ["Tool", "Used for"],

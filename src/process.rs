@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::{OsStr, OsString},
     path::Path,
     process::{Command, Stdio},
@@ -12,6 +12,7 @@ pub struct CommandSpec {
     program: OsString,
     args: Vec<OsString>,
     environment: BTreeMap<OsString, OsString>,
+    removed_environment: BTreeSet<OsString>,
 }
 
 impl CommandSpec {
@@ -38,6 +39,11 @@ impl CommandSpec {
 
     pub fn env(mut self, name: impl Into<OsString>, value: impl Into<OsString>) -> Self {
         self.environment.insert(name.into(), value.into());
+        self
+    }
+
+    pub fn env_remove(mut self, name: impl Into<OsString>) -> Self {
+        self.removed_environment.insert(name.into());
         self
     }
 
@@ -82,10 +88,11 @@ impl CommandSpec {
 
     fn command(&self, directory: &Path) -> Command {
         let mut command = Command::new(&self.program);
-        command
-            .args(&self.args)
-            .current_dir(directory)
-            .envs(&self.environment);
+        command.args(&self.args).current_dir(directory);
+        for name in &self.removed_environment {
+            command.env_remove(name);
+        }
+        command.envs(&self.environment);
         command
     }
 }

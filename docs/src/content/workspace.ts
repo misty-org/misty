@@ -53,7 +53,7 @@ export const workspacePages: DocPage[] = [
         title: "Expected directory layout",
         blocks: [
           code(
-            "~/misty-org/\n├── misty/             # desktop application\n├── misty-server/      # backend and Docker stack\n├── misty-website/     # public website\n├── misty-extensions/  # first-party extensions\n└── misty-cli/         # developer CLI",
+            "~/misty-org/\n├── misty/             # desktop application\n├── misty-server/      # backend and Docker stack\n├── misty-website/     # public website\n├── misty-store/       # first-party Store apps\n└── misty-cli/         # developer CLI",
             "Filesystem",
           ),
           p(
@@ -352,7 +352,7 @@ export const workspacePages: DocPage[] = [
             "go vet ./... for static analysis.",
             "./test.sh on macOS/Linux, including serialized PostgreSQL-backed tests; Windows uses go test -p 1 ./... -count=1.",
             "scripts/check-container-contract.sh when present.",
-            "npm ci in cloudflare/journal-collab.",
+            "npm ci in apps/journal-collab.",
             "Worker typecheck, Vitest, runtime integration tests, and production dependency audit.",
             "Agent runtime clean install, typecheck, tests, and production build.",
           ]),
@@ -364,7 +364,7 @@ export const workspacePages: DocPage[] = [
         blocks: [
           list([
             "check website runs typecheck, lint, unit tests, and the production build from misty-website/.",
-            "check extensions validates the catalog, runs tests, and builds from misty-extensions/.",
+            "check extensions validates the catalog, runs tests, and builds from misty-store/.",
             "check cli runs rustfmt, Clippy with warnings denied, and locked tests from misty-cli/.",
           ]),
         ],
