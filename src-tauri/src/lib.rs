@@ -53,6 +53,10 @@ use infra::browser::host_messages::passwords::{
     browser_passwords_reveal, browser_passwords_save,
 };
 #[cfg(desktop)]
+use infra::browser::page_tools::media_tools::session::{
+    browser_webview_media_action, browser_webview_media_info,
+};
+#[cfg(desktop)]
 use infra::browser::page_tools::media_tools::{
     browser_webview_media_playback, browser_webview_picture_in_picture,
     browser_webview_reader_article,
@@ -144,6 +148,12 @@ pub fn run() {
     // Web APIs that website tabs reach natively; see kiri/README.md.
     #[cfg(desktop)]
     let builder = builder.plugin(infra::browser_kiri::plugin());
+
+    // WebKit can end a page's process while Misty is in the background; reload
+    // it as Tauri would, and log which page it was.
+    #[cfg(target_os = "macos")]
+    let builder =
+        builder.on_web_content_process_terminate(infra::browser_process_ended::page_process_ended);
 
     #[cfg(desktop)]
     let builder = builder
@@ -584,6 +594,8 @@ pub fn run() {
                     browser_webview_picture_in_picture,
                     #[cfg(desktop)]
                     browser_webview_media_playback,
+                    browser_webview_media_action,
+                    browser_webview_media_info,
                     #[cfg(desktop)]
                     browser_webview_reader_article,
                     #[cfg(desktop)]

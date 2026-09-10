@@ -216,3 +216,7 @@ pub async fn browser_webview_reader_article(
         .ok_or_else(|| "This page has no article to read.".to_owned())?;
     serde_json::from_str(&article).map_err(|_| "This page has no article to read.".to_owned())
 }
+
+// What a page is playing, and its own media controls.
+#[path = "browser_media_session.rs"]
+pub(crate) mod session;

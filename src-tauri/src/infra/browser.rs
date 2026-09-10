@@ -1130,6 +1130,7 @@ pub async fn browser_webview_create(
         ))
         .initialization_script(browser_status_script(&shortcut_token))
         .initialization_script(kiri::page_script())
+        .initialization_script(page_tools::media_tools::session::MEDIA_SESSION_PAGE_SCRIPT)
         .on_navigation(move |url| {
             if restoring_tab_session && url.as_str() == "about:blank" { return true; }
             // Misty's page scripts report over Kiri's host channel, never by

@@ -1,0 +1,96 @@
+/* The media player beside the navigator rail (docs/design/media-controls).
+   Monochrome; the only color is the page's own artwork. */
+.misty-now-playing {
+  display: grid;
+  width: 300px;
+  padding: 6px;
+  border-radius: 12px;
+}
+.misty-now-playing-card {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+.misty-now-playing-card + .misty-now-playing-card {
+  border-top: 1px solid var(--misty-theme-border);
+}
+.misty-now-playing-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 8px;
+  text-align: left;
+}
+.misty-now-playing-art {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--misty-theme-hover, var(--misty-theme-border));
+}
+.misty-now-playing-meta {
+  display: grid;
+  min-width: 0;
+}
+.misty-now-playing-title,
+.misty-now-playing-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.misty-now-playing-title {
+  color: var(--misty-theme-text-bright);
+  font-size: 13px;
+  font-weight: 500;
+}
+.misty-now-playing-top:hover .misty-now-playing-title {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.misty-now-playing-detail {
+  color: var(--misty-theme-text-muted);
+  font-size: 12px;
+}
+.misty-now-playing-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--misty-theme-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.misty-now-playing-bar {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--misty-theme-border);
+}
+.misty-now-playing-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--misty-theme-text-muted);
+  transition: width 1s linear;
+}
+.misty-now-playing-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.misty-now-playing-controls .misty-now-playing-play {
+  border-radius: 999px;
+  background: var(--misty-theme-text-bright);
+  color: var(--misty-theme-card);
+}
+.misty-now-playing-controls .misty-now-playing-play:hover {
+  background: var(--misty-theme-text);
+  color: var(--misty-theme-card);
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-now-playing-bar > span {
+    transition: none;
+  }
+}

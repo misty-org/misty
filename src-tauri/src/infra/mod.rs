@@ -24,6 +24,7 @@ pub mod browser_import;
 pub(crate) mod browser_kiri;
 #[cfg(desktop)]
 pub mod browser_library;
+pub mod browser_process_ended;
 #[cfg(desktop)]
 pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]

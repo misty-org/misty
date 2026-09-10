@@ -8,6 +8,7 @@ import {
   NavigatorExtensionsLink,
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
+import { NowPlayingRail } from "./NowPlayingRail";
 import { WorkspaceSpaceNavigation } from "@/features/spaces";
 import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
@@ -118,6 +119,7 @@ export function GlobalNavigator(props: {
         <NavigatorProfileBar
           utilityControls={
             <>
+              <NowPlayingRail className={navigatorHierarchyActionClass} />
               <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
               {props.syncControl}
             </>
