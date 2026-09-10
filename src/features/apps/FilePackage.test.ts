@@ -19,11 +19,19 @@ it("the downloaded Files entry uses the complete workspace for both routes and r
   expect(misty.fileSystem.mountWorkspace).toHaveBeenCalledWith(root, {
     view: "explorer",
     active: true,
+    extractDocumentText: expect.any(Function),
+    renderPdf: expect.any(Function),
+    renderVideo: expect.any(Function),
+    renderPhoto: expect.any(Function),
   });
   app.update({ ...context, route: "/apps/files?view=transfers" });
-  expect(view.update).toHaveBeenLastCalledWith({ view: "transfers", active: true });
+  expect(view.update).toHaveBeenLastCalledWith(
+    expect.objectContaining({ view: "transfers", active: true }),
+  );
   app.update(context);
-  expect(view.update).toHaveBeenLastCalledWith({ view: "explorer", active: true });
+  expect(view.update).toHaveBeenLastCalledWith(
+    expect.objectContaining({ view: "explorer", active: true }),
+  );
   controller.abort();
   await app.unmount();
   expect(view.unmount).toHaveBeenCalledTimes(1);
