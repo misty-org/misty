@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/shared/ui";
 import { capabilityApprovalsApi, type CapabilityApprovalReview } from "./api";
+import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useCapabilityApprovals } from "./store";
 
-export function CapabilityApprovals() {
+export function CapabilityApprovals({ detailOnly = false }: { detailOnly?: boolean } = {}) {
   const { items, loading, loaded, error, nextCursor, refresh, loadMore } = useCapabilityApprovals();
   const [params, setParams] = useSearchParams();
   const selected = params.get("approval") ?? "";
@@ -34,7 +35,7 @@ export function CapabilityApprovals() {
       {loaded && !items.length && !selected ? (
         <p className="px-2 text-sm text-cream-muted">No actions waiting for approval.</p>
       ) : null}
-      {items.length ? (
+      {!detailOnly && items.length ? (
         <ul className="m-0 list-none p-0">
           {items.map((item) => (
             <li key={item.id} className="border-t border-charcoal-border/70">
@@ -102,13 +103,18 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
   }, []);
   useEffect(() => {
     const controller = new AbortController();
+    const accountId = useCapabilityApprovals.getState().accountId;
     setReview(undefined);
     setLoading(true);
     setError("");
     void capabilityApprovalsApi
       .review(id, controller.signal)
       .then((value) => {
-        if (!controller.signal.aborted) setReview(value);
+        if (!controller.signal.aborted && useCapabilityApprovals.getState().accountId === accountId) {
+          setReview(value);
+          if (value.approval.state !== "pending")
+            useActivityStore.getState().resolveSourceRequest(accountId, "capabilities", id);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted)
@@ -132,12 +138,14 @@ export function CapabilityApprovalDetail({ id, onClose }: { id: string; onClose(
   const pending = review?.approval.state === "pending" && !expired;
   const decide = async (approved: boolean) => {
     if (!review || !pending || submitting.current) return;
+    const accountId = useCapabilityApprovals.getState().accountId;
     submitting.current = true;
     setBusy(true);
     setError("");
     try {
       await capabilityApprovalsApi.decide(review, approved);
-      if (!alive.current) return;
+      if (!alive.current || useCapabilityApprovals.getState().accountId !== accountId) return;
+      useActivityStore.getState().resolveSourceRequest(accountId, "capabilities", id);
       setReview((current) =>
         current
           ? {

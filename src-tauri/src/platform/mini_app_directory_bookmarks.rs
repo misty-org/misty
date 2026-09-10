@@ -12,9 +12,9 @@ use std::{
         Arc, Mutex,
     },
 };
-const SERVICE: &str = "misty.native-app.directory-bookmarks.v1";
+const SERVICE: &str = "com.misty.native-app.directory-bookmarks.v1";
 const MAX_RECORDS: usize = 32;
-const MAX_BYTES: usize = 262144;
+const MAX_BYTES: usize = 2097152;
 static STORE_LOCK: Mutex<()> = Mutex::new(());
 
 trait Vault {
@@ -120,8 +120,15 @@ struct Request {
 }
 enum Output {
     Listed(Value),
-    Remembered { id: String, name: String },
-    Opened { directory: Dir, name: String },
+    Remembered {
+        id: String,
+        name: String,
+    },
+    Opened {
+        directory: Dir,
+        name: String,
+        scope: Option<platform::SecurityScope>,
+    },
     Forgotten,
 }
 impl Request {
@@ -197,10 +204,26 @@ impl Request {
                 if self.writable && !record.writable {
                     return Err("This folder was remembered read-only.".into());
                 }
-                let directory = platform::reopen(&record.identity)?;
+                let (directory, scope) = platform::reopen_scoped(&record.identity)?;
+                // Refresh stale bookmarks and migrate existing identity-only records.
+                let identity = platform::remember(&directory)?;
+                {
+                    let _lock = STORE_LOCK
+                        .lock()
+                        .map_err(|_| "The folder bookmark store is unavailable.")?;
+                    let mut store = load(vault, &self.owner)?;
+                    let current = store
+                        .records
+                        .get_mut(id)
+                        .ok_or("This saved folder was forgotten.")?;
+                    current.identity = identity;
+                    self.assert()?;
+                    save(vault, &self.owner, &store)?;
+                }
                 self.assert()?;
                 Ok(Output::Opened {
                     directory,
+                    scope,
                     name: record.name,
                 })
             }
@@ -237,7 +260,11 @@ impl Request {
                 }
                 Ok(json!({"bookmarkId":id,"name":name,"writable":self.writable}))
             }
-            Output::Opened { directory, name } => {
+            Output::Opened {
+                directory,
+                name,
+                scope,
+            } => {
                 if permissions.folders.len() >= 32 {
                     return Err("Release an open folder before reopening another.".into());
                 }
@@ -251,6 +278,11 @@ impl Request {
                         released: Arc::new(AtomicBool::new(false)),
                     },
                 );
+                if let Some(scope) = scope {
+                    permissions
+                        .folder_security_scopes
+                        .insert(handle.clone(), Arc::new(scope));
+                }
                 Ok(json!({"handle":handle,"name":name,"writable":self.writable}))
             }
             Output::Forgotten => Ok(Value::Null),
@@ -696,5 +728,49 @@ mod tests {
         let dir = &p.folders[opened["handle"].as_str().unwrap()].directory;
         let text = dir.read_to_string("file.txt").unwrap();
         dir.write("restored-by-child.txt", text).unwrap();
+    }
+    #[test]
+    fn migrates_identity_only_records_without_changing_saved_references() {
+        let (_root, mut p) = fixture();
+        let vault = MemoryVault::default();
+        let saved = call(
+            &mut p,
+            &vault,
+            "files.rememberDirectory",
+            json!({"directory":"folder"}),
+        )
+        .unwrap();
+        let owner = p.owner_namespace.clone().unwrap();
+        let mut value: Value = serde_json::from_str(&vault.load(&owner).unwrap().unwrap()).unwrap();
+        let id = saved["bookmarkId"].as_str().unwrap();
+        value["records"][id]["identity"]
+            .as_object_mut()
+            .unwrap()
+            .remove("bookmark");
+        vault
+            .store(&owner, &serde_json::to_string(&value).unwrap())
+            .unwrap();
+        let opened = call(
+            &mut p,
+            &vault,
+            "files.reopenDirectory",
+            json!({"bookmarkId":id}),
+        )
+        .unwrap();
+        assert!(p.folders.contains_key(opened["handle"].as_str().unwrap()));
+        let updated: Value = serde_json::from_str(&vault.load(&owner).unwrap().unwrap()).unwrap();
+        assert!(updated["records"][id]["identity"]["bookmark"].is_string());
+        // A second restoration now uses a retained security scope.
+        let opened = call(
+            &mut p,
+            &vault,
+            "files.reopenDirectory",
+            json!({"bookmarkId":id}),
+        )
+        .unwrap();
+        let handle = opened["handle"].as_str().unwrap();
+        let weak = Arc::downgrade(&p.folder_security_scopes[handle]);
+        super::super::binary_files::release(&mut p, handle);
+        assert!(weak.upgrade().is_none());
     }
 }

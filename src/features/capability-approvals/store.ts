@@ -70,6 +70,8 @@ export function capabilityApprovalActivities(
     source: "capabilities",
     sourceId: item.id,
     kind: "approval",
+    lifecycle: "request",
+    sourceLabel: "Misty",
     title: "Action needs your approval",
     body: item.summary,
     createdAt: item.created_at,
