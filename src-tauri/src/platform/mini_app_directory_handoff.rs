@@ -130,7 +130,22 @@ pub fn execute(
             }
             Ok((id.clone(), folder.directory.clone(), folder.name.clone()))
         })?;
+    #[cfg(target_os = "macos")]
+    let scope = {
+        let p = &registry.get(&source).unwrap().permissions;
+        let share = p.directory_shares.get(ticket).unwrap();
+        p.folder_security_scopes.get(&share.directory).cloned()
+    };
     let handle = uuid::Uuid::new_v4().to_string();
+    #[cfg(target_os = "macos")]
+    if let Some(scope) = scope {
+        registry
+            .get_mut(instance)
+            .unwrap()
+            .permissions
+            .folder_security_scopes
+            .insert(handle.clone(), scope);
+    }
     registry
         .get_mut(instance)
         .unwrap()
@@ -433,5 +448,41 @@ mod tests {
             .permissions
             .directory_shares
             .contains_key(next["ticket"].as_str().unwrap()));
+    }
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn adopted_bookmark_scope_survives_source_close_and_ends_on_revocation() {
+        use super::super::directory_bookmark_macos as platform;
+        let (_root, mut registry) = fixture();
+        let identity =
+            platform::remember(&registry["first"].permissions.folders["folder"].directory).unwrap();
+        let (_, scope) = platform::reopen_scoped(&identity).unwrap();
+        let scope = Arc::new(scope.unwrap());
+        let weak = Arc::downgrade(&scope);
+        registry
+            .get_mut("first")
+            .unwrap()
+            .permissions
+            .folder_security_scopes
+            .insert("folder".into(), scope);
+        let ticket = share(&mut registry, true);
+        let opened = adopt(&mut registry, &ticket, true).unwrap();
+        registry.remove("first");
+        assert!(weak.upgrade().is_some());
+        let handle = opened["handle"].as_str().unwrap();
+        assert_eq!(
+            registry["second"].permissions.folders[handle]
+                .directory
+                .read_to_string("日本語.txt")
+                .unwrap(),
+            "original"
+        );
+        registry
+            .get_mut("second")
+            .unwrap()
+            .permissions
+            .decide("files.read", false)
+            .unwrap();
+        assert!(weak.upgrade().is_none());
     }
 }
