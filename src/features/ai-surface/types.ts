@@ -54,7 +54,14 @@ export type AiSurfaceId =
   | "settings";
 export type AiInvocationMode = "quick" | "drawer" | "companion";
 export type AiTrigger =
-  "message" | "selection" | "object" | "schedule" | "event" | "handoff" | "continuation";
+  | "message"
+  | "selection"
+  | "object"
+  | "schedule"
+  | "scheduled_task"
+  | "event"
+  | "handoff"
+  | "continuation";
 export type AiPrivacyClass = "shared" | "private" | "device" | "provider";
 export type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
 export type AiApprovalPolicy =
@@ -205,6 +212,9 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  /** A scheduled run this computer claimed and is starting (roadmap C1). */
+  scheduleId?: string;
+  scheduleClaim?: string;
   methodVersionId?: string;
   methodInputs?: Record<string, string | number | boolean>;
   skillVersionIds?: string[];

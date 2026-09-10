@@ -23,7 +23,7 @@ import {
 } from "./store";
 const review = {
   token: "review",
-  entry: { id: 12, guid: "fixture@misty.test", name: "Fixture" },
+  entry: { id: "12", store: "firefox", guid: "fixture@misty.test", name: "Fixture" },
   permissions: ["storage"],
   hosts: ["https://example.com/*"],
   blocked: false,
@@ -73,6 +73,43 @@ describe("extension account controls", () => {
       permissions: ["storage", "tabs"],
     });
     expect(mocks.values["extensions.pins"]).toBeUndefined();
+  });
+  it("stores Firefox IDs as numbers for older versions and reads both forms", async () => {
+    await install(review, true);
+    const stored = JSON.parse(String(mocks.values["extensions.installations"]));
+    expect(stored[0].id).toBe(12);
+    expect(parseInstallations(JSON.stringify(stored))[0].id).toBe("12");
+    const chrome = "ddkjiahejlhfcafbddmgiahcphecmpfh";
+    await install(
+      { ...review, entry: { ...review.entry, id: chrome, store: "chrome", guid: chrome } },
+      false,
+    );
+    const both = JSON.parse(String(mocks.values["extensions.installations"]));
+    expect(both.map((item: { id: unknown }) => item.id)).toEqual([12, chrome]);
+    expect(parseInstallations(JSON.stringify(both)).map((item) => item.id)).toEqual(["12", chrome]);
+  });
+  it("drops installations whose identity does not fit their store", () => {
+    const base = {
+      generation: "g",
+      name: "N",
+      installed: true,
+      enabled: true,
+      privateAccess: false,
+      agentAccess: true,
+      permissions: [],
+      hosts: [],
+    };
+    const chrome = "ddkjiahejlhfcafbddmgiahcphecmpfh";
+    expect(
+      parseInstallations(
+        JSON.stringify([
+          { ...base, id: chrome, guid: "someone@else" },
+          { ...base, id: 7, guid: chrome },
+          { ...base, id: "not-an-id", guid: "x@y" },
+          { ...base, id: chrome, guid: chrome },
+        ]),
+      ).map((item) => item.id),
+    ).toEqual([chrome]);
   });
   it("blocks incompatible packages and account-mismatched preference writes", async () => {
     await expect(install({ ...review, blocked: true }, true)).rejects.toThrow("unavailable");

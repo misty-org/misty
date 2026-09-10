@@ -3,6 +3,8 @@
 pub mod clipboard_commands;
 #[cfg(unix)]
 pub mod code_commands;
+#[cfg(unix)]
+pub mod code_snapshots;
 pub mod commands;
 #[cfg(desktop)]
 pub mod device_admission_commands;

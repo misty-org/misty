@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiRequest } from "@/api/client";
 
-/** How a published agent takes requests from other members' agents. */
+/** How an agent takes requests from the other members of its Space. */
 export const acceptPolicies = ["ask", "auto", "off"] as const;
 export type AcceptPolicy = (typeof acceptPolicies)[number];
 
@@ -10,6 +10,9 @@ const listingSchema = z.object({
   space_name: z.string(),
   agent_id: z.string(),
   agent_name: z.string(),
+  agent_role: z.string().default(""),
+  agent_avatar: z.record(z.string(), z.json()).nullish(),
+  system_managed: z.boolean().default(false),
   owner_user_id: z.string(),
   owner_name: z.string(),
   description: z.string(),
@@ -28,6 +31,8 @@ const requestSchema = z.object({
   message: z.string(),
   approval: z.string(),
   created_at: z.string(),
+  /** Set when a person @mentioned the agent in Space chat rather than their agent asking. */
+  source_message_id: z.string().optional(),
 });
 export type AgentMemberRequest = z.infer<typeof requestSchema>;
 

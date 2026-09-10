@@ -63,7 +63,7 @@ export function reviewRows(preview: ImportPreview, keychainPrompt: boolean): Rev
       label: "Extensions",
       available: preview.extensions.length > 0,
       detail: preview.extensions.length
-        ? `${count(preview.extensions.length, "extension")} to find in Misty's catalog.`
+        ? `${count(preview.extensions.length, "extension")} to add from their stores.`
         : "No extensions to bring across.",
     },
   ];

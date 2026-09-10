@@ -222,6 +222,7 @@ fn grants_are_agent_capability_and_expiry_scoped() {
         operation: "browser.inspect".to_owned(),
         input: Value::Null,
         site_blocks: None,
+        confirm_kinds: None,
     };
     assert!(validate_browser_grant(&mut session, &request).is_ok());
     request.agent_id = "agent-b".to_owned();

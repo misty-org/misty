@@ -78,11 +78,11 @@ describe("navigation reordering", () => {
     const before = workspace().layout;
     fireEvent.keyDown(agents, { key: "ArrowUp", altKey: true, shiftKey: true });
     await waitFor(() =>
-      expect(destinationOrder()).toEqual(["agents", "browser", "extensions", "spaces"]),
+      expect(destinationOrder()).toEqual(["agents", "browser", "spaces"]),
     );
     expect(saveOrder).toHaveBeenCalledWith(
       "collections.tabs.navigator",
-      '["agents","browser","extensions","spaces"]',
+      '["agents","browser","spaces"]',
     );
     expect(document.activeElement).toBe(agents);
     expect(workspace().layout).toBe(before);
@@ -92,7 +92,7 @@ describe("navigation reordering", () => {
     act(() =>
       useSettingsProfiles.setState({ accountId: "account-2", state: initialProfileState({}) }),
     );
-    expect(destinationOrder()).toEqual(["browser", "agents", "extensions", "spaces"]);
+    expect(destinationOrder()).toEqual(["browser", "agents", "spaces"]);
   });
 
   it.each(["left", "right", "top", "bottom"] as const)(
@@ -117,7 +117,7 @@ describe("navigation reordering", () => {
       pointer(window, "pointerup", vertical ? 10 : 110, vertical ? 110 : 10);
       fireEvent.click(browser, { detail: 1 });
       await waitFor(() =>
-        expect(destinationOrder().slice(0, 3)).toEqual(["agents", "extensions", "browser"]),
+        expect(destinationOrder().slice(0, 3)).toEqual(["agents", "spaces", "browser"]),
       );
       expect(workspace().layout).toBe(before);
       expect(document.querySelector(".pointer-reorder-shield")).toBeNull();

@@ -5,7 +5,6 @@ import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderAgentsButton,
   NavigatorHeaderSearchButton,
-  NavigatorExtensionsLink,
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { NowPlayingRail } from "./NowPlayingRail";
@@ -102,11 +101,6 @@ export function GlobalNavigator(props: {
                     }
                   />
                 ),
-              },
-              {
-                value: "extensions",
-                label: "Extensions",
-                content: <NavigatorExtensionsLink active={activeTab?.surfaceId === "extensions"} />,
               },
               {
                 value: "spaces",

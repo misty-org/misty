@@ -6,49 +6,93 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  SkeletonList,
+  Spinner,
 } from "@/shared/ui";
 import { SettingsControlLabelContext } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
+import { ExtensionIcon } from "./ExtensionIcon";
 import { permissionLabel } from "./permissions";
+import { storeNames } from "./store";
 import type { ExtensionReview, Installation } from "./types";
 
-/** Reviews the access an extension requests before it installs. */
+/**
+ * Reviews the access an extension requests before it is added. Opens while
+ * Misty downloads and checks the package, with the review's shape as a skeleton.
+ */
 export function InstallReviewDialog({
+  open,
   review,
+  existing,
   busy,
   failure,
   privateAccess,
   onPrivateAccess,
+  onRetry,
   onClose,
   onInstall,
 }: {
+  open: boolean;
   review: ExtensionReview | null;
+  /** Already added: the review grants a new version's access instead. */
+  existing: boolean;
   busy: boolean;
   failure: string;
   privateAccess: boolean;
   onPrivateAccess(value: boolean): void;
+  onRetry?(): void;
   onClose(): void;
   onInstall(review: ExtensionReview): void;
 }) {
+  const name = review?.entry.name || "this extension";
   return (
     <Dialog
-      open={Boolean(review)}
-      onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !busy) onClose();
       }}
     >
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {review?.blocked
-              ? "Extension unavailable"
-              : `Install ${review?.entry.name ?? "extension"}?`}
+          <DialogTitle className="flex min-w-0 items-center gap-3">
+            {review && (
+              <span className="grid size-8 shrink-0 place-items-center [&_img]:size-8">
+                <ExtensionIcon entry={review.entry} />
+              </span>
+            )}
+            <span className="min-w-0 break-words">
+              {review?.blocked
+                ? `${name} can't run in Misty`
+                : review
+                  ? existing
+                    ? `Review ${name}`
+                    : `Add ${name}?`
+                  : "Add extension"}
+            </span>
           </DialogTitle>
           <DialogDescription>
-            Review the access this extension requests. Installs and controls apply across your Misty
-            account.
+            {review
+              ? `${storeNames[review.entry.store]} · Version ${review.entry.version}. ` +
+                "Review the access it asks for. Extensions you add sync to your Misty account."
+              : "Misty downloads the extension from its store and checks its signature before you review it."}
           </DialogDescription>
         </DialogHeader>
+        {!review && !failure && (
+          <SkeletonList label="Extension access" rows={3} lines={1} />
+        )}
+        {!review && failure && (
+          <>
+            <p role="alert" className="text-sm">
+              {failure}
+            </p>
+            <DialogFooter>
+              <Button variant="ghost" onClick={onClose}>
+                Close
+              </Button>
+              {onRetry && <Button onClick={onRetry}>Try again</Button>}
+            </DialogFooter>
+          </>
+        )}
         {review && (
           <>
             <ul className="max-h-52 overflow-y-auto list-inside list-disc space-y-1 break-words text-sm">
@@ -86,7 +130,7 @@ export function InstallReviewDialog({
                 Cancel
               </Button>
               <Button disabled={review.blocked || busy} onClick={() => onInstall(review)}>
-                {busy ? "Installing…" : "Install"}
+                {busy ? <Spinner label="Adding extension" /> : existing ? "Allow" : "Add"}
               </Button>
             </DialogFooter>
           </>
@@ -116,7 +160,7 @@ export function UninstallDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Uninstall {removing?.name}?</DialogTitle>
+          <DialogTitle>Remove {removing?.name}?</DialogTitle>
           <DialogDescription>
             This removes the extension and its synced settings from your Misty account and connected
             devices.
@@ -127,7 +171,7 @@ export function UninstallDialog({
             Cancel
           </Button>
           <Button disabled={busy} onClick={() => removing && onUninstall(removing)}>
-            Uninstall everywhere
+            Remove everywhere
           </Button>
         </DialogFooter>
       </DialogContent>

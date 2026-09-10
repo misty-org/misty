@@ -27,6 +27,7 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionsInternal.h");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionTabs.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionPopupWindows.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompat.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNotifications.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.h");
@@ -50,6 +51,7 @@ fn main() {
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
             .file("native/macos/MistyExtensionTabs.m")
+            .file("native/macos/MistyExtensionPopupWindows.m")
             .file("native/macos/MistyExtensionCompat.m")
             .file("native/macos/MistyExtensionNotifications.m")
             .file("native/macos/MistyExtensionNativeMessaging.m")

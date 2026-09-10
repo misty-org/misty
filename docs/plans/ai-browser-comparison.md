@@ -20,6 +20,16 @@ Legend: ✓ has it · ◐ partial or limited · ✗ doesn't have it · ? the ven
 | **ChatGPT** (OpenAI) | Chat app with a built-in browser, ChatGPT Work, scheduled tasks (Plus) and Dot, an always-on agent (Pro). Atlas shut down 2026-08-09. |
 | **Claude** (Anthropic) | Chat app; Claude in Chrome, scheduled tasks and Claude Code on Pro and up. |
 
+Always-on agent apps, added 2026-10-11 for positioning only. They are not chart columns yet, and every detail here is † until checked on the vendor's own pages:
+
+| Product | What it is |
+| --- | --- |
+| **Muse** (Meta) | Agent app on iOS, Android, web and WhatsApp (US). Acts through connected apps and keeps running after you close it; asks before sensitive steps. Free, $20 and $100 plans. Takes custom MCP connectors. |
+| **Dots** (OpenAI) | Always-on agents in ChatGPT (DevDay 2026-09-29), each with its own cloud computer and browser. ChatGPT Pro; not in the EEA, Switzerland or UK. |
+| **Grok Bot** (xAI) | Agents on dedicated cloud machines; learn a task by watching once; routines on schedules or triggers. Bundled with SuperGrok Heavy and Cursor Ultra. No public API beyond a routine webhook. |
+
+How Misty differs: their agents work on the vendor's cloud computers with the vendor's model and your handed-over sign-ins. Misty's works in your browser on your computer, signed in as you, with any model, and Misty is still a full browser without AI. Where they lead: runs while your laptop is off. Misty doesn't chase that (see `roadmap.md`).
+
 Edge, Opera Neon and Brave were not re-checked against their own sites and are out of this version.
 
 ## Comparison chart
@@ -85,7 +95,7 @@ Edge, Opera Neon and Brave were not re-checked against their own sites and are o
 | Tab sleeping | ✓ | ? | ? | ✓ | ✓ |
 | End-to-end encrypted sync | ✓ | ✓ passphrase; bookmarks, passwords, autofill, history, extensions, tabs | ? | ✓ | ◐ with a passphrase |
 | Website sign-ins carry over between your computers | ✓ some sites ask again | ✗ not in its synced types | ? | ✗ not in its synced types | ✗ |
-| Built-in ad and tracker blocking | ✓ | ✓ | ? | ✓ | ✗ |
+| Built-in ad and tracker blocking | ✗ by extension, such as uBlock Origin Lite | ✓ | ? | ✓ | ✗ |
 | Password manager | ✓ | ✓ | ? | ✓ | ✓ |
 | Import from other browsers | ✓ including sign-ins | ✓ including passwords | ? | ✓ | ✓ |
 | Cross-device clipboard | ◐ built, not shipped | ✗ | ✗ | ✗ | ✗ |
@@ -125,13 +135,12 @@ Goal: Misty has everything the others have, so no public row shows Misty losing.
 | C8 | Send the agent a task by email or Slack | Comet, Claude | Composio Gmail and Slack | M | 8 |
 | C9 | Ship the cross-device clipboard; confirm agents at the cursor | Misty-only rows | Built | S | 9 |
 | C10 | Some model choice on the free plan | — (lead, not parity) | One fast model on Basic | S | 10 |
-| C11 | Team plan with shared billing and pooled AI (no SSO, admin or compliance work) | Comet, Polar, Dia, ChatGPT, Claude | Spaces; billing per account | L | 11 |
 | C12 | Chrome Web Store extensions | Comet, Dia, Chrome | In progress through Kiri | L | 12 |
 | C13 | Extensions on Windows | Comet, Dia, Chrome | None on WebView2 | L | 13 |
 | C14 | iPhone and Android | Comet, Chrome, ChatGPT, Claude | No mobile client | XL | 14 |
 | C15 | Run the agent on your own hardware | Comet | Browser work already runs on your device; models don't | XL | later |
 
-**Out of scope:** SOC 2 and other enterprise compliance, SSO, SCIM and MDM. Misty is not pursuing enterprise customers, so these never go on the chart or in the parity plan.
+**Out of scope:** SOC 2 and other enterprise compliance, SSO, SCIM and MDM. Misty is not pursuing enterprise customers, so these never go on the chart or in the parity plan. Team plans are also out (2026-10-11): Misty is a consumer app, so the "Team plan" row stays off the website. C11 was removed, and C12–C15 keep their IDs.
 
 **Template wording.** Misty's 22 templates in `src/features/agents/workspace/taskTemplates.ts` use the same category set as Polar's gallery and near-identical titles ("Turn a listing page into a spreadsheet" vs Polar's "Turn any listing page into a spreadsheet", "Draft replies to messages waiting on me" vs "Draft replies to emails waiting on me", "Find the best price for an item" vs "Find the best price for this exact item"). Before a public page names Polar, rewrite these in Misty's own words.
 

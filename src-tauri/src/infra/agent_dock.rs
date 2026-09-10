@@ -11,6 +11,9 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window};
 
+mod host_view;
+pub(super) use host_view::{fill_host, page_returned};
+
 /// Host windows for detached tabs: `misty-dock-<uuid>`.
 pub const HOST_PREFIX: &str = "misty-dock-";
 /// Height of a host window's bar above its page.
@@ -296,7 +299,7 @@ fn visibility() -> Result<Value, String> {
     Ok(json!([]))
 }
 
-fn browser_label(tab: &str) -> Result<String, String> {
+pub(super) fn browser_label(tab: &str) -> Result<String, String> {
     let valid = !tab.is_empty()
         && tab.len() <= 96
         && tab
@@ -395,10 +398,7 @@ pub fn detach(
         let _ = target.destroy();
         return Err(error.to_string());
     }
-    #[cfg(target_os = "macos")]
-    webview
-        .with_webview(|platform| unsafe { misty_agent_dock_fill(platform.inner(), HOST_BAR) })
-        .map_err(|e| e.to_string())?;
+    fill_host(&webview, HOST_BAR)?;
     dock(&app, &label, &name)?;
     Ok(label)
 }
@@ -422,9 +422,7 @@ pub fn attach(app: &AppHandle, label: &str) -> Result<(), String> {
     if let (Some(webview), Some(owner)) = (webview, app.get_window(&host.owner)) {
         if webview.window().label() == label {
             webview.reparent(&owner).map_err(|e| e.to_string())?;
-            #[cfg(target_os = "macos")]
-            let _ = webview
-                .with_webview(|platform| unsafe { misty_agent_dock_page_returned(platform.inner()) });
+            page_returned(&webview);
             // The owner lays it out again where its tab is shown.
             let _ = webview.hide();
         }

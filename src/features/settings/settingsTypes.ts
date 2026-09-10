@@ -16,6 +16,7 @@ export type SettingsSection =
   | "browser-privacy"
   | "browser-permissions"
   | "browser-passwords"
+  | "browser-extensions"
   | "browser-handoff"
   | "browser-import"
   | "spaces-defaults"

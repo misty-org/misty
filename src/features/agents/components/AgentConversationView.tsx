@@ -7,7 +7,7 @@ import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatu
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { AnimatedEllipsis, Button, cn } from "@/shared/ui";
-import { CalendarClock, Flag } from "lucide-react";
+import { CalendarClock, Flag, Inbox } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
@@ -201,6 +201,11 @@ function AgentMessageView(props: AgentMessageProps) {
             <CalendarClock size={13} aria-hidden="true" />
             Sent by scheduled task
           </span>
+        ) : message.source === "inbound_task" ? (
+          <span className="flex items-center gap-1.5 text-xs text-cream-muted">
+            <Inbox size={13} aria-hidden="true" />
+            Sent from email or Slack
+          </span>
         ) : null}
         <div
           className={cn(
@@ -249,7 +254,7 @@ function AgentMessageView(props: AgentMessageProps) {
             <MistyActivityStatus activity={message.activity} />
           </div>
         ) : null}
-        <AnswerChanges message={message} />
+        <AnswerChanges message={message} conversationId={props.conversationId} />
         {message.citations?.length ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {message.citations.map((citation) => (

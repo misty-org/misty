@@ -93,7 +93,7 @@ export function AgentExecutionSurface() {
                   : "Working with native apps. Progress and results appear in chat."}
               </p>
             </div>
-            <TaskArtifacts agentId={execution.agentId} spaceId={execution.spaceId} />
+            <TaskArtifacts taskId={execution.taskId} />
             <nav
               className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto px-3"
               aria-label="Task browser tabs"

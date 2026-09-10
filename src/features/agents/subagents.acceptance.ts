@@ -74,11 +74,12 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
     expect(children.some((child) => child.state === "completed")).toBe(true);
     for (const answer of ["Paris", "Tokyo", "Nairobi", "euro", "yen", "shilling"])
       expect(run.text.toLowerCase()).toContain(answer.toLowerCase());
-    // The plan and the sub-agents' findings reached the conversation.
+    // The sub-agents' findings reached the conversation; the agent's own
+    // checklist did not.
     const notebook = last(notebooks)?.notebook;
-    expect(notebook?.plan.trim()).toBeTruthy();
+    expect(notebook?.plan.trim()).toBeFalsy();
     expect(notebook?.findings.trim()).toBeTruthy();
-    // The full notebook is a note in the personal Space.
+    // The findings are a note in the personal Space.
     expect(notebook?.noteId).toBeTruthy();
     const note = await client.json<{ title: string; markdown?: string }>(
       `/spaces/${spaceId}/notes/${notebook?.noteId}`,

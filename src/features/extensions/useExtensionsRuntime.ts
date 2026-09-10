@@ -15,8 +15,10 @@ import { requestBrowserWebviewLayout } from "@/features/browser";
 import { browserRuntimeId } from "@/features/browser";
 import { useBrowserMediaStore } from "@/features/browser";
 import { answerCompatRequest, startCompatEvents } from "./compat/requests";
+import { startNewTabOverride } from "./newTabOverride";
 import type { ExtensionEvent } from "./types";
 import { extensionsNative } from "./native";
+import { closeExtensionPopup, floatExtensionPopup, watchExtensionPopups } from "./extensionPopups";
 import {
   enqueuePermission,
   finishPermission,
@@ -127,6 +129,8 @@ export function useExtensionsRuntime() {
         void publishLayout().catch(() => {});
     });
     const stopCompatEvents = startCompatEvents();
+    const stopNewTabOverride = startNewTabOverride();
+    const stopPopups = watchExtensionPopups();
     const listener = listen<ExtensionEvent>("misty://extensions", ({ payload: event }) => {
       if (cancelled || event.account !== account) return;
       // Extension API calls are frequent and change no extension UI state.
@@ -142,7 +146,7 @@ export function useExtensionsRuntime() {
       if (event.kind === "runtime-error")
         useExtensionsStore.setState((state) => ({
           states: state.states.map((item) =>
-            item.id === Number(event.id)
+            item.id === String(event.id)
               ? {
                   ...item,
                   status: event.detail ? "needs-attention" : "enabled",
@@ -152,16 +156,20 @@ export function useExtensionsRuntime() {
           ),
         }));
       if (event.kind === "permissions-removed" && event.id)
-        void revokePermissions(Number(event.id), event.permissions ?? [], event.hosts ?? []).catch(
+        void revokePermissions(String(event.id), event.permissions ?? [], event.hosts ?? []).catch(
           () => {},
         );
       if (event.kind === "permission-expired" && event.requestId) finishPermission(event.requestId);
       if (event.kind === "permission-request") enqueuePermission(event);
+      if (event.kind === "store-install" && typeof event.id === "string")
+        useExtensionsStore.setState({ installRequest: event.id });
+      if (event.kind === "store-remove" && typeof event.id === "string")
+        useExtensionsStore.setState({ removeRequest: event.id });
       if (
         event.kind === "uninstalled" &&
-        installations().some((i) => i.id === Number(event.id) && i.generation === event.generation)
+        installations().some((i) => i.id === String(event.id) && i.generation === event.generation)
       )
-        void updateInstallation(Number(event.id), {
+        void updateInstallation(String(event.id), {
           installed: false,
           enabled: false,
           permissions: [],
@@ -174,15 +182,23 @@ export function useExtensionsRuntime() {
         .flatMap((window) => allLayoutViews(window.layout))
         .find((t) => browserRuntimeId(t) === event.tabId);
       if (event.kind === "focus-window" && event.windowId) workspace.switchWindow(event.windowId);
+      if (event.kind === "close-window" || event.kind === "close-tab")
+        closeExtensionPopup({ tabId: event.tabId, windowId: event.windowId });
       if (event.kind === "close-window" && event.windowId) workspace.closeWindow(event.windowId);
       if (event.kind === "open-window") {
         const previousWindow = workspace.activeWindowId;
-        workspace.createWindow();
+        const opened = workspace.createWindow();
         const urls = event.urls?.length ? event.urls : ["about:blank"];
-        const created = urls.map((url) =>
-          useWorkspaceStore.getState().openBrowserView({ url, private: event.private ?? false }),
+        // The first page fills the new window's empty pane rather than opening beside it.
+        const created = urls.map((url, index) =>
+          useWorkspaceStore.getState().openBrowserView({
+            url,
+            private: event.private ?? false,
+            paneId: index === 0 ? useWorkspaceStore.getState().layout.focusedPaneId : undefined,
+          }),
         );
-        if (event.focused === false && previousWindow)
+        const floating = event.popup && created[0];
+        if (event.focused === false && previousWindow && !floating)
           useWorkspaceStore.getState().switchWindow(previousWindow);
         if (event.requestId && created[0])
           void publishLayout()
@@ -190,6 +206,7 @@ export function useExtensionsRuntime() {
               extensionsNative.tabCreated(event.requestId!, browserRuntimeId(created[0]!)),
             )
             .catch(() => {});
+        if (floating) void floatExtensionPopup(created[0]!, opened.id, event, previousWindow);
       }
       if (event.kind === "open-tab" && event.url) {
         const previousView = activeLayoutView(workspace.layout);
@@ -229,6 +246,8 @@ export function useExtensionsRuntime() {
       unsubscribe();
       unsubscribeMedia();
       stopCompatEvents();
+      stopNewTabOverride();
+      stopPopups();
       void listener.then((off) => off());
     };
   }, [account]);

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button, SkeletonList } from "@/shared/ui";
 import type { AgentMemberRequest } from "./api";
 import { useAgentMemberRequests } from "./store";
 
 const empty: AgentMemberRequest[] = [];
 const expiry = (createdAt: string) => new Date(Date.parse(createdAt) + 24 * 60 * 60 * 1000);
 
-/** Requests other members' agents sent to this account's published agents. */
+/** Requests to this account's agents from the other members of their Spaces. */
 export function AgentMemberRequests({
   accountId,
   selectedId,
@@ -39,7 +39,9 @@ export function AgentMemberRequests({
     if (saved && active.current)
       setNotice(
         approve
-          ? `${request.target_agent_name} started. Its reply goes to ${request.requester_name}’s agent and appears in ${request.space_name}.`
+          ? request.source_message_id
+            ? `${request.target_agent_name} started. Its reply posts in the ${request.space_name} chat.`
+            : `${request.target_agent_name} started. Its reply goes to ${request.requester_name}’s agent and appears in ${request.space_name}.`
           : "Declined. Nothing ran.",
       );
   };
@@ -67,9 +69,7 @@ export function AgentMemberRequests({
         </p>
       ) : null}
       {loading ? (
-        <p role="status" className="px-2 text-sm text-cream-muted">
-          Checking for agent requests…
-        </p>
+        <SkeletonList label="Agent requests" rows={1} leading="none" lines={2} />
       ) : !items.length ? (
         <p className="px-2 text-sm text-cream-muted">No agent requests waiting for you.</p>
       ) : null}
@@ -77,7 +77,9 @@ export function AgentMemberRequests({
         {items.map((request) => (
           <li key={request.id} className="border-t border-charcoal-border/70 px-2 py-3">
             <h3 className="text-sm font-medium text-cream-bright">
-              {request.requester_name || "A member"}’s agent asked {request.target_agent_name}
+              {request.source_message_id
+                ? `${request.requester_name || "A member"} asked ${request.target_agent_name} in the chat`
+                : `${request.requester_name || "A member"}’s agent asked ${request.target_agent_name}`}
             </h3>
             <p className="mt-1 text-sm text-cream-muted">In {request.space_name}</p>
             <blockquote className="mt-2 border-l-2 border-charcoal-border pl-3 whitespace-pre-wrap break-words text-sm text-cream [overflow-wrap:anywhere]">
@@ -85,7 +87,8 @@ export function AgentMemberRequests({
             </blockquote>
             <p className="mt-2 text-sm text-cream-muted">
               Approving runs {request.target_agent_name} in {request.space_name} with your
-              permissions there. You pay for its work.
+              permissions there. It can’t see your private chats or apps, and{" "}
+              {request.requester_name || "the member who asked"} pays for its work.
             </p>
             <p className="mt-1 text-xs text-cream-muted">
               Expires {expiry(request.created_at).toLocaleString()}

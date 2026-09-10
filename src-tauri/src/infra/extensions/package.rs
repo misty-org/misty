@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-use super::catalog::CatalogEntry;
+use super::catalog::{is_chrome_id, CatalogEntry, Store};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -52,15 +52,31 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
         return Err("Only manifest versions 2 and 3 are supported.".into());
     }
     if manifest["version"].as_str() != Some(&entry.version) {
-        return Err("Package version does not match Mozilla's metadata.".into());
+        return Err("Package version does not match the store's metadata.".into());
     }
-    if let Some(guid) = manifest
-        .pointer("/browser_specific_settings/gecko/id")
-        .or_else(|| manifest.pointer("/applications/gecko/id"))
-        .and_then(Value::as_str)
-    {
-        if guid != entry.guid {
-            return Err("Package identity does not match Mozilla's metadata.".into());
+    match entry.store {
+        Store::Firefox => {
+            if is_chrome_id(&entry.guid) {
+                return Err("Package identity is not a Firefox add-on identity.".into());
+            }
+            if let Some(guid) = manifest
+                .pointer("/browser_specific_settings/gecko/id")
+                .or_else(|| manifest.pointer("/applications/gecko/id"))
+                .and_then(Value::as_str)
+            {
+                if guid != entry.guid {
+                    return Err("Package identity does not match the store's metadata.".into());
+                }
+            }
+        }
+        // The signature check already bound the package to this ID.
+        Store::Chrome => {
+            if entry.guid != entry.id || !is_chrome_id(&entry.id) {
+                return Err("Package identity does not match the store's metadata.".into());
+            }
+            if manifest.get("theme").is_some() || manifest.get("app").is_some() {
+                return Err("This is a Chrome theme or app, not an extension.".into());
+            }
         }
     }
     let all = strings(&manifest["permissions"]);
@@ -84,7 +100,7 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
     permissions.extend(super::compat::added_permissions(&permissions));
     let mut optional_hosts = strings(&manifest["optional_host_permissions"]);
     optional_hosts.extend(optional.iter().filter(|p| is_host(p)).cloned());
-    let unsupported = ["debugger", "proxy", "sidePanel"];
+    let unsupported = ["debugger", "proxy"];
     let mut findings: Vec<String> = permissions
         .iter()
         .filter(|p| unsupported.contains(&p.as_str()))
@@ -114,8 +130,21 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
             "Its Firefox sidebar opens from its toolbar button.".into()
         });
     }
-    if manifest.get("chrome_url_overrides").is_some() {
-        findings.push("Extension new-tab overrides are not enabled in this release.".into());
+    if manifest.get("side_panel").is_some() {
+        findings.push(if has_action {
+            "Its Chrome side panel opens in a tab.".into()
+        } else {
+            "Its Chrome side panel opens from its toolbar button.".into()
+        });
+    }
+    if manifest.pointer("/chrome_url_overrides/newtab").is_some() {
+        findings.push("New tabs open its page while it's turned on.".into());
+    }
+    if ["bookmarks", "history"]
+        .iter()
+        .any(|page| manifest.pointer(&format!("/chrome_url_overrides/{page}")).is_some())
+    {
+        findings.push("Its replacement bookmarks or history page isn't used in Misty.".into());
     }
     findings.push(
         "Not verified with Misty. Some browser-specific functionality may be unavailable.".into(),
@@ -137,19 +166,23 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
 
 pub fn extract(
     bytes: &[u8],
-    entry: CatalogEntry,
+    mut entry: CatalogEntry,
     root: &Path,
     token: String,
 ) -> Result<Review, String> {
     let expected = entry
         .digest
         .strip_prefix("sha256:")
-        .ok_or("Mozilla did not provide a SHA-256 digest.")?;
+        .ok_or("The store did not provide a SHA-256 digest.")?;
     if hex::encode(Sha256::digest(bytes)) != expected.to_ascii_lowercase() {
         return Err("Extension package integrity check failed.".into());
     }
+    let contents = match entry.store {
+        Store::Firefox => bytes,
+        Store::Chrome => super::crx::verify(bytes, &entry.id)?,
+    };
     let mut archive =
-        zip::ZipArchive::new(Cursor::new(bytes)).map_err(|_| "Invalid extension archive.")?;
+        zip::ZipArchive::new(Cursor::new(contents)).map_err(|_| "Invalid extension archive.")?;
     if archive.len() > MAX_FILES {
         return Err("The extension contains too many files.".into());
     }
@@ -169,6 +202,7 @@ pub fn extract(
                 .any(|p| !matches!(p, Component::Normal(_)))
             || !seen.insert(name.to_lowercase())
             || name.to_ascii_lowercase().starts_with("__misty_sync__")
+            || name.to_ascii_lowercase().starts_with("__misty_user_scripts__")
             || name
                 .to_ascii_lowercase()
                 .starts_with(super::compat::DIRECTORY)
@@ -210,8 +244,15 @@ pub fn extract(
     }
     let manifest =
         serde_json::from_slice(&manifest_bytes).map_err(|_| "Invalid extension manifest JSON.")?;
+    if entry.store == Store::Chrome {
+        super::chrome_store::describe(&mut entry, &manifest, &runtime);
+    }
+    let original = match entry.store {
+        Store::Firefox => "original.xpi",
+        Store::Chrome => "original.crx",
+    };
     let review = inspect(&manifest, entry, token)?;
-    fs::write(root.join("original.xpi"), bytes).map_err(|e| e.to_string())?;
+    fs::write(root.join(original), bytes).map_err(|e| e.to_string())?;
     fs::write(
         root.join("review.json"),
         serde_json::to_vec(&review).map_err(|e| e.to_string())?,
@@ -233,7 +274,8 @@ mod tests {
     use std::io::Write;
     fn entry(bytes: &[u8]) -> CatalogEntry {
         CatalogEntry {
-            id: 1,
+            id: "1".into(),
+            store: Store::Firefox,
             guid: "fixture@misty.test".into(),
             slug: "fixture".into(),
             name: "Fixture".into(),

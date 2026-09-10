@@ -54,7 +54,13 @@ export interface WorkflowSchedule extends ScheduleTiming {
   conversation_id?: string;
   inputs: AgentMethodInputs;
   enabled: boolean;
-  state: "idle" | "running" | "failed";
+  /** awaiting_device: due, waiting for Misty on its computer (device_claimed: starting there). */
+  state: "idle" | "running" | "failed" | "awaiting_device" | "device_claimed";
+  /** The computer whose Misty browser runs it; absent runs without a browser. */
+  device_id?: string;
+  /** The run waiting for its computer, and later runs that passed meanwhile. */
+  due_at?: string;
+  missed_count?: number;
   next_run_at?: string;
   last_invocation_id?: string;
   last_run_at?: string;
@@ -101,7 +107,12 @@ export const agentMethodsApi = {
   /** Sets a workflow's schedule; every run uses the workflow's latest version. */
   saveSchedule: (
     methodId: string,
-    schedule: ScheduleTiming & { inputs: AgentMethodInputs; enabled: boolean },
+    schedule: ScheduleTiming & {
+      inputs: AgentMethodInputs;
+      enabled: boolean;
+      /** "" runs without a browser; absent keeps the current computer. */
+      device_id?: string;
+    },
   ) =>
     apiRequest<{ schedule: WorkflowSchedule }>(`${base}/${encodeURIComponent(methodId)}/schedule`, {
       method: "PUT",
@@ -111,9 +122,36 @@ export const agentMethodsApi = {
     apiRequest<void>(`${base}/${encodeURIComponent(methodId)}/schedule`, { method: "DELETE" }),
   upcoming: () =>
     apiRequest<{ runs: UpcomingWorkflowRun[] }>("/ai/workflow-schedules", { cache: "no-store" }),
+  /** Runs waiting for this computer (roadmap C1). */
+  deviceRuns: (deviceId: string) =>
+    apiRequest<{ runs: (WorkflowSchedule & { title: string; agent_id: string })[] }>(
+      `/ai/workflow-schedules/device-runs?device_id=${encodeURIComponent(deviceId)}`,
+      { cache: "no-store" },
+    ),
+  /** Takes a waiting run for this computer; the run must then start with its grant. */
+  claimDeviceRun: (scheduleId: string, deviceId: string) =>
+    apiRequest<DeviceRunClaim>(
+      `/ai/workflow-schedules/${encodeURIComponent(scheduleId)}/device-claim`,
+      { method: "POST", body: JSON.stringify({ device_id: deviceId }) },
+    ),
   instantiate: (versionId: string, inputs: AgentMethodInputs) =>
     apiRequest<{ prompt: string; method: AgentMethod }>(`${base}/instantiate`, {
       method: "POST",
       body: JSON.stringify({ version_id: versionId, inputs }),
     }),
 };
+
+/** What a computer needs to start a scheduled run it claimed. */
+export interface DeviceRunClaim {
+  claim: string;
+  schedule_id: string;
+  agent_id: string;
+  conversation_id: string;
+  method_version_id: string;
+  inputs: AgentMethodInputs;
+  timezone: string;
+  title: string;
+  due_at: string;
+  missed_count: number;
+  idempotency_key: string;
+}

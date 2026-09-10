@@ -1,12 +1,15 @@
 import { socialApi as spacesApi } from "../SocialRuntime";
 import type { SpaceLibraryItem, SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
+import type { AgentListing } from "@/features/agent-member-requests/api";
+import { agentOwnerLabel } from "../../members/agents/useSpaceAgentMembers";
 import { useEffect, useMemo, useState } from "react";
 
 const MAX_SUGGESTIONS = 24;
 
 /**
- * The `@` autocomplete: People, then unattached Library items.
+ * The `@` autocomplete: People, then the Space's agents, then unattached
+ * Library items. Mentioning an agent asks it for help in the chat.
  *
  * Library items are only offered while there is room left in the attachment
  * budget, so the list never suggests something that cannot be added.
@@ -14,6 +17,7 @@ const MAX_SUGGESTIONS = 24;
 export function useChatSuggestions(options: {
   spaceId: string;
   members: SpaceMember[];
+  agents?: AgentListing[];
   currentUserId: string | undefined;
   canBrowseLibrary: boolean;
   canReadLibrary: boolean;
@@ -55,6 +59,12 @@ export function useChatSuggestions(options: {
         label: member.name,
         detail: member.email,
       }));
+    const agents: ChatComposerSuggestion[] = (options.agents ?? []).map((agent) => ({
+      kind: "agent",
+      id: agent.agent_id,
+      label: agent.agent_name,
+      detail: agentOwnerLabel(agent, currentUserId),
+    }));
     const library: ChatComposerSuggestion[] =
       canBrowseLibrary && options.attachmentSlotsLeft > 0
         ? libraryItems
@@ -67,7 +77,7 @@ export function useChatSuggestions(options: {
               item,
             }))
         : [];
-    return [...people, ...library]
+    return [...people, ...agents, ...library]
       .filter(
         (item) => !needle || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(needle),
       )
@@ -77,6 +87,7 @@ export function useChatSuggestions(options: {
     currentUserId,
     libraryItems,
     members,
+    options.agents,
     options.attachmentSlotsLeft,
     query,
     selectedLibraryIds,

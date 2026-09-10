@@ -8,7 +8,6 @@ const hiddenSetting = "app.navigation.hidden";
 const destinations = [
   { value: "browser", label: "Browser" },
   { value: "agents", label: "Agents" },
-  { value: "extensions", label: "Extensions" },
   { value: "spaces", label: "Spaces" },
 ];
 

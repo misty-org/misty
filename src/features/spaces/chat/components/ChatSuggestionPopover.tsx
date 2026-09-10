@@ -10,7 +10,7 @@ import {
   PopoverContent,
   SkeletonList,
 } from "@/shared/ui";
-import { LibraryBig, Paperclip, Users } from "lucide-react";
+import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 
 export interface ChatSuggestionPopoverProps {
@@ -69,7 +69,13 @@ export function ChatSuggestionPopover(props: ChatSuggestionPopoverProps) {
                 onMouseEnter={() => props.onHoverIndex(index)}
                 onSelect={() => props.onSelect(suggestion)}
               >
-                {suggestion.kind === "member" ? <Users /> : <LibraryBig />}
+                {suggestion.kind === "member" ? (
+                  <Users />
+                ) : suggestion.kind === "agent" ? (
+                  <Bot />
+                ) : (
+                  <LibraryBig />
+                )}
                 <span className="min-w-0">
                   <span className="block truncate">{suggestion.label}</span>
                   <span className="block truncate text-xs text-cream-muted">

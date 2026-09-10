@@ -37,8 +37,21 @@ export function messageFromSpaceEvent(event: SpaceEvent): SpaceMessage | undefin
   return payload as unknown as SpaceMessage;
 }
 
-export function buildMessageSpans(text: string, members: SpaceMember[]): MessageSpan[] {
-  const candidates = [...members.map((member) => ({ label: member.name, userId: member.user_id }))]
+/** An agent member of the Space that people can @mention to ask for help. */
+export interface MentionableAgent {
+  agent_id: string;
+  agent_name: string;
+}
+
+export function buildMessageSpans(
+  text: string,
+  members: SpaceMember[],
+  agents: MentionableAgent[] = [],
+): MessageSpan[] {
+  const candidates: { label: string; userId?: string; agentId?: string }[] = [
+    ...members.map((member) => ({ label: member.name, userId: member.user_id })),
+    ...agents.map((agent) => ({ label: agent.agent_name, agentId: agent.agent_id })),
+  ]
     .filter((item) => item.label.trim())
     .sort((left, right) => right.label.length - left.label.length);
   if (candidates.length === 0) return [{ type: "text", text }];
@@ -58,6 +71,8 @@ export function buildMessageSpans(text: string, members: SpaceMember[]): Message
     const candidate = matching.length === 1 ? matching[0] : undefined;
     if (candidate?.userId)
       spans.push({ type: "mention", user_id: candidate.userId, label: candidate.label });
+    else if (candidate?.agentId)
+      spans.push({ type: "mention", agent_id: candidate.agentId, label: candidate.label });
     else spans.push({ type: "text", text: match[0] });
     offset = index + match[0].length;
   }

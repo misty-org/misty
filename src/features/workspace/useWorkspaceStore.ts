@@ -92,8 +92,8 @@ import {
   restoreClosedWorkspaceItem,
   type ClosedWorkspaceItem,
 } from "./closedWorkspaceItems";
+import { browserNewTabUrl } from "./browserHome";
 import {
-  browserHomeUrl,
   browserViewTitle,
   createBrowserViewState,
   maxWorkspacePanels,
@@ -323,7 +323,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         return next.views[0] ?? null;
       },
       openBrowserView: (request = {}) => {
-        const url = request.url?.trim() || browserHomeUrl();
         let sourcePrivate = false;
         if (request.sourceViewId) {
           mapAllWorkspaceWindowViews(get(), (candidate) => {
@@ -333,6 +332,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
         }
         const isPrivate = request.private || sourcePrivate;
+        const url = request.url?.trim() || browserNewTabUrl(Boolean(isPrivate));
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",

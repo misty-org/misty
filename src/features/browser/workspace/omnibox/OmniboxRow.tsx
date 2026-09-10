@@ -17,7 +17,7 @@ export function omniboxMatchIcon(match: OmniboxMatch) {
 function OmniboxMatchIcon({ match }: { match: OmniboxMatch }) {
   const [failed, setFailed] = useState<string | null>(null);
   const Icon = omniboxMatchIcon(match);
-  const page = ["url", "history", "bookmark", "tab"].includes(match.kind);
+  const page = ["url", "history", "bookmark", "tab", "search"].includes(match.kind);
   const src = page ? match.faviconUrl : null;
   if (src && failed !== src)
     return (

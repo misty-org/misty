@@ -36,8 +36,10 @@
     if (!el) {
       // A key with no ref goes to whatever has focus; Enter there may submit.
       const active = document.activeElement;
-      const consequence = args.action === "key" && args.key === "Enter" ? P.consequence(active, "key") : "";
-      return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(active), consequence };
+      const enter = args.action === "key" && args.key === "Enter";
+      const consequence = enter ? P.consequence(active, "key") : "";
+      const consequenceKind = enter ? P.consequenceKind(active, "key") : "";
+      return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(active), consequence, consequenceKind, describe: P.describe(active) };
     }
     if (el.disabled || el.getAttribute("aria-disabled") === "true") return fail(`${P.describe(el)} is disabled.`, { errorCode: "browser_target_disabled" });
     const view = el.ownerDocument.defaultView;
@@ -50,8 +52,9 @@
     }
     const judged = ["click", "check", "uncheck"].includes(args.action) || (args.action === "key" && args.key === "Enter");
     const consequence = judged ? P.consequence(el, args.action) : "";
+    const consequenceKind = judged ? P.consequenceKind(el, args.action) : "";
     if (!["click", "check", "uncheck", "hover"].includes(args.action)) {
-      return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(el), consequence, describe: P.describe(el), scrolled, locator: P.locatorOf(el) };
+      return { ok: true, point: null, viewport: { width: innerWidth, height: innerHeight }, editable: P.editable(el), consequence, consequenceKind, describe: P.describe(el), scrolled, locator: P.locatorOf(el) };
     }
     if (rect.width < 1 || rect.height < 1) {
       // Custom checkboxes often hide the input and show its label instead.
@@ -85,6 +88,7 @@
       return {
         ok: true, point: { x: topX / innerWidth, y: topY / innerHeight }, viewport: { width: innerWidth, height: innerHeight },
         editable: P.editable(el), consequence: args.consequenceOf ? P.consequence(args.consequenceOf, args.action) : consequence,
+        consequenceKind: args.consequenceOf ? P.consequenceKind(args.consequenceOf, args.action) : consequenceKind,
         describe: P.describe(args.consequenceOf || el), scrolled, locator: P.locatorOf(args.consequenceOf || el),
       };
     }

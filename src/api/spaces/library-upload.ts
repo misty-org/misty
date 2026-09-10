@@ -137,6 +137,8 @@ export async function uploadLibraryFile(
       sha256,
       purpose,
       ...(options?.conversationId ? { conversation_id: options.conversationId } : {}),
+      // An agent made this file: it saves to the agent's Space with provenance.
+      ...(options?.agent ? { agent: options.agent } : {}),
       // In-place replace: the server should reuse `replace_item_id` instead of
       // minting a new item. Older servers ignore these and mint a new id, which
       // replaceLibraryItemContent() detects and cleans up.
@@ -299,9 +301,18 @@ export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+/** Which of the uploader's agents made a file, and in which chat and run. */
+export interface AgentArtifactProvenance {
+  agent_id: string;
+  conversation_id?: string;
+  run_id?: string;
+  kind: "download" | "file" | "image" | "code" | "document";
+}
+
 export interface LibraryUploadOptions {
   signal?: AbortSignal;
   conversationId?: string;
+  agent?: AgentArtifactProvenance;
   onProgress?: (progress: number) => void;
   onStage?: (stage: "reading" | "hashing" | "uploading" | "finalizing") => void;
 }

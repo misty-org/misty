@@ -74,6 +74,8 @@ pub(crate) mod kiri_probe;
 
 #[path = "browser_page/mod.rs"]
 mod page_agent;
+#[path = "browser_action_confirm.rs"]
+pub mod action_confirm;
 #[path = "browser_interact.rs"]
 mod interact;
 use interact::interact_browser;
@@ -233,7 +235,7 @@ struct BrowserSession {
     scope_id: String,
     grants: HashMap<String, BrowserGrant>,
     snapshot_generation: u64,
-    snapshot_extension: Option<u64>,
+    snapshot_extension: Option<String>,
     element_targets: HashMap<String, String>,
     downloads: Vec<BrowserDownload>,
     pending_agent_download: Option<PendingAgentDownload>,
@@ -434,6 +436,10 @@ pub struct BrowserAgentExecuteRequest {
     /// Absent means the safe default: sensitive categories blocked.
     #[serde(default)]
     pub site_blocks: Option<page_agent::SiteBlocks>,
+    /// The page actions the account asks about first, from the job's server
+    /// config. Absent means the safe default: all of them.
+    #[serde(default)]
+    pub confirm_kinds: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -2785,8 +2791,11 @@ async fn inspect_browser(
         include_str!("browser_inspection_snapshot.js"),
         include_str!("browser_semantic_snapshot.js")
     );
-    let extension_id = request.input.get("extensionId").and_then(Value::as_u64);
-    let raw = if let Some(extension) = extension_id {
+    let extension_id = request
+        .input
+        .get("extensionId")
+        .and_then(super::extensions::agent_extension_id);
+    let raw = if let Some(extension) = extension_id.clone() {
         super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
             ["result"]
             .clone()
@@ -2821,7 +2830,7 @@ async fn inspect_browser(
     {
         return Err("Browser inspection is not granted.".to_owned());
     }
-    session.snapshot_extension = extension_id;
+    session.snapshot_extension = extension_id.clone();
     let interactive = replace_snapshot_targets(session, snapshot.interactive);
     Ok(json!({
         "documentId": document_id,
@@ -3228,6 +3237,7 @@ pub(super) fn authorize_workspace_dispatch(
         operation: "browser.workspace.interact".into(),
         input: json!({}),
         site_blocks: None,
+        confirm_kinds: None,
     };
     validate_browser_grant(session, &request)?;
     Ok(())

@@ -32,7 +32,7 @@ const browserTab: WorkspaceView = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
-// The extensions toolbar links to the Extensions page.
+// The extensions toolbar opens Settings › Browser › Extensions.
 const view = (tab: WorkspaceView) => (
   <MemoryRouter>
     <BrowserWorkspace tab={tab} />

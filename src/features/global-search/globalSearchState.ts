@@ -100,6 +100,8 @@ export interface GlobalSearchState {
       capture?: AiCaptureAttachment;
       /** Continues the conversation after a screen opened; shows no new user turn. */
       continuation?: boolean;
+      /** A scheduled run this computer claimed (roadmap C1). */
+      schedule?: { id: string; claim: string };
       /** Opens a tab in this window for the task, at this page when given. */
       openScreen?: { url?: string; hint?: string; tabId?: string; place?: "current" | "new" };
     },

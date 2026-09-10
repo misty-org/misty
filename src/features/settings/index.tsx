@@ -5,6 +5,7 @@ export { SettingsProfilesBridge } from "./profiles/SettingsProfilesBridge";
 export type { SettingsSection } from "./settingsTypes";
 export * from "./store/appTheme";
 export { settingsBoolean } from "./store/preferences";
+export { PreferenceRow } from "./sections/PreferenceRow";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";
 const SettingsWorkspaceImplementation = lazy(() =>

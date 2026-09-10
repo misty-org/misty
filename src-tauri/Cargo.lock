@@ -4558,6 +4558,7 @@ dependencies = [
  "plist",
  "rand 0.8.6",
  "reqwest",
+ "ring",
  "rusqlite",
  "rustls",
  "security-framework",

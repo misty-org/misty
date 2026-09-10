@@ -19,6 +19,7 @@ import {
 } from "@/shared/ui";
 import { AgentMethodInputFields, methodError } from "../workspace/AgentMethodEditor";
 import { ruleFor, ScheduleRuleEditor } from "./ScheduleRuleEditor";
+import { ScheduleComputerField } from "./ScheduleComputerField";
 import { describeSchedule } from "./scheduleSummary";
 
 const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -47,6 +48,8 @@ export function WorkflowScheduleDialog({
   const [skipDates, setSkipDates] = useState<string[]>(existing?.skip_dates ?? []);
   const [inputs, setInputs] = useState<AgentMethodInputs>(existing?.inputs ?? {});
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+  const [deviceId, setDeviceId] = useState(existing?.device_id ?? "");
+  const needsBrowser = method.definition.target !== "cloud";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = async (action: () => Promise<void>) => {
@@ -70,6 +73,10 @@ export function WorkflowScheduleDialog({
       setError(`Answer “${missing.label}” so scheduled runs have it.`);
       return;
     }
+    if (needsBrowser && !deviceId) {
+      setError("Choose the computer whose Misty browser runs this workflow.");
+      return;
+    }
     void run(async () => {
       const { schedule } = await agentMethodsApi.saveSchedule(method.id, {
         timezone,
@@ -77,6 +84,7 @@ export function WorkflowScheduleDialog({
         skip_dates: skipDates.filter(Boolean),
         inputs,
         enabled,
+        device_id: deviceId,
       });
       onSaved(schedule);
     });
@@ -163,12 +171,16 @@ export function WorkflowScheduleDialog({
                 onChange={setInputs}
               />
             )}
-            {method.definition.target !== "cloud" && (
-              <p className="agent-method-hint">
-                This workflow needs an interactive Misty device. Unattended browser control is not
-                available, so scheduled runs will report unavailable device access.
+            <ScheduleComputerField
+              value={deviceId}
+              onChange={setDeviceId}
+              needsBrowser={needsBrowser}
+            />
+            {existing?.state === "awaiting_device" && existing.due_at ? (
+              <p className="agent-method-hint" role="status">
+                A run due {new Date(existing.due_at).toLocaleString()} is waiting for its computer.
               </p>
-            )}
+            ) : null}
           </fieldset>
           {error && (
             <p role="alert" className="agent-method-error">

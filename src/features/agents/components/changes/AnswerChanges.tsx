@@ -9,6 +9,7 @@ import { DiffCounts, DiffFile } from "./DiffView";
 import type { DiffSet } from "./diffTypes";
 import { changedProject, runCheckpoint } from "./projectRuns";
 import { useProjectReview } from "./useProjectReview";
+import { useProjectSnapshot } from "./useProjectSnapshot";
 
 type Target = NonNullable<Awaited<ReturnType<typeof runCheckpoint>>>;
 
@@ -18,7 +19,13 @@ type Target = NonNullable<Awaited<ReturnType<typeof runCheckpoint>>>;
  * Undo. Shown only on the computer the project is on, while the run's undo
  * copy exists (docs/plans/agent-code-projects.md).
  */
-export function AnswerChanges({ message }: { message: GlobalAiMessage }) {
+export function AnswerChanges({
+  message,
+  conversationId,
+}: {
+  message: GlobalAiMessage;
+  conversationId?: string;
+}) {
   const runId = message.invocationId;
   const finished = message.state !== "pending" && message.state !== "streaming";
   const relevant = Boolean(
@@ -28,6 +35,13 @@ export function AnswerChanges({ message }: { message: GlobalAiMessage }) {
   const [diff, setDiff] = useState<DiffSet | null>();
   const [state, setState] = useState<"idle" | "busy" | "undone" | "failed">("idle");
   const openReview = useProjectReview((s) => s.open);
+  const snapshot = useProjectSnapshot({
+    conversationId,
+    scopeId: target?.project.id,
+    runId: target?.checkpoint.runId,
+    createdAt: target?.checkpoint.createdAt,
+    changed: Boolean(diff?.files.length) && state !== "undone",
+  });
 
   useEffect(() => {
     if (!relevant || !runId) return;
@@ -104,6 +118,18 @@ export function AnswerChanges({ message }: { message: GlobalAiMessage }) {
       {state === "failed" ? (
         <p className="misty-diff-note" role="alert">
           Those changes couldn’t be undone.
+        </p>
+      ) : null}
+      {snapshot.status.state === "saved" ? (
+        <p className="misty-diff-note" role="status">
+          A snapshot of {name} is saved in {snapshot.status.spaceName}.
+        </p>
+      ) : snapshot.status.state === "failed" ? (
+        <p className="misty-diff-note" role="alert">
+          {snapshot.status.message}{" "}
+          <Button variant="link" size="sm" className="h-auto p-0" onClick={snapshot.retry}>
+            Try again
+          </Button>
         </p>
       ) : null}
       <div className="misty-diff">

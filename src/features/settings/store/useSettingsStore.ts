@@ -57,7 +57,6 @@ import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures
 import { configureBrowserTabSleep } from "@/features/webviews/tabSleepSettings";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
-import { configureBrowserContentBlocking } from "@/features/webviews/contentBlocking";
 import { configureAutoPictureInPicture } from "@/features/webviews/pictureInPictureSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
@@ -303,10 +302,6 @@ function applySettingsSideEffects(
   configureBrowserTabSleep(settingsNumber(document, "general", "browser_tab_sleep_minutes", 30));
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
-  configureBrowserContentBlocking(
-    settingsBoolean(document, "general", "browser_content_blocking", true),
-    settingsString(document, "general", "browser_content_blocking_allowed_json", "[]"),
-  );
   configureAutoPictureInPicture(
     settingsBoolean(document, "general", "browser_auto_picture_in_picture", true),
   );

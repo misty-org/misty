@@ -1,7 +1,8 @@
 import "./processShim";
 import { invoke } from "@tauri-apps/api/core";
 import { Agent } from "@midscene/core/agent";
-import { DeviceOperationNotAttempted, jobSiteBlocks } from "../workerBrowserJobs";
+import { askPerson, kindOf } from "../actionQuestions";
+import { DeviceOperationNotAttempted, jobConfirmKinds, jobSiteBlocks } from "../workerBrowserJobs";
 import { actionContexts } from "./screenActions";
 import { MistyScreenDevice, type ScreenFrame } from "./screenDevice";
 import { screenModelClient, screenModelConfig } from "./screenModel";
@@ -59,6 +60,7 @@ export async function runScreenAct(
 ): Promise<ScreenActResult> {
   const { goal, agentId, taskId, allowConsequential, surface } = parseJob(job);
   const adapter = surfaceAdapter(surface);
+  const confirmKinds = jobConfirmKinds(job.config);
   const runtimeId = await invoke<string>("browser_runtime_for_scope", { scopeId: job.scopeId });
   const grantId = `${job.contextId}:${job.id}:act`;
   const expiresAt = new Date(
@@ -83,6 +85,10 @@ export async function runScreenAct(
     adapter,
     allowConsequential,
     controller,
+    // The account chooses which kinds wait for the person; the rest run.
+    confirm: async (description) =>
+      !(confirmKinds ?? [kindOf(description)]).includes(kindOf(description)) ||
+      askPerson({ description, agentId, taskId: taskId ?? "" }),
     execute: (operation, input) =>
       invoke("browser_agent_execute", {
         request: {
@@ -92,6 +98,7 @@ export async function runScreenAct(
           operation,
           input: { ...input, __mistyTaskId: taskId },
           siteBlocks: jobSiteBlocks(job.config),
+          confirmKinds,
         },
       }),
   });

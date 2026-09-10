@@ -28,7 +28,7 @@ it("shows each sub-agent's progress in words and stops a running one", async () 
   expect(screen.queryAllByRole("button", { name: /Stop sub-agent/ })).toHaveLength(0);
 });
 
-it("shows the notebook open, and hides it on request", async () => {
+it("shows the notebook's findings open, without the agent's checklist", async () => {
   render(
     <AgentNotebookCard
       notebook={{
@@ -38,7 +38,7 @@ it("shows the notebook open, and hides it on request", async () => {
       }}
     />,
   );
-  expect(screen.getByText("Find prices")).toBeTruthy();
+  expect(screen.queryByText("Find prices")).toBeNull();
   expect(screen.getByText(/Acme costs \$12/)).toBeTruthy();
   expect(screen.getByText("Also saved as a note in your personal Space.")).toBeTruthy();
   const toggle = screen.getByRole("button", { name: /Notebook/ });
@@ -48,6 +48,8 @@ it("shows the notebook open, and hides it on request", async () => {
 });
 
 it("renders nothing for an empty notebook", () => {
-  const { container } = render(<AgentNotebookCard notebook={{ plan: " ", findings: "" }} />);
+  const { container } = render(
+    <AgentNotebookCard notebook={{ plan: "- [ ] Only a checklist", findings: " " }} />,
+  );
   expect(container.textContent).toBe("");
 });

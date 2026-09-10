@@ -18,7 +18,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
         _contexts = [NSMutableDictionary dictionary]; _descriptors = [NSMutableDictionary dictionary];
         _windows = [NSMutableDictionary dictionary];
         _tabs = [NSMutableDictionary dictionary]; _bridges = [NSMutableDictionary dictionary];
-        _pending = [NSMutableDictionary dictionary]; _optionsWindows = [NSMutableArray array];
+        _pending = [NSMutableDictionary dictionary]; _optionsWindows = [NSMutableArray array]; _popupWindows = [NSMutableArray array];
         _openRequests = [NSMutableDictionary dictionary]; _openingTabs = [NSMutableDictionary dictionary];
         _nativeTasks = [NSMutableDictionary dictionary];
         _nativeConnections = [NSMutableDictionary dictionary];
@@ -113,6 +113,9 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
         context.uniqueIdentifier = descriptor[@"guid"];
         context.baseURL = [NSURL URLWithString:[NSString stringWithFormat:@"webkit-extension://%@/", descriptor[@"origin"]]];
         context.hasAccessToPrivateData = [descriptor[@"privateAccess"] boolValue] && ![extension.manifest[@"incognito"] isEqual:@"not_allowed"];
+        // MISTY_INSPECT_EXTENSIONS=1 shows each extension's background and popup in
+        // Safari's Develop menu, to see why one fails. Off otherwise.
+        context.inspectable = [NSProcessInfo.processInfo.environment[@"MISTY_INSPECT_EXTENSIONS"] isEqual:@"1"];
         // identity, management and sidebarAction come from the compatibility layer.
         context.unsupportedAPIs = [NSSet setWithArray:@[@"browser.debugger", @"browser.sidePanel"]];
         for (NSString *permission in descriptor[@"permissions"]) [context setPermissionStatus:WKWebExtensionContextPermissionStatusGrantedExplicitly forPermission:permission];
@@ -123,6 +126,14 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
         NSError *loadError;
         if (![self.controller loadExtensionContext:context error:&loadError]) { reply(@{@"error":loadError.localizedDescription ?: @"The extension runtime rejected this package."}); return; }
         self.contexts[identifier] = context; self.descriptors[identifier] = descriptor;
+        // WebKit wakes a background that isn't persistent only for events it saw the
+        // extension register, and remembers those across launches. Starting it now lets
+        // one that never ran here (or ran an older package) register its listeners.
+        if (context.webExtension.hasBackgroundContent) {
+            [context loadBackgroundContentWithCompletionHandler:^(NSError *failure) {
+                if (failure) [self event:@"background-error" data:@{@"id":identifier, @"detail":failure.localizedDescription ?: @""}];
+            }];
+        }
         for (MistyExtensionTab *tab in self.tabs.allValues) [self registerOpenTab:tab];
         [self startCompat:identifier context:context];
         if ([context hasPermission:@"storage"]) {
@@ -164,7 +175,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     if (!self.account || ![request[@"account"] isEqual:self.account]) { reply(@{@"error":@"The extension account changed."}); return; }
     if ([self compatRequest:request reply:reply]) return;
     if ([operation isEqual:@"diagnostics"]) {
-        reply(@{@"runtimeCount":@(self.contexts.count),@"bridgeViewCount":@(self.bridges.count),@"platform":NSProcessInfo.processInfo.operatingSystemVersionString,@"minimumOS":@"15.4",@"manifestVersions":@[@2,@3],@"compatibility":@"Version-specific testing required",@"acquisition":@[@"firefox-addons"],@"knownUnavailable":@[@"debugger",@"proxy",@"sidePanel"],@"limited":@[@"webRequestBlocking",@"identity",@"management",@"tabHide",@"contextualIdentities",@"bookmarks",@"privacy"],@"compatibilityLayer":@[@"notifications",@"downloads",@"history",@"topSites",@"search",@"sessions",@"browsingData",@"find",@"idle",@"tts",@"theme"],@"hostLimitations":@[@"new-tab overrides",@"moving existing tabs into new windows",@"pinned and reader-mode tabs"]}); return;
+        reply(@{@"runtimeCount":@(self.contexts.count),@"bridgeViewCount":@(self.bridges.count),@"platform":NSProcessInfo.processInfo.operatingSystemVersionString,@"minimumOS":@"15.4",@"manifestVersions":@[@2,@3],@"compatibility":@"Version-specific testing required",@"acquisition":@[@"firefox-addons",@"chrome-web-store"],@"knownUnavailable":@[@"debugger",@"proxy"],@"limited":@[@"webRequestBlocking",@"identity",@"management",@"tabHide",@"contextualIdentities",@"privacy",@"sidePanel",@"offscreen",@"tabGroups",@"declarativeContent",@"contentSettings",@"fontSettings",@"power",@"userScripts",@"tabCapture",@"desktopCapture"],@"compatibilityLayer":@[@"notifications",@"downloads",@"history",@"topSites",@"search",@"sessions",@"browsingData",@"find",@"idle",@"tts",@"theme",@"sidePanel",@"offscreen",@"bookmarks",@"tabGroups",@"declarativeContent",@"contentSettings",@"fontSettings",@"power",@"userScripts",@"tabCapture",@"desktopCapture"],@"hostLimitations":@[@"moving existing tabs into new windows",@"pinned and reader-mode tabs"]}); return;
     }
     if ([operation isEqual:@"validate"]) {
         NSURL *root=[NSURL fileURLWithPath:request[@"runtimePath"] isDirectory:YES];
@@ -337,6 +348,8 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 - (id<WKWebExtensionWindow>)webExtensionController:(WKWebExtensionController *)controller focusedWindowForExtensionContext:(WKWebExtensionContext *)context {
     MistyExtensionWindow *window=self.tabs[self.activeTab].window;
+    // An extension's own popup window counts while it's in front.
+    for (MistyExtensionTab *tab in self.tabs.allValues) if (tab.window.popupWindow && tab.window.native.isKeyWindow) window=tab.window;
     return window.privateWindow && !context.hasAccessToPrivateData ? nil : window;
 }
 - (void)permissionsRemoved:(NSNotification *)notification {
@@ -373,6 +386,8 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     NSView *parent = self.popupParent ?: ((MistyExtensionTab *)action.associatedTab).view.window.contentView;
     if (!parent || !action.popupPopover) { done(ExtensionError(@"Open a browser tab to use this extension.")); return; }
     action.popupPopover.behavior = NSPopoverBehaviorTransient;
+    // The popover's frame follows Misty's window, so a dark popup isn't ringed in light.
+    action.popupPopover.appearance = parent.window.effectiveAppearance;
     [action.popupPopover showRelativeToRect:self.popupAnchor ofView:parent preferredEdge:NSRectEdgeMinY];
     done(nil);
 }
@@ -410,6 +425,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 - (void)webExtensionController:(WKWebExtensionController *)controller openNewWindowUsingConfiguration:(WKWebExtensionWindowConfiguration *)configuration forExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(id<WKWebExtensionWindow>,NSError *))done {
     if (configuration.shouldBePrivate && !context.hasAccessToPrivateData) { done(nil,ExtensionError(@"Private access is disabled.")); return; }
+    if ([self openPopupWindow:configuration context:context done:done]) return;
     if (configuration.tabs.count) { done(nil,ExtensionError(@"Moving existing tabs into a new window is not available.")); return; }
     NSString *requestId=NSUUID.UUID.UUIDString;
     self.openRequests[requestId]=[^(MistyExtensionTab *tab,NSError *error) { done(tab.window,error); } copy];

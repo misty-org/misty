@@ -33,6 +33,31 @@
   // Apple's language recognizer answers i18n.detectLanguage.
   define(api.i18n, "detectLanguage", method((text) => compat.call("i18n.detectLanguage", String(text ?? ""))));
 
+  // Safari's engine has no requestIdleCallback; extension pages and workers expect it.
+  if (typeof globalThis.requestIdleCallback !== "function") {
+    globalThis.requestIdleCallback = (callback, options = {}) => {
+      const started = Date.now();
+      return setTimeout(
+        () => callback({ didTimeout: false, timeRemaining: () => Math.max(0, 50 - (Date.now() - started)) }),
+        Math.min(Number(options.timeout) || 1, 50),
+      );
+    };
+    globalThis.cancelIdleCallback = (handle) => clearTimeout(handle);
+  }
+
+  // webRequest additions: Misty's rule-learning has no handler cache to flush.
+  if (api.webRequest) {
+    define(api.webRequest, "handlerBehaviorChanged", resolved(undefined));
+    define(api.webRequest, "MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES", 20);
+  }
+
+  // webNavigation additions: an event for pages opening tabs, which WebKit lacks.
+  // Misty does not report it yet, so listeners are kept but never called.
+  if (api.webNavigation) {
+    define(api.webNavigation, "onCreatedNavigationTarget", event("webNavigation.onCreatedNavigationTarget"));
+    define(api.webNavigation, "onTabReplaced", event("webNavigation.onTabReplaced"));
+  }
+
   // tabs additions
   if (api.tabs) {
     define(api.tabs, "hide", resolved([]));
@@ -63,6 +88,40 @@
       if (tab) await api.tabs.update(tab.id, { active: true });
       return api.windows.get(tab?.windowId ?? api.windows.WINDOW_ID_CURRENT);
     }));
+  }
+
+  // Menu filters: WebKit accepts only web address patterns and throws on others
+  // (uBlock Origin's abp:*), where Chrome and Firefox accept any scheme. Patterns
+  // WebKit can't take are left out; a filter left empty matches nothing, as before.
+  const webPattern = /^(<all_urls>|(\*|https?|wss?|ftp|file|webkit-extension):\/\/.+)$/;
+  const filtered = (list) => {
+    if (!Array.isArray(list)) return list;
+    const kept = list.filter((pattern) => webPattern.test(String(pattern)));
+    return kept.length ? kept : ["https://misty.invalid/*"];
+  };
+  const menuProperties = (properties) => {
+    if (!properties || typeof properties !== "object") return properties;
+    const out = { ...properties };
+    for (const key of ["targetUrlPatterns", "documentUrlPatterns"]) if (key in out) out[key] = filtered(out[key]);
+    return out;
+  };
+  const replace = (target, name, wrap) => {
+    const original = target?.[name];
+    if (typeof original !== "function") return;
+    compat.retain(target);
+    try {
+      Object.defineProperty(target, name, { value: wrap(original), configurable: true, writable: true });
+    } catch {
+      // A frozen WebKit object keeps its own behavior.
+    }
+  };
+  for (const menus of new Set([api.menus, api.contextMenus, globalThis.chrome?.contextMenus].filter(Boolean))) {
+    replace(menus, "create", (create) => function (properties, callback) {
+      return create.call(menus, menuProperties(properties), callback);
+    });
+    replace(menus, "update", (update) => function (id, properties, callback) {
+      return update.call(menus, id, menuProperties(properties), callback);
+    });
   }
 
   // Firefox menus additions
@@ -245,27 +304,4 @@
       onUpdated: event("theme.onUpdated"),
     });
   }
-
-  if (compat.declared("bookmarks")) {
-    const bookmarks = "Bookmarks are not shared with extensions in Misty yet.";
-    namespace("bookmarks", {
-      getTree: resolved([{ id: "root________", title: "", type: "folder", children: [] }]),
-      getSubTree: resolved([]),
-      getChildren: resolved([]),
-      get: resolved([]),
-      getRecent: resolved([]),
-      search: resolved([]),
-      create: unsupported(bookmarks),
-      update: unsupported(bookmarks),
-      move: unsupported(bookmarks),
-      remove: unsupported(bookmarks),
-      removeTree: unsupported(bookmarks),
-      onCreated: event("bookmarks.onCreated"),
-      onChanged: event("bookmarks.onChanged"),
-      onMoved: event("bookmarks.onMoved"),
-      onRemoved: event("bookmarks.onRemoved"),
-      onChildrenReordered: event("bookmarks.onChildrenReordered"),
-    });
-  }
-
 })();

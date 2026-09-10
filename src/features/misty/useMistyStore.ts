@@ -567,10 +567,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,
           methodInputs: companion?.methodInputs,
+          ...(companion?.schedule && { scheduleId: companion.schedule.id, scheduleClaim: companion.schedule.claim }),
           skillVersionIds: companion?.skillVersionIds,
           surfaceId: handoff?.surfaceId ?? "global",
           // Turns sent to carry on after a card read as events, not as typed messages.
-          trigger: selection ? "selection" : companion?.continuation ? "continuation" : "message",
+          trigger: companion?.schedule ? "scheduled_task" : selection ? "selection" : companion?.continuation ? "continuation" : "message",
           requestedArtifactKind: handoff?.requestedArtifactKind,
           prompt: normalized,
           context: invocationContext,

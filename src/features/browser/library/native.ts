@@ -46,6 +46,8 @@ export interface BrowserFindResult {
   total: number;
 }
 
+export const browserHistoryClearedEvent = "misty:browser-history-cleared";
+
 export type BrowserWebsiteDataKind = "cookies" | "cache";
 
 export const browserLibrary = {
@@ -73,7 +75,10 @@ export const browserLibrary = {
     invoke<void>("browser_history_forget", { request }),
   deleteVisits: (ids: number[]) => invoke<void>("browser_history_delete", { request: { ids } }),
   clearHistory: (request: { profileId?: string; since?: number }) =>
-    invoke<void>("browser_history_clear", { request }),
+    invoke<void>("browser_history_clear", { request }).then(() => {
+      // Open history lists reload instead of waiting for a manual refresh.
+      window.dispatchEvent(new Event(browserHistoryClearedEvent));
+    }),
 
   clearWebsiteData: (request: {
     profileId?: string;

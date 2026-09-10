@@ -218,7 +218,13 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             <Item
               icon={<Puzzle />}
               label="Extensions"
-              onSelect={() => commands.openPage("extensions")}
+              onSelect={() =>
+                window.dispatchEvent(
+                  new CustomEvent("misty:open-settings", {
+                    detail: { section: "browser-extensions" },
+                  }),
+                )
+              }
             />
             <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
             <Item

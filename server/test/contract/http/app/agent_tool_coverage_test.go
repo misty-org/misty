@@ -44,6 +44,8 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /me/(agent-questions|agent-plans|agent-goals)/|^\S+ /me/conversations/\{conversationID\}/(mode|goal)$`,
 		why: "answering questions, approving plans and setting goals are the person's choices; agents ask, propose and report through conversation_ask_user, plan_propose and goal_update"},
 	{pattern: `^POST /agent-requests/\{requestID\}/(approve|decline)$`, why: "the agent's owner decides; agents never approve themselves"},
+	{pattern: `^POST /ai/workflow-schedules/\{scheduleID\}/device-claim$`, why: "the person's computer picks up its own scheduled run before starting it"},
+	{pattern: `^\S+ /ai/inbound-channels/\{channel\}$`, why: "letting email or Slack start tasks is the person's choice in Settings"},
 	{pattern: `^POST /a2a/agents/\{agentID\}/token$`, why: "agent credentials are minted by the person's signed-in app"},
 	{pattern: `^POST /a2a/`, tool: "agents.request"},
 	{pattern: `^\S+ /space-invitations/`, why: "accepting an invitation is the invitee's choice"},
@@ -72,7 +74,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /spaces/\{spaceID\}/invitations/\{inviteID\}/resend$`, tool: "spaces.manage"},
 	{pattern: `^DELETE /spaces/\{spaceID\}/members/\{userID\}$`, tool: "spaces.manage"},
 	{pattern: `^PUT /spaces/\{spaceID\}/members/\{userID\}/permissions$`, why: "member permissions are access control set by the owner"},
-	{pattern: `^\S+ /spaces/\{spaceID\}/agent-listings/`, why: "publishing an agent is its owner's consent"},
+	{pattern: `^\S+ /spaces/\{spaceID\}/agent-listings/`, why: "how an agent takes requests in its Space is its owner's consent"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/(read|item-state)$|/conversations/\{conversationID\}/read$`, why: "per-person read and pin state"},
 	{pattern: `^\S+ /spaces/\{spaceID\}/integrations/`, why: "connecting an account needs the person to sign in"},
 

@@ -11,6 +11,8 @@ export const AgentProfileInputSchema = z.strictObject({
   model_id: z.string().max(200).default(""),
   reasoning_effort: z.string().max(32).default(""),
   enabled: z.boolean().default(true),
+  /** The one Space the agent lives in. Omit to create it in the personal Space. */
+  space_id: z.string().max(200).optional(),
 });
 
 export const AgentProfileSchema = AgentProfileInputSchema.extend({

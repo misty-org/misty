@@ -130,7 +130,7 @@ export interface GlobalAiMessage {
   /** Sub-agents the run started, with their progress. */
   subagents?: AgentSubagent[];
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task" | "goal_continuation" | "continuation";
+  source?: "scheduled_task" | "goal_continuation" | "continuation" | "inbound_task";
   /** Misty sees this message and everything before it only as summarized notes. */
   compactedAfter?: boolean;
 }
