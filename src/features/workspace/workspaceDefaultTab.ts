@@ -7,7 +7,7 @@ import {
 
 const workspaceDefaultTabPreferenceKey = "misty:workspace-default-tab:v1";
 
-export const workspaceDefaultTabOptions = ["Home", "Discover"] as const;
+export const workspaceDefaultTabOptions = ["Choose app", "Discover", "Home"] as const;
 
 interface DefaultTabDescriptor {
   surfaceId: WorkspaceSurfaceId;
@@ -36,6 +36,7 @@ export function workspaceDefaultTabIndex(): number {
 }
 
 export function createDefaultWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
+  if (configuredDefaultTabIndex === 0) return createBlankWorkspaceTab(scopeKey);
   const descriptor = defaultTabDescriptor(scopeKey, configuredDefaultTabIndex);
   const now = Date.now();
   const id = `tab:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`;
@@ -70,6 +71,15 @@ export function createHomeWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTa
     state: {},
     createdAt: now,
     lastFocusedAt: now,
+  };
+}
+
+export function createBlankWorkspaceTab(scopeKey: WorkspaceScopeKey): WorkspaceTab {
+  return {
+    ...createHomeWorkspaceTab(scopeKey),
+    title: "New Tab",
+    route: "/home",
+    placeholder: true,
   };
 }
 

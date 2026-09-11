@@ -175,7 +175,7 @@ export const desktopWallpaperLayerClass = "hidden";
 export const desktopTitlebarNavigationClass =
   "pointer-events-auto absolute top-0 z-[55] flex h-[38px] items-center gap-1";
 export const desktopTitlebarNavigationButtonClass = [
-  "grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  "grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-charcoal-active",
   "disabled:pointer-events-none disabled:text-cream-muted/35",
@@ -183,7 +183,7 @@ export const desktopTitlebarNavigationButtonClass = [
 export const windowsTitlebarControlsClass =
   "pointer-events-auto absolute right-0 top-0 z-[3] grid h-full grid-cols-3";
 
-export const windowsWorkspaceControlsClass = "ml-auto flex h-7 shrink-0 items-center gap-0.5";
+export const windowsWorkspaceControlsClass = "ml-auto flex h-7 shrink-0 items-center gap-1";
 
 export const windowsTitlebarControlButtonClass =
   "grid h-full w-[46px] place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";

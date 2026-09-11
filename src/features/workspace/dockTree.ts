@@ -35,6 +35,54 @@ export function dockTabs(node: WorkspaceDockNode): WorkspaceTab[] {
   return dockLeaves(node).flatMap((leaf) => leaf.tabs);
 }
 
+/** Relocate an existing pane without creating or discarding any pane contents. */
+export function moveDockPane(
+  root: WorkspaceDockNode,
+  paneId: string,
+  direction: DockSplitDirection,
+  targetPaneId?: string,
+): WorkspaceDockNode {
+  const pane = findDockLeaf(root, paneId);
+  if (!pane || paneId === targetPaneId || (targetPaneId && !findDockLeaf(root, targetPaneId)))
+    return root;
+  const leaves = dockLeaves(root);
+  if (leaves.length >= 4) {
+    const grid = normalizePaneLayout(root);
+    const ordered = dockLeaves(grid);
+    const index = ordered.findIndex((leaf) => leaf.id === paneId);
+    const neighbor =
+      direction === "left"
+        ? index >= 2
+          ? index - 2
+          : index
+        : direction === "right"
+          ? index < 2
+            ? index + 2
+            : index
+          : direction === "up"
+            ? index % 2
+              ? index - 1
+              : index
+            : index % 2 === 0
+              ? index + 1
+              : index;
+    return swapDockLeaves(grid, paneId, targetPaneId ?? ordered[neighbor].id);
+  }
+  const remaining = removeDockLeaf(root, paneId);
+  if (!remaining) return root;
+  if (targetPaneId)
+    return normalizePaneLayout(insertDockSplit(remaining, targetPaneId, pane, direction));
+  const first = direction === "left" || direction === "up";
+  return normalizePaneLayout({
+    type: "split",
+    id: createDockId("split"),
+    direction: direction === "left" || direction === "right" ? "horizontal" : "vertical",
+    ratio: 0.5,
+    first: first ? pane : remaining,
+    second: first ? remaining : pane,
+  });
+}
+
 export function capDockLeaves(node: WorkspaceDockNode, maximum: number): WorkspaceDockNode {
   const leaves = dockLeaves(node);
   if (leaves.length <= maximum) return node;
@@ -212,4 +260,71 @@ export function normalizeDockNode(node: WorkspaceDockNode): WorkspaceDockNode {
   return ratio === node.ratio && first === node.first && second === node.second
     ? node
     : { ...node, ratio, first, second };
+}
+
+/** Project a pane's bounds from the resulting tree, including collapsed source splits. */
+export function dockPaneBounds(
+  node: WorkspaceDockNode,
+  paneId: string,
+  bounds: { x: number; y: number; width: number; height: number },
+): typeof bounds | null {
+  if (node.type === "leaf") return node.id === paneId ? bounds : null;
+  const horizontal = node.direction === "horizontal";
+  const first = {
+    ...bounds,
+    width: horizontal ? bounds.width * node.ratio : bounds.width,
+    height: horizontal ? bounds.height : bounds.height * node.ratio,
+  };
+  const second = {
+    x: horizontal ? bounds.x + first.width : bounds.x,
+    y: horizontal ? bounds.y : bounds.y + first.height,
+    width: horizontal ? bounds.width - first.width : bounds.width,
+    height: horizontal ? bounds.height : bounds.height - first.height,
+  };
+  return dockPaneBounds(node.first, paneId, first) ?? dockPaneBounds(node.second, paneId, second);
+}
+
+/** Direction toward the sibling that fills the closed pane's space. */
+export function dockPaneCloseDirection(
+  node: WorkspaceDockNode,
+  paneId: string,
+): DockSplitDirection | null {
+  if (node.type === "leaf") return null;
+  if (node.first.type === "leaf" && node.first.id === paneId)
+    return node.direction === "horizontal" ? "right" : "down";
+  if (node.second.type === "leaf" && node.second.id === paneId)
+    return node.direction === "horizontal" ? "left" : "up";
+  return dockPaneCloseDirection(node.first, paneId) ?? dockPaneCloseDirection(node.second, paneId);
+}
+
+/** Supported arrangements: two halves, a large pane beside two halves, or four quadrants. */
+export function normalizePaneLayout(root: WorkspaceDockNode): WorkspaceDockNode {
+  const leaves = dockLeaves(root);
+  if (leaves.length === 4) {
+    if (
+      root.type === "split" &&
+      root.direction === "horizontal" &&
+      root.first.type === "split" &&
+      root.second.type === "split" &&
+      root.first.direction === "vertical" &&
+      root.second.direction === "vertical"
+    )
+      return root;
+    const bounds = { x: 0, y: 0, width: 1, height: 1 };
+    const ordered = [...leaves].sort((a, b) => {
+      const aa = dockPaneBounds(root, a.id, bounds)!,
+        bb = dockPaneBounds(root, b.id, bounds)!;
+      return aa.y - bb.y || aa.x - bb.x;
+    });
+    return dockGrid(ordered);
+  }
+  if (leaves.length === 3 && root.type === "split") {
+    const direction = root.direction === "horizontal" ? "vertical" : "horizontal";
+    return {
+      ...root,
+      first: root.first.type === "split" ? { ...root.first, direction } : root.first,
+      second: root.second.type === "split" ? { ...root.second, direction } : root.second,
+    };
+  }
+  return root;
 }

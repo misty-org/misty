@@ -1,5 +1,5 @@
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { appViewHasUnsavedChanges } from "@/features/apps/appUpdateSafety";
-import { dockTabs } from "./dockTree";
 import type {
   WorkspaceDockNode,
   WorkspaceScopeKey,
@@ -41,7 +41,7 @@ export function nextWorkspaceFocusTimestamp(
 ): number {
   const latest = Object.values(windowsByScope)
     .flatMap((windows) => windows ?? [])
-    .flatMap((window) => dockTabs(window.layout.root))
+    .flatMap((window) => allLayoutViews(window.layout))
     .reduce((maximum, tab) => Math.max(maximum, tab.lastFocusedAt), 0);
   return Math.max(Date.now(), latest + 1);
 }
@@ -74,7 +74,11 @@ export function lastUsedUpdatesForTab(
 
 export function canCloseWorkspaceTab(_tab?: WorkspaceTab, _scopedTabs?: WorkspaceTab[]): boolean {
   if (_tab && appViewHasUnsavedChanges(_tab.id)) {
-    window.dispatchEvent(new CustomEvent("misty:app-update-notice", {detail: "Save the changes in Code before closing this tab."}));
+    window.dispatchEvent(
+      new CustomEvent("misty:app-update-notice", {
+        detail: "Save the changes in Code before closing this tab.",
+      }),
+    );
     return false;
   }
   return true;
@@ -84,5 +88,8 @@ export function canCloseWorkspaceWindow(
   _workspaceWindow: WorkspaceVirtualWindow,
   scopedWindows: WorkspaceVirtualWindow[],
 ): boolean {
-  return scopedWindows.length > 1;
+  return (
+    scopedWindows.length > 1 &&
+    allLayoutViews(_workspaceWindow.layout).every((tab) => canCloseWorkspaceTab(tab))
+  );
 }

@@ -74,6 +74,34 @@ describe("MultiPanelWorkspace", () => {
     expect(store.getState().tabs[0]?.panes).toHaveLength(2);
   });
 
+  it("preserves live pane content when lanes are reordered, split, and collapsed", async () => {
+    const store = createMultiPanelStore({ idPrefix: "stable-files" });
+    store.getState().initialize("/Users/demo", "demo");
+    const first = store.getState().activePaneId;
+    await act(async () =>
+      root.render(
+        <MultiPanelWorkspace
+          store={store}
+          renderPane={(id) => <input data-live-pane={id} defaultValue="Draft" />}
+        />,
+      ),
+    );
+    const original = container.querySelector(`[data-live-pane="${first}"]`);
+    await act(async () => store.getState().splitPane(first, "vertical"));
+    const tab = store.getState().tabs[0];
+    const second = tab.panes.find((pane) => pane.id !== first)!.id;
+    expect(container.querySelector(`[data-live-pane="${first}"]`)).toBe(original);
+    for (const lanes of [[[second], [first]], [[second, first]]]) {
+      await act(async () =>
+        store.setState({ tabs: [{ ...tab, layout: { ...tab.layout, lanes } }] }),
+      );
+      expect(container.querySelector(`[data-live-pane="${first}"]`)).toBe(original);
+    }
+    await act(async () => store.getState().closePane(second));
+    expect(container.querySelector(`[data-live-pane="${first}"]`)).toBe(original);
+    expect(container.querySelector(`[data-live-pane="${second}"]`)).toBeNull();
+  });
+
   it("makes the file pane containing keyboard focus active", async () => {
     const store = createMultiPanelStore({ idPrefix: "focused-files" });
     store.getState().initialize("/Users/demo", "demo");

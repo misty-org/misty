@@ -28,7 +28,7 @@ describe("app zoom", () => {
     setAppZoom(0.8);
 
     expect(getAppliedAppZoom()).toBe(0.8);
-    expect(document.body.style.zoom).toBe("0.8");
+    expect(document.body.style.zoom).toBe("0.88");
     expect(document.documentElement.dataset.appZoom).toBe("80");
   });
 
@@ -38,11 +38,22 @@ describe("app zoom", () => {
 
     act(() => result.current.zoomOut());
     expect(result.current.zoom).toBe(0.9);
-    expect(document.body.style.zoom).toBe("0.9");
+    expect(document.body.style.zoom).toBe("0.99");
 
     act(() => result.current.resetZoom());
     expect(result.current.zoom).toBe(1);
-    expect(document.body.style.zoom).toBe("1");
+    expect(document.body.style.zoom).toBe("1.1");
+  });
+
+  it("restores physical scale while displaying the relative percentage", () => {
+    window.localStorage.setItem("misty.app.zoom", "1.21");
+    const { result } = renderHook(() => useAppZoom());
+    expect(result.current.zoomPercent).toBe(110);
+    expect(document.body.style.zoom).toBe("1.21");
+    act(() => result.current.resetZoom());
+    expect(result.current.zoomPercent).toBe(100);
+    expect(document.body.style.zoom).toBe("1.1");
+    expect(window.localStorage.getItem("misty.app.zoom")).toBeNull();
   });
 
   it("uses native page zoom without CSS layout scaling in the desktop app", async () => {
@@ -57,6 +68,6 @@ describe("app zoom", () => {
 
     expect(getAppliedAppZoom()).toBe(0.9);
     expect(document.body.style.zoom).toBe("");
-    await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(0.9));
+    await waitFor(() => expect(setNativeZoom).toHaveBeenCalledWith(0.99));
   });
 });

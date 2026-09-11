@@ -113,7 +113,7 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
     ) => {
       const workspace = useWorkspaceStore.getState();
       if (record) recordWorkspaceTabRoute(props.tab.id, nextRoute, Boolean(options?.replace));
-      workspace.updateTabRoute(props.tab.id, nextRoute);
+      workspace.updateTabRoute(props.tab.id, nextRoute, Boolean(options?.replace));
       const focusedPane = dockLeaves(workspace.layout.root).find(
         (pane) => pane.id === workspace.layout.focusedPaneId,
       );
@@ -131,6 +131,16 @@ export function WorkspaceTabRouteScope(props: { tab: WorkspaceTab; children: Rea
       createHref: (to) => createPath(resolvePath(to, location.pathname)),
       encodeLocation: (to) => resolvePath(to, location.pathname),
       go: (delta) => {
+        const workspace = useWorkspaceStore.getState();
+        const pane = dockLeaves(workspace.layout.root).find(
+          (pane) => pane.activeTabId === props.tab.id,
+        );
+        if (pane) {
+          const view = workspace.navigatePane(delta, pane.id);
+          if (view && pane.id === workspace.layout.focusedPaneId)
+            outerNavigate(view.route, { replace: true });
+          return;
+        }
         const nextRoute = navigateWorkspaceTabRoute(props.tab.id, delta);
         if (nextRoute) apply(nextRoute, null, { replace: true }, false);
       },

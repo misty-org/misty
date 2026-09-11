@@ -4,10 +4,7 @@ import {
   officialAppRoute,
   useInstalledNavigatorAppIds,
 } from "@/features/apps";
-import {
-  preferredDefaultSpace,
-  useSpacesStore,
-} from "@/features/spaces";
+import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import {
   NAVIGATOR_APP_IDS,
   WORKSPACE_TOOLS_META,
@@ -26,7 +23,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import { Plus, type LucideIcon } from "lucide-react";
+import { Compass, Plus, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export interface NewTabOption {
@@ -65,33 +62,24 @@ export const NEW_TAB_OPTIONS: NewTabOption[] = createNewTabOptions();
 export const GENERAL_TAB_OPTIONS = NEW_TAB_OPTIONS;
 
 interface Props {
+  buttonText?: string;
+  defaultOpen?: boolean;
+  onDismiss?: () => void;
+  label?: string;
   paneId: string;
   onOpenNewTab: (option: NewTabOption, paneId: string) => void;
 }
 
-export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
-  const [open, setOpen] = useState(false);
-  const { user } = useAuth();
-  const accountId = user?.id ?? "";
-  const enabledAppIds = useInstalledNavigatorAppIds();
-  const spaces = useSpacesStore((state) => state.spaces);
-  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const scopedSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
-  const activeSpaceId =
-    spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredDefaultSpace(spaces)?.id;
-  const options = useMemo(() => {
-    const optionsById = new Map(
-      createNewTabOptions({ spaceId: activeSpaceId, accountId }).map((option) => [
-        option.appId,
-        option,
-      ]),
-    );
-    const enabledApps = enabledAppIds.flatMap((appId) => {
-      const option = optionsById.get(appId);
-      return option ? [option] : [];
-    });
-    return enabledApps;
-  }, [accountId, activeSpaceId, enabledAppIds]);
+export function WorkspaceNewTabMenu({
+  paneId,
+  onOpenNewTab,
+  defaultOpen = false,
+  onDismiss,
+  buttonText,
+  label = "New tab",
+}: Props) {
+  const [open, setOpen] = useState(defaultOpen);
+  const options = useNewTabOptions();
 
   useEffect(() => {
     const openPicker = (event: Event) => {
@@ -102,19 +90,28 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
   }, [paneId]);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) onDismiss?.();
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           className={cn(
-            "grid size-7 place-items-center rounded text-cream-muted outline-none",
+            buttonText
+              ? "flex h-9 items-center gap-2 rounded border border-charcoal-border px-3 text-sm text-cream outline-none"
+              : "grid size-7 place-items-center rounded text-cream-muted outline-none",
             "hover:bg-charcoal-card hover:text-cream focus:outline-none",
             "focus-visible:ring-1 focus-visible:ring-cream-muted",
           )}
-          aria-label="New tab"
-          title="New tab"
+          aria-label={label}
+          title={label}
         >
           <Plus size={15} />
+          {buttonText}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -141,9 +138,45 @@ export function WorkspaceNewTabMenu({ paneId, onOpenNewTab }: Props) {
             </p>
           )}
         </DropdownMenuGroup>
+        <DropdownMenuItem
+          className="mt-1.5 h-9 gap-2 border-t border-charcoal-border rounded-none px-2 text-xs text-cream-muted"
+          onSelect={() =>
+            onOpenNewTab(
+              { surfaceId: "marketplace", label: "Discover", route: "/discover", icon: Compass },
+              paneId,
+            )
+          }
+        >
+          <Compass size={14} aria-hidden="true" />
+          <span>Browse more apps</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+export function useNewTabOptions() {
+  const { user } = useAuth();
+  const accountId = user?.id ?? "";
+  const enabledAppIds = useInstalledNavigatorAppIds();
+  const spaces = useSpacesStore((state) => state.spaces);
+  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
+  const scopedSpaceId = activeScopeKey.startsWith("space:") ? activeScopeKey.slice(6) : "";
+  const activeSpaceId =
+    spaces.find((space) => space.id === scopedSpaceId)?.id ?? preferredDefaultSpace(spaces)?.id;
+  return useMemo(() => {
+    const optionsById = new Map(
+      createNewTabOptions({ spaceId: activeSpaceId, accountId }).map((option) => [
+        option.appId,
+        option,
+      ]),
+    );
+    const enabledApps = enabledAppIds.flatMap((appId) => {
+      const option = optionsById.get(appId);
+      return option ? [option] : [];
+    });
+    return enabledApps;
+  }, [accountId, activeSpaceId, enabledAppIds]);
 }
 
 function NewTabMenuItem(props: { option: NewTabOption; onSelect: () => void }) {
