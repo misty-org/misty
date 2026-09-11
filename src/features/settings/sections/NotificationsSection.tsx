@@ -1,3 +1,4 @@
+import { ActivityNotificationControls } from "@/features/activity/ActivityNotificationControls";
 import {
   nativeNotificationPermission,
   requestNativeNotificationPermission,
@@ -41,6 +42,7 @@ export function NotificationsSection(props: SettingsContentProps) {
 
   return (
     <>
+      <ActivityNotificationControls />
       <SettingsSectionBlock title="Delivery">
         <SettingsRow
           label={isNativeMobileBuild ? "Push notifications" : "Desktop notifications"}

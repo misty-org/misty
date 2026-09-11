@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectEditorPreferences } from "./preferences";
+import { selectAppearancePreferences, selectEditorPreferences } from "./preferences";
 
 describe("selectEditorPreferences", () => {
   it("uses comfortable Code defaults", () => {
@@ -15,4 +15,11 @@ describe("selectEditorPreferences", () => {
     ).toMatchObject({ interfaceScale: 0.8, fontSize: 18 });
     expect(selectEditorPreferences({ editor: { interface_scale: 3 } }).interfaceScale).toBe(1.5);
   });
+});
+
+it("uses the comfortable baseline for defaults and existing 110% settings", () => {
+  expect(selectAppearancePreferences({}).appZoom).toBe(1);
+  expect(selectAppearancePreferences({ appearance: { app_zoom: 1 } }).appZoom).toBe(1);
+  expect(selectAppearancePreferences({ appearance: { app_zoom: 1.1 } }).appZoom).toBe(1);
+  expect(selectAppearancePreferences({ appearance: { app_zoom: 1.21 } }).appZoom).toBe(1.1);
 });

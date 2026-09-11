@@ -1,5 +1,8 @@
-import { toggleDesktopMistyPanel } from "@/features/desktop-pet";
-import { useGlobalSearchStore } from "@/features/global-search";
+import { useNavigationNames } from "@/features/navigation-names/store";
+import { mapAllVirtualWorkspaceLayouts } from "@/features/workspace/virtualWindows";
+import { allLayoutViews, layoutTabs, layoutTabLabel } from "@/features/workspace/layoutTabs";
+import { WorkspaceLayoutTabs } from "./WorkspaceLayoutTabs";
+import { openMisty } from "@/features/misty/handoff";
 import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
@@ -27,11 +30,7 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DockSplitDirection } from "@/features/workspace/model";
-import {
-  minimumForWorkspaceTabs,
-  tabForGroupedShortcut,
-  WorkspaceDockTree,
-} from "./WorkspaceDockTree";
+import { minimumForWorkspaceTabs, WorkspaceDockTree } from "./WorkspaceDockTree";
 import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
@@ -39,6 +38,24 @@ export function WorkspaceCanvas(props: {
   titlebarInsets?: { left: number; right: number };
   windowsTitlebarControls?: boolean;
 }) {
+  const legacyNames = useNavigationNames((state) => state.names);
+  const legacyNamesReady = useNavigationNames((state) => state.ready);
+  useEffect(() => {
+    if (!legacyNamesReady) return;
+    useWorkspaceStore.setState(
+      mapAllVirtualWorkspaceLayouts(useWorkspaceStore.getState(), (layout) => ({
+        ...layout,
+        tabs: layoutTabs(layout).map((tab) => {
+          if (!tab.legacyNameKeys) return tab;
+          const { legacyNameKeys, ...rest } = tab;
+          return {
+            ...rest,
+            title: rest.title ?? legacyNameKeys.map((key) => legacyNames[key]).find(Boolean),
+          };
+        }),
+      })),
+    );
+  }, [legacyNames, legacyNamesReady]);
   const location = useLocation();
   const navigate = useNavigate();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -237,20 +254,21 @@ export function WorkspaceCanvas(props: {
 
   const closeActiveTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
-    const focused = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-    const active = focused?.tabs.find((tab) => tab.id === focused.activeTabId);
-    if (active) closeWorkspaceTab(active);
-  }, [closeWorkspaceTab]);
+    const id = state.layout.activeLayoutTabId;
+    const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
+    const closed =
+      dockLeaves(state.layout.root).length > 1
+        ? pane?.tabs[0] && state.closeTab(pane.tabs[0].id)
+        : id && state.closeLayoutTab(id);
+    if (closed) navigateToActiveLayoutTab();
+  }, [navigateToActiveLayoutTab]);
 
   const canCloseActiveTab = useCallback(() => {
     const state = useWorkspaceStore.getState();
-    const focused = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-    const active = focused?.tabs.find((tab) => tab.id === focused.activeTabId);
-    const scopedTabs = virtualWindows.flatMap((workspaceWindow) =>
-      dockTabs(workspaceWindow.layout.root),
+    return canCloseWorkspaceTab(
+      findDockLeaf(state.layout.root, state.layout.focusedPaneId)?.tabs[0],
     );
-    return Boolean(active && canCloseWorkspaceTab(active, scopedTabs));
-  }, [virtualWindows]);
+  }, []);
 
   const openSelectedTab = useCallback(
     (tab: WorkspaceTab | null) => {
@@ -263,9 +281,7 @@ export function WorkspaceCanvas(props: {
   useShortcutHandler(
     "misty.contextual_companion",
     useCallback(() => {
-      void toggleDesktopMistyPanel().then((openedNativePanel) => {
-        if (!openedNativePanel) useGlobalSearchStore.getState().togglePanel();
-      });
+      void openMisty();
     }, []),
   );
   useShortcutHandler(
@@ -289,19 +305,15 @@ export function WorkspaceCanvas(props: {
   useShortcutHandler(
     "workspace.new_tab",
     useCallback(() => {
-      const paneId = useWorkspaceStore.getState().layout.focusedPaneId;
-      window.dispatchEvent(new CustomEvent("misty:open-new-tab-picker", { detail: { paneId } }));
-    }, []),
+      const view = useWorkspaceStore.getState().newLayoutTab();
+      openSelectedTab(view);
+    }, [openSelectedTab]),
   );
   useEffect(() => {
     const unregister = Array.from({ length: 9 }, (_, index) =>
       registerShortcutHandler(`workspace.tab_${index + 1}`, () => {
         const state = useWorkspaceStore.getState();
-        const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-        const tab = pane
-          ? tabForGroupedShortcut(pane.tabs, index === 8 ? "last" : index, state.lastUsedTabByGroup)
-          : null;
-        if (tab) state.focusTab(tab.id);
+        const tab = state.selectTab(index === 8 ? "last" : index);
         openSelectedTab(tab);
       }),
     );
@@ -483,14 +495,12 @@ export function WorkspaceCanvas(props: {
   return (
     <div
       ref={windowTransitionRef}
-      className="h-full min-h-0 overflow-hidden bg-charcoal-border"
+      className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-border"
       data-workspace-panes={leaves.length}
       data-workspace-scope={activeScopeKey}
       data-virtual-window={activeVirtualWindowId}
     >
-      <WorkspaceDockTree
-        node={layout.root}
-        dockEdge={{ top: true, left: true, right: true }}
+      <WorkspaceLayoutTabs
         titlebarInsets={props.titlebarInsets}
         windowsTitlebarControls={props.windowsTitlebarControls}
         focusedPaneId={layout.focusedPaneId}
@@ -498,10 +508,17 @@ export function WorkspaceCanvas(props: {
         onOpen={openTab}
         onClose={closeWorkspaceTab}
         onOpenNewTab={openNewTab}
+        onNewTab={() => openTab(useWorkspaceStore.getState().newLayoutTab())}
+        onCloseLayoutTab={(id) => {
+          if (useWorkspaceStore.getState().closeLayoutTab(id)) navigateToActiveLayoutTab();
+        }}
         onMoveTab={moveTab}
         onDockTab={dockTab}
         onSplitPane={splitWorkspacePane}
-        onClosePane={closePane}
+        onClosePane={(paneId) => {
+          closePane(paneId);
+          navigateToActiveLayoutTab();
+        }}
         virtualWindows={virtualWindows}
         activeVirtualWindowId={activeVirtualWindowId}
         canReopenVirtualWindow={canReopenVirtualWindow}
@@ -511,6 +528,44 @@ export function WorkspaceCanvas(props: {
         onReopenVirtualWindow={reopenWorkspaceVirtualWindow}
         onResizeSplit={updateSplitRatio}
       />
+      {layoutTabs(layout).map((tab) => {
+        const active = tab.id === layout.activeLayoutTabId;
+        return (
+          <div
+            key={tab.id}
+            className={active ? "min-h-0 flex-1 overflow-hidden" : "hidden"}
+            role="tabpanel"
+            aria-label={layoutTabLabel(tab)}
+            aria-hidden={!active}
+            inert={!active}
+          >
+            <WorkspaceDockTree
+              node={tab.root}
+              workspaceActive={active}
+              focusedPaneId={tab.focusedPaneId}
+              lastUsedTabByGroup={lastUsedTabByGroup}
+              onOpen={openTab}
+              onClose={closeWorkspaceTab}
+              onOpenNewTab={openNewTab}
+              onMoveTab={moveTab}
+              onDockTab={dockTab}
+              onSplitPane={splitWorkspacePane}
+              onClosePane={(paneId) => {
+                closePane(paneId);
+                navigateToActiveLayoutTab();
+              }}
+              virtualWindows={virtualWindows}
+              activeVirtualWindowId={activeVirtualWindowId}
+              canReopenVirtualWindow={canReopenVirtualWindow}
+              onSelectVirtualWindow={selectVirtualWindow}
+              onCreateVirtualWindow={createWorkspaceVirtualWindow}
+              onCloseVirtualWindow={closeWorkspaceVirtualWindow}
+              onReopenVirtualWindow={reopenWorkspaceVirtualWindow}
+              onResizeSplit={updateSplitRatio}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -527,7 +582,7 @@ function workspaceTabsById(
     Object.values(state.virtualWindowsByScope)
       .filter((windows): windows is NonNullable<typeof windows> => Boolean(windows))
       .flat()
-      .flatMap((workspaceWindow) => dockTabs(workspaceWindow.layout.root))
+      .flatMap((workspaceWindow) => allLayoutViews(workspaceWindow.layout))
       .map((tab) => [tab.id, tab]),
   );
 }

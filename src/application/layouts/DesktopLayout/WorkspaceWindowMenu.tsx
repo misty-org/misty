@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { clearNavigationRestoreHistory } from "@/features/navigation-names/clearHistory";
 import type { WorkspaceVirtualWindow } from "@/features/workspace";
 import {
@@ -9,9 +10,10 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import { AppWindow, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { AppWindow, ChevronDown, Plus, RotateCcw, Trash2, X } from "lucide-react";
 
 export function WorkspaceWindowMenu(props: {
+  titlebar?: boolean;
   windows: WorkspaceVirtualWindow[];
   activeWindowId: string;
   canReopen: boolean;
@@ -21,6 +23,10 @@ export function WorkspaceWindowMenu(props: {
   onClose: (windowId: string) => void;
   onReopen: () => void;
 }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(props.titlebar ? document.getElementById("misty-virtual-window-controls") : null);
+  }, [props.titlebar]);
   const [error, setError] = useState("");
   const canClose = (workspaceWindow: WorkspaceVirtualWindow) =>
     props.windows.length > 1 && (!props.canCloseWindow || props.canCloseWindow(workspaceWindow));
@@ -28,7 +34,7 @@ export function WorkspaceWindowMenu(props: {
     (workspaceWindow) => workspaceWindow.id === props.activeWindowId,
   );
 
-  return (
+  const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -38,7 +44,8 @@ export function WorkspaceWindowMenu(props: {
           title="Manage virtual windows"
           data-tour-target="workspace-window-menu"
         >
-          <AppWindow size={18} />
+          <AppWindow className="size-[18px]" />
+          <ChevronDown className="size-3" aria-hidden="true" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -116,12 +123,13 @@ export function WorkspaceWindowMenu(props: {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  return target ? createPortal(menu, target) : menu;
 }
 
 const menuItemClass =
   "min-h-8 min-w-0 cursor-pointer gap-2 rounded-[5px] px-[9px] py-[7px] text-[13px] leading-[18px] data-[disabled]:opacity-40";
 
 const dockActionClass = [
-  "grid size-7 place-items-center rounded text-cream-muted outline-none",
+  "flex h-7 shrink-0 items-center justify-center gap-1 px-1 rounded text-cream-muted outline-none",
   "hover:bg-charcoal-card hover:text-cream focus:outline-none focus-visible:ring-1 focus-visible:ring-cream-muted",
 ].join(" ");

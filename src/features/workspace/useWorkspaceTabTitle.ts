@@ -1,5 +1,5 @@
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { createContext, createElement, useContext, useEffect, type ReactNode } from "react";
-import { dockTabs } from "./dockTree";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 const WorkspaceTabIdContext = createContext<string | undefined>(undefined);
@@ -19,7 +19,7 @@ export function useWorkspaceTabTitle(tabId: string | undefined, title: string) {
     const trimmed = title.trim();
     if (!resolvedTabId || !trimmed) return;
     const state = useWorkspaceStore.getState();
-    const tab = dockTabs(state.layout.root).find((entry) => entry.id === resolvedTabId);
+    const tab = allLayoutViews(state.layout).find((entry) => entry.id === resolvedTabId);
     if (tab && tab.title !== trimmed) state.renameTab(resolvedTabId, trimmed);
   }, [resolvedTabId, title]);
 }

@@ -10,18 +10,19 @@ import {
 describe("workspace default tab", () => {
   afterEach(() => configureWorkspaceDefaultTab(0));
 
-  it("creates Space Home by default", () => {
+  it("creates a blank Choose app pane by default", () => {
     const tab = createDefaultWorkspaceTab("space:family");
 
     expect(tab).toMatchObject({
       surfaceId: "space",
       groupKey: "space:family",
-      title: "Home",
-      route: "/spaces/family/home",
+      title: "New Tab",
+      placeholder: true,
+      route: "/home",
     });
   });
 
-  it("uses Discover as the only configurable alternative to Home", () => {
+  it("supports an explicit Discover preference", () => {
     configureWorkspaceDefaultTab(workspaceDefaultTabOptions.indexOf("Discover"));
 
     expect(dockTabs(initialWorkspaceLayout("space:family").root)).toMatchObject([
@@ -34,12 +35,13 @@ describe("workspace default tab", () => {
     ]);
   });
 
-  it("falls back to Home for an invalid preference", () => {
+  it("falls back to Choose app for an invalid preference", () => {
     configureWorkspaceDefaultTab(999);
 
     expect(createDefaultWorkspaceTab("global")).toMatchObject({
       surfaceId: "home",
-      title: "Home",
+      title: "New Tab",
+      placeholder: true,
       route: "/home",
     });
   });

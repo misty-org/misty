@@ -1,11 +1,35 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { useActivityStore } from "@/features/activity/useActivityStore";
 import { buildSupportBundle } from "./supportBundle";
 
 describe("support bundle", () => {
   beforeEach(() => {
     localStorage.clear();
+    useActivityStore.setState(useActivityStore.getInitialState(), true);
   });
 
+  it("includes only the active account and deployment diagnostics", async () => {
+    const store = () => useActivityStore.getState();
+    store().setAccount("one");
+    store().ingestLocal({
+      id: "diagnostic",
+      kind: "failure",
+      visibility: "diagnostic",
+      title: "Hosted-only diagnostic",
+    });
+    localStorage.setItem("misty:deployment-scope", "private");
+    store().setAccount("one");
+    store().ingestLocal({
+      id: "diagnostic",
+      kind: "failure",
+      visibility: "diagnostic",
+      title: "Private-only diagnostic",
+    });
+    expect(JSON.stringify(await buildSupportBundle())).not.toContain("Hosted-only");
+    expect(JSON.stringify(await buildSupportBundle())).toContain("Private-only");
+    store().setAccount("two");
+    expect(JSON.stringify(await buildSupportBundle())).not.toContain("Private-only");
+  });
   it("redacts sensitive values and never uploads anything", async () => {
     localStorage.setItem(
       "misty.clientDebug.events.v1",

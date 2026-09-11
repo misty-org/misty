@@ -81,7 +81,7 @@ function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): Lucide
   return workspaceAppIcon(getTabAppId(tab)) ?? fallback;
 }
 
-function TabIcon({
+export function TabIcon({
   tab,
   icon: DefaultIcon,
   size = 14,

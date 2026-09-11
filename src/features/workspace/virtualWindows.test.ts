@@ -50,7 +50,7 @@ describe("workspace virtual windows", () => {
     expect(useWorkspaceStore.getState().activeVirtualWindowId).toBe(secondWindow.id);
   });
 
-  it("creates a Space-local window with its own Home tab", () => {
+  it("creates a Space-local window with its own blank pane", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     const firstWindowId = useWorkspaceStore.getState().activeVirtualWindowId;
@@ -58,7 +58,7 @@ describe("workspace virtual windows", () => {
 
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
     expect(dockTabs(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "space", title: "Home", route: "/spaces/family/home" },
+      { surfaceId: "space", title: "New Tab", route: "/home", placeholder: true },
     ]);
     expect(useWorkspaceStore.getState().switchVirtualWindow(firstWindowId)).toBe(true);
     expect(useWorkspaceStore.getState().switchVirtualWindow(second.id)).toBe(true);
@@ -244,16 +244,15 @@ describe("workspace virtual windows", () => {
     ).toContain(firstWindowId);
   });
 
-  it("swaps complete panel tab groups without changing the dock shape", () => {
-    const first = useWorkspaceStore.getState().layout.focusedPaneId;
+  it("swaps pane views without changing the tab layout", () => {
     const files = useWorkspaceStore.getState().openSurface({
       surfaceId: "files",
       groupKey: "tool:files",
       title: "Files",
       route: "/files",
       forceNew: true,
-      paneId: first,
     });
+    const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
     const terminal = useWorkspaceStore.getState().openSurface({
       surfaceId: "terminal",
