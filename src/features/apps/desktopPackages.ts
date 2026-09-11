@@ -10,10 +10,10 @@ interface LocalAppRecord {
   root: string;
 }
 
-export async function officialDesktopPackageReady(app: OfficialApp): Promise<boolean> {
+export async function officialDesktopPackageReady(app: OfficialApp, nativeService = false): Promise<boolean> {
   if (!hasTauriInternals() || app.desktop.runtime !== "downloaded") return false;
   const local = localDesktopComponentUrl(app);
-  if (local) return localAppComponentReady(local);
+  if (local && !nativeService) return localAppComponentReady(local);
   const sha256 = app.desktop.sha256?.trim();
   const signature = app.desktop.signature?.trim();
   const signatureKeyId = app.desktop.signature_key_id?.trim();
@@ -27,15 +27,18 @@ export async function officialDesktopPackageReady(app: OfficialApp): Promise<boo
   });
 }
 
-export async function stageOfficialDesktopPackage(app: OfficialApp): Promise<string | null> {
+export async function stageOfficialDesktopPackage(app: OfficialApp, nativeService = false): Promise<string | null> {
   if (!hasTauriInternals() || app.desktop.runtime !== "downloaded") return null;
   assertAppCompatible(app);
-  if (localDesktopComponentUrl(app)) {
+  if (localDesktopComponentUrl(app) && !nativeService) {
     if (!(await officialDesktopPackageReady(app)))
       throw new Error(`Build ${app.name} in the local Apps repository first.`);
     return null;
   }
-  const entry = app.desktop.entry?.trim();
+  const local = localDesktopComponentUrl(app);
+  const entry = local && nativeService
+    ? new URL(`/official-apps/${encodeURIComponent(app.id)}/${encodeURIComponent(app.version)}/desktop.zip`, local).href
+    : app.desktop.entry?.trim();
   const sha256 = app.desktop.sha256?.trim();
   const signature = app.desktop.signature?.trim();
   const signatureKeyId = app.desktop.signature_key_id?.trim();
@@ -56,17 +59,22 @@ export async function stageOfficialDesktopPackage(app: OfficialApp): Promise<str
 }
 
 export async function finalizeOfficialDesktopPackageInstall(
-  appId: string,
+  app: OfficialApp,
   operationId: string | null,
   commit: boolean,
 ): Promise<void> {
   if (!hasTauriInternals() || !operationId) return;
-  await invoke<void>("finalize_official_app_install", { pluginId: appId, operationId, commit });
+  await invoke<void>("finalize_official_app_install", {
+    pluginId: app.id,
+    sha256: app.desktop.sha256,
+    operationId,
+    commit,
+  });
 }
 
-export async function installOfficialDesktopPackage(app: OfficialApp): Promise<void> {
-  const operationId = await stageOfficialDesktopPackage(app);
-  await finalizeOfficialDesktopPackageInstall(app.id, operationId, true);
+export async function installOfficialDesktopPackage(app: OfficialApp, nativeService = false): Promise<void> {
+  const operationId = await stageOfficialDesktopPackage(app, nativeService);
+  await finalizeOfficialDesktopPackageInstall(app, operationId, true);
 }
 
 export async function uninstallOfficialDesktopPackage(

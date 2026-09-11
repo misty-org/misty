@@ -1,12 +1,21 @@
+import { officialAppNeedsReview } from "./appInstallationStatus";
+import { assertAppsClosedForUpdate } from "./appUpdateSafety";
+import { appConsentKey, useAppConsent } from "./useAppConsent";
+import { appDownloadKey, useAppDownloads } from "./useAppDownloads";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import "./appDetails.css";
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import { FaGithub } from "react-icons/fa6";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
+import { AppSpaceAccessPanel, type SpaceAccessChange } from "./AppSpaceAccessPanel";
+import { useAppsStore } from "./useAppsStore";
+import { useSpacesStore } from "@/features/spaces/core";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { OfficialAppIcon } from "./OfficialAppIcon";
-import { officialAppNeedsConsent, officialAppNeedsReview } from "./appInstallationStatus";
 import { appPermissionGroups, hasUnknownAppPermissions } from "./appPermissions";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui/dialog";
 import {
   ArrowLeft,
-  ArrowUpRight,
+  ChevronDown,
   Clipboard,
   Database,
   Globe,
@@ -22,7 +31,10 @@ import { discoverAppName, discoverAppPlatform, discoverAppSize } from "./appDeta
 
 type Props = {
   app: OfficialApp | undefined;
-  installation?: UserAppInstallation;
+  reviewPermissions?: boolean;
+  consentAccountId?: string;
+  onAgreed?: () => void;
+  installation?: SpaceAppInstallation;
   actionAppId: string;
   mobile: boolean;
   error: string;
@@ -79,17 +91,58 @@ const permissionIcons = {
 
 function AppDetailsContent(props: Props & { app: OfficialApp }) {
   const { app, installation } = props;
-  const [step, setStep] = useState<"details" | "permissions" | "uninstall">("details");
+  const spaceId = useAppsStore((state) => state.spaceId);
+  const spaces = useSpacesStore((state) => state.spaces);
+  const storeAccountId = useAppsStore((state) => state.accountId);
+  const accountId = props.consentAccountId ?? storeAccountId;
+  const agreed = useAppConsent((state) =>
+    Boolean(accountId && state.agreed[appConsentKey(accountId, app)]),
+  );
+  const prefetchSpaceAccess = useAppsStore((state) => state.prefetchSpaceAccess);
+  useEffect(() => {
+    void prefetchSpaceAccess();
+  }, [accountId, spaces, prefetchSpaceAccess]);
+  const downloadedState = useAppDownloads((state) => state.ready[appDownloadKey(app)]);
+  const checkDownloads = useAppDownloads((state) => state.check);
+  useEffect(() => {
+    void checkDownloads([app]);
+  }, [app, checkDownloads]);
+  const removed = useAppDownloads((state) => state.removed[app.id]);
+  const downloaded =
+    !removed &&
+    (hasTauriInternals() ? downloadedState === true : installation?.state === "installed");
+  const [permissionPurpose, setPermissionPurpose] = useState<"download" | "spaces" | "update">(
+    "spaces",
+  );
+  const [targets, setTargets] = useState<SpaceAccessChange[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const targetAccount = useRef("");
+  const spaceName = (
+    targets.length
+      ? targets.filter((target) => target.enabled).map((target) => target.spaceId)
+      : [spaceId]
+  )
+    .map((id) => spaces.find((space) => space.id === id)?.name ?? "this Space")
+    .join(", ");
+  const [step, setStep] = useState<"details" | "permissions" | "remove">(
+    props.reviewPermissions ? "permissions" : "details",
+  );
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState("");
   const locked = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const busy = pending || Boolean(props.actionAppId);
   const installed = installation?.state === "installed";
-  const update = officialAppNeedsReview(app, installation);
+  const updateAvailable = officialAppNeedsReview(app, installation);
+  const addedToCurrentSpace = useAppsStore((state) => {
+    const cached = state.bySpace[spaceId];
+    return cached
+      ? cached.some((item) => item.app_id === app.id && item.state === "installed")
+      : installed;
+  });
   const unsupported = (props.mobile ? app.mobile : app.desktop).runtime === "unsupported";
   const unknown = hasUnknownAppPermissions(app.scopes);
-  const groups = appPermissionGroups(app.scopes, installation?.granted_scopes);
+  const groups = appPermissionGroups(app.scopes);
   const source = repositoryLink(app.repository_url);
   const name = discoverAppName(app);
   const error = failure || props.error;
@@ -97,18 +150,70 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
     heading.current?.focus();
   }, [step]);
 
-  const run = async (operation: "install" | "uninstall") => {
-    if (locked.current || busy || (operation === "install" && (unknown || unsupported))) return;
+  const run = async (changes = targets) => {
+    if (
+      locked.current ||
+      busy ||
+      (changes.some((change) => change.enabled) && (unknown || unsupported))
+    )
+      return;
     locked.current = true;
     setPending(true);
     setFailure("");
     try {
-      await (operation === "install" ? props.onInstall(app) : props.onRemove(app));
+      for (const change of changes) {
+        if (useAppsStore.getState().accountId !== targetAccount.current)
+          throw new Error("The account changed. Reopen the app to continue.");
+        await useAppsStore.getState().setSpaceEnabled(app, change.spaceId, change.enabled);
+        setTargets((current) => current.filter((target) => target.spaceId !== change.spaceId));
+      }
       setStep("details");
     } catch (error) {
       setFailure(
         error instanceof Error ? error.message : "The app could not be changed. Try again.",
       );
+    } finally {
+      locked.current = false;
+      setPending(false);
+    }
+  };
+
+  const download = async () => {
+    if (locked.current || busy || unknown || unsupported) return;
+    locked.current = true;
+    setPending(true);
+    setFailure("");
+    try {
+      await useAppDownloads.getState().get(app);
+      setStep("details");
+    } catch (error) {
+      setFailure(
+        error instanceof Error ? error.message : "Could not download this app. Try again.",
+      );
+    } finally {
+      locked.current = false;
+      setPending(false);
+    }
+  };
+
+  const update = async () => {
+    if (locked.current || busy || unknown || unsupported) return;
+    locked.current = true;
+    setPending(true);
+    setFailure("");
+    try {
+      assertAppsClosedForUpdate(app.id);
+      if (hasTauriInternals() && app.desktop.runtime === "downloaded" && !downloaded)
+        await useAppDownloads.getState().get(app);
+      if (
+        useAppsStore.getState().accountId !== accountId ||
+        useAppsStore.getState().spaceId !== spaceId
+      )
+        throw new Error("The account or Space changed. Reopen the app to continue.");
+      await props.onInstall(app);
+      setStep("details");
+    } catch (error) {
+      setFailure(error instanceof Error ? error.message : "Could not update this app. Try again.");
     } finally {
       locked.current = false;
       setPending(false);
@@ -151,7 +256,7 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
                     {source ? (
                       <a href={source.href} target="_blank" rel="noopener noreferrer">
                         {source.label}
-                        <ArrowUpRight size={13} aria-hidden="true" />
+                        <FaGithub size={15} aria-hidden="true" />
                       </a>
                     ) : (
                       "Not provided"
@@ -169,6 +274,82 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
                 <span aria-hidden="true">·</span>
                 <span>{discoverAppSize(app, props.mobile)}</span>
               </p>
+              <div className="discover-detail-primary-action">
+                {downloaded && (
+                  <button
+                    type="button"
+                    className="discover-action"
+                    disabled={busy}
+                    onClick={() => {
+                      setFailure("");
+                      setStep("remove");
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+                {updateAvailable && (
+                  <button
+                    type="button"
+                    className="discover-action discover-action-primary"
+                    disabled={busy || unsupported || unknown}
+                    onClick={() => {
+                      setPermissionPurpose("update");
+                      setFailure("");
+                      if (agreed) void update();
+                      else setStep("permissions");
+                    }}
+                  >
+                    {pending ? "Updating…" : "Update"}
+                  </button>
+                )}
+                {downloaded ? (
+                  <Popover modal open={pickerOpen} onOpenChange={setPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className={`discover-action discover-add-trigger${addedToCurrentSpace ? "" : " discover-action-primary"}`}
+                        disabled={busy}
+                      >
+                        <span className="discover-add-label">Add</span>
+                        <span className="discover-add-chevron" aria-hidden="true">
+                          <ChevronDown size={14} />
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" side="bottom" className="discover-space-picker">
+                      <AppSpaceAccessPanel
+                        app={app}
+                        onSelect={(changes) => {
+                          setTargets(changes);
+                          targetAccount.current = useAppsStore.getState().accountId;
+                          setPickerOpen(false);
+                          setFailure("");
+                          setPermissionPurpose("spaces");
+                          if (changes.some((change) => change.enabled) && !agreed)
+                            setStep("permissions");
+                          else void run(changes);
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : !updateAvailable ? (
+                  <button
+                    type="button"
+                    className="discover-action discover-action-primary"
+                    disabled={busy || unsupported}
+                    onClick={() => {
+                      setPermissionPurpose("download");
+                      setTargets([]);
+                      setFailure("");
+                      if (agreed) void download();
+                      else setStep("permissions");
+                    }}
+                  >
+                    Get
+                  </button>
+                ) : null}
+              </div>
             </div>
           </div>
           <div className="discover-details-body misty-transient-scrollbar">
@@ -185,12 +366,7 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
               )}
               {installation?.state === "recoverable" && (
                 <p className="discover-detail-note">
-                  Installing this app restores its recoverable saved data.
-                </p>
-              )}
-              {installed && (
-                <p className="discover-detail-note">
-                  {update ? `Version ${app.version} is available to install.` : "Installed"}
+                  Adding this app restores its saved content in the Space.
                 </p>
               )}
               {unsupported && (
@@ -204,23 +380,85 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
             </section>
           </div>
         </>
-      ) : step === "permissions" ? (
+      ) : step === "remove" ? (
+        <>
+          <DialogTitle className="discover-step-title">Remove {name} from this device?</DialogTitle>
+          <DialogDescription className="discover-permissions-intro">
+            This deletes the downloaded app files and its local data on this device. Local data
+            cannot be restored.
+          </DialogDescription>
+          <p className="discover-uninstall-copy">
+            Spaces using {name} will keep access, and their shared data stays intact. You won’t be
+            able to use the app on this device until you get it again.
+          </p>
+          {error && (
+            <p className="discover-error" role="alert">
+              {error}
+            </p>
+          )}
+          <footer className="discover-details-actions">
+            <button className="discover-action" disabled={busy} onClick={() => setStep("details")}>
+              Cancel
+            </button>
+            <button
+              className="discover-action discover-uninstall"
+              disabled={busy}
+              onClick={async () => {
+                if (locked.current) return;
+                locked.current = true;
+                setPending(true);
+                setFailure("");
+                try {
+                  await useAppDownloads.getState().remove(app);
+                  setStep("details");
+                } catch (error) {
+                  setFailure(
+                    error instanceof Error ? error.message : "Could not remove the app. Try again.",
+                  );
+                } finally {
+                  locked.current = false;
+                  setPending(false);
+                }
+              }}
+            >
+              {pending ? "Removing…" : "Remove"}
+            </button>
+          </footer>
+        </>
+      ) : (
         <>
           <DialogTitle ref={heading} tabIndex={-1} className="discover-step-title">
             App permissions
           </DialogTitle>
           <DialogDescription className="discover-permissions-intro">
-            {name} needs access to the following:
+            {props.reviewPermissions
+              ? `Review the permissions ${name} needs before you use it. Space access does not grant consent on your behalf.`
+              : permissionPurpose === "download"
+                ? `Review the permissions ${name} requests. Downloading does not add it to any Space.`
+                : `${name} needs access to the following in ${spaceName}:`}
           </DialogDescription>
           <div className="discover-details-body misty-transient-scrollbar">
             {unknown && (
               <p className="discover-error" role="alert">
                 This app requests access that this version of Misty cannot describe. Update Misty
-                before installing it.
+                before adding it.
               </p>
             )}
             {!app.scopes.length && (
               <p className="discover-detail-note">No additional permissions requested.</p>
+            )}
+            {targets.some((target) => !target.enabled) && (
+              <p className="discover-detail-note">
+                Access will also be removed from{" "}
+                {targets
+                  .filter((target) => !target.enabled)
+                  .map(
+                    (target) =>
+                      spaces.find((space) => space.id === target.spaceId)?.name ?? "a Space",
+                  )
+                  .join(", ")}
+                . Saved content is retained.
+              </p>
             )}
             <ul className="discover-permission-groups">
               {groups.map((group) => {
@@ -251,82 +489,58 @@ function AppDetailsContent(props: Props & { app: OfficialApp }) {
             )}
           </div>
         </>
-      ) : (
-        <>
-          <DialogTitle ref={heading} tabIndex={-1} className="discover-step-title">
-            Uninstall {name}?
-          </DialogTitle>
-          <div className="discover-details-body misty-transient-scrollbar">
-            <DialogDescription className="discover-uninstall-copy">
-              The app will be uninstalled from your signed-in devices. Your private app data can be
-              recovered for 30 days, then it will be permanently deleted. Content shared with a
-              Space will remain in that Space.
-            </DialogDescription>
-            {error && (
-              <p className="discover-error" role="alert">
-                {error}
-              </p>
-            )}
-          </div>
-        </>
       )}
-      <footer className="discover-details-actions">
-        {pending && (
-          <span className="discover-operation" role="status">
-            <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
-            {step === "uninstall" ? "Uninstalling…" : "Installing…"}
-          </span>
-        )}
-        {step === "permissions" ? (
-          <>
-            <p className="discover-consent-copy">Agree to these permissions to install {name}.</p>
-            <button
-              type="button"
-              className="discover-action discover-action-primary"
-              disabled={busy || unknown || unsupported}
-              onClick={() => void run("install")}
-            >
-              Agree
-            </button>
-          </>
-        ) : step === "uninstall" ? (
-          <button
-            type="button"
-            className="discover-action discover-uninstall"
-            disabled={busy}
-            onClick={() => void run("uninstall")}
-          >
-            Uninstall
-          </button>
-        ) : (
-          <>
-            {installed && (
+      {step === "permissions" && (
+        <footer className="discover-details-actions">
+          {pending && (
+            <span className="discover-operation" role="status">
+              <LoaderCircle size={15} className="animate-spin" aria-hidden="true" />
+              {permissionPurpose === "download" ? "Downloading…" : "Saving…"}
+            </span>
+          )}
+          {step === "permissions" ? (
+            <>
+              <p className="discover-consent-copy">
+                {permissionPurpose === "download"
+                  ? `Your agreement applies wherever you use ${name}. You choose Space access separately.`
+                  : `Your agreement applies wherever you use ${name}. Other members agree for themselves.`}
+              </p>
               <button
                 type="button"
                 className="discover-action"
                 disabled={busy}
-                onClick={() => setStep("uninstall")}
+                onClick={() => {
+                  setFailure("");
+                  if (props.reviewPermissions) props.onClose();
+                  else {
+                    setStep("details");
+                    if (permissionPurpose === "spaces") setPickerOpen(true);
+                  }
+                }}
               >
-                Uninstall
+                Cancel
               </button>
-            )}
-            {(!installed || update) && (
               <button
                 type="button"
                 className="discover-action discover-action-primary"
-                disabled={busy || unsupported}
+                disabled={busy || unknown || unsupported || !accountId}
                 onClick={() => {
-                  setFailure("");
-                  if (unknown || officialAppNeedsConsent(app, installation)) setStep("permissions");
-                  else void run("install");
+                  useAppConsent.getState().agree(accountId, app);
+                  if (props.reviewPermissions) props.onAgreed?.();
+                  else
+                    void (permissionPurpose === "update"
+                      ? update()
+                      : permissionPurpose === "download"
+                        ? download()
+                        : run());
                 }}
               >
-                Install
+                {permissionPurpose === "update" ? "Agree and update" : "Agree"}
               </button>
-            )}
-          </>
-        )}
-      </footer>
+            </>
+          ) : null}
+        </footer>
+      )}
     </>
   );
 }

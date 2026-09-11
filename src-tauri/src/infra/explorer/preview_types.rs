@@ -128,10 +128,12 @@ pub(super) fn image_thumbnail_cache_path(
     ))
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn thumbnail_decode_limits() -> Limits {
     Limits::no_limits()
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn validate_image_thumbnail_source(width: u32, height: u32) -> ApiResult<()> {
     if width == 0 || height == 0 {
         return Err(ApiError::Message(
@@ -142,6 +144,7 @@ pub(super) fn validate_image_thumbnail_source(width: u32, height: u32) -> ApiRes
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn image_dimensions(path: &Path) -> ApiResult<(u32, u32)> {
     let mut reader = ImageReader::open(path)
         .map_err(|error| {
@@ -166,12 +169,14 @@ pub(super) fn image_dimensions(path: &Path) -> ApiResult<(u32, u32)> {
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn is_gif_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("gif"))
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn decode_gif_first_frame(path: &Path) -> ApiResult<image::DynamicImage> {
     let file = File::open(path).map_err(|error| {
         ApiError::Message(format!(
@@ -211,6 +216,7 @@ pub(super) fn decode_gif_first_frame(path: &Path) -> ApiResult<image::DynamicIma
     Ok(image::DynamicImage::ImageRgba8(rgba_image))
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn decode_image_thumbnail_source(path: &Path) -> ApiResult<image::DynamicImage> {
     if is_gif_path(path) {
         return decode_gif_first_frame(path);
@@ -244,6 +250,7 @@ pub(super) fn temporary_image_thumbnail_path(output_path: &Path) -> PathBuf {
     output_path.with_extension(format!("tmp-{temporary_id}"))
 }
 
+#[cfg(not(target_os = "macos"))]
 pub(super) fn write_image_thumbnail_png(
     thumbnail: &image::DynamicImage,
     thumbnail_path: &Path,

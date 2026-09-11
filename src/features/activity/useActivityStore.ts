@@ -1,298 +1,445 @@
 import { useSpacesStore } from "@/features/spaces";
+import { readDeploymentScope } from "@/api/deployment/api";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { compareActivityNewestFirst } from "./activityModel";
 import { publishNativeActivity, syncNativeBadge } from "./nativeNotifications";
-import type { ActivityItem, ActivityTarget, LocalActivityInput } from "./types";
-import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
+import {
+  activityTransition,
+  isActivityMuted,
+  isDiagnosticActivity,
+  isPendingRequest,
+  shouldNotifyActivity,
+} from "./activityPolicy";
+import {
+  activityAccountKey,
+  activityReadKey,
+  belongsToActivityAccount,
+  boundedActivityItems,
+  deriveActivityState,
+  type ActivityData,
+} from "./activityState";
+import type { ActivityItem, ActivityTarget, LocalActivityInput, ActivityCategory } from "./types";
 
-const maximumDeviceItems = 200;
-const maximumKnownSourceIdsPerAccount = 500;
-const maximumReadKeysPerAccount = 500;
-let localActivitySequence = 0;
-
-interface ActivityStore {
-  accountId: string;
-  sourceItems: ActivityItem[];
-  localItems: ActivityItem[];
-  readAtByKey: Record<string, string>;
-  knownSourceIdsByAccount: Record<string, string[]>;
-  baselinedAccounts: string[];
+type Source = ActivityItem["source"];
+interface ActivityStore extends ActivityData {
   allItems: ActivityItem[];
   attentionItems: ActivityItem[];
   attentionCount: number;
+  hasUnseenHistory: boolean;
   loading: boolean;
   offline: boolean;
   error: string | null;
-  setAccount: (accountId: string) => void;
-  syncSources: (accountId: string, items: ActivityItem[]) => void;
-  load: () => Promise<void>;
-  refresh: () => Promise<void>;
-  ingestLocal: (input: LocalActivityInput) => string | null;
-  markRead: (id: string) => void;
-  markAllRead: () => Promise<void>;
-  openItem: (id: string) => ActivityTarget | null;
-  clearDeviceHistory: () => void;
-  setOffline: (offline: boolean) => void;
-  clearError: () => void;
+  setAccount(accountId: string): void;
+  syncSources(
+    accountId: string,
+    items: ActivityItem[],
+    completeSources?: Source[],
+    observedSources?: Source[],
+  ): void;
+  resolveSourceRequest(accountId: string, source: Source, sourceId: string): void;
+  load(): Promise<void>;
+  refresh(): Promise<void>;
+  ingestLocal(input: LocalActivityInput): string | null;
+  markRead(id: string): void;
+  markAllRead(ids?: string[]): Promise<void>;
+  markHistoryChecked(): void;
+  dismissItem(id: string): void;
+  setSourceMuted(key: string, muted: boolean): void;
+  setCategoryEnabled(category: ActivityCategory, enabled: boolean): void;
+  openItem(id: string): ActivityTarget | null;
+  clearHistory(ids?: string[]): void;
+  clearDeviceHistory(): void;
+  setOffline(offline: boolean): void;
+  clearError(): void;
 }
 
 export const useActivityStore = create<ActivityStore>()(
   persist(
-    (set, get) => ({
-      accountId: "",
-      sourceItems: [],
-      localItems: [],
-      readAtByKey: {},
-      knownSourceIdsByAccount: {},
-      baselinedAccounts: [],
-      allItems: [],
-      attentionItems: [],
-      attentionCount: 0,
-      loading: false,
-      offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
-      error: null,
-
-      setAccount: (accountId) => {
-        const normalized = accountId.trim();
-        if (get().accountId === normalized) return;
-        const next = deriveActivityState({ ...get(), accountId: normalized, sourceItems: [] });
-        set({ accountId: normalized, sourceItems: [], error: null, ...next });
-        void syncNativeBadge(next.attentionCount);
-      },
-
-      syncSources: (accountId, items) => {
-        const normalized = accountId.trim();
-        if (!normalized || normalized !== get().accountId) return;
+    (set, get) => {
+      const update = (partial: Partial<ActivityData>) => {
+        const state = { ...get(), ...partial };
+        const derived = deriveActivityState(state);
+        set({ ...partial, ...derived });
+        void syncNativeBadge(derived.attentionCount);
+      };
+      const deliver = (items: ActivityItem[]) => {
         const state = get();
-        const known = new Set(state.knownSourceIdsByAccount[normalized] ?? []);
-        const baselined = state.baselinedAccounts.includes(normalized);
-        const normalizedItems = items
-          .filter((item) => item.accountId === normalized)
-          .map((item) => applyDeviceReadState(item, state.readAtByKey))
-          .sort(compareActivityNewestFirst)
-          .slice(0, maximumKnownSourceIdsPerAccount);
-        const newItems = baselined ? normalizedItems.filter((item) => !known.has(item.id)) : [];
-        const knownIds = [
-          ...normalizedItems.map((item) => item.id),
-          ...(state.knownSourceIdsByAccount[normalized] ?? []),
-        ]
-          .filter(uniqueString)
-          .slice(0, maximumKnownSourceIdsPerAccount);
-        const knownSourceIdsByAccount = {
-          ...state.knownSourceIdsByAccount,
-          [normalized]: knownIds,
-        };
-        const baselinedAccounts = baselined
-          ? state.baselinedAccounts
-          : [...state.baselinedAccounts, normalized];
-        const next = deriveActivityState({
-          ...state,
-          sourceItems: normalizedItems,
-        });
-        set({
-          sourceItems: normalizedItems,
-          knownSourceIdsByAccount,
-          baselinedAccounts,
-          error: null,
-          ...next,
-        });
-        void syncNativeBadge(next.attentionCount);
-        for (const item of newItems.filter(
-          (candidate) => candidate.attention && !candidate.readAt,
-        )) {
-          void publishNativeActivity(item);
+        const muted = state.mutedSourcesByAccount[activityAccountKey(state)] ?? [];
+        for (const item of items) {
+          if (
+            belongsToActivityAccount(item, state) &&
+            shouldNotifyActivity(item) &&
+            !state.clearedHistoryByKey[activityReadKey(state, item)] &&
+            !isActivityMuted(item, muted)
+          )
+            void publishNativeActivity(item);
         }
-      },
-
-      load: async () => runRefresh(set, get),
-      refresh: async () => runRefresh(set, get),
-
-      ingestLocal: (input) => {
-        const accountId = (input.accountId ?? get().accountId).trim();
-        if (!accountId) return null;
-        const createdAt = validIsoDate(input.createdAt);
-        const sourceId = input.id?.trim() || nextLocalActivityId();
-        const item: ActivityItem = {
-          id: `device:${accountId}:${sourceId}`,
-          accountId,
-          source: "device",
-          sourceId,
-          kind: input.kind,
-          title: input.title.trim() || "Misty activity",
-          body: input.body?.trim() ?? "",
-          createdAt,
-          attention: input.attention ?? (input.kind === "failure" || input.kind === "reminder"),
-          target: input.target ?? { kind: "none" },
-        };
-        const state = get();
-        if (state.localItems.some((candidate) => candidate.id === item.id)) return item.id;
-        const localItems = [item, ...state.localItems]
-          .sort(compareActivityNewestFirst)
-          .slice(0, maximumDeviceItems);
-        const next = deriveActivityState({ ...state, localItems });
-        set({ localItems, ...next });
-        void syncNativeBadge(next.attentionCount);
-        if (input.notify !== false) void publishNativeActivity(item);
-        return item.id;
-      },
-
-      markRead: (id) => {
-        const item = get().allItems.find((candidate) => candidate.id === id);
-        if (!item || item.readAt) return;
-        const readAtByKey = boundedReadKeys(
-          { ...get().readAtByKey, [readKey(item.accountId, item.id)]: new Date().toISOString() },
-          item.accountId,
-        );
-        const next = deriveActivityState({ ...get(), readAtByKey });
-        set({ readAtByKey, ...next });
-        void syncNativeBadge(next.attentionCount);
-      },
-
-      markAllRead: async () => {
-        const state = get();
-        if (!state.accountId) return;
-        const readAt = new Date().toISOString();
-        let readAtByKey = { ...state.readAtByKey };
-        for (const item of state.allItems) readAtByKey[readKey(state.accountId, item.id)] = readAt;
-        readAtByKey = boundedReadKeys(readAtByKey, state.accountId);
-        const next = deriveActivityState({ ...state, readAtByKey });
-        set({ readAtByKey, error: null, ...next });
-        void syncNativeBadge(0);
+      };
+      const refresh = async () => {
+        const account = activityAccountKey(get());
+        if (!get().accountId) return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          set({ loading: false, offline: true });
+          return;
+        }
+        set({ loading: true, offline: false, error: null });
         try {
-          await useSpacesStore.getState().markInboxSeen();
+          await useSpacesStore.getState().loadInbox();
+          if (account === activityAccountKey(get()))
+            set({ loading: false, error: useSpacesStore.getState().inboxError ?? null });
         } catch (error) {
-          set({ error: errorMessage(error) });
+          if (account === activityAccountKey(get()))
+            set({ loading: false, error: errorMessage(error) });
         }
-      },
-
-      openItem: (id) => {
-        const item = get().allItems.find((candidate) => candidate.id === id);
-        if (!item) return null;
-        get().markRead(id);
-        return item.target;
-      },
-
-      clearDeviceHistory: () => {
-        const state = get();
-        if (!state.accountId) return;
-        const removedIds = new Set(
-          state.localItems
-            .filter((item) => item.accountId === state.accountId)
-            .map((item) => readKey(state.accountId, item.id)),
-        );
-        const localItems = state.localItems.filter((item) => item.accountId !== state.accountId);
-        const readAtByKey = Object.fromEntries(
-          Object.entries(state.readAtByKey).filter(([key]) => !removedIds.has(key)),
-        );
-        const next = deriveActivityState({ ...state, localItems, readAtByKey });
-        set({ localItems, readAtByKey, ...next });
-        void syncNativeBadge(next.attentionCount);
-      },
-
-      setOffline: (offline) => set({ offline }),
-      clearError: () => set({ error: null }),
-    }),
+      };
+      return {
+        accountId: "",
+        deploymentScope: readDeploymentScope(),
+        sourceItems: [],
+        localItems: [],
+        readAtByKey: {},
+        clearedHistoryByKey: {},
+        knownSourceIdsByAccount: {},
+        baselinedAccounts: [],
+        historySequence: 0,
+        historyCheckedByAccount: {},
+        mutedSourcesByAccount: {},
+        categoriesByAccount: {},
+        allItems: [],
+        attentionItems: [],
+        attentionCount: 0,
+        hasUnseenHistory: false,
+        loading: false,
+        offline: typeof navigator !== "undefined" && !navigator.onLine,
+        error: null,
+        setAccount(accountId) {
+          update({ accountId: accountId.trim(), deploymentScope: readDeploymentScope() });
+          set({ error: null, loading: false });
+        },
+        syncSources(accountId, items, completeSources = [], observedSources = ["spaces"]) {
+          if (!accountId || accountId !== get().accountId) return;
+          const state = get();
+          const key = activityAccountKey(state);
+          const known = new Set(state.knownSourceIdsByAccount[key] ?? []);
+          const baseline = new Set(state.baselinedAccounts);
+          const previous = state.sourceItems.filter((item) =>
+            belongsToActivityAccount(item, state),
+          );
+          const incoming = items.filter((item) => item.accountId === accountId);
+          const sourceGroups = new Set<Source>([
+            ...observedSources,
+            ...incoming.map((item) => item.source),
+            ...completeSources,
+          ]);
+          let sequence = state.historySequence;
+          const notifications: ActivityItem[] = [];
+          const merged = incoming.map((item) => {
+            const old = previous.find((candidate) => candidate.id === item.id);
+            // A confirmed terminal request cannot be reopened by an older list response.
+            if (old?.resolvedAt && isPendingRequest(item)) return old;
+            const changed = !old || activityTransition(old) !== activityTransition(item);
+            const sourceBaseline = `${key}:${item.source}`;
+            const next: ActivityItem = {
+              ...item,
+              deploymentScope: state.deploymentScope,
+              historySequence: changed
+                ? baseline.has(sourceBaseline)
+                  ? ++sequence
+                  : 0
+                : old.historySequence,
+              updatedAt: changed ? (item.updatedAt ?? item.createdAt) : old.updatedAt,
+            };
+            const transition = activityTransition(next);
+            if (changed && baseline.has(sourceBaseline) && !known.has(transition))
+              notifications.push(next);
+            known.add(transition);
+            return next;
+          });
+          for (const old of previous) {
+            if (merged.some((item) => item.id === old.id)) continue;
+            if (isPendingRequest(old) && completeSources.includes(old.source)) {
+              merged.push({
+                ...old,
+                resolvedAt: new Date().toISOString(),
+                status: "resolved",
+                updatedAt: new Date().toISOString(),
+                historySequence: ++sequence,
+              });
+            } else merged.push(old);
+          }
+          sourceGroups.forEach((source) => baseline.add(`${key}:${source}`));
+          update({
+            sourceItems: boundedActivityItems([
+              ...state.sourceItems.filter((item) => !belongsToActivityAccount(item, state)),
+              ...merged,
+            ]),
+            historySequence: sequence,
+            knownSourceIdsByAccount: {
+              ...state.knownSourceIdsByAccount,
+              [key]: [...known].slice(-2000),
+            },
+            baselinedAccounts: [...baseline],
+          });
+          deliver(
+            notifications.map(
+              (item) => get().allItems.find((entry) => entry.id === item.id) ?? item,
+            ),
+          );
+        },
+        resolveSourceRequest(accountId, source, sourceId) {
+          const state = get();
+          if (accountId !== state.accountId) return;
+          const item = state.sourceItems.find(
+            (entry) =>
+              belongsToActivityAccount(entry, state) &&
+              entry.source === source &&
+              entry.sourceId === sourceId &&
+              isPendingRequest(entry),
+          );
+          if (!item) return;
+          const now = new Date().toISOString();
+          update({
+            sourceItems: state.sourceItems.map((entry) =>
+              entry === item
+                ? {
+                    ...entry,
+                    status: "resolved",
+                    resolvedAt: now,
+                    updatedAt: now,
+                    historySequence: state.historySequence + 1,
+                  }
+                : entry,
+            ),
+            historySequence: state.historySequence + 1,
+          });
+        },
+        load: refresh,
+        refresh,
+        ingestLocal(input) {
+          const state = get();
+          const accountId = (input.accountId ?? state.accountId).trim();
+          if (!accountId) return null;
+          const sourceId = input.id?.trim() || crypto.randomUUID();
+          const id = `device:${accountId}:${sourceId}`;
+          const previous = state.localItems.find(
+            (item) =>
+              item.id === id && (item.deploymentScope ?? "hosted") === state.deploymentScope,
+          );
+          if (
+            input.revision !== undefined &&
+            previous?.revision !== undefined &&
+            input.revision <= previous.revision
+          )
+            return id;
+          const now = new Date().toISOString();
+          const item: ActivityItem = {
+            id,
+            accountId,
+            source: "device",
+            sourceId,
+            deploymentScope: state.deploymentScope,
+            kind: input.kind,
+            visibility: input.visibility,
+            appId: input.appId,
+            spaceId: input.spaceId,
+            sourceLabel: input.sourceLabel,
+            lifecycle: input.lifecycle,
+            status: input.status,
+            revision: input.revision,
+            dismissible: input.dismissible,
+            title: input.title.trim() || "Misty activity",
+            body: input.body?.trim() ?? "",
+            createdAt: previous?.createdAt ?? validDate(input.createdAt),
+            updatedAt: now,
+            attention: false,
+            target: input.target ?? { kind: "none" },
+            ...(input.status === "resolved" ? { resolvedAt: now } : {}),
+          };
+          item.attention = shouldNotifyActivity(item);
+          const changed = !previous || activityTransition(previous) !== activityTransition(item);
+          if (!changed && previous.title === item.title && previous.body === item.body) return id;
+          const key = activityAccountKey({ ...state, accountId });
+          const known = new Set(state.knownSourceIdsByAccount[key] ?? []);
+          const transition = activityTransition(item);
+          const alreadyKnown = known.has(transition);
+          known.add(transition);
+          item.historySequence = changed ? state.historySequence + 1 : previous.historySequence;
+          if (!changed) {
+            item.updatedAt = previous.updatedAt;
+            item.resolvedAt = previous.resolvedAt;
+          }
+          update({
+            localItems: boundedActivityItems([
+              item,
+              ...state.localItems.filter((candidate) => candidate !== previous),
+            ]),
+            knownSourceIdsByAccount: {
+              ...state.knownSourceIdsByAccount,
+              [key]: [...known].slice(-2000),
+            },
+            historySequence: changed ? state.historySequence + 1 : state.historySequence,
+          });
+          if (changed && !alreadyKnown && input.notify !== false) deliver([item]);
+          return id;
+        },
+        markRead(id) {
+          const state = get();
+          const item = state.allItems.find((candidate) => candidate.id === id);
+          if (!item || item.readAt) return;
+          update({
+            readAtByKey: {
+              ...state.readAtByKey,
+              [activityReadKey(state, item)]: new Date().toISOString(),
+            },
+          });
+        },
+        async markAllRead(ids) {
+          const state = get();
+          const readAtByKey = { ...state.readAtByKey };
+          for (const item of state.allItems.filter(
+            (entry) => !isPendingRequest(entry) && (!ids || ids.includes(entry.id)),
+          )) {
+            readAtByKey[activityReadKey(state, item)] = new Date().toISOString();
+          }
+          update({ readAtByKey });
+          // Server inbox read semantics do not resolve approvals or invitations.
+          try {
+            if (!ids && state.accountId) await useSpacesStore.getState().markInboxSeen();
+          } catch (error) {
+            if (activityAccountKey(state) === activityAccountKey(get()))
+              set({ error: errorMessage(error) });
+          }
+        },
+        markHistoryChecked() {
+          const state = get();
+          update({
+            historyCheckedByAccount: {
+              ...state.historyCheckedByAccount,
+              [activityAccountKey(state)]: state.historySequence,
+            },
+          });
+        },
+        dismissItem(id) {
+          const state = get();
+          const item = state.localItems.find(
+            (entry) => entry.id === id && belongsToActivityAccount(entry, state),
+          );
+          if (!item?.dismissible || !isPendingRequest(item)) return;
+          update({
+            localItems: state.localItems.map((entry) =>
+              entry === item
+                ? {
+                    ...item,
+                    resolvedAt: new Date().toISOString(),
+                    status: "resolved",
+                    historySequence: state.historySequence + 1,
+                  }
+                : entry,
+            ),
+            historySequence: state.historySequence + 1,
+          });
+        },
+        setSourceMuted(source, muted) {
+          const state = get();
+          const key = activityAccountKey(state);
+          const sources = new Set(state.mutedSourcesByAccount[key] ?? []);
+          if (muted) sources.add(source);
+          else sources.delete(source);
+          update({
+            mutedSourcesByAccount: { ...state.mutedSourcesByAccount, [key]: [...sources] },
+          });
+        },
+        setCategoryEnabled(category, enabled) {
+          const state = get();
+          const key = activityAccountKey(state);
+          update({
+            categoriesByAccount: {
+              ...state.categoriesByAccount,
+              [key]: { ...state.categoriesByAccount[key], [category]: enabled },
+            },
+          });
+        },
+        openItem(id) {
+          const item = get().allItems.find((candidate) => candidate.id === id);
+          if (!item) return null;
+          get().markRead(id);
+          return item.target;
+        },
+        clearHistory(ids) {
+          const state = get();
+          const clearedHistoryByKey = { ...state.clearedHistoryByKey };
+          for (const item of state.allItems) {
+            if (!isPendingRequest(item) && (!ids || ids.includes(item.id)))
+              clearedHistoryByKey[activityReadKey(state, item)] = true;
+          }
+          // Keep transition receipts so refresh/restart cannot resurrect cleared history.
+          // Required requests and separately bounded diagnostics are unaffected.
+          update({ clearedHistoryByKey });
+        },
+        clearDeviceHistory() {
+          const state = get();
+          update({
+            localItems: state.localItems.filter(
+              (item) =>
+                !belongsToActivityAccount(item, state) ||
+                (!isDiagnosticActivity(item) && isPendingRequest(item)),
+            ),
+          });
+        },
+        setOffline: (offline) => set({ offline }),
+        clearError: () => set({ error: null }),
+      };
+    },
     {
       name: "misty:activity:v1",
-      version: 1,
-      storage: createJSONStorage(() => (isNativeMobileBuild ? sessionStorage : localStorage)),
+      version: 2,
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        localItems: state.localItems.slice(0, maximumDeviceItems),
+        localItems: boundedActivityItems(state.localItems),
+        sourceItems: boundedActivityItems(state.sourceItems),
         readAtByKey: state.readAtByKey,
+        clearedHistoryByKey: state.clearedHistoryByKey,
         knownSourceIdsByAccount: state.knownSourceIdsByAccount,
         baselinedAccounts: state.baselinedAccounts,
+        historySequence: state.historySequence,
+        historyCheckedByAccount: state.historyCheckedByAccount,
+        mutedSourcesByAccount: state.mutedSourcesByAccount,
+        categoriesByAccount: state.categoriesByAccount,
       }),
-      merge: (persistedState, currentState) => {
-        const persisted = (persistedState ?? {}) as Partial<ActivityStore>;
+      migrate(persisted) {
+        const old = persisted as Partial<ActivityData>;
+        const localItems = (old.localItems ?? []).map((item) => ({
+          ...item,
+          deploymentScope: "hosted",
+          historySequence: 0,
+          ...(old.readAtByKey?.[`${item.accountId}:${item.id}`]
+            ? { readAt: old.readAtByKey[`${item.accountId}:${item.id}`] }
+            : {}),
+        }));
         return {
-          ...currentState,
-          localItems: Array.isArray(persisted.localItems)
-            ? persisted.localItems.slice(0, maximumDeviceItems)
-            : [],
-          readAtByKey: persisted.readAtByKey ?? {},
-          knownSourceIdsByAccount: persisted.knownSourceIdsByAccount ?? {},
-          baselinedAccounts: Array.isArray(persisted.baselinedAccounts)
-            ? persisted.baselinedAccounts
-            : [],
+          ...old,
+          localItems,
+          historySequence: 0,
+          baselinedAccounts: [],
+          knownSourceIdsByAccount: {},
+          historyCheckedByAccount: {},
+          mutedSourcesByAccount: {},
+          categoriesByAccount: {},
         };
+      },
+      merge(persisted, current) {
+        const data = { ...current, ...((persisted as Partial<ActivityData>) ?? {}) };
+        return { ...data, ...deriveActivityState(data) };
       },
     },
   ),
 );
 
-async function runRefresh(
-  set: (partial: Partial<ActivityStore>) => void,
-  get: () => ActivityStore,
-): Promise<void> {
-  if (!get().accountId) return;
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
-    set({ loading: false, offline: true });
-    return;
-  }
-  set({ loading: true, offline: false, error: null });
-  try {
-    await useSpacesStore.getState().loadInbox();
-    set({ loading: false });
-  } catch (error) {
-    set({ loading: false, error: errorMessage(error) });
-  }
+function validDate(value?: string): string {
+  return value && Number.isFinite(Date.parse(value))
+    ? new Date(value).toISOString()
+    : new Date().toISOString();
 }
-
-function deriveActivityState(
-  state: Pick<ActivityStore, "accountId" | "sourceItems" | "localItems" | "readAtByKey">,
-) {
-  const allItems = [...state.sourceItems, ...state.localItems]
-    .filter((item) => item.accountId === state.accountId)
-    .map((item) => applyDeviceReadState(item, state.readAtByKey))
-    .filter(
-      (item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index,
-    )
-    .sort(compareActivityNewestFirst);
-  const attentionItems = allItems.filter((item) => item.attention && !item.readAt);
-  return { allItems, attentionItems, attentionCount: attentionItems.length };
-}
-
-function applyDeviceReadState(
-  item: ActivityItem,
-  readAtByKey: Record<string, string>,
-): ActivityItem {
-  const deviceReadAt = readAtByKey[readKey(item.accountId, item.id)];
-  if (!deviceReadAt || item.readAt) return item;
-  return { ...item, readAt: deviceReadAt };
-}
-
-function boundedReadKeys(keys: Record<string, string>, accountId: string): Record<string, string> {
-  const prefix = `${accountId}:`;
-  const accountEntries = Object.entries(keys)
-    .filter(([key]) => key.startsWith(prefix))
-    .sort((left, right) => right[1].localeCompare(left[1]));
-  const retained = new Set(accountEntries.slice(0, maximumReadKeysPerAccount).map(([key]) => key));
-  return Object.fromEntries(
-    Object.entries(keys).filter(([key]) => !key.startsWith(prefix) || retained.has(key)),
-  );
-}
-
-function readKey(accountId: string, id: string): string {
-  return `${accountId}:${id}`;
-}
-
-function uniqueString(value: string, index: number, items: string[]): boolean {
-  return items.indexOf(value) === index;
-}
-
-function nextLocalActivityId(): string {
-  localActivitySequence += 1;
-  return `${Date.now()}-${localActivitySequence}`;
-}
-
-function validIsoDate(value: string | undefined): string {
-  const timestamp = value ? Date.parse(value) : Number.NaN;
-  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : new Date().toISOString();
-}
-
 function errorMessage(error: unknown): string {
-  return error instanceof Error && error.message
-    ? error.message
-    : "Activity could not be refreshed.";
+  return error instanceof Error ? error.message : "Activity could not be refreshed.";
 }

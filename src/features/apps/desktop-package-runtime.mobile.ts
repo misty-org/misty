@@ -13,7 +13,7 @@ export async function stageOfficialDesktopPackage(_app: OfficialApp): Promise<st
 }
 
 export async function finalizeOfficialDesktopPackageInstall(
-  _appId: string,
+  _app: OfficialApp,
   _operationId: string | null,
   _commit: boolean,
 ): Promise<void> {}

@@ -46,6 +46,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   inbox: { unreads: [], mentions: [] },
   presenceBySpace: {},
   snapshotReady: false,
+  inboxError: null,
   referenceOnly: false,
   lastSyncedAt: null,
   loading: false,
@@ -154,9 +155,9 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       });
     }
     const tasks = [get().loadMembers(spaceId)];
-    if (canReadMessages) {
-      tasks.push(get().loadMessages(spaceId), get().loadNodes(spaceId));
-    }
+    // Space home/settings only need membership. App runtimes load their own
+    // content after checking installation and session permissions; prefetching
+    // it here fails for Spaces that do not have Chat installed.
     const results = await Promise.allSettled(tasks);
     if (generation !== spacesAccountGeneration) return;
     const rejected = results.find((result) => result.status === "rejected");
@@ -251,10 +252,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         activityApi.inbox("mentions"),
       ]);
       if (generation !== spacesAccountGeneration) return;
-      set({ inbox: { unreads: unreads.items, mentions: mentions.items } });
+      set({ inbox: { unreads: unreads.items, mentions: mentions.items }, inboxError: null });
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
-      set({ error: errorText(error) });
+      set({ inboxError: errorText(error) });
     }
   },
 
@@ -395,6 +396,7 @@ export function resetSpacesAccountState(): void {
     inbox: { unreads: [], mentions: [] },
     presenceBySpace: {},
     snapshotReady: false,
+  inboxError: null,
     referenceOnly: false,
     lastSyncedAt: null,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"

@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dockTabs } from "./dockTree";
+import { allLayoutViews } from "./layoutTabs";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useWorkspaceTabTitle, WorkspaceTabTitleProvider } from "./useWorkspaceTabTitle";
 
@@ -26,7 +26,7 @@ describe("useWorkspaceTabTitle", () => {
 
   it("renames only the workspace tab rendering the content", () => {
     useWorkspaceStore.getState().setScope("space:family");
-    const first = useWorkspaceStore.getState().openSurface({
+    const first = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
       groupKey: "space:family:planner",
       title: "Planner",
@@ -36,7 +36,7 @@ describe("useWorkspaceTabTitle", () => {
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });
-    const second = useWorkspaceStore.getState().openSurface({
+    const second = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
       groupKey: "space:family:journal",
       title: "Journal",
@@ -55,7 +55,7 @@ describe("useWorkspaceTabTitle", () => {
       ),
     );
 
-    const tabs = dockTabs(useWorkspaceStore.getState().layout.root);
+    const tabs = allLayoutViews(useWorkspaceStore.getState().layout);
     expect(tabs.find((tab) => tab.id === first.id)?.title).toBe("Planner");
     expect(tabs.find((tab) => tab.id === second.id)?.title).toBe("Project brief");
   });

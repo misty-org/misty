@@ -18,7 +18,7 @@ use crate::{
     infra::credential_store,
 };
 
-const KEY_SERVICE: &str = "misty.mobile-cache";
+const KEY_SERVICE: &str = "com.misty.mobile-cache";
 const KEY_ACCOUNT: &str = "install-v1";
 const MAX_RECORD_BYTES: usize = 2 * 1024 * 1024;
 const ACCOUNT_SOFT_CAP_BYTES: u64 = 32 * 1024 * 1024;

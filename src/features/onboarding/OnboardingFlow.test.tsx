@@ -1,227 +1,123 @@
+import type * as Lifecycle from "@/telemetry/lifecycle";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as AppsApi from "@/api/apps";
-import type * as Lifecycle from "@/telemetry/lifecycle";
-
-const { finishOnboarding } = vi.hoisted(() => ({ finishOnboarding: vi.fn() }));
-
-vi.mock("@/api/apps", async (importOriginal) => ({
-  ...(await importOriginal<typeof AppsApi>()),
-  finishOnboarding,
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  catalog: vi.fn(),
+  templates: vi.fn(),
+  personal: vi.fn(),
 }));
-
-vi.mock("@/features/auth", () => ({
-  useAuth: () => ({ user: { id: "account-1", name: "Misty Tester" } }),
+vi.mock("@/api/spaces/api", () => ({
+  spacesApi: { create: mocks.create, templates: mocks.templates },
 }));
-
-vi.mock("@/features/browser", () => ({
-  setBrowserWebviewsSuspended: vi.fn(),
+vi.mock("@/api/apps", () => ({ appsApi: { catalog: mocks.catalog } }));
+vi.mock("@/api/spaces/templates", () => ({ personalSpaceTemplatesApi: { list: mocks.personal } }));
+vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account-1" } }) }));
+vi.mock("@/telemetry/lifecycle", async (original) => ({
+  ...(await original<typeof Lifecycle>()),
+  trackOnboardingCompleted: vi.fn(),
 }));
-
-vi.mock("@/telemetry/lifecycle", async (importOriginal) => ({
-  ...(await importOriginal<typeof Lifecycle>()),
-  trackOnboardingCompleted: vi.fn(async () => undefined),
-}));
-
-import { useSpacesStore } from "@/features/spaces";
-import {
-  navigatorAppIdsForAccount,
-  useNavigatorAppsStore,
-} from "@/features/workspace/useNavigatorAppsStore";
+vi.mock("@/features/activity", () => ({ reportSystemError: vi.fn() }));
+import { useSpacesStore } from "@/features/spaces/core";
 import { markAccountCreating } from "./onboardingState";
 import { OnboardingFlow } from "./OnboardingFlow";
-
-describe("OnboardingFlow", () => {
-  let container: HTMLDivElement;
-  let root: Root;
-
-  beforeEach(() => {
-    (
-      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
-    window.localStorage.clear();
-    sessionStorage.clear();
-    markAccountCreating("account-1");
-    finishOnboarding.mockReset();
-    finishOnboarding.mockResolvedValue({
-      space: { id: "new-space", name: "Launch", owner_user_id: "account-1", is_default: true },
-      apps: [
-        { app_id: "journal", state: "installed", pinned: true, pin_rank: 1024 },
-        { app_id: "planner", state: "installed", pinned: true, pin_rank: 2048 },
-      ],
-    });
-    useNavigatorAppsStore.setState({ appIdsByAccount: {}, collapsedByAccount: {} });
-    useSpacesStore.setState({
-      snapshotReady: true,
-      spaces: [],
-      limits: null,
-      error: null,
-      clearError: vi.fn(),
-      load: vi.fn(async () => undefined) as never,
-    });
-    container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
+let root: Root, container: HTMLDivElement;
+async function click(text: string) {
+  const button = [...document.querySelectorAll("button")].find(
+    (item) => item.textContent?.trim() === text,
+  );
+  expect(button, text).toBeDefined();
+  await act(async () => button!.click());
+}
+async function name(value: string) {
+  const input = document.querySelector("input")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-
-  afterEach(async () => {
-    await act(async () => root.unmount());
-    container.remove();
+}
+beforeEach(async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  localStorage.clear();
+  sessionStorage.clear();
+  markAccountCreating("account-1");
+  vi.clearAllMocks();
+  mocks.create.mockResolvedValue({ space: { id: "new-space" } });
+  mocks.catalog.mockResolvedValue({
+    apps: [
+      {
+        id: "journal",
+        name: "Journal",
+        scopes: ["notes.read"],
+        permission_version: 3,
+        requires_apps: [],
+      },
+    ],
   });
-
-  it("creates a Space with the selected starter apps", async () => {
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <div data-misty-route-shell />
-          <OnboardingFlow />
-        </MemoryRouter>,
-      );
-    });
-
-    expect(document.querySelector("[data-misty-onboarding]")).not.toBeNull();
-    expect(document.body.textContent).toContain("What will this Space hold?");
-    expect(document.querySelector('[role="progressbar"]')).toBeNull();
-
-    const nameInput = document.querySelector<HTMLInputElement>("#onboarding-space-name");
-    expect(nameInput).not.toBeNull();
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(nameInput, "Launch plan");
-      nameInput?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Continue"))
-        ?.click();
-    });
-
-    expect(document.body.textContent).toContain("Start with the apps you need");
-    expect(document.body.textContent).toContain("Journal");
-
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>('[aria-label="Remove Chat"]')?.click();
-    });
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Finish setup"))
-        ?.click();
-    });
-
-    expect(finishOnboarding).toHaveBeenCalledWith("Launch plan", ["journal", "planner"]);
-    expect(navigatorAppIdsForAccount(useNavigatorAppsStore.getState(), "account-1")).toEqual([
-      "inbox",
-      "journal",
-      "files",
-      "agents",
-      "planner",
-    ]);
+  mocks.templates.mockResolvedValue({
+    templates: [
+      { id: "blank", name: "Blank", app_ids: [] },
+      { id: "family", name: "Family", app_ids: ["journal"] },
+    ],
   });
-
-  it("does not interrupt an account that already owns a default Space", async () => {
-    useSpacesStore.setState({
-      spaces: [
-        {
-          id: "space-1",
-          name: "Existing",
-          owner_user_id: "account-1",
-          is_default: true,
-        },
-      ] as never,
-    });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <div data-misty-route-shell />
-          <OnboardingFlow />
-        </MemoryRouter>,
-      );
-    });
-
-    expect(document.querySelector("[data-misty-onboarding]")).toBeNull();
+  mocks.personal.mockResolvedValue({ templates: [] });
+  useSpacesStore.setState({
+    spaces: [],
+    snapshotReady: true,
+    clearError: vi.fn(),
+    load: vi.fn(async () => undefined) as never,
   });
-
-  it("creates an owned default Space when the account only has shared Spaces", async () => {
-    useSpacesStore.setState({
-      spaces: [
-        {
-          id: "shared-space",
-          name: "Team",
-          owner_user_id: "account-2",
-          is_default: false,
-        },
-      ] as never,
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <MemoryRouter>
+        <OnboardingFlow />
+      </MemoryRouter>,
+    ),
+  );
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+});
+describe("Space onboarding", () => {
+  it("creates a truly empty Blank Space", async () => {
+    await name("Family");
+    await click("Continue");
+    await click("Create Space");
+    expect(mocks.create).toHaveBeenCalledWith({
+      name: "Family",
+      template_id: "blank",
+      integration_providers: [],
+      app_ids: [],
+      app_permissions: {},
     });
-
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <div data-misty-route-shell />
-          <OnboardingFlow />
-        </MemoryRouter>,
-      );
-    });
-
-    expect(document.querySelector("[data-misty-onboarding]")).not.toBeNull();
-
-    const nameInput = document.querySelector<HTMLInputElement>("#onboarding-space-name");
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(nameInput, "Product work");
-      nameInput?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Continue"))
-        ?.click();
-    });
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Finish setup"))
-        ?.click();
-    });
-
-    expect(finishOnboarding).toHaveBeenCalledWith("Product work", ["chat", "journal", "planner"]);
   });
-
-  it("allows setup with no starter apps", async () => {
-    finishOnboarding.mockResolvedValue({
-      space: { id: "new-space", name: "Home", owner_user_id: "account-1", is_default: true },
-      apps: [],
-    });
-    await act(async () => {
-      root.render(
-        <MemoryRouter>
-          <div data-misty-route-shell />
-          <OnboardingFlow />
-        </MemoryRouter>,
-      );
-    });
-    const nameInput = document.querySelector<HTMLInputElement>("#onboarding-space-name");
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(nameInput, "Home");
-      nameInput?.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Continue"))
-        ?.click();
-    });
-    for (const app of ["Chat", "Journal", "Planner"]) {
-      await act(async () => {
-        document.querySelector<HTMLButtonElement>(`[aria-label="Remove ${app}"]`)?.click();
-      });
-    }
-    await act(async () => {
-      Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent?.includes("Finish setup"))
-        ?.click();
-    });
-    expect(finishOnboarding).toHaveBeenCalledWith("Home", []);
+  it("reviews the template's editable apps using current permission versions", async () => {
+    await name("Family");
+    await click("Continue");
+    await click("Family");
+    expect(document.body.textContent).toContain("App permissions");
+    await click("Create Space");
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template_id: "family",
+        app_ids: ["journal"],
+        app_permissions: { journal: 3 },
+      }),
+    );
+  });
+  it("allows a failed creation to be retried", async () => {
+    mocks.create.mockRejectedValueOnce(new Error("Connection interrupted"));
+    await name("Family");
+    await click("Continue");
+    await click("Create Space");
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe("Connection interrupted");
+    await click("Create Space");
+    expect(mocks.create).toHaveBeenCalledTimes(2);
   });
 });

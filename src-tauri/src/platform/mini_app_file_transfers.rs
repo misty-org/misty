@@ -16,10 +16,38 @@ impl Drop for TransferJob {
     }
 }
 pub fn execute(p: &mut PermissionSet, method: &str, params: &Value) -> Result<Value, String> {
+    #[cfg(all(test, target_os = "macos"))]
+    let lease = Some(super::document_processing::ServiceLease::fixture_worker(
+        "file-operations",
+    ));
+    #[cfg(not(all(test, target_os = "macos")))]
+    let lease = None;
+    execute_with_worker(p, method, params, lease)
+}
+pub fn execute_with_worker(
+    p: &mut PermissionSet,
+    method: &str,
+    params: &Value,
+    worker_lease: Option<Arc<super::document_processing::ServiceLease>>,
+) -> Result<Value, String> {
     p.authorize("files.write")?;
+    if method == "files.transferPrepared" {
+        #[cfg(target_os = "macos")]
+        return macos::start_prepared(
+            p,
+            params,
+            worker_lease.ok_or("Update this App to install its file service.")?,
+        );
+        #[cfg(not(target_os = "macos"))]
+        return Err("Prepared file copies are currently available on macOS.".into());
+    }
     if method == "files.transferStart" {
         #[cfg(target_os = "macos")]
-        return macos::start(p, params);
+        return macos::start(
+            p,
+            params,
+            worker_lease.ok_or("Update this App to install its file service.")?,
+        );
         #[cfg(not(target_os = "macos"))]
         return Err("App file transfers are currently available on macOS.".into());
     }

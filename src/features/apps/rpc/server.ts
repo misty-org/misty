@@ -1,3 +1,5 @@
+import { appSessionRequests } from "@/api/apps/sessionRequests";
+import { apiErrorMessage } from "@/api/client/errors";
 import { httpRequest } from "@/api/client/http";
 import {
   mistyServerMethods,
@@ -88,17 +90,33 @@ export function createServerRpc(
         });
         assertActive();
         if (!response.ok) {
+          if (response.status === 401 || response.status === 403)
+            appSessionRequests.invalidate(session.appId, session.spaceId ?? "");
           const raw = await response.text();
           let error: { code?: string; message?: string } = {};
           try {
-            const parsed = AppRpcErrorSchema.safeParse(JSON.parse(raw));
+            const body: unknown = JSON.parse(raw);
+            const parsed = AppRpcErrorSchema.safeParse(body);
             if (parsed.success) error = parsed.data;
+            else if (
+              body &&
+              typeof body === "object" &&
+              "code" in body &&
+              typeof body.code === "string"
+            )
+              error = { code: body.code };
           } catch {
             /* Preserve a useful bounded server error. */
           }
           throw new AppRpcError(
             error.code ?? "server_error",
-            error.message ?? `Misty denied the method (${response.status}).`,
+            error.message ??
+              apiErrorMessage(
+                error.code,
+                response.status === 424
+                  ? "The connected service is unavailable. Try again shortly."
+                  : `The request failed (${response.status}).`,
+              ),
           );
         }
         if (response.status === 204) return undefined;

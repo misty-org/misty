@@ -101,9 +101,8 @@ describe("SDK component AI capability", () => {
   });
   it("denies ungranted, foreign-surface and cross-Space context or artifact access", async () => {
     const denied = fixture([]);
-    await expect(denied.bridge.register(denied.adapter)).rejects.toMatchObject({
-      code: "capability_denied",
-    });
+    await denied.bridge.register(denied.adapter);
+    expect(() => denied.bridge.read()!.getContext()).toThrow("ai.use");
     denied.scope.close();
     const f = fixture();
     await expect(f.bridge.register({ ...f.adapter, surfaceId: "settings" })).rejects.toMatchObject({

@@ -7,13 +7,15 @@ const empty: Wait[] = [];
 export function AgentInterventions({
   accountId,
   onCount,
+  selectedId,
 }: {
   accountId: string;
+  selectedId?: string;
   onCount(count: number): void;
 }) {
   const store = useAgentInterventions();
   const matched = store.accountId === accountId;
-  const items = matched ? store.items : empty;
+  const items = matched ? store.items.filter((item) => !selectedId || item.id === selectedId) : empty;
   const loading = !matched || (!store.loaded && store.loading);
   const busy = matched ? store.busy : "";
   const error = matched ? store.error : "";

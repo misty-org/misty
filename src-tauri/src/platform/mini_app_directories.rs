@@ -39,7 +39,11 @@ impl Request {
             return Err("Folder access was revoked or the App closed.".into());
         }
         match &self.operation {
-            Operation::Watch => super::file_observation::DirectoryWatch::start(self.directory.clone(), self.released.clone()).map(Output::Watch),
+            Operation::Watch => super::file_observation::DirectoryWatch::start(
+                self.directory.clone(),
+                self.released.clone(),
+            )
+            .map(Output::Watch),
             Operation::Mutate(mutation) => mutation.run(&self.directory).map(Output::Listing),
             Operation::List { offset, limit } => {
                 let mut entries = Vec::new();
@@ -79,12 +83,22 @@ impl Request {
                         "other"
                     };
                     let mut entry = json!({"entry": encode_name(&name), "name": name.to_string_lossy(), "kind": label});
-                    if kind.is_file() {
-                        // symlink_metadata prevents metadata reads from following a raced symlink.
-                        if let Ok(metadata) = self.directory.symlink_metadata(&name) {
+                    // Never follow a link while collecting presentation metadata.
+                    if let Ok(metadata) = self.directory.symlink_metadata(&name) {
+                        if metadata.file_type().is_file() == kind.is_file()
+                            && metadata.file_type().is_dir() == kind.is_dir()
+                            && metadata.file_type().is_symlink() == kind.is_symlink()
+                        {
                             if metadata.is_file() {
                                 entry["bytes"] = json!(metadata.len());
                             }
+                            entry["modifiedMs"] = json!(super::file_observation::milliseconds(
+                                metadata.modified().map(|time| time.into_std())
+                            ));
+                            entry["createdMs"] = json!(super::file_observation::milliseconds(
+                                metadata.created().map(|time| time.into_std())
+                            ));
+                            entry["readonly"] = json!(metadata.permissions().readonly());
                         }
                     }
                     entries.push(entry);
@@ -144,7 +158,9 @@ impl Request {
                     return Err("Close an old folder watch before starting another.".into());
                 }
                 let handle = uuid::Uuid::new_v4().to_string();
-                permissions.directory_watches.insert(handle.clone(), watcher);
+                permissions
+                    .directory_watches
+                    .insert(handle.clone(), watcher);
                 Ok(json!({"watcher":handle}))
             }
             Output::Listing(value) => Ok(value),

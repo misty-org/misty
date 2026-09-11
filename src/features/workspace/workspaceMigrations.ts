@@ -1,4 +1,4 @@
-import { mapDockTabs } from "./dockTree";
+import { mapLayoutViews } from "./layoutTabs";
 import { officialAppRoute } from "@/features/apps/appRoute";
 import {
   browserTabTitle,
@@ -30,10 +30,7 @@ export function migrateRetiredWorkspaceTabs(
   layout: WorkspaceLayout,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceLayout {
-  return {
-    ...layout,
-    root: mapDockTabs(layout.root, (tab) => migrateRetiredWorkspaceTab(tab, scopeKey)),
-  };
+  return mapLayoutViews(layout, (tab) => migrateRetiredWorkspaceTab(tab, scopeKey));
 }
 
 export function migrateRetiredWorkspaceTab(
@@ -128,50 +125,44 @@ const officialAppIds = new Set([
 ]);
 
 export function migrateBrowserTabs(layout: WorkspaceLayout): WorkspaceLayout {
-  return {
-    ...layout,
-    root: mapDockTabs(layout.root, (tab) =>
-      tab.surfaceId === "browser"
-        ? {
-            ...tab,
-            title:
-              tab.title && tab.title !== "Browser"
-                ? tab.title
-                : browserTabTitle(parseBrowserTabState(tab.state).url),
-            state: parseBrowserTabState(tab.state),
-          }
-        : tab,
-    ),
-  };
+  return mapLayoutViews(layout, (tab) =>
+    tab.surfaceId === "browser"
+      ? {
+          ...tab,
+          title:
+            tab.title && tab.title !== "Browser"
+              ? tab.title
+              : browserTabTitle(parseBrowserTabState(tab.state).url),
+          state: parseBrowserTabState(tab.state),
+        }
+      : tab,
+  );
 }
 
 export function migrateSpaceToolTabs(layout: WorkspaceLayout): WorkspaceLayout {
-  return {
-    ...layout,
-    root: mapDockTabs(layout.root, (tab) => {
-      if (tab.surfaceId !== "space") return tab;
-      const request = workspaceSurfaceFromRoute(tab.route);
-      if (!request) return tab;
-      if (request.surfaceId === "official-app") {
-        return {
-          ...tab,
-          surfaceId: "official-app",
-          groupKey: request.groupKey,
-          instanceKey: request.instanceKey ?? tab.instanceKey,
-          title: request.title,
-          route: request.route,
-          sidebarVisible: true,
-          state: tab.state ?? request.state ?? {},
-        };
-      }
-      if (request.surfaceId !== "space") return tab;
+  return mapLayoutViews(layout, (tab) => {
+    if (tab.surfaceId !== "space") return tab;
+    const request = workspaceSurfaceFromRoute(tab.route);
+    if (!request) return tab;
+    if (request.surfaceId === "official-app") {
       return {
         ...tab,
+        surfaceId: "official-app",
         groupKey: request.groupKey,
         instanceKey: request.instanceKey ?? tab.instanceKey,
         title: request.title,
         route: request.route,
+        sidebarVisible: true,
+        state: tab.state ?? request.state ?? {},
       };
-    }),
-  };
+    }
+    if (request.surfaceId !== "space") return tab;
+    return {
+      ...tab,
+      groupKey: request.groupKey,
+      instanceKey: request.instanceKey ?? tab.instanceKey,
+      title: request.title,
+      route: request.route,
+    };
+  });
 }

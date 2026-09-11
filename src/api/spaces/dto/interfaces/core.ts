@@ -53,6 +53,8 @@ export interface SpaceTemplateSeedSummary {
 }
 
 export interface SpaceTemplate {
+  app_ids?: string[];
+  personal?: boolean;
   id: string;
   name: string;
   description: string;
@@ -62,6 +64,8 @@ export interface SpaceTemplate {
 }
 
 export interface CreateSpaceRequest {
+  app_ids?: string[];
+  app_permissions?: Record<string, number>;
   name: string;
   template_id: string;
   integration_providers: SpaceIntegrationProvider[];

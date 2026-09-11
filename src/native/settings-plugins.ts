@@ -1,7 +1,6 @@
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import type {
   CloudConfigPaths,
-  ExtensionCommandRequest,
   LaunchOnLoginSnapshot,
   OpenWithAssociation,
   PluginCommandRunResult,
@@ -143,24 +142,45 @@ function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsS
   return hydrated;
 }
 
-export function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
-  return invoke("plugin_commands_snapshot");
+let readSpaceApps: () => Promise<ReadonlySet<string>> = async () => new Set();
+export function configurePluginSpaceAuthority(read: () => Promise<ReadonlySet<string>>) {
+  readSpaceApps = read;
+  return () => {
+    if (readSpaceApps === read) readSpaceApps = async () => new Set();
+  };
 }
 
-export function pluginCommandRun(
+export async function pluginCommandsSnapshot(): Promise<PluginCommandsSnapshot> {
+  const apps = await readSpaceApps();
+  const snapshot = await invoke<PluginCommandsSnapshot>("plugin_commands_snapshot");
+  return {
+    ...snapshot,
+    commands: snapshot.commands.filter((entry) => apps.has(entry.pluginId)),
+    panels: snapshot.panels.filter((entry) => apps.has(entry.pluginId)),
+  };
+}
+
+export async function pluginCommandRun(
   request: RunPluginCommandRequest,
 ): Promise<PluginCommandRunResult> {
+  const snapshot = await pluginCommandsSnapshot();
+  if (!snapshot.commands.some((entry) => entry.id === request.commandId))
+    throw new Error("This command is not available in the active Space.");
   return invoke("plugin_command_run", { request });
 }
 
-export function pluginPanelRender(
+export async function pluginPanelRender(
   request: RenderPluginPanelRequest,
 ): Promise<PluginPanelRenderResult> {
+  const snapshot = await pluginCommandsSnapshot();
+  if (
+    !snapshot.panels.some(
+      (entry) =>
+        entry.id === request.panelId && (!request.pluginId || entry.pluginId === request.pluginId),
+    )
+  )
+    throw new Error("This app is not available in the active Space.");
   return invoke("plugin_panel_render", { request });
-}
-
-export function extensionCommandRun<T = unknown>(request: ExtensionCommandRequest): Promise<T> {
-  return invoke("extension_command_run", { request });
 }
 
 export function pluginDiagnosticsSnapshot(): Promise<PluginDiagnosticsSnapshot> {

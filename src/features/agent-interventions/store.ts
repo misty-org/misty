@@ -1,3 +1,4 @@
+import { useActivityStore } from "@/features/activity/useActivityStore";
 import { create } from "zustand";
 import { agentInterventionsApi, interventionLabels, type AgentInterventionWait } from "./api";
 import type { ActivityItem } from "@/features/activity/types";
@@ -75,6 +76,7 @@ export const useAgentInterventions = create<InterventionStore>((set, get) => ({
     try {
       await agentInterventionsApi.decide(id, ready, controller.signal);
       if (current !== generation || controller.signal.aborted) return false;
+      useActivityStore.getState().resolveSourceRequest(accountId, "interventions", id);
       set({ items: get().items.filter((item) => item.id !== id) });
       saved = true;
     } catch {
@@ -102,6 +104,8 @@ export function agentInterventionActivities(
       source: "interventions",
       sourceId: item.id,
       kind: "agent",
+      lifecycle: "request",
+      sourceLabel: "Misty",
       title: interventionLabels[item.action],
       // Keep website text and model-authored reasons out of system notifications.
       body: "Misty is waiting for you in the original browser. Review the request in Activity.",

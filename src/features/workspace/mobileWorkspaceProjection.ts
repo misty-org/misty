@@ -1,3 +1,4 @@
+import { layoutTabs } from "./layoutTabs";
 import { dockLeaves } from "./dockTree";
 import type {
   WorkspaceScopeKey,
@@ -9,6 +10,7 @@ import type {
 export interface WorkspaceTabProjection {
   tab: WorkspaceTab;
   paneId: string;
+  layoutTabId: string;
   windowId: string;
   scopeKey: WorkspaceScopeKey;
 }
@@ -30,13 +32,16 @@ export function flattenWorkspaceTabs(
   const excluded = options.excludeSurfaceIds;
   return (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
     .flatMap((workspaceWindow) =>
-      dockLeaves(workspaceWindow.layout.root).flatMap((pane) =>
-        pane.tabs.map((tab) => ({
-          tab,
-          paneId: pane.id,
-          windowId: workspaceWindow.id,
-          scopeKey: state.activeScopeKey,
-        })),
+      layoutTabs(workspaceWindow.layout).flatMap((layoutTab) =>
+        dockLeaves(layoutTab.root).flatMap((pane) =>
+          pane.tabs.map((tab) => ({
+            layoutTabId: layoutTab.id,
+            tab,
+            paneId: pane.id,
+            windowId: workspaceWindow.id,
+            scopeKey: state.activeScopeKey,
+          })),
+        ),
       ),
     )
     .filter((entry) => !excluded?.has(entry.tab.surfaceId))

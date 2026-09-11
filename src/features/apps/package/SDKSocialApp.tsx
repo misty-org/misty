@@ -22,7 +22,11 @@ export default defineComponentApp({
     const dispose = () => {
       if (closed) return;
       closed = true;
-      reactRoot?.unmount();
+      const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      // Abort can run during the parent root's React commit. Release resources
+      // now, but unmount this independent root after that commit finishes.
+      queueMicrotask(() => detachedRoot?.unmount());
       lifetime.abort();
       runtime?.close();
       signal?.removeEventListener("abort", dispose);
