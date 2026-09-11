@@ -85,7 +85,7 @@ Actions have gently rounded control corners and a minimum desktop height of 30px
 
 ## Components
 
-- **Integration rows:** Social lists native Misty messaging plus Instagram, Messenger, X, Discord, Slack, and Microsoft Teams. Inbox lists Gmail, Outlook, iCloud Mail, and Yahoo Mail. Keep native Misty messaging accessible through “Open Misty.”
+- **Integration rows:** Social lists native Misty messaging plus Instagram, Messenger, X, Discord, Slack, and Microsoft Teams. Inbox lists Gmail, Outlook, iCloud Mail, and Yahoo Mail. Keep native Misty messaging accessible through “Open.”
 - **Actions:** “Add” opens a provider website and saves its shortcut; “Open” returns to a saved account. The primary action uses the raised fill and structural outline; “Hide” and “Show in sidebar” use transparent secondary styling. Hover uses one charcoal tonal step. Keyboard focus has a two-pixel outline with a two-pixel offset. Pending operations disable their affected actions; the current implementation dims them to half opacity.
 - **Account state:** A saved website profile adds its shortcut immediately; it does not prove website sign-in or authorize Misty access. Hiding a shortcut preserves the account session. Website sign-in and mail search authorization remain separate.
 - **Feedback:** Loading uses status text. Load, navigation, and sidebar failures provide concise text with Retry. Added and hidden states appear as row copy, with explicit accessible action labels.
@@ -106,3 +106,5 @@ The provider toolbar keeps Refresh on the left, website identity, More, and an i
 ## Shared directory ownership
 
 `PlatformDirectory` imports its own styles through `providers.css`. `platformDirectory.css` owns search, row layout, type, icons, controls, feedback, and narrow-width behavior. Do not style directory internals through `.integration-dialog` ancestors or rely on `websites.css` imports. `data-embedded` changes only the outer frame. Both standalone directories and popups use identical rows. The popup retains its existing heading, close/back actions, bounded scroll body, and focus restoration.
+
+Integration directory content is centered in the available pane, within a 760px column and scrolls naturally in smaller panes. Rows have no hover fill; keyboard focus stays visible. Open/Add actions use Discover’s bright surface and dark text.

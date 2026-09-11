@@ -89,7 +89,7 @@ export function BrowserOmniboxView(props: {
         autoComplete="off"
         spellCheck={false}
         className={cn(
-          "w-full max-w-[720px] mx-auto rounded-md border bg-transparent px-[9px] text-center outline-none transition-colors",
+          "w-full min-w-0 rounded-md border bg-transparent px-[9px] text-center outline-none transition-colors",
           isNativeMobileBuild ? "h-11 text-base" : "h-[30px] text-xs",
           props.lightChrome
             ? "border-black/[0.06] text-[#252525] hover:bg-black/[0.025] focus:border-black/[0.11] focus:bg-[#ededed] focus:text-left"

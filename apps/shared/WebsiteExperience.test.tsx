@@ -160,14 +160,6 @@ it("filters the curated gallery and adds a service without a Space", async () =>
   });
   expect(ui.queryByRole("button", { name: "Todoist" })).toBeNull();
   fireEvent.click(ui.getByRole("button", { name: "Add Jira Cloud" }));
-  await ui.findByRole("textbox", { name: "Jira Cloud workspace" });
-  fireEvent.change(await ui.findByRole("textbox", { name: "Profile name" }), {
-    target: { value: "Work" },
-  });
-  fireEvent.change(ui.getByRole("textbox", { name: "Jira Cloud workspace" }), {
-    target: { value: "https://team.atlassian.net" },
-  });
-  fireEvent.click(ui.getByRole("button", { name: "Continue to sign in" }));
   await ui.findByTestId("website-canvas");
   expect(f.native.mount).not.toHaveBeenCalled();
   await waitFor(() =>
@@ -180,10 +172,6 @@ it("pins a document directly, follows navigation, and unpins without interruptin
   const f = await fixture("journal"),
     ui = within(document.body);
   fireEvent.click(await ui.findByRole("button", { name: "Add Google Docs" }));
-  fireEvent.change(await ui.findByRole("textbox", { name: "Profile name" }), {
-    target: { value: "Personal" },
-  });
-  fireEvent.click(ui.getByRole("button", { name: "Continue to sign in" }));
   await ui.findByTestId("website-canvas");
   await waitFor(() => expect(f.misty.browser.subscribe).toHaveBeenCalled());
   await act(async () => {
@@ -208,7 +196,9 @@ it("pins a document directly, follows navigation, and unpins without interruptin
     f.emit({ type: "title", title: "Organization sign-in" });
   });
   await waitFor(() =>
-    expect(f.misty.workspace.setTitle).toHaveBeenLastCalledWith("organization.example · Google Docs"),
+    expect(f.misty.workspace.setTitle).toHaveBeenLastCalledWith(
+      "organization.example · Google Docs",
+    ),
   );
   expect(
     ui.queryByRole("button", { name: "Return to Google Docs" }),
@@ -304,10 +294,6 @@ it.each(["journal", "planner", "library"] as const)(
     const label =
       app === "journal" ? "Notion" : app === "planner" ? "Todoist" : "Dropbox";
     fireEvent.click(await ui.findByRole("button", { name: `Add ${label}` }));
-    fireEvent.change(await ui.findByRole("textbox", { name: "Profile name" }), {
-      target: { value: "Personal" },
-    });
-    fireEvent.click(ui.getByRole("button", { name: "Continue to sign in" }));
     const canvas = await ui.findByTestId("website-canvas");
     const button = ui.getByRole("button", { name: "More website actions" });
     expect(button.closest("header")).not.toBeNull();
@@ -323,7 +309,9 @@ it.each(["journal", "planner", "library"] as const)(
     expect(ui.getByTestId("website-canvas")).toBe(canvas);
     expect(canvas.getAttribute("data-active")).toBe("true");
     expect(drawer.getAttribute("aria-modal")).toBe("true");
-    expect(within(drawer).queryByRole("button", { name: /Sharing/ })).toBeNull();
+    expect(
+      within(drawer).queryByRole("button", { name: /Sharing/ }),
+    ).toBeNull();
     expect(browserBlockingOverlayOpen()).toBe(true);
     expect(within(drawer).queryByRole("button", { name: "Browse" })).toBeNull();
     expect(within(drawer).queryByRole("button", { name: "Added" })).toBeNull();

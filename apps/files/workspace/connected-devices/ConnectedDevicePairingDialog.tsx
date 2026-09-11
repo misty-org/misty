@@ -33,6 +33,7 @@ export function ConnectedDevicePairingDialog({
 }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [failureMessage, setFailureMessage] = useState("");
 
   useEffect(() => {
     const state = controller.pairing?.session.state;
@@ -42,11 +43,13 @@ export function ConnectedDevicePairingDialog({
   }, [controller, open]);
 
   const run = async (action: () => Promise<unknown>) => {
+    setFailureMessage("");
     setBusy(true);
     try {
       await action();
     } catch (cause) {
       const failure = pairingFailure(cause);
+      setFailureMessage(`${failure.title}. ${failure.description} ${failure.action}`);
       reportSystemError({
         title: failure.title,
         error: failure.description,
@@ -76,6 +79,7 @@ export function ConnectedDevicePairingDialog({
         }}
       >
         <DialogContent className="max-w-md border-charcoal-border bg-charcoal-card text-cream">
+          {failureMessage ? <p role="alert" className="text-sm text-cream-muted">{failureMessage}</p> : null}
           <DialogHeader>
             <DialogTitle>Connect another device</DialogTitle>
             <DialogDescription>

@@ -298,6 +298,11 @@ export function SDKBrowserView({
         attributeFilter: ["class", "style", "hidden"],
       });
     }
+    const paneLayout = () => {
+      lastGeometry = "";
+      schedule();
+    };
+    window.addEventListener("misty:workspace-geometry-changed", paneLayout);
     refreshLayout.current = visibility;
     window.addEventListener("resize", resize);
     window.addEventListener("scroll", schedule, true);
@@ -307,6 +312,7 @@ export function SDKBrowserView({
     schedule();
     return () => {
       closed = true;
+      window.removeEventListener("misty:workspace-geometry-changed", paneLayout);
       cancelAnimationFrame(frame);
       window.clearTimeout(resizeTimer);
       observer.disconnect();

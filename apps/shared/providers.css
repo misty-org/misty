@@ -42,7 +42,7 @@
   color: inherit;
   cursor: pointer;
 }
-.provider-workspace button:hover {
+.provider-workspace button:hover:where(:not(:disabled)) {
   background: var(--misty-theme-hover, #2b2b2b);
 }
 .provider-workspace button:disabled {

@@ -5,11 +5,22 @@ import {
   EmbeddedUniversalPreviewView,
   useEmbeddedDocument as useEmbeddedDocumentView,
 } from "./EmbeddedUniversalPreviewView";
-const runtime = { Error: SystemErrorActivity, readBytes: fetchPreviewBytes };
+import { useContext } from "react";
+import { FilePreviewRenderersContext } from "@/features/apps/FilePdfPreview";
 export function EmbeddedUniversalPreview(
   props: Omit<ComponentProps<typeof EmbeddedUniversalPreviewView>, "runtime">,
 ) {
-  return <EmbeddedUniversalPreviewView {...props} runtime={runtime} />;
+  return (
+    <EmbeddedUniversalPreviewView
+      {...props}
+      runtime={{
+        Error: SystemErrorActivity,
+        readBytes: fetchPreviewBytes,
+        extractDocumentText: useContext(FilePreviewRenderersContext)
+          .extractDocumentText,
+      }}
+    />
+  );
 }
 export function useEmbeddedDocument(
   url: string,
@@ -17,5 +28,12 @@ export function useEmbeddedDocument(
   mimeType: string,
   enabled: boolean,
 ) {
-  return useEmbeddedDocumentView(url, extension, mimeType, enabled, fetchPreviewBytes);
+  return useEmbeddedDocumentView(
+    url,
+    extension,
+    mimeType,
+    enabled,
+    fetchPreviewBytes,
+    useContext(FilePreviewRenderersContext).extractDocumentText,
+  );
 }

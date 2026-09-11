@@ -4,7 +4,9 @@ import materialIconTheme from "material-icon-theme/dist/material-icons.json";
 import { fileBrowserStyles } from "./FileBrowserStyles";
 
 const materialTheme = materialIconTheme as MaterialIconTheme;
-const materialIconBaseUrl = `${import.meta.env.BASE_URL}assets/material-icon-theme/`;
+const materialIconBaseUrl = import.meta.env.MISTY_PACKAGED_ICONS
+  ? new URL("./assets/material-icon-theme/", import.meta.env.MISTY_PACKAGE_BASE_URL).href
+  : `${import.meta.env.BASE_URL}assets/material-icon-theme/`;
 
 export function FileIcon(props: { entry: FileEntry; size?: number; variant?: "table" | "grid" }) {
   const size = props.size ?? 20;

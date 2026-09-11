@@ -1,6 +1,6 @@
 import { Button, EmptyState, Skeleton } from "@/shared/ui";
 import { ClipboardCopy } from "lucide-react";
-import { Suspense, type ComponentType } from "react";
+import { Suspense, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../model/types/types";
 
 import type { NoteBlockEditorProps } from "./NoteBlockEditorView";
@@ -16,6 +16,7 @@ export interface NotePreviewProps {
   linkableNotes: UnifiedNote[];
 }
 export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreviewRuntime }) {
+  const [copyFailed, setCopyFailed] = useState(false);
   const NoteBlockEditor = props.runtime.Editor;
   const noteText = props.note.bodyMarkdown ?? props.note.preview ?? props.note.body;
   const linkableNotes = props.linkableNotes
@@ -23,9 +24,11 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
     .map((candidate) => ({ id: candidate.sourceId, title: candidate.title }));
 
   const copyToClipboard = async () => {
+    setCopyFailed(false);
     try {
       await props.runtime.copy(noteText);
     } catch (error) {
+      setCopyFailed(true);
       props.runtime.report(error);
     }
   };
@@ -50,6 +53,7 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       </div>
 
       <div className="misty-scrollbar min-h-0 overflow-auto">
+        {copyFailed ? <p role="alert" className="px-3 text-sm text-cream-muted">Copy failed. Try Copy to clipboard again or select and copy the text.</p> : null}
         {noteText.trim() ? (
           <Suspense
             fallback={

@@ -1,12 +1,11 @@
+import { integrationSectionUrl } from "./integrationSections";
+import { providerLoginUrls } from "./providerLoginUrls";
 import { providerNavigationTitles } from "./navigationTitles";
 import { WebsiteLoader } from "./WebsiteLoader";
-import { PlatformPanel } from "./PlatformPanel";
-import { useWebsiteOverlay } from "./useWebsiteOverlay";
 import { WebsiteHeader } from "./WebsiteHeader";
 import { usePagePin } from "./usePagePin";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  mistyBrowserProviders,
   type MistyAppSDK,
   type MistyComponentContext,
   type MistyBrowserEvent,
@@ -14,14 +13,13 @@ import {
 import { SDKBrowserView } from "@misty/browser-view";
 import { WebsiteBrandIcon } from "./WebsiteBrandIcon";
 import {
-  integrationRoute,
   savedWebsiteUrl,
   websiteIntegrations,
   type WebsiteAppId,
   type WebsiteIntegrationId,
 } from "./websiteIntegrations";
 import {
-  createWebsiteAccount,
+  ensureWebsiteSession,
   restoredWebsitePage,
   saveWebsitePage,
   selectWebsiteAccount,
@@ -46,17 +44,14 @@ export function WebsiteWorkspace({
   const { state, error: loadError, retry } = useWebsiteState(misty, appId);
   const info = websiteIntegrations[provider];
   const params = new URL(context.route, "https://misty.local").searchParams;
+  const sectionUrl = integrationSectionUrl(provider, context.route);
   const requestedAccount = params.get("account"),
     requestedPin = params.get("pin");
   const [selected, setSelected] = useState<string>(),
     [initialUrl, setInitialUrl] = useState("");
   const [availability, setAvailability] = useState<Availability>(),
     [attempt, setAttempt] = useState(0);
-  const [panel, setPanel] = useState<"add" | null>(null);
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [name, setName] = useState(""),
-    [workspace, setWorkspace] = useState("");
+  const [error, setError] = useState("");
   const [view, setView] = useState<View | null>(null),
     [url, setUrl] = useState(""),
     [title, setTitle] = useState("");
@@ -95,9 +90,6 @@ export function WebsiteWorkspace({
     };
   }, [misty, attempt]);
   useEffect(() => {
-    setPanel(null);
-  }, [requestedPin, requestedAccount]);
-  useEffect(() => {
     if (!state) return;
     let closed = false;
     void selectedWebsiteAccount(misty.storage.local, provider)
@@ -131,7 +123,7 @@ export function WebsiteWorkspace({
     void restoredWebsitePage(misty.storage.local, account)
       .then((restored) => {
         if (!closed) {
-          const next = pin?.url ?? restored;
+          const next = sectionUrl ?? pin?.url ?? restored;
           setInitialUrl(next);
           setUrl(next);
         }
@@ -143,7 +135,15 @@ export function WebsiteWorkspace({
     return () => {
       closed = true;
     };
-  }, [account?.id, account?.removing, requestedPin, misty, provider, report]);
+  }, [
+    account?.id,
+    account?.removing,
+    requestedPin,
+    sectionUrl,
+    misty,
+    provider,
+    report,
+  ]);
   useEffect(() => {
     void misty.workspace
       .setTitle(
@@ -201,14 +201,11 @@ export function WebsiteWorkspace({
     setError(reason instanceof Error ? reason.message : String(reason));
   }, []);
   const run = async (action: () => Promise<unknown>) => {
-    setBusy(true);
     setError("");
     try {
       await action();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
-    } finally {
-      setBusy(false);
     }
   };
   const supported =
@@ -238,18 +235,33 @@ export function WebsiteWorkspace({
     !service?.removing &&
     !!initialUrl &&
     supported;
-  const overlayReady = useWebsiteOverlay(misty, view, !!panel, context.active);
-  const visiblePanel = overlayReady ? panel : null;
+  useEffect(() => {
+    if (!supported || !state || accounts.length || service?.removing || error)
+      return;
+    let closed = false;
+    void ensureWebsiteSession(misty.storage.local, provider)
+      .then((created) => {
+        if (!closed) setSelected(created.id);
+      })
+      .catch((reason) => {
+        if (!closed) setError(String(reason));
+      });
+    return () => {
+      closed = true;
+    };
+  }, [
+    supported,
+    state,
+    accounts.length,
+    service?.removing,
+    error,
+    misty,
+    provider,
+  ]);
   return (
     <section
       data-browser-page-container
       className="provider-workspace website-workspace"
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && panel) {
-          event.stopPropagation();
-          setPanel(null);
-        }
-      }}
     >
       <WebsiteHeader
         key={`header:${provider}:${account?.id}`}
@@ -268,7 +280,9 @@ export function WebsiteWorkspace({
         pinned={pin.pinned}
         pinBusy={pin.busy}
         canPin={!!canvas && pin.ready && !!savedWebsiteUrl(provider, url)}
-        canOpenExternal={!!savedWebsiteUrl(provider, url)}
+        canOpenExternal={
+          url === providerLoginUrls[provider] || !!savedWebsiteUrl(provider, url)
+        }
         report={(reason) =>
           void run(async () => {
             throw reason;
@@ -303,118 +317,7 @@ export function WebsiteWorkspace({
           </button>
         </div>
       ) : null}
-      {supported && state && !service && (
-        <div className="website-empty">
-          <h2>Add {info.label} to get started</h2>
-          <p>Choose a website to set up a profile.</p>
-          <button
-            onClick={() =>
-              void run(() =>
-                misty.navigation.open(`/apps/${appId}?view=integrations`),
-              )
-            }
-          >
-            Choose a website
-          </button>
-        </div>
-      )}
-      <PlatformPanel
-        open={
-          context.active &&
-          params.get("drawer") !== "integrations" &&
-          !!supported &&
-          !!service &&
-          (!!visiblePanel || (!account && !service.removing))
-        }
-        compact
-        title="Set up"
-        onClose={() => {
-          setPanel(null);
-          if (!account || account.removing || service?.removing)
-            void run(() =>
-              misty.navigation.open(`/apps/${appId}?view=integrations`),
-            );
-        }}
-      >
-        {supported && service && (visiblePanel === "add" || !account) && (
-          <div className="provider-panel website-management">
-            {!service.removing && (
-              <form
-                className="website-account-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(async () => {
-                    const created = await createWebsiteAccount(
-                      misty.storage.local,
-                      provider,
-                      name,
-                      provider === "jira"
-                        ? workspace
-                        : provider === "outlook-calendar" &&
-                            workspace === "work"
-                          ? "https://outlook.office.com/calendar/"
-                          : mistyBrowserProviders[provider].url,
-                    );
-                    setName("");
-                    setWorkspace("");
-                    setSelected(created.id);
-                    setPanel(null);
-                    await selectWebsiteAccount(
-                      misty.storage.local,
-                      provider,
-                      created.id,
-                    );
-                    await misty.navigation.open(
-                      integrationRoute(appId, provider, created.id),
-                    );
-                  });
-                }}
-              >
-                <label>
-                  Profile name
-                  <input
-                    autoFocus={!accounts.length}
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Personal or Work"
-                    required
-                    maxLength={200}
-                  />
-                </label>
-                {provider === "jira" && (
-                  <label>
-                    Jira Cloud workspace
-                    <input
-                      value={workspace}
-                      onChange={(event) => setWorkspace(event.target.value)}
-                      aria-label="Jira Cloud workspace"
-                      placeholder="https://your-team.atlassian.net"
-                      type="url"
-                      required
-                    />
-                    <small>Use your team's atlassian.net address.</small>
-                  </label>
-                )}
-                {provider === "outlook-calendar" && (
-                  <label>
-                    Account type
-                    <select
-                      value={workspace}
-                      onChange={(event) => setWorkspace(event.target.value)}
-                    >
-                      <option value="">Personal Outlook account</option>
-                      <option value="work">Work or school account</option>
-                    </select>
-                  </label>
-                )}
-                <button disabled={busy || !name.trim()} type="submit">
-                  {busy ? "Opening…" : "Continue to sign in"}
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-      </PlatformPanel>
+      {supported && state && !account && !error && <WebsiteLoader />}
       {canvas && (
         <div className="provider-canvas">
           <SDKBrowserView

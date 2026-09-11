@@ -1,11 +1,9 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { dockLeaves } from "@/features/workspace/dockTree";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { allLayoutViews, activeLayoutView } from "@/features/workspace/layoutTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { openBrowserPopup } from "./openBrowserPopup";
-import {
-  registerProviderBrowser,
-  popupBrowserProfile,
-} from "./browserProviders";
+import { registerProviderBrowser, popupBrowserProfile } from "./browserProviders";
 import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
 const nativeNavigate = vi.hoisted(() => vi.fn(async () => {}));
 const setError = vi.hoisted(() => vi.fn());
@@ -35,9 +33,7 @@ beforeEach(() => {
 });
 it("opens a downloaded Browser popup beside its source with the active Space route", () => {
   useWorkspaceStore.getState().setScope("space:family");
-  const source = useWorkspaceStore
-    .getState()
-    .openBrowserTab({ url: "https://example.com" });
+  const source = useWorkspaceStore.getState().openBrowserTab({ url: "https://example.com" });
   resolveRuntime.mockReturnValue(source.id);
   const popup = openBrowserPopup({
     sourceId: "native-source",
@@ -48,40 +44,40 @@ it("opens a downloaded Browser popup beside its source with the active Space rou
     groupKey: "app:browser",
     route: source.route,
   });
-  const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-    (pane) => pane.tabs.some((tab) => tab.id === source.id),
-  )!;
-  expect(
-    pane.tabs[pane.tabs.findIndex((tab) => tab.id === source.id) + 1].id,
-  ).toBe(popup!.id);
-  expect(pane.activeTabId).toBe(popup!.id);
+  const layout = useWorkspaceStore.getState().layout;
+  const views = allLayoutViews(layout);
+  expect(views[views.findIndex((tab) => tab.id === source.id) + 1].id).toBe(popup!.id);
+  expect(activeLayoutView(layout)?.id).toBe(popup!.id);
 });
-it("ignores unknown, closed, other-Space and non-Browser sources", () => {
-  expect(
-    openBrowserPopup({ sourceId: "unknown", url: "https://example.com" }),
-  ).toBeNull();
+it("ignores unknown, closed, other-Space and unregistered sources", () => {
+  expect(openBrowserPopup({ sourceId: "unknown", url: "https://example.com" })).toBeNull();
   const source = useWorkspaceStore.getState().openBrowserTab();
   resolveRuntime.mockReturnValue(source.id);
   useWorkspaceStore.getState().closeTab(source.id);
-  expect(
-    openBrowserPopup({ sourceId: "native-source", url: "https://example.com" }),
-  ).toBeNull();
+  expect(openBrowserPopup({ sourceId: "native-source", url: "https://example.com" })).toBeNull();
   const other = useWorkspaceStore.getState().openBrowserTab();
   resolveRuntime.mockReturnValue(other.id);
   useWorkspaceStore.getState().setScope("space:other");
-  expect(
-    openBrowserPopup({ sourceId: "native-source", url: "https://example.com" }),
-  ).toBeNull();
+  expect(openBrowserPopup({ sourceId: "native-source", url: "https://example.com" })).toBeNull();
   const home = dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0];
   resolveRuntime.mockReturnValue(home.id);
-  expect(
-    openBrowserPopup({ sourceId: "native-source", url: "https://example.com" }),
-  ).toBeNull();
+  activeRuntime.mockReturnValue(undefined);
+  expect(openBrowserPopup({ sourceId: "native-source", url: "https://example.com" })).toBeNull();
+});
+it("accepts an App's registered embedded browser without requiring a provider classification", () => {
+  const source = useWorkspaceStore
+    .getState()
+    .openSurface(workspaceSurfaceFromRoute("/apps/journal")!);
+  resolveRuntime.mockReturnValue(source.id);
+  const popup = openBrowserPopup({
+    sourceId: "native-source",
+    url: "https://tenant.identity.example/login",
+    popupInstanceKey: "real-popup",
+  });
+  expect(popup?.groupKey).toBe("app:browser");
 });
 it("rejects popup URLs that cannot be hosted by Browser", () => {
-  resolveRuntime.mockReturnValue(
-    useWorkspaceStore.getState().openBrowserTab().id,
-  );
+  resolveRuntime.mockReturnValue(useWorkspaceStore.getState().openBrowserTab().id);
   for (const url of [
     "javascript:alert(1)",
     "file:///etc/passwd",
@@ -91,13 +87,9 @@ it("rejects popup URLs that cannot be hosted by Browser", () => {
 });
 
 it("rejects an old native view after the same workspace tab replaces it", () => {
-  resolveRuntime.mockReturnValue(
-    useWorkspaceStore.getState().openBrowserTab().id,
-  );
+  resolveRuntime.mockReturnValue(useWorkspaceStore.getState().openBrowserTab().id);
   activeRuntime.mockReturnValue("replacement-native-view");
-  expect(
-    openBrowserPopup({ sourceId: "native-source", url: "https://example.com" }),
-  ).toBeNull();
+  expect(openBrowserPopup({ sourceId: "native-source", url: "https://example.com" })).toBeNull();
 });
 
 function instagramSource() {
@@ -116,18 +108,20 @@ function instagramSource() {
   );
   return source;
 }
-it("opens provider sign-in links in Misty Browser with the source account", () => {
-  instagramSource();
-  const url = "https://www.facebook.com/login.php?next=instagram";
-  const popup = openBrowserPopup({ sourceId: "native-source", url })!;
-  expect(popup.groupKey).toBe("app:browser");
-  expect(popupBrowserProfile(popup.id)).toMatchObject({
-    provider: { id: "instagram", accountId: "work" },
-    url,
-  });
-  expect(nativeNavigate).not.toHaveBeenCalled();
-  expect(external).not.toHaveBeenCalled();
-});
+it.each(["https://example.net/article", "https://www.facebook.com/login.php?next=instagram"])(
+  "opens integration links in Browser with the source account: %s",
+  (url) => {
+    instagramSource();
+    const popup = openBrowserPopup({ sourceId: "native-source", url })!;
+    expect(popup.groupKey).toBe("app:browser");
+    expect(popupBrowserProfile(popup.id)).toMatchObject({
+      provider: { id: "instagram", accountId: "work" },
+      url,
+    });
+    expect(nativeNavigate).not.toHaveBeenCalled();
+    expect(external).not.toHaveBeenCalled();
+  },
+);
 it.each(["https://www.facebook.com/dialog/oauth", "about:blank"])(
   "adopts a real Instagram sign-in popup into Browser with the originating account: %s",
   (url) => {
@@ -165,9 +159,7 @@ it("opens out-of-provider links as ordinary Browser pages without native privile
 
 it("ignores blank setup frames instead of passing about:blank to the external URL validator", () => {
   instagramSource();
-  expect(
-    openBrowserPopup({ sourceId: "native-source", url: "about:blank" }),
-  ).toBeNull();
+  expect(openBrowserPopup({ sourceId: "native-source", url: "about:blank" })).toBeNull();
   expect(external).not.toHaveBeenCalled();
   expect(nativeNavigate).not.toHaveBeenCalled();
   expect(setError).not.toHaveBeenCalled();

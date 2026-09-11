@@ -1,14 +1,17 @@
 /* Social/Inbox's catalog layout, owned by PlatformDirectory in every app.
    Embedded changes only the outer frame; rows and controls remain identical. */
 .provider-workspace.provider-directory {
-  display: block;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   padding: 32px 28px;
   scrollbar-color: var(--misty-theme-border, #393939) transparent;
 }
-.provider-directory > * {
+.provider-directory > .platform-directory-content {
+  width: 100%;
   max-width: 760px;
-  margin-inline: auto;
+  flex: none;
+  margin: auto;
 }
 .provider-directory h1 {
   font-size: 22px;
@@ -115,6 +118,27 @@
 .provider-directory .platform-action {
   flex: none;
   margin-left: auto;
+  min-width: 64px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border-color: transparent;
+  background: var(--misty-theme-text-bright, #f1f1f1);
+  color: var(--misty-theme-bg, #131313);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  transition: background-color 140ms ease-out;
+}
+.provider-directory .platform-action:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--misty-theme-text-bright, #f1f1f1) 85%,
+    var(--misty-theme-bg, #131313)
+  );
+}
+.provider-directory .platform-entry:hover,
+.provider-directory .platform-entry:active {
+  background: transparent;
 }
 .provider-integration-actions {
   display: flex;

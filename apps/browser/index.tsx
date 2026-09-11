@@ -60,7 +60,9 @@ export default defineComponentApp({
       if (closed) return;
       closed = true;
       for (const remove of [...removers]) remove();
-      reactRoot?.unmount();
+      const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      queueMicrotask(() => detachedRoot?.unmount());
       signal?.removeEventListener("abort", dispose);
     };
     try {

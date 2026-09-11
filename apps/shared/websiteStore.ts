@@ -1,4 +1,5 @@
 import { uniquePagePins } from "./pagePins";
+import { providerLaunchUrl, providerLoginUrls } from "./providerLoginUrls";
 import {
   mistyBrowserProviders,
   type MistyAppSDK,
@@ -85,10 +86,14 @@ export async function loadWebsiteState(
       allowed.includes(record.provider as WebsiteIntegrationId) &&
       label(record.label) &&
       typeof record.websiteUrl === "string" &&
-      savedWebsiteUrl(
-        record.provider as WebsiteIntegrationId,
-        record.websiteUrl,
-      )
+      (record.websiteUrl ===
+        providerLoginUrls[record.provider as WebsiteIntegrationId] ||
+        record.websiteUrl ===
+        mistyBrowserProviders[record.provider as WebsiteIntegrationId].url ||
+        savedWebsiteUrl(
+          record.provider as WebsiteIntegrationId,
+          record.websiteUrl,
+        ))
     )
       accounts.push(record as unknown as IntegrationAccount);
     if (
@@ -126,6 +131,46 @@ export async function addWebsiteService(
   if (!(await storage.get(key("service", id))))
     await put(storage, "service", id, { id, order: Date.now() });
 }
+// Reuse one internal browser session; account records are compatibility storage,
+// not a setup step the user must name or configure.
+const pendingSessions = new WeakMap<
+  Storage,
+  Map<string, Promise<IntegrationAccount>>
+>();
+export function ensureWebsiteSession(
+  storage: Storage,
+  provider: WebsiteIntegrationId,
+): Promise<IntegrationAccount> {
+  let pending = pendingSessions.get(storage);
+  if (!pending) {
+    pending = new Map();
+    pendingSessions.set(storage, pending);
+  }
+  const existing = pending.get(provider);
+  if (existing) return existing;
+  const task = (async () => {
+    const state = await loadWebsiteState(
+      storage,
+      mistyBrowserProviders[provider].owner as WebsiteAppId,
+    );
+    const account = state.accounts.find(
+      (candidate) => candidate.provider === provider,
+    );
+    if (account) return account;
+    await addWebsiteService(storage, provider);
+    const created: IntegrationAccount = {
+      id: crypto.randomUUID(),
+      provider,
+      label: websiteIntegrations[provider].label,
+      websiteUrl: providerLoginUrls[provider],
+    };
+    await put(storage, "account", created.id, created);
+    return created;
+  })().finally(() => pending!.delete(provider));
+  pending.set(provider, task);
+  return task;
+}
+
 export async function createWebsiteAccount(
   storage: Storage,
   provider: WebsiteIntegrationId,
@@ -243,9 +288,10 @@ export async function restoredWebsitePage(
   account: IntegrationAccount,
 ) {
   const url = await storage.get(key("page", account.id));
-  return (
+  return providerLaunchUrl(
+    account.provider,
     (typeof url === "string" && savedWebsiteUrl(account.provider, url)) ||
-    account.websiteUrl
+      account.websiteUrl,
   );
 }
 export async function selectWebsiteAccount(

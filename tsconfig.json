@@ -146,7 +146,9 @@
       "react-icons/fa6": [
         "../misty/node_modules/react-icons/fa6/index.d.ts"
       ],
-      "react-icons/bi": ["../misty/node_modules/react-icons/bi/index.d.ts"],
+      "react-icons/bi": [
+        "../misty/node_modules/react-icons/bi/index.d.ts"
+      ],
       "react-icons/si": [
         "../misty/node_modules/react-icons/si/index.d.ts"
       ],
@@ -395,6 +397,9 @@
       ],
       "@tauri-apps/api/window": [
         "../misty/node_modules/@tauri-apps/api/window.d.ts"
+      ],
+      "@noble/hashes/*": [
+        "../misty/node_modules/@noble/hashes/*"
       ]
     }
   },

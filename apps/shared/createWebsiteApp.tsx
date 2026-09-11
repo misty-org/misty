@@ -1,5 +1,6 @@
 import { withIntegrationShell } from "./IntegrationShell";
 import { createRoot } from "react-dom/client";
+import { unmountReactRoot } from "./unmountReactRoot";
 import {
   defineComponentApp,
   type MistyComponentDefinition,
@@ -84,8 +85,9 @@ export function createWebsiteApp(
             lifetime?.abort();
             await child?.unmount();
             child = undefined;
-            root?.unmount();
+            const detachedRoot = root;
             root = undefined;
+            await unmountReactRoot(detachedRoot);
             if (closed) return;
             mode = nextMode;
             if (mode === "native") {
@@ -166,8 +168,9 @@ export function createWebsiteApp(
           closed = true;
           window.removeEventListener(providerAccountsChanged, changed);
           lifetime?.abort();
-          root?.unmount();
+          const detachedRoot = root;
           root = undefined;
+          await unmountReactRoot(detachedRoot);
           await queue.catch(() => {});
           await child?.unmount();
           child = undefined;

@@ -21,7 +21,9 @@ export default defineComponentApp({
     const dispose = () => {
       if (closed) return;
       closed = true;
-      reactRoot?.unmount();
+      const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      queueMicrotask(() => detachedRoot?.unmount());
       lifetime.abort();
       runtime?.close();
       signal?.removeEventListener("abort", dispose);
@@ -53,8 +55,7 @@ export default defineComponentApp({
         return <AgentsPage />;
       }
       await misty.navigation.setItems([
-        { id: "chat", label: "Chat", route: "/apps/agents" },
-        { id: "automations", label: "Automations", route: "/apps/agents?view=automations" },
+        { id: "activity", label: "Activity", route: "/apps/agents" },
       ]);
       if (closed) throw new Error("The app closed while loading.");
       reactRoot = createRoot(root);

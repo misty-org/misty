@@ -29,7 +29,12 @@ interface FilesViewState {
   recent: FileEntry[];
   starred: FileEntry[];
   location:
-    | { kind: "folder"; root: string; relative: string; handoff?: SdkCodeProjectHandoff }
+    | {
+        kind: "folder";
+        root: string;
+        relative: string;
+        handoff?: SdkCodeProjectHandoff;
+      }
     | { kind: "trash" | "recent" | "starred" }
     | null;
   sidebarWidth: number;
@@ -49,10 +54,18 @@ const initial = (): FilesViewState => ({
   previewVisible: true,
 });
 function parse(value: unknown): FilesViewState {
-  if (!value || typeof value !== "object" || (value as { kind?: unknown }).kind !== "sdk-files")
+  if (
+    !value ||
+    typeof value !== "object" ||
+    (value as { kind?: unknown }).kind !== "sdk-files"
+  )
     return initial();
   const raw = value as FilesViewState;
-  if (raw.version !== 1 || !Array.isArray(raw.folders) || raw.folders.length > 32)
+  if (
+    raw.version !== 1 ||
+    !Array.isArray(raw.folders) ||
+    raw.folders.length > 32
+  )
     throw new Error("Saved Files view is invalid.");
   const folders = raw.folders.map(parseSdkCodeProjectReference);
   if (new Set(folders.map((folder) => folder.root)).size !== folders.length)
@@ -67,12 +80,19 @@ function parse(value: unknown): FilesViewState {
       typeof source.relative !== "string" ||
       source.relative.includes("\0") ||
       (source.relative !== "" &&
-        source.relative.split("/").some((part) => !part || part === "." || part === ".."))
+        source.relative
+          .split("/")
+          .some((part) => !part || part === "." || part === ".."))
     )
       throw new Error("Saved Files location is outside its folder.");
-    const handoff = source.handoff ? parseSdkCodeProjectHandoff(source.handoff) : undefined;
+    const handoff = source.handoff
+      ? parseSdkCodeProjectHandoff(source.handoff)
+      : undefined;
     const reference = folders.find((folder) => folder.root === source.root)!;
-    if (handoff && (handoff.root !== reference.root || handoff.write !== reference.write))
+    if (
+      handoff &&
+      (handoff.root !== reference.root || handoff.write !== reference.write)
+    )
       throw new Error("Saved Files handoff does not match its folder.");
     location = {
       kind: "folder",
@@ -80,7 +100,8 @@ function parse(value: unknown): FilesViewState {
       relative: source.relative,
       ...(handoff ? { handoff } : {}),
     };
-  } else if (raw.location !== null) throw new Error("Saved Files location is invalid.");
+  } else if (raw.location !== null)
+    throw new Error("Saved Files location is invalid.");
   const width = (value: number, fallback: number, min: number, max: number) =>
     Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
   return {
@@ -100,7 +121,11 @@ function parse(value: unknown): FilesViewState {
 /** One host view owns its Files controller; new views receive independent native grants. */
 export function createSdkFilesWorkspace(
   misty: MistyAppSDK,
-  options: { viewId: string; signal: AbortSignal; report(error: unknown): void },
+  options: {
+    viewId: string;
+    signal: AbortSignal;
+    report(error: unknown): void;
+  },
 ) {
   const lifetime = new AbortController();
   const files = createSdkFilesStore(misty, lifetime.signal);
@@ -112,6 +137,9 @@ export function createSdkFilesWorkspace(
   const paneId = multiPanel.getState().activePaneId;
   const model = create(() => ({
     loading: true,
+    hasSavedState: false,
+    restoreErrors: [] as string[],
+    sharedRoots: [] as string[],
     sidebarVisible: true,
     previewVisible: true,
     sidebarWidth: 220,
@@ -119,6 +147,9 @@ export function createSdkFilesWorkspace(
     active: true,
     focused: true,
   }));
+  let retainedRestore: FilesViewState | undefined;
+  const pendingReferences = new Map<string, SdkCodeProjectReference>();
+  let retrying: Promise<void> | undefined;
   let closed = false,
     initializing = true,
     revision = -1,
@@ -126,7 +157,8 @@ export function createSdkFilesWorkspace(
   let pending = Promise.resolve();
   let unsubscribeWorkspace: (() => void) | undefined;
   const assert = () => {
-    if (closed || options.signal.aborted) throw new Error("This Files workspace is closed.");
+    if (closed || options.signal.aborted)
+      throw new Error("This Files workspace is closed.");
   };
   const report = (cause: unknown) => {
     if (!closed) {
@@ -148,9 +180,14 @@ export function createSdkFilesWorkspace(
   async function serialize(): Promise<FilesViewState> {
     const state = files.store.getState(),
       presentation = model.getState();
-    const folders = [];
+    const folders = [...pendingReferences.values()];
     for (const folder of state.folders) {
-      folders.push(await folder.remember());
+      const reference = await folder.remember();
+      const retained = folders.findIndex(
+        (item) => item.root === reference.root,
+      );
+      if (retained >= 0) folders[retained] = reference;
+      else folders.push(reference);
       assert();
     }
     const path = state.pane.listing?.path;
@@ -162,7 +199,10 @@ export function createSdkFilesWorkspace(
       "misty://recent",
       "misty://starred",
     ].includes(path ?? "")
-      ? { kind: path!.slice("misty://".length) as "trash" | "recent" | "starred" }
+      ? {
+          kind: path!.slice("misty://".length) as
+            "trash" | "recent" | "starred",
+        }
       : folder && path
         ? {
             kind: "folder",
@@ -174,14 +214,17 @@ export function createSdkFilesWorkspace(
       kind: "sdk-files",
       version: 1,
       folders,
-      sources: Object.fromEntries(
-        state.folders
-          .filter((folder) => folder.source)
-          .map((folder) => [folder.root, folder.source!]),
-      ),
+      sources: {
+        ...retainedRestore?.sources,
+        ...Object.fromEntries(
+          state.folders
+            .filter((folder) => folder.source)
+            .map((folder) => [folder.root, folder.source!]),
+        ),
+      },
       recent: state.recent,
       starred: state.starred,
-      location,
+      location: location ?? retainedRestore?.location ?? null,
       sidebarWidth: presentation.sidebarWidth,
       previewWidth: presentation.previewWidth,
       previewVisible: presentation.previewVisible,
@@ -213,42 +256,91 @@ export function createSdkFilesWorkspace(
   const unsubscribeFiles = files.store.subscribe((state, previous) => {
     if (state.pane.listing?.path !== previous.pane.listing?.path) {
       const path = state.pane.listing?.path ?? "misty://choose-folder";
-      multiPanel.getState().updateActiveTabPath(paneId, path, state.pane.listing?.title || "Files");
+      multiPanel
+        .getState()
+        .updateActiveTabPath(
+          paneId,
+          path,
+          state.pane.listing?.title || "Files",
+        );
       void save();
     }
   });
   async function restore(state: FilesViewState) {
+    retainedRestore = state;
     const location = state.location;
+    const errors: string[] = [];
     model.setState({
       sidebarWidth: state.sidebarWidth,
       previewWidth: state.previewWidth,
       previewVisible: state.previewVisible,
     });
+    for (const reference of state.folders)
+      pendingReferences.set(reference.root, reference);
     for (const reference of state.folders) {
       assert();
-      if (files.store.getState().folders.some((folder) => folder.root === reference.root)) continue;
-      const handoff =
-        location?.kind === "folder" && location.root === reference.root
-          ? location.handoff
-          : undefined;
-      if (handoff) {
-        try {
-          await files.openFolder({ handoff, source: state.sources[reference.root] });
-          continue;
-        } catch {
-          assert(); /* A hidden tab may mount after the temporary handoff expires. */
-        }
+      if (
+        files.store
+          .getState()
+          .folders.some((folder) => folder.root === reference.root)
+      ) {
+        pendingReferences.delete(reference.root);
+        continue;
       }
-      await files.openFolder({ reference, source: state.sources[reference.root] });
+      try {
+        const handoff =
+          location?.kind === "folder" && location.root === reference.root
+            ? location.handoff
+            : undefined;
+        let opened = false;
+        if (handoff) {
+          try {
+            opened = Boolean(
+              await files.openFolder({
+                handoff,
+                source: state.sources[reference.root],
+                activate: false,
+              }),
+            );
+          } catch {
+            assert();
+          }
+        }
+        if (!opened)
+          opened = Boolean(
+            await files.openFolder({
+              reference,
+              source: state.sources[reference.root],
+              activate: false,
+            }),
+          );
+        assert();
+        if (!opened) throw new Error("Folder access was not granted.");
+        pendingReferences.delete(reference.root);
+      } catch (cause) {
+        assert();
+        errors.push(cause instanceof Error ? cause.message : String(cause));
+      }
     }
     files.store.setState({ recent: state.recent, starred: state.starred });
-    if (location && ["trash", "recent", "starred"].includes(location.kind))
-      await files.navigate(`misty://${location.kind}`);
-    else if (location?.kind === "folder")
-      await files.navigate(
-        `${location.root}${location.relative ? `/${location.relative}` : ""}`,
-        "replace",
-      );
+    try {
+      if (location && ["trash", "recent", "starred"].includes(location.kind))
+        await files.navigate(`misty://${location.kind}`);
+      else if (
+        location?.kind === "folder" &&
+        !pendingReferences.has(location.root)
+      )
+        await files.navigate(
+          `${location.root}${location.relative ? `/${location.relative}` : ""}`,
+          "replace",
+        );
+    } catch (cause) {
+      assert();
+      errors.push(cause instanceof Error ? cause.message : String(cause));
+    }
+    assert();
+    model.setState({ restoreErrors: errors });
+    if (!errors.length) retainedRestore = undefined;
   }
   const ready = (async () => {
     try {
@@ -263,7 +355,9 @@ export function createSdkFilesWorkspace(
       assert();
       accept(snapshot);
       const own = snapshot.views.find((view) => view.viewId === options.viewId);
-      if (!own) throw new Error("This Files view is no longer in the workspace.");
+      if (!own)
+        throw new Error("This Files view is no longer in the workspace.");
+      model.setState({ hasSavedState: own.state !== null });
       await restore(parse(own.state));
       assert();
     } catch (cause) {
@@ -296,6 +390,27 @@ export function createSdkFilesWorkspace(
     multiPanel,
     paneId,
     ready,
+    retryRestore() {
+      assert();
+      if (!retainedRestore) return Promise.resolve();
+      if (!retrying)
+        retrying = (async () => {
+          await ready;
+          assert();
+          const current = await serialize();
+          assert();
+          initializing = true;
+          try {
+            await restore(current);
+          } finally {
+            initializing = false;
+          }
+          await save();
+        })().finally(() => {
+          retrying = undefined;
+        });
+      return retrying;
+    },
     close,
     flush: () => pending,
     async openView(
@@ -306,17 +421,29 @@ export function createSdkFilesWorkspace(
       let state = initial(),
         title = "Files",
         cancel: (() => Promise<void>) | undefined;
-      if (["misty://trash", "misty://recent", "misty://starred"].includes(path ?? "")) {
+      if (
+        ["misty://trash", "misty://recent", "misty://starred"].includes(
+          path ?? "",
+        )
+      ) {
         state = await serialize();
-        state.location = { kind: path!.slice("misty://".length) as "trash" | "recent" | "starred" };
-        title = { trash: "Trash", recent: "Recent", starred: "Starred" }[state.location.kind];
+        state.location = {
+          kind: path!.slice("misty://".length) as
+            "trash" | "recent" | "starred",
+        };
+        title = { trash: "Trash", recent: "Recent", starred: "Starred" }[
+          state.location.kind
+        ];
       } else if (path) {
         const folder = files.owner(path),
           reference = await folder.remember();
         assert();
         const handoff = await folder.share();
         cancel = () => folder.cancelShare(handoff.ticket);
-        title = path === folder.root ? folder.name : path.slice(path.lastIndexOf("/") + 1);
+        title =
+          path === folder.root
+            ? folder.name
+            : path.slice(path.lastIndexOf("/") + 1);
         state = {
           ...state,
           folders: [reference],
@@ -354,12 +481,16 @@ export function createSdkFilesWorkspace(
     },
     setSidebarWidth(sidebarWidth: number) {
       assert();
-      model.setState({ sidebarWidth: Math.max(160, Math.min(420, sidebarWidth)) });
+      model.setState({
+        sidebarWidth: Math.max(160, Math.min(420, sidebarWidth)),
+      });
       return save();
     },
     setPreviewWidth(previewWidth: number) {
       assert();
-      model.setState({ previewWidth: Math.max(220, Math.min(560, previewWidth)) });
+      model.setState({
+        previewWidth: Math.max(220, Math.min(560, previewWidth)),
+      });
       return save();
     },
     closeView: () => misty.workspace.close(options.viewId),

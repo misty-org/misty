@@ -29,15 +29,17 @@
     "sync:server-apps": "node scripts/sync-server-official-apps.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "package:official-apps": "node scripts/build-official-apps.mjs",
-    "build:apps": "node scripts/build-apps.mjs"
+    "build:apps": "node scripts/build-apps.mjs",
+    "build:native-services": "node scripts/build-native-services.mjs",
+    "test:native-services": "node --test scripts/package-native-services.test.mjs && cargo test --locked --manifest-path native-services/document-processing/Cargo.toml && cargo test --locked --manifest-path native-services/file-search/Cargo.toml"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-b66d8dda8b2add39.tgz",
-    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-e889d4508bf5fb15.tgz"
+    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-648bd1a66454e7ef.tgz",
+    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-df8b73eeef2bb25f.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

@@ -1,4 +1,5 @@
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { packageExtensionServices } from "./package-extension-services.mjs";
+import { cp, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,8 @@ for (const entry of await readdir(pluginsSrc, { withFileTypes: true })) {
   await cp(path.join(srcDir, "assets"), path.join(destDir, "assets"), { recursive: true }).catch(() => undefined);
   await cp(path.join(srcDir, "tools"), path.join(destDir, "tools"), { recursive: true }).catch(() => undefined);
   await cp(path.join(srcDir, "THIRD_PARTY_NOTICES.md"), path.join(destDir, "THIRD_PARTY_NOTICES.md")).catch(() => undefined);
+  const manifest = JSON.parse(await readFile(path.join(destDir, "manifest.json"), "utf8"));
+  await packageExtensionServices(repo, manifest, destDir, { release: process.argv.includes("--release") });
   const webDir = path.join(destDir, "web");
   await mkdir(webDir, { recursive: true });
   await cp(path.join(dist, "index.html"), path.join(webDir, "index.html"));

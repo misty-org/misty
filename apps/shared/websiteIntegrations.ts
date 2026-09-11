@@ -1,4 +1,5 @@
 import { mistyBrowserProviders } from "@misty/sdk";
+import { providerLoginUrls } from "./providerLoginUrls";
 export type WebsiteAppId = "journal" | "planner" | "library";
 export const websiteIntegrations = {
   "google-drive": { label: "Google Drive", category: "Cloud storage", description: "Open your files and shared drives." },
@@ -97,6 +98,11 @@ export function savedWebsiteUrl(
 ): string | undefined {
   try {
     const url = new URL(value);
+    if (
+      providerLoginUrls[id] !== mistyBrowserProviders[id].url &&
+      url.href === providerLoginUrls[id]
+    )
+      return;
     if (
       url.protocol !== "https:" ||
       url.username ||

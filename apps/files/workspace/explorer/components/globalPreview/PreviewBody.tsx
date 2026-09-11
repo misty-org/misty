@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { PreviewBodyView } from "./PreviewBodyView";
-import { hostPreviewRuntime } from "./hostPreviewRuntime";
+import { useHostPreviewRuntime } from "./hostPreviewRuntime";
 export function PreviewBody(props: Omit<ComponentProps<typeof PreviewBodyView>, "runtime">) {
-  return <PreviewBodyView {...props} runtime={hostPreviewRuntime} />;
+  return <PreviewBodyView {...props} runtime={useHostPreviewRuntime()} />;
 }

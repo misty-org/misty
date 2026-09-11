@@ -51,18 +51,8 @@ export default createSdkCodeComponent(async ({ misty, runtime, context, signal }
       useEffect(() => retain(misty.surfaces.register(adapter)), [adapter]);
     });
     const InlineRewrite = createInlineRewrite({
-      useSettings: () => ({providerId:"host", model:"Configured model"}),
-      useShortcutHandler, ShortcutHint, SystemErrorActivity:ErrorActivity,
-      async rewrite({signal: requestSignal, onDelta, ...input}) {
-        const requestId = crypto.randomUUID();
-        const cancel = () => { void misty.code.cancelRewrite(requestId).catch(report); };
-        requestSignal.addEventListener("abort", cancel, {once:true});
-        try {
-          if (requestSignal.aborted) return;
-          const result = await misty.code.rewrite({...input, requestId});
-          if (!requestSignal.aborted && !closed) onDelta(result);
-        } finally { requestSignal.removeEventListener("abort", cancel); }
-      },
+      openMisty: () => misty.ai.open({prompt:"Help me change this code."}),
+      report,
     });
     let dirty: boolean | undefined;
     const publishDirty = () => {

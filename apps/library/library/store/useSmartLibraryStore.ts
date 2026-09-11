@@ -1,3 +1,4 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
 import type { SmartLibraryPreviewInput, SmartLibraryProgress } from "@/features/files/explorer";
 import { clearSemanticExplorerSearchCache } from "@/features/files/explorer";
 import {
@@ -79,6 +80,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   addFiles: async (paths) => {
+    const originSpaceId = useAppsStore.getState().spaceId;
     const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
     if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing")
       return;
@@ -123,8 +125,8 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       const billable = eligible
         .filter((asset) => !sampleIds.has(asset.assetId) || asset.status === "changed")
         .map((asset) => asset.assetId);
-      if (included.length > 0) serverProgress = await analyzeAssets(folderId, included, "sample");
-      if (billable.length > 0) serverProgress = await analyzeAssets(folderId, billable, "full");
+      if (included.length > 0) serverProgress = await analyzeAssets(folderId, included, "sample", originSpaceId);
+      if (billable.length > 0) serverProgress = await analyzeAssets(folderId, billable, "full", originSpaceId);
       set({
         progress: serverProgress,
         phase: phaseFromProgress(serverProgress),
@@ -194,6 +196,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   rescan: async () => get().discoverChanges(),
 
   trySample: async () => {
+    const originSpaceId = useAppsStore.getState().spaceId;
     const current = get().library;
     if (!current || current.preflight.sampleAssetIds.length === 0) return;
     set({ phase: "uploading", error: null });
@@ -214,7 +217,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
         sample.assetIds.length > 0
           ? sample.assetIds.slice(0, 25)
           : current.preflight.sampleAssetIds;
-      const progress = await analyzeAssets(folderId, requested, "sample");
+      const progress = await analyzeAssets(folderId, requested, "sample", originSpaceId);
       set({
         progress,
         estimate: sample.estimate,
@@ -228,6 +231,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   analyzeFolder: async () => {
+    const originSpaceId = useAppsStore.getState().spaceId;
     const current = get().library;
     if (!current) return;
     set({ phase: "uploading", error: null });
@@ -246,8 +250,8 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
         .map((asset) => asset.assetId);
       let progress: SmartLibraryProgress | null = null;
       if (includedRetries.length > 0)
-        progress = await analyzeAssets(folderId, includedRetries, "sample");
-      if (billableIds.length > 0) progress = await analyzeAssets(folderId, billableIds, "full");
+        progress = await analyzeAssets(folderId, includedRetries, "sample", originSpaceId);
+      if (billableIds.length > 0) progress = await analyzeAssets(folderId, billableIds, "full", originSpaceId);
       if (!progress) throw new Error("There are no new or changed files to analyze.");
       set({ progress, phase: phaseFromProgress(progress), error: progress.message ?? null });
       await get().refreshProgress();
@@ -304,6 +308,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   upgradeIndex: async () => {
+    const originSpaceId = useAppsStore.getState().spaceId;
     const library = get().library;
     const folderId = library?.serverFolderId;
     if (!library || !folderId) return;
@@ -315,7 +320,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
       while (plan.assets.length > 0) {
         for (let offset = 0; offset < plan.assets.length; offset += 8) {
           const assets = plan.assets.slice(offset, offset + 8);
-          const inputs = await prepareSemanticReindexInputs(library, assets);
+          const inputs = await prepareSemanticReindexInputs(library, assets, originSpaceId);
           await completeSemanticReindex(plan.jobId, inputs);
           processed += inputs.length;
           set({ reindexProcessed: processed });
@@ -401,11 +406,12 @@ async function analyzeAssets(
   folderId: string,
   assetIds: string[],
   kind: "sample" | "full",
+  originSpaceId: string,
 ): Promise<SmartLibraryProgress> {
   let progress: SmartLibraryProgress | null = null;
   for (let offset = 0; offset < assetIds.length; offset += 8) {
     const ids = assetIds.slice(offset, offset + 8);
-    const previews = await smartLibraryPreparePreviews(ids, 512);
+    const previews = await smartLibraryPreparePreviews(ids, 512, originSpaceId);
     const payload: SmartLibraryPreviewInput[] = previews.map((preview) => ({
       assetId: preview.assetId,
       fingerprint: preview.fingerprint,

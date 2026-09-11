@@ -10,6 +10,7 @@ import {
   type MistyLibraryReadOperation,
 } from "@misty/sdk";
 import { PhotoEditorView } from "@/features/editor/PhotoEditorView";
+import { extractDocumentText } from "@/features/files/explorer/components/globalPreview/previewDocument";
 import { EmbeddedUniversalPreviewView } from "@/features/files/explorer/components/globalPreview/EmbeddedUniversalPreviewView";
 import { useSDKSurfaceRegistration } from "@/features/ai-surface/SDKSurfaceRegistration";
 import { configureLibraryRuntime, type LibraryRuntime } from "./libraryRuntime";
@@ -162,6 +163,7 @@ export async function createSdkLibraryRuntime(
         {...props}
         runtime={{
           Error: ErrorView,
+          extractDocumentText,
           readBytes: async (url, abort) => {
             if (!url.startsWith("blob:")) throw new Error("The preview is unavailable.");
             return (await fetch(url, { signal: abort })).arrayBuffer();

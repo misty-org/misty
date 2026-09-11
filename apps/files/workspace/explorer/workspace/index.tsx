@@ -1,5 +1,13 @@
-import { routes, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { ProvidersWorkspacePanel, useProvidersStore } from "@/features/providers";
+import { createFilesAiAdapter } from "../../createFilesAiAdapter";
+import {
+  routes,
+  useAppRouteMemoryStore,
+  useAppStore,
+} from "@/features/app-shell";
+import {
+  ProvidersWorkspacePanel,
+  useProvidersStore,
+} from "@/features/providers";
 import {
   selectAdvancedPreferences,
   selectFilePreferences,
@@ -7,13 +15,13 @@ import {
   useSettingsStore,
 } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import {
-  useAiSurfaceAdapter,
-  type AiArtifact,
-  type AiSurfaceAdapter,
-} from "@/features/ai-surface/AiPaneHost";
+import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useTransientScrollbars } from "@/shared/hooks/useTransientScrollbars";
-import { isAndroidBuild, isNativeMobileBuild, isWebBuild } from "@/shared/platform/buildTarget";
+import {
+  isAndroidBuild,
+  isNativeMobileBuild,
+  isWebBuild,
+} from "@/shared/platform/buildTarget";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -41,7 +49,10 @@ import {
   parsePluginTabPath,
 } from "./ExplorerDesktopPlugins";
 import { cx } from "./ExplorerDesktopShared";
-import { ExplorerNotifications, ExplorerRenameStatus } from "./ExplorerDesktopStatus";
+import {
+  ExplorerNotifications,
+  ExplorerRenameStatus,
+} from "./ExplorerDesktopStatus";
 import { DuplicateFinderDialog } from "./ExplorerDuplicateFinderDialog";
 import { createExplorerAddTabControl } from "./ExplorerNewTabControl";
 import { ExplorerMultiPanelWorkspace } from "./ExplorerMultiPanelWorkspace";
@@ -77,7 +88,9 @@ import {
 } from "./ExplorerWorkspaceUtils";
 import { useExplorerDevices } from "./useExplorerDevices";
 export type { ResizeTarget } from "../model/types/workspace/index";
-export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: ExplorerWorkspaceProps) {
+export const ExplorerWorkspace = memo(function ExplorerWorkspace(
+  props: ExplorerWorkspaceProps,
+) {
   const navigate = useNavigate();
   const multiPanelStore = useMemo(
     () => filesMultiPanelStore(props.workspaceId),
@@ -134,7 +147,8 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     workspacePathSignature,
   } = multiPanelStore(
     useShallow((state) => {
-      const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
+      const activeTab =
+        state.tabs.find((tab) => tab.id === state.activeTabId) ?? state.tabs[0];
       return {
         activePaneId: state.activePaneId,
         activeTabPath: activeTab?.path ?? "",
@@ -150,14 +164,17 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   const workspaceRef = useRef<HTMLElement | null>(null);
   useTransientScrollbars(workspaceRef);
   const mainRef = useRef<HTMLElement | null>(null);
-  const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } = useSettingsStore(
-    useShallow((state) => ({
-      preferredWorkspaceRoot: selectGeneralPreferences(state.settings?.document)
-        .preferredWorkspaceRoot,
-      settingsMountPath: selectAdvancedPreferences(state.settings?.document).mountPath,
-      settingsLoaded: state.loaded,
-    })),
-  );
+  const { preferredWorkspaceRoot, settingsLoaded, settingsMountPath } =
+    useSettingsStore(
+      useShallow((state) => ({
+        preferredWorkspaceRoot: selectGeneralPreferences(
+          state.settings?.document,
+        ).preferredWorkspaceRoot,
+        settingsMountPath: selectAdvancedPreferences(state.settings?.document)
+          .mountPath,
+        settingsLoaded: state.loaded,
+      })),
+    );
   const filePreferences = useSettingsStore(
     useShallow((state) => selectFilePreferences(state.settings?.document)),
   );
@@ -171,7 +188,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
       showHidden: filePreferences.showHiddenFiles,
       viewMode: filePreferences.defaultViewModeIndex === 1 ? "grid" : "list",
     });
-  }, [filePreferences.defaultViewModeIndex, filePreferences.showHiddenFiles, settingsLoaded]);
+  }, [
+    filePreferences.defaultViewModeIndex,
+    filePreferences.showHiddenFiles,
+    settingsLoaded,
+  ]);
   const environmentHomePath = app?.environment.homeDir ?? "/";
   const storageHomePath = resolvePreferredWorkspaceRoot(
     preferredWorkspaceRoot,
@@ -198,145 +219,25 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
     (state) => selectedPathsForPane(state.panes[activePaneId])[0] ?? "",
   );
   const activePane = useExplorerStore((state) => state.panes[activePaneId]);
-  const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
-    const selectedIds = new Set(activePane?.selectedIds ?? []);
-    const selectedEntries = (activePane?.listing?.entries ?? [])
-      .filter((entry) => selectedIds.has(entry.id))
-      .slice(0, 100);
-    const entries = selectedEntries.map((entry) => ({
-      id: `file-${filesAiHash(entry.id)}`,
-      name: entry.name,
-      kind: entry.kind,
-      extension: entry.extension,
-      mime_type: entry.mimeType,
-      size_bytes: entry.sizeBytes,
-      modified_ms: entry.modifiedMs,
-      readonly: entry.readonly,
-      location: entry.location.kind,
-    }));
-    const content = JSON.stringify({ selected: entries }).slice(0, 32 << 10);
-    const applicablePlan = (artifact: AiArtifact) => {
-      if (artifact.kind !== "file_plan" || isAndroidBuild || selectedEntries.length === 0)
-        return null;
-      const operations = artifact.operations as {
-        steps?: Array<{
-          action?: string;
-          source_scope_id?: string;
-          destination_scope_id?: string;
-          display_name?: string;
-          conflict_policy?: string;
-        }>;
-      };
-      const steps = operations.steps;
-      if (!steps?.length || steps.length > 100) return null;
-      const byScope = new Map<string, (typeof selectedEntries)[number]>(
-        selectedEntries.map((entry) => [`file-${filesAiHash(entry.id)}`, entry] as const),
-      );
-      if (
-        steps.some(
-          (step) => !byScope.has(step.source_scope_id ?? "") || step.conflict_policy !== "ask",
-        )
-      )
-        return null;
-      if (steps.length === 1 && steps[0].action === "rename") {
-        const entry = byScope.get(steps[0].source_scope_id ?? "");
-        const name = steps[0].display_name?.trim() ?? "";
-        return entry &&
-          !entry.readonly &&
-          entry.location.kind === "local" &&
-          name &&
-          name !== entry.name &&
-          !name.includes("/") &&
-          !name.includes("\\") &&
-          !Array.from(name).some((character) => character.charCodeAt(0) === 0)
-          ? { kind: "rename" as const, name }
-          : null;
-      }
-      const sourceIds = new Set(steps.map((step) => step.source_scope_id));
-      return steps.every((step) => step.action === "trash") &&
-        sourceIds.size === selectedEntries.length &&
-        selectedEntries.every(
-          (entry) =>
-            sourceIds.has(`file-${filesAiHash(entry.id)}`) &&
-            !entry.readonly &&
-            entry.location.kind === "local",
-        )
-        ? { kind: "trash" as const }
-        : null;
-    };
-    return {
-      surfaceId: "files",
-      label: entries.length
-        ? `${entries.length} selected file${entries.length === 1 ? "" : "s"}`
-        : "Files",
-      getContext: () => [
-        {
-          kind: "files.scope",
-          id: activePaneId || props.workspaceId || "files",
-          title: entries.length
-            ? `${entries.length} selected item${entries.length === 1 ? "" : "s"}`
-            : "Current file view",
-          privacy: "device",
-          opaqueScopeId: `files-${filesAiHash(`${props.workspaceId}:${activePaneId}`)}`,
-          metadata: { selected_count: entries.length },
-        },
-      ],
-      getSelection: () =>
-        entries.length
-          ? {
-              kind: "objects",
-              content,
-              object: { kind: "files.selection", id: activePaneId || props.workspaceId || "files" },
-              anchors: { count: entries.length },
-              contentHash: filesAiHash(content),
-            }
-          : null,
-      getSuggestedActions: () => [
-        {
-          id: "explain-selection",
-          label: "Explain selection",
-          prompt:
-            "Summarize the selected file metadata and call out anything unusual. Do not claim to have read file contents.",
-        },
-        {
-          id: "cleanup-plan",
-          label: "Cleanup plan",
-          prompt:
-            "Propose a safe organization and cleanup plan for the selected items. Do not move, rename, or delete anything.",
-        },
-        {
-          id: "review-file-change",
-          label: "Review file change",
-          prompt:
-            "Propose only a local rename for one selected item or moving every selected local item to Trash. " +
-            "Use the exact opaque source IDs and conflict policy ask. Do not execute it.",
-          requestedArtifactKind: "file_plan",
-        },
-        {
-          id: "find-patterns",
-          label: "Find patterns",
-          prompt: "Find naming, type, size, and recency patterns in the selected file metadata.",
-        },
-        {
-          id: "search-strategy",
-          label: "Search strategy",
-          prompt:
-            "Suggest precise searches or filters to find related files without exposing raw local paths.",
-        },
-      ],
-      canApply: (artifact) => Boolean(applicablePlan(artifact)),
-      applyArtifact: async (artifact) => {
-        const plan = applicablePlan(artifact);
-        if (!plan)
-          throw new Error(
-            "The file selection or device capability changed. Ask Misty to regenerate this plan.",
+  const aiAdapter = useMemo(
+    () =>
+      createFilesAiAdapter({
+        viewId: `${props.workspaceId ?? "files"}:${activePaneId}`,
+        canMutate: !isAndroidBuild,
+        selected: () => {
+          const pane = useExplorerStore.getState().panes[activePaneId];
+          const ids = new Set(pane?.selectedIds ?? []);
+          return (pane?.listing?.entries ?? []).filter((entry) =>
+            ids.has(entry.id),
           );
-        const store = useExplorerStore.getState();
-        if (plan.kind === "rename") await store.renameSelected(activePaneId, plan.name);
-        else await store.deleteSelected(activePaneId, "trash");
-      },
-    };
-  }, [activePane, activePaneId, props.workspaceId]);
+        },
+        rename: (_entry, name) =>
+          useExplorerStore.getState().renameSelected(activePaneId, name),
+        trash: () =>
+          useExplorerStore.getState().deleteSelected(activePaneId, "trash"),
+      }),
+    [activePane, activePaneId, props.workspaceId],
+  );
   useAiSurfaceAdapter(aiAdapter);
   const explorerInitialized = useExplorerStore((state) => state.initialized);
   const openSidebarPathInNewTab = useFilesDockWorkspace({
@@ -362,22 +263,37 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
   });
   const activePaneIdRef = useRef(activePaneId);
   const activePathRef = useRef(activePath);
-  const { pluginCommands, pluginPanels, executableCommandIdsRef, pluginCommandsRef } =
-    usePluginRegistry({ extensionsEnabled });
+  const {
+    pluginCommands,
+    pluginPanels,
+    executableCommandIdsRef,
+    pluginCommandsRef,
+  } = usePluginRegistry({ extensionsEnabled });
   const ownsPane = useCallback(
     (paneId: string) =>
-      multiPanelStore.getState().tabs.some((tab) => tab.panes.some((pane) => pane.id === paneId)),
+      multiPanelStore
+        .getState()
+        .tabs.some((tab) => tab.panes.some((pane) => pane.id === paneId)),
     [multiPanelStore],
   );
-  const { duplicateFinderPaneId, setDuplicateFinderPaneId, compareDialog, setCompareDialog } =
-    useExplorerDialogEvents(activePaneIdRef, ownsPane);
+  const {
+    duplicateFinderPaneId,
+    setDuplicateFinderPaneId,
+    compareDialog,
+    setCompareDialog,
+  } = useExplorerDialogEvents(activePaneIdRef, ownsPane);
   useTransferRefreshPolling(mountRoot);
   useConnectedDeviceDirectoryInvalidation();
-  const { resizeTarget, resizeSidebarBy, resizePreviewBy, startSidebarResize, startPreviewResize } =
-    usePanelResize({
-      workspaceRef,
-      mainRef,
-    });
+  const {
+    resizeTarget,
+    resizeSidebarBy,
+    resizePreviewBy,
+    startSidebarResize,
+    startPreviewResize,
+  } = usePanelResize({
+    workspaceRef,
+    mainRef,
+  });
   const workspacePaths = useMemo(
     () => workspacePathSignature.split("\n").filter(Boolean),
     [workspacePathSignature],
@@ -451,7 +367,13 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         />
       );
     },
-    [extensionsEnabled, locationResults, navigate, pluginCommands, pluginPanels],
+    [
+      extensionsEnabled,
+      locationResults,
+      navigate,
+      pluginCommands,
+      pluginPanels,
+    ],
   );
   const renderPane = useCallback(
     (paneId: string, path: string) => {
@@ -472,7 +394,11 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
         ) : undefined;
       if (isRemotesTabPath(path)) {
         return (
-          <ChromeTabShell embedded={props.embedded} label="Remotes" homePath={homePath}>
+          <ChromeTabShell
+            embedded={props.embedded}
+            label="Remotes"
+            homePath={homePath}
+          >
             <ProvidersWorkspacePanel workspaceId={paneId} />
           </ChromeTabShell>
         );
@@ -594,9 +520,18 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           terminalPath={activePath}
         />
       ),
-    [activePath, activeTabPath, activeTabSupportsSidePanels, navigate, props.workspaceId],
+    [
+      activePath,
+      activeTabPath,
+      activeTabSupportsSidePanels,
+      navigate,
+      props.workspaceId,
+    ],
   );
-  const renderAddTabControl = useMemo(() => createExplorerAddTabControl(homePath), [homePath]);
+  const renderAddTabControl = useMemo(
+    () => createExplorerAddTabControl(homePath),
+    [homePath],
+  );
   if (!explorerInitialized || !hasExplorerTabs) return <ExplorerLoadingShell />;
   return (
     <ExplorerDragProvider>
@@ -611,7 +546,9 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           <ExplorerMultiPanelWorkspace
             store={multiPanelStore}
             className="explorer-multipanel"
-            canCloseTab={(tab) => canCloseExplorerTab(tab, multiPanelStore.getState().tabs)}
+            canCloseTab={(tab) =>
+              canCloseExplorerTab(tab, multiPanelStore.getState().tabs)
+            }
             renderBottomBar={resolveExplorerBottomBarRenderer(props.embedded)}
             renderAddTabControl={renderAddTabControl}
             renderTabActions={renderTabActions}
@@ -635,33 +572,34 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(props: Explorer
           <ExplorerRenameStatus edit={inlineEdit} />
         ) : null}
         {workspaceFocused ? (
-          <ExplorerNotifications notifications={notifications} onDismiss={dismissNotification} />
+          <ExplorerNotifications
+            notifications={notifications}
+            onDismiss={dismissNotification}
+          />
         ) : null}
         {duplicateFinderPaneId ? (
           <DuplicateFinderDialog
             paneId={duplicateFinderPaneId}
             defaultRoot={
-              useExplorerStore.getState().panes[duplicateFinderPaneId]?.listing?.path ?? activePath
+              useExplorerStore.getState().panes[duplicateFinderPaneId]?.listing
+                ?.path ?? activePath
             }
             onClose={() => setDuplicateFinderPaneId(null)}
           />
         ) : null}
         {compareDialog ? (
-          <CompareDialog seed={compareDialog} onClose={() => setCompareDialog(null)} />
+          <CompareDialog
+            seed={compareDialog}
+            onClose={() => setCompareDialog(null)}
+          />
         ) : null}
         {ownsPane(contextMenuPaneId) ? <ExplorerContextMenu /> : null}
-        {explorerDialogPaneId && ownsPane(explorerDialogPaneId) ? <ExplorerDialog /> : null}
+        {explorerDialogPaneId && ownsPane(explorerDialogPaneId) ? (
+          <ExplorerDialog />
+        ) : null}
       </section>
     </ExplorerDragProvider>
   );
 });
 
-function filesAiHash(value: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index++) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16);
-}
 export default ExplorerWorkspace;

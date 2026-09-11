@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { ExplorerLoadingShell } from "./components/ExplorerLoadingShell";
 
 export * from "./components/ExplorerPickerToolbar";
@@ -31,7 +31,9 @@ export {
 } from "./workspace/explorerWorkspace/filesDockStores";
 export { ExplorerPluginPanelHost } from "./workspace/explorerPlugins/pluginPanelHosts";
 
-const loadDesktopFilesPage = () => import("./workspace");
+const loadDesktopFilesPage: () => Promise<{default: ComponentType<{embedded?: boolean; active?: boolean; workspaceId?: string; workspaceTitle?: string}>}> = import.meta.env.MISTY_SHELL_MACOS
+  ? async () => ({default: () => <div role="status" className="p-4 text-cream-muted">Update Files in Discover to open its downloaded workspace.</div>})
+  : () => import("./workspace");
 const DesktopFilesPage = lazy(loadDesktopFilesPage);
 
 export function preloadDesktopFilesPage(): Promise<unknown> {

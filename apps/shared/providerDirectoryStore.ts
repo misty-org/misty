@@ -1,3 +1,4 @@
+import { loadMailWebsiteAccounts } from "./mailWebsiteAccounts";
 import { uniquePagePins } from "./pagePins";
 import { loadProviderPins, type ProviderPin } from "./providerPins";
 import type { MistyAppSDK, MistyNavigationItem } from "@misty/sdk";
@@ -16,6 +17,7 @@ export const providerAppPath = (appId: "chat" | "inbox") =>
 export async function loadProviderDirectory(
   misty: MistyAppSDK,
   appId: "chat" | "inbox",
+  onLocal?: (state: ProviderDirectoryState) => void | Promise<void>,
 ): Promise<ProviderDirectoryState> {
   const accounts = await loadWebsiteAccounts(misty.storage.local);
   // A saved website profile is a shortcut, not proof of provider authorization.
@@ -32,23 +34,26 @@ export async function loadProviderDirectory(
         hidden.add(id);
     }),
   );
+  const pins = await loadProviderPins(misty.storage.local);
+  // Website shortcuts stay usable while optional server metadata is pending.
+  await onLocal?.({ accounts, pins, added: new Set(added), hidden });
   let mailError: string | undefined;
   if (appId === "inbox") {
     try {
-      const result = await misty.server.call("mail.accounts.list");
-      for (const account of result.accounts) {
+      const accounts = await loadMailWebsiteAccounts(misty);
+      for (const account of accounts) {
         if (["google", "gmail"].includes(account.provider)) added.add("google");
         if (["microsoft", "outlook"].includes(account.provider))
           added.add("microsoft");
       }
     } catch {
       mailError =
-        "Mail connections could not be checked. Your website accounts are still available.";
+        "Saved mail integrations could not be loaded. Your website sign-ins are unaffected.";
     }
   }
   return {
     accounts,
-    pins: await loadProviderPins(misty.storage.local),
+    pins,
     added,
     hidden,
     mailError,

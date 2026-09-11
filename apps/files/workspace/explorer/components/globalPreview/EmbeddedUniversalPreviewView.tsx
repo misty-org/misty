@@ -12,7 +12,6 @@ import {
   videoMimeTypes,
 } from "./previewMediaTables";
 import { PreviewMessage } from "./previewPrimitives";
-import { extractDocumentText } from "./previewDocument";
 
 const ReactMarkdown = lazy(() => import("react-markdown"));
 const PdfViewer = lazy(() => import("../PdfViewerView"));
@@ -35,11 +34,15 @@ export function EmbeddedUniversalPreviewView(props: {
   fallbackAction?: React.ReactNode;
 }) {
   const extension = sourceExtension({ path: "", name: props.name });
-  const isImage = props.mimeType.startsWith("image/") || Boolean(imageMimeTypes[extension]);
-  const isVideo = props.mimeType.startsWith("video/") || Boolean(videoMimeTypes[extension]);
-  const isAudio = props.mimeType.startsWith("audio/") || Boolean(audioMimeTypes[extension]);
+  const isImage =
+    props.mimeType.startsWith("image/") || Boolean(imageMimeTypes[extension]);
+  const isVideo =
+    props.mimeType.startsWith("video/") || Boolean(videoMimeTypes[extension]);
+  const isAudio =
+    props.mimeType.startsWith("audio/") || Boolean(audioMimeTypes[extension]);
   const isPdf = props.mimeType === "application/pdf" || extension === "pdf";
-  const isReadableDocument = textExtensions.has(extension) || officeExtensions.has(extension);
+  const isReadableDocument =
+    textExtensions.has(extension) || officeExtensions.has(extension);
   const {
     resource,
     loading: documentLoading,
@@ -50,6 +53,7 @@ export function EmbeddedUniversalPreviewView(props: {
     props.mimeType,
     isReadableDocument,
     props.runtime.readBytes,
+    props.runtime.extractDocumentText,
   );
   if (props.loading || documentLoading)
     return (
@@ -111,8 +115,16 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (isPdf && props.url)
     return (
-      <Suspense fallback={<div className="h-full min-h-[520px] w-full bg-charcoal-card" />}>
-        <PdfViewer Error={props.runtime.Error} url={props.url} name={props.name} />
+      <Suspense
+        fallback={
+          <div className="h-full min-h-[520px] w-full bg-charcoal-card" />
+        }
+      >
+        <PdfViewer
+          Error={props.runtime.Error}
+          url={props.url}
+          name={props.name}
+        />
       </Suspense>
     );
   if (resource?.kind === "markdown")
@@ -151,6 +163,7 @@ export function useEmbeddedDocument(
   mimeType: string,
   enabled: boolean,
   readBytes: EmbeddedPreviewRuntime["readBytes"],
+  extractDocumentText: EmbeddedPreviewRuntime["extractDocumentText"],
 ) {
   const [resource, setResource] = useState<PreviewResource | null>(null);
   const [loading, setLoading] = useState(false);
@@ -168,12 +181,15 @@ export function useEmbeddedDocument(
     void readBytes(url, lifetime.signal)
       .then(async (buffer) => {
         const bytes = new Uint8Array(buffer);
-        if (officeExtensions.has(extension))
+        if (officeExtensions.has(extension)) {
+          if (!extractDocumentText)
+            throw new Error("The app's document reader is unavailable.");
           return {
             kind: "document" as const,
             text: await extractDocumentText(extension, bytes),
             mimeType,
           };
+        }
         const text = new TextDecoder().decode(bytes);
         return {
           kind:
@@ -197,11 +213,15 @@ export function useEmbeddedDocument(
       active = false;
       lifetime.abort();
     };
-  }, [enabled, extension, mimeType, url, readBytes]);
+  }, [enabled, extension, mimeType, url, readBytes, extractDocumentText]);
   return { resource, loading, error };
 }
 
 export interface EmbeddedPreviewRuntime {
+  extractDocumentText?: (
+    extension: string,
+    bytes: Uint8Array,
+  ) => Promise<string>;
   Error: PreviewErrorComponent;
   readBytes(url: string, signal: AbortSignal): Promise<ArrayBuffer>;
 }

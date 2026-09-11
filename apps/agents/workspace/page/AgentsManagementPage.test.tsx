@@ -9,11 +9,11 @@ vi.mock("../mcp/McpConnectionsSheet", () => ({
     open ? <aside aria-label="Tool connections sheet">Connections</aside> : null,
 }));
 
-vi.mock("../components/MistyWorkspace", () => ({
-  MistyWorkspace: ({ onManageConnections }: { onManageConnections: () => void }) => (
+vi.mock("../components/MistyDashboard", () => ({
+  MistyDashboard: ({ onManageConnections }: { onManageConnections: () => void }) => (
     <section aria-label="Misty workspace">
       Misty
-      <textarea aria-label="Message Misty" />
+      <p>Activity</p>
       <button type="button" onClick={onManageConnections}>
         Tool connections
       </button>
@@ -30,7 +30,7 @@ describe("Agents conversation page", () => {
     document.body.innerHTML = "";
   });
 
-  it("presents one Misty workspace with a natural composer", async () => {
+  it("presents Misty activity without another composer", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -43,7 +43,7 @@ describe("Agents conversation page", () => {
     );
 
     expect(container.textContent).toContain("Misty");
-    expect(container.querySelector('[aria-label="Message Misty"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Message Misty"]')).toBeNull();
     expect(container.querySelector('[aria-label="Misty workspace"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Definitions");
     expect(container.textContent).not.toContain("Edit Scout");
@@ -64,8 +64,8 @@ describe("Agents conversation page", () => {
       ),
     );
 
-    expect(container.querySelector('[aria-label="Automations workspace"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Misty workspace"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Automations workspace"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Misty workspace"]')).not.toBeNull();
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());

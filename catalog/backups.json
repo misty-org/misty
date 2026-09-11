@@ -1,7 +1,7 @@
 {
   "published": true,
   "featured_rank": 3,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "overview": "Create encrypted, verifiable Restic snapshots in a local folder you choose.",
   "status": "available",
   "capabilities": [
@@ -9,11 +9,13 @@
     "Back up chosen folders, verify data, and browse snapshots",
     "Restore into a new collision-safe folder without exposing native paths"
   ],
-  "where_it_appears": ["Workspace app tab"],
+  "where_it_appears": [
+    "Workspace app tab"
+  ],
   "permissions": [
     "Read access to source folders chosen in the native picker",
     "Write access to repository and restore folders chosen in the native picker",
-    "Use Misty’s Host-owned backup service"
+    "Use Misty\u2019s Host-owned backup service"
   ],
   "getting_started": [
     "Install Backups.",
@@ -21,21 +23,33 @@
     "Initialize the repository, choose source folders, and start a backup."
   ],
   "changelog": [
-    "v0.4.0 - Moved backup work behind explicit folder and backup grants with Host-owned repository, credential, and restricted-process handling on macOS.",
+    "v0.4.1 - Runs archive or file scanning work in the signed app package.",
+    "v0.4.0 - Moved backup work behind explicit folder and backup grants with scoped repository, credential, and restricted-process handling on macOS.",
     "v0.3.0 - Initial production release."
   ],
   "included_tools": [],
-  "runtime_capabilities": ["files.read", "files.write", "backups.manage"],
+  "runtime_capabilities": [
+    "files.read",
+    "files.write",
+    "backups.manage"
+  ],
   "links": [
     {
       "label": "Documentation",
       "url": "https://mistysys.com/docs/extensions/backups"
     }
   ],
-  "actions": [{ "label": "Install", "kind": "primary" }],
+  "actions": [
+    {
+      "label": "Install",
+      "kind": "primary"
+    }
+  ],
   "verified": true,
   "launcher": {
-    "views": ["all"],
+    "views": [
+      "all"
+    ],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
@@ -45,11 +59,11 @@
     "artifacts": [
       {
         "platform": "macos-aarch64",
-        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/backups-macos-aarch64.zip"
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.1/backups-macos-aarch64.zip"
       },
       {
         "platform": "macos-x86_64",
-        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/backups-macos-x86_64.zip"
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.1/backups-macos-x86_64.zip"
       }
     ]
   },

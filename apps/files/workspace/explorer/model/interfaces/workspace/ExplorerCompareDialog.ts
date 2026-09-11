@@ -3,6 +3,7 @@ import type { CompareMode, CompareTextDiffKind } from "../../types/workspace/Exp
 export interface CompareDialogSeed {
   paneId: string;
   leftPath: string;
+  rightPath?: string;
   mode: CompareMode;
 }
 

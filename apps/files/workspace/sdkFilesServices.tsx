@@ -81,6 +81,55 @@ export async function createSdkFilesServices(
     }
     return files.openFolder({ directoryGrant: grant, source, activate });
   };
+  let legacyPending = true;
+  const restoreLegacyLocation = async () => {
+    if (!legacyPending || workspace.model.getState().hasSavedState) return;
+    try {
+      const saved = await misty.files.restoreLocation();
+      signal.throwIfAborted();
+      if (!saved) {
+        legacyPending = false;
+        return;
+      }
+      if ("virtual" in saved) {
+        await files.navigate(`misty://${saved.virtual}`, "replace");
+        signal.throwIfAborted();
+        legacyPending = false;
+        workspace.model.setState({ hasSavedState: true, restoreErrors: [] });
+        return;
+      }
+      if ("unavailable" in saved)
+        throw new Error("Reconnect the source for this saved Files tab.");
+      const source = sources
+        .getState()
+        .items.find((item) => item.id === saved.sourceId);
+      if (!source) throw new Error("The saved folder's source is unavailable.");
+      const folder = await openSource(source, false);
+      signal.throwIfAborted();
+      if (!folder)
+        throw new Error("Allow access to the saved folder to reopen this tab.");
+      let path = folder.root;
+      for (const name of saved.relative) {
+        const listing = await folder.list({ path, showHidden: true });
+        signal.throwIfAborted();
+        const child = listing.entries.find(
+          (entry) => entry.name === name && entry.kind === "folder",
+        );
+        if (!child)
+          throw new Error("A saved folder moved or is no longer available.");
+        path = child.path;
+      }
+      await files.navigate(path, "replace");
+      signal.throwIfAborted();
+      legacyPending = false;
+      workspace.model.setState({ hasSavedState: true, restoreErrors: [] });
+    } catch (error) {
+      signal.throwIfAborted();
+      workspace.model.setState({
+        restoreErrors: [error instanceof Error ? error.message : String(error)],
+      });
+    }
+  };
   const resolvePath = async (path: string) => {
     const source = sources
       .getState()
@@ -174,10 +223,10 @@ export async function createSdkFilesServices(
   try {
     await refreshSources();
     await workspace.ready;
+    await restoreLegacyLocation();
     if (
-      !files.store.getState().pane.listing ||
-      (files.store.getState().folders.length === 0 &&
-        files.store.getState().pane.listing?.path === "misty://recent")
+      !workspace.model.getState().restoreErrors.length &&
+      !files.store.getState().pane.listing
     ) {
       const home = sources
         .getState()
@@ -198,10 +247,16 @@ export async function createSdkFilesServices(
     },
     async retrySources() {
       await refreshSources();
+      await restoreLegacyLocation();
       const home = sources
         .getState()
         .items.find((item) => item.id === "local:home");
-      if (home && !files.store.getState().folders.length)
+      if (
+        home &&
+        !workspace.model.getState().restoreErrors.length &&
+        !files.store.getState().folders.length &&
+        !files.store.getState().pane.listing
+      )
         await openSource(home);
     },
     useSidebar() {

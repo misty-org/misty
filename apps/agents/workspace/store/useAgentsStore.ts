@@ -1,3 +1,4 @@
+import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AgentCitation,
@@ -18,15 +19,13 @@ export async function agentsOpenCitation(request: { citation: AgentCitation }): 
   await invoke("agents_open_citation", { request });
 }
 
-export async function agentsPrepareDocument(request: {
-  path: string;
-}): Promise<PreparedAgentDocument> {
-  return invoke<PreparedAgentDocument>("agents_prepare_document", { request });
-}
-
 export async function agentsPrepareScopedDocument(request: {
   scopeId: string;
   relativePath: string;
-}): Promise<PreparedAgentDocument> {
-  return invoke<PreparedAgentDocument>("agents_prepare_scoped_document", { request });
+  spaceId: string;
+}, signal?: AbortSignal): Promise<PreparedAgentDocument> {
+  if (!supportsPackagedDocuments()) return invoke("agents_prepare_scoped_document", {request:{scopeId:request.scopeId,relativePath:request.relativePath}});
+  const { withNativeDocumentService } = await import("@/features/apps/nativeDocumentService");
+  return withNativeDocumentService("files", request.spaceId, instance =>
+    invoke<PreparedAgentDocument>("agents_prepare_scoped_document", {instance,request:{scopeId:request.scopeId,relativePath:request.relativePath}}), signal);
 }

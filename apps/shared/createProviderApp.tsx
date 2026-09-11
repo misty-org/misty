@@ -1,6 +1,7 @@
 import { withIntegrationShell } from "./IntegrationShell";
 import { createWebsiteApp } from "./createWebsiteApp";
 import { createRoot } from "react-dom/client";
+import { unmountReactRoot } from "./unmountReactRoot";
 import {
   defineComponentApp,
   type MistyComponentDefinition,
@@ -14,6 +15,7 @@ import { providerAccountsChanged } from "./accountStore";
 import {
   loadProviderDirectory,
   providerNavigationItems,
+  type ProviderDirectoryState,
 } from "./providerDirectoryStore";
 
 /** Third-party views belong to the downloaded App. Native messaging retains its existing mount. */
@@ -54,11 +56,14 @@ export function createProviderApp(
         };
         const refreshNavigation = async () => {
           const run = ++navigationGeneration;
-          const state = await loadProviderDirectory(input.misty, appId);
-          if (!closed && run === navigationGeneration)
-            await input.misty.navigation.setItems(
-              providerNavigationItems(appId, state),
-            );
+          const apply = async (state: ProviderDirectoryState) => {
+            if (!closed && run === navigationGeneration)
+              await input.misty.navigation.setItems(
+                providerNavigationItems(appId, state),
+              );
+          };
+          const state = await loadProviderDirectory(input.misty, appId, apply);
+          await apply(state);
         };
         const changed = () => {
           void refreshNavigation().catch(report);
@@ -89,8 +94,9 @@ export function createProviderApp(
             childLifetime?.abort();
             await child?.unmount();
             child = undefined;
-            root?.unmount();
+            const detachedRoot = root;
             root = undefined;
+            await unmountReactRoot(detachedRoot);
             if (closed) return;
             nativeMode = nextNative;
             if (nextNative) {
@@ -107,7 +113,8 @@ export function createProviderApp(
                 return;
               }
             } else root = createRoot(input.root);
-            await refreshNavigation().catch(report);
+            // Restoring a website must not wait for optional connection discovery.
+            void refreshNavigation().catch(report);
           }
           if (closed) return;
           if (child) child.update(context);
@@ -131,8 +138,9 @@ export function createProviderApp(
           closed = true;
           window.removeEventListener(providerAccountsChanged, changed);
           childLifetime?.abort();
-          root?.unmount();
+          const detachedRoot = root;
           root = undefined;
+          await unmountReactRoot(detachedRoot);
           await queue.catch(() => {});
           await child?.unmount();
           child = undefined;

@@ -1,3 +1,4 @@
+import { packageNativeServices } from "./package-native-services.mjs";
 import {
   createHash,
   createPrivateKey,
@@ -76,6 +77,7 @@ for (const app of packagedApps) {
     throw new Error(`${app.id} must export an SDK protocol 2 component before it can be signed.`);
   }
   const files = [
+    ...await packageNativeServices(root, app, signingKey, keyId, { release }),
     {
       name: `${app.id}/manifest.json`,
       data: json({

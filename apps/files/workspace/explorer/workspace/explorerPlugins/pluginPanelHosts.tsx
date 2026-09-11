@@ -1,7 +1,7 @@
 import { NativeAppView } from "@/features/apps/NativeAppView";
 import { useNativeAppPermissions } from "@/features/apps/useNativeAppPermissions";
 import { useAuth } from "@/features/auth";
-import { extensionCommandRun, pluginPanelRender } from "@/features/files/native";
+import { pluginPanelRender } from "@/features/files/native";
 import { SystemErrorActivity } from "@/features/activity";
 import { extensionThemeChangedEvent, extensionThemeSnapshot } from "@/features/settings";
 import type {
@@ -19,7 +19,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { selectedPathsForPane, useExplorerStore } from "../../store";
 import { pluginTabHostStyles } from "../ExplorerDesktopPluginStyles";
 import { PluginPanelElementView } from "./PluginPanelElementView";
-import { monitorExtensionJob } from "./extensionJobs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 
 export function ExplorerPluginPanelHost(props: {
@@ -373,15 +372,7 @@ export function ExplorerWebPluginPanelHost(props: {
               );
             return { ok: true };
           }
-          const result = await extensionCommandRun({
-            pluginId: props.panel.pluginId,
-            command,
-            payload,
-          });
-          const started = result as { jobId?: string };
-          if (typeof started.jobId === "string" && started.jobId)
-            monitorExtensionJob(props.panel.pluginId, props.panel.pluginName, started.jobId);
-          return result;
+          throw new Error("Update this extension to use the capability API.");
         }}
       />
     </section>

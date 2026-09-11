@@ -64,6 +64,7 @@ export function ConnectedDevicesSidebarSection(
           <SystemErrorActivity
             error={connectedDevices.error}
             scope="files:connected-devices"
+            intent="background"
             title="Connected devices could not be refreshed"
             target={{ kind: "workspace-tool", tool: "files" }}
           />

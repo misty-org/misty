@@ -22,7 +22,9 @@ const nativeApp = defineComponentApp({
     const dispose = () => {
       if (closed) return;
       closed = true;
-      reactRoot?.unmount();
+      const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      queueMicrotask(() => detachedRoot?.unmount());
       lifetime.abort();
       runtime?.close();
       signal?.removeEventListener("abort", dispose);

@@ -165,3 +165,90 @@ it("keeps batch rename progress after failure and retries only remaining names",
     await files.close();
   }
 });
+
+
+it("reports one structured batch result and gives later work a new ID", async () => {
+  const fixture = createSdkCodeFileFixture();
+  const operation = vi.fn(async (_event: import("@misty/contracts").MistyActivityOperation) => undefined);
+  const files = createSdkFilesStore({ ...fixture.sdk, activity: { operation, report: async () => {} } }, new AbortController().signal);
+  try {
+    const folder = (await files.openFolder())!;
+    await files.navigate(`${folder.root}/src`);
+    await files.create("first.txt", "file");
+    await files.create("second.txt", "file");
+    expect(operation).not.toHaveBeenCalled();
+    files.select(`${folder.root}/src/first.txt`);
+    files.select(`${folder.root}/src/second.txt`, { toggle: true });
+    files.copy("copy");
+    await files.back();
+    await files.paste();
+    const events = operation.mock.calls.map(([event]) => event);
+    expect(events.map(event => event.status)).toEqual(["running", "completed"]);
+    expect(new Set(events.map(event => event.operationId)).size).toBe(1);
+    expect(events.map(event => event.revision)).toEqual([1, 2]);
+    await files.navigate(`${folder.root}/src`);
+    await files.create("third.txt", "file");
+    files.select(`${folder.root}/src/third.txt`);
+    files.copy("copy");
+    await files.back();
+    await files.paste();
+    expect(operation.mock.calls[2][0].operationId).not.toBe(events[0].operationId);
+  } finally { await files.close(); }
+});
+
+
+it("keeps the granted folder browsable when automatic observation cannot start", async () => {
+  const fixture = createSdkCodeFileFixture();
+  const watch = vi.spyOn(fixture.sdk.files, "watchDirectory").mockRejectedValue(
+    new Error("The chosen folder could not be watched."),
+  );
+  const choose = vi.spyOn(fixture.sdk.files, "pickDirectory");
+  const files = createSdkFilesStore(fixture.sdk, new AbortController().signal);
+  try {
+    const folder = (await files.openFolder())!;
+    expect(files.store.getState().folders).toContain(folder);
+    expect(files.store.getState().pane.listing?.path).toBe(folder.root);
+    expect(files.store.getState().error).toContain("Use Refresh");
+    await files.navigate(`${folder.root}/src`);
+    await files.refresh();
+    expect(files.store.getState().pane.listing?.path).toBe(`${folder.root}/src`);
+    expect(choose).toHaveBeenCalledTimes(1);
+    expect(watch).toHaveBeenCalledTimes(1);
+  } finally {
+    await files.close();
+  }
+  expect(fixture.handles.size).toBe(0);
+  expect(fixture.watchers.size).toBe(0);
+});
+
+
+it("refreshes in place without clearing loading, selection, history or the inline draft", async () => {
+  const fixture = createSdkCodeFileFixture();
+  const files = createSdkFilesStore(fixture.sdk, new AbortController().signal);
+  try {
+    const folder = (await files.openFolder())!;
+    files.select(files.store.getState().pane.listing!.entries[0].id);
+    files.startInlineCreate("file");
+    files.updateInlineEdit("draft.txt");
+    const before = files.store.getState();
+    let release!: () => void;
+    const list = folder.list.bind(folder);
+    vi.spyOn(folder, "list").mockImplementationOnce(async (...args) => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return list(...args);
+    });
+    const refresh = files.refresh();
+    expect(files.store.getState()).toBe(before);
+    release();
+    await refresh;
+    expect(files.store.getState()).toBe(before);
+    expect(files.store.getState().inlineEdit?.value).toBe("draft.txt");
+    await folder.create({ directory: folder.root, name: "external.txt", kind: "file" });
+    await files.refresh();
+    expect(files.store.getState().pane.listing?.entries.some((entry) => entry.name === "external.txt")).toBe(true);
+    expect(files.store.getState().pane.selectedIds).toEqual(before.pane.selectedIds);
+    expect(files.store.getState().pane.backHistory).toEqual(before.pane.backHistory);
+    expect(files.store.getState().inlineEdit?.value).toBe("draft.txt");
+    expect(files.store.getState().pane.loading).toBe(false);
+  } finally { await files.close(); }
+});

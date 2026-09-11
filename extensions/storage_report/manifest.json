@@ -2,17 +2,21 @@
   "schema_version": 3,
   "id": "storage_report",
   "name": "Storage Report",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Analyze a selected local folder without following symlinks.",
   "author": "Misty",
   "enabled": true,
-  "platforms": ["web"],
+  "platforms": [
+    "web"
+  ],
   "runtime": {
     "type": "web",
     "entry": "web/index.html?plugin=storage_report"
   },
   "launcher": {
-    "views": ["Files"],
+    "views": [
+      "Files"
+    ],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
@@ -21,7 +25,9 @@
     "runtime": "web",
     "entry": "web/index.html?plugin=storage_report"
   },
-  "runtime_capabilities": ["files.read"],
+  "runtime_capabilities": [
+    "files.read"
+  ],
   "tools": [],
   "panels": [
     {
@@ -32,7 +38,9 @@
       "default_height": 620,
       "entry": "web/index.html?plugin=storage_report",
       "launcher": {
-        "views": ["Files"]
+        "views": [
+          "Files"
+        ]
       }
     }
   ]

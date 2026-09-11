@@ -20,7 +20,10 @@ function fixture() {
     close: vi.fn(async () => {}),
   };
   const callbacks = { ready: vi.fn(), event: vi.fn(), error: vi.fn() };
-  const controller = createSdkBrowserController(browser as unknown as MistyBrowserSDK, callbacks);
+  const controller = createSdkBrowserController(
+    browser as unknown as MistyBrowserSDK,
+    callbacks,
+  );
   return { browser, controller, callbacks, stop, view };
 }
 it("defers native creation while hidden and applies only the newest layout during creation", async () => {
@@ -37,8 +40,14 @@ it("defers native creation while hidden and applies only the newest layout durin
   expect(f.browser.create).not.toHaveBeenCalled();
   f.controller.update(geometry);
   await vi.waitFor(() => expect(f.browser.create).toHaveBeenCalledOnce());
-  f.controller.update({ ...geometry, bounds: { ...geometry.bounds, width: 600 } });
-  f.controller.update({ ...geometry, bounds: { ...geometry.bounds, width: 700 } });
+  f.controller.update({
+    ...geometry,
+    bounds: { ...geometry.bounds, width: 600 },
+  });
+  f.controller.update({
+    ...geometry,
+    bounds: { ...geometry.bounds, width: 700 },
+  });
   finish();
   await vi.waitFor(() =>
     expect(f.browser.layout).toHaveBeenCalledExactlyOnceWith(f.view.handle, {
@@ -46,7 +55,10 @@ it("defers native creation while hidden and applies only the newest layout durin
       bounds: { ...geometry.bounds, width: 700 },
     }),
   );
-  f.controller.update({ ...geometry, bounds: { ...geometry.bounds, width: 700 } });
+  f.controller.update({
+    ...geometry,
+    bounds: { ...geometry.bounds, width: 700 },
+  });
   await Promise.resolve();
   expect(f.browser.layout).toHaveBeenCalledOnce();
   await f.controller.close();
@@ -104,10 +116,14 @@ it("waits for the previous account's native cleanup before opening its replaceme
   );
   const closing = f.controller.close();
   await vi.waitFor(() => expect(f.browser.close).toHaveBeenCalledOnce());
-  const next = createSdkBrowserController(f.browser as unknown as MistyBrowserSDK, f.callbacks, {
-    provider: { id: "instagram", accountId: "work" },
-    url: "https://www.instagram.com/direct/inbox/",
-  });
+  const next = createSdkBrowserController(
+    f.browser as unknown as MistyBrowserSDK,
+    f.callbacks,
+    {
+      provider: { id: "instagram", accountId: "work" },
+      url: "https://www.instagram.com/direct/inbox/",
+    },
+  );
   next.update(geometry);
   await Promise.resolve();
   expect(f.browser.create).toHaveBeenCalledOnce();
@@ -119,4 +135,41 @@ it("waits for the previous account's native cleanup before opening its replaceme
   });
   f.browser.close.mockResolvedValue(undefined);
   await next.close();
+});
+
+it("retries a failed event subscription without losing or duplicating the native page", async () => {
+  const f = fixture();
+  f.browser.subscribe.mockRejectedValueOnce(
+    new Error("Event bridge unavailable"),
+  );
+  f.controller.update(geometry);
+  await vi.waitFor(() => expect(f.callbacks.error).toHaveBeenCalledOnce());
+  expect(f.callbacks.ready).not.toHaveBeenCalled();
+  f.controller.update(geometry, true);
+  await vi.waitFor(() => expect(f.callbacks.ready).toHaveBeenCalledOnce());
+  expect(f.browser.create).toHaveBeenCalledOnce();
+  expect(f.browser.subscribe).toHaveBeenCalledTimes(2);
+  expect(f.browser.layout).toHaveBeenCalledWith(f.view.handle, geometry);
+  await f.controller.close();
+  expect(f.stop).toHaveBeenCalledOnce();
+  expect(f.browser.close).toHaveBeenCalledExactlyOnceWith(f.view.handle);
+});
+
+it("preserves a forced correction that arrives while the same layout is in flight", async () => {
+  const f = fixture();
+  f.controller.update(geometry);
+  await vi.waitFor(() => expect(f.browser.subscribe).toHaveBeenCalledOnce());
+  let finish!: () => void;
+  f.browser.layout.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  f.controller.update(geometry, true);
+  await vi.waitFor(() => expect(f.browser.layout).toHaveBeenCalledTimes(1));
+  f.controller.update(geometry, true);
+  finish();
+  await vi.waitFor(() => expect(f.browser.layout).toHaveBeenCalledTimes(2));
+  await f.controller.close();
 });

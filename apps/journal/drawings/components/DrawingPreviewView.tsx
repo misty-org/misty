@@ -51,6 +51,7 @@ export function DrawingPreviewView(props: {
   const room = runtime.useRoom(props.drawing.space_id, props.drawing.id, props.user, {
     publishPresence: false,
   });
+  const [exportError, setExportError] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [exportData, setExportData] = useState<DrawingExportData | null>(null);
   const [previewSurface, setPreviewSurface] = useState(previewSurfaceColors[0]);
@@ -144,6 +145,7 @@ export function DrawingPreviewView(props: {
   }, [props.drawing.id, props.drawing.space_id, room.session, room.synced, runtime]);
 
   const reportExportFailure = (title: string, error: unknown) => {
+    setExportError(`${title}. Try the action again or choose another export format.`);
     runtime.reportError({
       accountId: props.user.id,
       scope: `drawings:${props.drawing.space_id}:${props.drawing.id}:export`,
@@ -157,6 +159,7 @@ export function DrawingPreviewView(props: {
   };
 
   const exportPng = () => {
+    setExportError("");
     if (!previewBlobRef.current) return;
     void runtime
       .exportFile(previewBlobRef.current, drawingExportFilename(props.drawing.title, "png"))
@@ -164,6 +167,7 @@ export function DrawingPreviewView(props: {
   };
 
   const exportSvg = async () => {
+    setExportError("");
     if (!exportData) return;
     try {
       const { exportToSvg } = await import("@excalidraw/excalidraw");
@@ -186,6 +190,7 @@ export function DrawingPreviewView(props: {
   };
 
   const copyPng = async () => {
+    setExportError("");
     if (!exportData) return;
     try {
       const { exportToBlob } = await import("@excalidraw/excalidraw");
@@ -274,6 +279,7 @@ export function DrawingPreviewView(props: {
         <BackgroundChoices value={previewSurface} onChange={setPreviewSurface} />
       </div>
       <div className="min-h-0 transition-colors" style={{ backgroundColor: previewSurface }}>
+        {exportError ? <p role="alert" className="px-3 text-sm text-cream-muted">{exportError}</p> : null}
         {content}
       </div>
     </div>

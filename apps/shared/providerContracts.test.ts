@@ -42,12 +42,12 @@ function storage() {
     },
   };
 }
-it("Instagram selects its real DM website, while Misty stays native and providers cannot cross app families", () => {
+it("Instagram starts at sign-in, while Misty stays native and providers cannot cross app families", () => {
   expect(providerFromRoute("/apps/social?provider=instagram", "chat")).toBe(
     "instagram",
   );
   expect(providers.instagram.url).toBe(
-    "https://www.instagram.com/direct/inbox/",
+    "https://www.instagram.com/accounts/login/?next=%2Fdirect%2Finbox%2F",
   );
   expect(providerFromRoute("/apps/social?provider=misty", "chat")).toBeNull();
   expect(providerFromRoute("/apps/social?provider=google", "chat")).toBeNull();
@@ -261,7 +261,7 @@ it.each([["icloud", "Sign In"], ["yahoo", "Sign in button"]] as const)("does not
 
 it.each(["https://outlook.live.com/mail/0/inbox", "https://outlook.live.com/mail/?prompt=select_account"])("migrates old Outlook start %s without changing profile identity", (websiteUrl) => {
   const profile = { id: "same-profile", provider: "microsoft", label: "School", websiteUrl };
-  expect(parseWebsiteAccounts(JSON.stringify([profile]))).toEqual([{ ...profile, websiteUrl: "https://outlook.live.com/mail/" }]);
+  expect(parseWebsiteAccounts(JSON.stringify([profile]))).toEqual([{ ...profile, websiteUrl: providers.microsoft.url }]);
 });
 it.each(["outlook.live.com", "outlook.office.com", "outlook.office365.com", "outlook.cloud.microsoft"])("remembers only a clean mailbox destination for %s", (host) => {
   expect(outlookMailboxDestination(`https://${host}/mail/inbox/id/private?token=secret#message`)).toBe(`https://${host}/mail/`);
