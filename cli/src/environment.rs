@@ -863,6 +863,10 @@ fn is_placeholder(value: &str) -> bool {
 }
 
 fn require_private_file(path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    if !misty_credential_store::is_private_file(path) {
+        bail!("{} must be readable only by you", path.display());
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -878,6 +882,9 @@ fn require_private_file(path: &Path) -> Result<()> {
 }
 
 fn secure_directories(root: &Path) -> Result<()> {
+    // Everything below inherits the folder's owner-only access.
+    #[cfg(windows)]
+    misty_credential_store::restrict_private_directory(root)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -933,6 +940,9 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
     temporary.write_all(format!("{}\n", lines.join("\n")).as_bytes())?;
     temporary.as_file().sync_all()?;
     temporary.persist(&path).map_err(|e| e.error)?;
+    // Unix creates the temporary file private already.
+    #[cfg(windows)]
+    misty_credential_store::restrict_private_file(&path)?;
     Ok(())
 }
 

@@ -119,11 +119,7 @@ pub async fn fetch(url: &str, limit: usize) -> Result<Option<Vec<u8>>, String> {
     if !trusted_url(&url) {
         return Err("Extension resources must come from their store.".into());
     }
-    let response = client()?
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+    let response = client()?.get(url).send().await.map_err(|e| e.to_string())?;
     if response.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(None);
     }
@@ -232,9 +228,7 @@ async fn detail(key: &str) -> Result<CatalogEntry, String> {
         .pop_if_empty()
         .push(key)
         .push("");
-    let data = fetch(url.as_str(), 2 * 1024 * 1024)
-        .await?
-        .ok_or(REMOVED)?;
+    let data = fetch(url.as_str(), 2 * 1024 * 1024).await?.ok_or(REMOVED)?;
     entry(&serde_json::from_slice(&data).map_err(|_| "Mozilla returned invalid JSON.")?)
 }
 

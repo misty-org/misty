@@ -41,10 +41,10 @@ impl MediaJob {
     }
 }
 fn tool() -> Result<PathBuf, String> {
-    if !cfg!(target_os = "macos") {
+    if !cfg!(any(target_os = "macos", windows)) {
         return Err("Isolated media conversion is not implemented on this platform yet.".into());
     }
-    if !std::path::Path::new("/usr/bin/sandbox-exec").is_file() {
+    if cfg!(target_os = "macos") && !std::path::Path::new("/usr/bin/sandbox-exec").is_file() {
         return Err("The native media sandbox is unavailable.".into());
     }
     let path = system_dependencies::resolve_executable("ffmpeg", None)

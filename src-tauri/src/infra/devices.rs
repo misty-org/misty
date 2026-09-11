@@ -1,8 +1,12 @@
+#[cfg(not(windows))]
 use std::collections::HashSet;
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
+#[cfg(not(windows))]
 use std::fs;
+#[cfg(not(windows))]
 use std::path::Path;
+#[cfg(not(windows))]
 use std::process::Command;
 #[cfg(target_os = "macos")]
 use std::ptr;
@@ -155,20 +159,25 @@ extern "C" fn disk_changed(_disk: DADiskRef, context: *mut c_void) {
     let _ = app.emit(DEVICES_CHANGED_EVENT, ());
 }
 
+#[cfg(windows)]
+pub use super::devices_windows::start_device_change_listener;
+
 fn scan_mounted_devices() -> Vec<MountedDeviceSnapshot> {
+    #[cfg(windows)]
+    let mut devices = super::devices_windows::scan();
+    #[cfg(not(windows))]
     let mut devices = scan_from_df();
+    // The startup disk first, then by name.
     devices.sort_by(|left, right| {
-        if left.mount_path == "/" {
-            return std::cmp::Ordering::Less;
-        }
-        if right.mount_path == "/" {
-            return std::cmp::Ordering::Greater;
-        }
-        left.name.to_lowercase().cmp(&right.name.to_lowercase())
+        right
+            .is_system
+            .cmp(&left.is_system)
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
     });
     devices
 }
 
+#[cfg(not(windows))]
 fn scan_from_df() -> Vec<MountedDeviceSnapshot> {
     let output = Command::new("df").args(["-kP"]).output();
     let Ok(output) = output else {
@@ -181,6 +190,7 @@ fn scan_from_df() -> Vec<MountedDeviceSnapshot> {
     parse_df_kp_output(&text)
 }
 
+#[cfg(not(windows))]
 fn parse_df_kp_output(text: &str) -> Vec<MountedDeviceSnapshot> {
     let mut devices = Vec::new();
     let mut seen = HashSet::new();
@@ -214,6 +224,7 @@ fn parse_df_kp_output(text: &str) -> Vec<MountedDeviceSnapshot> {
     devices
 }
 
+#[cfg(not(windows))]
 struct DeviceDetails {
     volume_id: String,
     fs_type: String,
@@ -222,6 +233,7 @@ struct DeviceDetails {
     writable: bool,
 }
 
+#[cfg(not(windows))]
 fn device_details(row: &DfRow) -> DeviceDetails {
     let fallback = DeviceDetails {
         volume_id: row.fs_name.clone(),
@@ -314,7 +326,12 @@ fn perform_unmount(device: &MountedDeviceSnapshot) -> ApiResult<()> {
     }))
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn perform_unmount(device: &MountedDeviceSnapshot) -> ApiResult<()> {
+    super::devices_windows::remove(device)
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 fn perform_unmount(_device: &MountedDeviceSnapshot) -> ApiResult<()> {
     Err(ApiError::Unavailable(
         "Safe device unmounting is currently available on macOS.".to_owned(),
@@ -346,6 +363,7 @@ fn plist_bool(xml: &str, key: &str) -> Option<bool> {
     }
 }
 
+#[cfg(not(windows))]
 #[derive(Debug, PartialEq, Eq)]
 struct DfRow {
     fs_name: String,
@@ -354,6 +372,7 @@ struct DfRow {
     mount_path: String,
 }
 
+#[cfg(not(windows))]
 fn parse_df_kp_line(line: &str) -> Option<DfRow> {
     let columns: Vec<&str> = line.split_whitespace().collect();
     if columns.len() < 6 {
@@ -370,6 +389,7 @@ fn parse_df_kp_line(line: &str) -> Option<DfRow> {
     })
 }
 
+#[cfg(not(windows))]
 fn should_show_mount(mount_path: &str, fs_name: &str) -> bool {
     if mount_path == "/" {
         return true;
@@ -397,12 +417,7 @@ fn should_show_mount(mount_path: &str, fs_name: &str) -> bool {
         return false;
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        return mount_path.ends_with(":\\") || mount_path.ends_with(":/");
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         false
     }
@@ -425,6 +440,7 @@ fn linux_skip_fs(fs_name: &str) -> bool {
     )
 }
 
+#[cfg(not(windows))]
 fn device_name(mount_path: &str, fs_name: &str) -> String {
     if mount_path == "/" {
         #[cfg(target_os = "macos")]
@@ -444,6 +460,7 @@ fn device_name(mount_path: &str, fs_name: &str) -> String {
         .unwrap_or_else(|| fs_name.to_owned())
 }
 
+#[cfg(not(windows))]
 fn fs_type_for_row(row: &DfRow) -> String {
     #[cfg(target_os = "macos")]
     {
@@ -456,6 +473,7 @@ fn fs_type_for_row(row: &DfRow) -> String {
     row.fs_name.clone()
 }
 
+#[cfg(not(windows))]
 fn is_removable_mount(mount_path: &str) -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -465,11 +483,7 @@ fn is_removable_mount(mount_path: &str) -> bool {
     {
         return mount_path.starts_with("/media/") || mount_path.starts_with("/run/media/");
     }
-    #[cfg(target_os = "windows")]
-    {
-        return !mount_path.starts_with("C:");
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         false
     }

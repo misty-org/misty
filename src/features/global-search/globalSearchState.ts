@@ -14,7 +14,7 @@ import type {
   MistyImageAttachment,
   UnifiedMistyPanel,
 } from "./types";
-export type MistySubmissionPresentation = "panel" | "workspace";
+type MistySubmissionPresentation = "panel" | "workspace";
 export interface GlobalSearchState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;

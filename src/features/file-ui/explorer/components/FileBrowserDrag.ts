@@ -5,8 +5,6 @@ import type {
   ExplorerDragItem,
   ExplorerDragPayload,
 } from "../model/interfaces/drag/types";
-export type { FileBrowserDragItem } from "../model/types/components/FileBrowserDrag";
-
 export function dragItemsForEntry(
   entry: FileEntry,
   entries: FileEntry[],

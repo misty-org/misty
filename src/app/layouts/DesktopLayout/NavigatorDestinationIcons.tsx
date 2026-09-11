@@ -1,6 +1,5 @@
 import {
   CalendarDays,
-  FolderOpen,
   Folders,
   Heart,
   Images,
@@ -30,7 +29,6 @@ export const DrawingsDestinationIcon = destinationIcon(Pencil, "drawings");
 export const TasksDestinationIcon = destinationIcon(CheckSquare2, "tasks");
 export const AgendaDestinationIcon = destinationIcon(CalendarDays, "agenda");
 export const RoadmapsDestinationIcon = destinationIcon(Route, "roadmaps");
-export const ExplorerDestinationIcon = destinationIcon(FolderOpen, "explorer");
 export const AllItemsDestinationIcon = destinationIcon(Images, "all-items");
 export const FavoritesDestinationIcon = destinationIcon(Heart, "favorites");
 export const CollectionsDestinationIcon = destinationIcon(Folders, "collections");

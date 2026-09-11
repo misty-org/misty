@@ -173,9 +173,7 @@ pub(super) async fn pass(
         journal.initialized = true;
         write(app, account, installation, &journal)?;
     }
-    native::request(
-        json!({"operation":"sync-restored","account":account,"id":installation.id}),
-    )
-    .await?;
+    native::request(json!({"operation":"sync-restored","account":account,"id":installation.id}))
+        .await?;
     Ok(())
 }

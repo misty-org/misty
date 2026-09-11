@@ -42,7 +42,7 @@ interface Person {
   date: string;
 }
 
-export interface CommitData {
+interface CommitData {
   sha: string;
   tree: string;
   parents: string[];
@@ -73,7 +73,7 @@ const BATCH = 60;
 const PUSH_BYTES = 6 * 1024 * 1024;
 const FETCH_BYTES = 2_500_000;
 /** Commits brought in for a pull or clone; older history stays on GitHub. */
-export const HISTORY_DEPTH = 50;
+const HISTORY_DEPTH = 50;
 
 function chunks<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];

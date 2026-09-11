@@ -353,10 +353,28 @@ pub fn microphone_access() -> Result<(), String> {
         }
     }
 }
+/// Windows keeps the microphone switches in the capability consent store:
+/// one for the whole device and one for desktop apps such as Misty. Either
+/// set to "Deny" blocks the input stream with an unhelpful error, so the
+/// person is told which switch to turn on instead.
 #[cfg(windows)]
 pub fn microphone_access() -> Result<(), String> {
+    use crate::platform::windows::registry::read_string;
+    const STORE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+    let denied = |key: &str| {
+        read_string(key, "Value")
+            .ok()
+            .flatten()
+            .is_some_and(|value| value.eq_ignore_ascii_case("Deny"))
+    };
+    if denied(STORE) {
+        return Err("Microphone access is off. Turn it on in Windows Settings → Privacy & security → Microphone.".into());
+    }
+    if denied(&format!(r"{STORE}\NonPackaged")) {
+        return Err("Desktop apps can't use the microphone. Turn on \"Let desktop apps access your microphone\" in Windows Settings → Privacy & security → Microphone.".into());
+    }
     Ok(())
-} // WASAPI reports OS privacy denial when opening the input stream.
+}
 
 #[cfg(target_os = "macos")]
 pub fn screen_access() -> Result<(), String> {
@@ -408,8 +426,37 @@ pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
                 | WS_EX_TOOLWINDOW as isize
                 | WS_EX_TRANSPARENT as isize,
         );
+        // Kept out of every screen capture, Misty's own included, as macOS
+        // keeps these panels out (Windows 10 2004 and later).
+        SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
     }
     Ok(())
+}
+
+/// Shows an overlay above every other window, fullscreen apps included,
+/// without taking focus. Windows applies "always on top" once, and an app
+/// that goes fullscreen afterwards can cover it, so it is asserted again on
+/// every show.
+pub fn show_overlay(window: &tauri::WebviewWindow) {
+    let _ = window.show();
+    #[cfg(windows)]
+    if let Ok(hwnd) = window.hwnd() {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+        // SAFETY: a live window handle; only its z-order changes.
+        unsafe {
+            SetWindowPos(
+                hwnd.0 as _,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        };
+    }
 }
 
 #[cfg(test)]

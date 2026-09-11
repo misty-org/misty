@@ -92,7 +92,7 @@ Folder records gain a parent folder, and both kinds share sibling order:
 
 **Bookmarks bar:** retired October 8, 2026.
 
-**Onboarding:** an import step after `TourWelcomeModal`, before the tour, with Skip.
+**Onboarding:** the last step of first-run setup (`src/features/setup`), after theme and layout, with Skip.
 
 ## Phases
 

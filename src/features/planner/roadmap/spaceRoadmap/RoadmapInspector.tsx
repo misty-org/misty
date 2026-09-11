@@ -215,7 +215,7 @@ function EdgeForm({
   );
 }
 
-export function MilestoneForm({
+function MilestoneForm({
   milestone,
   canManage,
   onSave,
@@ -281,7 +281,7 @@ export function MilestoneForm({
   );
 }
 
-export function GoalForm({
+function GoalForm({
   goal,
   tasks,
   canManage,

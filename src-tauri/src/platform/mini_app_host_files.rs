@@ -37,6 +37,12 @@ fn directory_path(directory: &cap_std::fs::Dir) -> Result<std::path::PathBuf, St
     Ok(path)
 }
 
+#[cfg(windows)]
+fn directory_path(directory: &cap_std::fs::Dir) -> Result<std::path::PathBuf, String> {
+    crate::platform::windows::verified_path(directory, true)
+        .map_err(|_| "The chosen folder moved or was replaced. Choose it again.".into())
+}
+
 #[tauri::command]
 pub async fn mini_app_host_file(
     app: AppHandle,
@@ -93,10 +99,6 @@ pub async fn mini_app_host_file(
                 .state::<crate::app::runtime::MistyRuntime>()
                 .explorer
                 .clone();
-            let peers = app
-                .state::<crate::app::runtime::MistyRuntime>()
-                .connected_devices
-                .clone();
             tokio::spawn(async move {
                 let _slot = slot;
                 let cancellation = cancel.clone();
@@ -104,22 +106,7 @@ pub async fn mini_app_host_file(
                     let _ = permission.changed().await;
                     cancellation.store(true, Ordering::Release);
                 });
-                let mut request = request;
                 let operation = async {
-                    if request.sources[0].path.starts_with("misty://device/") {
-                        if matches!(
-                            request.operation,
-                            crate::domain::explorer::ClipboardOperation::Move
-                        ) {
-                            return Err("Connected devices are read-only.".to_owned());
-                        }
-                        let prepared = peers
-                            .materialize_tree(&request.sources[0].path)
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        request.sources[0].path =
-                            prepared.local_path.to_string_lossy().into_owned();
-                    }
                     let removed = matches!(
                         request.operation,
                         crate::domain::explorer::ClipboardOperation::Move
@@ -185,7 +172,7 @@ pub async fn mini_app_host_file(
             if write {
                 p.authorize("files.write")?;
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             {
                 if let Some(folder) = p.folders.get(handle) {
                     if folder.released.load(std::sync::atomic::Ordering::Acquire)
@@ -208,10 +195,10 @@ pub async fn mini_app_host_file(
                     json!({"path":super::file_open::granted_path(&file.file)?, "kind":"file", "writable":file.writable}),
                 )
             }
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(not(any(target_os = "macos", windows)))]
             {
                 let _ = handle;
-                Err("Native file services currently require macOS.".into())
+                Err("Native file services are not available on this platform.".into())
             }
         }
         "adoptDirectory" => {

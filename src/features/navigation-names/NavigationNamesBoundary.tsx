@@ -1,5 +1,4 @@
-import { LoadingScreen } from "@/shared/ui";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { refreshNavigationNames, useNavigationNames } from "./store";
@@ -15,7 +14,7 @@ export function NavigationNamesBoundary({
 }) {
   // Authentication must survive account-scope resets so pending sign-ins and
   // session-expiry messages are not discarded by the preferences loader.
-  if (!enabled) return <>{children}</>;
+  if (!enabled || !userId) return <>{children}</>;
   return (
     <AccountNavigationNamesBoundary userId={userId}>{children}</AccountNavigationNamesBoundary>
   );
@@ -36,7 +35,7 @@ function AccountNavigationNamesBoundary({
     return () => window.removeEventListener("misty:account-scope-reset", reset);
   }, []);
   const state = useNavigationNames();
-  useEffect(() => {
+  useLayoutEffect(() => {
     let disposed = false;
     setScope("");
     useNavigationNames.setState({ account: "", ready: false, names: {}, error: null });
@@ -48,7 +47,7 @@ function AccountNavigationNamesBoundary({
         useNavigationNames.setState({
           account,
           names: {},
-          ready: !hasTauriInternals(),
+          ready: true,
           error: null,
         });
       })
@@ -83,8 +82,6 @@ function AccountNavigationNamesBoundary({
       window.removeEventListener("focus", refresh);
     };
   }, [scope]);
-  if (!state.ready || (scope && state.account !== scope))
-    return <LoadingScreen label="Loading navigation" />;
   return (
     <>
       {state.error && (

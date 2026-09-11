@@ -1,1 +1,1 @@
-{"identifier":"agent-dock","description":"Windows that hold a tab an agent detached: the bar listens for the dock's status","platforms":["macOS"],"webviews":["misty-dock-*"],"permissions":["core:event:default"]}
+{"identifier":"agent-dock","description":"Agent dock windows: hosts for tabs an agent detached (their bar listens for the dock's status) and, on Windows, the dock stack","platforms":["macOS","windows"],"webviews":["misty-dock-*"],"permissions":["core:event:default"]}

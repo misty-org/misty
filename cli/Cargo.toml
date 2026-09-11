@@ -24,6 +24,10 @@ toml = "0.8.23"
 url = "2.5.4"
 walkdir = "2.5.0"
 
+[target.'cfg(windows)'.dependencies]
+# Owner-only folders for private files (the counterpart of mode 0700).
+misty-credential-store = { path = "../src-tauri/vendor/misty-credential-store" }
+
 # Match the desktop's development storage policy for this standalone tool.
 [profile.dev]
 debug = 1

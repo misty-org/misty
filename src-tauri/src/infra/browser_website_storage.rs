@@ -151,10 +151,11 @@ impl WebsiteStorage {
                 super::browser_profile::data_store_identifier(Some(&self.physical))?,
             );
             #[cfg(windows)]
-            let builder = builder.data_directory(super::browser::browser_data_directory(
+            let builder = super::browser::with_browser_data(
+                builder,
                 self.owner.app_handle(),
                 Some(&self.physical),
-            )?);
+            )?;
             let view = self
                 .owner
                 .window()

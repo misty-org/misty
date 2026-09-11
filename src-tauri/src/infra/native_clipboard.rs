@@ -303,14 +303,40 @@ pub fn write_native_clipboard_file_refs(items: &[PasteItem]) -> ApiResult<bool> 
     }))
 }
 
+/// Files copied in File Explorer (CF_HDROP).
 #[cfg(not(target_os = "macos"))]
 pub fn native_clipboard_file_refs() -> ApiResult<Vec<PasteItem>> {
-    Ok(Vec::new())
+    let Ok(mut clipboard) = arboard::Clipboard::new() else {
+        return Ok(Vec::new());
+    };
+    Ok(clipboard
+        .get()
+        .file_list()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|path| PasteItem {
+            is_directory: path.is_dir(),
+            path: path.to_string_lossy().into_owned(),
+            size_bytes: None,
+            remote_modified: None,
+        })
+        .collect())
 }
 
+/// Puts files on the clipboard so File Explorer can paste them (CF_HDROP).
 #[cfg(not(target_os = "macos"))]
-pub fn write_native_clipboard_file_refs(_items: &[PasteItem]) -> ApiResult<bool> {
-    Ok(false)
+pub fn write_native_clipboard_file_refs(items: &[PasteItem]) -> ApiResult<bool> {
+    let paths = items
+        .iter()
+        .map(|item| item.path.trim())
+        .filter(|path| !path.is_empty())
+        .collect::<Vec<_>>();
+    if paths.is_empty() {
+        return Ok(false);
+    }
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|_| crate::error::ApiError::Message("The clipboard is unavailable.".into()))?;
+    Ok(clipboard.set().file_list(&paths).is_ok())
 }
 
 #[cfg(all(test, target_os = "macos"))]

@@ -71,7 +71,11 @@ mod tests {
     fn dock_hosts_can_only_press_their_own_bar() {
         let host = "misty-dock-01951d32-40ac-7000-8000-000000000001";
         assert!(allows(host, "agent_dock_host_action"));
-        for command in ["agent_tab_detach", "agent_dock_status", "browser_webview_create"] {
+        for command in [
+            "agent_tab_detach",
+            "agent_dock_status",
+            "browser_webview_create",
+        ] {
             assert!(!allows(host, command), "{command}");
         }
         assert!(!allows("misty-dock-spoof", "agent_dock_host_action"));

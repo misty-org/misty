@@ -100,8 +100,8 @@ pub(super) async fn interact_browser(
     );
     let result = if let Some(extension) = extension_id.clone() {
         // Evaluate inside the actual popup; it never receives renderer IPC.
-        super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
-            ["result"]
+        super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script))
+            .await?["result"]
             .clone()
     } else {
         eval_json(webview.clone(), script).await?

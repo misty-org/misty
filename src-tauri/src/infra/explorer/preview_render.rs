@@ -48,6 +48,11 @@ pub(super) fn render_image_thumbnail_file_blocking(
             }
         }
         PreviewFormat::Psd => {
+            if std::fs::metadata(path).is_ok_and(|metadata| metadata.len() > MAX_PSD_BYTES) {
+                return Err(ApiError::Message(
+                    "This image is too large to preview.".to_string(),
+                ));
+            }
             let bytes = std::fs::read(path).map_err(|error| {
                 ApiError::Message(format!(
                     "Failed to read PSD thumbnail {}: {error}",
@@ -168,9 +173,19 @@ pub(super) fn transcode_psd_preview_png_with_dimension(
     path: &Path,
     max_dimension: u32,
 ) -> ApiResult<Vec<u8>> {
-    use zune_psd::zune_core::{bytestream::ZCursor, result::DecodingResult};
+    use zune_psd::zune_core::{
+        bytestream::ZCursor, options::DecoderOptions, result::DecodingResult,
+    };
 
-    let mut decoder = zune_psd::PSDDecoder::new(ZCursor::new(bytes));
+    if bytes.len() as u64 > MAX_PSD_BYTES {
+        return Err(ApiError::Message(
+            "This image is too large to preview.".to_string(),
+        ));
+    }
+    let options = DecoderOptions::default()
+        .set_max_width(MAX_SOURCE_DIMENSION as usize)
+        .set_max_height(MAX_SOURCE_DIMENSION as usize);
+    let mut decoder = zune_psd::PSDDecoder::new_with_options(ZCursor::new(bytes), options);
     let decoded = decoder.decode().map_err(|error| {
         ApiError::Message(format!(
             "Failed to decode PSD preview {}: {error:?}",

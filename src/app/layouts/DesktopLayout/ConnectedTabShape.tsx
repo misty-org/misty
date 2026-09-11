@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 
 /** Corner and shoulder radius, from the strip's `--tab-shoulder`. */
-export function connectedTabRadius(element: Element) {
+function connectedTabRadius(element: Element) {
   return parseFloat(getComputedStyle(element).getPropertyValue("--tab-shoulder")) || 14;
 }
 

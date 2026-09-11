@@ -8,7 +8,7 @@ export interface ShortcutBindingPair {
   alternate: string | null;
 }
 
-export interface ShortcutPlatformDefaults {
+interface ShortcutPlatformDefaults {
   macos: ShortcutBindingPair;
   windows: ShortcutBindingPair;
   linux: ShortcutBindingPair;

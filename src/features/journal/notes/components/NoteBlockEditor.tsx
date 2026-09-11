@@ -17,7 +17,7 @@ import {
   type NoteAiSelection,
 } from "./NoteBlockEditorView";
 
-export const hostNoteEditorRuntime: NoteEditorRuntime = {
+const hostNoteEditorRuntime: NoteEditorRuntime = {
   useCollaborationRoom(spaceId, noteId) {
     const room = useNoteCollaborationRoom(spaceId, noteId);
     const session = useMemo(

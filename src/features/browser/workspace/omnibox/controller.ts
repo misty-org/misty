@@ -1,7 +1,7 @@
 import type { OmniboxMatch } from "./types";
 import { urlKey } from "./urlText";
 
-export const OMNIBOX_MAX_MATCHES = 8;
+const OMNIBOX_MAX_MATCHES = 8;
 
 /** Matches for the same web page merge into one row; searches merge by text. */
 function dedupeKey(match: OmniboxMatch): string {

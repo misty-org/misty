@@ -1,8 +1,5 @@
 //! Device grants are native-owned, scoped to one live App registration, and
 //! invalidated on close. The main Host is the only permission decision maker.
-#[cfg(target_os = "macos")]
-#[path = "mini_app_capability_worker.rs"]
-mod capability_worker;
 use super::{require_host, MiniAppState};
 #[path = "mini_app_remembered_permissions.rs"]
 mod remembered_permissions;
@@ -16,24 +13,18 @@ use std::{
 };
 use tauri::{AppHandle, Manager, State, Webview};
 use tauri_plugin_dialog::DialogExt;
-#[path = "mini_app_backup_archive.rs"]
-mod backup_archive;
-#[path = "mini_app_backup_identity.rs"]
-mod backup_identity;
-#[path = "mini_app_backup_stream.rs"]
-mod backup_stream;
-#[path = "mini_app_backups.rs"]
-mod backups;
 #[path = "mini_app_binary_files.rs"]
 mod binary_files;
 #[path = "mini_app_clipboard.rs"]
 mod clipboard;
 #[path = "mini_app_directories.rs"]
 mod directories;
-#[cfg(target_os = "macos")]
-#[path = "mini_app_directory_bookmark_macos.rs"]
-mod directory_bookmark_macos;
-#[cfg(target_os = "macos")]
+/// How this platform remembers a folder across launches.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(target_os = "macos", path = "mini_app_directory_bookmark_macos.rs")]
+#[cfg_attr(windows, path = "mini_app_directory_bookmark_windows.rs")]
+mod directory_bookmark;
+#[cfg(any(target_os = "macos", windows))]
 #[path = "mini_app_directory_bookmarks.rs"]
 mod directory_bookmarks;
 #[path = "mini_app_directory_handoff.rs"]
@@ -66,18 +57,12 @@ pub mod host_files;
 mod media;
 #[path = "mini_app_text_files.rs"]
 mod text_files;
+#[path = "mini_app_tool_sandbox.rs"]
+mod tool_sandbox;
 
 /// Registered only by the debug integration harness; normal app grants are unaffected.
 #[cfg(all(debug_assertions, target_os = "macos"))]
 pub(crate) struct MiniAppProbeDirectory(pub std::path::PathBuf);
-
-#[cfg(target_os = "macos")]
-#[path = "mini_app_code_lsp.rs"]
-mod code_lsp;
-
-#[cfg(target_os = "macos")]
-#[path = "mini_app_peer.rs"]
-pub mod peer;
 
 #[cfg(target_os = "macos")]
 #[path = "mini_app_tree_drafts.rs"]
@@ -86,14 +71,9 @@ mod tree_drafts;
 pub struct PermissionSet {
     #[cfg(target_os = "macos")]
     tree_drafts: HashMap<String, tree_drafts::TreeDraft>,
-    #[cfg(target_os = "macos")]
-    peer_runtime: Option<std::sync::Arc<peer::Runtime>>,
     archive_reads: HashMap<String, file_preview::ReadGuard>,
-    #[cfg(target_os = "macos")]
-    code_lsp: HashMap<String, code_lsp::ProjectProcess>,
-    code_lsp_slots: std::sync::Arc<tokio::sync::Semaphore>,
-    #[cfg(target_os = "macos")]
-    folder_security_scopes: HashMap<String, Arc<directory_bookmark_macos::SecurityScope>>,
+    #[cfg(any(target_os = "macos", windows))]
+    folder_security_scopes: HashMap<String, Arc<directory_bookmark::SecurityScope>>,
     pub(super) owner_namespace: Option<String>,
     pub(super) native_owner: Option<super::NativeOwner>,
     pub(super) account_owned: bool,
@@ -108,7 +88,6 @@ pub struct PermissionSet {
     denied: HashSet<String>,
     files: HashMap<String, FileGrant>,
     folders: HashMap<String, file_jobs::FolderGrant>,
-    scans: HashMap<String, file_jobs::FileJob>,
     directory_shares: HashMap<String, directory_handoff::DirectoryShare>,
     directory_watches: HashMap<String, file_observation::DirectoryWatch>,
     transfers: HashMap<String, file_transfers::TransferJob>,
@@ -116,8 +95,6 @@ pub struct PermissionSet {
     outputs: HashMap<String, binary_files::OutputDraft>,
     media: HashMap<String, media::MediaJob>,
     downloads: HashMap<String, downloads::DownloadJob>,
-    backup_repositories: HashMap<String, backups::BackupRepository>,
-    backup_jobs: HashMap<String, backups::BackupJob>,
     epoch: u64,
     cancellation: tokio::sync::watch::Sender<u64>,
 }
@@ -196,13 +173,8 @@ impl PermissionSet {
         Ok(Self {
             #[cfg(target_os = "macos")]
             tree_drafts: HashMap::new(),
-            #[cfg(target_os = "macos")]
-            peer_runtime: None,
             archive_reads: HashMap::new(),
-            #[cfg(target_os = "macos")]
-            code_lsp: HashMap::new(),
-            code_lsp_slots: std::sync::Arc::new(tokio::sync::Semaphore::new(8)),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             folder_security_scopes: HashMap::new(),
             owner_namespace: None,
             native_owner: None,
@@ -223,7 +195,6 @@ impl PermissionSet {
             denied: HashSet::new(),
             files: HashMap::new(),
             folders: HashMap::new(),
-            scans: HashMap::new(),
             directory_shares: HashMap::new(),
             directory_watches: HashMap::new(),
             transfers: HashMap::new(),
@@ -231,8 +202,6 @@ impl PermissionSet {
             outputs: HashMap::new(),
             media: HashMap::new(),
             downloads: HashMap::new(),
-            backup_repositories: HashMap::new(),
-            backup_jobs: HashMap::new(),
             epoch: 0,
             cancellation: tokio::sync::watch::channel(0).0,
         })
@@ -265,17 +234,12 @@ impl PermissionSet {
         } else {
             self.granted.remove(capability);
             self.denied.insert(capability.into());
-            #[cfg(target_os = "macos")]
-            if capability.starts_with("files.") || capability == "code.execute" {
-                self.code_lsp.clear();
-            }
             if capability.starts_with("files.") {
                 self.archive_reads.clear();
                 self.files.clear();
                 self.folders.clear();
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 self.folder_security_scopes.clear();
-                self.scans.clear();
                 self.directory_shares.clear();
                 self.directory_watches.clear();
                 self.transfers.clear();
@@ -284,8 +248,6 @@ impl PermissionSet {
                 self.tree_drafts.clear();
                 self.media.clear();
                 self.downloads.clear();
-                self.backup_jobs.clear();
-                self.backup_repositories.clear();
             }
             if capability == "media.convert" {
                 self.media.clear();
@@ -295,10 +257,6 @@ impl PermissionSet {
             }
             if capability == "media.download" {
                 self.downloads.clear();
-            }
-            if capability == "backups.manage" {
-                self.backup_jobs.clear();
-                self.backup_repositories.clear();
             }
             self.epoch += 1;
             self.cancellation.send_replace(self.epoch);
@@ -337,11 +295,25 @@ fn origin(value: &str) -> Result<String, String> {
     }
     Ok(url.origin().ascii_serialization())
 }
+/// Services this release does not bundle a worker for. Apps get a plain answer
+/// instead of a failed worker lookup.
+fn unavailable_feature(method: &str) -> Option<&'static str> {
+    if method.starts_with("backups.") {
+        Some("Backups")
+    } else if method.starts_with("code.lsp.") {
+        Some("Code language services")
+    } else if method.starts_with("files.scan") {
+        Some("Folder scans")
+    } else if matches!(method, "files.transferStart" | "files.transferPrepared") {
+        Some("App file transfers")
+    } else {
+        None
+    }
+}
 fn capability(method: &str, params: &Value) -> Result<String, String> {
     Ok(match method {
         "terminal.authorize" => "terminal.execute".into(),
         "connections.authorize" => "connections.read".into(),
-        "code.lsp.startProject" | "code.lsp.sendProject" => "code.execute".into(),
         "files.sources.open"
         | "files.rememberDirectory"
         | "files.reopenDirectory"
@@ -366,15 +338,6 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
         | "downloads.jobStatus"
         | "downloads.jobCancel"
         | "downloads.jobClose" => "media.download".into(),
-        "backups.repositoryOpen"
-        | "backups.repositoryClose"
-        | "backups.backupStart"
-        | "backups.restoreStart"
-        | "backups.snapshotsStart"
-        | "backups.checkStart"
-        | "backups.jobStatus"
-        | "backups.jobCancel"
-        | "backups.jobClose" => "backups.manage".into(),
         "files.openExternal" => "files.open".into(),
         "files.index" | "files.sources.list" | "files.sources.open" | "files.readBytes"
         | "files.listArchive" | "documents.prepare" => "files.read".into(),
@@ -393,11 +356,7 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
         | "files.watchStatus"
         | "files.watchClose"
         | "files.listDirectory"
-        | "files.openEntry"
-        | "files.scanStart"
-        | "files.scanStatus"
-        | "files.scanCancel"
-        | "files.scanClose" => "files.read".into(),
+        | "files.openEntry" => "files.read".into(),
         "files.openTrash"
         | "files.replaceCopy"
         | "files.writeText"
@@ -409,8 +368,6 @@ fn capability(method: &str, params: &Value) -> Result<String, String> {
         | "files.treeSymlink"
         | "files.treeCommit"
         | "files.treeDiscard"
-        | "files.transferStart"
-        | "files.transferPrepared"
         | "files.transferStatus"
         | "files.transferCancel"
         | "files.transferClose" => "files.write".into(),
@@ -529,19 +486,10 @@ pub async fn mini_app_device_call(
     if method == "files.listArchive" {
         return file_preview::list_archive(&state, &instance, params).await;
     }
-    #[cfg(target_os = "macos")]
-    match method.as_str() {
-        "code.lsp.startProject" => return code_lsp::start(app, &state, &instance, params).await,
-        "code.lsp.sendProject" => return code_lsp::send(&state, &instance, params).await,
-        "code.lsp.releaseProject" => {
-            let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            let permissions = &mut registry
-                .get_mut(&instance)
-                .ok_or("App is closed.")?
-                .permissions;
-            return code_lsp::release(permissions, params);
-        }
-        _ => {}
+    if let Some(feature) = unavailable_feature(&method) {
+        return Err(format!(
+            "{feature} aren't available in this version of Misty."
+        ));
     }
     if method == "media.status" {
         let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -551,26 +499,13 @@ pub async fn mini_app_device_call(
         return Ok(media::availability());
     }
     if method == "backups.status" {
-        let (root, app_id, version) = {
-            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            let app = registry.get(&instance).ok_or("App is closed.")?;
-            (
-                app.root.clone(),
-                app.permissions.app_id.clone(),
-                app.permissions.version.clone(),
-            )
-        };
-        let verified = tokio::task::spawn_blocking(move || {
-            document_processing::verified_service(&root, &app_id, &version, "backup-archive", 1)
-        })
-        .await
-        .map_err(|_| "Backup service verification stopped.")?;
-        if let Err(error) = verified {
-            return Ok(
-                json!({"available":false,"format":"misty-tar-v1","message":format!("The backup worker is unavailable in this Misty release. {error}")}),
-            );
+        let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
+        if !registry.contains_key(&instance) {
+            return Err("App is closed.".into());
         }
-        return Ok(backups::availability());
+        return Ok(
+            json!({"available":false,"format":"misty-tar-v1","message":"Backups aren't available in this version of Misty."}),
+        );
     }
     if method == "downloads.status" {
         let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -586,9 +521,9 @@ pub async fn mini_app_device_call(
             | "files.reopenDirectory"
             | "files.forgetDirectory"
     ) {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         return directory_bookmarks::execute(&state, &instance, &method, &params).await;
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         return Err("Saved folder access is not implemented on this platform yet.".into());
     }
     if matches!(
@@ -608,8 +543,6 @@ pub async fn mini_app_device_call(
             .get_mut(&instance)
             .ok_or("App is closed.")?
             .permissions;
-        #[cfg(target_os = "macos")]
-        code_lsp::release_folder(permissions, handle);
         binary_files::release(permissions, handle);
         return Ok(Value::Null);
     }
@@ -656,86 +589,6 @@ pub async fn mini_app_device_call(
             .permissions;
         return request.commit(permissions, result?);
     }
-    if method == "backups.repositoryOpen" {
-        let worker_lease = document_processing::ServiceLease::acquire_service(
-            &state,
-            &instance,
-            "backups",
-            "backup-archive",
-            1,
-        )
-        .await?;
-        let handle = params
-            .get("directory")
-            .and_then(Value::as_str)
-            .ok_or("Choose a repository folder first.")?
-            .to_owned();
-        let create = params.get("create") == Some(&Value::Bool(true));
-        let name = params
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_owned();
-        let (directory, owner) = {
-            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            let permissions = &registry.get(&instance).ok_or("App is closed.")?.permissions;
-            permissions.authorize("files.write")?;
-            if permissions.backup_repositories.len() >= 4 {
-                return Err("Close an open backup repository before opening another.".into());
-            }
-            let folder = permissions
-                .folders
-                .get(&handle)
-                .filter(|folder| folder.writable)
-                .ok_or("Choose a writable repository folder first.")?;
-            (
-                folder.directory.clone(),
-                permissions
-                    .owner_namespace
-                    .clone()
-                    .ok_or("Sign in before opening an encrypted backup repository.")?,
-            )
-        };
-        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let cancellation_flag = cancelled.clone();
-        let watcher = tokio::spawn(async move {
-            let _ = cancellation.changed().await;
-            cancellation_flag.store(true, std::sync::atomic::Ordering::Release);
-        });
-        let opened = backups::open(
-            Arc::new(worker_lease),
-            directory.clone(),
-            owner,
-            create,
-            name,
-            cancelled,
-        )
-        .await;
-        watcher.abort();
-        let mut repository = opened?;
-        let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry
-            .get_mut(&instance)
-            .ok_or("App is closed.")?
-            .permissions;
-        permissions.authorize(&required)?;
-        permissions.authorize("files.write")?;
-        if permissions.epoch != epoch
-            || !permissions
-                .folders
-                .get(&handle)
-                .is_some_and(|folder| Arc::ptr_eq(&folder.directory, &directory) && folder.writable)
-        {
-            return Err("Permission changed while opening the repository.".into());
-        }
-        backups::assign_folder(&mut repository, handle);
-        let id = uuid::Uuid::new_v4().to_string();
-        let name = repository.name().to_owned();
-        permissions
-            .backup_repositories
-            .insert(id.clone(), repository);
-        return Ok(json!({"repository":id,"name":name}));
-    }
     if method == "network.fetch" {
         return tokio::select! {
             biased;
@@ -744,9 +597,6 @@ pub async fn mini_app_device_call(
         };
     }
     if method == "files.openTrash" {
-        #[cfg(not(target_os = "macos"))]
-        return Err("App Trash is currently available on macOS.".into());
-        #[cfg(target_os = "macos")]
         {
             let (owner, epoch) = {
                 let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -757,7 +607,7 @@ pub async fn mini_app_device_call(
                 .app_data_dir()
                 .map_err(|_| "App storage is unavailable.")?
                 .join("app-trash");
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, target_os = "macos"))]
             let root = app
                 .try_state::<MiniAppProbeDirectory>()
                 .map(|probe| probe.0.join(".misty-app-trash"))
@@ -883,49 +733,6 @@ pub async fn mini_app_device_call(
         }
         return tree_drafts::execute(p, &method, &params);
     }
-    let operation_worker = if matches!(
-        method.as_str(),
-        "files.transferStart" | "files.transferPrepared" | "files.scanStart"
-    ) {
-        let app_id = {
-            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            registry
-                .get(&instance)
-                .ok_or("App is closed.")?
-                .permissions
-                .app_id
-                .clone()
-        };
-        Some(Arc::new(
-            document_processing::ServiceLease::acquire_service(
-                &state,
-                &instance,
-                &app_id,
-                "file-operations",
-                1,
-            )
-            .await?,
-        ))
-    } else if matches!(
-        method.as_str(),
-        "backups.backupStart"
-            | "backups.restoreStart"
-            | "backups.snapshotsStart"
-            | "backups.checkStart"
-    ) {
-        Some(Arc::new(
-            document_processing::ServiceLease::acquire_service(
-                &state,
-                &instance,
-                "backups",
-                "backup-archive",
-                1,
-            )
-            .await?,
-        ))
-    } else {
-        None
-    };
     if method.starts_with("files.transfer") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
         let permissions = &mut registry
@@ -936,36 +743,7 @@ pub async fn mini_app_device_call(
         if permissions.epoch != epoch {
             return Err("App permission changed.".into());
         }
-        return file_transfers::execute_with_worker(
-            permissions,
-            &method,
-            &params,
-            operation_worker,
-        );
-    }
-    if method.starts_with("files.scan") {
-        let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry
-            .get_mut(&instance)
-            .ok_or("App is closed.")?
-            .permissions;
-        permissions.authorize(&required)?;
-        if permissions.epoch != epoch {
-            return Err("App permission changed.".into());
-        }
-        return file_jobs::execute_with_worker(permissions, &method, &params, operation_worker);
-    }
-    if method.starts_with("backups.") {
-        let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-        let permissions = &mut registry
-            .get_mut(&instance)
-            .ok_or("App is closed.")?
-            .permissions;
-        permissions.authorize(&required)?;
-        if permissions.epoch != epoch {
-            return Err("App permission changed.".into());
-        }
-        return backups::execute_with_worker(permissions, &method, &params, operation_worker);
+        return file_transfers::execute(permissions, &method, &params);
     }
     if method.starts_with("downloads.") {
         let mut registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
@@ -1399,15 +1177,6 @@ mod tests {
         }
         assert!(public_address("8.8.8.8".parse().unwrap()));
     }
-}
-
-#[cfg(target_os = "macos")]
-pub(super) fn search_process_command(
-    executable: &std::path::Path,
-    work: &std::path::Path,
-    index: &std::path::Path,
-) -> std::io::Result<std::process::Command> {
-    media::process::command_with_storage(executable, work, Some(index))
 }
 
 /// Duplicate a read-only temporary file between two live views of the same

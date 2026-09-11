@@ -5,7 +5,7 @@ export const MISTY_PANEL_WIDTH = 400;
 export const MISTY_PANEL_MIN_WIDTH = 320;
 export const MISTY_PANEL_MAX_WIDTH = 720;
 
-export const clampMistyPanelWidth = (width: number) =>
+const clampMistyPanelWidth = (width: number) =>
   Math.round(Math.max(MISTY_PANEL_MIN_WIDTH, Math.min(MISTY_PANEL_MAX_WIDTH, width)));
 
 // The width is a per-device layout convenience, like the agent sidebar's.

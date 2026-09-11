@@ -16,6 +16,8 @@
 //! matches `0.0.0.0`), and a listener would be a way around the closed
 //! network. Previews are served by Misty itself (see `preview`).
 //!
+//! Windows: the project's own AppContainer; see [`windows`].
+//!
 //! Other platforms have no sandbox yet, so commands are refused there.
 use std::{
     collections::BTreeMap,
@@ -23,6 +25,14 @@ use std::{
 };
 
 use crate::CodeError;
+
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub use windows::{
+    approval_arguments, container_name, discover_tools, forget, tools_needing_approval,
+    ToolFolder, TOOLS_CAPABILITY,
+};
 
 #[cfg(target_os = "macos")]
 const BASE_POLICY: &str = include_str!("seatbelt/base.sbpl");
@@ -34,6 +44,7 @@ const NETWORK_POLICY: &str = include_str!("seatbelt/network.sbpl");
 /// Only the system copy; a `sandbox-exec` earlier on PATH could be anything.
 pub const SANDBOX_EXEC: &str = "/usr/bin/sandbox-exec";
 
+#[cfg(target_os = "macos")]
 /// Read-only system and developer locations commands may use.
 const SYSTEM_READ: &[&str] = &[
     "/bin",
@@ -50,6 +61,7 @@ const SYSTEM_READ: &[&str] = &[
     "/private/etc",
 ];
 
+#[cfg(target_os = "macos")]
 /// Toolchain managers under the person's home. Only these, never the rest of
 /// the home folder; `~/.cargo` is limited to `bin` because its credentials
 /// file lives beside it.
@@ -75,6 +87,8 @@ pub struct Setup {
     pub args: Vec<String>,
     pub env: BTreeMap<String, String>,
     pub cwd: PathBuf,
+    #[cfg(windows)]
+    pub windows: windows::Confinement,
 }
 
 /// Where a project's commands live: the project, plus per-run scratch space.
@@ -84,8 +98,15 @@ pub struct Policy<'a> {
     pub home: &'a Path,
     pub user_home: Option<&'a Path>,
     pub proxy_port: Option<u16>,
+    /// Windows: where the project's sandbox records what it changed.
+    #[cfg(windows)]
+    pub state: &'a Path,
+    /// Windows: the toolchains commands may use.
+    #[cfg(windows)]
+    pub tools: &'a [ToolFolder],
 }
 
+#[cfg(target_os = "macos")]
 fn existing_toolchains(user_home: Option<&Path>) -> Vec<PathBuf> {
     let Some(home) = user_home else {
         return Vec::new();
@@ -163,6 +184,7 @@ fn newest_node(versions: &Path) -> Option<PathBuf> {
     found.pop().map(|(_, bin)| bin)
 }
 
+#[cfg(target_os = "macos")]
 /// Seatbelt strings can't hold every character safely; a project path with
 /// quotes, backslashes or control characters is refused outright.
 fn safe_for_profile(path: &Path) -> Result<String, CodeError> {
@@ -175,6 +197,7 @@ fn safe_for_profile(path: &Path) -> Result<String, CodeError> {
     Ok(text.into_owned())
 }
 
+#[cfg(target_os = "macos")]
 fn regex_escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -291,11 +314,15 @@ pub fn setup(policy: &Policy, cwd: &Path, command: &str) -> Result<Setup, CodeEr
             cwd: cwd.to_path_buf(),
         })
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        windows::setup(policy, cwd, command)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = (policy, cwd, command);
         Err(CodeError::Unavailable(
-            "Agents can run commands only on macOS for now.".into(),
+            "Agents can run commands only on macOS and Windows for now.".into(),
         ))
     }
 }

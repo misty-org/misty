@@ -129,7 +129,13 @@ fn set_layer(webview: &Webview, strength: f64) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Windows lays a click-through layered window over the page instead.
+#[cfg(windows)]
+fn set_layer(webview: &Webview, strength: f64) -> Result<(), String> {
+    super::page_frame::set_dim(webview, strength)
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 fn set_layer(_webview: &Webview, _strength: f64) -> Result<(), String> {
     Ok(())
 }

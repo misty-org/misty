@@ -4,7 +4,7 @@ export type * from "./agentArchitectureTypes";
 export type * from "./agentTaskTypes";
 export type * from "./conversationTypes";
 
-export interface LibraryFile {
+interface LibraryFile {
   id: string;
   blob_id: string;
   security_domain_id: string;
@@ -40,7 +40,7 @@ export interface SpaceLibraryItem {
   file: LibraryFile;
 }
 
-export interface LibraryAssetStackMember {
+interface LibraryAssetStackMember {
   item_id: string;
   role: "still" | "motion" | "raw" | "alternate" | "burst_frame";
   position: number;
@@ -121,7 +121,7 @@ export interface BulkLibraryItemOptions {
   locationOverride?: Record<string, unknown>;
 }
 
-export interface LibrarySearchFacet {
+interface LibrarySearchFacet {
   value: string;
   label: string;
   count: number;
@@ -289,7 +289,7 @@ export interface LibraryAlbumFolder {
   updated_at: string;
 }
 
-export interface LibraryGroupRule {
+interface LibraryGroupRule {
   field: "favorite" | "hidden" | "tag" | "mime" | "filename" | "album";
   op: "is" | "contains" | "prefix" | "in";
   value: boolean | string;

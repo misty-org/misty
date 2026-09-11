@@ -30,8 +30,6 @@ func deviceContextSurface(kind string) string {
 		return "browser"
 	case "terminal":
 		return "terminal"
-	case "inbox":
-		return "inbox"
 	}
 	return ""
 }
@@ -83,10 +81,6 @@ func verifyDeviceContextGrants(ctx context.Context, database *db.Database, userI
 		}
 		// Reaching another device needs this one added.
 		if requesterState != "admitted" {
-			return errDeviceGrantRequired
-		}
-		if deviceContext.Kind == "inbox" {
-			// Only a device can let files arrive in its own inbox.
 			return errDeviceGrantRequired
 		}
 		// Work on another device: it must be added too, and its own signed

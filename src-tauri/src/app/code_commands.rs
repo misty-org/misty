@@ -3,7 +3,6 @@
 //!
 //! Every command answers only Misty's main window. A device job's code tool
 //! checks the job's signed run grant here, natively, before anything runs.
-#![cfg(unix)]
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -37,13 +36,17 @@ pub struct CodeExecuteRequest {
 /// Runs one code tool for a device job, after checking its run grant.
 #[tauri::command]
 pub async fn code_execute(
+    app: tauri::AppHandle,
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,
     request: CodeExecuteRequest,
 ) -> Result<Value, String> {
     require_main(&webview)?;
     if !misty_agent_code::OPERATIONS.contains(&request.operation.as_str()) {
-        return Err(format!("unsupported_device_operation:{}", request.operation));
+        return Err(format!(
+            "unsupported_device_operation:{}",
+            request.operation
+        ));
     }
     let grant: SignedRecord = serde_json::from_value(request.config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
@@ -54,6 +57,12 @@ pub async fn code_execute(
         .project(request.scope_id.clone())
         .await
         .map_err(|_| "invalid_device_scope: the project is no longer shared".to_owned())?;
+    #[cfg(windows)]
+    if matches!(request.operation.as_str(), "code.run" | "code.start") {
+        super::code_tools_windows::ensure_tools_shared(&app, &state.code).await;
+    }
+    #[cfg(not(windows))]
+    let _ = app;
     misty_agent_code::outcome(
         state
             .code
@@ -103,7 +112,10 @@ pub async fn code_allow_project_changes(
     scope_id: String,
 ) -> ApiResult<()> {
     require_main(&webview).map_err(ApiError::Message)?;
-    state.agents.allow_project_changes(scope_id, &state.code).await
+    state
+        .agents
+        .allow_project_changes(scope_id, &state.code)
+        .await
 }
 
 #[tauri::command]
@@ -159,12 +171,18 @@ pub async fn code_undo(
 }
 
 /// Asks where to put a new folder, with the system folder picker.
-async fn pick_parent(app: &tauri::AppHandle, title: String) -> ApiResult<Option<std::path::PathBuf>> {
+async fn pick_parent(
+    app: &tauri::AppHandle,
+    title: String,
+) -> ApiResult<Option<std::path::PathBuf>> {
     use tauri_plugin_dialog::DialogExt;
     let (send, receive) = tokio::sync::oneshot::channel();
-    app.dialog().file().set_title(title).pick_folder(move |folder| {
-        let _ = send.send(folder);
-    });
+    app.dialog()
+        .file()
+        .set_title(title)
+        .pick_folder(move |folder| {
+            let _ = send.send(folder);
+        });
     let Some(folder) = receive
         .await
         .map_err(|_| ApiError::Message("Folder selection was canceled.".into()))?
@@ -186,10 +204,14 @@ pub async fn code_new_project(
     name: String,
 ) -> ApiResult<Option<Value>> {
     require_main(&webview).map_err(ApiError::Message)?;
-    let Some(parent) = pick_parent(&app, format!("Choose where to create {}", name.trim())).await? else {
+    let Some(parent) = pick_parent(&app, format!("Choose where to create {}", name.trim())).await?
+    else {
         return Ok(None);
     };
-    let (project, folder) = state.agents.create_project_folder(parent, &name, &state.code).await?;
+    let (project, folder) = state
+        .agents
+        .create_project_folder(parent, &name, &state.code)
+        .await?;
     misty_agent_code::git::init(&folder).map_err(|error| ApiError::Message(error.to_string()))?;
     Ok(Some(project))
 }
@@ -206,10 +228,14 @@ pub async fn code_clone_project(
     branch: String,
 ) -> ApiResult<Option<Value>> {
     require_main(&webview).map_err(ApiError::Message)?;
-    let Some(parent) = pick_parent(&app, format!("Choose where to put {owner}/{name}")).await? else {
+    let Some(parent) = pick_parent(&app, format!("Choose where to put {owner}/{name}")).await?
+    else {
         return Ok(None);
     };
-    let (project, folder) = state.agents.create_project_folder(parent, &name, &state.code).await?;
+    let (project, folder) = state
+        .agents
+        .create_project_folder(parent, &name, &state.code)
+        .await?;
     let github = misty_agent_code::git::GitHubRepo { owner, name };
     if let Err(error) = misty_agent_code::git::prepare_clone(&folder, &github, &branch)
         .and_then(|_| misty_agent_code::git::set_default_branch(&folder, &branch))
@@ -232,7 +258,10 @@ pub async fn code_set_project_push(
     allow_default: bool,
 ) -> ApiResult<()> {
     require_main(&webview).map_err(ApiError::Message)?;
-    state.agents.set_project_push(scope_id, allow, allow_default).await
+    state
+        .agents
+        .set_project_push(scope_id, allow, allow_default)
+        .await
 }
 
 /// What one answer changed in a project.
@@ -303,8 +332,14 @@ pub async fn code_git_job(
     request: CodeGitJobRequest,
 ) -> Result<Value, String> {
     require_main(&webview)?;
-    if !matches!(request.operation.as_str(), "git.push" | "git.pull" | "git.pull_request") {
-        return Err(format!("unsupported_device_operation:{}", request.operation));
+    if !matches!(
+        request.operation.as_str(),
+        "git.push" | "git.pull" | "git.pull_request"
+    ) {
+        return Err(format!(
+            "unsupported_device_operation:{}",
+            request.operation
+        ));
     }
     let grant: SignedRecord = serde_json::from_value(request.config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
@@ -317,7 +352,10 @@ pub async fn code_git_job(
         .map_err(|_| "invalid_device_scope: the project is no longer shared".to_owned())?;
     let status = misty_agent_code::git::status(&project.root).map_err(|error| error.to_string())?;
     let branch = status["branch"].as_str().unwrap_or_default().to_owned();
-    let default_branch = status["defaultBranch"].as_str().unwrap_or("main").to_owned();
+    let default_branch = status["defaultBranch"]
+        .as_str()
+        .unwrap_or("main")
+        .to_owned();
     if request.operation != "git.pull" {
         let (allow, allow_default) = state
             .agents
@@ -325,11 +363,17 @@ pub async fn code_git_job(
             .await
             .map_err(|error| error.to_string())?;
         if !allow {
-            return Ok(serde_json::json!({ "allowed": false, "reason": "Agents can't push this project. The person can turn on \"Agents can push\" for it in Integrations › Projects." }));
+            return Ok(
+                serde_json::json!({ "allowed": false, "reason": "Agents can't push this project. The person can turn on \"Agents can push\" for it in Integrations › Projects." }),
+            );
         }
         if request.operation == "git.push" && branch == default_branch && !allow_default {
-            return Ok(serde_json::json!({ "allowed": false, "reason": format!("Agents can't push {default_branch} in this project. Push a new branch with git_branch, then open a pull request.") }));
+            return Ok(
+                serde_json::json!({ "allowed": false, "reason": format!("Agents can't push {default_branch} in this project. Push a new branch with git_branch, then open a pull request.") }),
+            );
         }
     }
-    Ok(serde_json::json!({ "allowed": true, "branch": branch, "defaultBranch": default_branch, "github": status["github"] }))
+    Ok(
+        serde_json::json!({ "allowed": true, "branch": branch, "defaultBranch": default_branch, "github": status["github"] }),
+    )
 }

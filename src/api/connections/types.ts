@@ -1,6 +1,6 @@
 import type { IntegrationCapability } from "@/shared/integrations/types";
 
-export type AccountConnectionStatus = "active" | "needs_attention" | "revoked";
+type AccountConnectionStatus = "active" | "needs_attention" | "revoked";
 
 /** One provider account connected privately to the active Misty account. */
 export interface AccountConnection {

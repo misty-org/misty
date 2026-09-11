@@ -160,6 +160,18 @@ fn set_under_page_background(webview: &Webview, hex: String) {
     });
 }
 
+/// WebView2 fills unpainted area with its default background color.
+#[cfg(windows)]
+fn set_under_page_background(webview: &Webview, hex: String) {
+    let channel = |start: usize| u8::from_str_radix(&hex[start..start + 2], 16).unwrap_or(0);
+    let _ = webview.set_background_color(Some(tauri::window::Color(
+        channel(1),
+        channel(3),
+        channel(5),
+        255,
+    )));
+}
+
 fn trusted(app: &AppHandle, id: &str, token: &str) -> bool {
     app.try_state::<BrowserSessionState>()
         .is_some_and(|state| super::shortcut_token_matches(&state, id, token))
@@ -190,7 +202,7 @@ impl HostChannel for Channel {
             if !message.main_frame || !trusted(app, id, &background.token) {
                 return;
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             if let Some(webview) = app.get_webview(message.webview) {
                 set_under_page_background(&webview, background.background.clone());
             }

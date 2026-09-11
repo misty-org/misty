@@ -1,12 +1,12 @@
 /** Diffs as the native side builds them (src-tauri/crates/agent-code/src/diff.rs). */
-export interface DiffLine {
+interface DiffLine {
   kind: "context" | "add" | "del";
   text: string;
   old?: number;
   new?: number;
 }
 
-export interface DiffHunk {
+interface DiffHunk {
   oldStart: number;
   oldLines: number;
   newStart: number;

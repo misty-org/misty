@@ -19,7 +19,7 @@ import { projectTabGroups } from "./tabGroupSync";
 
 const recoveryWindowId = "recovery:window";
 export const recoveryTabId = (viewId: string) => `recovery:tab:${viewId}`;
-export const recoveryPaneId = (viewId: string) => `recovery:pane:${viewId}`;
+const recoveryPaneId = (viewId: string) => `recovery:pane:${viewId}`;
 
 function records<K extends RecordKind>(view: WorkspaceRecords, kind: K): SharedRecord<K>[] {
   return view.records.filter((record) => record.kind === kind) as SharedRecord<K>[];

@@ -6,7 +6,17 @@ import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { useUserStore } from "@/features/auth/core";
 import { isApiSessionTransitioning } from "@/api/client/session";
+import { desktopOs } from "@/shared/platform/desktopOs";
 import { useCompanionState } from "./companion/companionState";
+
+/**
+ * Stops a visible autopilot run from the keyboard. Plain Escape would also
+ * stop it when the agent itself presses Escape, and Ctrl+Shift+Esc opens Task
+ * Manager on Windows.
+ */
+export function autopilotStopShortcut(): string {
+  return desktopOs() === "macos" ? "Cmd+Shift+Escape" : "Ctrl+Alt+Escape";
+}
 
 export function workspaceAutopilotContext(
   accountId: string,

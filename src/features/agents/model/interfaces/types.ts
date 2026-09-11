@@ -30,7 +30,7 @@ export interface AgentDeviceSnapshot {
   loadedAt: string;
 }
 
-export interface PreparedDocumentSection {
+interface PreparedDocumentSection {
   kind: "page" | "slide" | "sheet" | "section" | "lines";
   locator: string;
   text: string;

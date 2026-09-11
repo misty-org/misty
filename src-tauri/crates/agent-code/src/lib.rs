@@ -6,7 +6,7 @@
 //! [`processes`], preview the result through [`preview`], and every run's
 //! changes can be undone through [`checkpoint`]. Package installs reach the
 //! internet only through the allowlisting [`proxy`].
-#![cfg(unix)]
+#![cfg(any(unix, windows))]
 
 pub mod beneath;
 pub mod checkpoint;
@@ -21,6 +21,7 @@ pub mod proxy;
 pub mod run_diff;
 pub mod sandbox;
 mod service;
+#[cfg(unix)]
 pub mod tree;
 mod walk;
 
@@ -70,18 +71,29 @@ pub fn outcome(result: Result<Value, CodeError>) -> Result<Value, String> {
     }
 }
 
+/// A path as people write it: Windows' verbatim prefix (`\\?\`, which
+/// canonicalizing adds) removed. Unchanged elsewhere.
+pub fn plain_path(path: &std::path::Path) -> std::path::PathBuf {
+    if !cfg!(windows) {
+        return path.to_path_buf();
+    }
+    let text = path.to_string_lossy();
+    match text.strip_prefix(r"\\?\UNC\") {
+        Some(rest) => format!(r"\\{rest}").into(),
+        None => text.strip_prefix(r"\\?\").unwrap_or(&text).into(),
+    }
+}
+
 pub(crate) fn io_fix(action: &str, error: std::io::Error) -> CodeError {
     use std::io::ErrorKind;
     let reason = match error.kind() {
         ErrorKind::NotFound => "it doesn't exist".to_owned(),
         ErrorKind::PermissionDenied => "permission was denied".to_owned(),
         ErrorKind::AlreadyExists => "it already exists".to_owned(),
-        _ if error.raw_os_error() == Some(libc::ELOOP) => {
+        _ if beneath::is_link_refusal(&error) => {
             "it is a symlink, and agents don't follow symlinks".to_owned()
         }
-        _ if error.raw_os_error() == Some(libc::ENOTDIR) => {
-            "part of the path is not a folder".to_owned()
-        }
+        _ if beneath::is_not_folder(&error) => "part of the path is not a folder".to_owned(),
         _ => error.to_string(),
     };
     CodeError::Fix(format!("Could not {action}: {reason}."))

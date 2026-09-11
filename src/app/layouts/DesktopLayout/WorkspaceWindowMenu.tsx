@@ -46,7 +46,6 @@ export function WorkspaceWindowMenu(props: {
           size="xs"
           label="Manage virtual windows"
           title="Manage virtual windows"
-          data-tour-target="workspace-window-menu"
           icon={<AppWindow className="size-4" />}
         />
         <DropdownMenuContent align="end" className="w-60 max-w-[calc(100vw-16px)]">

@@ -1,3 +1,4 @@
+import { desktopOs } from "@/shared/platform/desktopOs";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 export type SitePermissionDecision = "ask" | "allow" | "block";
 export interface SitePermissions {
@@ -16,18 +17,9 @@ export interface SavedSitePermission {
   origin: string;
   permissions: SitePermissions;
 }
+/** Kiri decides camera and microphone requests on macOS (WebKit) and Windows (WebView2). */
 export function supportsSitePermissions() {
-  return (
-    hasTauriInternals() &&
-    ((
-      window as Window & {
-        __TAURI_OS_PLUGIN_INTERNALS__?: {
-          platform?: string;
-        };
-      }
-    ).__TAURI_OS_PLUGIN_INTERNALS__?.platform === "macos" ||
-      /Mac/i.test(navigator.platform))
-  );
+  return hasTauriInternals() && ["macos", "windows"].includes(desktopOs());
 }
 export const permissionLabels: Record<SitePermissionDecision, string> = {
   ask: "Ask",

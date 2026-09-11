@@ -98,11 +98,11 @@ vi.mock("@/features/auth/AuthContext", () => ({
   }),
 }));
 
-vi.mock("@/features/tour", () => ({
-  AppTour: () => null,
-  isTourCompletedForAccount: () => true,
-  useTourStore: {
-    getState: () => ({ isOpen: false, startTour: vi.fn() }),
+vi.mock("@/features/setup", () => ({
+  FirstRunSetup: () => null,
+  isSetupCompletedForAccount: () => true,
+  useSetupStore: {
+    getState: () => ({ isOpen: false, startSetup: vi.fn() }),
   },
 }));
 

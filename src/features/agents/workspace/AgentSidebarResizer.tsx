@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 const storageKey = "misty:agent-sidebar-width";
-export const minSidebarWidth = 200;
+const minSidebarWidth = 200;
 const maxSidebarWidth = 420;
 const defaultSidebarWidth = 240;
 

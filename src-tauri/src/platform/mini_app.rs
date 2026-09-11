@@ -148,15 +148,6 @@ pub fn mini_app_close(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
-pub(crate) fn search_process_command(
-    executable: &std::path::Path,
-    work: &std::path::Path,
-    index: &std::path::Path,
-) -> std::io::Result<std::process::Command> {
-    permissions::search_process_command(executable, work, index)
-}
-
 /// A built-in Files instance as `builtin_service_open` creates it, for native
 /// integration tests that need real service leases.
 #[cfg(test)]

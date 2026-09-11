@@ -3,7 +3,7 @@ import { useAppThemeStore, type ResolvedAppTheme } from "./useAppThemeStore";
 /** The account's Theme setting; "system" follows the OS appearance. */
 export type AppThemeMode = "system" | ResolvedAppTheme;
 
-export type AppThemeTokens = {
+type AppThemeTokens = {
   background: string;
   surface: string;
   surfaceRaised: string;
@@ -93,7 +93,7 @@ export function appThemeSnapshot(): AppThemeSnapshot {
   return current;
 }
 
-export function resolveAppTheme(mode: AppThemeMode): ResolvedAppTheme {
+function resolveAppTheme(mode: AppThemeMode): ResolvedAppTheme {
   if (mode !== "system") return mode;
   return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }

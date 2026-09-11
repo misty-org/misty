@@ -19,7 +19,7 @@ export interface AgentMethodDefinition {
 }
 export type ScheduleFrequency = "once" | "hourly" | "daily" | "weekly" | "monthly" | "yearly";
 /** "The second Tuesday" is { nth: 2, weekday: 2 }; "the last Friday" is { nth: -1, weekday: 5 }. */
-export interface NthWeekday {
+interface NthWeekday {
   nth: number;
   weekday: number;
 }

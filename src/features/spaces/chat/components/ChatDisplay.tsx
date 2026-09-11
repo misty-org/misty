@@ -52,7 +52,7 @@ export function formatChatMessageTime(value: string): string {
   }).format(new Date(value));
 }
 
-export function formatChatDateDivider(value: string): string {
+function formatChatDateDivider(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
     month: "long",
     day: "numeric",

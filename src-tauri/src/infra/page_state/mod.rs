@@ -37,56 +37,14 @@ async fn run(view: &Webview, command: Value) -> Result<Value, String> {
     let body = format!(
         "{RUNTIME}\nreturn JSON.stringify(globalThis.__mistyPageState.run({command}) ?? null);"
     );
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     let raw = super::browser_macos::evaluate_isolated_javascript(view.clone(), body).await?;
-    #[cfg(windows)]
-    let raw = windows_eval(view, format!("(() => {{ {body} }})()")).await?;
     #[cfg(not(any(target_os = "macos", windows)))]
     let raw: String = {
         let _ = (view, body);
         return Err("Page state is not supported on this platform.".into());
     };
     serde_json::from_str(&raw).map_err(|_| "The page returned an invalid page state.".into())
-}
-
-/// WebView2 has no isolated script world; the runtime runs in the page world
-/// there. It still never submits or navigates across origins.
-#[cfg(windows)]
-async fn windows_eval(view: &Webview, script: String) -> Result<String, String> {
-    use std::sync::{Arc, Mutex};
-    use webview2_com::ExecuteScriptCompletedHandler;
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let send = Arc::new(Mutex::new(Some(send)));
-    view.with_webview(move |platform| unsafe {
-        let reply = send.clone();
-        let handler =
-            ExecuteScriptCompletedHandler::create(Box::new(move |status, result: String| {
-                if let Some(send) = reply.lock().ok().and_then(|mut s| s.take()) {
-                    // ExecuteScript JSON-encodes the returned string once more.
-                    let decoded =
-                        serde_json::from_str::<String>(&result).unwrap_or_else(|_| "null".into());
-                    let _ = send.send(if status.is_ok() {
-                        Ok(decoded)
-                    } else {
-                        Err("The page could not run page-state code.".to_string())
-                    });
-                }
-                Ok(())
-            }));
-        let started = platform.controller().CoreWebView2().and_then(|core| {
-            core.ExecuteScript(&windows::core::HSTRING::from(script.as_str()), &handler)
-        });
-        if started.is_err() {
-            if let Some(send) = send.lock().ok().and_then(|mut s| s.take()) {
-                let _ = send.send(Err("The page could not run page-state code.".to_string()));
-            }
-        }
-    })
-    .map_err(|e| e.to_string())?;
-    tokio::time::timeout(std::time::Duration::from_secs(10), receive)
-        .await
-        .map_err(|_| "Page state timed out.".to_string())?
-        .map_err(|_| "Page state was canceled.".to_string())?
 }
 
 #[derive(Serialize, Deserialize, Clone)]

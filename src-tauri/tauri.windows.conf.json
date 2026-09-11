@@ -4,10 +4,11 @@
     "windows": [
       {
         "title": "Misty",
+        "visible": false,
         "width": 1280,
         "height": 820,
-        "minWidth": 1040,
-        "minHeight": 720,
+        "minWidth": 640,
+        "minHeight": 420,
         "backgroundThrottling": "disabled",
         "backgroundColor": "#131313",
         "decorations": false,
@@ -23,8 +24,12 @@
   "bundle": {
     "targets": ["nsis"],
     "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerHooks": "windows/installer-hooks.nsh"
       }
     }
   }

@@ -1,6 +1,6 @@
 import type { DisplayCapture } from "./protocol";
 /** A walkthrough step: this answer shows `step` of about `total`. */
-export interface CompanionGuide {
+interface CompanionGuide {
   step: number;
   total: number;
 }

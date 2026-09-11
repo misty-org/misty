@@ -1,13 +1,14 @@
 import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model/types";
 import { enableModernWindowStyle } from "@/native";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { invoke } from "@tauri-apps/api/core";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
+const WINDOW_DRAG_SUPPRESS_SELECTOR = [
   "button",
   "a",
   "input",
@@ -308,6 +309,23 @@ export function useDesktopWindowChrome() {
   }, []);
   const shouldShowWindowsTitlebarControls =
     desktopPlatform === "windows" || desktopPlatform === "linux";
+  // Windows opens Snap Layouts when the pointer rests on a maximize button.
+  // Misty's is drawn in the page, so it asks for the flyout itself.
+  const snapLayoutsTimerRef = useRef<number | undefined>(undefined);
+  const cancelSnapLayouts = useCallback(() => {
+    window.clearTimeout(snapLayoutsTimerRef.current);
+    snapLayoutsTimerRef.current = undefined;
+  }, []);
+  const showSnapLayoutsSoon = useCallback(() => {
+    if (!hasTauriInternals() || desktopPlatform !== "windows") return;
+    cancelSnapLayouts();
+    snapLayoutsTimerRef.current = window.setTimeout(() => {
+      snapLayoutsTimerRef.current = undefined;
+      void invoke("window_show_snap_layouts").catch(() => undefined);
+    }, 500);
+  }, [cancelSnapLayouts, desktopPlatform]);
+  useEffect(() => cancelSnapLayouts, [cancelSnapLayouts]);
+
   return {
     desktopPlatform,
     shouldShowWindowsTitlebarControls,
@@ -317,5 +335,7 @@ export function useDesktopWindowChrome() {
     toggleTitlebarMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
+    showSnapLayoutsSoon,
+    cancelSnapLayouts,
   };
 }

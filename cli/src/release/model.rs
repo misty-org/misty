@@ -15,6 +15,16 @@ pub fn updater_endpoint() -> String {
 pub const RELEASE_MANIFEST_NAME: &str = "misty-release-manifest.json";
 pub const MACOS_PLATFORM: &str = "macos-universal";
 pub const WINDOWS_PLATFORM: &str = "windows-x86_64";
+pub const WINDOWS_ARM_PLATFORM: &str = "windows-aarch64";
+
+/// The Rust target a platform builds for when it isn't the host's own.
+pub fn cross_target(platform: &str) -> Option<&'static str> {
+    match platform {
+        MACOS_PLATFORM => Some("universal-apple-darwin"),
+        WINDOWS_ARM_PLATFORM => Some("aarch64-pc-windows-msvc"),
+        _ => None,
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ReleaseManifest {

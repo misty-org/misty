@@ -1,25 +1,21 @@
 import { invoke } from "./invoke";
 
-// Devices (docs/design/devices/BRIEF.md). Identity, trust, signatures, the
-// control channel and LAN connections stay native; these only drive them.
+// Devices (docs/design/devices/BRIEF.md). Identity, trust, signatures and the
+// control channel stay native; these only drive them. Everything between a
+// person's devices goes through the server.
 
-export interface PeerPresence {
+interface PeerPresence {
   deviceId: string;
-  endpointId: string;
   online: boolean;
-  networkKey: string;
-  overlay: boolean;
 }
 
 export interface ChannelSnapshot {
   connected: boolean;
   admitted: boolean;
-  networkKey: string;
-  overlay: boolean;
   peers: PeerPresence[];
 }
 
-export interface SharedFolder {
+interface SharedFolder {
   scopeId: string;
   name: string;
 }
@@ -37,13 +33,11 @@ export interface DevicePolicy {
 
 export interface DevicesView {
   serverDeviceId: string | null;
-  endpointId: string | null;
   admitted: boolean;
   canSign: boolean;
   vaultPinned: boolean;
   listVersion: number;
   channel: ChannelSnapshot;
-  connected: string[];
   policy: DevicePolicy | null;
 }
 
@@ -65,13 +59,6 @@ export interface PendingAdmission {
 export interface SignedRecord {
   payload: string;
   signature: string;
-}
-
-export interface DeliveryReceipt {
-  destinationDeviceId: string;
-  fileName: string;
-  size: number;
-  sha256: string;
 }
 
 type Account = { apiBase: string; accountId: string };
@@ -107,7 +94,6 @@ export const devicesNative = {
     policy: { files: FileSharing; clipboard: boolean; agentSurfaces: AgentSurface[] },
   ) => invoke<DevicePolicy>("devices_set_policy", { ...account, ...policy }),
   publishFolders: (account: Account) => invoke<void>("devices_publish_folders", account),
-  connect: (deviceId: string) => invoke<boolean>("devices_connect", { deviceId }),
   signRequest: (
     account: Account,
     request: { method: string; path: string; timestamp: string; nonce: string; bodyDigest: string },
@@ -123,6 +109,8 @@ export const devicesNative = {
   ) => invoke<SignedRecord[]>("device_sign_run_grants", { ...account, grants }),
   verifyJob: (operation: string, scopeId: string, config: unknown) =>
     invoke<void>("device_verify_job", { operation, scopeId, config }),
-  sendFile: (scopeId: string, input: unknown, config: unknown) =>
-    invoke<DeliveryReceipt>("device_send_file", { scopeId, input, config }),
+  /** A shared folder's file for a `files.send` job, checked against the job's
+   * run grant natively. Arrives as raw bytes (at most 128 MiB). */
+  readSharedFile: (scopeId: string, input: unknown, config: unknown) =>
+    invoke<ArrayBuffer>("device_read_shared_file", { scopeId, input, config }),
 };

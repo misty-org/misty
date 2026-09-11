@@ -17,12 +17,12 @@ export interface CommonClientProperties {
   environment: Environment;
 }
 
-export interface CommonServerProperties {
+interface CommonServerProperties {
   environment: Environment;
   server_version?: string;
 }
 
-export interface SubscriptionProperties extends CommonServerProperties {
+interface SubscriptionProperties extends CommonServerProperties {
   provider: "stripe" | "other";
   plan_id: string;
   billing_interval?: "monthly" | "yearly" | "lifetime" | "other";

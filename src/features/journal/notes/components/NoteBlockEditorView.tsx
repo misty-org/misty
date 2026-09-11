@@ -1126,4 +1126,3 @@ function collaborationUser(accountId?: string) {
     color: colors[Math.abs(hash) % colors.length],
   };
 }
-export default NoteBlockEditorView;

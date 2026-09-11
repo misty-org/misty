@@ -1,0 +1,91 @@
+/* Welcome hero: emerges from the haze as the clouds clear, then dives back in on Sign in. */
+.misty-welcome-hero {
+  opacity: 0;
+  transform: scale(0.22);
+  transform-origin: 50% 50%;
+  visibility: hidden;
+}
+.misty-welcome-hero[data-phase="in"] {
+  visibility: visible;
+  animation: misty-welcome-emerge 2.2s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
+}
+.misty-welcome-hero[data-phase="out"] {
+  visibility: visible;
+  pointer-events: none;
+  animation: misty-welcome-dive 1.5s cubic-bezier(0.5, 0, 0.85, 0.4) forwards;
+}
+/* A soft pool of background behind the copy so it stays readable over passing mist. */
+.misty-welcome-hero::before {
+  content: "";
+  position: absolute;
+  inset: -18% -25%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--color-charcoal-bg) 78%, transparent) 30%,
+    transparent
+  );
+}
+.misty-welcome-title,
+.misty-welcome-hint {
+  text-shadow: 0 0 40px var(--color-charcoal-bg);
+}
+.misty-welcome-hint {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.misty-welcome-hint[data-visible="true"] {
+  opacity: 1;
+  animation: misty-welcome-breathe 3.2s ease-in-out 1.2s infinite;
+}
+
+@keyframes misty-welcome-emerge {
+  from {
+    opacity: 0;
+    transform: scale(0.22);
+    filter: blur(14px);
+  }
+  45% {
+    opacity: 1;
+  }
+  70% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+@keyframes misty-welcome-dive {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.4);
+    filter: blur(18px);
+  }
+}
+@keyframes misty-welcome-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .misty-welcome-hero,
+  .misty-welcome-hero[data-phase] {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    animation: none;
+  }
+}

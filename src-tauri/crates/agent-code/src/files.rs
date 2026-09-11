@@ -62,8 +62,15 @@ fn checked(relative: &str) -> Result<PathBuf, CodeError> {
     Ok(path)
 }
 
+/// A project path as the model reads and writes it: `/` between parts on
+/// every platform.
 fn display(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
+    let text = path.to_string_lossy();
+    if cfg!(windows) {
+        text.replace('\\', "/")
+    } else {
+        text.into_owned()
+    }
 }
 
 /// Reads a whole text file, refusing binaries and very large files.
@@ -382,31 +389,10 @@ pub fn list(root: &std::fs::File, request: ListRequest) -> Result<Value, CodeErr
 }
 
 fn list_names(dir: &std::fs::File) -> std::io::Result<Vec<String>> {
-    use std::os::fd::AsRawFd;
-    // Read through a duplicate descriptor so the caller's handle stays usable.
-    let fd = unsafe { libc::dup(dir.as_raw_fd()) };
-    if fd < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    let stream = unsafe { libc::fdopendir(fd) };
-    if stream.is_null() {
-        unsafe { libc::close(fd) };
-        return Err(std::io::Error::last_os_error());
-    }
-    let mut names = Vec::new();
-    loop {
-        let entry = unsafe { libc::readdir(stream) };
-        if entry.is_null() {
-            break;
-        }
-        let name = unsafe { std::ffi::CStr::from_ptr((*entry).d_name.as_ptr()) }
-            .to_string_lossy()
-            .into_owned();
-        if name != "." && name != ".." {
-            names.push(name);
-        }
-    }
-    unsafe { libc::closedir(stream) };
+    let mut names: Vec<String> = beneath::list_names(dir)?
+        .into_iter()
+        .map(|name| name.to_string_lossy().into_owned())
+        .collect();
     names.sort_by_key(|name| name.to_lowercase());
     Ok(names)
 }

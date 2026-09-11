@@ -5,7 +5,7 @@ import {
   useMistyPanelStore,
   WorkflowSchedulesBridge,
 } from "@/features/agents";
-import { routes, useAppStore, type AppTab } from "@/features/app-shell";
+import { isAuthPath, routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
@@ -18,7 +18,7 @@ import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContex
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
-import { AppTour, isTourCompletedForAccount, useTourStore } from "@/features/tour";
+import { FirstRunSetup, isSetupCompletedForAccount, useSetupStore } from "@/features/setup";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import {
@@ -89,6 +89,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     toggleTitlebarMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
+    showSnapLayoutsSoon,
+    cancelSnapLayouts,
   } = useDesktopWindowChrome();
   const appZoom = appZoomRenderScale(useAppZoomValue());
   useDesktopFrameStyle();
@@ -148,10 +150,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   }, []);
   useEffect(() => {
     if (!user?.id || transitioning) return;
-    const tourState = useTourStore.getState();
-    if (!isTourCompletedForAccount(tourState, user.id) && !tourState.isOpen) {
-      tourState.startTour();
-    }
+    const setup = useSetupStore.getState();
+    if (!isSetupCompletedForAccount(setup, user.id) && !setup.isOpen) setup.startSetup();
   }, [user?.id, transitioning]);
 
   useEffect(() => {
@@ -295,7 +295,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       ? styles.windowsTitlebarNavigationInset
       : styles.desktopTitlebarNavigationInset,
   );
-  const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
+  const isAuthRoute = isAuthPath(location.pathname);
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(location.pathname);
   const sharedTitlebar =
     !isAuthRoute &&
@@ -427,7 +427,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 className={styles.windowsTitlebarControlButtonClass}
                 aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
                 title={isWindowMaximized ? "Restore" : "Maximize"}
-                onClick={() => void toggleTitlebarMaximize().catch(() => undefined)}
+                onPointerEnter={showSnapLayoutsSoon}
+                onPointerLeave={cancelSnapLayouts}
+                onClick={() => {
+                  cancelSnapLayouts();
+                  void toggleTitlebarMaximize().catch(() => undefined);
+                }}
               >
                 {isWindowMaximized ? <RestoreGlyph /> : <Square size={16} strokeWidth={1.5} />}
               </Pressable>
@@ -500,7 +505,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             <BrowserContextMenuBridge />
             <WorkflowSchedulesBridge />
             <AgentJobWorker />
-            <AppTour />
+            <FirstRunSetup />
           </>
         ) : null}
       </main>

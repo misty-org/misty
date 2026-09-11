@@ -207,18 +207,19 @@ pub(crate) unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSVi
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 static MAIN_WINDOW_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn main_window_ready() -> bool {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     return MAIN_WINDOW_READY.load(std::sync::atomic::Ordering::Acquire);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     true
 }
 
 /// Completes window preparation after React, fonts, and saved zoom are ready.
-/// The macOS window starts hidden so its first frame has positioned traffic lights.
+/// The window starts hidden so its first frame already has the theme's
+/// background (and, on macOS, positioned traffic lights).
 #[tauri::command]
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     // The main window can already contain embedded provider views on reload.
@@ -246,6 +247,13 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
             })
             .map_err(|error| error.to_string())?;
         receive.await.map_err(|error| error.to_string())?;
+    }
+    #[cfg(windows)]
+    {
+        let window = webview.window();
+        MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
+        window.show().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
     }
     Ok(())
 }

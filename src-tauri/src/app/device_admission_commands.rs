@@ -22,7 +22,7 @@ pub async fn devices_admit_self(
     require_main(&webview)?;
     let context = context(&state, &api_base, &account_id).await?;
     admission::admit_self(&context).await?;
-    Ok(view(&state, &account_id).await)
+    Ok(view(&account_id).await)
 }
 
 #[tauri::command]
@@ -124,8 +124,7 @@ pub async fn devices_remove(
     require_main(&webview)?;
     let context = context(&state, &api_base, &account_id).await?;
     admission::remove(&context, &device_id).await?;
-    state.connected_devices.close_untrusted();
-    Ok(view(&state, &account_id).await)
+    Ok(view(&account_id).await)
 }
 
 #[tauri::command]
@@ -184,34 +183,4 @@ pub async fn devices_publish_folders(
     )
     .await?;
     Ok(())
-}
-
-#[tauri::command]
-pub async fn devices_connect(
-    state: State<'_, MistyRuntime>,
-    device_id: String,
-) -> Result<bool, String> {
-    if state
-        .connected_devices
-        .connected_device_ids()
-        .contains(&device_id)
-    {
-        return Ok(true);
-    }
-    let endpoint = device_trust::current_list().and_then(|list| {
-        list.admitted_key(&device_id)
-            .and_then(crate::infra::device_records::endpoint_of)
-    });
-    let cached = device_trust::known_addresses(&device_id);
-    if let (Some(endpoint), false) = (endpoint, cached.is_empty()) {
-        if state
-            .connected_devices
-            .connect_device(&device_id, &endpoint, cached)
-            .await
-            .is_ok()
-        {
-            return Ok(true);
-        }
-    }
-    Ok(device_channel::request_connect(&device_id))
 }

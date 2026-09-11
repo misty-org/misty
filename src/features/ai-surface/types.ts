@@ -52,8 +52,8 @@ export type AiSurfaceId =
   | "scheduled"
   | "agents"
   | "settings";
-export type AiInvocationMode = "quick" | "drawer" | "companion";
-export type AiTrigger =
+type AiInvocationMode = "quick" | "drawer" | "companion";
+type AiTrigger =
   | "message"
   | "selection"
   | "object"
@@ -62,9 +62,9 @@ export type AiTrigger =
   | "event"
   | "handoff"
   | "continuation";
-export type AiPrivacyClass = "shared" | "private" | "device" | "provider";
-export type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
-export type AiApprovalPolicy =
+type AiPrivacyClass = "shared" | "private" | "device" | "provider";
+type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
+type AiApprovalPolicy =
   "none" | "auto_apply_with_undo" | "visible_apply" | "confirm" | "always_confirm";
 export interface AiContextReference {
   kind: string;
@@ -80,9 +80,8 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  /** A browser tab, a folder shared with agents, the Misty browser itself, or
-   * the device's inbox for files its other devices send it. */
-  kind: "browser_tab" | "local_folder" | "project_folder" | "workspace" | "inbox";
+  /** A browser tab, a folder shared with agents, a project, or the Misty browser itself. */
+  kind: "browser_tab" | "local_folder" | "project_folder" | "workspace";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
@@ -120,7 +119,7 @@ export type AiArtifactKind =
   | "transfer_plan"
   | "extension_action"
   | "image_edit";
-export interface AiArtifactTarget {
+interface AiArtifactTarget {
   kind: string;
   id: string;
   spaceId?: string;
@@ -181,7 +180,7 @@ export interface MistyUndoReceipt {
   title: string;
   expiresAt: string;
 }
-export interface AiCompanionRect {
+interface AiCompanionRect {
   x: number;
   y: number;
   width: number;
@@ -255,30 +254,6 @@ export interface AiInvocationCreated {
   conversationId?: string;
   state: AiInvocationState;
   eventsUrl: string;
-}
-export interface AiRunRoutingOption {
-  space_id: string;
-  space_name: string;
-  agent_id: string;
-  agent_name: string;
-  capability_id: string;
-  capability_name: string;
-}
-export interface AiRunCreated {
-  status: string;
-  agents_href?: string;
-  replayed?: boolean;
-  run?: {
-    id: string;
-    state: string;
-    error_message?: string;
-  };
-  routing?: {
-    needs_clarification?: boolean;
-    question?: string;
-    options?: AiRunRoutingOption[];
-    selected?: AiRunRoutingOption;
-  };
 }
 export type AiInvocationState =
   | "queued"
@@ -437,7 +412,7 @@ export interface AiTranscriptMessage {
  * What a tool call targeted and got back, summarized by the server from known
  * fields only: a short target, a short result, a few rows, or printed output.
  */
-export interface AiToolActivity {
+interface AiToolActivity {
   detail?: string;
   result?: string;
   rows?: { title: string; meta?: string }[];

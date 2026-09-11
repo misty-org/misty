@@ -85,7 +85,7 @@ export async function openScreenAndContinue(
       desktop &&
       !(await import("@/features/agents/workspaceAutopilot")).visibleAutopilotAvailable()
     )
-      throw new Error("Using other apps needs the Misty app on a Mac.");
+      throw new Error("Using other apps needs the Misty app on macOS or Windows.");
     const { useCompanionState } = await import("@/features/agents/companion/companionState");
     const companion = useCompanionState.getState();
     if (look && companion.submit && companion.accountId === get().accountId) {
@@ -164,7 +164,7 @@ export async function openScreenAndContinue(
  * (docs/design/agents-on-devices/BRIEF.md). Its tab arrives with a grant that
  * device signed; every step runs there.
  */
-export async function continueOnRemoteDevice(
+async function continueOnRemoteDevice(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
   conversationId: string,

@@ -28,13 +28,7 @@ const TASKS: &[&str] = &[
     "run-tool",
     "tauri",
     "workspace-pane-lifecycle",
-    "release/beta",
-    "release/collect-macos",
-    "release/finalize-draft",
-    "release/prepare-manifest",
-    "release/promote-beta",
     "release/setup-keys",
-    "release/sign-dmg",
 ];
 
 /// Tooling that uses Vite/Node APIs stays in TypeScript under cli/tasks.
@@ -58,7 +52,7 @@ fn task_path(root: &std::path::Path, name: &str) -> Result<PathBuf> {
             .split('/')
             .any(|s| s.is_empty() || s == "." || s == "..")
     {
-        bail!("Use a task name relative to cli/tasks, such as release/prepare-manifest");
+        bail!("Use a task name relative to cli/tasks, such as release/setup-keys");
     }
     let path = root.join(format!("{name}.ts")).canonicalize()?;
     if !path.starts_with(root) || !path.is_file() {
@@ -78,6 +72,16 @@ pub fn tasks(workspace: &Workspace) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn every_listed_task_exists() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tasks");
+        for name in TASKS {
+            assert!(
+                root.join(format!("{name}.ts")).is_file(),
+                "{name} is listed but missing"
+            );
+        }
+    }
     #[test]
     fn only_repo_tasks_can_run() {
         let dir = tempfile::tempdir().unwrap();

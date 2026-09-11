@@ -46,7 +46,6 @@ export function GlobalNavigator(props: {
         )}
         data-dock-position={props.position ?? "left"}
         aria-label="Primary"
-        data-tour-target="navigation"
         onPointerDown={props.onStartWindowDrag}
       >
         <div

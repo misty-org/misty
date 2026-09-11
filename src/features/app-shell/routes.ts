@@ -10,4 +10,10 @@ export const routes = {
   register: "/register",
   settings: "/settings",
   signIn: "/signin",
+  welcome: "/welcome",
 } as const;
+
+/** Signed-out screens: no workspace chrome, navigation rail or tabs. */
+export function isAuthPath(pathname: string): boolean {
+  return pathname === routes.welcome || pathname === routes.signIn || pathname === routes.register;
+}

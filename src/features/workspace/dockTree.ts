@@ -229,7 +229,7 @@ export function updateDockSplitRatio(
   return first === node.first && second === node.second ? node : { ...node, first, second };
 }
 
-export function clampDockRatio(ratio: number): number {
+function clampDockRatio(ratio: number): number {
   if (!Number.isFinite(ratio)) return 0.5;
   return Math.min(0.85, Math.max(0.15, ratio));
 }

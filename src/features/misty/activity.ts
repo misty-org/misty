@@ -19,9 +19,3 @@ export interface MistyActivityEntry {
     error?: string;
   }>;
 }
-export function activityParent(entry: MistyActivityEntry, entries: MistyActivityEntry[]) {
-  return entries.find(
-    (parent) =>
-      parent.id === entry.parent_run_id || (parent.run_id && parent.run_id === entry.parent_run_id),
-  );
-}

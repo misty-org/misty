@@ -26,6 +26,9 @@ pub struct Project {
 pub struct CodeService {
     data: PathBuf,
     user_home: Option<PathBuf>,
+    /// Windows: the toolchains commands may use.
+    #[cfg(windows)]
+    tools: Vec<sandbox::ToolFolder>,
     /// Folders that hold Misty's own data: never a project, never inside one.
     protected: Vec<PathBuf>,
     checkpoints: Checkpoints,
@@ -87,6 +90,8 @@ impl CodeService {
     pub fn new(data: PathBuf, user_home: Option<PathBuf>) -> Self {
         Self {
             checkpoints: Checkpoints::new(data.join("checkpoints")),
+            #[cfg(windows)]
+            tools: sandbox::discover_tools(user_home.as_deref(), &[data.clone()]),
             data,
             user_home,
             protected: Vec::new(),
@@ -106,10 +111,46 @@ impl CodeService {
         self
     }
 
+    /// Uses these toolchains instead of the ones found on PATH (tests).
+    #[cfg(windows)]
+    pub fn with_tools(mut self, tools: Vec<sandbox::ToolFolder>) -> Self {
+        self.tools = tools;
+        self
+    }
+
+    /// Windows toolchain folders that only an administrator can share with
+    /// sandboxed commands; the rest are shared on the way.
+    #[cfg(windows)]
+    pub fn tools_needing_approval(&self) -> Vec<PathBuf> {
+        sandbox::tools_needing_approval(&self.tools)
+    }
+
     /// Folders that can't become projects: the disk, the home folder itself,
     /// system and library folders, and anything holding Misty's own data.
     pub fn check_root(&self, root: &Path) -> Result<(), CodeError> {
         let refuse = |why: &str| Err(CodeError::Scope(why.to_owned()));
+        let root = &crate::plain_path(root);
+        #[cfg(windows)]
+        {
+            let lower = root.to_string_lossy().to_lowercase();
+            let system = ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+                .iter()
+                .filter_map(|name| std::env::var_os(name))
+                .map(|folder| folder.to_string_lossy().to_lowercase());
+            for folder in system {
+                if lower == folder || lower.starts_with(&format!("{folder}\\")) {
+                    return refuse("System folders can't be projects.");
+                }
+            }
+            // Temporary folders are fine, as on macOS; the rest of AppData
+            // belongs to apps.
+            let temp = crate::plain_path(&std::env::temp_dir());
+            if let Some(home) = self.user_home.as_ref().filter(|_| !root.starts_with(&temp)) {
+                if root.starts_with(home.join("AppData")) {
+                    return refuse("That folder holds app data or keys, so it can't be a project.");
+                }
+            }
+        }
         if !root.is_absolute() || root.parent().is_none() {
             return refuse("Choose a project folder, not the whole disk.");
         }
@@ -167,7 +208,9 @@ impl CodeService {
     }
 
     async fn proxy_port(&self, project: &Project) -> Result<Option<u16>, CodeError> {
-        if !project.allow_installs {
+        // A Windows AppContainer can't reach a proxy on this computer, so
+        // commands there stay offline (see `sandbox`).
+        if !project.allow_installs || cfg!(windows) {
             return Ok(None);
         }
         let mut proxy = self.proxy.lock().await;
@@ -196,14 +239,27 @@ impl CodeService {
         beneath::open_dir(&root, &cwd).map_err(|error| io_fix("use that folder", error))?;
         let (home, temp) = self.scratch(project, run_id)?;
         let proxy_port = self.proxy_port(project).await?;
+        #[cfg(windows)]
+        let state = self.sandbox_state(&project.scope_id);
         let policy = sandbox::Policy {
             project: &project.root,
             temp: &temp,
             home: &home,
             user_home: self.user_home.as_deref(),
             proxy_port,
+            #[cfg(windows)]
+            state: &state,
+            #[cfg(windows)]
+            tools: &self.tools,
         };
         sandbox::setup(&policy, &project.root.join(cwd), command)
+    }
+
+    /// Where a project's Windows sandbox records what it changed. Scope IDs
+    /// are checked before any command reaches here.
+    #[cfg(windows)]
+    fn sandbox_state(&self, scope_id: &str) -> PathBuf {
+        self.data.join("sandbox").join(scope_id)
     }
 
     fn ensure_checkpoint(&self, project: &Project, run_id: &str) -> Result<(), CodeError> {
@@ -475,6 +531,13 @@ impl CodeService {
         self.previews.stop(Some(scope_id));
         self.checkpoints.forget(scope_id);
         if scope_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') && !scope_id.is_empty() {
+            // The project's own permissions go back before its folders go.
+            #[cfg(windows)]
+            {
+                let state = self.sandbox_state(scope_id);
+                sandbox::forget(&state);
+                let _ = std::fs::remove_dir_all(state);
+            }
             let _ = std::fs::remove_dir_all(self.data.join("tmp").join(scope_id));
             let _ = std::fs::remove_dir_all(self.data.join("homes").join(scope_id));
         }

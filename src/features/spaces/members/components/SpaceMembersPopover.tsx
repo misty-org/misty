@@ -91,7 +91,6 @@ export function SpaceMembersPopover({
             title="Team"
             aria-haspopup="dialog"
             aria-expanded={open}
-            data-tour-target="space-share-button"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
           </IconButton>

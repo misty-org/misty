@@ -1,6 +1,8 @@
 mod common;
 
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{fs, path::Path};
 
 use common::{failed, fixture};
 use misty_agent_code::git::{self, transfer};
@@ -43,6 +45,7 @@ fn commits_never_run_hooks_or_include_secrets() {
     for hook in ["pre-commit", "commit-msg", "post-commit", "prepare-commit-msg"] {
         let path = f.root().join(".git/hooks").join(hook);
         fs::write(&path, format!("#!/bin/sh\ntouch '{}'\n", marker.display())).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
     }
     // Remove the starter .gitignore so secrets aren't merely ignored.
@@ -166,8 +169,12 @@ fn history_round_trips_through_githubs_description_with_identical_hashes() {
     fs::write(source.root().join("index.html"), "<h1>Hello</h1>\n").unwrap();
     fs::write(source.root().join("css/site.css"), "body{}\n").unwrap();
     fs::write(source.root().join("run.sh"), "#!/bin/sh\necho hi\n").unwrap();
-    fs::set_permissions(source.root().join("run.sh"), fs::Permissions::from_mode(0o755)).unwrap();
-    std::os::unix::fs::symlink("index.html", source.root().join("home.html")).unwrap();
+    // Executable bits and file symlinks exist on unix only.
+    #[cfg(unix)]
+    {
+        fs::set_permissions(source.root().join("run.sh"), fs::Permissions::from_mode(0o755)).unwrap();
+        std::os::unix::fs::symlink("index.html", source.root().join("home.html")).unwrap();
+    }
     let first = commit_all(&source.root(), "First page");
     fs::write(source.root().join("index.html"), "<h1>Hello again</h1>\n").unwrap();
     let second = commit_all(&source.root(), "Second page\n\nWith a body.");
@@ -181,9 +188,14 @@ fn history_round_trips_through_githubs_description_with_identical_hashes() {
     let repo = git2::Repository::open(target.root()).unwrap();
     assert_eq!(repo.head().unwrap().peel_to_commit().unwrap().id().to_string(), second);
     assert_eq!(repo.find_commit(git2::Oid::from_str(&first).unwrap()).unwrap().summary().unwrap(), Some("First page"));
-    assert_eq!(fs::read_to_string(target.root().join("index.html")).unwrap(), "<h1>Hello again</h1>\n");
-    assert_eq!(fs::read_link(target.root().join("home.html")).unwrap(), Path::new("index.html"));
-    assert_eq!(fs::metadata(target.root().join("run.sh")).unwrap().permissions().mode() & 0o111, 0o111);
+    // Checkout follows the person's core.autocrlf (on by default on Windows).
+    let checked_out = fs::read_to_string(target.root().join("index.html")).unwrap();
+    assert_eq!(checked_out.replace("\r\n", "\n"), "<h1>Hello again</h1>\n");
+    #[cfg(unix)]
+    {
+        assert_eq!(fs::read_link(target.root().join("home.html")).unwrap(), Path::new("index.html"));
+        assert_eq!(fs::metadata(target.root().join("run.sh")).unwrap().permissions().mode() & 0o111, 0o111);
+    }
 
     // A later commit pushes only what's new, and fast-forwards the copy.
     fs::write(source.root().join("about.html"), "<p>About</p>\n").unwrap();

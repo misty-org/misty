@@ -1,6 +1,6 @@
 export type SpaceActorRef = { kind: "person"; user_id: string };
 
-export interface SpaceParticipant {
+interface SpaceParticipant {
   kind: "person";
   user_id?: string;
   agent_id?: string;

@@ -3,6 +3,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 const invoke = vi.fn();
 const openBrowserView = vi.fn(() => ({ id: "view-new" }));
 const saveBookmark = vi.fn(() => "bookmark:new");
+const readSharedFile = vi.fn();
+const uploadLibraryBlob = vi.fn();
 const views = [
   { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
   { id: "a", surfaceId: "browser", title: "Docs", state: { url: "https://docs.example.com" } },
@@ -15,6 +17,12 @@ const views = [
   { id: "n", surfaceId: "notes", title: "Notes", state: {} },
 ];
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+vi.mock("@/native/devices", () => ({
+  devicesNative: { readSharedFile: (...args: unknown[]) => readSharedFile(...args) },
+}));
+vi.mock("@/api/spaces/library-upload", () => ({
+  uploadLibraryBlob: (...args: unknown[]) => uploadLibraryBlob(...args),
+}));
 vi.mock("./store/useAgentsStore", () => ({
   agentsPrepareScopedDocument: vi.fn(async () => ({
     displayName: "q3.txt",
@@ -57,12 +65,13 @@ vi.mock("@/features/bookmarks/library", () => ({
 }));
 
 const { runDeviceAgentOperation } = await import("./deviceAgentTools");
-const job = (operation: string, input: unknown, scopeId = "scope_reports") =>
+const job = (operation: string, input: unknown, scopeId = "scope_reports", spaceId?: string) =>
   ({
     id: "j",
     runId: "r",
     nodeId: "n",
     scopeId,
+    spaceId,
     operation,
     attempt: 1,
     input,
@@ -124,4 +133,25 @@ it("keeps folder jobs inside the granted folder", async () => {
       signal,
     ),
   ).toMatchObject({ name: "q3.txt", text: "Revenue grew" });
+});
+
+it("sends a shared file to the conversation's Space Library", async () => {
+  const input = { scopeId: "scope_reports", relativePath: "Q3/report.pdf" };
+  readSharedFile.mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
+  uploadLibraryBlob.mockResolvedValue({ item: { id: "item_1" } });
+  expect(
+    await runDeviceAgentOperation(job("files.send", input, "scope_reports", "space_1"), signal),
+  ).toEqual({ name: "report.pdf", size: 3, libraryItemId: "item_1" });
+  expect(readSharedFile).toHaveBeenCalledWith("scope_reports", input, {});
+  expect(uploadLibraryBlob).toHaveBeenCalledWith("space_1", expect.any(Blob), "report.pdf");
+});
+
+it("needs a Space to send a file to", async () => {
+  await expect(
+    runDeviceAgentOperation(
+      job("files.send", { scopeId: "scope_reports", relativePath: "report.pdf" }),
+      signal,
+    ),
+  ).rejects.toThrow("no_space");
+  expect(readSharedFile).not.toHaveBeenCalled();
 });

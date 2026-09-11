@@ -277,7 +277,7 @@ pub async fn browser_downloads_progress(
     Ok(progress)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 async fn native_progress(
     app: &AppHandle,
     active: Vec<(String, String)>,
@@ -310,7 +310,7 @@ async fn native_progress(
         .map_err(|_| "Download progress is unavailable.".to_owned())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 async fn native_progress(
     _app: &AppHandle,
     active: Vec<(String, String)>,
@@ -348,7 +348,7 @@ pub async fn browser_download_cancel(
             params![request.id, now_ms()],
         )
         .map_err(|error| error.to_string())?;
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
         let (sender, receiver) = tokio::sync::oneshot::channel();
         let destination = path.to_string_lossy().into_owned();
@@ -358,7 +358,7 @@ pub async fn browser_download_cancel(
         .map_err(|error| error.to_string())?;
         let _ = receiver.await;
     }
-    // WebKit removes its partial file; clean up anything left behind.
+    // The engine removes its partial file; clean up anything left behind.
     if path.is_file() {
         let _ = std::fs::remove_file(&path);
     }

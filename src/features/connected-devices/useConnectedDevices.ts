@@ -1,18 +1,7 @@
 import { useAuth } from "@/features/auth";
-import { platform } from "@tauri-apps/plugin-os";
 import { listen } from "@tauri-apps/api/event";
-import {
-  connectedDevicesInitialize,
-  connectedDevicesSetIdentity,
-  connectedDevicesSnapshot,
-} from "@/native/connected-devices";
 import { devicesApi } from "@/api/devices/api";
-import {
-  agentsDeviceSnapshot,
-  deviceAccount,
-  ensureDeviceStarted,
-} from "@/features/agents/devices";
-import type { ConnectedDevicesSnapshot } from "@/native/ipc";
+import { deviceAccount, ensureDeviceStarted } from "@/features/agents/devices";
 import {
   devicesNative,
   type AgentSurface,
@@ -22,50 +11,42 @@ import {
   type PendingAdmission,
 } from "@/native/devices";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   connectedDevicesErrorMessage,
   devicePeers,
   type AccountDevice,
 } from "./connectedDeviceModel";
-import { useFilesDeviceService } from "./useFilesDeviceService";
 
 /**
  * The account's devices (docs/design/devices/BRIEF.md): added once, then
- * trusted for sync, agents and LAN file sharing through the root-signed list.
- * Presence and connections come from native events; nothing here polls.
+ * trusted for sync, agents and the shared clipboard through the root-signed
+ * list. Everything between devices goes through the server; presence comes
+ * from native events and nothing here polls.
  */
 export function useConnectedDevices() {
   const { user } = useAuth();
   const accountId = user?.id;
   const desktop = hasTauriInternals();
-  const packaged = desktop && platform() === "macos";
-  const { deviceInstance, serviceError } = useFilesDeviceService(packaged, accountId);
   const [view, setView] = useState<DevicesView | null>(null);
   const [devices, setDevices] = useState<AccountDevice[]>([]);
   const [channel, setChannel] = useState<ChannelSnapshot | null>(null);
-  const [snapshot, setSnapshot] = useState<ConnectedDevicesSnapshot | null>(null);
   const [pending, setPending] = useState<PendingAdmission[]>([]);
-  const [unreachable, setUnreachable] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
-  const scope = useRef("");
-  scope.current = JSON.stringify([accountId, deviceInstance]);
 
   const reload = useCallback(async () => {
     const account = await deviceAccount();
-    const [list, current, requests, connections] = await Promise.all([
+    const [list, current, requests] = await Promise.all([
       devicesApi.list<{ devices: AccountDevice[] }>(),
       devicesNative.view(account.accountId),
       devicesNative.pendingRequests(account).catch(() => [] as PendingAdmission[]),
-      connectedDevicesSnapshot().catch(() => null),
     ]);
     setDevices(list.devices);
     setView(current);
     setChannel(current.channel);
     setPending(requests);
-    if (connections) setSnapshot(connections);
   }, []);
 
   // Start this device: register its key, verify trust, open the channel.
@@ -73,34 +54,19 @@ export function useConnectedDevices() {
     if (!desktop || !accountId) {
       setLoading(false);
       if (!desktop) setError("Your devices are available in the Misty desktop app.");
-      // Signed out: the channel, discovery and trust state close with the account.
+      // Signed out: the channel and trust state close with the account.
       else void devicesNative.stop().catch(() => {});
       return;
     }
-    const origin = scope.current;
     let active = true;
     void (async () => {
       try {
         const started = await ensureDeviceStarted();
-        if (!active || origin !== scope.current) return;
+        if (!active) return;
         setView(started);
         setChannel(started.channel);
-        if (!packaged || deviceInstance) {
-          const local = await agentsDeviceSnapshot();
-          if (local.device) {
-            const native = await connectedDevicesInitialize({
-              instance: deviceInstance || undefined,
-              accountId,
-              deviceId: local.device.id,
-              deviceName: local.device.displayName,
-            });
-            // Initializing forgets the previous owner's id; name this device again.
-            if (started.serverDeviceId) await connectedDevicesSetIdentity(started.serverDeviceId);
-            if (active) setSnapshot(native);
-          }
-        }
         await reload();
-        if (active) setError(packaged && !deviceInstance ? serviceError || null : null);
+        if (active) setError(null);
       } catch (cause) {
         if (active) setError(connectedDevicesErrorMessage(cause));
       } finally {
@@ -110,7 +76,7 @@ export function useConnectedDevices() {
     return () => {
       active = false;
     };
-  }, [desktop, packaged, accountId, deviceInstance, serviceError, reload]);
+  }, [desktop, accountId, reload]);
 
   // Native events: presence, list hints, removal, and sync unlocking.
   useEffect(() => {
@@ -122,17 +88,11 @@ export function useConnectedDevices() {
         if (active) stops.push(stop);
         else stop();
       });
-    subscribe<ChannelSnapshot>("misty:devices-presence", (payload) => {
-      setChannel(payload);
-      void connectedDevicesSnapshot().then(setSnapshot, () => {});
-    });
+    subscribe<ChannelSnapshot>("misty:devices-presence", setChannel);
     subscribe<{ topic: string }>("misty:devices-event", ({ topic }) => {
       if (topic === "devices" || topic === "device-admission" || topic === "reset")
         void reload().catch(() => {});
     });
-    subscribe<string>("misty:device-unreachable", (deviceId) =>
-      setUnreachable((current) => new Set(current).add(deviceId)),
-    );
     subscribe<null>("misty:device-removed", () => setRemoved(true));
     // Unlocking sync on this device is the proof that adds it.
     subscribe<string>("misty:browser-sync-changed", () => {
@@ -161,15 +121,8 @@ export function useConnectedDevices() {
   );
 
   const peers = useMemo(
-    () =>
-      devicePeers(
-        devices,
-        view?.serverDeviceId ?? null,
-        channel,
-        snapshot?.peers.map((peer) => peer.deviceId) ?? view?.connected ?? [],
-        unreachable,
-      ),
-    [devices, view, channel, snapshot, unreachable],
+    () => devicePeers(devices, view?.serverDeviceId ?? null, channel),
+    [devices, view, channel],
   );
 
   return {
@@ -178,21 +131,12 @@ export function useConnectedDevices() {
     error,
     removed,
     view,
-    snapshot,
     peers,
     devices,
     pending,
     localServerDeviceId: view?.serverDeviceId ?? null,
     localDeviceName: peers.find((peer) => peer.isSelf)?.name ?? "This Misty",
     refresh: () => act((account) => devicesNative.refresh(account)),
-    connect: async (deviceId: string) => {
-      setUnreachable((current) => {
-        const next = new Set(current);
-        next.delete(deviceId);
-        return next;
-      });
-      await devicesNative.connect(deviceId);
-    },
     rename: (deviceId: string, name: string) =>
       act((account) => devicesNative.rename(account, deviceId, name)),
     remove: (deviceId: string) => act((account) => devicesNative.remove(account, deviceId)),

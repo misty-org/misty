@@ -5,6 +5,7 @@ mod model;
 mod preflight;
 mod state;
 mod verification;
+mod windows_signing;
 
 use std::{
     fs,
@@ -22,7 +23,7 @@ use crate::{
 };
 use model::{
     PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY, RELEASE_MANIFEST_NAME,
-    WINDOWS_PLATFORM,
+    WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -87,8 +88,7 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
     let version = state::normalize_version(raw_version)?;
     let manifest = state::load_manifest(workspace, &version, !dry_run)?;
     state::verify_build_identity(workspace, &manifest)?;
-    let platform = build::current_platform()?;
-    require_selected_platform(&manifest, platform)?;
+    let platforms = local_platforms(&manifest)?;
     let public_environment = config::public_environment()?;
     if manifest.build_environment != public_environment {
         bail!("release API/website configuration differs from the release-start manifest");
@@ -100,7 +100,10 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
         bail!("release configuration differs from the release-start manifest");
     }
     if dry_run {
-        println!("Dry run: release identity and {platform} configuration are valid.");
+        println!(
+            "Dry run: release identity and {} configuration are valid.",
+            platforms.join(", ")
+        );
         return Ok(());
     }
     fs::write(&config_path, bytes)?;
@@ -113,11 +116,16 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
     CommandSpec::new(npm())
         .args(["run", "build:desktop"])
         .run(&workspace.misty)?;
-    if platform == MACOS_PLATFORM || !manifest.platforms.iter().any(|item| item == MACOS_PLATFORM) {
+    // Shared metadata comes from the macOS build when the release has one.
+    let builds_shared = platforms.contains(&MACOS_PLATFORM)
+        || !manifest.platforms.iter().any(|item| item == MACOS_PLATFORM);
+    if builds_shared {
         let shared = state::release_root(workspace, &version).join("shared");
         metadata::generate(workspace, &shared)?;
     }
-    build::platform(workspace, &manifest, platform, &config_path)?;
+    for platform in platforms {
+        build::platform(workspace, &manifest, platform, &config_path)?;
+    }
     Ok(())
 }
 
@@ -125,17 +133,19 @@ pub fn upload(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result
     let version = state::normalize_version(raw_version)?;
     let manifest = state::load_manifest(workspace, &version, !dry_run)?;
     state::verify_build_identity(workspace, &manifest)?;
-    let platform = build::current_platform()?;
-    require_selected_platform(&manifest, platform)?;
-    let platform_root = state::release_root(workspace, &version).join(platform);
-    let platform_manifest = platform_root.join(format!("release-{platform}.json"));
-    if !platform_manifest.is_file() {
-        bail!("build {platform} before uploading");
+    let platforms = local_platforms(&manifest)?;
+    let mut files = Vec::new();
+    for platform in &platforms {
+        let platform_root = state::release_root(workspace, &version).join(platform);
+        let platform_manifest = platform_root.join(format!("release-{platform}.json"));
+        if !platform_manifest.is_file() {
+            bail!("build {platform} before uploading");
+        }
+        let parsed = PlatformManifest::read(&platform_manifest)?;
+        state::verify_platform_identity(&manifest, &parsed)?;
+        verification::downloaded_files(&platform_root, &parsed)?;
+        files.extend(artifacts::files_under(&platform_root)?);
     }
-    let parsed = PlatformManifest::read(&platform_manifest)?;
-    state::verify_platform_identity(&manifest, &parsed)?;
-    verification::downloaded_files(&platform_root, &parsed)?;
-    let mut files = artifacts::files_under(&platform_root)?;
     let shared = state::release_root(workspace, &version).join("shared");
     if shared.is_dir() {
         files.extend(artifacts::files_under(&shared)?);
@@ -147,7 +157,7 @@ pub fn upload(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result
         return Ok(());
     }
     state::gh_upload(workspace, &manifest.tag, &files)?;
-    println!("Uploaded {platform} release artifacts.");
+    println!("Uploaded {} release artifacts.", platforms.join(", "));
     Ok(())
 }
 
@@ -302,27 +312,36 @@ fn finalize_public_release(workspace: &Workspace, version: &str) -> Result<()> {
 
 fn selected_platforms(os: &[ReleaseOs]) -> Result<Vec<String>> {
     if os.is_empty() {
-        return Ok(vec![build::current_platform()?.to_owned()]);
+        return Ok(build::current_platforms()?
+            .iter()
+            .map(|platform| (*platform).to_owned())
+            .collect());
     }
     let mut platforms = Vec::new();
     if os.contains(&ReleaseOs::Macos) {
         platforms.push(MACOS_PLATFORM.to_owned());
     }
     if os.contains(&ReleaseOs::Windows) {
-        platforms.push(WINDOWS_PLATFORM.to_owned());
+        platforms.extend([WINDOWS_PLATFORM.to_owned(), WINDOWS_ARM_PLATFORM.to_owned()]);
     }
     Ok(platforms)
 }
 
-fn require_selected_platform(release: &ReleaseManifest, platform: &str) -> Result<()> {
-    if release.platforms.iter().any(|item| item == platform) {
-        return Ok(());
+/// The release's platforms this machine builds; at least one.
+fn local_platforms(release: &ReleaseManifest) -> Result<Vec<&'static str>> {
+    let platforms: Vec<&'static str> = build::current_platforms()?
+        .iter()
+        .copied()
+        .filter(|platform| release.platforms.iter().any(|item| item == platform))
+        .collect();
+    if platforms.is_empty() {
+        bail!(
+            "release {} includes no platform this machine builds; selected platforms: {}",
+            release.version,
+            release.platforms.join(", ")
+        );
     }
-    bail!(
-        "release {} does not include {platform}; selected platforms: {}",
-        release.version,
-        release.platforms.join(", ")
-    )
+    Ok(platforms)
 }
 
 #[cfg(test)]
@@ -335,7 +354,7 @@ mod tests {
         if cfg!(target_os = "macos") {
             assert_eq!(selected.unwrap(), [MACOS_PLATFORM]);
         } else if cfg!(windows) {
-            assert_eq!(selected.unwrap(), [WINDOWS_PLATFORM]);
+            assert_eq!(selected.unwrap(), [WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM]);
         } else {
             assert!(selected.is_err());
         }
@@ -349,12 +368,12 @@ mod tests {
         );
         assert_eq!(
             selected_platforms(&[ReleaseOs::Windows]).unwrap(),
-            [WINDOWS_PLATFORM]
+            [WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM]
         );
         assert_eq!(
             selected_platforms(&[ReleaseOs::Windows, ReleaseOs::Macos, ReleaseOs::Windows])
                 .unwrap(),
-            [MACOS_PLATFORM, WINDOWS_PLATFORM]
+            [MACOS_PLATFORM, WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM]
         );
     }
 }

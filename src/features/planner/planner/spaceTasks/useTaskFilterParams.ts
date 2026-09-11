@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FILTER_PARAM_KEYS, activeFilterCount, filterDueRange } from "./taskFiltering";
 
-export type TaskSort = "rank" | "due" | "updated";
+type TaskSort = "rank" | "due" | "updated";
 
 /**
  * Task filters, read from and written back to the URL.

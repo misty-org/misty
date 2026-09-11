@@ -1,6 +1,6 @@
 import type { WorkspacePane, WorkspaceView } from "./model";
 
-export function paneHistory(pane: WorkspacePane) {
+function paneHistory(pane: WorkspacePane) {
   const active = pane.views[0];
   const history = pane.history;
   if (!history?.entries.length) return { entries: active ? [active] : [], index: 0 };

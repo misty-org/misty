@@ -100,7 +100,7 @@ pub(crate) async fn evaluate_browser_async_javascript(
 /// Runs `function_body` in Misty's page-state content world: it shares the
 /// DOM with the page but not its JavaScript, so page scripts cannot observe
 /// or tamper with it. The world is retained so its globals persist per page.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) async fn evaluate_isolated_javascript(
     webview: Webview,
     function_body: String,
@@ -256,12 +256,34 @@ pub(super) fn reload_browser_webview(webview: &Webview) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+/// Runs `function_body` as an async function in the page's own world and
+/// returns the string it resolves to, as WebKit's callAsyncJavaScript does.
+#[cfg(windows)]
+pub(crate) async fn evaluate_browser_async_javascript(
+    webview: Webview,
+    function_body: String,
+) -> Result<String, String> {
+    let expression = format!(
+        "(async () => {{
+{function_body}
+}})()"
+    );
+    match super::webview2::evaluate(&webview, expression, None).await {
+        Ok(serde_json::Value::String(value)) => Ok(value),
+        Ok(_) => Err("The Browser page returned an invalid answer.".to_owned()),
+        Err(super::webview2::CdpError::Invalid) => {
+            Err("The Browser page could not run that request.".to_owned())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
 pub(super) async fn evaluate_browser_async_javascript(
     _webview: Webview,
     _function_body: String,
 ) -> Result<String, String> {
-    Err("Browser region capture is not available on this platform yet.".to_owned())
+    Err("This browser feature is not available on this platform yet.".to_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -380,6 +402,20 @@ pub(super) fn ask_download_destination(suggested: &std::path::Path) -> Option<st
         let path = url.as_ref()?.path()?;
         Some(std::path::PathBuf::from(path.to_string()))
     }
+}
+
+/// Asks where to save a download with the system Save dialog. WebView2 asks
+/// for the destination on the UI thread, so the modal dialog can run in place.
+#[cfg(windows)]
+pub(super) fn ask_download_destination(suggested: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut dialog = rfd::FileDialog::new().set_title("Save");
+    if let Some(name) = suggested.file_name().and_then(|name| name.to_str()) {
+        dialog = dialog.set_file_name(name);
+    }
+    if let Some(directory) = suggested.parent() {
+        dialog = dialog.set_directory(directory);
+    }
+    dialog.save_file()
 }
 
 /// Removes the chosen kinds of website data changed since `since_ms` from one

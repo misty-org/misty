@@ -58,7 +58,7 @@ export function ExtensionsSettings() {
     <>
       {runtime.ready && !runtime.supported && (
         <DesktopSettingsNotice>
-          Extensions need the Misty desktop app on macOS 15.4 or later.
+          Extensions need the Misty desktop app on Windows, or on macOS 15.4 or later.
         </DesktopSettingsNotice>
       )}
       {(failure || runtime.error) && (

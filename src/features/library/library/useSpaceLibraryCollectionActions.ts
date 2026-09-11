@@ -1,5 +1,3 @@
-export type { SpaceLibraryCollectionActions } from "./types/useSpaceLibraryCollectionActions";
-
 import { usePinnedDescriptor } from "./libraryCollections/libraryPinnedDescriptor";
 import { useLibraryAlbumFolders } from "./libraryCollections/useLibraryAlbumFolders";
 import { useLibraryAlbums } from "./libraryCollections/useLibraryAlbums";

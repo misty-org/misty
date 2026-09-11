@@ -34,7 +34,7 @@ import {
 import { buildRoadmapExecutionPlan, type RoadmapExecutionState } from "./roadmapExecutionPlan";
 import { roadmapEdgeLabels, roadmapIcon, roadmapNodeColors } from "./roadmapNodeCatalog";
 
-export type RoadmapCanvasKind = "milestone" | "goal" | "support" | "task";
+type RoadmapCanvasKind = "milestone" | "goal" | "support" | "task";
 export type RoadmapNodeData = {
   canvasKind: RoadmapCanvasKind;
   label: string;

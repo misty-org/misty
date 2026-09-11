@@ -13,7 +13,7 @@ import {
 import { publish, type GitTransport } from "../../git/gitSync";
 
 /** GitHub accepts letters, numbers, dots, dashes and underscores. */
-export function repositoryName(name: string) {
+function repositoryName(name: string) {
   return name
     .trim()
     .replace(/[^A-Za-z0-9._-]+/g, "-")

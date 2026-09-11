@@ -55,7 +55,7 @@ export function finishPermission(requestId: string) {
   }));
 }
 
-export function preference<T>(key: string, fallback: T): T {
+function preference<T>(key: string, fallback: T): T {
   const state = useSettingsProfiles.getState().state;
   return state ? (resolveSetting(state, `extensions.${key}`).value as T) : fallback;
 }
@@ -108,7 +108,9 @@ export function parseInstallations(raw: string): Installation[] {
         extensionStore(item.id) !== null &&
         typeof item.guid === "string" &&
         // A Chrome extension's identity is its ID; Firefox identities never look like one.
-        (extensionStore(item.id) === "chrome" ? item.guid === item.id : !chromeId.test(item.guid)) &&
+        (extensionStore(item.id) === "chrome"
+          ? item.guid === item.id
+          : !chromeId.test(item.guid)) &&
         typeof item.generation === "string" &&
         typeof item.name === "string" &&
         typeof item.installed === "boolean" &&

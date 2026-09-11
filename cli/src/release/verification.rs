@@ -11,7 +11,7 @@ use crate::{artifacts, workspace::Workspace};
 use super::{
     model::{
         PlatformManifest, ReleaseManifest, MACOS_PLATFORM, PUBLIC_REPOSITORY,
-        RELEASE_MANIFEST_NAME, WINDOWS_PLATFORM,
+        RELEASE_MANIFEST_NAME, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
     },
     state,
 };
@@ -133,7 +133,7 @@ pub(super) fn public_asset_names(manifests: &[PlatformManifest]) -> Result<BTree
 
         let installer_extension = match manifest.platform.as_str() {
             MACOS_PLATFORM => "dmg",
-            WINDOWS_PLATFORM => "exe",
+            WINDOWS_PLATFORM | WINDOWS_ARM_PLATFORM => "exe",
             platform => bail!("cannot select a public installer for {platform}"),
         };
         let installers = manifest
@@ -234,6 +234,9 @@ pub(super) fn latest_json(
             WINDOWS_PLATFORM => {
                 platforms.insert("windows-x86_64".to_owned(), updater);
             }
+            WINDOWS_ARM_PLATFORM => {
+                platforms.insert("windows-aarch64".to_owned(), updater);
+            }
             platform => bail!("cannot generate updater metadata for {platform}"),
         }
     }
@@ -254,6 +257,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         fs::write(directory.path().join("mac.sig"), "mac-signature").unwrap();
         fs::write(directory.path().join("windows.sig"), "windows-signature").unwrap();
+        fs::write(directory.path().join("arm.sig"), "arm-signature").unwrap();
         let release = ReleaseManifest {
             version: "0.2.0".to_owned(),
             tag: "misty-v0.2.0".to_owned(),
@@ -278,6 +282,7 @@ mod tests {
             &[
                 platform(MACOS_PLATFORM, "Misty.tar.gz", "mac.sig"),
                 platform(WINDOWS_PLATFORM, "Misty.exe", "windows.sig"),
+                platform(WINDOWS_ARM_PLATFORM, "Misty-arm64.exe", "arm.sig"),
             ],
             directory.path(),
         )
@@ -287,6 +292,10 @@ mod tests {
             latest["platforms"]["darwin-x86_64"]["url"]
         );
         assert!(latest["platforms"]["windows-x86_64"].is_object());
+        assert_eq!(
+            latest["platforms"]["windows-aarch64"]["signature"],
+            "arm-signature"
+        );
     }
 
     #[test]

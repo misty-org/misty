@@ -10,8 +10,11 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
+mod clipboard;
 mod collections;
 mod workspaces;
+
+pub use clipboard::ClipboardRow;
 
 use crate::{
     crypto::{DeviceKey, VaultRoot, VaultScope},
@@ -135,6 +138,7 @@ enum Command {
         oneshot::Sender<Result<()>>,
     ),
     Flush(oneshot::Sender<Result<()>>),
+    ClipboardPublish(u8, Vec<u8>, oneshot::Sender<Result<()>>),
 }
 
 /// Longest a flush waits for the server before answering anyway; queued
@@ -153,6 +157,8 @@ pub struct WorkerHandle {
     pub workspaces: watch::Receiver<SyncState>,
     pub traffic: Arc<crate::transport::TrafficCounters>,
     events: broadcast::Sender<AccountEvent>,
+    /// The shared clipboard's sealed clips, as last read from the server.
+    pub clipboard_rows: watch::Receiver<Vec<ClipboardRow>>,
 }
 
 /// A native import owns one reserved command slot until completion. Dropping
@@ -558,6 +564,16 @@ impl WorkerHandle {
             .await
     }
 
+    /// Puts a sealed clip in `slot` of the shared clipboard ring.
+    pub async fn clipboard_publish(&self, slot: u8, ciphertext: Vec<u8>) -> Result<()> {
+        let (send, receive) = oneshot::channel();
+        self.commands
+            .send(Command::ClipboardPublish(slot, ciphertext, send))
+            .await
+            .map_err(|_| Error::Network)?;
+        receive.await.map_err(|_| Error::Network)?
+    }
+
     pub fn account_events(&self) -> broadcast::Receiver<AccountEvent> {
         self.events.subscribe()
     }
@@ -594,6 +610,8 @@ pub struct Worker<F> {
     /// Consecutive workspaces dropped and refetched after failing to verify.
     workspace_refetches: u8,
     collections: collections::CollectionSync,
+    clipboard: clipboard::ClipboardLane,
+    clipboard_rows: watch::Sender<Vec<ClipboardRow>>,
     /// Flushes awaiting the server, with their deadlines.
     flushes: Vec<(Instant, oneshot::Sender<Result<()>>)>,
 }
@@ -643,6 +661,8 @@ where
         )?;
         let (sync_state, workspaces_rx) =
             watch::channel(workspaces.optimistic_view(&store, &root)?);
+        let clipboard = clipboard::ClipboardLane::new(&root, &scope)?;
+        let (clipboard_rows, clipboard_rows_rx) = watch::channel(Vec::new());
         let handle = WorkerHandle {
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
             commands: commands_tx,
@@ -653,6 +673,7 @@ where
             workspaces: workspaces_rx,
             traffic: api.traffic(),
             events: events.clone(),
+            clipboard_rows: clipboard_rows_rx,
         };
         Ok((
             Self {
@@ -678,6 +699,8 @@ where
                 claimed_requests: std::collections::HashSet::new(),
                 workspace_refetches: 0,
                 collections: collections::CollectionSync::default(),
+                clipboard,
+                clipboard_rows,
                 flushes: Vec::new(),
             },
             handle,
@@ -966,6 +989,9 @@ where
                 } else {
                     let _ = reply.send(Err(Error::Network));
                 }
+            }
+            Command::ClipboardPublish(slot, ciphertext, reply) => {
+                let _ = reply.send(self.clipboard.publish(slot, ciphertext));
             }
             Command::Flush(reply) => {
                 if self.connected_now {
@@ -1275,9 +1301,14 @@ where
                         },
                         ServerFrame::AccountEvent { event } => {
                             if event.topic == "browser-records" {
-                                if let Some(collection) = event.id.as_deref() { self.collections.hinted(collection); }
+                                match event.id.as_deref() {
+                                    Some(crate::collections::CLIPBOARD) => self.clipboard.hinted(),
+                                    Some(collection) => self.collections.hinted(collection),
+                                    None => {}
+                                }
                             } else if event.topic == "reset" {
                                 self.collections.reset();
+                                self.clipboard.hinted();
                             }
                             let _ = self.events.send(event);
                         },
@@ -1298,8 +1329,20 @@ where
                         ServerFrame::BatchPolicy { policy } => self.batch_policy(&policy),
                         ServerFrame::Slot { request_id, slot } => self.workspaces.on_slot(&self.root, &self.scope, request_id.as_deref(), slot),
                         ServerFrame::Blobs { .. } | ServerFrame::BlobAck { .. } => {},
-                        ServerFrame::Records { request_id, listing } => self.records_listing(request_id.as_deref(), listing)?,
-                        ServerFrame::RecordsAck { request_id, results, .. } => self.records_ack(request_id.as_deref(), results)?,
+                        ServerFrame::Records { request_id, listing } => {
+                            if self.clipboard.listing(request_id.as_deref(), &listing).is_some() {
+                                self.publish_clipboard_rows();
+                            } else {
+                                self.records_listing(request_id.as_deref(), listing)?
+                            }
+                        },
+                        ServerFrame::RecordsAck { request_id, results, .. } => {
+                            if self.clipboard.ack(request_id.as_deref(), &results).is_some() {
+                                self.publish_clipboard_rows();
+                            } else {
+                                self.records_ack(request_id.as_deref(), results)?
+                            }
+                        },
                         ServerFrame::CheckpointRequired { .. } => return Err(Error::Recovery),
                         ServerFrame::Error { code, .. } if code == "sync_unavailable" => return Err(Error::Network),
                         ServerFrame::Error { code, .. } if code == "sync_device_forbidden" => return Err(Error::DeviceForbidden),
@@ -1323,6 +1366,7 @@ where
                     if socket.stale() || in_flight.as_ref().is_some_and(|(_, sent)| sent.elapsed() >= Duration::from_secs(20)) { return Err(Error::Network); }
                     self.workspace_tick(socket).await?;
                     self.records_tick(socket).await?;
+                    self.clipboard_tick(socket).await?;
                     self.settle_flushes()?;
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.

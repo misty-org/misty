@@ -8,3 +8,5 @@ pub mod mini_app;
 pub mod navigation_guard;
 pub mod plugins;
 pub mod synced_paths;
+#[cfg(windows)]
+pub mod windows;

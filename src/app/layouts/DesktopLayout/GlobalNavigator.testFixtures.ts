@@ -27,16 +27,3 @@ export const spaceTab: WorkspaceView = {
   createdAt: 1,
   lastFocusedAt: 1,
 };
-
-export const browserTab: WorkspaceView = {
-  id: "browser-tab",
-  surfaceId: "browser",
-  groupKey: "tool:browser",
-  instanceKey: "browser",
-  title: "Browser",
-  route: "/browser",
-  sidebarVisible: true,
-  state: { version: 1, url: "https://www.google.com", faviconUrl: null },
-  createdAt: 2,
-  lastFocusedAt: 2,
-};

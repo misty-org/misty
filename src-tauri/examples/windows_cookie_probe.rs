@@ -8,11 +8,24 @@ mod browser_cookie_cdp;
 #[path = "../src/infra/browser_cookie_restore.rs"]
 mod browser_cookie_restore;
 #[cfg(windows)]
+#[allow(dead_code, reason = "the probe exercises only cookie reads and writes")]
 #[path = "../src/infra/browser_cookie_store_windows.rs"]
 mod browser_cookie_store;
 #[cfg(windows)]
+#[allow(
+    dead_code,
+    reason = "the cookie modules use only part of the coverage helpers"
+)]
+#[path = "../src/infra/browser_data_coverage.rs"]
+mod browser_data_coverage;
+#[cfg(windows)]
+#[allow(dead_code, reason = "the probe needs only the profile folder name")]
 #[path = "../src/infra/browser_profile.rs"]
 mod browser_profile;
+#[cfg(windows)]
+#[allow(dead_code, reason = "the probe uses only CDP calls")]
+#[path = "../src/infra/webview2.rs"]
+mod webview2;
 
 // The adapter's expected-folder resolver is scoped to the supervisor's disposable
 // root. The adapter itself still reads and validates actual WebView2 COM state.
@@ -81,9 +94,13 @@ mod probe {
             .map_err(|_| "invalid cookie readback")
     }
     async fn read(view: &Webview, id: &str) -> Result<Vec<Cookie>> {
-        cookies::read(view, id)
+        let read = cookies::read(view, id)
             .await
-            .map_err(|_| "native cookie read failed")
+            .map_err(|_| "native cookie read failed")?;
+        if !read.skipped.is_empty() {
+            return Err("native read skipped a cookie");
+        }
+        Ok(read.cookies)
     }
     async fn check(
         a: &Webview,

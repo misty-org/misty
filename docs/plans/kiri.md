@@ -7,16 +7,17 @@ out, supplied from Rust. `kiri/README.md` describes how it works.
 
 | Phase | Scope | macOS | Linux | Windows |
 | --- | --- | --- | --- | --- |
-| 1 | Page bridge (`plugin:kiri\|call`), tab audio state | Ran in app | Ran in probe | Compiles |
-| 2 | Camera and microphone permissions on every engine | Ran in app | Ran in probe | Compiles |
+| 1 | Page bridge (`plugin:kiri\|call`), tab audio state | Ran in app | Ran in probe | Ran in probe |
+| 2 | Camera and microphone permissions on every engine | Ran in app | Ran in probe | Ran in probe |
 | 3 | Passkeys (WebAuthn) for any site | Runs up to Apple's entitlement | Not available | WebView2's own |
-| 4 | Host channel, context menu everywhere, extension transport | Ran in app | Ran in probe | Compiles |
+| 4 | Host channel, context menu everywhere, extension transport | Ran in app | Ran in probe | Ran in probe |
 
 ## Open items
 
-- [ ] **Run Kiri's tests on Windows.** None of Kiri's Windows code has run yet: the WebView2
-      permission hook, the host channel, context-menu copy/cut/paste, and WebView2's own
-      passkeys. On a Windows machine with Rust (MSVC) and the WebView2 runtime:
+- [x] **Run Kiri's tests on Windows.** 2026-10-12, Windows 11 (WebView2 runtime current): every
+      `KIRI RUNTIME` line passed — host channel, page bridge, media signal, unknown-capability
+      refusal, Tauri command refusal, no passkey shim, the camera policy hook and its block, and
+      `engine::edit` copy. To re-run on a Windows machine with Rust (MSVC) and the WebView2 runtime:
 
       ```powershell
       powershell -ExecutionPolicy Bypass -File kiri\probes\runtime\run.ps1

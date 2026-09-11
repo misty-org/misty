@@ -14,19 +14,8 @@ import { transferDropAcceptance } from "./FileBrowserDrag";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
 import { FileBrowserSkeleton } from "./FileBrowserSkeleton";
 import { fileBrowserStyles } from "./FileBrowserStyles";
-export type {
-  FileBrowserProps,
-  GridThumbnailJob,
-} from "../model/interfaces/components/FileBrowser";
-export type {
-  FileTableColumn,
-  FileTableColumnWidths,
-  GridThumbnailSubscriber,
-} from "../model/types/components/FileBrowser";
-
+export type { FileBrowserProps } from "../model/interfaces/components/FileBrowser";
 const emptyEntries: FileEntry[] = [];
-
-export type { FileBrowserDragItem } from "./FileBrowserDrag";
 
 export const FileBrowserView = memo(function FileBrowserView(props: FileBrowserProps) {
   const deferredCommandQuery = useDeferredValue(props.commandQuery);
@@ -54,11 +43,7 @@ export const FileBrowserView = memo(function FileBrowserView(props: FileBrowserP
       id: `pane:${props.paneId}`,
       accepts: (payload: ExplorerDragPayload) =>
         destination
-          ? transferDropAcceptance(payload, destination, {
-              writable:
-                props.listing?.location.kind !== "peer_device" ||
-                props.listing.location.peerWritable === true,
-            })
+          ? transferDropAcceptance(payload, destination)
           : { valid: false, label: "Unavailable" },
       onDrop: (payload: ExplorerDragPayload, modifiers: ExplorerDragModifiers) => {
         if (!props.listing) return;

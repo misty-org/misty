@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
 import { openExternalLink } from "@/features/workspace/externalLinks";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -54,6 +55,8 @@ export function installMistyDeepLinkHandler(
     try {
       if (!hasTauriInternals()) return;
       await handleCurrentUrls();
+      // Web links Misty was started with as the default browser (Windows).
+      handleUrls(await invoke<string[]>("app_take_launch_urls"), "current");
       unlisten = await onOpenUrl((urls) => handleUrls(urls, "event"));
     } catch {}
   })();

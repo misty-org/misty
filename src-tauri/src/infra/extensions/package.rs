@@ -140,10 +140,11 @@ pub fn inspect(manifest: &Value, entry: CatalogEntry, token: String) -> Result<R
     if manifest.pointer("/chrome_url_overrides/newtab").is_some() {
         findings.push("New tabs open its page while it's turned on.".into());
     }
-    if ["bookmarks", "history"]
-        .iter()
-        .any(|page| manifest.pointer(&format!("/chrome_url_overrides/{page}")).is_some())
-    {
+    if ["bookmarks", "history"].iter().any(|page| {
+        manifest
+            .pointer(&format!("/chrome_url_overrides/{page}"))
+            .is_some()
+    }) {
         findings.push("Its replacement bookmarks or history page isn't used in Misty.".into());
     }
     findings.push(
@@ -202,7 +203,9 @@ pub fn extract(
                 .any(|p| !matches!(p, Component::Normal(_)))
             || !seen.insert(name.to_lowercase())
             || name.to_ascii_lowercase().starts_with("__misty_sync__")
-            || name.to_ascii_lowercase().starts_with("__misty_user_scripts__")
+            || name
+                .to_ascii_lowercase()
+                .starts_with("__misty_user_scripts__")
             || name
                 .to_ascii_lowercase()
                 .starts_with(super::compat::DIRECTORY)
@@ -380,13 +383,16 @@ mod tests {
         manifest["permissions"] = json!(["webRequest", "webRequestBlocking", "management"]);
         let review = inspect(&manifest, entry(&[]), "review".into()).unwrap();
         assert!(!review.blocked);
-        assert!(review
-            .findings
-            .iter()
-            .any(|v| v.contains("first matching request")));
-        assert!(review
-            .permissions
-            .contains(&"declarativeNetRequest".to_owned()));
+        // Only WebKit needs the compatibility layer's stand-ins.
+        if cfg!(not(windows)) {
+            assert!(review
+                .findings
+                .iter()
+                .any(|v| v.contains("first matching request")));
+            assert!(review
+                .permissions
+                .contains(&"declarativeNetRequest".to_owned()));
+        }
         manifest["permissions"] = json!([]);
         manifest["incognito"] = json!("not_allowed");
         assert!(

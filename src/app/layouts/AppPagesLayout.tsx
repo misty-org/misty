@@ -10,6 +10,7 @@ const appPageTitles = new Map<string, string>([
   [routes.scheduled, "Misty - Scheduled"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
+  [routes.welcome, "Misty"],
 ]);
 
 export function AppPagesLayout() {

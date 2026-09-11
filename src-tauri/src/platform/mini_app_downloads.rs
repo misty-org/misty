@@ -1,5 +1,5 @@
 //! Grant-owned public media review/download jobs.
-use super::{download_process, download_proxy::PublicProxy, PermissionSet};
+use super::{download_process, PermissionSet};
 use cap_std::fs::{Dir, OpenOptions};
 use serde_json::{json, Value};
 use std::{
@@ -32,12 +32,21 @@ struct Tools {
     ffmpeg: PathBuf,
     ffprobe: PathBuf,
 }
+impl Tools {
+    fn borrow(&self) -> download_process::Tools<'_> {
+        download_process::Tools {
+            ytdlp: &self.ytdlp,
+            ffmpeg: &self.ffmpeg,
+            ffprobe: &self.ffprobe,
+        }
+    }
+}
 
 fn tools() -> Result<Tools, String> {
-    if !cfg!(target_os = "macos") {
+    if !cfg!(any(target_os = "macos", windows)) {
         return Err("Isolated media downloads are not implemented on this platform yet.".into());
     }
-    if !Path::new("/usr/bin/sandbox-exec").is_file() {
+    if cfg!(target_os = "macos") && !Path::new("/usr/bin/sandbox-exec").is_file() {
         return Err("The native media sandbox is unavailable.".into());
     }
     let resolve = |name| {
@@ -51,6 +60,17 @@ fn tools() -> Result<Tools, String> {
         ffmpeg: resolve("ffmpeg")?,
         ffprobe: resolve("ffprobe")?,
     };
+    // A pip-installed yt-dlp is a launcher for a Python the sandbox can't
+    // reach; the standalone build carries its own.
+    let standalone = result
+        .ytdlp
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
+    if cfg!(windows) && !standalone {
+        return Err(
+            "Media downloads need the standalone yt-dlp.exe (winget install yt-dlp).".into(),
+        );
+    }
     if let Some(home) = dirs::home_dir() {
         let packages = home.join(".misty/plugins");
         if [&result.ytdlp, &result.ffmpeg, &result.ffprobe]
@@ -165,17 +185,8 @@ pub fn execute(
             let (id, state, cancel) = insert_job(permissions, None, "Reading media details…")?;
             let flag = cancel.clone();
             tokio::task::spawn_blocking(move || {
-                let result = PublicProxy::start(flag.clone()).and_then(|proxy| {
-                    download_process::inspect(
-                        &tools.ytdlp,
-                        &tools.ffmpeg,
-                        &tools.ffprobe,
-                        proxy.endpoint(),
-                        &url,
-                        playlist,
-                        flag.clone(),
-                    )
-                });
+                let result =
+                    download_process::inspect(&tools.borrow(), &url, playlist, flag.clone());
                 drop(permit);
                 finish(&state, &flag, result);
             });
@@ -207,21 +218,15 @@ pub fn execute(
             let flag = cancel.clone();
             let format = format.to_owned();
             tokio::task::spawn_blocking(move || {
-                let result = PublicProxy::start(flag.clone())
-                    .and_then(|proxy| {
-                        download_process::download(
-                            &tools.ytdlp,
-                            &tools.ffmpeg,
-                            &tools.ffprobe,
-                            proxy.endpoint(),
-                            &url,
-                            &format,
-                            playlist,
-                            flag.clone(),
-                        )
-                    })
-                    .and_then(|files| save(files, &directory, &flag))
-                    .map(|outputs| json!({"outputs":outputs}));
+                let result = download_process::download(
+                    &tools.borrow(),
+                    &url,
+                    &format,
+                    playlist,
+                    flag.clone(),
+                )
+                .and_then(|files| save(files, &directory, &flag))
+                .map(|outputs| json!({"outputs":outputs}));
                 drop(permit);
                 finish(&state, &flag, result);
             });

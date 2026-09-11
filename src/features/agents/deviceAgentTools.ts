@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { uploadLibraryBlob } from "@/api/spaces/library-upload";
 import { bookmarks, bookmarkUrl, saveBookmark } from "@/features/bookmarks/library";
 import {
   isPrivateBrowserView,
@@ -63,10 +64,13 @@ export async function runDeviceAgentOperation(
     case "files.send": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
-      // The file goes directly to the other device over the LAN; only this
-      // receipt returns to the server.
-      const receipt = await devicesNative.sendFile(job.scopeId, job.input, job.config);
-      return { ...receipt };
+      if (!job.spaceId) throw new Error("no_space");
+      // The file is read natively under the job's grant and arrives in the
+      // conversation's Space Library as a new item.
+      const bytes = await devicesNative.readSharedFile(job.scopeId, job.input, job.config);
+      const name = target.relativePath.split(/[\\/]/).filter(Boolean).pop() || "file";
+      const uploaded = await uploadLibraryBlob(job.spaceId, new Blob([bytes]), name);
+      return { name, size: bytes.byteLength, libraryItemId: uploaded.item?.id ?? null };
     }
     case "files.list":
       return invoke<Record<string, unknown>>("agents_list_scoped_files", {

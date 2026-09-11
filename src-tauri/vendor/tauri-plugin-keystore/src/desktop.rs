@@ -18,6 +18,7 @@ impl<R: Runtime> Keystore<R> {
         Ok(())
     }
     pub fn retrieve(&self, payload: RetrieveRequest) -> crate::Result<RetrieveResponse> {
+        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
         let mut value = misty_credential_store::load(&payload.service, &payload.user)?;
         // Import the prior macOS debug file. Production Keychain items are left
         // untouched; this plugin never requests access to them.

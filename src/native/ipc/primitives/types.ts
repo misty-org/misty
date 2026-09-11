@@ -4,7 +4,7 @@ export type ClipboardOrigin = "local_system" | "local_misty" | "remote_shared";
 
 export type FileKind = "folder" | "file" | "symlink" | "other";
 
-export type ExplorerLocationKind = "local" | "remote_provider" | "remote" | "peer_device";
+export type ExplorerLocationKind = "local" | "remote_provider" | "remote";
 
 export type DirectorySizeStatus = "unknown" | "calculating" | "ready" | "failed";
 

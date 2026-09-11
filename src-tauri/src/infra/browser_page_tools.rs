@@ -167,6 +167,20 @@ pub async fn browser_webview_save_page(
         let bytes = web_archive(&webview).await?;
         return std::fs::write(&path, bytes).map_err(|error| error.to_string());
     }
+    // A single-file web page with its images and styles, as Chromium saves it.
+    #[cfg(windows)]
+    if path.extension().and_then(|value| value.to_str()) == Some("mhtml") {
+        let snapshot = crate::infra::webview2::cdp(
+            &webview,
+            "Page.captureSnapshot",
+            &serde_json::json!({ "format": "mhtml" }),
+        )
+        .await?;
+        let data = snapshot["data"]
+            .as_str()
+            .ok_or_else(|| "The page could not be saved.".to_owned())?;
+        return std::fs::write(&path, data).map_err(|error| error.to_string());
+    }
     let value = eval_json(&webview, "document.documentElement.outerHTML".to_owned()).await?;
     let html = serde_json::from_str::<Option<String>>(&value)
         .ok()
@@ -210,6 +224,22 @@ pub fn browser_webview_developer_tools(
     request: BrowserWebviewIdRequest,
 ) -> Result<BrowserDeveloperToolsResult, String> {
     let webview = running_webview(&app, &request.id)?;
+    // Websites can always be inspected, like in any browser. Only this page's
+    // view turns developer tools on; Misty's own windows keep them off.
+    #[cfg(windows)]
+    webview
+        .with_webview(|platform| {
+            // SAFETY: the controller is live during this UI-thread callback.
+            let _ = unsafe {
+                platform.controller().CoreWebView2().and_then(|core| {
+                    core.Settings()?.SetAreDevToolsEnabled(true)?;
+                    core.OpenDevToolsWindow()
+                })
+            };
+        })
+        .map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    return Ok(BrowserDeveloperToolsResult { opened: true });
     // Make the page inspectable from Safari's Develop menu (macOS 13.3+) in
     // every build; development builds can also open the inspector directly.
     #[cfg(target_os = "macos")]
@@ -223,11 +253,14 @@ pub fn browser_webview_developer_tools(
             }
         })
         .map_err(|error| error.to_string())?;
-    #[cfg(debug_assertions)]
-    webview.open_devtools();
-    Ok(BrowserDeveloperToolsResult {
-        opened: cfg!(debug_assertions),
-    })
+    #[cfg(not(windows))]
+    {
+        #[cfg(debug_assertions)]
+        webview.open_devtools();
+        Ok(BrowserDeveloperToolsResult {
+            opened: cfg!(debug_assertions),
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -240,53 +273,143 @@ pub struct BrowserClearDataRequest {
     pub since: i64,
 }
 
+/// Which website data to clear.
+#[derive(Clone, Copy, Default)]
+struct ClearKinds {
+    /// Cookies and every kind of site storage.
+    cookies: bool,
+    cache: bool,
+}
+
 #[tauri::command]
 pub async fn browser_clear_website_data(
     app: AppHandle,
     request: BrowserClearDataRequest,
 ) -> Result<(), String> {
-    let mut data_types = Vec::new();
+    let mut kinds = ClearKinds::default();
     for kind in &request.kinds {
         match kind.as_str() {
-            "cookies" => data_types.extend([
-                "WKWebsiteDataTypeCookies",
-                "WKWebsiteDataTypeLocalStorage",
-                "WKWebsiteDataTypeSessionStorage",
-                "WKWebsiteDataTypeIndexedDBDatabases",
-                "WKWebsiteDataTypeWebSQLDatabases",
-                "WKWebsiteDataTypeServiceWorkerRegistrations",
-                "WKWebsiteDataTypeFileSystem",
-            ]),
-            "cache" => data_types.extend([
-                "WKWebsiteDataTypeDiskCache",
-                "WKWebsiteDataTypeMemoryCache",
-                "WKWebsiteDataTypeOfflineWebApplicationCache",
-                "WKWebsiteDataTypeFetchCache",
-            ]),
+            "cookies" => kinds.cookies = true,
+            "cache" => kinds.cache = true,
             _ => return Err("Unknown kind of website data.".to_owned()),
         }
     }
-    if data_types.is_empty() {
+    if !kinds.cookies && !kinds.cache {
         return Ok(());
     }
     let identifier = browser_profile_identifier(request.profile_id.as_deref())?;
-    // Older macOS tabs use temporary stores that are discarded anyway.
     #[cfg(target_os = "macos")]
+    return clear_webkit_website_data(&app, identifier, kinds, request.since).await;
+    #[cfg(windows)]
+    {
+        let _ = identifier;
+        clear_webview2_website_data(&app, request.profile_id.as_deref(), kinds, request.since).await
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (app, identifier);
+        Err("Clearing website data is not available on this platform.".to_owned())
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn clear_webkit_website_data(
+    app: &AppHandle,
+    identifier: [u8; 16],
+    kinds: ClearKinds,
+    since: i64,
+) -> Result<(), String> {
+    let mut data_types = Vec::new();
+    if kinds.cookies {
+        data_types.extend([
+            "WKWebsiteDataTypeCookies",
+            "WKWebsiteDataTypeLocalStorage",
+            "WKWebsiteDataTypeSessionStorage",
+            "WKWebsiteDataTypeIndexedDBDatabases",
+            "WKWebsiteDataTypeWebSQLDatabases",
+            "WKWebsiteDataTypeServiceWorkerRegistrations",
+            "WKWebsiteDataTypeFileSystem",
+        ]);
+    }
+    if kinds.cache {
+        data_types.extend([
+            "WKWebsiteDataTypeDiskCache",
+            "WKWebsiteDataTypeMemoryCache",
+            "WKWebsiteDataTypeOfflineWebApplicationCache",
+            "WKWebsiteDataTypeFetchCache",
+        ]);
+    }
+    // Older macOS tabs use temporary stores that are discarded anyway.
     if browser_requires_ephemeral_store() {
         return Ok(());
     }
-    #[cfg(target_os = "macos")]
-    return super::super::browser_macos::clear_browser_website_data(
-        &app,
-        identifier,
-        data_types,
-        request.since,
-    )
-    .await;
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = (app, identifier, data_types);
-        Err("Clearing website data requires Misty on a Mac.".to_owned())
+    super::super::browser_macos::clear_browser_website_data(app, identifier, data_types, since)
+        .await
+}
+
+/// Clears through a hidden page in the profile: WebView2 removes data only
+/// through a live view's profile.
+#[cfg(windows)]
+async fn clear_webview2_website_data(
+    app: &AppHandle,
+    profile: Option<&str>,
+    kinds: ClearKinds,
+    since: i64,
+) -> Result<(), String> {
+    use crate::infra::webview2::{with_core, CdpError};
+    use webview2_com::{
+        ClearBrowsingDataCompletedHandler,
+        Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2Profile2, ICoreWebView2_13, COREWEBVIEW2_BROWSING_DATA_KINDS,
+            COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_DOM_STORAGE,
+            COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE,
+            COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES, COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE,
+        },
+    };
+    use windows::core::Interface;
+
+    let mut flags = 0;
+    if kinds.cookies {
+        flags |= COREWEBVIEW2_BROWSING_DATA_KINDS_COOKIES.0
+            | COREWEBVIEW2_BROWSING_DATA_KINDS_ALL_DOM_STORAGE.0;
+    }
+    if kinds.cache {
+        flags |= COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE.0
+            | COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE.0;
+    }
+    let start = since.max(0) as f64 / 1000.0;
+    let end = Utc::now().timestamp_millis() as f64 / 1000.0 + 60.0;
+    let view = crate::infra::browser_profile_view::ProfileView::open(app, profile)?;
+    let (send, receive) = tokio::sync::oneshot::channel();
+    let send = Mutex::new(Some(send));
+    with_core(&view, move |core, _| {
+        let handler = ClearBrowsingDataCompletedHandler::create(Box::new(move |status| {
+            if let Some(send) = send.lock().ok().and_then(|mut slot| slot.take()) {
+                let _ = send.send(status.is_ok());
+            }
+            Ok(())
+        }));
+        // SAFETY: a live view on its UI thread; the handler owns its state.
+        unsafe {
+            core.cast::<ICoreWebView2_13>()
+                .and_then(|core| core.Profile())
+                .and_then(|profile| profile.cast::<ICoreWebView2Profile2>())
+                .and_then(|profile| {
+                    profile.ClearBrowsingDataInTimeRange(
+                        COREWEBVIEW2_BROWSING_DATA_KINDS(flags),
+                        start,
+                        end,
+                        &handler,
+                    )
+                })
+        }
+        .map_err(|_| CdpError::Unavailable)
+    })
+    .await?;
+    match tokio::time::timeout(Duration::from_secs(60), receive).await {
+        Ok(Ok(true)) => Ok(()),
+        Ok(_) => Err("Windows could not clear that website data.".to_owned()),
+        Err(_) => Err("Clearing website data timed out.".to_owned()),
     }
 }
 
@@ -300,8 +423,8 @@ pub struct BrowserMuteRequest {
 const MUTE_MEDIA_SCRIPT: &str =
     "document.querySelectorAll('audio, video').forEach((media) => { media.muted = __MUTED__; });";
 
-/// Mutes or unmutes everything a page plays. On macOS WebKit mutes the whole
-/// page, including Web Audio, and keeps it muted across navigations.
+/// Mutes or unmutes everything a page plays. The engine mutes the whole page,
+/// including Web Audio, and keeps it muted across navigations.
 #[tauri::command]
 pub async fn browser_webview_set_muted(
     app: AppHandle,
@@ -330,6 +453,21 @@ pub async fn browser_webview_set_muted(
             .map_err(|error| error.to_string())?;
         let native = tokio::time::timeout(Duration::from_secs(2), receiver).await;
         if matches!(native, Ok(Ok(true))) {
+            return Ok(());
+        }
+    }
+    #[cfg(windows)]
+    {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_8;
+        use windows::core::Interface;
+        let muted = request.muted;
+        let native = crate::infra::webview2::with_core(&webview, move |core, _| {
+            // SAFETY: a live view on its UI thread.
+            unsafe { core.cast::<ICoreWebView2_8>()?.SetIsMuted(muted)? };
+            Ok(())
+        })
+        .await;
+        if native.is_ok() {
             return Ok(());
         }
     }

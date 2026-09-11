@@ -29,24 +29,21 @@ use app::commands::{
 };
 
 #[cfg(desktop)]
-use app::commands::{
-    connected_devices_initialize, connected_devices_set_identity, connected_devices_snapshot,
-};
-#[cfg(desktop)]
 use app::device_admission_commands::{
     devices_admit_self, devices_approval_status, devices_approve_confirm, devices_approve_start,
-    devices_approve_status, devices_connect, devices_deny, devices_pending_requests,
-    devices_publish_folders, devices_remove, devices_rename, devices_request_approval,
-    devices_set_policy,
+    devices_approve_status, devices_deny, devices_pending_requests, devices_publish_folders,
+    devices_remove, devices_rename, devices_request_approval, devices_set_policy,
 };
 #[cfg(desktop)]
 use app::device_commands::{devices_refresh, devices_start, devices_stop, devices_view};
 #[cfg(desktop)]
 use app::device_job_commands::{
-    device_send_file, device_sign_request, device_sign_run_grants, device_verify_job,
+    device_read_shared_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
+#[cfg(desktop)]
+use infra::browser::action_confirm::agent_action_confirm;
 #[cfg(desktop)]
 use infra::browser::host_messages::passwords::{
     browser_password_offer_respond, browser_passwords_delete, browser_passwords_list,
@@ -61,8 +58,6 @@ use infra::browser::page_tools::media_tools::{
     browser_webview_media_playback, browser_webview_picture_in_picture,
     browser_webview_reader_article,
 };
-#[cfg(desktop)]
-use infra::browser::action_confirm::agent_action_confirm;
 use infra::browser::pane_dim::browser_webview_set_pane_dim;
 #[cfg(desktop)]
 use infra::browser::profile_cleanup::browser_device_profile_delete;
@@ -121,18 +116,21 @@ use tauri::{Emitter, Manager};
 use telemetry::TelemetryReporter;
 
 pub fn run() {
+    // Only development builds adjust the context.
+    #[cfg_attr(not(all(desktop, debug_assertions)), allow(unused_mut))]
     let mut context = tauri::generate_context!();
     #[cfg(all(desktop, debug_assertions))]
     development_profile::configure(&mut context).expect("invalid development profile");
-    // Use one TLS provider for backend calls, updates and the peer transport.
+    // Use one TLS provider for backend calls and updates.
     let _ = rustls::crypto::ring::default_provider().install_default();
     telemetry::initialize();
     let builder = tauri::Builder::default();
 
     // Register this first so duplicate launches are rejected before any other
     // plugin or application service can initialize a second Misty runtime.
+    infra::default_browser::remember_launch(std::env::args().skip(1));
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         if !mac_rounded_corners::main_window_ready() {
             return;
         }
@@ -143,6 +141,11 @@ pub fn run() {
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
+        }
+        // Links opened while Misty runs, as the default browser.
+        let urls = infra::default_browser::web_urls(args.iter().skip(1));
+        if !urls.is_empty() {
+            let _ = app.emit("deep-link://new-url", urls);
         }
     }));
 
@@ -222,20 +225,8 @@ pub fn run() {
             // policy) lives beside its other app data.
             #[cfg(desktop)]
             infra::device_trust::set_storage_root(runtime.environment.config_dir());
-            #[cfg(desktop)]
-            {
-                let route_app = app.handle().clone();
-                let _ = runtime
-                    .connected_devices
-                    .set_workspace_route_handler(Arc::new(move |request| {
-                        route_app
-                            .emit("misty://open-workspace-route", request)
-                            .is_ok()
-                    }));
-            }
-            #[cfg(unix)]
             app.manage(infra::agent_files::AgentFilesState::default());
-            #[cfg(all(desktop, unix))]
+            #[cfg(all(desktop, any(unix, windows)))]
             infra::clipboard_bridge::start(app.handle().clone(), runtime.environment.config_dir());
             app.manage(runtime);
             #[cfg(desktop)]
@@ -258,8 +249,14 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             infra::app_menu::setup(app)?;
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             infra::devices::start_device_change_listener(app.handle().clone());
+            #[cfg(windows)]
+            infra::misty_context_windows::start_foreground_watch();
+            #[cfg(windows)]
+            if let Some(main) = app.get_webview("main") {
+                infra::browser_process_ended::watch_page_process(&main);
+            }
             Ok(())
         });
 
@@ -359,6 +356,15 @@ pub fn run() {
                     crate::infra::workspace_autopilot::agent_desktop_recent_audio,
                     crate::infra::workspace_autopilot::agent_control_yield,
                     crate::infra::workspace_autopilot::agent_control_island,
+                    #[cfg(windows)]
+                    crate::infra::desktop_overlays_windows::agent_desktop_island_press,
+                    #[cfg(windows)]
+                    crate::infra::desktop_overlays_windows::agent_desktop_overlay_state,
+                    #[cfg(windows)]
+                    crate::infra::agent_dock_windows::agent_dock_card,
+                    #[cfg(windows)]
+                    crate::infra::window_snap_windows::window_show_snap_layouts,
+                    crate::infra::default_browser::app_take_launch_urls,
                     #[cfg(desktop)]
                     platform::mini_app::builtin_service_open,
                     #[cfg(desktop)]
@@ -367,64 +373,38 @@ pub fn run() {
                     mac_rounded_corners::enable_modern_window_style,
                     app_snapshot,
                     agents_device_snapshot,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_choose,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_prepare,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_apply,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_cancel,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_manifest,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_history,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_snapshot,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_undo,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
-                    #[cfg(unix)]
                     app::code_commands::code_execute,
-                    #[cfg(unix)]
                     app::code_commands::code_choose_project,
-                    #[cfg(unix)]
                     app::code_commands::code_set_project_installs,
-                    #[cfg(unix)]
                     app::code_commands::code_allow_project_changes,
-                    #[cfg(unix)]
                     app::code_commands::code_remove_project,
-                    #[cfg(unix)]
                     app::code_commands::code_checkpoints,
-                    #[cfg(unix)]
                     app::code_commands::code_undo,
-                    #[cfg(unix)]
                     app::code_snapshots::code_project_snapshot,
-                    #[cfg(unix)]
                     app::code_commands::code_new_project,
-                    #[cfg(unix)]
                     app::code_commands::code_clone_project,
-                    #[cfg(unix)]
                     app::code_commands::code_set_project_push,
-                    #[cfg(unix)]
                     app::code_commands::code_run_diff,
-                    #[cfg(unix)]
                     app::code_commands::code_git,
-                    #[cfg(unix)]
                     app::code_commands::code_git_job,
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
-                    connected_devices_initialize,
-                    #[cfg(desktop)]
-                    connected_devices_snapshot,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
                     #[cfg(desktop)]
-                    connected_devices_set_identity,
+                    #[cfg(desktop)]
                     #[cfg(desktop)]
                     devices_start,
                     #[cfg(desktop)]
@@ -458,7 +438,6 @@ pub fn run() {
                     #[cfg(desktop)]
                     devices_publish_folders,
                     #[cfg(desktop)]
-                    devices_connect,
                     #[cfg(desktop)]
                     device_sign_request,
                     #[cfg(desktop)]
@@ -466,7 +445,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     device_verify_job,
                     #[cfg(desktop)]
-                    device_send_file,
+                    device_read_shared_file,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
                     check_system,

@@ -40,14 +40,14 @@ export interface AiPaneSession {
   capture?: AiCaptureAttachment;
 }
 
-export interface AiPaneRegistration {
+interface AiPaneRegistration {
   accountId: string;
   paneId: string;
   adapter: AiSurfaceAdapter;
   element: HTMLElement;
 }
 
-export interface MistyCompanionSession {
+interface MistyCompanionSession {
   phase: MistyPresencePhase;
   accountId?: string;
   paneId?: string;

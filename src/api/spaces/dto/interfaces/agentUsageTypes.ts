@@ -5,7 +5,7 @@ import type { SpaceStorageUsage, StorageQuotaDimension } from "./library";
  * The account's weekly hosted-AI allowance — the budget behind "This member has
  * used all of their weekly AI agent usage". It is per account, not per Space.
  */
-export interface AgentUsage {
+interface AgentUsage {
   /** 0–100. The server sends a percentage, not a ratio. */
   percentage_used: number;
   unit?: "weighted_tokens" | "microusd";
@@ -31,7 +31,7 @@ export interface AiLimit {
 }
 
 /** Weekly account weighted-token meter. Legacy servers may omit the accounting unit. */
-export interface AiQuotaUsage {
+interface AiQuotaUsage {
   /** The three limits work must fit; older servers send only the weekly meter. */
   limits?: { window?: AiLimit; weekly?: AiLimit; monthly?: AiLimit };
   percentage_used?: number;
@@ -51,7 +51,7 @@ export interface AiQuotaUsage {
   reset_at?: string;
 }
 
-export interface BillingEntitlements {
+interface BillingEntitlements {
   plan?: string;
   max_owned_spaces?: number;
   personal_storage_limit_bytes?: number;
@@ -64,7 +64,7 @@ export interface BillingEntitlements {
   unlimited_collaborators?: boolean;
 }
 
-export interface BillingSpaceUsage {
+interface BillingSpaceUsage {
   space_id: string;
   name: string;
   role: "owner" | "member" | string;

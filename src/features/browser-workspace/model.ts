@@ -3,7 +3,7 @@
  * Names follow the sync hierarchy: window → tab → pane → view, plus bookmark
  * folders and bookmarks. Native storage keeps older names and translates them
  * at the renderer boundary. */
-export interface FolderFields {
+interface FolderFields {
   label: string;
   icon: string;
   order: number;
@@ -13,7 +13,7 @@ export interface FolderFields {
   /** First added, in ms since the epoch (kept from imports). */
   added_at?: number;
 }
-export interface BookmarkFields {
+interface BookmarkFields {
   folder_id: string;
   title: string;
   url: string;
@@ -22,7 +22,7 @@ export interface BookmarkFields {
   /** First added, in ms since the epoch (kept from imports). */
   added_at?: number;
 }
-export interface WindowFields {
+interface WindowFields {
   title: string;
   order: number;
 }
@@ -39,7 +39,7 @@ export type SplitTree =
       first: SplitTree;
       second: SplitTree;
     };
-export interface TabFields {
+interface TabFields {
   window_id: string;
   title: string;
   order: number;
@@ -47,7 +47,7 @@ export interface TabFields {
   /** A pinned tab's page; null clears it (native sync removes the field). */
   pinned_url?: string | null;
 }
-export interface ViewFields {
+interface ViewFields {
   /** "home" is the retired Home page, still sent by older clients. */
   surface: "browser" | "files" | "agents" | "space" | "home" | "extensions";
   title: string;
@@ -62,20 +62,20 @@ export interface ViewFields {
   tool_route: string | null;
   agent_owned: boolean;
 }
-export interface TabGroupFields {
+interface TabGroupFields {
   name: string;
   color: string;
   order: number;
   tab_ids: string[];
 }
-export interface SavedTabGroupFields {
+interface SavedTabGroupFields {
   name: string;
   color: string;
   order: number;
   /** The saved tabs, as JSON text. */
   tabs: string;
 }
-export interface FieldsByKind {
+interface FieldsByKind {
   folder: FolderFields;
   bookmark: BookmarkFields;
   window: WindowFields;

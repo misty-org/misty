@@ -32,6 +32,12 @@ extern "C" {
 static SYNC_EVENTS: std::sync::OnceLock<tokio::sync::mpsc::UnboundedSender<Value>> =
     std::sync::OnceLock::new();
 static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
+#[cfg(windows)]
+pub(super) fn app() -> Option<&'static tauri::AppHandle> {
+    APP.get()
+}
+
 pub fn initialize(app: &tauri::AppHandle) {
     let _ = APP.set(app.clone());
     SYNC_EVENTS.get_or_init(|| {
@@ -108,9 +114,8 @@ extern "C" fn event(pointer: *const c_char) {
             tauri::async_runtime::spawn(async move {
                 let mut state = super::service().lock().await;
                 if event["account"].as_str() == Some(&state.account) {
-                    if let Some(status) = event["id"]
-                        .as_str()
-                        .and_then(|id| state.states.get_mut(id))
+                    if let Some(status) =
+                        event["id"].as_str().and_then(|id| state.states.get_mut(id))
                     {
                         status.detail = event["detail"]
                             .as_str()
@@ -164,10 +169,14 @@ pub async fn request(value: Value) -> Result<Value, String> {
         }
         Ok(value)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        super::native_windows::request(value).await
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = value;
-        Err("Extensions require macOS 15.4 or later.".into())
+        Err("Extensions require macOS 15.4 or later, or Windows.".into())
     }
 }
 
@@ -194,6 +203,8 @@ pub fn register(view: &tauri::Webview, id: &str, private: bool, url: &str) {
             );
         });
     }
+    #[cfg(windows)]
+    super::native_windows::register(view);
     #[cfg(not(target_os = "macos"))]
     let _ = (view, id, private, url);
 }
@@ -252,4 +263,22 @@ pub fn trusted(view: &tauri::Webview) -> Result<(), String> {
     } else {
         Err("Only the Misty workspace can manage extensions.".into())
     }
+}
+
+/// The scheme extension pages load from: WebKit's on macOS, Chromium's in
+/// WebView2 on Windows.
+pub(crate) const EXTENSION_SCHEME: &str = if cfg!(windows) {
+    "chrome-extension"
+} else {
+    "webkit-extension"
+};
+
+/// The host an extension's pages load from, for its account origin. WebKit
+/// uses the origin itself; WebView2 uses the extension ID that the manifest
+/// key Misty derives from the origin gives it.
+pub(crate) fn page_host(origin: &str) -> Option<String> {
+    #[cfg(windows)]
+    return super::native_windows::page_host(origin);
+    #[cfg(not(windows))]
+    Some(origin.to_owned())
 }

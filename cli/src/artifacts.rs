@@ -75,6 +75,12 @@ pub fn write_private(path: &Path, contents: &[u8]) -> Result<()> {
         file.set_permissions(fs::Permissions::from_mode(0o600))
             .with_context(|| format!("could not secure {}", path.display()))?;
     }
+    #[cfg(windows)]
+    {
+        drop(file);
+        misty_credential_store::restrict_private_file(path)
+            .with_context(|| format!("could not secure {}", path.display()))?;
+    }
     Ok(())
 }
 

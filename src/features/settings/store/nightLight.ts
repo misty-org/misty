@@ -8,8 +8,8 @@ export interface NightLightSchedule {
   startAt: string;
   endAt: string;
 }
-export const defaultNightLightSchedule: NightLightSchedule = { startAt: "21:00", endAt: "07:00" };
-export const defaultNightLightWarmth = 0.5;
+const defaultNightLightSchedule: NightLightSchedule = { startAt: "21:00", endAt: "07:00" };
+const defaultNightLightWarmth = 0.5;
 
 export function validClockTime(value: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);

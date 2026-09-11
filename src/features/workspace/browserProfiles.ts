@@ -18,11 +18,11 @@ export interface BrowserProfile {
   sites?: string[];
 }
 
-export interface BrowserProfileState {
+interface BrowserProfileState {
   browserProfiles: BrowserProfile[];
 }
 
-export interface BrowserProfileActions {
+interface BrowserProfileActions {
   createBrowserProfile(name: string): BrowserProfile;
   renameBrowserProfile(id: string, name: string): void;
   setBrowserProfileSites(id: string, sites: string[]): void;
@@ -32,7 +32,7 @@ export interface BrowserProfileActions {
   selectBrowserProfile(id: string | null): boolean;
 }
 
-export const initialBrowserProfiles = (): BrowserProfileState => ({ browserProfiles: [] });
+const initialBrowserProfiles = (): BrowserProfileState => ({ browserProfiles: [] });
 
 export interface BrowserProfileStore extends BrowserProfileState, BrowserProfileActions {}
 
@@ -45,7 +45,7 @@ export function scopeTarget(active: WorkspaceScopeKey, requested: WorkspaceScope
   return requested === "global" && profileIdFromScope(active) ? active : requested;
 }
 
-export function profileScopeKey(id: string): WorkspaceScopeKey {
+function profileScopeKey(id: string): WorkspaceScopeKey {
   return `profile:${id}`;
 }
 
@@ -54,7 +54,7 @@ export function profileIdFromScope(scope: string): string | null {
 }
 
 /** Hosts as typed (example.com, https://mail.example.com/…), lowercased and deduplicated. */
-export function normalizeSites(sites: string[]): string[] {
+function normalizeSites(sites: string[]): string[] {
   const hosts = sites.flatMap((site) => {
     const value = site.trim().toLowerCase();
     if (!value) return [];

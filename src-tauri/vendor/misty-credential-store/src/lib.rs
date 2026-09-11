@@ -1,5 +1,9 @@
 //! Native credential files, with a separate Keychain-backed account login store.
+//! On Windows every file is sealed to the signed-in user with DPAPI and the
+//! credential directory admits only its owner and SYSTEM.
 pub mod account;
+#[cfg(windows)]
+mod windows;
 use sha2::{Digest, Sha256};
 use std::{
     fs,
@@ -11,7 +15,7 @@ static OVERRIDE_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 // Mobile shells select their private app-data directory before using the store.
 pub fn configure_root(path: PathBuf) -> io::Result<()> {
-    private_directory(&path)?;
+    credential_directory(&path)?;
     OVERRIDE_ROOT
         .set(path)
         .map_err(|_| io::Error::other("Credential root already configured"))
@@ -19,20 +23,57 @@ pub fn configure_root(path: PathBuf) -> io::Result<()> {
 
 const MAX_BYTES: u64 = 4 * 1024 * 1024;
 
+/// Windows: gives a folder of private data a DACL that admits only its
+/// owner and SYSTEM (the counterpart of mode 0700). A no-op when it has one.
+#[cfg(windows)]
+pub fn restrict_private_directory(path: &Path) -> io::Result<()> {
+    windows::restrict_directory(path)
+}
+
+/// Windows: whether a folder already admits only its owner and SYSTEM.
+#[cfg(windows)]
+pub fn is_private_directory(path: &Path) -> bool {
+    windows::is_restricted(path)
+}
+
+/// Windows: gives a private file the same owner-and-SYSTEM DACL (the
+/// counterpart of mode 0600).
+#[cfg(windows)]
+pub fn restrict_private_file(path: &Path) -> io::Result<()> {
+    windows::restrict_directory(path)
+}
+
+/// Windows: whether a file admits only its owner and SYSTEM.
+#[cfg(windows)]
+pub fn is_private_file(path: &Path) -> bool {
+    windows::is_restricted(path)
+}
+
 pub fn root() -> io::Result<PathBuf> {
     if let Some(root) = OVERRIDE_ROOT.get() {
-        private_directory(root)?;
+        credential_directory(root)?;
         return Ok(root.clone());
     }
     let home = dirs::home_dir().ok_or_else(|| io::Error::other("Home directory unavailable"))?;
     let directory = home.join(".misty");
     private_directory(&directory)?;
     let directory = directory.join(".auth");
-    private_directory(&directory)?;
+    credential_directory(&directory)?;
     Ok(directory)
 }
 
+/// A directory that holds credential files: private, and on Windows locked to
+/// its owner. Only leaf directories get the Windows DACL, because replacing it
+/// propagates to every file below.
+fn credential_directory(path: &Path) -> io::Result<()> {
+    private_directory(path)?;
+    #[cfg(windows)]
+    windows::restrict_directory(path)?;
+    Ok(())
+}
+
 fn private_directory(path: &Path) -> io::Result<()> {
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
     {
@@ -111,12 +152,27 @@ pub fn read_private_file(path: &Path) -> io::Result<Option<String>> {
         }
         file.set_permissions(fs::Permissions::from_mode(0o600))?;
     }
-    let mut value = String::new();
-    file.take(MAX_BYTES + 1).read_to_string(&mut value)?;
-    if value.len() as u64 > MAX_BYTES {
+    let mut bytes = zeroize::Zeroizing::new(Vec::new());
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_BYTES {
         return Err(io::Error::other("Credential file too large"));
     }
+    #[cfg(windows)]
+    if let Some(sealed) = bytes.strip_prefix(windows::SEALED_PREFIX) {
+        let plaintext = windows::open(sealed)?;
+        return utf8(&plaintext).map(Some);
+    }
+    let value = utf8(&bytes)?;
+    // A plaintext file from a build before sealing: seal it in place.
+    #[cfg(windows)]
+    write_private_file(path, &value)?;
     Ok(Some(value))
+}
+
+fn utf8(bytes: &[u8]) -> io::Result<String> {
+    std::str::from_utf8(bytes)
+        .map(str::to_owned)
+        .map_err(|_| io::Error::other("Credential file is not valid text"))
 }
 
 pub fn store(service: &str, account: &str, value: &str) -> io::Result<()> {
@@ -130,7 +186,7 @@ pub fn write_private_file(path: &Path, value: &str) -> io::Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| io::Error::other("Missing credential directory"))?;
-    private_directory(parent)?;
+    credential_directory(parent)?;
     let mut file = tempfile::NamedTempFile::new_in(parent)?;
     #[cfg(unix)]
     {
@@ -138,6 +194,9 @@ pub fn write_private_file(path: &Path, value: &str) -> io::Result<()> {
         file.as_file()
             .set_permissions(fs::Permissions::from_mode(0o600))?;
     }
+    #[cfg(windows)]
+    file.write_all(&windows::seal(value.as_bytes())?)?;
+    #[cfg(not(windows))]
     file.write_all(value.as_bytes())?;
     file.as_file().sync_all()?;
     file.persist(path).map_err(|error| error.error)?;
@@ -185,6 +244,35 @@ mod tests {
                 0o700
             );
         }
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_files_are_sealed_and_plaintext_files_migrate() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("credential");
+        write_private_file(&path, "secret-token").unwrap();
+        let raw = fs::read(&path).unwrap();
+        assert!(raw.starts_with(windows::SEALED_PREFIX));
+        assert!(!raw.windows(12).any(|window| window == b"secret-token"));
+        assert_eq!(read_private_file(&path).unwrap().as_deref(), Some("secret-token"));
+
+        let legacy = temp.path().join("legacy");
+        fs::write(&legacy, "old-token").unwrap();
+        assert_eq!(read_private_file(&legacy).unwrap().as_deref(), Some("old-token"));
+        assert!(fs::read(&legacy).unwrap().starts_with(windows::SEALED_PREFIX));
+        assert_eq!(read_private_file(&legacy).unwrap().as_deref(), Some("old-token"));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_refuses_tampered_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("credential");
+        write_private_file(&path, "secret-token").unwrap();
+        let mut raw = fs::read(&path).unwrap();
+        let last = raw.len() - 1;
+        raw[last] ^= 1;
+        fs::write(&path, raw).unwrap();
+        assert!(read_private_file(&path).is_err());
     }
     #[cfg(unix)]
     #[test]

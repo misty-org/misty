@@ -201,7 +201,7 @@ export function resetSpacesRealtimeRuntime(): void {
   realtimeTicketCooldownUntil = 0;
 }
 
-export async function applyRealtimeEvent(
+async function applyRealtimeEvent(
   event: SpaceEvent,
   accountId: string,
   get: () => SpacesStore,
@@ -272,7 +272,7 @@ export async function applyRealtimeEvent(
   set({ realtimeConnected: true });
 }
 
-export function applyRealtimeEventSafely(
+function applyRealtimeEventSafely(
   event: SpaceEvent,
   accountId: string,
   get: () => SpacesStore,
@@ -285,7 +285,7 @@ export function applyRealtimeEventSafely(
   });
 }
 
-export function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
+function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
   if (
     !realtimeWanted ||
     realtimeAccountId !== accountId ||
@@ -307,7 +307,7 @@ export function scheduleReconnect(get: () => SpacesStore, accountId: string, gen
   }, delay);
 }
 
-export function stopRealtimeConnection() {
+function stopRealtimeConnection() {
   realtimeWanted = false;
   realtimeConnecting = false;
   realtimeConnectPromise = null;
@@ -323,7 +323,7 @@ export function stopRealtimeConnection() {
   socket?.close();
 }
 
-export function sendViewingMessage(spaceId: string, active: boolean): void {
+function sendViewingMessage(spaceId: string, active: boolean): void {
   if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
   try {
     realtimeSocket.send(JSON.stringify({ type: "viewing", space_id: spaceId, active }));
@@ -334,12 +334,12 @@ export function sendViewingMessage(spaceId: string, active: boolean): void {
 
 // "Active" means the Space is in view and the window has focus. Anything else
 // counts as idle even though the WebSocket is still connected.
-export function computeViewingActivity(): boolean {
+function computeViewingActivity(): boolean {
   if (typeof document === "undefined") return true;
   return document.visibilityState === "visible" && document.hasFocus();
 }
 
-export function handleViewingActivityChange(): void {
+function handleViewingActivityChange(): void {
   const active = computeViewingActivity();
   if (active === currentViewingActive) return;
   currentViewingActive = active;
@@ -352,7 +352,7 @@ if (typeof document !== "undefined") {
   window.addEventListener("blur", handleViewingActivityChange);
 }
 
-export function clearRealtimeOpenTimer() {
+function clearRealtimeOpenTimer() {
   if (realtimeOpenTimer != null) window.clearTimeout(realtimeOpenTimer);
   realtimeOpenTimer = null;
 }

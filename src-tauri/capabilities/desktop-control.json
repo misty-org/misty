@@ -1,0 +1,1 @@
+{"identifier":"desktop-control","description":"The desktop control island and mist on Windows","platforms":["windows"],"webviews":["misty-desktop-*"],"permissions":["core:event:default"]}

@@ -86,16 +86,20 @@ fn rejects_packages_the_store_did_not_sign() {
         .unwrap_err()
         .contains("Chrome Web Store"));
     // Test keys are never the real publisher key.
-    assert!(verify(&bytes, &id).unwrap_err().contains("Chrome Web Store"));
+    assert!(verify(&bytes, &id)
+        .unwrap_err()
+        .contains("Chrome Web Store"));
 }
 
 #[test]
 fn rejects_another_extensions_package_and_missing_developer_proofs() {
     let (developer, store, other) = (key(), key(), key());
     let bytes = package(&[&developer, &store], &developer, b"archive");
-    assert!(verify_with(&bytes, &id_for(&other.spki), &publisher(&store))
-        .unwrap_err()
-        .contains("identity"));
+    assert!(
+        verify_with(&bytes, &id_for(&other.spki), &publisher(&store))
+            .unwrap_err()
+            .contains("identity")
+    );
     let unsigned = package(&[&store], &developer, b"archive");
     assert!(
         verify_with(&unsigned, &id_for(&developer.spki), &publisher(&store))
@@ -122,7 +126,10 @@ fn rejects_tampered_archives_and_malformed_headers() {
     let mut oversized = bytes.clone();
     oversized[8..12].copy_from_slice(&u32::MAX.to_le_bytes());
     for (case, bytes) in [("magic", wrong_magic), ("crx2", crx2), ("size", oversized)] {
-        assert!(verify_with(&bytes, &id, &publisher(&store)).is_err(), "{case}");
+        assert!(
+            verify_with(&bytes, &id, &publisher(&store)).is_err(),
+            "{case}"
+        );
     }
 
     // An end-of-central-directory record hidden in the header is refused.

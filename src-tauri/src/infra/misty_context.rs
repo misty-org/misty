@@ -33,8 +33,14 @@ pub async fn misty_screen_status(
             .await
             .map_err(|e| e.to_string())?
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
     {
+        let _ = request;
+        Ok(super::misty_context_windows::status())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = request;
         Ok(serde_json::json!({"supported":false,"allowed":false}))
     }
 }
@@ -47,9 +53,15 @@ pub async fn misty_screen_capture(window: tauri::Webview) -> Result<serde_json::
             .await
             .map_err(|e| e.to_string())?
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
     {
-        Err("Screen context requires macOS 14 or later.".into())
+        tauri::async_runtime::spawn_blocking(super::misty_context_windows::capture)
+            .await
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        Err("Screen context isn't available on this system.".into())
     }
 }
 
@@ -62,5 +74,7 @@ pub fn misty_workspace_focused(window: tauri::Webview) -> Result<(), String> {
     unsafe {
         misty_context_main_focused();
     }
+    #[cfg(windows)]
+    super::misty_context_windows::workspace_focused();
     Ok(())
 }

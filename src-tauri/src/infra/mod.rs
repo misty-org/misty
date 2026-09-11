@@ -1,9 +1,7 @@
 pub mod agent_dock;
-pub mod extension_popup;
+pub mod agent_projects;
 pub mod agent_workspace;
 pub mod agents;
-#[cfg(unix)]
-pub mod agent_projects;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;
@@ -12,10 +10,11 @@ pub mod browser;
 #[cfg(desktop)]
 pub mod browser_agent_control;
 pub mod default_browser;
+pub mod extension_popup;
 #[cfg(desktop)]
 pub mod power_keep_awake;
 
-#[cfg(all(desktop, target_os = "macos"))]
+#[cfg(all(desktop, any(target_os = "macos", windows)))]
 pub(crate) mod browser_content_world;
 #[cfg(desktop)]
 pub mod browser_history;
@@ -25,11 +24,12 @@ pub mod browser_import;
 pub(crate) mod browser_kiri;
 #[cfg(desktop)]
 pub mod browser_library;
-pub mod browser_process_ended;
 #[cfg(desktop)]
 pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
+pub mod browser_process_ended;
+pub(crate) mod browser_profile_view;
 #[cfg(desktop)]
 mod browser_scripts;
 pub mod browser_search_suggest;
@@ -40,8 +40,6 @@ pub mod clipboard_bridge;
 pub mod cloud_clipboard;
 pub mod command_defaults;
 pub mod commands;
-#[cfg(desktop)]
-pub mod connected_devices;
 pub mod credential_store;
 pub mod credentials;
 #[cfg(desktop)]
@@ -53,11 +51,11 @@ pub mod device_approval_approver;
 #[cfg(desktop)]
 pub mod device_channel;
 #[cfg(desktop)]
-pub mod device_discovery;
-#[cfg(desktop)]
 pub mod device_http;
 #[cfg(desktop)]
 pub mod device_identity;
+#[cfg(desktop)]
+pub mod device_key;
 #[cfg(desktop)]
 pub mod device_records;
 #[cfg(all(test, desktop))]
@@ -67,23 +65,20 @@ mod device_server_e2e_tests;
 #[cfg(desktop)]
 pub mod device_trust;
 pub mod devices;
+#[cfg(windows)]
+mod devices_windows;
 pub mod document_intelligence;
+#[cfg(windows)]
+pub(crate) mod document_worker_windows;
 pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 pub mod extensions;
 pub mod kura;
-mod macos_privacy;
 pub mod misty;
 pub mod misty_home;
 pub mod native_clipboard;
 pub mod paths;
-#[cfg(desktop)]
-pub mod peer_files;
-#[cfg(desktop)]
-pub mod peer_identity;
-#[cfg(desktop)]
-pub mod peer_writes;
 #[cfg(desktop)]
 mod plugin_routes;
 pub mod settings;
@@ -93,6 +88,8 @@ pub mod system_dependencies;
 pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;
+#[cfg(windows)]
+pub(crate) mod webview2;
 pub mod workspaces;
 
 mod browser_profile;
@@ -104,18 +101,19 @@ pub mod browser_provider;
 
 pub mod navigation_names;
 
-#[cfg(target_os = "macos")]
-pub(crate) mod native_process_worker;
-#[cfg(target_os = "macos")]
-pub(crate) mod peer_transport_worker;
-#[cfg(target_os = "macos")]
-pub(crate) mod space_peer_files;
-#[cfg(target_os = "macos")]
-pub(crate) mod space_peer_roots;
-#[cfg(target_os = "macos")]
-pub(crate) mod space_peer_session;
-
+#[cfg(windows)]
+pub mod agent_dock_windows;
+#[cfg(windows)]
+pub mod desktop_control_windows;
+#[cfg(windows)]
+pub mod desktop_overlays_windows;
 pub mod misty_context;
+#[cfg(windows)]
+pub mod misty_context_windows;
+#[cfg(windows)]
+pub mod window_snap_windows;
+#[cfg(windows)]
+pub mod workspace_autopilot_windows;
 
 pub mod auth_cookies;
 
@@ -168,5 +166,4 @@ pub mod browser_night_light;
 
 pub mod settings_profile_store;
 
-#[cfg(unix)]
 pub mod agent_files;

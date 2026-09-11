@@ -249,7 +249,7 @@ function isMacNativeRuntime(): boolean {
   return /Mac/.test(navigator.platform);
 }
 
-export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
+function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
   const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
   return quantizeBrowserBounds({
     x: bounds.x * zoom,
@@ -269,7 +269,7 @@ export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): 
   });
 }
 
-export function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
+function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
   const quantize = (value: number) => Math.round(value * 2) / 2;
   return {
     x: quantize(bounds.x),

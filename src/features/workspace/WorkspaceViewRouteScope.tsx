@@ -37,7 +37,7 @@ export function useWorkspaceViewFocused(): boolean {
   });
 }
 
-export function syncWorkspaceViewRouteHistory(tabId: string, route: string): void {
+function syncWorkspaceViewRouteHistory(tabId: string, route: string): void {
   const current = routeHistories.get(tabId);
   if (!current) {
     routeHistories.set(tabId, { entries: [route], index: 0 });
@@ -53,7 +53,7 @@ export function syncWorkspaceViewRouteHistory(tabId: string, route: string): voi
   current.index = current.entries.length - 1;
 }
 
-export function navigateWorkspaceViewRoute(tabId: string, delta: number): string | null {
+function navigateWorkspaceViewRoute(tabId: string, delta: number): string | null {
   const history = routeHistories.get(tabId);
   if (!history) return null;
   const nextIndex = history.index + delta;

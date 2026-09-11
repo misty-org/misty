@@ -2,7 +2,7 @@ import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
 import type { TaskDraft } from "../SpacePlannerViews";
 import { toLocalInput } from "../SpaceTaskPrimitives";
 
-export function localTimezone() {
+function localTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   } catch {
@@ -35,7 +35,7 @@ export function taskDraft(task: SpaceTask): TaskDraft {
 }
 
 /** Throws on an unparseable date so the caller surfaces it instead of sending junk. */
-export function dueAtForRequest(value: string) {
+function dueAtForRequest(value: string) {
   if (!value.trim()) return undefined;
   const dueAt = new Date(value);
   if (Number.isNaN(dueAt.getTime())) throw new Error("Enter a valid due date and time.");

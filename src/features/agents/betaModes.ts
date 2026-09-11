@@ -1,6 +1,6 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-// The first visible-control beta targets foreground macOS.
+// Visible control runs in the Misty app on macOS and Windows.
 export const visibleAutopilotAvailable = () =>
   hasTauriInternals() &&
-  /Mac/.test(navigator.platform) &&
+  /Mac|Win/.test(navigator.platform) &&
   !new URLSearchParams(window.location.search).has("agent_worker");

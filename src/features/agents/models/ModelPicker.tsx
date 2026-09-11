@@ -16,7 +16,7 @@ import {
 import { ModelProviderIcon } from "./ModelProviderIcon";
 
 /** The display name for a model ID, from the catalog when it lists it. */
-export function modelName(options: SenseModel[], id: string) {
+function modelName(options: SenseModel[], id: string) {
   return options.find((option) => option.id === id)?.name ?? id.slice(id.indexOf("/") + 1);
 }
 

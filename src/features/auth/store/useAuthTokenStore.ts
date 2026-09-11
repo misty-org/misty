@@ -14,11 +14,7 @@ import type {
   SecureAccountVault,
 } from "../model/stores/account/interfaces/useAuthTokenStore";
 import { SavedAccountSessionUnavailableError } from "../sessionErrors";
-export type {
-  SavedAccountSession,
-  SecureAccountSession,
-  SecureAccountVault,
-} from "../model/stores/account/interfaces/useAuthTokenStore";
+export type { SavedAccountSession } from "../model/stores/account/interfaces/useAuthTokenStore";
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
 const tokenStoredMarkerKey = "misty:account-auth-token:file-present";

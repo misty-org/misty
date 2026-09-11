@@ -10,11 +10,6 @@ export function physicalToClientPoint(
     y: point.y / safeScale / safeZoom,
   };
 }
-
-export function dragDistance(a: PointLike, b: PointLike): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
 export function selectDropCandidate<T extends { priority: number; depth: number }>(
   candidates: T[],
 ): T | null {

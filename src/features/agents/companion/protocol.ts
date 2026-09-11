@@ -1,6 +1,6 @@
 import type { AiCaptureAttachment } from "@/features/ai-surface/types";
-export type CompanionMode = "team" | "auto";
-export type CompanionPhase = "idle" | "listening" | "processing" | "responding";
+type CompanionMode = "team" | "auto";
+type CompanionPhase = "idle" | "listening" | "processing" | "responding";
 /** Global coordinates are CG display points on macOS, physical pixels on Windows. */
 export interface DisplayFrame {
   id: number;

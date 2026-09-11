@@ -12,7 +12,7 @@ export async function withBuiltinService<T>(
   _spaceId: string,
   run: (instance: string) => Promise<T>,
   signal?: AbortSignal,
-  purpose: "documents" | "search" | "previews" | "devices" = "documents",
+  purpose: "documents" | "search" | "previews" = "documents",
 ): Promise<T> {
   const account = readActiveSavedAccountSession();
   const generation = readApiSessionGeneration();

@@ -29,7 +29,7 @@ interface UploadResult {
   };
 }
 
-export interface SignedJournalAssetDownload {
+interface SignedJournalAssetDownload {
   url: string;
   expires_at: string;
   filename: string;

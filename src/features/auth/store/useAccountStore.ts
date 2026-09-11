@@ -11,12 +11,7 @@ import {
 } from "../googleSignInCode";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
 
-export type {
-  AccountAuthUser,
-  AccountHandoffPath,
-  AccountMeResponse,
-  LoginResponse,
-} from "@/api/account/types";
+export type { AccountAuthUser, AccountMeResponse } from "@/api/account/types";
 export { isAccountUnauthorizedError } from "@/api/account/api";
 
 configureAccountApi({ readAnalyticsEnabled: () => analytics.isAnalyticsEnabled() });
@@ -131,7 +126,7 @@ export function accountFetchAvatar(): Promise<Blob> {
   return accountApi.avatar();
 }
 
-export function accountUpdateTelemetryPreferences(
+function accountUpdateTelemetryPreferences(
   analyticsEnabled: boolean,
   errorReportingEnabled: boolean,
 ): Promise<void> {

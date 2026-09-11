@@ -1,4 +1,3 @@
 export { buildChatDisplayRows, formatChatMessageTime } from "./components/ChatDisplay";
 export { messageReplyPreviewText } from "./components/messageHelpers";
-export { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 export * from "./store/useSpaceMessageSpansStore";

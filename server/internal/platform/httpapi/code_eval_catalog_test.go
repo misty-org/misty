@@ -55,7 +55,8 @@ func TestCodeEvalCatalogIsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v (regenerate with MISTY_WRITE_CODE_EVAL_CATALOG=1)", codeEvalCatalogPath, err)
 	}
-	if !bytes.Equal(got, want) {
+	// A Windows checkout may store the catalog with CRLF line endings.
+	if !bytes.Equal(bytes.ReplaceAll(got, []byte("\r\n"), []byte("\n")), want) {
 		t.Fatal("the code eval catalog is stale; regenerate it with MISTY_WRITE_CODE_EVAL_CATALOG=1")
 	}
 }

@@ -30,15 +30,26 @@ billing() {
   [ -f "$billing_root/.githooks/checks.sh" ] || { echo "Billing checkout missing: $billing_root" >&2; return 1; }
   (cd "$billing_root" && MISTY_SERVER_REPO="$root" bash .githooks/checks.sh go)
 }
-server() { parallel server-go billing-contract agent-runtime journal-collab clipboard-worker; }
+server() { parallel server-go billing-contract agent-runtime journal-collab; }
 server_go() { bash "$hooks/server-tests.sh"; }
 billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
-clipboard_worker() { (cd server/apps/clipboard && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
-rust_desktop() { parallel desktop-crate browser-sync-crate agent-code-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate agent-code-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }
+# The desktop crate compiles for Windows too. A Windows machine already covers
+# it in desktop-crate; elsewhere cargo-xwin cross-checks every target, so
+# macOS-only changes cannot silently break the Windows build.
+desktop_windows() {
+  case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) echo "Covered by desktop-crate on Windows."; return 0 ;; esac
+  if ! cargo xwin --version >/dev/null 2>&1; then
+    echo "cargo-xwin is required to check the Windows build: cargo install --locked cargo-xwin" >&2
+    echo "and rustup target add x86_64-pc-windows-msvc" >&2
+    return 1
+  fi
+  cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path src-tauri/Cargo.toml
+}
 browser_sync_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
 # Code projects: file tools, the Seatbelt sandbox and its escape tests (macOS).
 agent_code_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/agent-code/Cargo.toml; }

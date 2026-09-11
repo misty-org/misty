@@ -123,7 +123,7 @@ export function continueWithTemporaryWorkspace(accountId: string, error: unknown
 
 /** Snapshot at the end of a burst, not on every resize frame. The recovery store
  * retains the exact failed write for a retry before accepting the newest value. */
-export class WorkspaceRecoveryWriter {
+class WorkspaceRecoveryWriter {
   private timer?: ReturnType<typeof setTimeout>;
   private since?: number;
   constructor(

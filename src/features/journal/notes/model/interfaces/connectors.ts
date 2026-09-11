@@ -22,7 +22,7 @@ export interface UpdateNoteInput {
 }
 
 /** A page or database in the source that a Space can subscribe to. */
-export interface NoteSourceOption {
+interface NoteSourceOption {
   id: string;
   kind: NoteSourceKind;
   title: string;
@@ -31,7 +31,7 @@ export interface NoteSourceOption {
 }
 
 /** Content appended to the end of an existing note. */
-export interface AppendNoteInput {
+interface AppendNoteInput {
   /** Markdown. The connector shapes it into the source's native blocks. */
   body: string;
 }
@@ -40,7 +40,7 @@ export interface AppendNoteInput {
  * A structured Misty artifact published outward. Beta covers the three shapes a
  * Space actually produces; anything freer is just a `body`.
  */
-export interface PublishNoteInput {
+interface PublishNoteInput {
   title: string;
   body?: string;
   summary?: string;
@@ -53,7 +53,7 @@ export interface PublishNoteInput {
 }
 
 /** Outcome of a publish, including anything the source refused to accept. */
-export interface PublishNoteResult {
+interface PublishNoteResult {
   note: UnifiedNote;
   /** Properties skipped because the target schema did not support them. */
   skippedProperties: string[];

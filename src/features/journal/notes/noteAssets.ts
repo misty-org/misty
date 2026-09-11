@@ -6,7 +6,7 @@ import {
 } from "@/api/journal/assets";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
-export const MAX_NOTE_ASSET_BYTES = MAX_JOURNAL_ASSET_BYTES;
+const MAX_NOTE_ASSET_BYTES = MAX_JOURNAL_ASSET_BYTES;
 
 export interface UploadNoteAssetInput {
   accountId?: string;

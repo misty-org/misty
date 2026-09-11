@@ -4,19 +4,15 @@ import type {
   DirectorySizeStatus,
   ExplorerLocationKind,
   FileKind,
-  SearchQueryScope,
-  SearchScanOutcome,
-  SearchScanPhase,
   SearchSourceKind,
 } from "@/native/ipc/primitives";
-import type { SavedSearchRule } from "./transfers-files";
 export interface AppSnapshot {
   appName: string;
   version: string;
   migrationStage: string;
   environment: AppEnvironmentSnapshot;
 }
-export interface AppEnvironmentSnapshot {
+interface AppEnvironmentSnapshot {
   homeDir: string;
   mistyDir: string;
   configDir: string;
@@ -30,7 +26,7 @@ export interface AppEnvironmentSnapshot {
   mountPath: string;
   configExists: boolean;
 }
-export interface ClipboardFileRef {
+interface ClipboardFileRef {
   display_name: string;
   local_path: string;
   provider_type: string;
@@ -38,7 +34,7 @@ export interface ClipboardFileRef {
   remote_path: string;
   is_dir: boolean;
 }
-export interface ClipboardImage {
+interface ClipboardImage {
   mime_type: string;
   blob_id: string;
   checksum: string;
@@ -80,35 +76,11 @@ export interface MountedDevice {
 export interface DeviceSnapshot {
   devices: MountedDevice[];
 }
-/** A live LAN connection from this device to another of its devices. */
-export interface ConnectedPeerStatus {
-  deviceId: string;
-  state: "online";
-  connectionType: "direct" | "relay" | "unknown";
-}
-export interface ConnectedDevicesSnapshot {
-  enabled: boolean;
-  endpointId: string | null;
-  addressing: unknown | null;
-  relayPolicy: "managed" | "public-development" | "disabled" | "lan-only";
-  peers: ConnectedPeerStatus[];
-  unavailableReason: string | null;
-}
-export interface PeerRoot {
-  id: string;
-  name: string;
-  kind: "system" | "volume" | "folder";
-  readonly: true;
-}
 export interface ExplorerLocation {
   kind: ExplorerLocationKind;
   providerType: string | null;
   remoteName: string | null;
   remotePath: string | null;
-  peerDeviceId?: string | null;
-  peerRootId?: string | null;
-  /** For a connected device: whether it lets this device change its files. */
-  peerWritable?: boolean;
 }
 export interface FileEntry {
   id: string;
@@ -133,57 +105,6 @@ export interface DirectorySizeRecord {
   calculatedAtMs: number | null;
   error?: string | null;
 }
-export interface DirectorySizeRequest {
-  paths: string[];
-  force?: boolean;
-}
-export interface SearchScanError {
-  source: string;
-  message: string;
-}
-export interface SearchStatus {
-  scanInProgress: boolean;
-  scanPhase: SearchScanPhase;
-  lastScanTimeMs: number | null;
-  lastScanOutcome: SearchScanOutcome | null;
-  lastScanError: string | null;
-  indexedItemCount: number;
-  indexedLocalItemCount: number;
-  indexedRemoteItemCount: number;
-  scanIndexedItemCount: number;
-  indexSizeBytes: number;
-  currentSource: string | null;
-  currentPath: string | null;
-  scanErrors: SearchScanError[];
-  indexedLocalRoots: string[];
-  indexedRemoteNames: string[];
-  lastScanAddedItemCount: number;
-  lastScanUpdatedItemCount: number;
-  lastScanRemovedItemCount: number;
-  lastScanUnchangedItemCount: number;
-  /** When the last scan began, in any Misty window sharing this index. */
-  lastScanStartedMs?: number | null;
-}
-export interface SearchScanRequest {
-  roots?: string[];
-  includeLocal?: boolean;
-  includeRemotes?: boolean;
-  remoteNames?: string[];
-  maxDepth?: number | null;
-  ignoredPaths?: string[];
-  incremental?: boolean;
-}
-export interface SearchQueryRequest {
-  query: string;
-  currentPath?: string | null;
-  scope?: SearchQueryScope;
-  includeFiles?: boolean;
-  includeDirectories?: boolean;
-  includeHidden?: boolean;
-  limit?: number | null;
-  rules?: SavedSearchRule[];
-  matchMode?: "all" | "any";
-}
 export interface SearchResult {
   entry: FileEntry;
   score: number;
@@ -191,7 +112,7 @@ export interface SearchResult {
   indexedAtMs: number;
   match?: SearchResultMatch;
 }
-export interface SearchResultMatch {
+interface SearchResultMatch {
   kind: "filename" | "metadata" | "semantic" | "hybrid";
   semanticScore?: number | null;
   lexicalScore?: number | null;

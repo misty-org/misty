@@ -25,8 +25,6 @@ export const navigatorIslandActionClass = [
 export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
-
-export const workStatusToastDurationMs = 3500;
 export const desktopTitlebarNavigationInset = 84;
 export const windowsTitlebarNavigationInset = 8;
 

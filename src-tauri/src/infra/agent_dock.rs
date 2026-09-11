@@ -12,6 +12,8 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window};
 
 mod host_view;
+#[cfg(target_os = "macos")]
+mod macos;
 pub(super) use host_view::{fill_host, page_returned};
 
 /// Host windows for detached tabs: `misty-dock-<uuid>`.
@@ -34,37 +36,10 @@ fn hosts() -> &'static Mutex<HashMap<String, Host>> {
     HOSTS.get_or_init(Default::default)
 }
 
-#[cfg(target_os = "macos")]
-extern "C" {
-    fn misty_agent_dock_init(callback: extern "C" fn(*const std::ffi::c_char));
-    fn misty_agent_dock_add(
-        window: *mut std::ffi::c_void,
-        id: *const std::ffi::c_char,
-        name: *const std::ffi::c_char,
-        parent: *mut std::ffi::c_void,
-    ) -> bool;
-    fn misty_agent_dock_open(id: *const std::ffi::c_char);
-    fn misty_agent_dock_is_docked(id: *const std::ffi::c_char) -> bool;
-    fn misty_agent_dock_forget(id: *const std::ffi::c_char);
-    fn misty_agent_dock_status(
-        id: *const std::ffi::c_char,
-        status: *const std::ffi::c_char,
-        waiting: bool,
-    );
-    fn misty_agent_dock_fill(view: *mut std::ffi::c_void, top: f64);
-    fn misty_agent_dock_visibility() -> *mut std::ffi::c_char;
-    fn misty_agent_dock_carousel(show: bool);
-    fn misty_agent_dock_test_app(action: *const std::ffi::c_char);
-    fn misty_agent_dock_page_returned(view: *mut std::ffi::c_void);
-}
-
 /// For the dock check: hide, unhide, minimize or unminimize Misty.
 pub fn test_app(app: &AppHandle, action: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    {
-        let action = action.to_owned();
-        on_main(app, move |_| unsafe { misty_agent_dock_test_app(c_string(&action).as_ptr()) })?;
-    }
+    macos::test_app(app, action)?;
     #[cfg(not(target_os = "macos"))]
     let _ = (app, action);
     Ok(())
@@ -73,24 +48,17 @@ pub fn test_app(app: &AppHandle, action: &str) -> Result<(), String> {
 /// Fans the stack out into the carousel, or folds it (the dock check drives it).
 pub fn carousel(app: &AppHandle, show: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    on_main(app, move |_| unsafe { misty_agent_dock_carousel(show) })?;
-    #[cfg(not(target_os = "macos"))]
+    macos::carousel(app, show)?;
+    #[cfg(windows)]
+    super::agent_dock_windows::carousel(app, show);
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (app, show);
     Ok(())
 }
 
-/// A press in the dock: the docked window hears it, and so does the window
-/// running a detached tab's task.
-#[cfg(target_os = "macos")]
-extern "C" fn dock_event(value: *const std::ffi::c_char) {
-    if value.is_null() {
-        return;
-    }
-    let payload =
-        unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
-    let (Some(app), Ok(payload)) = (APP.get(), payload) else {
-        return;
-    };
+/// A dock event: the docked window hears it, and so does the window running
+/// a detached tab's task.
+pub(super) fn route(app: &AppHandle, payload: Value) {
     let id = payload["id"].as_str().unwrap_or_default().to_owned();
     let owner = hosts()
         .lock()
@@ -107,15 +75,8 @@ extern "C" fn dock_event(value: *const std::ffi::c_char) {
 fn ensure_init(app: &AppHandle) {
     if APP.set(app.clone()).is_ok() {
         #[cfg(target_os = "macos")]
-        unsafe {
-            misty_agent_dock_init(dock_event)
-        };
+        macos::init();
     }
-}
-
-#[cfg(target_os = "macos")]
-fn c_string(value: &str) -> std::ffi::CString {
-    std::ffi::CString::new(value.replace('\0', "")).unwrap_or_default()
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -129,25 +90,10 @@ fn on_main(app: &AppHandle, work: impl FnOnce(&AppHandle) + Send + 'static) -> R
 pub fn dock(app: &AppHandle, label: &str, name: &str) -> Result<(), String> {
     ensure_init(app);
     #[cfg(target_os = "macos")]
-    {
-        let (label, name) = (label.to_owned(), name.to_owned());
-        on_main(app, move |app| {
-            let Some(window) = app.get_window(&label) else {
-                return;
-            };
-            let Ok(pointer) = window.ns_window() else {
-                return;
-            };
-            // Docked windows live in Misty's window and move with it.
-            let parent = app
-                .get_window("main")
-                .and_then(|main| main.ns_window().ok())
-                .unwrap_or(std::ptr::null_mut());
-            let (id, name) = (c_string(&label), c_string(&name));
-            unsafe { misty_agent_dock_add(pointer, id.as_ptr(), name.as_ptr(), parent) };
-        })?;
-    }
-    #[cfg(not(target_os = "macos"))]
+    macos::add(app, label, name)?;
+    #[cfg(windows)]
+    super::agent_dock_windows::add(app, label, name)?;
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (label, name);
     Ok(())
 }
@@ -155,33 +101,33 @@ pub fn dock(app: &AppHandle, label: &str, name: &str) -> Result<(), String> {
 /// Opens a docked window at full size in front.
 pub fn open(app: &AppHandle, label: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    {
-        let label = label.to_owned();
-        on_main(app, move |_| unsafe { misty_agent_dock_open(c_string(&label).as_ptr()) })?;
-    }
-    #[cfg(not(target_os = "macos"))]
+    macos::open(app, label)?;
+    #[cfg(windows)]
+    super::agent_dock_windows::open(app, label);
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (app, label);
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
 pub fn is_docked(label: &str) -> bool {
-    unsafe { misty_agent_dock_is_docked(c_string(label).as_ptr()) }
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn is_docked(_label: &str) -> bool {
-    false
+    #[cfg(target_os = "macos")]
+    return macos::is_docked(label);
+    #[cfg(windows)]
+    return super::agent_dock_windows::is_docked(label);
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = label;
+        false
+    }
 }
 
 /// The window is going away; the dock drops it and closes the gap.
 pub fn forget(app: &AppHandle, label: &str) {
     #[cfg(target_os = "macos")]
-    {
-        let label = label.to_owned();
-        let _ = on_main(app, move |_| unsafe { misty_agent_dock_forget(c_string(&label).as_ptr()) });
-    }
-    #[cfg(not(target_os = "macos"))]
+    macos::forget(app, label);
+    #[cfg(windows)]
+    super::agent_dock_windows::forget(app, label);
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (app, label);
 }
 
@@ -252,14 +198,10 @@ pub fn agent_dock_status(
         );
     }
     #[cfg(target_os = "macos")]
-    on_main(&app, move |_| unsafe {
-        misty_agent_dock_status(
-            c_string(&label).as_ptr(),
-            c_string(&status).as_ptr(),
-            waiting,
-        )
-    })?;
-    #[cfg(not(target_os = "macos"))]
+    macos::status(&app, label, status, waiting)?;
+    #[cfg(windows)]
+    super::agent_dock_windows::status(&app, &label, &status, waiting);
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (label, status, waiting);
     Ok(())
 }
@@ -280,22 +222,15 @@ pub async fn visibility_now(app: &AppHandle) -> Result<Value, String> {
     receive.await.map_err(|e| e.to_string())?
 }
 
-#[cfg(target_os = "macos")]
 fn visibility() -> Result<Value, String> {
-    unsafe {
-        let pointer = misty_agent_dock_visibility();
-        if pointer.is_null() {
-            return Ok(json!([]));
-        }
-        let value = serde_json::from_slice(std::ffi::CStr::from_ptr(pointer).to_bytes())
-            .map_err(|error| error.to_string());
-        libc::free(pointer.cast());
-        value
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn visibility() -> Result<Value, String> {
+    #[cfg(target_os = "macos")]
+    return macos::visibility();
+    #[cfg(windows)]
+    return Ok(APP
+        .get()
+        .map(super::agent_dock_windows::visibility)
+        .unwrap_or_else(|| json!([])));
+    #[cfg(not(any(target_os = "macos", windows)))]
     Ok(json!([]))
 }
 
@@ -372,14 +307,17 @@ pub fn detach(
     .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
     .build()
     .map_err(|e| e.to_string())?;
-    hosts().lock().map_err(|_| "agent_dock_unavailable")?.insert(
-        label.clone(),
-        Host {
-            owner: window.label().to_owned(),
-            tab: tab.clone(),
-            name: name.clone(),
-        },
-    );
+    hosts()
+        .lock()
+        .map_err(|_| "agent_dock_unavailable")?
+        .insert(
+            label.clone(),
+            Host {
+                owner: window.label().to_owned(),
+                tab: tab.clone(),
+                name: name.clone(),
+            },
+        );
     let closing = (app.clone(), label.clone());
     host.on_window_event(move |event| match event {
         // Closing the agent's window brings its tab home; the task goes on.
@@ -441,7 +379,11 @@ pub fn attach(app: &AppHandle, label: &str) -> Result<(), String> {
 
 /// A press in a host window's bar.
 #[tauri::command]
-pub fn agent_dock_host_action(window: Window, app: AppHandle, action: String) -> Result<(), String> {
+pub fn agent_dock_host_action(
+    window: Window,
+    app: AppHandle,
+    action: String,
+) -> Result<(), String> {
     let label = window.label().to_owned();
     let (owner, name) = {
         let hosts = hosts().lock().map_err(|_| "agent_dock_unavailable")?;
@@ -452,7 +394,11 @@ pub fn agent_dock_host_action(window: Window, app: AppHandle, action: String) ->
         "dock" => dock(&app, &label, &name),
         "attach" => attach(&app, &label),
         "stop" => app
-            .emit_to(owner.as_str(), EVENT, json!({ "action": "stop", "id": label }))
+            .emit_to(
+                owner.as_str(),
+                EVENT,
+                json!({ "action": "stop", "id": label }),
+            )
             .map_err(|e| e.to_string()),
         _ => Err("Unknown agent window action.".into()),
     }

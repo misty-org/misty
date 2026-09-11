@@ -11,7 +11,11 @@ Push-Location $here
 try {
     cargo build -q
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    # WebView2 logs harmless Chromium lines to stderr; only the probe's own
+    # exit code decides the result.
+    $ErrorActionPreference = "Continue"
     & (Join-Path $here "target\debug\kiri-runtime-probe.exe") 2>&1 |
+        ForEach-Object { "$_" } |
         Select-String -Pattern "KIRI RUNTIME|EVENT|panicked"
     exit $LASTEXITCODE
 } finally {

@@ -23,14 +23,8 @@ use crate::domain::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
-use crate::infra::connected_devices::{
-    ConnectedDevicesService, ConnectedDevicesSnapshot, InitializeConnectedDevicesRequest,
-    PeerPathRequest, PeerReadRequest,
-};
 use crate::infra::default_browser::DefaultBrowserSnapshot;
 use crate::infra::devices::{DeviceSnapshot, DeviceUnmountRequest};
-#[cfg(not(target_os = "macos"))]
-use crate::infra::document_intelligence::PrepareAgentDocumentRequest;
 use crate::infra::document_intelligence::PreparedAgentDocument;
 use crate::infra::environment::AppEnvironmentSnapshot;
 use crate::infra::explorer::SavePreviewRequest;
@@ -153,14 +147,6 @@ pub async fn agents_list_scoped_files(
     state.agents.list_scoped_files(request).await
 }
 
-#[cfg(not(target_os = "macos"))]
-#[tauri::command]
-pub async fn agents_prepare_document(
-    request: PrepareAgentDocumentRequest,
-) -> ApiResult<PreparedAgentDocument> {
-    crate::infra::document_intelligence::prepare_document(request).await
-}
-
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
@@ -198,17 +184,22 @@ pub async fn agents_prepare_scoped_document(
     )
     .map_err(|_| crate::error::ApiError::Message("Invalid document response.".into()))
 }
-#[cfg(not(target_os = "macos"))]
+/// Windows parses the document in the confined worker; the shared folder's
+/// file is copied in, never opened by the worker in place.
+#[cfg(windows)]
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
+    webview: tauri::Webview,
     request: PrepareScopedAgentDocumentRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedAgentDocument> {
+    if webview.label() != "main" {
+        return Err(crate::error::ApiError::Message(
+            "Only the Host can process approved device scopes.".into(),
+        ));
+    }
     let target = state.agents.scoped_document_path(request).await?;
-    crate::infra::document_intelligence::prepare_document(PrepareAgentDocumentRequest {
-        path: target.to_string_lossy().into_owned(),
-    })
-    .await
+    crate::infra::document_intelligence::prepare_document(target).await
 }
 
 #[tauri::command]
@@ -389,134 +380,7 @@ pub async fn explorer_list_directory(
     app: AppHandle,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<DirectoryListing> {
-    #[cfg(desktop)]
-    if request
-        .path
-        .as_deref()
-        .is_some_and(|path| path.starts_with("misty://device/"))
-    {
-        use crate::domain::connected_devices::{PeerEntryKind, PeerResponse};
-        use crate::domain::explorer::{ExplorerLocation, FileEntry, FileKind};
-        use crate::infra::peer_files::PeerVirtualPath;
-        use sha2::{Digest, Sha256};
-
-        let path = request.path.clone().unwrap_or_default();
-        let parsed = PeerVirtualPath::parse(&path)?;
-        let response = state
-            .connected_devices
-            .list_directory(PeerPathRequest {
-                device_id: parsed.device_id.clone(),
-                path: path.clone(),
-                show_hidden: request.show_hidden.unwrap_or(false),
-            })
-            .await?;
-        let PeerResponse::Directory {
-            entries,
-            snapshot: _,
-            writable,
-            ..
-        } = response
-        else {
-            return Err(ApiError::Message(
-                "Peer returned an unexpected directory response.".to_owned(),
-            ));
-        };
-        let location = ExplorerLocation::peer_device(
-            parsed.device_id.clone(),
-            parsed.root_id.clone(),
-            parsed.relative_path.to_string_lossy().into_owned(),
-            writable,
-        );
-        let total_count = entries.len();
-        let hidden_count = entries.iter().filter(|entry| entry.hidden).count();
-        let entries = entries
-            .into_iter()
-            .map(|entry| {
-                let extension = std::path::Path::new(&entry.name)
-                    .extension()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or("")
-                    .to_owned();
-                let mut hasher = Sha256::new();
-                hasher.update(entry.path.as_bytes());
-                FileEntry {
-                    id: format!("peer_{}", hex::encode(&hasher.finalize()[..16])),
-                    name: entry.name,
-                    path: entry.path,
-                    extension,
-                    mime_type: None,
-                    remote_modified: Some(entry.snapshot),
-                    kind: match entry.kind {
-                        PeerEntryKind::File => FileKind::File,
-                        PeerEntryKind::Directory => FileKind::Folder,
-                        PeerEntryKind::Symlink => FileKind::Symlink,
-                    },
-                    size_bytes: entry.size_bytes,
-                    modified_ms: entry.modified_ms,
-                    created_ms: None,
-                    readonly: entry.readonly,
-                    hidden: entry.hidden,
-                    is_deleted: false,
-                    location: location.clone(),
-                }
-            })
-            .collect();
-        let parent_path = if parsed.relative_path.as_os_str().is_empty() {
-            None
-        } else {
-            let parent = parsed
-                .relative_path
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new(""));
-            Some(PeerVirtualPath::format(
-                &parsed.device_id,
-                &parsed.root_id,
-                parent,
-            )?)
-        };
-        return Ok(DirectoryListing {
-            path,
-            title: None,
-            parent_path,
-            location,
-            entries,
-            total_count,
-            hidden_count,
-            modified_ms: None,
-            created_ms: None,
-        });
-    }
-
     state.explorer.list_directory(request).await
-}
-
-#[cfg(desktop)]
-async fn materialize_peer_paste_sources(
-    request: &mut PasteItemsRequest,
-    connected_devices: &ConnectedDevicesService,
-) -> ApiResult<()> {
-    if request.destination_directory.starts_with("misty://device/") {
-        return Err(ApiError::Message(
-            "Copy to a connected device through the transfer queue.".to_owned(),
-        ));
-    }
-    let has_peer_source = request
-        .sources
-        .iter()
-        .any(|source| source.path.starts_with("misty://device/"));
-    if has_peer_source && matches!(request.operation, ClipboardOperation::Move) {
-        return Err(ApiError::Message(
-            "Files cannot be cut or moved from a connected device. Copy them instead.".to_owned(),
-        ));
-    }
-    for source in &mut request.sources {
-        if !source.path.starts_with("misty://device/") {
-            continue;
-        }
-        let materialized = connected_devices.materialize_tree(&source.path).await?;
-        source.path = materialized.local_path.to_string_lossy().into_owned();
-    }
-    Ok(())
 }
 
 #[tauri::command]
@@ -524,17 +388,6 @@ pub async fn explorer_prepare_open_item(
     request: PrepareOpenItemRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedOpenItem> {
-    #[cfg(desktop)]
-    if request.path.starts_with("misty://device/") {
-        let materialized = state.connected_devices.materialize(&request.path).await?;
-        return Ok(PreparedOpenItem {
-            local_path: materialized.local_path.to_string_lossy().into_owned(),
-            cached: true,
-            source_path: Some(request.path),
-            cache_path: Some(materialized.local_path.to_string_lossy().into_owned()),
-            cache_hit: materialized.cache_hit,
-        });
-    }
     state.explorer.prepare_open_item(request).await
 }
 
@@ -605,97 +458,6 @@ pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<Devic
     tokio::task::spawn_blocking(move || devices.snapshot())
         .await
         .map_err(|err| ApiError::Message(format!("Device scan failed: {err}")))
-}
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn connected_devices_initialize(
-    request: InitializeConnectedDevicesRequest,
-    webview: tauri::Webview,
-    apps: State<'_, crate::platform::mini_app::MiniAppState>,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    let device_id = request.device_id.clone();
-    let device_name = if request.device_name.trim().is_empty() {
-        "This Misty".to_owned()
-    } else {
-        request.device_name.clone()
-    };
-    #[cfg(target_os = "macos")]
-    let lease = {
-        if webview.label() != "main" {
-            return Err(ApiError::Unavailable(
-                "Only the Host can start device services.".into(),
-            ));
-        }
-        let lease = crate::infra::document_intelligence::ServiceLease::acquire_service(
-            &apps,
-            &request.instance,
-            "files",
-            "peer-transport",
-            2,
-        )
-        .await
-        .map_err(ApiError::Unavailable)?;
-        let owner = lease
-            .peer_identity(&request.device_id)
-            .map_err(ApiError::Unavailable)?;
-        if owner.account_id != request.account_id {
-            return Err(ApiError::Unavailable(
-                "The Files session belongs to another account.".into(),
-            ));
-        }
-        std::sync::Arc::new(lease)
-    };
-    let snapshot = state
-        .connected_devices
-        .initialize(
-            request,
-            #[cfg(target_os = "macos")]
-            lease,
-        )
-        .await?;
-    if snapshot.enabled {
-        state.clipboard.set_device_identity(device_id, device_name);
-    }
-    Ok(snapshot)
-}
-
-#[cfg(all(desktop, not(target_os = "macos")))]
-#[tauri::command]
-pub async fn connected_devices_initialize(
-    request: InitializeConnectedDevicesRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    let device_id = request.device_id.clone();
-    let device_name = if request.device_name.trim().is_empty() {
-        "This Misty".to_owned()
-    } else {
-        request.device_name.clone()
-    };
-    let snapshot = state.connected_devices.initialize(request).await?;
-    if snapshot.enabled {
-        state.clipboard.set_device_identity(device_id, device_name);
-    }
-    Ok(snapshot)
-}
-
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_snapshot(
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<ConnectedDevicesSnapshot> {
-    state.connected_devices.snapshot()
-}
-
-/// This device's id on Misty's server, which paired devices know it by.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn connected_devices_set_identity(
-    device_id: String,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<()> {
-    state.connected_devices.set_network_identity(device_id)
 }
 
 fn open_with_application(application_path: &str, file_path: &str) -> ApiResult<()> {

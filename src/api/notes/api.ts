@@ -19,7 +19,7 @@ export interface ServerSpaceNote {
   backlink_count?: number;
 }
 
-export type NoteCollaborationRole = "creator" | "editor" | "viewer";
+type NoteCollaborationRole = "creator" | "editor" | "viewer";
 
 export interface NoteCollaborationTicket {
   ticket: string;

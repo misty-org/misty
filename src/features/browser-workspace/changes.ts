@@ -41,7 +41,7 @@ function tree(node: WorkspaceDockNode): SplitTree {
 
 /** Encode shared fields only. Focus, history, local paths, browser viewport,
  * favicon cache, and physical window geometry are not workspace mutations. */
-export function workspaceRecords(windows: WorkspaceWindow[], profileId: string): SharedRecord[] {
+function workspaceRecords(windows: WorkspaceWindow[], profileId: string): SharedRecord[] {
   const records: SharedRecord[] = [];
   const seen = new Set<string>();
   const add = (record: SharedRecord) => {
