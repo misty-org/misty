@@ -50,11 +50,7 @@ export const router = createBrowserRouter([
               { path: "apps", element: <Navigate to={routes.discover} replace /> },
               {
                 path: "activity",
-                element: isNativeMobileBuild ? (
-                  <ActivityPage />
-                ) : (
-                  <Navigate to={routes.spaces} replace />
-                ),
+                element: <ActivityPage />,
               },
               { path: "apps/:appId", element: null },
               { path: "discover", element: <DiscoverPage /> },

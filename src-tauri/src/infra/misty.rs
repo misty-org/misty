@@ -394,7 +394,8 @@ pub fn open_external_url(app: tauri::AppHandle, url: String) -> Result<(), Strin
         if !parsed.username().is_empty() || parsed.password().is_some() {
             return Err("Web addresses cannot contain credentials.".into());
         }
-        return app.emit_to("main", "misty://open-web-url", parsed.as_str())
+        return app
+            .emit_to("main", "misty://open-web-url", parsed.as_str())
             .map_err(|error| error.to_string());
     }
     open_url_in_system_browser(&url)
@@ -671,7 +672,7 @@ fn is_loopback_official_app_url(url: &str, plugin_id: &str, version: &str) -> bo
         && parsed.fragment().is_none()
 }
 
-fn verify_official_app_signature(
+pub(crate) fn verify_official_app_signature(
     archive: &[u8],
     encoded_signature: &str,
     key_id: &str,
@@ -713,6 +714,30 @@ pub async fn official_app_package_ready(
     .map_err(|error| format!("Could not check installed app package: {error}"))?
 }
 
+// Content-addressed package roots keep every verified release inert and independent.
+#[cfg(desktop)]
+fn official_release_root(sha256: &str) -> Result<PathBuf, String> {
+    let digest = sha256.trim().to_ascii_lowercase();
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("A valid package checksum is required.".to_owned());
+    }
+    Ok(misty_plugin_root_dir("public")?
+        .join("releases")
+        .join(digest))
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn official_app_package_path(plugin_id: String, sha256: String) -> Result<String, String> {
+    if !OFFICIAL_APP_IDS.contains(&plugin_id.as_str()) {
+        return Err("Unknown official app.".to_owned());
+    }
+    Ok(official_release_root(&sha256)?
+        .join(plugin_id)
+        .to_string_lossy()
+        .into_owned())
+}
+
 #[cfg(desktop)]
 fn verified_official_app_package_ready(
     plugin_id: String,
@@ -724,7 +749,7 @@ fn verified_official_app_package_ready(
     if !OFFICIAL_APP_IDS.contains(&plugin_id.as_str()) {
         return Ok(false);
     }
-    let app_dir = misty_plugin_root_dir("public")?.join(&plugin_id);
+    let app_dir = official_release_root(&sha256)?.join(&plugin_id);
     if app_dir.join(".misty-official-operation").exists() {
         return Ok(false);
     }
@@ -747,56 +772,9 @@ fn verified_official_app_package_ready(
     verify_extracted_official_app(&archive, &app_dir, &plugin_id)
 }
 
-/// Resolve an app-selected path and prove that it remains beneath the exact
-/// folder (or equals the exact file) granted by the system picker. Doing this
-/// in Rust closes both lexical parent-segment escapes and symlink escapes
-/// before a host capability passes the path to Files, Code, or Terminal.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn official_app_resolve_granted_path(
-    root: String,
-    candidate: String,
-    expected_kind: Option<String>,
-) -> Result<String, String> {
-    let root_path = PathBuf::from(root.trim());
-    let candidate_path = PathBuf::from(candidate.trim());
-    if !root_path.is_absolute() || !candidate_path.is_absolute() {
-        return Err("App paths must be absolute.".to_owned());
-    }
-    let canonical_root = root_path
-        .canonicalize()
-        .map_err(|_| "The selected file or folder is no longer available.".to_owned())?;
-    let canonical_candidate = candidate_path
-        .canonicalize()
-        .map_err(|_| "The requested file or folder is no longer available.".to_owned())?;
-    let contained = if canonical_root.is_file() {
-        canonical_candidate == canonical_root
-    } else {
-        canonical_candidate == canonical_root || canonical_candidate.starts_with(&canonical_root)
-    };
-    if !contained {
-        return Err("That path is outside the folder granted to this app.".to_owned());
-    }
-    match expected_kind.as_deref().unwrap_or("any") {
-        "directory" if !canonical_candidate.is_dir() => {
-            return Err("The app requested a folder, but that path is not a folder.".to_owned());
-        }
-        "file" if !canonical_candidate.is_file() => {
-            return Err("The app requested a file, but that path is not a file.".to_owned());
-        }
-        "any" | "directory" | "file" => {}
-        _ => return Err("The app requested an unsupported path kind.".to_owned()),
-    }
-    Ok(canonical_candidate.to_string_lossy().into_owned())
-}
-
 #[cfg(mobile)]
 #[tauri::command]
-pub fn official_app_resolve_granted_path(
-    _root: String,
-    _candidate: String,
-    _expected_kind: Option<String>,
-) -> Result<String, String> {
+pub fn official_app_package_path(_plugin_id: String, _sha256: String) -> Result<String, String> {
     Err("Downloaded apps are not available in Misty mobile.".to_owned())
 }
 
@@ -920,7 +898,11 @@ pub async fn install_plugin_bundle(
         )?;
     }
 
-    let root_dir = misty_plugin_root_dir(&root)?;
+    let root_dir = if official {
+        official_release_root(sha256.as_deref().unwrap_or_default())?
+    } else {
+        misty_plugin_root_dir(&root)?
+    };
     fs::create_dir_all(&root_dir)
         .map_err(|error| format!("Could not create app root {}: {error}", root_dir.display()))?;
     let operation_id = install_plugin_archive_atomically(
@@ -945,6 +927,7 @@ pub async fn install_plugin_bundle(
 #[tauri::command]
 pub fn finalize_official_app_install(
     plugin_id: String,
+    sha256: String,
     operation_id: String,
     commit: bool,
 ) -> Result<(), String> {
@@ -954,7 +937,7 @@ pub fn finalize_official_app_install(
     {
         return Err("Official app install operation is invalid.".to_owned());
     }
-    let root = misty_plugin_root_dir("public")?;
+    let root = official_release_root(&sha256)?;
     finalize_official_app_install_at_root(&root, &plugin_id, &operation_id, commit)
 }
 
@@ -1025,6 +1008,7 @@ fn cleanup_official_app_transaction_artifacts(root: &Path, plugin_id: &str) -> R
 #[tauri::command]
 pub fn finalize_official_app_install(
     _plugin_id: String,
+    _sha256: String,
     _operation_id: String,
     _commit: bool,
 ) -> Result<(), String> {
@@ -3141,46 +3125,6 @@ mod tests {
         );
         assert!(target.join("web/index.html").is_file());
         assert!(!target.join("old.txt").exists());
-    }
-
-    #[test]
-    fn official_app_granted_paths_reject_parent_escape() {
-        let directory = tempfile::tempdir().expect("path sandbox should exist");
-        let granted = directory.path().join("granted");
-        let outside = directory.path().join("outside.txt");
-        fs::create_dir_all(&granted).expect("granted folder should exist");
-        fs::write(&outside, "private").expect("outside file should exist");
-
-        let escaped = granted.join("..").join("outside.txt");
-        let result = official_app_resolve_granted_path(
-            granted.to_string_lossy().into_owned(),
-            escaped.to_string_lossy().into_owned(),
-            Some("file".to_owned()),
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn official_app_granted_paths_reject_symlink_escape() {
-        use std::os::unix::fs::symlink;
-
-        let directory = tempfile::tempdir().expect("path sandbox should exist");
-        let granted = directory.path().join("granted");
-        let outside = directory.path().join("outside.txt");
-        fs::create_dir_all(&granted).expect("granted folder should exist");
-        fs::write(&outside, "private").expect("outside file should exist");
-        let link = granted.join("link.txt");
-        symlink(&outside, &link).expect("symlink should exist");
-
-        let result = official_app_resolve_granted_path(
-            granted.to_string_lossy().into_owned(),
-            link.to_string_lossy().into_owned(),
-            Some("file".to_owned()),
-        );
-
-        assert!(result.is_err());
     }
 
     #[test]

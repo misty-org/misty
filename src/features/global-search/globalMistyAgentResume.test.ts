@@ -18,7 +18,7 @@ vi.mock("@/api/agents/api", () => ({
   },
 }));
 
-import { useGlobalSearchStore } from "./useGlobalSearchStore";
+import { useMistyStore as useGlobalSearchStore } from "@/features/misty/useMistyStore";
 
 initializeHostAgentsRuntime();
 

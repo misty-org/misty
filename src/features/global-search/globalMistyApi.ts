@@ -26,8 +26,8 @@ export const globalMistyApi = {
       kinds: filters?.kinds,
       spaceId: filters?.spaceId,
     }),
-  visualSearch: (attachmentId: string, query = "", limit = 40) =>
-    assistantApi.visualSearch<GlobalSearchResult>(attachmentId, query, limit),
+  visualSearch: (attachmentId: string, query = "", limit = 40, spaceId?: string) =>
+    assistantApi.visualSearch<GlobalSearchResult>(attachmentId, query, limit, spaceId),
   conversations: (query = "") => assistantApi.conversations<GlobalAiConversation>(query),
   createConversation: (title: string, spaceId?: string) =>
     assistantApi.createConversation<GlobalAiConversation>(title, spaceId),

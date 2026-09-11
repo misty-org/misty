@@ -1,3 +1,4 @@
+import type * as BrowserRuntime from "@/features/browser/browserRuntime";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Renameable } from "./Renameable";
@@ -12,7 +13,7 @@ import {
 const native = vi.hoisted(() => ({ invoke: vi.fn(), overlay: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
 vi.mock("@/features/browser/browserRuntime", async (original) => ({
-  ...(await original<typeof import("@/features/browser/browserRuntime")>()),
+  ...(await original<typeof BrowserRuntime>()),
   setBrowserWebviewsSuspended: native.overlay,
 }));
 let disk: Record<string, Record<string, string>>;
@@ -96,49 +97,36 @@ it("validates names without changing meaningful numbers", () => {
     expect(() => validateNavigationName(name)).toThrow();
 });
 
-it("renames an individual tab from its group dropdown", async () => {
-  const { WorkspaceTabGroupButton } =
-    await import("@/application/layouts/DesktopLayout/WorkspaceTabGroupButton");
-  const { Inbox } = await import("lucide-react");
-  const tab = {
-    id: "one",
-    groupInstanceId: "group-one",
-    surfaceId: "browser" as const,
-    groupKey: "tool:browser" as const,
-    instanceKey: "one",
-    title: "Inbox · Gmail",
-    route: "/browser",
-    sidebarVisible: true,
-    state: {},
-    createdAt: 1,
-    lastFocusedAt: 1,
-  };
-  render(
-    <WorkspaceTabGroupButton
-      group={{
-        key: tab.groupKey,
-        surfaceId: tab.surfaceId,
-        label: "Browser",
-        tabs: [tab],
-        storeGroupKey: tab.groupKey,
-      }}
-      icon={Inbox}
-      activeTabId={tab.id}
-      canClose
-      lastUsedTabByGroup={{}}
-      onOpen={() => {}}
-      onClose={() => {}}
-      onMoveTab={() => {}}
-    />,
+it("renames a layout tab and offers the active-pane title reset", async () => {
+  const onRename = vi.fn();
+  const { rerender } = render(
+    <Renameable
+      nameKey="layout-tab:one"
+      automatic="Inbox · Gmail"
+      onRename={onRename}
+      resetLabel="Use active pane title"
+    >
+      <button>Inbox · Gmail</button>
+    </Renameable>,
   );
-  const trigger = screen.getByRole("button", { name: "Show Browser tabs" });
-  fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
-  const row = await screen.findByRole("menuitem", { name: /Inbox · Gmail/ });
-  fireEvent.contextMenu(row, { button: 2 });
+  fireEvent.contextMenu(screen.getByRole("button"), { button: 2 });
   fireEvent.click(await screen.findByText("Rename"));
   const input = await screen.findByRole("textbox");
   fireEvent.change(input, { target: { value: "My mailbox" } });
   fireEvent.keyDown(input, { key: "Enter" });
-  await waitFor(() => expect(useNavigationNames.getState().names["tab:one"]).toBe("My mailbox"));
-  expect(useNavigationNames.getState().names["group:group-one"]).toBeUndefined();
+  await waitFor(() => expect(onRename).toHaveBeenCalledWith("My mailbox"));
+  rerender(
+    <Renameable
+      nameKey="layout-tab:one"
+      automatic="Inbox · Gmail"
+      customName="My mailbox"
+      onRename={onRename}
+      resetLabel="Use active pane title"
+    >
+      <button>My mailbox</button>
+    </Renameable>,
+  );
+  fireEvent.contextMenu(screen.getByRole("button"), { button: 2 });
+  fireEvent.click(await screen.findByText("Use active pane title"));
+  expect(onRename).toHaveBeenLastCalledWith(null);
 });

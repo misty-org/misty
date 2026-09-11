@@ -1,4 +1,4 @@
-import { dockTabs } from "@/features/workspace/dockTree";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { groupNameKey, setNavigationName, tabNameKey, useNavigationNames } from "./store";
 export async function clearNavigationRestoreHistory() {
@@ -6,12 +6,12 @@ export async function clearNavigationRestoreHistory() {
     account = useNavigationNames.getState().account;
   const open = Object.values(state.virtualWindowsByScope)
     .flatMap((windows) => windows ?? [])
-    .flatMap((window) => dockTabs(window.layout.root));
+    .flatMap((window) => allLayoutViews(window.layout));
   const closed = [
     ...state.closedTabs.map((entry) => entry.tab),
     ...Object.values(state.closedVirtualWindowsByScope)
       .flatMap((windows) => windows ?? [])
-      .flatMap((window) => dockTabs(window.layout.root)),
+      .flatMap((window) => allLayoutViews(window.layout)),
   ];
   const keys = (tabs: typeof open) =>
     new Set(

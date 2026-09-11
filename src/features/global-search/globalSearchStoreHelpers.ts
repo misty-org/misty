@@ -1,4 +1,4 @@
-import { runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
+import { captureAgentActivityReporter, runtimeAgentsApi as agentsApi } from "@/features/agents/agentsRuntime";
 
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId, normalizeActionState } from "./globalMistyActions";
@@ -163,13 +163,17 @@ async function pollGlobalAgentTask(
   messageId: string,
   runId: string,
 ) {
+  const accountId = get().accountId;
+  const reportActivity = captureAgentActivityReporter();
   for (let attempt = 0; attempt < 240; attempt += 1) {
+    if (get().accountId !== accountId) return;
     await new Promise((resolve) => window.setTimeout(resolve, 1_250));
     try {
       const detail = await agentsApi.run<{
         summary?: { state?: string; progress?: number; error_message?: string };
         approvals?: Array<{ id: string; state: string; summary?: string }>;
       }>(runId);
+      if (get().accountId !== accountId) return;
       const state = normalizeActionState(detail.summary?.state ?? "running");
       const message = get()
         .conversations.find((conversation) => conversation.id === conversationId)
@@ -194,7 +198,14 @@ async function pollGlobalAgentTask(
           : "pending",
         retryable: state === "failed",
       });
-      if (isTerminalAgentState(state)) return;
+      if (isTerminalAgentState(state)) {
+        reportActivity?.({ operationId: runId, revision: state === "completed" ? 3 : state === "failed" ? 2 : 4,
+          status: state === "completed" ? "completed" : state === "failed" ? "blocked" : "resolved",
+          title: state === "completed" ? "Misty finished your task" : state === "failed" ? "Agent task needs attention" : "Agent task canceled",
+          body: "Open Agents to review the task and its result.", route: `/apps/agents?run=${encodeURIComponent(runId)}`,
+        }, accountId);
+        return;
+      }
     } catch {
       // The durable run remains available in Agents history if projection polling is interrupted.
     }

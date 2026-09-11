@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 export function MobileTopBar(props: {
   title: string;
   attentionCount: number;
+  hasUnseenHistory?: boolean;
   tabCount: number;
   onBack: () => void;
   onActivity: () => void;
@@ -82,20 +83,35 @@ export function MobileTopBar(props: {
         </DropdownMenu>
       ) : !detail ? (
         <TopBarButton
-          label={props.attentionCount ? `Activity, ${props.attentionCount} unread` : "Activity"}
+          label={
+            props.attentionCount
+              ? `Activity, ${props.attentionCount} needing attention`
+              : props.hasUnseenHistory
+                ? "Activity, unseen updates"
+                : "Activity"
+          }
           onClick={props.onActivity}
         >
           <Bell size={19} />
-          {props.attentionCount ? <ActionBadge count={props.attentionCount} /> : null}
+          {props.attentionCount ? (
+            <ActionBadge count={props.attentionCount} neutral />
+          ) : props.hasUnseenHistory ? (
+            <span
+              aria-hidden="true"
+              className="absolute right-1 top-1 size-1.5 rounded-full bg-cream-bright"
+            />
+          ) : null}
         </TopBarButton>
       ) : null}
     </header>
   );
 }
 
-function ActionBadge(props: { count: number }) {
+function ActionBadge(props: { count: number; neutral?: boolean }) {
   return (
-    <span className="absolute right-0 top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-notification-red px-1 text-[10px] font-bold text-cream-bright ring-2 ring-charcoal-workspace">
+    <span
+      className={`absolute right-0 top-0 grid min-h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold ring-2 ring-charcoal-workspace ${props.neutral ? "bg-cream-bright text-charcoal-workspace" : "bg-notification-red text-cream-bright"}`}
+    >
       {formatActivityBadge(props.count)}
     </span>
   );

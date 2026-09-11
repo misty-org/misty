@@ -1,4 +1,4 @@
-import { BotMessageSquare, Workflow } from "lucide-react";
+import { Activity } from "lucide-react";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
 export function AgentsNavigatorDisclosure(props: {
@@ -14,31 +14,8 @@ export function AgentsNavigatorDisclosure(props: {
       label="Agents"
       path={props.path}
       active={props.active}
-      activeDestination={props.active ? destinationFromRoute(props.activeRoute) : null}
-      destinations={[
-        {
-          id: "chat",
-          label: "Chat",
-          icon: BotMessageSquare,
-          path: props.path,
-        },
-        {
-          id: "automations",
-          label: "Automations",
-          icon: Workflow,
-          path: `${props.path}?view=automations`,
-        },
-      ]}
+      activeDestination={props.active ? "activity" : null}
+      destinations={[{ id: "activity", label: "Activity", icon: Activity, path: props.path }]}
     />
   );
-}
-
-function destinationFromRoute(route: string): "chat" | "automations" {
-  try {
-    return new URL(route, "https://misty.local").searchParams.get("view") === "automations"
-      ? "automations"
-      : "chat";
-  } catch {
-    return "chat";
-  }
 }

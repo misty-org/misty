@@ -529,7 +529,7 @@ describe("GlobalNavigator Space tools", () => {
     expect(spaceName?.className).not.toContain("mask-image");
     expect(spaceName?.getAttribute("data-text-overflowing")).toBe("false");
     expect(spaceName?.getAttribute("title")).toBe("Family");
-    expect(spaceName?.closest('[role="menuitem"]')?.className).toContain("pr-[94px]");
+    expect(spaceName?.closest('[role="menuitem"]')?.className).not.toContain("pr-[94px]");
     expect(menu?.className).toContain("w-[240px]");
   });
 

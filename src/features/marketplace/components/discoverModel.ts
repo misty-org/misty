@@ -6,8 +6,8 @@ export {
   discoverAppSize,
 } from "@/features/apps/appDetailsModel";
 
-export type DiscoverSection = "featured" | "apps" | "installed";
-export const discoverCategories = ["All Apps", "Creative", "Productivity", "Utilities"] as const;
+export type DiscoverSection = "featured" | "apps" | "extensions" | "installed";
+export const discoverCategories = ["All", "Creative", "Productivity", "Utilities"] as const;
 export type DiscoverCategory = (typeof discoverCategories)[number];
 
 export function discoverAppCategory(app: OfficialApp): DiscoverCategory {

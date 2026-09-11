@@ -112,18 +112,23 @@ export function GlobalSpaceSwitcher(props: {
             </Tooltip>
           </TooltipProvider>
 
-          <DropdownMenuContent align="start" sideOffset={6} className="w-[240px]">
+          <DropdownMenuContent
+            align="start"
+            sideOffset={6}
+            className="w-[240px] grid-cols-[minmax(0,1fr)]"
+          >
             <DropdownMenuLabel>Spaces</DropdownMenuLabel>
-            <div className="misty-transient-scrollbar grid max-h-[320px] gap-1 overflow-y-auto">
+            <div className="misty-transient-scrollbar grid max-h-[320px] min-w-0 grid-cols-[minmax(0,1fr)] gap-1 overflow-x-hidden overflow-y-auto">
               {props.spaces.map((space) => {
                 const active = space.id === props.activeSpaceId;
                 const unread = unreadActivityCountForSpace(activityItems, space.id);
                 return (
-                  <div className="group/space-menu-row relative" key={space.id}>
+                  <div className="group/space-menu-row relative min-w-0" key={space.id}>
                     <DropdownMenuItem
                       className={cn(
-                        "h-8 gap-2.5 overflow-hidden pr-[94px]",
+                        "h-8 min-w-0 gap-2.5 overflow-hidden",
                         "group-hover/space-menu-row:bg-charcoal-hover",
+                        "group-has-[[data-state=open]]/space-menu-row:bg-charcoal-hover",
                         active && "bg-charcoal-hover text-cream",
                       )}
                       aria-current={active ? "page" : undefined}
@@ -152,7 +157,8 @@ export function GlobalSpaceSwitcher(props: {
                     </DropdownMenuItem>
                     <div
                       className={cn(
-                        "pointer-events-none absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end opacity-0 transition-opacity",
+                        "pointer-events-none absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end bg-charcoal-hover opacity-0 transition-opacity",
+                        "before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-[18px] before:bg-gradient-to-r before:from-transparent before:to-charcoal-hover",
                         "group-hover/space-menu-row:pointer-events-auto group-hover/space-menu-row:opacity-100",
                         "group-focus-within/space-menu-row:pointer-events-auto group-focus-within/space-menu-row:opacity-100",
                         "has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100",

@@ -1,3 +1,4 @@
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import {mistyIntent} from "./mistyIntent";
 export {mistyIntent} from "./mistyIntent";
 import { shortcutCommandRegistry } from "@/features/shortcuts";
@@ -24,7 +25,6 @@ export function buildUnifiedMistyCandidates(
 ): UnifiedMistyCandidate[] {
   const normalized = normalize(query);
   if (!normalized) return emptyCandidates();
-  const intent = mistyIntent(normalized);
   const navigation = /^(open|go to|take me to|show me)\b/.test(normalized);
   const objectQuery = normalized.replace(/^(open|go to|take me to|show me)\s+/, "");
   const candidates: UnifiedMistyCandidate[] = [];
@@ -46,28 +46,7 @@ export function buildUnifiedMistyCandidates(
     });
   }
 
-  if (filters.intent !== "agent") {
-    candidates.push({
-      id: `answer:${normalized}`,
-      type: "answer",
-      title: `Ask Misty “${query.trim()}”`,
-      description: "Get a grounded answer with sources from Misty",
-      prompt: query.trim(),
-      score: filters.intent === "misty" ? 180 : intent === "answer" ? 128 : 48,
-      ranking: [intent === "answer" ? "conversational-intent" : "available-answer"],
-    });
-  }
-  if (filters.intent !== "misty") {
-    candidates.push({
-      id: `agent:${normalized}`,
-      type: "agent_task",
-      title: `Have Misty handle “${query.trim()}”`,
-      description: "Route this work to the best available Space Agent",
-      prompt: query.trim(),
-      score: filters.intent === "agent" ? 180 : intent === "agent" ? 132 : 28,
-      ranking: [intent === "agent" ? "work-intent" : "available-agent"],
-    });
-  }
+  candidates.push({id:`answer:${normalized}`,type:"answer",title:"Continue with Misty",description:query.trim(),prompt:query.trim(),score:-1,ranking:["explicit-handoff"]});
 
   for (const command of shortcutCommandRegistry) {
     if (isNativeMobileBuild && !mobileCommandAllowed(command.id, command.category)) continue;
@@ -95,7 +74,7 @@ export function buildUnifiedMistyCandidates(
 function emptyCandidates(): UnifiedMistyCandidate[] {
   const state = useWorkspaceStore.getState();
   const recent = (state.virtualWindowsByScope[state.activeScopeKey] ?? [])
-    .flatMap((window) => dockTabs(window.layout.root))
+    .flatMap((window) => allLayoutViews(window.layout))
     .filter((tab) => !isNativeMobileBuild || !["extension", "marketplace"].includes(tab.surfaceId))
     .sort((left, right) => right.lastFocusedAt - left.lastFocusedAt)
     .slice(0, 4)
