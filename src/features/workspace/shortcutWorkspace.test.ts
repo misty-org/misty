@@ -8,17 +8,17 @@ describe("workspace shortcut actions", () => {
     useWorkspaceStore.getState().reset();
   });
 
-  it("cycles only within the focused pane and wraps", () => {
+  it("cycles window tabs and wraps", () => {
     const store = useWorkspaceStore.getState();
     const defaultTab = findDockLeaf(store.layout.root, store.layout.focusedPaneId)?.tabs[0];
-    const first = store.openSurface({
+    const first = store.addSurface({
       surfaceId: "files",
       groupKey: "tool:files",
       title: "Files",
       route: "/files",
       instancePolicy: "single",
     });
-    store.openSurface({
+    store.addSurface({
       surfaceId: "code",
       groupKey: "tool:code",
       title: "Code",
@@ -33,14 +33,14 @@ describe("workspace shortcut actions", () => {
 
   it("selects the last tab for slot nine", () => {
     const store = useWorkspaceStore.getState();
-    store.openSurface({
+    store.addSurface({
       surfaceId: "files",
       groupKey: "tool:files",
       title: "Files",
       route: "/files",
       instancePolicy: "single",
     });
-    const last = store.openSurface({
+    const last = store.addSurface({
       surfaceId: "browser",
       groupKey: "tool:browser",
       title: "Browser",
@@ -52,7 +52,7 @@ describe("workspace shortcut actions", () => {
 
   it("reopens the most recently closed tab in the focused pane", () => {
     const store = useWorkspaceStore.getState();
-    const tab = store.openSurface({
+    const tab = store.addSurface({
       surfaceId: "code",
       groupKey: "tool:code",
       title: "Code",
@@ -60,7 +60,7 @@ describe("workspace shortcut actions", () => {
       forceNew: true,
       state: { rootPath: "/project" },
     });
-    store.openSurface({
+    store.addSurface({
       surfaceId: "browser",
       groupKey: "tool:browser",
       title: "Browser",
@@ -76,21 +76,22 @@ describe("workspace shortcut actions", () => {
 
   it("recreates a collapsed panel when reopening its last tab", () => {
     const store = useWorkspaceStore.getState();
-    store.openSurface({
+    store.addSurface({
       surfaceId: "files",
       groupKey: "tool:files",
       title: "Files",
       route: "/files",
       instancePolicy: "single",
     });
-    const browser = store.openSurface({
+    const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;
+    const browser = store.addSurface({
       surfaceId: "browser",
       groupKey: "tool:browser",
       title: "Browser",
       route: "/browser",
       forceNew: true,
     });
-    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const firstPane = { id: sourcePaneId };
     expect(store.dockTab(browser.id, firstPane.id, "right")).toBe(true);
     const browserPane = dockLeaves(useWorkspaceStore.getState().layout.root).find((pane) =>
       pane.tabs.some((tab) => tab.id === browser.id),
@@ -111,26 +112,27 @@ describe("workspace shortcut actions", () => {
 
   it("returns a tab to its existing source panel instead of the focused panel", () => {
     const store = useWorkspaceStore.getState();
-    const files = store.openSurface({
+    const files = store.addSurface({
       surfaceId: "files",
       groupKey: "tool:files",
       title: "Files",
       route: "/files",
       instancePolicy: "single",
     });
-    const browser = store.openSurface({
+    const sourcePaneId = useWorkspaceStore.getState().layout.focusedPaneId;
+    const browser = store.addSurface({
       surfaceId: "browser",
       groupKey: "tool:browser",
       title: "Browser",
       route: "/browser",
       forceNew: true,
     });
-    const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
+    const firstPane = { id: sourcePaneId };
     store.dockTab(browser.id, firstPane.id, "right");
     const browserPane = dockLeaves(useWorkspaceStore.getState().layout.root).find((pane) =>
       pane.tabs.some((tab) => tab.id === browser.id),
     )!;
-    store.openSurface({
+    store.addSurface({
       surfaceId: "code",
       groupKey: "tool:code",
       title: "Code",

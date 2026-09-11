@@ -18,7 +18,9 @@ pub struct OutputDraft {
     bytes: u64,
 }
 pub fn release(permissions: &mut PermissionSet, handle: &str) {
-    permissions.archive_reads.retain(|_, read| read.handle != handle);
+    permissions
+        .archive_reads
+        .retain(|_, read| read.handle != handle);
     permissions.media.retain(|_, job| !job.uses_handle(handle));
     permissions
         .downloads
@@ -30,8 +32,12 @@ pub fn release(permissions: &mut PermissionSet, handle: &str) {
         .backup_repositories
         .retain(|_, repository| !repository.uses_handle(handle));
     permissions.files.remove(handle);
+    #[cfg(target_os = "macos")]
+    permissions.folder_security_scopes.remove(handle);
     if let Some(folder) = permissions.folders.remove(handle) {
-        permissions.directory_watches.retain(|_, watch| !Arc::ptr_eq(&watch.directory, &folder.directory));
+        permissions
+            .directory_watches
+            .retain(|_, watch| !Arc::ptr_eq(&watch.directory, &folder.directory));
         permissions
             .outputs
             .retain(|_, draft| !Arc::ptr_eq(&draft.directory, &folder.directory));
@@ -217,7 +223,9 @@ pub fn execute(
         return Ok(Value::Null);
     }
     if method == "files.replaceCopy" {
-        let target = permissions.files.get(key(params, "target")?)
+        let target = permissions
+            .files
+            .get(key(params, "target")?)
             .ok_or("Choose the destination file before saving it.")?;
         if !target.writable {
             return Err("This file was selected for reading. Choose it for writing first.".into());
@@ -226,12 +234,23 @@ pub fn execute(
         // Both handles belong to this live App registration. Validation and
         // all staged writes finish before the original descriptor is touched.
         // Like writeText this preserves file identity, rather than replacing a path.
-        let mut target = target.file.try_clone().map_err(|_| "The destination is unavailable.")?;
-        draft.file.seek(SeekFrom::Start(0)).map_err(|_| "The staged copy is unavailable.")?;
-        target.seek(SeekFrom::Start(0)).map_err(|_| "The destination is unavailable.")?;
-        let written = std::io::copy(&mut draft.file, &mut target)
-            .map_err(|_| "Saving failed; the original may contain partial changes. The staged copy is retained.")?;
-        target.set_len(written).and_then(|_| target.sync_data())
+        let mut target = target
+            .file
+            .try_clone()
+            .map_err(|_| "The destination is unavailable.")?;
+        draft
+            .file
+            .seek(SeekFrom::Start(0))
+            .map_err(|_| "The staged copy is unavailable.")?;
+        target
+            .seek(SeekFrom::Start(0))
+            .map_err(|_| "The destination is unavailable.")?;
+        let written = std::io::copy(&mut draft.file, &mut target).map_err(|_| {
+            "Saving failed; the original may contain partial changes. The staged copy is retained."
+        })?;
+        target
+            .set_len(written)
+            .and_then(|_| target.sync_data())
             .map_err(|_| "Saving could not finish. The staged copy is retained.")?;
         permissions.outputs.remove(handle);
         return Ok(Value::Null);
@@ -320,12 +339,32 @@ mod tests {
         let original = root.path().join("image.png");
         let moved = root.path().join("moved.png");
         std::fs::write(&original, b"old longer image").unwrap();
-        let file = std::fs::OpenOptions::new().read(true).write(true).open(&original).unwrap();
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&original)
+            .unwrap();
         let mut p = permissions(root.path(), true);
-        p.files.insert("target".into(), FileGrant { file, writable: false });
-        let draft = execute(&mut p, "files.createCopy", &json!({"directory":"chosen","name":"image.png"})).unwrap();
+        p.files.insert(
+            "target".into(),
+            FileGrant {
+                file,
+                writable: false,
+            },
+        );
+        let draft = execute(
+            &mut p,
+            "files.createCopy",
+            &json!({"directory":"chosen","name":"image.png"}),
+        )
+        .unwrap();
         let handle = draft["handle"].as_str().unwrap();
-        execute(&mut p, "files.appendCopy", &json!({"handle":handle,"bytes":{"$mistyBytes":[0,255,42]}})).unwrap();
+        execute(
+            &mut p,
+            "files.appendCopy",
+            &json!({"handle":handle,"bytes":{"$mistyBytes":[0,255,42]}}),
+        )
+        .unwrap();
         let params = json!({"handle":handle,"target":"target"});
         assert!(execute(&mut p, "files.replaceCopy", &params).is_err());
         assert_eq!(std::fs::read(&original).unwrap(), b"old longer image");
@@ -334,8 +373,11 @@ mod tests {
         std::fs::rename(&original, &moved).unwrap();
         std::fs::write(&original, b"replacement must remain unchanged").unwrap();
         execute(&mut p, "files.replaceCopy", &params).unwrap();
-        assert_eq!(std::fs::read(&moved).unwrap(), [0,255,42]);
-        assert_eq!(std::fs::read(&original).unwrap(), b"replacement must remain unchanged");
+        assert_eq!(std::fs::read(&moved).unwrap(), [0, 255, 42]);
+        assert_eq!(
+            std::fs::read(&original).unwrap(),
+            b"replacement must remain unchanged"
+        );
         assert!(!p.outputs.contains_key(handle));
         assert!(execute(&mut p, "files.replaceCopy", &params).is_err());
     }

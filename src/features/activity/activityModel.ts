@@ -1,8 +1,6 @@
 import type { SpaceInboxItem, SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
 import type { ActivityItem, ActivityKind, ActivityTarget } from "./types";
 
-const failureWords = /\b(fail(?:ed|ure)?|error|blocked|needs attention)\b/i;
-
 export function activityItemsFromSpaces(
   accountId: string,
   inbox: { unreads: SpaceInboxItem[]; mentions: SpaceInboxItem[] },
@@ -31,6 +29,8 @@ export function activityItemFromSpaceInbox(accountId: string, item: SpaceInboxIt
     accountId,
     source: "spaces",
     sourceId: String(item.id),
+    sourceLabel: item.space_name,
+    spaceId: item.space_id,
     kind,
     title: activityTitle(kind, actor, item.space_name),
     body: preview,
@@ -51,6 +51,9 @@ export function activityItemFromInvitation(
     accountId,
     source: "invitation",
     sourceId: invitation.id,
+    sourceLabel: invitation.space_name,
+    spaceId: invitation.space_id,
+    lifecycle: "request",
     kind: "invitation",
     title: `${inviter} invited you to ${invitation.space_name}`,
     body: "Review the invitation in Misty.",
@@ -61,7 +64,15 @@ export function activityItemFromInvitation(
 }
 
 export function activityKindNeedsAttention(kind: ActivityKind): boolean {
-  return ["mention", "reply", "invitation", "approval", "reminder", "failure"].includes(kind);
+  return [
+    "mention",
+    "reply",
+    "invitation",
+    "approval",
+    "reminder",
+    "failure",
+    "completion",
+  ].includes(kind);
 }
 
 export function compareActivityNewestFirst(left: ActivityItem, right: ActivityItem): number {
@@ -120,16 +131,13 @@ export function activityTargetMatchesLocation(target: ActivityTarget, pathname: 
 function spaceInboxActivityKind(item: SpaceInboxItem): ActivityKind {
   if (item.kind === "mention") return "mention";
   if (item.kind === "approval") return "approval";
-  if (item.kind === "agent") return payloadNeedsApproval(item.payload) ? "approval" : "agent";
-  if (item.kind === "workflow") {
-    return payloadFailed(item.payload)
-      ? "failure"
-      : payloadNeedsApproval(item.payload)
-        ? "approval"
-        : "workflow";
+  if (item.kind === "agent" || item.kind === "workflow") {
+    if (payloadNeedsApproval(item.payload)) return "approval";
+    if (payloadFailed(item.payload)) return "failure";
+    if (stringPayload(item.payload, "status") === "completed") return "completion";
+    return item.kind;
   }
   if (payloadIsReply(item.payload)) return "reply";
-  if (payloadFailed(item.payload)) return "failure";
   return "message";
 }
 
@@ -162,9 +170,7 @@ function payloadNeedsApproval(payload: Record<string, unknown>): boolean {
 }
 
 function payloadFailed(payload: Record<string, unknown>): boolean {
-  return ["status", "level", "message", "preview"]
-    .map((key) => stringPayload(payload, key))
-    .some((value) => failureWords.test(value));
+  return ["failed", "blocked", "awaiting_input"].includes(stringPayload(payload, "status"));
 }
 
 function activityTitle(kind: ActivityKind, actor: string, spaceName: string): string {
@@ -177,6 +183,8 @@ function activityTitle(kind: ActivityKind, actor: string, spaceName: string): st
       return `${spaceName} needs your approval`;
     case "failure":
       return `${spaceName} needs attention`;
+    case "completion":
+      return `Background work completed in ${spaceName}`;
     case "agent":
       return `Agent activity in ${spaceName}`;
     case "workflow":

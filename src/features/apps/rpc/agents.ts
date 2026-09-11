@@ -88,6 +88,28 @@ export function createAgentsRpc(
       const method = message.method;
       if (method === "agents.perform") {
         const input = mistyAgentsContracts[method].params.parse(message.params);
+        if (
+          ["ai.createInvocation", "ai.createRun", "assistant.turn", "assistant.complete"].includes(
+            input.operation,
+          )
+        )
+          throw new AppRpcError(
+            "misty_handoff_required",
+            "Open Misty with misty.ai.open() to start AI work.",
+          );
+        if (
+          [
+            "assistant.visualSearch",
+            "assistant.decideProposal",
+            "agents.retryRun",
+            "agents.decideApproval",
+            "ai.decideArtifact",
+          ].includes(input.operation)
+        ) {
+          const { assertMistyAvailable } = await import("@/features/misty/availability");
+          await assertMistyAvailable(scope.identity.accountId, scope.identity.spaceId || "");
+          scope.assert();
+        }
         const [domain, name] = input.operation.split(".") as [keyof typeof api, string];
         const action = (api[domain] as Record<string, (...args: unknown[]) => Promise<unknown>>)[
           name

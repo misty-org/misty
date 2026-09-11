@@ -4,7 +4,6 @@ import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import type { PointerEvent as ReactPointerEvent } from "react";
@@ -68,7 +67,7 @@ export function useDesktopWindowChrome() {
       // Normalize the native view to the content bounds first. Tauri computes
       // auto-resize ratios from the current frame, so this ordering guarantees
       // a 1:1 main-webview resize instead of capturing a stale launch ratio.
-      await enableModernWindowStyle(getCurrentWebviewWindow());
+      await enableModernWindowStyle(getCurrentWindow());
       if (disposed) return;
       await getCurrentWebview().setAutoResize(true);
     };
@@ -165,14 +164,14 @@ export function useDesktopWindowChrome() {
               }
               customZoomAnimatingRef.current = false;
               if (desktopPlatform === "macos") {
-                void repositionTrafficLights(getCurrentWebviewWindow()).catch(() => undefined);
+                void repositionTrafficLights(getCurrentWindow()).catch(() => undefined);
               }
               resolve();
             },
             (error: unknown) => {
               customZoomAnimatingRef.current = false;
               if (desktopPlatform === "macos") {
-                void repositionTrafficLights(getCurrentWebviewWindow()).catch(() => undefined);
+                void repositionTrafficLights(getCurrentWindow()).catch(() => undefined);
               }
               reject(error);
             },

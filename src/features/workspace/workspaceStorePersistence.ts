@@ -1,3 +1,5 @@
+import { layoutTabs, selectLayoutTab } from "./layoutTabs";
+import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import {
   createWorkspaceVirtualWindow,
@@ -72,11 +74,27 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
   const activeScopeKey = state.activeScopeKey ?? "global";
-  const migrateLayout = (layout: WorkspaceStore["layout"], scopeKey: WorkspaceScopeKey) =>
-    normalizeWorkspaceLayout(
+  const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
+    const migrated = normalizeWorkspaceLayout(
       migrateSpaceToolTabs(migrateRetiredWorkspaceTabs(layout, scopeKey)),
       scopeKey,
     );
+    const history = (node: WorkspaceDockNode): WorkspaceDockNode => {
+      if (node.type === "split")
+        return { ...node, first: history(node.first), second: history(node.second) };
+      if (!node.history?.entries?.length) return node;
+      const entries = node.history.entries.map((view) =>
+        migrateRetiredWorkspaceTab(view, scopeKey),
+      );
+      const index = Math.max(
+        0,
+        Math.min(Number.isFinite(node.history.index) ? node.history.index : 0, entries.length - 1),
+      );
+      return { ...node, history: { entries, index } };
+    };
+    const tabs = layoutTabs(migrated).map((tab) => ({ ...tab, root: history(tab.root) }));
+    return selectLayoutTab({ ...migrated, tabs }, migrated.activeLayoutTabId ?? tabs[0].id);
+  };
   const migrateWindows = (
     windows: WorkspaceVirtualWindow[] | undefined,
     scopeKey: WorkspaceScopeKey,
@@ -111,6 +129,20 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
     closedTabs: migrateClosedWorkspaceTabs(state.closedTabs).map((closed) => ({
       ...closed,
       tab: migrateRetiredWorkspaceTab(closed.tab, activeScopeKey),
+      ...(closed.layoutTab
+        ? {
+            layoutTab: layoutTabs(
+              migrateLayout(
+                {
+                  ...closed.layoutTab,
+                  tabs: [closed.layoutTab],
+                  activeLayoutTabId: closed.layoutTab.id,
+                },
+                activeScopeKey,
+              ),
+            )[0],
+          }
+        : {}),
     })),
   };
 }

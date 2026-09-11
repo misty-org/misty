@@ -117,3 +117,13 @@ describe("apiRequest", () => {
     window.removeEventListener("misty:account-session-invalid", invalidSession);
   });
 });
+
+it("retains the server cooldown on throttled responses", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ message: "too many requests" }), {
+      status: 429,
+      headers: { "Retry-After": "120" },
+    }),
+  );
+  await expect(apiRequest("/apps")).rejects.toMatchObject({ status: 429, retryAfterMs: 120000 });
+});

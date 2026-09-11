@@ -177,7 +177,7 @@ export interface ConnectedDevicesSnapshot {
 export interface PeerRoot {
   id: string;
   name: string;
-  kind: "system" | "volume";
+  kind: "system" | "volume" | "folder";
   readonly: true;
 }
 
@@ -196,6 +196,7 @@ export type PeerResponse =
   | { type: "roots"; data: { roots: PeerRoot[] } }
   | { type: "directory"; data: { path: string; entries: PeerEntry[]; snapshot: string } }
   | { type: "stat"; data: { entry: PeerEntry } }
+  | { type: "symlink"; data: { target: number[]; snapshot: string } }
   | { type: "pong"; data: { nonce: number } };
 
 export interface ExplorerLocation {

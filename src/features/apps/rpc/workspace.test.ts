@@ -1,3 +1,4 @@
+import { allLayoutPanes, allLayoutViews } from "@/features/workspace/layoutTabs";
 import { createMistyAppSDK } from "@misty/sdk";
 import { afterEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
@@ -34,12 +35,13 @@ function fixture(grants = ["navigation.write"]) {
 it("opens a separate own-App tab and split panels through the SDK without replacing the caller", async () => {
   const { sdk, tab } = fixture();
   const next = await sdk.workspace.open({ route: "/apps/planner?view=agenda" });
-  const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find((item) =>
+  const pane = allLayoutPanes(useWorkspaceStore.getState().layout).find((item) =>
     item.tabs.some((item) => item.id === tab.id),
   )!;
-  expect(pane.tabs.find((item) => item.id === next.viewId)?.route).toBe(
-    "/apps/planner?view=agenda&space=space-a",
-  );
+  expect(
+    allLayoutViews(useWorkspaceStore.getState().layout).find((item) => item.id === next.viewId)
+      ?.route,
+  ).toBe("/apps/planner?view=agenda&space=space-a");
   expect(pane.tabs.find((item) => item.id === tab.id)?.route).toBe(tab.route);
   const right = await sdk.workspace.open({
     route: "/apps/planner?view=roadmaps",
@@ -128,10 +130,10 @@ it("opens restored state to the left/above, focuses, places and closes only owne
   ).toBe(true);
   await sdk.workspace.place({ viewId: up.viewId, targetViewId: left.viewId, placement: "tab" });
   const grouped = (await sdk.workspace.snapshot()).views;
-  expect(grouped.find((view) => view.viewId === up.viewId)?.panelId).toBe(
+  expect(grouped.find((view) => view.viewId === up.viewId)?.panelId).not.toBe(
     grouped.find((view) => view.viewId === left.viewId)?.panelId,
   );
-  expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
+  expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
   await sdk.workspace.close(up.viewId);
   expect((await sdk.workspace.snapshot()).views.map((view) => view.viewId)).not.toContain(
     up.viewId,

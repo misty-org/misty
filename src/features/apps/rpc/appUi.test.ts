@@ -17,6 +17,7 @@ function fixture(appId = "terminal", grants: string[] = []) {
     setTitle: vi.fn(),
     settings: vi.fn(() => ({})),
     reportError: vi.fn(),
+    reportOperation: vi.fn(),
     openExternal: vi.fn(async () => {}),
     registerShortcut: vi.fn((_command: unknown, _listener: () => void) => remove),
     subscribeSettings: vi.fn(() => remove),
@@ -191,3 +192,22 @@ it.each(["chat", "inbox"])(
     denied.scope.close();
   },
 );
+
+describe("structured activity boundary", () => {
+  it("pins operation destinations to the calling app and Space", async () => {
+    const f = fixture("files");
+    await f.sdk.activity.operation({ operationId: "batch", revision: 1, status: "completed", title: "Transfer finished" });
+    expect(f.backend.reportOperation).toHaveBeenCalledWith(expect.objectContaining({ route: "/apps/files?space=space-a" }));
+    await expect(f.sdk.activity.operation({ operationId: "batch", revision: 2, status: "blocked", title: "Review", route: "/apps/agents" })).rejects.toThrow();
+    await expect(f.sdk.activity.operation({ operationId: "batch", revision: 2, status: "blocked", title: "Review", route: "/apps/files?space=other" })).rejects.toThrow();
+    f.scope.close();
+    await expect(f.sdk.activity.operation({ operationId: "batch", revision: 2, status: "resolved", title: "Done" })).rejects.toThrow();
+  });
+  it("rejects forged identity, direct delivery and approval fields", async () => {
+    const f = fixture("files");
+    for (const extra of [{ accountId: "other" }, { appId: "agents" }, { notify: true }, { attention: true }]) {
+      await expect(f.sdk.activity.operation({ operationId: "batch", revision: 1, status: "completed", title: "Done", ...extra })).rejects.toThrow();
+    }
+    expect(f.backend.reportOperation).not.toHaveBeenCalled(); f.scope.close();
+  });
+});

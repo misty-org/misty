@@ -3,6 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 export const appZoomDefault = 1;
+export const appZoomBaseline = 1.1;
+/** UI percentages are relative to the comfortable product baseline. */
+export function appZoomRenderScale(zoom: number): number {
+  return Math.round(zoom * appZoomBaseline * 1000) / 1000;
+}
+/** Persist physical scale for compatibility with existing settings. */
+export function appZoomFromStoredScale(scale: number): number {
+  if (scale === 1) return appZoomDefault;
+  return clampAppZoom(scale / appZoomBaseline);
+}
 export const appZoomMin = 0.8;
 export const appZoomMax = 2;
 export const appZoomStep = 0.1;
@@ -119,17 +129,18 @@ function applyAppZoom(zoom: number): void {
     // page zoom API; clearing this first also repairs hot-reloaded sessions that
     // previously received the CSS fallback.
     clearCssZoom();
-    void applyNativeZoom(zoom, applySequence);
+    void applyNativeZoom(appZoomRenderScale(zoom), applySequence);
     return;
   }
 
   // Keep web previews usable without pretending this is the desktop path.
-  applyCssZoom(zoom);
+  applyCssZoom(appZoomRenderScale(zoom));
 }
 
 async function applyNativeZoom(zoom: number, applySequence: number): Promise<void> {
   try {
     const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+    if (applySequence !== zoomApplySequence) return;
     await getCurrentWebview().setZoom(zoom);
   } catch (error) {
     if (applySequence === zoomApplySequence) {
@@ -144,7 +155,7 @@ function loadStoredAppZoom(): number {
     const raw = window.localStorage.getItem(APP_ZOOM_STORAGE_KEY);
     if (!raw) return appZoomDefault;
     const parsed = Number(raw);
-    return Number.isFinite(parsed) ? clampAppZoom(parsed) : appZoomDefault;
+    return Number.isFinite(parsed) ? appZoomFromStoredScale(parsed) : appZoomDefault;
   } catch {
     return appZoomDefault;
   }
@@ -153,13 +164,14 @@ function loadStoredAppZoom(): number {
 function saveStoredAppZoom(zoom: number): void {
   try {
     if (zoom === appZoomDefault) window.localStorage.removeItem(APP_ZOOM_STORAGE_KEY);
-    else window.localStorage.setItem(APP_ZOOM_STORAGE_KEY, String(zoom));
+    else window.localStorage.setItem(APP_ZOOM_STORAGE_KEY, String(appZoomRenderScale(zoom)));
   } catch {
     // Browser privacy modes can disable localStorage; zoom still works for the session.
   }
 }
 
 function clampAppZoom(zoom: number): number {
+  if (!Number.isFinite(zoom)) return appZoomDefault;
   const rounded = Math.round(zoom * 10) / 10;
   return Math.min(appZoomMax, Math.max(appZoomMin, rounded));
 }

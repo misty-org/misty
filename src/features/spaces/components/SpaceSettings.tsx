@@ -1,7 +1,7 @@
+import { SpaceAppsSettings } from "@/features/apps/SpaceAppsSettings";
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SystemErrorActivity } from "@/features/activity";
 import { SpaceMembers } from "@/features/spaces/members";
-import { spacesApi } from "@/api/spaces/api";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,10 +19,9 @@ import {
   CardTitle,
   Input,
   Separator,
-  Switch,
 } from "@/shared/ui";
 import { WorkspaceOverlay } from "@/shared/ui/workspace-overlay";
-import { Lightbulb, Settings2, Trash2, UsersRound } from "lucide-react";
+import { Settings2, Trash2, UsersRound } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -30,11 +29,12 @@ import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace"
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
 
-type SpaceSettingsSection = "general" | "members";
+type SpaceSettingsSection = "general" | "members" | "apps";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
+  { id: "apps", label: "Manage apps", icon: Settings2 },
 ];
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
@@ -63,7 +63,7 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   const canDelete = isOwner && canManageSpaceLifecycle(space, "delete");
   const encodedSpaceId = encodeURIComponent(spaceId);
   const locationState = location.state as { spaceSettingsReturnTo?: string } | null;
-  const fallbackReturnPath = `/spaces/${encodedSpaceId}/social/misty`;
+  const fallbackReturnPath = `/spaces/${encodedSpaceId}/home`;
   const closeSettings = () => {
     const destination = locationState?.spaceSettingsReturnTo;
     navigate(
@@ -278,8 +278,8 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             </div>
           ) : null}
 
+          {activeSection === "apps" ? <SpaceAppsSettings spaceId={spaceId} /> : null}
           {activeSection === "members" ? <SpaceMembers embedded spaceId={spaceId} /> : null}
-
         </DesktopSettingsFrame>
 
         <AlertDialog

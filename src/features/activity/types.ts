@@ -1,3 +1,6 @@
+export type ActivityCategory =
+  "conversations" | "invitations" | "reminders" | "requests" | "completions";
+
 export type ActivityKind =
   | "mention"
   | "reply"
@@ -27,7 +30,19 @@ export interface ActivityItem {
   accountId: string;
   source: "spaces" | "invitation" | "device" | "capabilities" | "interventions";
   sourceId: string;
+  deploymentScope?: string;
+  spaceId?: string;
+  appId?: string;
+  sourceLabel?: string;
+  lifecycle?: "update" | "request";
+  revision?: number;
+  status?: "running" | "blocked" | "completed" | "resolved";
+  resolvedAt?: string;
+  updatedAt?: string;
+  historySequence?: number;
+  dismissible?: boolean;
   kind: ActivityKind;
+  visibility?: "activity" | "diagnostic";
   title: string;
   body: string;
   createdAt: string;
@@ -38,8 +53,16 @@ export interface ActivityItem {
 
 export interface LocalActivityInput {
   id?: string;
+  spaceId?: string;
+  appId?: string;
+  sourceLabel?: string;
+  lifecycle?: "update" | "request";
+  revision?: number;
+  status?: "running" | "blocked" | "completed" | "resolved";
+  dismissible?: boolean;
   accountId?: string;
   kind: Extract<ActivityKind, "reminder" | "failure" | "completion" | "system">;
+  visibility?: "activity" | "diagnostic";
   title: string;
   body?: string;
   createdAt?: string;

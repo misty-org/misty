@@ -15,6 +15,8 @@ describe("WorkspaceNewTabMenu", () => {
       installations: ["inbox", "chat", "planner", "browser"].map((app_id, pin_rank) => ({
         app_id,
         state: "installed" as const,
+        space_id: "space-a",
+        authority_generation: 1,
         installed_version: "1.0.0",
         permission_version: 1,
         granted_scopes: [],
@@ -60,7 +62,7 @@ describe("WorkspaceNewTabMenu", () => {
       [...(menu?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])].map(
         (item) => item.textContent,
       ),
-    ).toEqual(["Inbox", "Social", "Planner", "Browser"]);
+    ).toEqual(["Inbox", "Social", "Planner", "Browser", "Browse more apps"]);
     expect(menu?.textContent).not.toContain("Home");
     expect(menu?.textContent).not.toContain("Journal");
     expect(menu?.textContent).toContain("Planner");
@@ -77,7 +79,7 @@ describe("WorkspaceNewTabMenu", () => {
     expect(browser?.className).not.toContain("focus:text-cream");
     await act(async () => browser?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onOpenNewTab).toHaveBeenCalledWith(
-        expect.objectContaining({ label: "Browser", route: "/apps/browser" }),
+      expect.objectContaining({ label: "Browser", route: "/apps/browser" }),
       "pane-1",
     );
   });
@@ -110,7 +112,7 @@ describe("WorkspaceNewTabMenu", () => {
     });
 
     const menu = document.querySelector<HTMLElement>('[data-slot="dropdown-menu-content"]');
-    expect(menu?.querySelector('[role="menuitem"]')).toBeNull();
+    expect(menu?.querySelector('[role="menuitem"]')?.textContent).toBe("Browse more apps");
     expect(menu?.textContent).toContain("No apps enabled. Add apps from the sidebar.");
   });
 

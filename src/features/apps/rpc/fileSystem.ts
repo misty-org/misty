@@ -1,3 +1,4 @@
+import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
 import { AppRpcError, rpcRecord, type AppRpcScope } from "./session";
 
 /** Exact SDK-to-IPC mapping; no package-supplied native command names. */
@@ -38,7 +39,10 @@ export function createFileSystemRpc(
     scope.assert(capability);
     if (capability === "files.write" || capability === "connections.read")
       scope.assert("files.read");
-    const value = await invoke(command, rpcRecord(params ?? {}));
+    const args=rpcRecord(params ?? {});
+    const value = command === "explorer_preview_item" && supportsPackagedDocuments()
+      ? await import("../nativeImageService").then(({invokeFilesImage})=>invokeFilesImage(command,args,scope.identity.spaceId ?? ""))
+      : await invoke(command,args);
     scope.assert(capability);
     return value;
   };

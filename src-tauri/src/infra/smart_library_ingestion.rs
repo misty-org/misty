@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs, io::Read, path::Path};
 
 use serde::{Deserialize, Serialize};
+#[cfg(not(target_os = "macos"))]
 use zip::ZipArchive;
 
 use crate::error::{ApiError, ApiResult};
@@ -135,7 +136,7 @@ pub struct AssetClassification {
     pub unsupported_reason: Option<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ExtractedSemanticContent {
     pub text: Option<String>,
     pub metadata: BTreeMap<String, String>,
@@ -207,10 +208,12 @@ pub fn is_mpeg_transport_stream(path: &Path) -> bool {
     bytes.len() >= 188 * 3 && bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[188 * 2] == 0x47
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn extract(
     path: &Path,
     extension: &str,
     kind: SemanticAssetKind,
+    #[cfg(target_os = "macos")] service: Option<&crate::infra::document_intelligence::ServiceLease>,
 ) -> ApiResult<ExtractedSemanticContent> {
     let metadata = fs::metadata(path).map_err(io_error(path))?;
     let mut content = ExtractedSemanticContent::default();
@@ -230,7 +233,13 @@ pub fn extract(
 
     match kind {
         SemanticAssetKind::Text => extract_plain_text(path, &mut content)?,
-        SemanticAssetKind::Document => extract_document(path, extension, &mut content)?,
+        SemanticAssetKind::Document => extract_document(
+            path,
+            extension,
+            &mut content,
+            #[cfg(target_os = "macos")]
+            service,
+        )?,
         SemanticAssetKind::Audio => extract_audio_metadata(path, extension, &mut content)?,
         SemanticAssetKind::Archive => extract_archive_summary(path, &mut content)?,
         SemanticAssetKind::Binary => extract_binary_summary(path, &mut content)?,
@@ -249,6 +258,7 @@ pub fn extract(
     Ok(content)
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_plain_text(path: &Path, content: &mut ExtractedSemanticContent) -> ApiResult<()> {
     let bytes = read_prefix(path, MAX_TEXT_READ_BYTES)?;
     let text = match String::from_utf8(bytes.clone()) {
@@ -263,10 +273,12 @@ fn extract_plain_text(path: &Path, content: &mut ExtractedSemanticContent) -> Ap
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_document(
     path: &Path,
     extension: &str,
     content: &mut ExtractedSemanticContent,
+    #[cfg(target_os = "macos")] service: Option<&crate::infra::document_intelligence::ServiceLease>,
 ) -> ApiResult<()> {
     match extension {
         "pdf" => {
@@ -277,6 +289,29 @@ fn extract_document(
                 );
                 return Ok(());
             }
+            #[cfg(target_os = "macos")]
+            let extracted = {
+                let response = service
+                    .ok_or_else(|| {
+                        ApiError::Message("Open Library in a Space to process documents.".into())
+                    })?
+                    .process(path, "pdfText")
+                    .map_err(ApiError::Message)?;
+                let semantic = response
+                    .get("semantic")
+                    .ok_or_else(|| ApiError::Message("Invalid PDF response.".into()))?;
+                content.truncated = semantic
+                    .get("truncated")
+                    .and_then(serde_json::Value::as_bool)
+                    .ok_or_else(|| ApiError::Message("Invalid PDF truncation status.".into()))?;
+                semantic
+                    .get("text")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|text| text.len() <= MAX_EXTRACTED_TEXT_BYTES)
+                    .ok_or_else(|| ApiError::Message("Invalid PDF text.".into()))?
+                    .to_owned()
+            };
+            #[cfg(not(target_os = "macos"))]
             let extracted = std::panic::catch_unwind(|| pdf_extract::extract_text(path))
                 .map_err(|_| ApiError::Message("PDF text extraction failed safely".to_owned()))?
                 .map_err(|error| {
@@ -302,6 +337,7 @@ fn extract_document(
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_zip_document(
     path: &Path,
     extension: &str,
@@ -362,6 +398,7 @@ fn extract_zip_document(
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn should_extract_package_entry(extension: &str, name: &str) -> bool {
     match extension {
         "docx" => name.starts_with("word/") && name.ends_with(".xml"),
@@ -376,6 +413,7 @@ fn should_extract_package_entry(extension: &str, name: &str) -> bool {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_archive_summary(path: &Path, content: &mut ExtractedSemanticContent) -> ApiResult<()> {
     let file = fs::File::open(path).map_err(io_error(path))?;
     let mut archive = ZipArchive::new(file)
@@ -412,6 +450,7 @@ fn extract_archive_summary(path: &Path, content: &mut ExtractedSemanticContent) 
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_audio_metadata(
     path: &Path,
     extension: &str,
@@ -436,6 +475,7 @@ fn extract_audio_metadata(
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn parse_id3v2(bytes: &[u8]) -> BTreeMap<String, String> {
     let mut values = BTreeMap::new();
     if bytes.len() < 10 || &bytes[..3] != b"ID3" {
@@ -471,12 +511,14 @@ fn parse_id3v2(bytes: &[u8]) -> BTreeMap<String, String> {
     values
 }
 
+#[cfg(not(target_os = "macos"))]
 fn syncsafe(bytes: &[u8]) -> usize {
     bytes.iter().take(4).fold(0_usize, |value, byte| {
         (value << 7) | (*byte as usize & 0x7f)
     })
 }
 
+#[cfg(not(target_os = "macos"))]
 fn decode_id3_text(frame: &[u8]) -> String {
     let Some((&encoding, body)) = frame.split_first() else {
         return String::new();
@@ -490,6 +532,7 @@ fn decode_id3_text(frame: &[u8]) -> String {
     value.trim_matches('\0').trim().chars().take(512).collect()
 }
 
+#[cfg(not(target_os = "macos"))]
 fn extract_binary_summary(path: &Path, content: &mut ExtractedSemanticContent) -> ApiResult<()> {
     let bytes = read_prefix(path, 16)?;
     content.metadata.insert(
@@ -503,6 +546,7 @@ fn extract_binary_summary(path: &Path, content: &mut ExtractedSemanticContent) -
     Ok(())
 }
 
+#[cfg(not(target_os = "macos"))]
 fn strip_xml(xml: &str) -> String {
     let mut text = String::with_capacity(xml.len().min(MAX_EXTRACTED_TEXT_BYTES));
     let mut in_tag = false;
@@ -520,6 +564,7 @@ fn strip_xml(xml: &str) -> String {
     decode_entities(&text)
 }
 
+#[cfg(not(target_os = "macos"))]
 fn strip_rtf(rtf: &str) -> String {
     let mut output = String::new();
     let mut control = false;
@@ -536,6 +581,7 @@ fn strip_rtf(rtf: &str) -> String {
     output
 }
 
+#[cfg(not(target_os = "macos"))]
 fn decode_entities(value: &str) -> String {
     value
         .replace("&amp;", "&")
@@ -555,6 +601,7 @@ fn read_prefix(path: &Path, limit: usize) -> ApiResult<Vec<u8>> {
     Ok(bytes)
 }
 
+#[cfg(not(target_os = "macos"))]
 fn capped_text(mut value: String, content: &mut ExtractedSemanticContent) -> String {
     if value.len() > MAX_EXTRACTED_TEXT_BYTES {
         let boundary = floor_char_boundary(&value, MAX_EXTRACTED_TEXT_BYTES);
@@ -564,6 +611,7 @@ fn capped_text(mut value: String, content: &mut ExtractedSemanticContent) -> Str
     value
 }
 
+#[cfg(not(target_os = "macos"))]
 fn floor_char_boundary(value: &str, mut index: usize) -> usize {
     index = index.min(value.len());
     while index > 0 && !value.is_char_boundary(index) {
@@ -572,6 +620,7 @@ fn floor_char_boundary(value: &str, mut index: usize) -> usize {
     index
 }
 
+#[cfg(not(target_os = "macos"))]
 fn nonempty(value: String) -> Option<String> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then(|| trimmed.to_owned())
@@ -623,7 +672,7 @@ fn io_error(path: &Path) -> impl FnOnce(std::io::Error) -> ApiError + '_ {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "macos")))]
 mod tests {
     use super::*;
     use std::io::Write;
@@ -652,7 +701,14 @@ mod tests {
     fn text_extraction_is_bounded_and_unicode_safe() {
         let path = temp_file("txt");
         fs::write(&path, "é".repeat(MAX_EXTRACTED_TEXT_BYTES)).unwrap();
-        let extracted = extract(&path, "txt", SemanticAssetKind::Text).unwrap();
+        let extracted = extract(
+            &path,
+            "txt",
+            SemanticAssetKind::Text,
+            #[cfg(target_os = "macos")]
+            None,
+        )
+        .unwrap();
         assert!(extracted.truncated);
         assert!(extracted.text.unwrap().len() <= MAX_EXTRACTED_TEXT_BYTES);
         let _ = fs::remove_file(path);
@@ -668,7 +724,14 @@ mod tests {
         zip.write_all(b"<w:p><w:t>Pikachu file manager</w:t></w:p>")
             .unwrap();
         zip.finish().unwrap();
-        let extracted = extract(&path, "docx", SemanticAssetKind::Document).unwrap();
+        let extracted = extract(
+            &path,
+            "docx",
+            SemanticAssetKind::Document,
+            #[cfg(target_os = "macos")]
+            None,
+        )
+        .unwrap();
         assert!(extracted.text.unwrap().contains("Pikachu file manager"));
         let _ = fs::remove_file(path);
     }
@@ -682,7 +745,14 @@ mod tests {
             .unwrap();
         zip.write_all(b"secret contents are not extracted").unwrap();
         zip.finish().unwrap();
-        let extracted = extract(&path, "zip", SemanticAssetKind::Archive).unwrap();
+        let extracted = extract(
+            &path,
+            "zip",
+            SemanticAssetKind::Archive,
+            #[cfg(target_os = "macos")]
+            None,
+        )
+        .unwrap();
         let text = extracted.text.unwrap();
         assert_eq!(text, "report.txt");
         assert!(!text.contains("private/path"));
@@ -712,7 +782,14 @@ mod tests {
             b"\x7fELF OPENAI_API_KEY=sk-secret /Users/private/database.sqlite",
         )
         .unwrap();
-        let extracted = extract(&path, "bin", SemanticAssetKind::Binary).unwrap();
+        let extracted = extract(
+            &path,
+            "bin",
+            SemanticAssetKind::Binary,
+            #[cfg(target_os = "macos")]
+            None,
+        )
+        .unwrap();
         assert!(extracted.text.is_none());
         assert_eq!(
             extracted.metadata.get("extraction").map(String::as_str),
@@ -723,4 +800,63 @@ mod tests {
         assert!(!serialized.contains("/Users/private"));
         let _ = fs::remove_file(path);
     }
+}
+
+#[cfg(target_os = "macos")]
+pub fn extract(
+    path: &Path,
+    extension: &str,
+    kind: SemanticAssetKind,
+    service: Option<&crate::infra::document_intelligence::ServiceLease>,
+) -> ApiResult<ExtractedSemanticContent> {
+    let service = service.ok_or_else(|| {
+        ApiError::Message("Open Library in a Space to process its content.".into())
+    })?;
+    if service.cancelled() {
+        return Err(ApiError::Message("Library content access changed.".into()));
+    }
+    let size = fs::metadata(path).map_err(io_error(path))?.len();
+    // Oversized assets retain the existing metadata-only behavior without staging their contents.
+    if size > MAX_SOURCE_BYTES {
+        return Ok(ExtractedSemanticContent {
+            text: None,
+            truncated: false,
+            metadata: BTreeMap::from([
+                ("sizeBytes".into(), size.to_string()),
+                ("extension".into(), extension.into()),
+                ("extraction".into(), "metadata_only_size_limit".into()),
+            ]),
+        });
+    }
+    let operation = match kind {
+        SemanticAssetKind::Text => "semanticText",
+        SemanticAssetKind::Document => "semanticDocument",
+        SemanticAssetKind::Audio => "semanticAudio",
+        SemanticAssetKind::Archive => "semanticArchive",
+        SemanticAssetKind::Binary => "semanticBinary",
+        SemanticAssetKind::Image => "semanticImage",
+    };
+    let response = service
+        .process_semantic(path, operation, extension)
+        .map_err(ApiError::Message)?;
+    let mut content: ExtractedSemanticContent = serde_json::from_value(
+        response
+            .get("semantic")
+            .cloned()
+            .ok_or_else(|| ApiError::Message("Missing extracted content.".into()))?,
+    )?;
+    if content
+        .text
+        .as_ref()
+        .is_some_and(|text| text.len() > MAX_EXTRACTED_TEXT_BYTES)
+        || content.metadata.len() > 256
+    {
+        return Err(ApiError::Message(
+            "Extracted content exceeds its limits.".into(),
+        ));
+    }
+    content
+        .metadata
+        .insert("extension".into(), extension.into());
+    Ok(content)
 }

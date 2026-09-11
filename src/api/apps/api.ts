@@ -1,3 +1,6 @@
+import { appSessionRequests as requestSession } from "./sessionRequests";
+import { matchingDevelopmentApp } from "./developmentRelease";
+import type { SpaceAppInstallation as SharedSpaceAppInstallation } from "@misty/sdk";
 import { ApiRequestError, apiRequest } from "@/api/client";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 
@@ -56,26 +59,32 @@ export interface OfficialApp {
   };
 }
 
-export interface UserAppInstallation {
-  app_id: string;
-  state: "installed" | "recoverable" | "purging";
-  installed_version: string;
-  permission_version: number;
-  granted_scopes: string[];
-  pinned: boolean;
-  pin_rank: number;
-  installed_at: string;
-  uninstalled_at?: string;
-  data_deletion_at?: string;
-  updated_at: string;
+export interface SpaceAppInstallation extends Pick<
+  SharedSpaceAppInstallation,
+  | "space_id"
+  | "app_id"
+  | "state"
+  | "installed_version"
+  | "permission_version"
+  | "granted_scopes"
+  | "pin_rank"
+  | "authority_generation"
+  | "installed_at"
+  | "uninstalled_at"
+  | "updated_at"
+> {
+  release_metadata?: OfficialApp;
+  /** A local presentation preference; it never grants access. */
+  pinned?: boolean;
 }
 
 export interface OnboardingCompletion {
   space: Space;
-  apps: UserAppInstallation[];
+  apps: SpaceAppInstallation[];
 }
 
 export interface OfficialAppSession {
+  authority_generation?: number;
   token: string;
   app_id: string;
   space_id?: string;
@@ -96,8 +105,14 @@ export interface OfficialAppCatalogResponse {
 }
 
 export class AppRequestError extends ApiRequestError {
-  constructor(message: string, status: number, code?: string, responseText = "") {
-    super(message, status, code, responseText);
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    responseText = "",
+    retryAfterMs?: number,
+  ) {
+    super(message, status, code, responseText, retryAfterMs);
     this.name = "AppRequestError";
   }
 }
@@ -112,6 +127,7 @@ async function appRequest<T>(path: string, init?: RequestInit): Promise<T> {
         error.status,
         error.code,
         error.responseText,
+        error.retryAfterMs,
       );
     }
     throw error;
@@ -171,37 +187,19 @@ export function appErrorMessage(code: string | undefined, fallback: string): str
   return code && messages[code] ? messages[code] : fallback.trim() || "The app request failed.";
 }
 
-export function finishOnboarding(spaceName: string, appIds: string[]) {
+export function finishOnboarding(
+  spaceName: string,
+  appIds: string[],
+  appPermissions: Record<string, number> = {},
+) {
   return appRequest<OnboardingCompletion>("/onboarding/finish", {
     method: "POST",
-    body: JSON.stringify({ space_name: spaceName, app_ids: appIds }),
+    body: JSON.stringify({
+      space_name: spaceName,
+      app_ids: appIds,
+      app_permissions: appPermissions,
+    }),
   });
-}
-
-function sameCatalogValues(left: string[] = [], right: string[] = []): boolean {
-  const sortedRight = [...right].sort();
-  return (
-    left.length === right.length &&
-    [...left].sort().every((value, index) => value === sortedRight[index])
-  );
-}
-
-// The server issues installation grants. Local packages may replace artifact
-// locations, but must never introduce a different release or permission contract.
-function matchingDevelopmentApp(server: OfficialApp, local: OfficialApp): boolean {
-  return (
-    server.id === local.id &&
-    server.official &&
-    local.official &&
-    server.publisher === local.publisher &&
-    server.version === local.version &&
-    server.permission_version === local.permission_version &&
-    server.minimum_host_protocol === local.minimum_host_protocol &&
-    server.minimum_host_version === local.minimum_host_version &&
-    sameCatalogValues(server.requires_apps, local.requires_apps) &&
-    sameCatalogValues(server.scopes, local.scopes) &&
-    sameCatalogValues(server.network_origins, local.network_origins)
-  );
 }
 
 export async function loadOfficialAppCatalog(
@@ -244,25 +242,33 @@ export async function localAppComponentReady(url: URL): Promise<boolean> {
 
 export const appsApi = {
   catalog: loadOfficialAppCatalog,
-  installations: () => appRequest<{ apps: UserAppInstallation[] }>("/me/apps"),
-  install: (appId: string, permissionVersion: number) =>
-    appRequest<UserAppInstallation>(`/me/apps/${encodeURIComponent(appId)}`, {
+  installations: (spaceId: string) =>
+    appRequest<{ apps: SpaceAppInstallation[] }>(spaceAppsPath(spaceId)),
+  install: (spaceId: string, appId: string, permissionVersion: number) =>
+    appRequest<SpaceAppInstallation>(`${spaceAppsPath(spaceId)}/${encodeURIComponent(appId)}`, {
       method: "PUT",
       body: JSON.stringify({ permission_version: permissionVersion }),
     }),
-  setPinned: (appId: string, pinned: boolean) =>
-    appRequest<UserAppInstallation>(`/me/apps/${encodeURIComponent(appId)}`, {
-      method: "PATCH",
-      body: JSON.stringify({ pinned }),
+  reorder: (spaceId: string, appIds: string[]) =>
+    appRequest<void>(`${spaceAppsPath(spaceId)}/order`, {
+      method: "PUT",
+      body: JSON.stringify({ app_ids: appIds }),
     }),
-  uninstall: (appId: string) =>
-    appRequest<UserAppInstallation>(`/me/apps/${encodeURIComponent(appId)}`, {
+  uninstall: (spaceId: string, appId: string) =>
+    appRequest<SpaceAppInstallation>(`${spaceAppsPath(spaceId)}/${encodeURIComponent(appId)}`, {
       method: "DELETE",
     }),
-  createSession: (appId: string, spaceId = "") =>
-    appRequest<OfficialAppSession>(`/me/apps/${encodeURIComponent(appId)}/sessions`, {
-      method: "POST",
-      body: JSON.stringify({ space_id: spaceId }),
-    }),
+  createSession: (appId: string, spaceId = "", authorityGeneration?: number) =>
+    requestSession(appId, spaceId, authorityGeneration, () =>
+      appRequest<OfficialAppSession>(
+        `${spaceAppsPath(spaceId)}/${encodeURIComponent(appId)}/sessions`,
+        { method: "POST", body: JSON.stringify({}) },
+      ),
+    ),
   finishOnboarding,
 };
+
+function spaceAppsPath(spaceId: string) {
+  if (!spaceId) throw new Error("Choose a Space to use its apps.");
+  return `/spaces/${encodeURIComponent(spaceId)}/apps`;
+}

@@ -16,6 +16,8 @@ pub struct Identity {
     volume: [u8; 16],
     inode: u64,
     created_ns: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bookmark: Option<String>,
 }
 fn supported_mount(mount: &libc::statfs) -> bool {
     let kind = unsafe { CStr::from_ptr(mount.f_fstypename.as_ptr()) }.to_bytes();
@@ -61,6 +63,7 @@ fn identity(dir: &Dir) -> Result<Identity, String> {
         return Err("This volume cannot retain a reliable folder identity. Choose the folder again when reopening it.".into());
     }
     Ok(Identity {
+        bookmark: None,
         volume: volume.uuid,
         inode: metadata.ino(),
         created_ns: metadata
@@ -74,11 +77,76 @@ fn identity(dir: &Dir) -> Result<Identity, String> {
     })
 }
 pub fn remember(dir: &Dir) -> Result<Identity, String> {
-    identity(dir)
+    let mut id = identity(dir)?;
+    let mut path = [0 as libc::c_char; libc::PATH_MAX as usize];
+    if unsafe { libc::fcntl(dir.as_raw_fd(), libc::F_GETPATH, path.as_mut_ptr()) } == -1 {
+        return Err("The folder location is unavailable.".into());
+    }
+    let encoded = unsafe { misty_folder_bookmark_create(path.as_ptr()) };
+    if encoded.is_null() {
+        return Err("Could not remember macOS folder access. Choose the folder again.".into());
+    }
+    id.bookmark = Some(
+        unsafe { CStr::from_ptr(encoded) }
+            .to_string_lossy()
+            .into_owned(),
+    );
+    unsafe { libc::free(encoded.cast()) };
+    Ok(id)
 }
 
+unsafe extern "C" {
+    fn misty_folder_bookmark_create(path: *const libc::c_char) -> *mut libc::c_char;
+    fn misty_folder_bookmark_open(
+        encoded: *const libc::c_char,
+        path: *mut *mut libc::c_char,
+    ) -> *mut libc::c_void;
+    fn misty_folder_bookmark_close(scope: *mut libc::c_void);
+}
+/// Owns a retained immutable Foundation lease; no UI or thread-affine state.
+#[derive(Debug)]
+pub struct SecurityScope(*mut libc::c_void);
+unsafe impl Send for SecurityScope {}
+unsafe impl Sync for SecurityScope {}
+impl Drop for SecurityScope {
+    fn drop(&mut self) {
+        unsafe { misty_folder_bookmark_close(self.0) };
+    }
+}
+fn same_identity(actual: &Identity, expected: &Identity) -> bool {
+    actual.volume == expected.volume
+        && actual.inode == expected.inode
+        && actual.created_ns == expected.created_ns
+}
+pub fn reopen_scoped(expected: &Identity) -> Result<(Dir, Option<SecurityScope>), String> {
+    let Some(bookmark) = &expected.bookmark else {
+        return reopen_identity(expected).map(|dir| (dir, None));
+    };
+    let encoded =
+        std::ffi::CString::new(bookmark.as_str()).map_err(|_| "Invalid saved folder access.")?;
+    let mut path = std::ptr::null_mut();
+    let lease = unsafe { misty_folder_bookmark_open(encoded.as_ptr(), &mut path) };
+    if lease.is_null() {
+        return Err("Saved macOS folder access is unavailable. Choose the folder again.".into());
+    }
+    let scope = SecurityScope(lease);
+    let result = Dir::open_ambient_dir(
+        OsStr::from_bytes(unsafe { CStr::from_ptr(path) }.to_bytes()),
+        cap_std::ambient_authority(),
+    );
+    unsafe { libc::free(path.cast()) };
+    let dir =
+        result.map_err(|_| "Saved macOS folder access was denied. Choose the folder again.")?;
+    if !identity(&dir).is_ok_and(|actual| same_identity(&actual, expected)) {
+        // Foundation can prefer a replacement at the old path after a move.
+        // Recover only the recorded volume/inode/creation identity, never that replacement.
+        return reopen_identity(expected).map(|dir| (dir, Some(scope)));
+    }
+    Ok((dir, Some(scope)))
+}
+#[cfg(test)]
 pub fn reopen(expected: &Identity) -> Result<Dir, String> {
-    reopen_identity(expected)
+    reopen_scoped(expected).map(|(dir, _)| dir)
 }
 
 // Recover only the exact original object on its already mounted local volume.
@@ -140,7 +208,7 @@ fn reopen_identity(expected: &Identity) -> Result<Dir, String> {
         ) else {
             break;
         };
-        if identity(&directory).as_ref() == Ok(expected) {
+        if identity(&directory).is_ok_and(|actual| same_identity(&actual, expected)) {
             return Ok(directory);
         }
         break;

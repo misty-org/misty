@@ -6,10 +6,26 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(target_os = "macos")]
+use crate::infra::{
+    document_intelligence::ServiceLease,
+    peer_transport_worker::{
+        Connection as TransportConnection, RecvStream as TransportRecvStream, Relay as RelayMode,
+        SendStream as TransportSendStream,
+    },
+};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::VerifyingKey;
+#[cfg(not(target_os = "macos"))]
+use iroh::endpoint::{
+    Connection as TransportConnection, RecvStream as TransportRecvStream,
+    SendStream as TransportSendStream,
+};
+#[cfg(not(target_os = "macos"))]
 use iroh::{endpoint::presets, Endpoint, EndpointAddr, RelayMode, SecretKey};
+#[cfg(target_os = "macos")]
+type Endpoint = Arc<crate::infra::peer_transport_worker::Endpoint>;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -40,11 +56,15 @@ pub struct InitializeConnectedDevicesRequest {
     pub device_name: String,
     #[serde(default)]
     pub development_ticket_keys: HashMap<String, String>,
+    #[cfg(target_os = "macos")]
+    pub instance: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectPeerRequest {
+    #[cfg(target_os = "macos")]
+    pub instance: String,
     pub device_id: String,
     pub address: serde_json::Value,
     pub ticket: String,
@@ -91,7 +111,7 @@ pub struct ConnectedPeerStatus {
 
 #[derive(Clone)]
 struct AuthorizedConnection {
-    connection: iroh::endpoint::Connection,
+    connection: TransportConnection,
     claims: PeerTicketClaims,
 }
 
@@ -102,6 +122,8 @@ struct ClipboardBlobRecord {
 }
 
 struct ConnectedDevicesState {
+    #[cfg(target_os = "macos")]
+    instance: String,
     endpoint: Endpoint,
     local_device_id: String,
     keys: HashMap<String, VerifyingKey>,
@@ -217,15 +239,43 @@ impl ConnectedDevicesService {
     pub async fn initialize(
         &self,
         request: InitializeConnectedDevicesRequest,
+        #[cfg(target_os = "macos")] lease: Arc<ServiceLease>,
     ) -> ApiResult<ConnectedDevicesSnapshot> {
+        #[cfg(target_os = "macos")]
+        {
+            let existing = self
+                .state
+                .read()
+                .map_err(lock_error)?
+                .as_ref()
+                .map(|state| (state.instance.clone(), state.endpoint.clone()));
+            if let Some((instance, endpoint)) = existing {
+                if instance == request.instance && !endpoint.is_closed() {
+                    endpoint.snapshot().await.map_err(ApiError::Unavailable)?;
+                    return self.snapshot();
+                }
+                endpoint.close();
+                self.state.write().map_err(lock_error)?.take();
+            }
+            let owner = lease
+                .peer_identity(&request.device_id)
+                .map_err(ApiError::Unavailable)?;
+            if owner.account_id != request.account_id {
+                return Err(ApiError::Unavailable(
+                    "The Files session belongs to a different account.".into(),
+                ));
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
         if self.state.read().map_err(lock_error)?.is_some() {
             return self.snapshot();
         }
         let secret = peer_identity::load_or_create(&request.account_id, &request.device_id)?;
         let keys = pinned_ticket_keys(&request.development_ticket_keys)?;
         let (relay_mode, relay_policy) = configured_relay_mode()?;
+        #[cfg(not(target_os = "macos"))]
         let endpoint = Endpoint::builder(presets::N0)
-            .secret_key(secret)
+            .secret_key(SecretKey::from_bytes(&secret))
             .relay_mode(relay_mode)
             .alpns(vec![DEVICE_ALPN.to_vec()])
             .bind()
@@ -235,7 +285,15 @@ impl ConnectedDevicesService {
                     "Could not start Connected Devices networking: {error}"
                 ))
             })?;
+        #[cfg(target_os = "macos")]
+        let endpoint = crate::infra::peer_transport_worker::Endpoint::initialize_legacy(
+            lease, secret, relay_mode,
+        )
+        .await
+        .map_err(ApiError::Unavailable)?;
         let state = ConnectedDevicesState {
+            #[cfg(target_os = "macos")]
+            instance: request.instance.clone(),
             endpoint: endpoint.clone(),
             local_device_id: request.device_id,
             keys,
@@ -270,6 +328,10 @@ impl ConnectedDevicesService {
                 ..Default::default()
             });
         };
+        #[cfg(target_os = "macos")]
+        if state.endpoint.is_closed() {
+            return Ok(ConnectedDevicesSnapshot { unavailable_reason:Some("The Space Files device service closed.".into()), relay_policy:"disabled".into(), ..Default::default() });
+        }
         let peers = state
             .connections
             .read()
@@ -283,6 +345,9 @@ impl ConnectedDevicesService {
                     "authorization_expired"
                 }
                 .to_owned(),
+                #[cfg(target_os = "macos")]
+                connection_type: "unknown".into(),
+                #[cfg(not(target_os = "macos"))]
                 connection_type: connection
                     .connection
                     .paths()
@@ -305,7 +370,10 @@ impl ConnectedDevicesService {
         Ok(ConnectedDevicesSnapshot {
             enabled: true,
             endpoint_id: Some(state.endpoint.id().to_string()),
+            #[cfg(not(target_os = "macos"))]
             addressing: serde_json::to_value(state.endpoint.addr()).ok(),
+            #[cfg(target_os = "macos")]
+            addressing: Some(state.endpoint.address()),
             relay_policy: state.relay_policy.clone(),
             peers,
             unavailable_reason: None,
@@ -321,6 +389,12 @@ impl ConnectedDevicesService {
             let state = guard.as_ref().ok_or_else(|| {
                 ApiError::Unavailable("Connected Devices has not started.".to_owned())
             })?;
+            #[cfg(target_os = "macos")]
+            if state.instance != request.instance || state.endpoint.is_closed() {
+                return Err(ApiError::Unavailable(
+                    "The originating Files device session closed.".into(),
+                ));
+            }
             (
                 state.endpoint.clone(),
                 state.endpoint.id().to_string(),
@@ -328,9 +402,20 @@ impl ConnectedDevicesService {
                 state.connections.clone(),
             )
         };
+        #[cfg(not(target_os = "macos"))]
         let address: EndpointAddr = serde_json::from_value(request.address)
             .map_err(|error| ApiError::Message(format!("Peer addressing is invalid: {error}")))?;
+        #[cfg(not(target_os = "macos"))]
         let remote_endpoint_id = address.id.to_string();
+        #[cfg(target_os = "macos")]
+        let address = request.address;
+        #[cfg(target_os = "macos")]
+        let remote_endpoint_id = address
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .ok_or_else(|| ApiError::Message("Invalid peer endpoint identity.".into()))?
+            .to_owned();
         let claims = verify_peer_ticket(
             &request.ticket,
             &keys,
@@ -344,12 +429,18 @@ impl ConnectedDevicesService {
                 "Peer ticket targets a different device.".to_owned(),
             ));
         }
+        #[cfg(not(target_os = "macos"))]
         let connection = endpoint
             .connect(address, DEVICE_ALPN)
             .await
             .map_err(|error| {
                 ApiError::Unavailable(format!("Could not connect to peer: {error}"))
             })?;
+        #[cfg(target_os = "macos")]
+        let connection = endpoint
+            .connect(address, &remote_endpoint_id)
+            .await
+            .map_err(ApiError::Unavailable)?;
         let response = exchange_control(
             &connection,
             PeerRequest::Hello {
@@ -750,7 +841,7 @@ impl ConnectedDevicesService {
         exchange_control(&connection, request).await
     }
 
-    fn authorized_connection(&self, device_id: &str) -> ApiResult<iroh::endpoint::Connection> {
+    fn authorized_connection(&self, device_id: &str) -> ApiResult<TransportConnection> {
         let guard = self.state.read().map_err(lock_error)?;
         let state = guard.as_ref().ok_or_else(|| {
             ApiError::Unavailable("Connected Devices has not started.".to_owned())
@@ -1258,6 +1349,7 @@ struct PeerAcceptContext {
     workspace_route_results: Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
 }
 
+#[cfg(not(target_os = "macos"))]
 async fn run_accept_loop(context: PeerAcceptContext) {
     while let Some(incoming) = context.endpoint.accept().await {
         let context = context.clone();
@@ -1270,9 +1362,19 @@ async fn run_accept_loop(context: PeerAcceptContext) {
     }
 }
 
+#[cfg(target_os = "macos")]
+async fn run_accept_loop(context: PeerAcceptContext) {
+    while let Ok(connection) = context.endpoint.accept().await {
+        let context = context.clone();
+        tokio::spawn(async move {
+            let _ = handle_incoming_connection(context, connection).await;
+        });
+    }
+}
+
 async fn handle_incoming_connection(
     context: PeerAcceptContext,
-    connection: iroh::endpoint::Connection,
+    connection: TransportConnection,
 ) -> ApiResult<()> {
     let remote_endpoint = connection.remote_id().to_string();
     let (mut send, mut receive) = connection
@@ -1312,7 +1414,10 @@ async fn handle_incoming_connection(
 
     loop {
         if claims.exp <= unix_now() {
+            #[cfg(not(target_os = "macos"))]
             connection.close(1u8.into(), b"authorization expired");
+            #[cfg(target_os = "macos")]
+            connection.close();
             return Ok(());
         }
         let Ok((send, receive)) = connection.accept_bi().await else {
@@ -1341,8 +1446,8 @@ async fn handle_incoming_connection(
 }
 
 async fn handle_authorized_stream(
-    mut send: iroh::endpoint::SendStream,
-    mut receive: iroh::endpoint::RecvStream,
+    mut send: TransportSendStream,
+    mut receive: TransportRecvStream,
     roots: PeerRootRegistry,
     claims: PeerTicketClaims,
     clipboard_handler: Arc<RwLock<Option<Arc<dyn Fn(ClipboardPayload) + Send + Sync>>>>,
@@ -1353,6 +1458,9 @@ async fn handle_authorized_stream(
     workspace_route_results: Arc<Mutex<HashMap<String, (i64, OpenWorkspaceRouteResult)>>>,
 ) -> ApiResult<()> {
     let envelope: PeerRequestEnvelope = read_frame(&mut receive).await?;
+    #[cfg(target_os = "macos")]
+    if send.is_closed() { return Err(ApiError::Unavailable("The Files device session closed.".into())); }
+
     if claims.exp <= unix_now() {
         return write_response(
             &mut send,
@@ -1505,7 +1613,8 @@ async fn handle_authorized_stream(
                     .map_err(|error| ApiError::Unavailable(error.to_string()))?;
                 remaining -= count as u64;
             }
-            send.finish()
+            finish_stream(&mut send)
+                .await
                 .map_err(|error| ApiError::Unavailable(error.to_string()))?;
             Ok(())
         }
@@ -1580,7 +1689,7 @@ async fn handle_authorized_stream(
                     }
                 }
             }
-            let _ = send.finish();
+            let _ = finish_stream(&mut send).await;
             Ok(())
         }
         PeerRequest::ClipboardOffer { payload } => {
@@ -1622,6 +1731,8 @@ async fn handle_authorized_stream(
             }
             let revision = payload.revision;
             let converted = clipboard_offer_to_payload(&claims.source_device_id, payload);
+            #[cfg(target_os = "macos")]
+            if send.is_closed() { return Err(ApiError::Unavailable("The Files device session closed.".into())); }
             if let Some(handler) = clipboard_handler.read().map_err(lock_error)?.clone() {
                 handler(converted);
             }
@@ -1686,7 +1797,8 @@ async fn handle_authorized_stream(
             send.write_all(&blob.bytes[start..end])
                 .await
                 .map_err(|error| ApiError::Unavailable(error.to_string()))?;
-            send.finish()
+            finish_stream(&mut send)
+                .await
                 .map_err(|error| ApiError::Unavailable(error.to_string()))?;
             Ok(())
         }
@@ -1710,6 +1822,18 @@ async fn handle_authorized_stream(
                 &mut send,
                 &envelope.request_id,
                 Ok(PeerResponse::Pong { nonce }),
+            )
+            .await
+        }
+        PeerRequest::ReadLink { .. } => {
+            write_response(
+                &mut send,
+                &envelope.request_id,
+                Err(PeerError {
+                    code: PeerErrorCode::UnsupportedOperation,
+                    message: "Symbolic links require a Space peer connection.".into(),
+                    retry_after_ms: None,
+                }),
             )
             .await
         }
@@ -1833,7 +1957,14 @@ fn peer_protocol_error(error: ApiError) -> PeerError {
     }
 }
 
-async fn write_forbidden(send: &mut iroh::endpoint::SendStream, request_id: &str) -> ApiResult<()> {
+async fn finish_stream(send: &mut TransportSendStream) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return send.finish().await;
+    #[cfg(not(target_os = "macos"))]
+    send.finish().map_err(|error| error.to_string())
+}
+
+async fn write_forbidden(send: &mut TransportSendStream, request_id: &str) -> ApiResult<()> {
     write_response(
         send,
         request_id,
@@ -1847,14 +1978,14 @@ async fn write_forbidden(send: &mut iroh::endpoint::SendStream, request_id: &str
 }
 
 async fn exchange_control(
-    connection: &iroh::endpoint::Connection,
+    connection: &TransportConnection,
     request: PeerRequest,
 ) -> ApiResult<PeerResponse> {
     exchange_control_with_id(connection, &uuid::Uuid::new_v4().to_string(), request).await
 }
 
 async fn exchange_control_with_id(
-    connection: &iroh::endpoint::Connection,
+    connection: &TransportConnection,
     request_id: &str,
     request: PeerRequest,
 ) -> ApiResult<PeerResponse> {
@@ -1872,15 +2003,12 @@ async fn exchange_control_with_id(
     response.response.map_err(peer_error)
 }
 
-async fn write_request(
-    send: &mut iroh::endpoint::SendStream,
-    request: PeerRequest,
-) -> ApiResult<()> {
+async fn write_request(send: &mut TransportSendStream, request: PeerRequest) -> ApiResult<()> {
     write_request_with_id(send, &uuid::Uuid::new_v4().to_string(), request).await
 }
 
 async fn write_request_with_id(
-    send: &mut iroh::endpoint::SendStream,
+    mut send: &mut TransportSendStream,
     request_id: &str,
     request: PeerRequest,
 ) -> ApiResult<()> {
@@ -1892,24 +2020,26 @@ async fn write_request_with_id(
     send.write_all(&frame)
         .await
         .map_err(|error| ApiError::Unavailable(error.to_string()))?;
-    send.finish()
+    finish_stream(&mut send)
+        .await
         .map_err(|error| ApiError::Unavailable(error.to_string()))?;
     Ok(())
 }
 
 async fn write_response(
-    send: &mut iroh::endpoint::SendStream,
+    mut send: &mut TransportSendStream,
     request_id: &str,
     response: Result<PeerResponse, PeerError>,
 ) -> ApiResult<()> {
     write_response_open(send, request_id, response).await?;
-    send.finish()
+    finish_stream(&mut send)
+        .await
         .map_err(|error| ApiError::Unavailable(error.to_string()))?;
     Ok(())
 }
 
 async fn write_response_open(
-    send: &mut iroh::endpoint::SendStream,
+    send: &mut TransportSendStream,
     request_id: &str,
     response: Result<PeerResponse, PeerError>,
 ) -> ApiResult<()> {
@@ -1924,7 +2054,7 @@ async fn write_response_open(
 }
 
 async fn read_frame<T: serde::de::DeserializeOwned>(
-    receive: &mut iroh::endpoint::RecvStream,
+    receive: &mut TransportRecvStream,
 ) -> ApiResult<T> {
     let mut header = [0u8; 4];
     receive
@@ -1947,7 +2077,7 @@ async fn read_frame<T: serde::de::DeserializeOwned>(
     decode_control_frame(&framed)
 }
 
-fn pinned_ticket_keys(
+pub(crate) fn pinned_ticket_keys(
     development_keys: &HashMap<String, String>,
 ) -> ApiResult<HashMap<String, VerifyingKey>> {
     let configured = option_env!("MISTY_DEVICE_TICKET_PUBLIC_KEYS")
@@ -1985,6 +2115,7 @@ fn pinned_ticket_keys(
         .collect()
 }
 
+#[cfg(not(target_os = "macos"))]
 fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
     let relay_url = option_env!("MISTY_DEVICE_RELAY_URL").unwrap_or("").trim();
     if !relay_url.is_empty() {
@@ -1998,6 +2129,22 @@ fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
     } else {
         Err(ApiError::Unavailable(
             "A managed Connected Devices relay is required in production.".to_owned(),
+        ))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn configured_relay_mode() -> ApiResult<(RelayMode, String)> {
+    let url = option_env!("MISTY_DEVICE_RELAY_URL").unwrap_or("").trim();
+    if !url.is_empty() {
+        url::Url::parse(url).map_err(|_| ApiError::Message("Invalid managed relay URL.".into()))?;
+        return Ok((RelayMode::Managed { url: url.into() }, "managed".into()));
+    }
+    if cfg!(debug_assertions) {
+        Ok((RelayMode::Default, "public-development".into()))
+    } else {
+        Err(ApiError::Unavailable(
+            "A managed Connected Devices relay is required in production.".into(),
         ))
     }
 }

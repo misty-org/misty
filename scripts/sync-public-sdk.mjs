@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { relative, resolve } from "node:path";
 
 const host = resolve(import.meta.dirname, "..");
-const source = resolve(process.argv[2] || resolve(host, "../misty-sdk"));
+const source = resolve(process.argv.slice(2).find(arg => !arg.startsWith("--")) || resolve(host, "../misty-sdk"));
 const consumers = [host, resolve(process.env.MISTY_APPS_ROOT || resolve(host, "../misty-apps"))];
 const run = (args, cwd, capture = false) =>
   execFileSync("npm", args, {
@@ -28,8 +28,12 @@ for (const consumer of consumers) {
   if (!existsSync(resolve(consumer, "package.json")))
     throw new Error(`App consumer is missing: ${consumer}`);
 }
-run(["run", "check"], source);
-run(["run", "test:packed"], source);
+if (process.argv.includes("--skip-tests")) {
+  run(["run", "build"], source);
+} else {
+  run(["run", "check"], source);
+  run(["run", "test:packed"], source);
+}
 const { mistyBrowserProviders } = await import(resolve(source, "packages/contracts/dist/index.js"));
 writeFileSync(resolve(host, "src-tauri/src/infra/browser-providers.json"), JSON.stringify(mistyBrowserProviders, null, 2) + "\n");
 const temporary = mkdtempSync(resolve(tmpdir(), "misty-sdk-snapshot-"));

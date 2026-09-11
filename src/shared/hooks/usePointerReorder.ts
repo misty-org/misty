@@ -14,7 +14,7 @@ export type ReorderDrag = {
   paneId?: string;
   ids?: string[];
 };
-type Hit = { id: string; after: boolean; rect: DOMRect; axis: "x" | "y" };
+type Hit = { id: string; after: boolean; rect: DOMRect; previewRect?: DOMRect; axis: "x" | "y" };
 type Target = {
   element: HTMLElement;
   scope: string;
@@ -129,7 +129,12 @@ function createDragPreview(surface: HTMLElement) {
   return { preview, rect };
 }
 
-function startGesture(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) {
+function startGesture(
+  event: ReactPointerEvent<HTMLElement>,
+  drag: ReorderDrag,
+  onLift?: () => () => void,
+) {
+  let restorePresentation: (() => void) | undefined;
   cancelCurrent?.();
   const source = (event.target as Element).closest<HTMLElement>("[data-reorder-handle]")!;
   const surface =
@@ -175,6 +180,8 @@ function startGesture(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) 
     } catch {
       /* Native focus may already have released it. */
     }
+    restorePresentation?.();
+    restorePresentation = undefined;
     shield?.remove();
     preview?.remove();
     indicator?.remove();
@@ -240,28 +247,38 @@ function startGesture(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) 
       }
     }
     if (preview) {
-      preview.style.left = `${Math.max(0, Math.min(point.x - offset.x, window.innerWidth - surfaceRect.width))}px`;
-      preview.style.top = `${Math.max(0, Math.min(point.y - offset.y, window.innerHeight - surfaceRect.height))}px`;
+      preview.style.left = `${Math.max(0, Math.min(point.x - offset.x, window.innerWidth - preview.offsetWidth))}px`;
+      preview.style.top = `${Math.max(0, Math.min(point.y - offset.y, window.innerHeight - preview.offsetHeight))}px`;
     }
     if (indicator) {
       indicator.hidden = !current;
       if (current) {
-        const { rect: r, after, axis } = current.hit;
+        const { rect, after, axis } = current.hit;
+        const r = current.hit.previewRect ?? rect;
         Object.assign(
           indicator.style,
-          axis === "x"
+          drag.scope === "workspace-panes"
             ? {
-                left: `${after ? r.right : r.left}px`,
-                top: `${r.top}px`,
-                width: "2px",
-                height: `${r.height}px`,
-              }
-            : {
                 left: `${r.left}px`,
-                top: `${after ? r.bottom : r.top}px`,
+                top: `${r.top}px`,
                 width: `${r.width}px`,
-                height: "2px",
-              },
+                height: `${r.height}px`,
+                opacity: "0.2",
+                border: "1px solid currentColor",
+              }
+            : axis === "x"
+              ? {
+                  left: `${after ? r.right : r.left}px`,
+                  top: `${r.top}px`,
+                  width: "2px",
+                  height: `${r.height}px`,
+                }
+              : {
+                  left: `${r.left}px`,
+                  top: `${after ? r.bottom : r.top}px`,
+                  width: `${r.width}px`,
+                  height: "2px",
+                },
         );
       }
     }
@@ -303,7 +320,15 @@ function startGesture(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) 
       active = true;
       window.getSelection()?.removeAllRanges();
       document.documentElement.dataset.pointerDragging = "true";
-      preview = createDragPreview(surface).preview;
+      if (drag.scope === "workspace-panes") {
+        preview = document.createElement("div");
+        preview.className = "pointer-reorder-preview pointer-pane-title";
+        preview.textContent = drag.label;
+        preview.setAttribute("aria-hidden", "true");
+      } else {
+        preview = createDragPreview(surface).preview;
+      }
+      restorePresentation = onLift?.();
       surface.dataset.reorderDragging = "true";
       window.dispatchEvent(new CustomEvent("misty:pointer-reorder", { detail: true }));
       shield = document.createElement("div");
@@ -347,6 +372,16 @@ function startGesture(event: ReactPointerEvent<HTMLElement>, drag: ReorderDrag) 
   }
   cancelCurrent = cancel;
   return cancel;
+}
+
+export function usePointerDrag(drag: ReorderDrag, onLift?: () => () => void) {
+  const cancel = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => () => cancel.current?.(), []);
+  return (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    event.stopPropagation();
+    cancel.current = startGesture(event, drag, onLift);
+  };
 }
 
 export function usePointerReorder(options: {

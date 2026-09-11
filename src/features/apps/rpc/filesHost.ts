@@ -23,11 +23,16 @@ export interface FilesHostBackend {
   subscribeDrop(listener: (event: MistyFileDropEvent) => void): Promise<() => void>;
   importDrop(tokens: string[], path: string, operation: "copy" | "move"): Promise<void>;
   sources(): Promise<FilesHostSource[]>;
+  copyPeer?(entry: FileEntry, destination: string, conflict: "error" | "rename"): Promise<{jobId: string}>;
+  shareSource?(directory: string, shared: boolean): Promise<void>;
+  legacyLocation?(): string | null;
+  list(path: string, force?: boolean): Promise<DirectoryListing>;
+  prepare(entry: FileEntry): Promise<{ handle: string; bytes: number }>;
   invoke<T>(method: string, params?: Record<string, unknown>): Promise<T>;
   native(method: string, params?: unknown): Promise<unknown>;
   file<T>(operation: string, params: Record<string, unknown>): Promise<T>;
   manage(kind: "remote" | "device"): Promise<void>;
-  preview(handle: string, dimension: number): Promise<ArrayBuffer>;
+  preview(handle: string, dimension: number, name?: string): Promise<ArrayBuffer>;
   drag(handles: string[], mode: "copy" | "move"): Promise<{ dropped: boolean }>;
   bookmarks(): Record<string, FilesSourceBookmark>;
   saveBookmarks(records: Record<string, FilesSourceBookmark>): void;
@@ -110,9 +115,7 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
   };
   async function listing(value: Folder, force = false) {
     assert();
-    const result = await backend.invoke<DirectoryListing>("explorer_list_directory", {
-      request: { path: value.path, showHidden: true, forceRemoteRefresh: force },
-    });
+    const result = await backend.list(value.path, force);
     assert();
     const entries = result.entries.filter((entry) => {
       childName(entry.name);
@@ -210,6 +213,7 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
       !file &&
       !record &&
       !shared &&
+      !(typeof p.jobId === "string" && transfers.has(p.jobId)) &&
       !(method === "files.listSavedDirectories" && Object.keys(records).length)
     )
       return { handled: false };
@@ -217,6 +221,41 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
     let value: unknown;
     if (isMistyFileHostMethod(method)) mistyFileHostContracts[method].params.parse(p);
     switch (method) {
+      case "files.sources.share":
+        scope.assert("connections.write");
+        if (!backend.shareSource) throw new AppRpcError("unavailable", "Folder sharing is unavailable.");
+        await backend.shareSource(rpcString(p.directory, 256), p.shared === true);
+        value = null;
+        break;
+      case "files.index":
+        value = await backend.native(method, p);
+        break;
+      case "files.sources.restoreLocation": {
+        const saved = backend.legacyLocation?.();
+        if (!saved) {
+          value = null;
+          break;
+        }
+        if (["misty://trash", "misty://recent", "misty://starred"].includes(saved)) {
+          value = { virtual: saved.slice("misty://".length) };
+          break;
+        }
+        const normalized = saved.replace(/\\/g, "/").replace(/\/$/, "");
+        const sources = await backend.sources();
+        assert();
+        const candidates = sources
+          .map((source) => ({ source, root: source.path.replace(/\\/g, "/").replace(/\/$/, "") }))
+          .filter(({ root }) => root && (normalized === root || normalized.startsWith(root + "/")))
+          .sort((a, b) => b.root.length - a.root.length);
+        const match = candidates[0];
+        value = match
+          ? {
+              sourceId: match.source.id,
+              relative: normalized.slice(match.root.length).split("/").filter(Boolean),
+            }
+          : { unavailable: true };
+        break;
+      }
       case "files.sources.list":
         value = (await backend.sources()).map(({ path: _path, ...item }) => item);
         break;
@@ -272,7 +311,11 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
         await backend.manage(p.kind as "remote" | "device");
         break;
       case "files.previewImage":
-        value = await backend.preview(rpcString(p.handle, 256), Number(p.maxDimension ?? 1024));
+        value = await backend.preview(
+          rpcString(p.handle, 256),
+          Number(p.maxDimension ?? 1024),
+          file?.entry.name,
+        );
         break;
       case "files.drag.start": {
         const mode = p.mode === "move" ? "move" : "copy";
@@ -342,14 +385,15 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
           current = folder(input.directory);
         const entries = input.offset === 0 || !current.page ? await listing(current) : current.page;
         value = {
-          entries: entries
-            .slice(input.offset, input.offset + input.limit)
-            .map((item) => ({
-              entry: token(item.name),
-              name: item.name,
-              kind: item.kind === "folder" ? "directory" : item.kind,
-              ...(item.sizeBytes !== null ? { bytes: item.sizeBytes } : {}),
-            })),
+          entries: entries.slice(input.offset, input.offset + input.limit).map((item) => ({
+            entry: token(item.name),
+            name: item.name,
+            kind: item.kind === "folder" ? "directory" : item.kind,
+            ...(item.sizeBytes !== null ? { bytes: item.sizeBytes } : {}),
+            modifiedMs: item.modifiedMs,
+            createdMs: item.createdMs,
+            readonly: item.readonly,
+          })),
           nextOffset:
             input.offset + input.limit < entries.length ? input.offset + input.limit : null,
         };
@@ -374,20 +418,7 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
               "read_only_preview",
               "Download this connected file to a chosen folder before editing it.",
             );
-          const prepared = await backend.invoke<{ localPath: string }>(
-            "explorer_prepare_open_item",
-            {
-              request: {
-                path: item.path,
-                sizeBytes: item.sizeBytes,
-                remoteModified: item.remoteModified,
-              },
-            },
-          );
-          assert();
-          const result = await backend.file<{ handle: string; bytes: number }>("adoptPrepared", {
-            path: prepared.localPath,
-          });
+          const result = await backend.prepare(item);
           try {
             assert();
           } catch (error) {
@@ -563,13 +594,7 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
         const current = folder(p.directory, true),
           item = await entry(current, p.entry);
         if (item.kind === "folder" && p.recursive !== true) {
-          if (
-            (
-              await backend.invoke<DirectoryListing>("explorer_list_directory", {
-                request: { path: item.path, showHidden: true, forceRemoteRefresh: true },
-              })
-            ).entries.length
-          )
+          if ((await backend.list(item.path, true)).entries.length)
             throw new AppRpcError("not_empty", "This folder is not empty.");
         }
         assert(true);
@@ -580,6 +605,13 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
         await listing(current, true);
         break;
       }
+      case "files.transferStatus":
+      case "files.transferCancel":
+      case "files.transferClose":
+        assert(true);
+        value = await backend.native(method, p);
+        if (method === "files.transferClose") transfers.delete(rpcString(p.jobId, 256));
+        break;
       case "files.transferStart": {
         const input = mistyFileTransferContracts[method].params.parse(p);
         assert(true);
@@ -596,6 +628,14 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
         if (sourceFolder) {
           folder(input.sourceDirectory, input.operation === "move");
           item = await entry(sourceFolder, input.entry);
+          if (sourceFolder.source.kind === "device" && backend.copyPeer) {
+            if (input.operation !== "copy" || destination)
+              throw new AppRpcError("unsupported_transfer", "Copy device files into a chosen local folder.");
+            const job = await backend.copyPeer(item as FileEntry, input.destinationDirectory, input.conflict);
+            transfers.set(job.jobId, [input.sourceDirectory, input.destinationDirectory]);
+            value = job;
+            break;
+          }
         } else {
           const opened = (await backend.native("files.openEntry", {
             directory: input.sourceDirectory,
@@ -625,11 +665,7 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
                 })
               ).path;
           const existing = new Set(
-            (
-              await backend.invoke<DirectoryListing>("explorer_list_directory", {
-                request: { path, showHidden: true, forceRemoteRefresh: true },
-              })
-            ).entries.map((item) => item.name),
+            (await backend.list(path, true)).entries.map((item) => item.name),
           );
           let name = item.name;
           if (existing.has(name) && input.conflict === "error")

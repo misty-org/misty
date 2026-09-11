@@ -1,3 +1,4 @@
+import { parseRetryAfter } from "./errors";
 import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { ApiRequestError, decodeApiError } from "./errors";
@@ -64,7 +65,13 @@ async function authenticatedResponse(
     assertStableApiSession(accountGeneration);
     if (response.status === 401 && token) notifyApiSessionInvalid();
     const decoded = decodeApiError(text);
-    throw new ApiRequestError(decoded.message, response.status, decoded.code, text);
+    throw new ApiRequestError(
+      decoded.message,
+      response.status,
+      decoded.code,
+      text,
+      parseRetryAfter(response.headers.get("Retry-After")),
+    );
   }
   return { response, accountGeneration };
 }

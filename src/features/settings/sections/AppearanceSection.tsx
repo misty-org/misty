@@ -1,13 +1,14 @@
 import { publishNavigatorLayout, useNavigatorLayoutValue } from "@/features/app-shell";
 import {
   appZoomDefault,
+  appZoomRenderScale,
   appZoomMax,
   appZoomMin,
   appZoomStep,
   setAppZoom,
   useAppZoomValue,
 } from "@/shared/hooks/useAppZoom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -17,6 +18,7 @@ import {
   FilePathControl,
   numberSetting,
   SliderControl,
+  SelectControl,
   stringSetting,
   SwitchControl,
 } from "../settingsControls";
@@ -29,28 +31,7 @@ export function AppearanceSection(props: SettingsContentProps) {
   const navigatorLayout = useNavigatorLayoutValue();
   const appZoom = useAppZoomValue();
   const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
-  const zoomFrameRef = useRef<number | null>(null);
-  const pendingZoomRef = useRef<number | null>(null);
-
   const displayedAppZoom = appZoomDraft ?? appZoom;
-  const cancelPendingZoom = useCallback(() => {
-    if (zoomFrameRef.current !== null) window.cancelAnimationFrame(zoomFrameRef.current);
-    zoomFrameRef.current = null;
-    pendingZoomRef.current = null;
-  }, []);
-  const previewAppZoom = useCallback((value: number) => {
-    setAppZoomDraft(value);
-    pendingZoomRef.current = value;
-    if (zoomFrameRef.current !== null) return;
-    zoomFrameRef.current = window.requestAnimationFrame(() => {
-      zoomFrameRef.current = null;
-      const pendingZoom = pendingZoomRef.current;
-      pendingZoomRef.current = null;
-      if (pendingZoom !== null) setAppZoom(pendingZoom);
-    });
-  }, []);
-
-  useEffect(() => cancelPendingZoom, [cancelPendingZoom]);
 
   return (
     <>
@@ -99,12 +80,11 @@ export function AppearanceSection(props: SettingsContentProps) {
               step={appZoomStep}
               disabled={props.working}
               format={(value) => `${Math.round(value * 100)}%`}
-              onChange={previewAppZoom}
+              onChange={setAppZoomDraft}
               onCommit={(value) => {
-                cancelPendingZoom();
                 setAppZoom(value);
                 setAppZoomDraft(null);
-                props.onSettingChange("appearance", "app_zoom", value);
+                props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
               }}
             />
             <button
@@ -113,10 +93,9 @@ export function AppearanceSection(props: SettingsContentProps) {
               disabled={props.working || displayedAppZoom === appZoomDefault}
               aria-hidden={displayedAppZoom === appZoomDefault}
               onClick={() => {
-                cancelPendingZoom();
                 setAppZoom(appZoomDefault);
                 setAppZoomDraft(null);
-                props.onSettingChange("appearance", "app_zoom", appZoomDefault);
+                props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(appZoomDefault));
               }}
             >
               Reset
@@ -146,6 +125,52 @@ export function AppearanceSection(props: SettingsContentProps) {
                 width: "full",
                 visibility: value ? "hidden" : "sticky",
               })
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Pane focus">
+        <SettingsRow
+          label="Dim inactive panes"
+          description="Keep the focused pane visually prominent."
+        >
+          <SwitchControl
+            checked={booleanSetting(props.document, "appearance", "dim_inactive_panes", true)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "dim_inactive_panes", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Dimming strength">
+          <SliderControl
+            value={numberSetting(props.document, "appearance", "pane_dim_strength", 0.15)}
+            min={0}
+            max={0.4}
+            step={0.01}
+            disabled={
+              props.working ||
+              !booleanSetting(props.document, "appearance", "dim_inactive_panes", true)
+            }
+            format={(value) => `${Math.round(value * 100)}%`}
+            onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
+          />
+        </SettingsRow>
+        <SettingsRow label="Active-pane indicator" last>
+          <SelectControl
+            value={Math.max(
+              0,
+              ["none", "outline", "border"].indexOf(
+                stringSetting(props.document, "appearance", "pane_focus_indicator", "none"),
+              ),
+            )}
+            options={["None", "Subtle outline", "Border"]}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange(
+                "appearance",
+                "pane_focus_indicator",
+                ["none", "outline", "border"][value],
+              )
             }
           />
         </SettingsRow>

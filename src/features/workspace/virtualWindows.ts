@@ -1,3 +1,4 @@
+import { layoutTabs, mapLayoutViews, migrateLayoutTabs, selectLayoutTab } from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
 import {
   capDockLeaves,
@@ -7,7 +8,6 @@ import {
   findDockLeaf,
   normalizeDockNode,
   removeDockLeaf,
-  mapDockTabs,
 } from "./dockTree";
 import {
   maxWorkspacePanels,
@@ -38,18 +38,25 @@ export function normalizeWorkspaceLayout(
   layout: WorkspaceLayout,
   scopeKey: WorkspaceScopeKey = "global",
 ): WorkspaceLayout {
-  const root = normalizeDockNode(
-    fillEmptyDockLeaves(capDockLeaves(layout.root, maxWorkspacePanels), () =>
-      createDefaultWorkspaceTab(scopeKey),
-    ),
-  );
-  const panes = dockLeaves(root);
-  return reconcileGroupIdentities({
-    root,
-    focusedPaneId: panes.some((pane) => pane.id === layout.focusedPaneId)
-      ? layout.focusedPaneId
-      : panes[0].id,
+  const migrated = migrateLayoutTabs(layout);
+  const activeId = migrated.activeLayoutTabId ?? layoutTabs(migrated)[0].id;
+  const tabs = layoutTabs(migrated).map((tab) => {
+    const source = tab.id === activeId ? migrated : tab;
+    const root = normalizeDockNode(
+      fillEmptyDockLeaves(capDockLeaves(source.root, maxWorkspacePanels), () =>
+        createDefaultWorkspaceTab(scopeKey),
+      ),
+    );
+    const panes = dockLeaves(root);
+    const normalized = reconcileGroupIdentities({
+      root,
+      focusedPaneId: panes.some((pane) => pane.id === source.focusedPaneId)
+        ? source.focusedPaneId
+        : panes[0].id,
+    });
+    return { ...tab, ...normalized };
   });
+  return selectLayoutTab({ ...migrated, tabs }, activeId);
 }
 
 export function createWorkspaceVirtualWindow(
@@ -110,15 +117,34 @@ export function withActiveVirtualWindowLayout(
   };
 }
 
+/** Transform every saved layout without changing the selected window. */
+export function mapAllVirtualWorkspaceLayouts(
+  state: VirtualWorkspaceState,
+  update: (layout: WorkspaceLayout) => WorkspaceLayout,
+) {
+  return {
+    layout: update(state.layout),
+    layoutsByScope: Object.fromEntries(
+      Object.entries(state.layoutsByScope).map(([scope, layout]) => [
+        scope,
+        layout ? update(layout) : layout,
+      ]),
+    ) as VirtualWorkspaceState["layoutsByScope"],
+    virtualWindowsByScope: Object.fromEntries(
+      Object.entries(state.virtualWindowsByScope).map(([scope, windows]) => [
+        scope,
+        windows?.map((window) => ({ ...window, layout: update(window.layout) })),
+      ]),
+    ) as VirtualWorkspaceState["virtualWindowsByScope"],
+  };
+}
+
 /** Applies tab-owned async state even when its virtual window or scope is inactive. */
 export function mapAllVirtualWorkspaceTabs(
   state: VirtualWorkspaceState,
   update: (tab: WorkspaceTab) => WorkspaceTab,
 ): Pick<VirtualWorkspaceState, "layout" | "layoutsByScope" | "virtualWindowsByScope"> {
-  const mapLayout = (layout: WorkspaceLayout): WorkspaceLayout => {
-    const root = mapDockTabs(layout.root, update);
-    return root === layout.root ? layout : { ...layout, root };
-  };
+  const mapLayout = (layout: WorkspaceLayout): WorkspaceLayout => mapLayoutViews(layout, update);
   return {
     layout: mapLayout(state.layout),
     layoutsByScope: Object.fromEntries(
@@ -268,6 +294,7 @@ export function extractPaneToVirtualWindow(state: VirtualWorkspaceState, paneId:
   const sourceRoot = removeDockLeaf(state.layout.root, paneId) ?? createDockLeaf([]);
   const sourceLayout = normalizeWorkspaceLayout(
     {
+      ...state.layout,
       root: sourceRoot,
       focusedPaneId: dockLeaves(sourceRoot)[0].id,
     },
