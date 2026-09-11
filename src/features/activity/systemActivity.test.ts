@@ -19,7 +19,7 @@ describe("system Activity", () => {
     });
   });
 
-  it("reports operational failures as attention items without native notifications", () => {
+  it("keeps operational errors in diagnostics without attention or native notifications", () => {
     reportSystemError({
       scope: "inbox:connection-1",
       title: "Inbox account could not refresh",
@@ -27,10 +27,11 @@ describe("system Activity", () => {
       target: { kind: "route", href: "/inbox" },
     });
 
-    expect(useActivityStore.getState().allItems[0]).toMatchObject({
+    expect(useActivityStore.getState().localItems[0]).toMatchObject({
       kind: "failure",
       title: "Inbox account could not refresh",
-      attention: true,
+      attention: false,
+      visibility: "diagnostic",
       target: { kind: "route", href: "/inbox" },
     });
   });
@@ -52,7 +53,7 @@ describe("system Activity", () => {
       body: "Could not reach https://dev-api.mistysys.com/v1/mail/threads: Load failed",
     });
 
-    expect(useActivityStore.getState().allItems[0]?.body).toBe(
+    expect(useActivityStore.getState().localItems[0]?.body).toBe(
       "Misty could not reach the service. Check your connection and try again.",
     );
   });
@@ -61,6 +62,8 @@ describe("system Activity", () => {
     const input = { scope: "inbox", title: "Inbox could not refresh", error: "Load failed" };
     reportSystemError(input);
     reportSystemError(input);
-    expect(useActivityStore.getState().allItems).toHaveLength(1);
+    expect(useActivityStore.getState().localItems).toHaveLength(1);
+    expect(useActivityStore.getState().attentionCount).toBe(0);
+    expect(useActivityStore.getState().hasUnseenHistory).toBe(false);
   });
 });
