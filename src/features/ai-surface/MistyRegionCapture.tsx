@@ -1,4 +1,3 @@
-import html2canvas from "html2canvas";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { captureAttachmentFromDataUrl } from "./captureAttachment";
@@ -26,6 +25,7 @@ export function MistyRegionCapture({
   const startRef = useRef<Point | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState("");
 
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
@@ -53,8 +53,11 @@ export function MistyRegionCapture({
     }
     setRegion(selected);
     setCapturing(true);
+    setCaptureError("");
     try {
       onCapture(await captureMistyRegion(selected));
+    } catch (error) {
+      setCaptureError(error instanceof Error ? error.message : "Capture failed. Select the region again.");
     } finally {
       setCapturing(false);
     }
@@ -79,7 +82,7 @@ export function MistyRegionCapture({
       }}
     >
       <div className="misty-region-capture-hint">
-        {capturing ? "Attaching capture…" : "Drag around anything Misty should see · Esc to cancel"}
+        {captureError || (capturing ? "Attaching capture…" : "Drag around anything Misty should see · Esc to cancel")}
       </div>
       {region ? (
         <div
@@ -93,6 +96,20 @@ export function MistyRegionCapture({
 }
 
 export async function captureMistyRegion(region: Region): Promise<AiCaptureAttachment> {
+  if (import.meta.env.MISTY_NATIVE_MACOS_CAPTURE) {
+    const hidden = Array.from(document.querySelectorAll<HTMLElement>("[data-html2canvas-ignore], .misty-presence"))
+      .map(element => ({ element, visibility: element.style.visibility }));
+    try {
+      hidden.forEach(({ element }) => { element.style.visibility = "hidden"; });
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      const { invoke } = await import("@tauri-apps/api/core");
+      const capture = await invoke<{dataUrl: string; width: number; height: number}>("host_webview_capture_region", { ...region });
+      return captureAttachmentFromDataUrl(capture.dataUrl, capture.width, capture.height);
+    } finally {
+      hidden.forEach(({ element, visibility }) => { element.style.visibility = visibility; });
+    }
+  } else {
+  const { default: html2canvas } = await import("html2canvas");
   const scale = Math.min(2, 1280 / Math.max(region.width, region.height));
   const canvas = await html2canvas(document.documentElement, {
     x: region.x + window.scrollX,
@@ -111,6 +128,7 @@ export async function captureMistyRegion(region: Region): Promise<AiCaptureAttac
   const output = resizeCapture(canvas, 1280);
   const dataUrl = output.toDataURL("image/jpeg", 0.82);
   return captureAttachmentFromDataUrl(dataUrl, output.width, output.height);
+  }
 }
 
 function resizeCapture(source: HTMLCanvasElement, maximum: number) {

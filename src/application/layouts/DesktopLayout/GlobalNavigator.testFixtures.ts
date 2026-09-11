@@ -9,6 +9,8 @@ export function seedNavigatorApps() {
     installations: NAVIGATOR_APP_IDS.map((id, pin_rank) => ({
       app_id: id === "social" ? "chat" : id,
       state: "installed" as const,
+      space_id: "space-a",
+      authority_generation: 1,
       installed_version: "1.0.0",
       permission_version: 1,
       granted_scopes: [],

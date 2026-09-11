@@ -1,16 +1,14 @@
 import { analytics } from "@/telemetry/client";
 import { create } from "zustand";
-import { aiSurfaceApi, subscribeToAiInvocation } from "./api";
-import { aiMessage, aiPaneSession, aiSessionKey } from "./storeHelpers";
+import { aiSurfaceApi } from "./api";
+import { aiPaneSession, aiSessionKey } from "./storeHelpers";
 import {
   clearSpeechTimer,
   conciseSpeech,
-  consumeInvocationEvent,
   failInvocation,
   makeSpeech,
   patchArtifact,
   patchSession,
-  pointerAnchor,
   scheduleHome,
 } from "./storeRuntime";
 import type {
@@ -142,52 +140,11 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
     }));
   },
 
-  summon: (accountId, paneId, anchor) => {
-    const key = aiSessionKey(accountId, paneId);
-    const registration = get().registrations[key] ?? Object.values(get().registrations)[0];
-    clearSpeechTimer(accountId);
-    const current = aiPaneSession(get().sessions, accountId, paneId);
-    const companion = get().companion;
-    const recalling =
-      companion.completedCount > 0 &&
-      Boolean(companion.speech) &&
-      (!companion.accountId || companion.accountId === accountId);
-    const session =
-      current.interactionOpen || recalling
-        ? current
-        : {
-            ...current,
-            conversationId: undefined,
-            invocationId: undefined,
-            activeTaskId: undefined,
-            messages: [],
-            error: undefined,
-            interactionOpen: true,
-          };
-    set((state) => ({
-      sessions: { ...state.sessions, [key]: session },
-      companion: {
-        phase: state.companion.approval
-          ? "awaiting_approval"
-          : recalling
-            ? "speaking"
-            : "composing",
-        accountId,
-        paneId,
-        anchor: pointerAnchor(paneId, anchor, registration.element),
-        speech: state.companion.speech,
-        completedCount: Math.max(0, state.companion.completedCount - 1),
-      },
-    }));
-    if (recalling) {
-      analytics.track("ai_companion_reply_recalled", { surface: registration.adapter.surfaceId });
-    }
-    analytics.track("ai_companion_summoned", {
-      surface: registration.adapter.surfaceId,
-      anchor_kind: "pointer",
-    });
+  summon: (accountId, paneId, _anchor) => {
+    const registration = get().registrations[aiSessionKey(accountId, paneId)];
+    if (!registration) return;
+    void get().submit(accountId, paneId, registration.adapter);
   },
-
   returnHome: () => {
     const current = get().companion;
     const registration =
@@ -259,69 +216,18 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
 
   submit: async (accountId, paneId, adapter, action) => {
     const current = aiPaneSession(get().sessions, accountId, paneId);
-    const prompt = (action?.prompt ?? current.prompt).trim();
-    if (!prompt || current.state === "queued" || current.state === "running") return;
-    const key = aiSessionKey(accountId, paneId);
-    const taskId = current.activeTaskId ?? crypto.randomUUID();
-    patchSession(set, get, accountId, paneId, {
-      prompt: "",
-      state: "queued",
-      error: undefined,
-      activeTaskId: taskId,
-      interactionOpen: true,
-      messages: [...current.messages, aiMessage("user", prompt, taskId)],
+    const { openMisty } = await import("@/features/misty/handoff");
+    const { mistyContextRef } = await import("@/features/misty/context");
+    await openMisty({
+      accountId,
+      paneId,
+      surfaceId: adapter.surfaceId,
+      prompt: action?.prompt ?? current.prompt,
+      context: adapter.getContext().map(mistyContextRef),
+      selection: adapter.getSelection?.() ?? undefined,
+      requestedArtifactKind: action?.requestedArtifactKind,
     });
-    set((state) => ({
-      companion: {
-        ...state.companion,
-        phase: "working",
-        speech: makeSpeech("status", "Getting started…", true),
-        approval: undefined,
-      },
-    }));
-    analytics.track("ai_companion_task_submitted", {
-      surface: adapter.surfaceId,
-      trigger: action?.trigger ?? (adapter.getSelection?.() ? "selection" : "message"),
-      refinement: false,
-    });
-    try {
-      const created = await aiSurfaceApi.createInvocation({
-        mode: "companion",
-        surfaceId: adapter.surfaceId,
-        trigger: action?.trigger ?? (adapter.getSelection?.() ? "selection" : "message"),
-        prompt,
-        context: adapter.getContext(),
-        selection: adapter.getSelection?.() ?? undefined,
-        capture: current.capture,
-        requestedArtifactKind: action?.requestedArtifactKind,
-        conversationId: current.conversationId,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      patchSession(set, get, accountId, paneId, {
-        capture: undefined,
-        invocationId: created.invocationId,
-        conversationId: created.conversationId ?? current.conversationId,
-        state: created.state,
-      });
-      streamStops.get(key)?.();
-      streamStops.set(
-        key,
-        subscribeToAiInvocation(created.eventsUrl, {
-          onEvent: (event) => consumeInvocationEvent(set, get, accountId, paneId, adapter, event),
-          onError: (error) => failInvocation(set, get, accountId, paneId, error.message),
-        }),
-      );
-    } catch (error) {
-      failInvocation(
-        set,
-        get,
-        accountId,
-        paneId,
-        error instanceof Error ? error.message : "Misty could not start this task.",
-      );
-    }
   },
-
   cancel: async (accountId, paneId) => {
     const current = aiPaneSession(get().sessions, accountId, paneId);
     if (!current.invocationId) return;
@@ -338,6 +244,16 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
   },
 
   decideArtifact: async (accountId, paneId, adapter, artifact, decision) => {
+    if (decision === "accept") {
+      const { assertMistyAvailable, currentMistySpace } =
+        await import("@/features/misty/availability");
+      await assertMistyAvailable(
+        accountId,
+        artifact.target?.spaceId ||
+          adapter.getContext().find((ref) => ref.spaceId)?.spaceId ||
+          currentMistySpace(),
+      );
+    }
     analytics.track("ai_companion_artifact_decided", {
       surface: adapter.surfaceId,
       artifact_kind: artifact.kind,
@@ -362,6 +278,7 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       state: decision === "accept" ? "applying" : "rejected",
     });
     if (decision === "reject") {
+      await aiSurfaceApi.decideArtifact(artifact.id, "reject", artifact.idempotencyKey);
       set((state) => ({
         companion: {
           ...state.companion,
@@ -427,6 +344,7 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       });
       void aiSurfaceApi.completeArtifact(artifact.id, "failed", message).catch(() => undefined);
       failInvocation(set, get, accountId, paneId, message);
+      throw error;
     }
   },
 

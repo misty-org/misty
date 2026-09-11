@@ -43,9 +43,23 @@ export function consumeInvocationEvent(
     return;
   }
   if (event.type === "assistant.status") {
-    if (event.phase === "awaiting_device" || event.phase === "device_resume_pending" || event.phase === "awaiting_intervention" || event.phase === "intervention_resume_pending" || event.phase === "awaiting_timer" || event.phase === "timer_resume_pending") {
+    if (
+      event.phase === "awaiting_device" ||
+      event.phase === "device_resume_pending" ||
+      event.phase === "awaiting_intervention" ||
+      event.phase === "intervention_resume_pending" ||
+      event.phase === "awaiting_timer" ||
+      event.phase === "timer_resume_pending"
+    ) {
       patchSession(set, get, accountId, paneId, {
-        state: event.phase === "awaiting_device" ? "awaiting_device" : event.phase === "awaiting_intervention" ? "awaiting_intervention" : event.phase === "awaiting_timer" ? "awaiting_timer" : "running",
+        state:
+          event.phase === "awaiting_device"
+            ? "awaiting_device"
+            : event.phase === "awaiting_intervention"
+              ? "awaiting_intervention"
+              : event.phase === "awaiting_timer"
+                ? "awaiting_timer"
+                : "running",
       });
     }
     set((state) => ({
@@ -101,7 +115,6 @@ export function consumeInvocationEvent(
   ) {
     return;
   }
-  if (event.type === "approval.required") return;
 
   const current = aiPaneSession(get().sessions, accountId, paneId);
   const messages = [...current.messages];
@@ -117,22 +130,18 @@ export function consumeInvocationEvent(
   if (event.type === "response.delta") replacement.content += event.delta;
   if (event.type === "assistant.message") replacement.content = event.text;
   if (event.type === "citation") replacement.citations = [...replacement.citations, event.citation];
-  if (event.type === "artifact.proposed")
+  if (event.type === "artifact.proposed" || event.type === "approval.required")
     replacement.artifacts = [...replacement.artifacts, event.artifact];
   messages[messages.length - 1] = replacement;
   patchSession(set, get, accountId, paneId, { messages, state: "running" });
 
-  if (event.type !== "artifact.proposed") return;
-  if (event.artifact.approvalPolicy === "auto_apply_with_undo") {
-    queueMicrotask(
-      () => void get().decideArtifact(accountId, paneId, adapter, event.artifact, "accept"),
-    );
-    return;
-  }
+  if (event.type !== "artifact.proposed" && event.type !== "approval.required") return;
   const awaitingInBackground = get().companion.phase === "home";
   set((state) => ({
     companion: {
       ...state.companion,
+      accountId,
+      paneId,
       phase: awaitingInBackground ? "home" : "awaiting_approval",
       speech: makeSpeech("clarification", event.artifact.summary, true),
       approval: {

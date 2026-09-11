@@ -1,5 +1,14 @@
+import { assertMistyAvailable } from "@/features/misty/availability";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
-import { useGlobalSearchStore } from "@/features/global-search";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useGlobalSearchStore } from "./useGlobalSearchStore";
+vi.mock("@/features/misty/availability", () => ({
+  assertMistyAvailable: vi.fn(async () => {}),
+  currentMistySpace: () => "work",
+}));
+vi.mock("@/features/misty/contextBridge", () => ({
+  requestHostContext: vi.fn(async () => ({ context: [] })),
+}));
 import { aiSurfaceApi } from "@/features/ai-surface";
 import { useSpacesStore } from "@/features/spaces";
 import { globalMistyApi } from "./globalMistyApi";
@@ -11,72 +20,154 @@ initializeHostAgentsRuntime();
 describe("Global Misty state", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    useGlobalSearchStore.getState().setAccount("");
-    useGlobalSearchStore.setState({ panel: "closed", working: false });
+    useMistyStore.getState().setAccount("");
+    useMistyStore.setState({
+      panel: "closed",
+      working: false,
+      context: [],
+      handoff: undefined,
+      targets: [],
+      captureEnabled: false,
+    });
     useSpacesStore.setState({ spaces: [] });
   });
 
-  it("remembers the last mode independently for each account", () => {
+  it("keeps Search independent of Misty's draft and conversation mode", () => {
     useGlobalSearchStore.getState().setAccount("account-a");
-    useGlobalSearchStore.getState().setMode("action");
-    useGlobalSearchStore.getState().setAccount("account-b");
+    useGlobalSearchStore.getState().setMode("ask");
+    useMistyStore.getState().setAccount("account-a");
+    useMistyStore.getState().setQuery("private draft");
+    useGlobalSearchStore.getState().setQuery("file query");
     expect(useGlobalSearchStore.getState().mode).toBe("search");
+    expect(useMistyStore.getState().query).toBe("private draft");
+  });
 
-    useGlobalSearchStore.getState().setAccount("account-a");
-    expect(useGlobalSearchStore.getState().mode).toBe("action");
+  it("preserves the draft and prevents model work when Agents admission fails", async () => {
+    const create = vi.spyOn(aiSurfaceApi, "createInvocation");
+    vi.mocked(assertMistyAvailable).mockRejectedValueOnce(new Error("Agents unavailable"));
+    useMistyStore.setState({ accountId: "account-a", query: "keep this draft", working: false });
+    await useMistyStore.getState().submitAnswer("keep this draft");
+    expect(create).not.toHaveBeenCalled();
+    expect(useMistyStore.getState()).toMatchObject({
+      query: "keep this draft",
+      working: false,
+      error: "Agents unavailable",
+    });
+  });
+
+  it("keeps an explicit selection handoff when the focused view changes", async () => {
+    const create = vi
+      .spyOn(aiSurfaceApi, "createInvocation")
+      .mockRejectedValueOnce(new Error("stop after admission"));
+    const selected = {
+      kind: "text" as const,
+      content: "selected source",
+      contentHash: "revision-1",
+      object: { kind: "note", id: "source", spaceId: "work" },
+    };
+    useMistyStore.setState({
+      accountId: "account-a",
+      activeConversationId: "conversation-a",
+      conversations: [
+        {
+          id: "conversation-a",
+          title: "Misty",
+          spaceId: "work",
+          createdAt: "2026-09-10",
+          updatedAt: "2026-09-10",
+          messages: [],
+          remote: true,
+        },
+      ],
+      context: [],
+      handoff: {
+        spaceId: "work",
+        selection: selected,
+        context: [
+          {
+            id: "source",
+            kind: "note",
+            title: "Source",
+            attached: true,
+            spaceId: "work",
+            source: "current",
+            privacy: "private",
+          },
+        ],
+      },
+    });
+    await useMistyStore.getState().submitAnswer("Explain this");
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selection: selected,
+        context: expect.arrayContaining([expect.objectContaining({ id: "source" })]),
+      }),
+    );
   });
 
   it("collapses without canceling background work", () => {
-    useGlobalSearchStore.setState({ panel: "results", working: true });
-    useGlobalSearchStore.getState().closePanel();
-    expect(useGlobalSearchStore.getState()).toMatchObject({ panel: "closed", working: true });
+    useMistyStore.setState({ panel: "results", working: true });
+    useMistyStore.getState().closePanel();
+    expect(useMistyStore.getState()).toMatchObject({ panel: "closed", working: true });
   });
 
   it("does not install a pending browser conversation into a different account", async () => {
     let finish!: (value: Awaited<ReturnType<typeof globalMistyApi.createConversation>>) => void;
     const create = vi.spyOn(globalMistyApi, "createConversation").mockImplementationOnce(
-      () => new Promise((resolve) => { finish = resolve; }),
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
     );
-    useGlobalSearchStore.getState().setAccount("account-a");
-    const pending = useGlobalSearchStore.getState().newConversation("family");
-    useGlobalSearchStore.getState().setAccount("account-b");
-    const current = useGlobalSearchStore.getState();
-    finish({ id: "old-account-conversation", title: "Ask", spaceId: "family", createdAt: "2026-09-08T00:00:00Z", updatedAt: "2026-09-08T00:00:00Z", messages: [], remote: true });
+    useMistyStore.getState().setAccount("account-a");
+    const pending = useMistyStore.getState().newConversation("family");
+    useMistyStore.getState().setAccount("account-b");
+    const current = useMistyStore.getState();
+    finish({
+      id: "old-account-conversation",
+      title: "Ask",
+      spaceId: "family",
+      createdAt: "2026-09-08T00:00:00Z",
+      updatedAt: "2026-09-08T00:00:00Z",
+      messages: [],
+      remote: true,
+    });
     await pending;
-    expect(useGlobalSearchStore.getState().conversations).toEqual(current.conversations);
-    expect(useGlobalSearchStore.getState().activeConversationId).toBe(current.activeConversationId);
+    expect(useMistyStore.getState().conversations).toEqual(current.conversations);
+    expect(useMistyStore.getState().activeConversationId).toBe(current.activeConversationId);
     create.mockRestore();
   });
 
   it("never rewrites the user's query while normalizing a search term", async () => {
-    useGlobalSearchStore.getState().setAccount("account-a");
-    useGlobalSearchStore.getState().setQuery("a ");
+    useMistyStore.getState().setAccount("account-a");
+    useMistyStore.getState().setQuery("a ");
 
-    await useGlobalSearchStore.getState().search("a ");
+    await useMistyStore.getState().search("a ");
 
-    expect(useGlobalSearchStore.getState().query).toBe("a ");
+    expect(useMistyStore.getState().query).toBe("a ");
   });
 
   it("invalidates an in-flight search as soon as the user types again", () => {
-    const before = useGlobalSearchStore.getState().requestId;
+    const before = useMistyStore.getState().requestId;
 
-    useGlobalSearchStore.getState().setQuery("newer query");
+    useMistyStore.getState().setQuery("newer query");
 
-    expect(useGlobalSearchStore.getState().requestId).toBe(before + 1);
+    expect(useMistyStore.getState().requestId).toBe(before + 1);
   });
 
   it("keeps Agent workspace answers out of the global Search panel", async () => {
     const createInvocation = vi
       .spyOn(aiSurfaceApi, "createInvocation")
       .mockRejectedValueOnce(new Error("stop after presentation state"));
-    useGlobalSearchStore.setState({
+    useMistyStore.setState({
       accountId: "account-a",
       panel: "closed",
       activeConversationId: "conversation-a",
       conversations: [
         {
           id: "conversation-a",
-          title: "Agent chat",
+          title: "Misty",
+          spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
           updatedAt: "2026-08-25T00:00:00.000Z",
           messages: [],
@@ -85,22 +176,44 @@ describe("Global Misty state", () => {
       ],
     });
 
-    await useGlobalSearchStore.getState().submitAnswer("hello", undefined, undefined, "workspace");
+    await useMistyStore.getState().submitAnswer("hello", undefined, undefined, "workspace");
 
-    expect(useGlobalSearchStore.getState().panel).toBe("closed");
-    expect(useGlobalSearchStore.getState().conversations[0]?.messages[0]?.content).toBe("hello");
+    expect(useMistyStore.getState().panel).toBe("closed");
+    expect(useMistyStore.getState().conversations[0]?.messages[0]?.content).toBe("hello");
     createInvocation.mockRestore();
   });
 
   it("uses the originating conversation after workspace preparation changes the active view", async () => {
-    const createInvocation = vi.spyOn(aiSurfaceApi, "createInvocation").mockRejectedValueOnce(new Error("stop after admission"));
-    const base = { title: "Ask", createdAt: "2026-09-08T00:00:00Z", updatedAt: "2026-09-08T00:00:00Z", messages: [], remote: true };
-    useGlobalSearchStore.setState({ accountId: "account-a", working: false, activeConversationId: "other", conversations: [
-      { ...base, id: "origin", spaceId: "work" }, { ...base, id: "other", spaceId: "family" },
-    ], context: [] });
-    await useGlobalSearchStore.getState().submitAnswer("Create a task", [], undefined, "workspace", [], { conversationId: "origin", context: [] });
-    expect(createInvocation).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "origin" }));
-    expect(useGlobalSearchStore.getState().conversations.find((item) => item.id === "other")?.messages).toEqual([]);
+    const createInvocation = vi
+      .spyOn(aiSurfaceApi, "createInvocation")
+      .mockRejectedValueOnce(new Error("stop after admission"));
+    const base = {
+      title: "Ask",
+      createdAt: "2026-09-08T00:00:00Z",
+      updatedAt: "2026-09-08T00:00:00Z",
+      messages: [],
+      remote: true,
+    };
+    useMistyStore.setState({
+      accountId: "account-a",
+      working: false,
+      activeConversationId: "other",
+      conversations: [
+        { ...base, id: "origin", spaceId: "work" },
+        { ...base, id: "other", spaceId: "family" },
+      ],
+      context: [],
+    });
+    await useMistyStore.getState().submitAnswer("Create a task", [], undefined, "workspace", [], {
+      conversationId: "origin",
+      context: [],
+    });
+    expect(createInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "origin" }),
+    );
+    expect(
+      useMistyStore.getState().conversations.find((item) => item.id === "other")?.messages,
+    ).toEqual([]);
   });
 
   it("does not retarget a global Ask follow-up based on old message text", async () => {
@@ -119,7 +232,7 @@ describe("Global Misty state", () => {
     const createInvocation = vi
       .spyOn(aiSurfaceApi, "createInvocation")
       .mockRejectedValueOnce(new Error("stop after binding"));
-    useGlobalSearchStore.setState({
+    useMistyStore.setState({
       accountId: "account-a",
       panel: "answer",
       activeConversationId: "conversation-a",
@@ -127,6 +240,7 @@ describe("Global Misty state", () => {
         {
           id: "conversation-a",
           title: "hello",
+          spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
           updatedAt: "2026-08-25T00:00:00.000Z",
           messages: [
@@ -144,29 +258,30 @@ describe("Global Misty state", () => {
       ],
     });
 
-    await useGlobalSearchStore.getState().submitAnswer("can you check again");
+    await useMistyStore.getState().submitAnswer("can you check again");
 
     expect(bindConversation).not.toHaveBeenCalled();
     expect(createInvocation).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conversation-a" }),
     );
-    expect(useGlobalSearchStore.getState().conversations[0]?.spaceId).toBeUndefined();
+    expect(useMistyStore.getState().conversations[0]?.spaceId).toBe("work");
     bindConversation.mockRestore();
     createInvocation.mockRestore();
   });
 
   it("keeps Agent workspace tasks out of the global Search panel", async () => {
     const createRun = vi
-      .spyOn(aiSurfaceApi, "createRun")
+      .spyOn(aiSurfaceApi, "createInvocation")
       .mockRejectedValueOnce(new Error("stop after presentation state"));
-    useGlobalSearchStore.setState({
+    useMistyStore.setState({
       accountId: "account-a",
       panel: "closed",
       activeConversationId: "conversation-a",
       conversations: [
         {
           id: "conversation-a",
-          title: "Agent chat",
+          title: "Misty",
+          spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
           updatedAt: "2026-08-25T00:00:00.000Z",
           messages: [],
@@ -175,17 +290,15 @@ describe("Global Misty state", () => {
       ],
     });
 
-    await useGlobalSearchStore.getState().submitAgentTask("draw a diagram", "agents", "workspace");
+    await useMistyStore.getState().submitAgentTask("draw a diagram", "agents", "workspace");
 
-    expect(useGlobalSearchStore.getState().panel).toBe("closed");
-    expect(useGlobalSearchStore.getState().conversations[0]?.messages[0]?.content).toBe(
-      "draw a diagram",
-    );
+    expect(useMistyStore.getState().panel).toBe("closed");
+    expect(useMistyStore.getState().conversations[0]?.messages[0]?.content).toBe("draw a diagram");
     createRun.mockRestore();
   });
 
   it("deduplicates context by its semantic destination", () => {
-    useGlobalSearchStore.getState().setContext([
+    useMistyStore.getState().setContext([
       {
         id: "route:/spaces/space-1/chat",
         kind: "route",
@@ -218,6 +331,6 @@ describe("Global Misty state", () => {
       },
     ]);
 
-    expect(useGlobalSearchStore.getState().context).toHaveLength(2);
+    expect(useMistyStore.getState().context).toHaveLength(2);
   });
 });

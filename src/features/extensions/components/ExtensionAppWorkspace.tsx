@@ -1,3 +1,4 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
 import type { WorkspaceTab } from "@/features/workspace";
 import { ExplorerPluginPanelHost } from "@/features/files/explorer";
 import type { PluginPanelEntry } from "@/native/contracts";
@@ -10,6 +11,9 @@ import { parseExtensionAppRoute } from "../model/extensionAppRoute";
 
 export function ExtensionAppWorkspace({ tab }: { tab: WorkspaceTab }) {
   const route = useMemo(() => parseExtensionAppRoute(tab.route), [tab.route]);
+  const installed = useAppsStore((state) =>
+    state.installations.some((app) => app.app_id === route?.pluginId && app.state === "installed"),
+  );
   const [panel, setPanel] = useState<PluginPanelEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -49,6 +53,15 @@ export function ExtensionAppWorkspace({ tab }: { tab: WorkspaceTab }) {
       />
     );
   }
+
+  if (!installed)
+    return (
+      <ErrorState
+        className="h-full"
+        title="App unavailable in this Space"
+        description="A Space manager needs to add this app before members can use it."
+      />
+    );
 
   if (loading) {
     return (

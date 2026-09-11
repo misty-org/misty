@@ -1,3 +1,4 @@
+import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -17,6 +18,7 @@ vi.mock("./globalMistyApi", async (importOriginal) => {
 });
 
 import { GlobalMisty } from "./GlobalMisty";
+import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
 
 initializeHostAgentsRuntime();
@@ -30,6 +32,7 @@ describe("GlobalMisty", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     window.localStorage.clear();
+    useAiSurfaceStore.setState({ registrations: {} });
     useGlobalSearchStore.getState().setAccount("");
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -40,6 +43,45 @@ describe("GlobalMisty", () => {
     await act(async () => root.unmount());
     container.remove();
   });
+
+  it.each(["context", "selection"])(
+    "keeps Search usable when app %s access is denied",
+    async (denied) => {
+      const reject = () => {
+        throw new Error("This App does not have ai.use permission.");
+      };
+      useAiSurfaceStore.setState({
+        registrations: {
+          "account-1:files-pane": {
+            accountId: "account-1",
+            paneId: "files-pane",
+            element: document.createElement("div"),
+            adapter: {
+              surfaceId: "files",
+              label: "Files",
+              getContext: denied === "context" ? reject : () => [],
+              getSelection: denied === "selection" ? reject : () => null,
+            },
+          },
+        },
+      });
+      await act(async () => {
+        root.render(
+          <MemoryRouter>
+            <GlobalMisty
+              accountId="account-1"
+              currentPath="/apps/files"
+              activePaneId="files-pane"
+              activePanePath="/apps/files"
+            />
+          </MemoryRouter>,
+        );
+      });
+      await act(async () => useGlobalSearchStore.getState().activateLauncher());
+      expect(container.querySelector("[data-global-misty-launcher-input]")).not.toBeNull();
+      useAiSurfaceStore.setState({ registrations: {} });
+    },
+  );
 
   it("keeps one stable input while search results expand beneath it", async () => {
     const requestDrag = vi.fn();
@@ -69,12 +111,7 @@ describe("GlobalMisty", () => {
     expect(input).not.toBeNull();
     expect(document.activeElement).toBe(input);
     expect(container.querySelector('[aria-label="Misty Search"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Search or Ask"]')).not.toBeNull();
-    expect(
-      container
-        .querySelector<HTMLButtonElement>('[data-misty-mode="search"]')
-        ?.getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(container.querySelector('[aria-label="Search or Ask"]')).toBeNull();
     expect(container.querySelector('[aria-label="Misty candidates"]')).toBeNull();
     expect(container.querySelector('[aria-label="Search filters"]')).toBeNull();
     expect(contentVisibilityChanged).toHaveBeenLastCalledWith(false);
@@ -88,9 +125,7 @@ describe("GlobalMisty", () => {
       dragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
     });
     expect(requestDrag).toHaveBeenCalledTimes(1);
-    const petSwitch = container.querySelector<HTMLButtonElement>(
-      '[aria-label="Switch to Misty pet"]',
-    );
+    const petSwitch = container.querySelector<HTMLButtonElement>('[aria-label="Collapse Misty"]');
     expect(petSwitch).not.toBeNull();
     await act(async () => petSwitch?.click());
     expect(switchToPet).toHaveBeenCalledTimes(1);
@@ -120,52 +155,8 @@ describe("GlobalMisty", () => {
     expect(container.querySelector('[aria-label="Search filters"]')).not.toBeNull();
     expect(contentVisibilityChanged).toHaveBeenLastCalledWith(true);
 
-    await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-misty-mode="ask"]')
-        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    const askInput = container.querySelector<HTMLTextAreaElement>(
-      "[data-global-misty-launcher-input]",
-    );
-    expect(askInput?.value).toBe("a ");
-    expect(askInput?.placeholder).toBe("Ask a follow-up…");
-    expect(useGlobalSearchStore.getState().mode).toBe("ask");
-    expect(useGlobalSearchStore.getState().panel).toBe("answer");
-    expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
-    expect(container.querySelector("[data-misty-voice-island]")).not.toBeNull();
-    expect(
-      container
-        .querySelector<HTMLButtonElement>('[data-misty-mode="ask"]')
-        ?.getAttribute("aria-pressed"),
-    ).toBe("true");
-
-    const islandDragHandle = container.querySelector<HTMLButtonElement>(
-      '[data-misty-voice-island] [aria-label="Move Misty window"]',
-    );
-    expect(islandDragHandle).not.toBeNull();
-    await act(async () => {
-      islandDragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
-    });
-    expect(requestDrag).toHaveBeenCalledTimes(2);
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('[aria-label="Switch to Misty pet"]')?.click();
-    });
-    expect(switchToPet).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      container.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
-    });
-    // Floating panel stays open on outside click
-    expect(useGlobalSearchStore.getState().panel).toBe("answer");
-
-    container.tabIndex = 0;
-    container.focus();
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    });
-    expect(useGlobalSearchStore.getState().panel).toBe("closed");
+    expect(useGlobalSearchStore.getState().mode).toBe("search");
+    expect(container.querySelector('[data-misty-mode="ask"]')).toBeNull();
   });
 
   it("keeps Ask history scrollable while a follow-up is composed", async () => {
@@ -173,6 +164,7 @@ describe("GlobalMisty", () => {
       root.render(
         <MemoryRouter initialEntries={["/home"]}>
           <GlobalMisty
+            controller="misty"
             accountId="account-1"
             currentPath="/home"
             activePaneId=""
@@ -183,7 +175,7 @@ describe("GlobalMisty", () => {
     });
 
     await act(async () => {
-      useGlobalSearchStore.setState({
+      useMistyStore.setState({
         panel: "answer",
         mode: "ask",
         activeConversationId: "conversation-1",
@@ -268,7 +260,7 @@ describe("GlobalMisty", () => {
     });
 
     expect(input?.placeholder).toBe("Ask a follow-up…");
-    expect(useGlobalSearchStore.getState().panel).toBe("answer");
+    expect(useMistyStore.getState().panel).toBe("answer");
     expect(container.querySelector("[data-misty-conversation-scroll]")).not.toBeNull();
 
     await act(async () => {
@@ -277,6 +269,6 @@ describe("GlobalMisty", () => {
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(useGlobalSearchStore.getState().panel).toBe("results");
+    expect(useMistyStore.getState().panel).toBe("answer");
   });
 });

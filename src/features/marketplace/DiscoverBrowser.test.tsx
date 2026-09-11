@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OfficialAppDetails } from "@/features/apps/OfficialAppDetails";
 import { useState } from "react";
-import type { OfficialApp, UserAppInstallation } from "@/api/apps";
+import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { DiscoverBrowser, type DiscoverBrowserProps } from "./components/DiscoverBrowser";
 
 const catalog: OfficialApp[] = [
@@ -24,9 +24,11 @@ const catalog: OfficialApp[] = [
   desktop: { runtime: "downloaded" },
   mobile: { runtime: app.id === "terminal" ? "unsupported" : "hosted" },
 }));
-const installed: UserAppInstallation = {
+const installed: SpaceAppInstallation = {
   app_id: "browser",
   state: "installed",
+  space_id: "space-a",
+  authority_generation: 1,
   installed_version: "1.0.0",
   permission_version: 2,
   granted_scopes: ["files.read"],
@@ -64,15 +66,114 @@ function setup(overrides: Partial<DiscoverBrowserProps> = {}) {
 afterEach(cleanup);
 
 describe("Discover compact catalog", () => {
+  it("opens the requested app directly at permissions in Discover", () => {
+    setup({ selectedAppId: "browser", reviewPermissions: true });
+    expect(screen.getByRole("heading", { name: "App permissions" })).toBeTruthy();
+    expect(screen.getByText(/Review the permissions Browser needs/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("shows the approved navigation and filters the live catalog by category", () => {
     setup();
     const nav = screen.getByRole("navigation", { name: "Discover sections" });
-    expect(within(nav).getAllByRole("button")).toHaveLength(3);
+    expect(within(nav).getAllByRole("button")).toHaveLength(4);
     expect(screen.queryByText("Settings")).toBeNull();
-    expect(screen.queryByText("Extensions")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Creative 1" }));
+    expect(within(nav).getByRole("button", { name: "Extensions" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Creative" }));
     expect(screen.getByRole("button", { name: "View Journal details" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "View Browser details" })).toBeNull();
+  });
+
+  it("shows the beta coming-soon state for Extensions", () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "Extensions" }));
+    expect(screen.getByRole("heading", { name: "Extensions" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Coming soon…" })).toBeTruthy();
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Refresh Discover" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "View Journal details" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "App categories" })).toBeNull();
+  });
+
+  it("combines filters, keeps the menu open, and resets the catalog", () => {
+    setup({ installations: [{ ...installed, installed_version: "0.9.0" }] });
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "iPhone and iPad" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Downloaded" }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Updates available" }));
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "Updates available" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "View Browser details" })).toBeTruthy();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Creative" }));
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.getByText("No apps found")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Filter" }).hasAttribute("data-active")).toBe(false);
+  });
+
+  it("filters compatibility and synchronizes the category tabs with the menu", () => {
+    setup();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "iPhone and iPad" }));
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.queryByRole("button", { name: "View Terminal details" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Creative" }));
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(
+      screen.getByRole("menuitemradio", { name: "Creative" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset filters" }));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(4);
+  });
+
+  it("sorts and filters the catalog through the toolbar menus", () => {
+    setup();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Sort by" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Name: off" }));
+    expect(screen.getByRole("menuitem", { name: "Name: ascending" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Name: ascending" }));
+    expect(screen.getByRole("menuitem", { name: "Name: descending" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Name: descending" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Name: off" }));
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(
+      screen.getAllByRole("button", { name: /^View .* details$/ })[0].getAttribute("aria-label"),
+    ).toBe("View Browser details");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Added to this Space" }));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "View Browser details" })).toBeTruthy();
   });
 
   it("searches the displayed Social name and restores results when cleared", () => {
@@ -88,16 +189,16 @@ describe("Discover compact catalog", () => {
 
   it("honors the Installed section requested by an update notice", () => {
     setup({ requestedSection: "installed" });
-    expect(screen.getByRole("heading", { name: "Installed" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Downloaded" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "View Browser details" })).toBeTruthy();
   });
 
   it("shows installed apps and opens details without launching or changing them", () => {
     const props = setup();
-    fireEvent.click(screen.getByRole("button", { name: /Installed 1 installed apps/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Downloaded" }));
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Uninstall Browser" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage Browser" }));
     expect(screen.getByRole("dialog", { name: "Browser" })).toBeTruthy();
     expect(props.onOpen).not.toHaveBeenCalled();
     expect(props.onRemove).not.toHaveBeenCalled();
@@ -105,7 +206,7 @@ describe("Discover compact catalog", () => {
 
   it("shows metadata above About and installs only after a separate Agree step", async () => {
     const props = setup();
-    const trigger = screen.getByRole("button", { name: "Install Journal" });
+    const trigger = screen.getByRole("button", { name: "Get Journal" });
     trigger.focus();
     fireEvent.click(trigger);
     const dialog = screen.getByRole("dialog", { name: "Journal" });
@@ -134,7 +235,7 @@ describe("Discover compact catalog", () => {
   it("requires new consent when an update adds access", async () => {
     const changed = { ...catalog[2], scopes: ["files.read", "files.write"] };
     const props = setup({ catalog: [changed] });
-    fireEvent.click(screen.getByRole("button", { name: "Install Browser" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get Browser" }));
     const ui = within(screen.getByRole("dialog"));
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(ui.getByText("New access")).toBeTruthy();
@@ -143,24 +244,24 @@ describe("Discover compact catalog", () => {
     await waitFor(() => expect(props.onInstall).toHaveBeenCalledExactlyOnceWith(changed));
   });
 
-  it.each([{ installed_version: "0.9.0" }, { permission_version: 1 }])(
-    "uses Install without renewed consent when access is unchanged (%j)",
-    async (previous) => {
-      const props = setup({ installations: [{ ...installed, ...previous }] });
-      fireEvent.click(screen.getByRole("button", { name: "Install Browser" }));
-      expect(props.onInstall).not.toHaveBeenCalled();
-      const ui = within(screen.getByRole("dialog"));
-      fireEvent.click(ui.getByRole("button", { name: "Install" }));
-      await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[2]));
-      expect(ui.queryByRole("button", { name: "Agree" })).toBeNull();
-    },
-  );
+  it.each([
+    { space_id: "space-a", authority_generation: 1, installed_version: "0.9.0" },
+    { permission_version: 1 },
+  ])("uses Install without renewed consent when access is unchanged (%j)", async (previous) => {
+    const props = setup({ installations: [{ ...installed, ...previous }] });
+    fireEvent.click(screen.getByRole("button", { name: "Get Browser" }));
+    expect(props.onInstall).not.toHaveBeenCalled();
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[2]));
+    expect(ui.queryByRole("button", { name: "Agree" })).toBeNull();
+  });
 
   it("explains recovery and requests consent before reinstalling", async () => {
     const props = setup({
       installations: [{ ...installed, app_id: "journal", state: "recoverable" }],
     });
-    fireEvent.click(screen.getByRole("button", { name: "Install Journal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get Journal" }));
     const ui = within(screen.getByRole("dialog"));
     expect(ui.getByText(/restores its recoverable saved data/)).toBeTruthy();
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
@@ -171,7 +272,7 @@ describe("Discover compact catalog", () => {
 
   it("blocks unknown permissions without exposing scope identifiers", () => {
     const props = setup({ catalog: [{ ...catalog[1], scopes: ["unknown.secret"] }] });
-    fireEvent.click(screen.getByRole("button", { name: "Install Journal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Get Journal" }));
     const ui = within(screen.getByRole("dialog"));
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(ui.getByRole("alert").textContent).toContain("cannot describe");

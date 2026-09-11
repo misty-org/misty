@@ -1,3 +1,8 @@
+import {
+  createAppNavigationRegistration,
+  useAppNavigationStore,
+} from "@/features/apps/appNavigation";
+import { createAppRpcScope } from "@/features/apps/rpc/session";
 import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { resetInboxAccountState, useInboxStore } from "@/features/inbox";
@@ -44,6 +49,7 @@ describe("GlobalNavigator disclosures", () => {
     });
     useWorkspaceStore.getState().reset();
     seedNavigatorApps();
+    useAppNavigationStore.setState({ entries: [], providerCache: [] });
     resetInboxAccountState();
     useNavigatorAppsStore.setState({
       appIdsByAccount: {},
@@ -155,7 +161,34 @@ describe("GlobalNavigator disclosures", () => {
     expect(useInboxStore.getState().selectedProvider).toBe("");
   });
 
-  it("shows Chat and Automations as destinations under Agents", async () => {
+  it("retains Agents SDK navigation after its view closes on Discover", async () => {
+    const scope = createAppRpcScope({
+      identity: {
+        appId: "agents",
+        accountId: "account-1",
+        spaceId: "space-1",
+        instanceId: "agents-tab",
+      },
+      scopes: ["navigation.write"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      isCurrentAccount: () => true,
+    });
+    createAppNavigationRegistration(scope).setItems([
+      { id: "activity", label: "Current agent activity", route: "/apps/agents" },
+    ]);
+    await renderNavigator("/discover");
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Agents"]');
+    if (trigger?.getAttribute("aria-expanded") !== "true") {
+      await act(async () => trigger?.click());
+    }
+    expect(container.textContent).toContain("Current agent activity");
+    await act(async () => scope.close());
+    expect(container.textContent).toContain("Current agent activity");
+    expect(container.textContent).not.toContain("Automations");
+    useAppNavigationStore.setState({ entries: [], providerCache: [] });
+  });
+
+  it("shows the current Agents Activity destination without a mounted app", async () => {
     useWorkspaceStore.setState({
       layout: {
         focusedPaneId: "pane-1",
@@ -193,21 +226,9 @@ describe("GlobalNavigator disclosures", () => {
         '[role="group"][aria-label="Agents destinations"] a',
       ),
     ];
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["Chat", "Automations"]);
-    expect(items.map((item) => item.getAttribute("href"))).toEqual([
-      "/apps/agents",
-      "/apps/agents?view=automations",
-    ]);
-    expect(
-      items
-        .find((item) => item.textContent?.trim() === "Chat")
-        ?.querySelector(".lucide-bot-message-square"),
-    ).not.toBeNull();
-    expect(
-      items
-        .find((item) => item.textContent?.trim() === "Automations")
-        ?.getAttribute("aria-current"),
-    ).toBe("page");
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["Activity"]);
+    expect(items.map((item) => item.getAttribute("href"))).toEqual(["/apps/agents"]);
+    expect(items[0]?.getAttribute("aria-current")).toBe("page");
   });
 
   it("opens Planner destinations and highlights only the active section", async () => {

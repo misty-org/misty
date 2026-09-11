@@ -12,11 +12,15 @@ colors:
   primary-cream: "#e0e0e0"
   bright-cream: "#f1f1f1"
   muted-ash: "#8c8c8c"
-  notification-red: "#c94747"
-  collaborative-sage: "#a3bfab"
-  sage-wash: "#28312b"
-  mention-indigo: "#5865f2"
-  mention-cream: "#f5f2ed"
+  avatar-red: "#eab7ab"
+  avatar-orange: "#f0c38e"
+  avatar-yellow: "#f0d58c"
+  avatar-green: "#c5cf8e"
+  avatar-aqua: "#a8d1b3"
+  avatar-blue: "#a0c4d4"
+  avatar-purple: "#d3b3c9"
+  avatar-gray: "#d5c9b8"
+  avatar-ink: "#3c3836"
 typography:
   display:
     fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
@@ -136,7 +140,7 @@ components:
 
 Misty should feel like a serious desktop environment that disappears behind the work. The supplied Inbox, Planner, and Files references establish an almost-monochrome charcoal field whose structure comes from alignment, narrow tonal steps, and fine dividers rather than decorative containers. The interface is compact and calm: a person can scan a great deal of information without feeling that every object is competing for attention.
 
-The workspace may contain many different tools, but all of them should feel built into the same operating environment. Shell chrome, sidebars, toolbars, tables, boards, empty states, and overlays share one density and one interaction language. Color appears only when it carries meaning—identity, status, unread activity, collaboration, or a file type—not as ambient decoration.
+The workspace may contain many different tools, but all of them should feel built into the same operating environment. Shell chrome, sidebars, toolbars, tables, boards, empty states, and overlays share one density and one interaction language. Black, white, and gray are the default for every surface, control, selection, focus indicator, badge, and status. Optional color accents use only the soft pastel family already used by Space and person avatars; color is never required to make a control look active or important.
 
 **Key Characteristics:**
 
@@ -144,28 +148,20 @@ The workspace may contain many different tools, but all of them should feel buil
 - Dense desktop-tool rhythm with generous empty canvas where the task benefits from it.
 - Hairline structure, compact controls, restrained rounding, and almost no ornament.
 - Clear hierarchy through weight, alignment, and brightness before size.
-- Sparse, semantic color reserved for information and state.
+- Monochrome chrome and interaction states; rare pastel accents for meaningful identity or information.
 
 ## Colors
 
-The palette is a compressed charcoal ladder with warm off-white text, softened ash metadata, and a small set of functional accents.
+The primary palette is black, white, and gray: a compressed charcoal ladder, off-white text, and ash metadata. There is no signature brand accent color. Existing token names such as Cream refer to the neutral gray values listed below.
 
 ### Brand identity
 
 - **Misty Logo**: Always monochrome. Use warm white on dark surfaces and near-black on light surfaces, inheriting the surrounding foreground color so the mark stays consistent across themes. Keep the original silhouette unchanged.
 - **Integration logos**: Use the original brand SVG colors and gradients in navigation, tabs, Discover, connection screens, and app views. Reuse `misty-apps/apps/shared/brandIcons.ts` everywhere. Preserve brand colors on inactive rows; show selection through the surrounding neutral background. Inherently monochrome brands use their light or dark foreground variant. Misty tool icons remain monochrome.
 
-### Primary
+### Primary: monochrome
 
-- **Collaborative Sage** (#a3bfab): Use for successful states, connected presence, agent or collaboration cues, and narrow moments of emphasis. Its rarity is part of the system.
-- **Sage Wash** (#28312b): Use behind sage content when a quiet status region needs separation without becoming a colored card.
-
-### Secondary
-
-- **Mention Indigo** (#5865f2): Reserved for explicit mentions and similarly direct person-or-agent targeting actions. Do not reuse it as a general brand accent.
-- **Notification Red** (#c94747): Reserved for unread markers, destructive urgency, and small attention signals.
-
-### Neutral
+Use neutral tones for navigation, tabs, buttons, links, focus rings, source icons, unread indicators, notification counts, and status labels. Selected controls gain brightness, weight, a neutral underline, or one tonal fill. Success, collaboration, and agent-related UI do not automatically earn green.
 
 - **Workspace Black** (#0f0f0f): The deepest shell and rail layer.
 - **Canvas Charcoal** (#131313): The primary tool canvas and application background.
@@ -178,11 +174,21 @@ The palette is a compressed charcoal ladder with warm off-white text, softened a
 - **Bright Cream** (#f1f1f1): High-emphasis titles, active labels, and current values.
 - **Muted Ash** (#8c8c8c): Secondary labels, metadata, placeholders, and inactive navigation.
 
+### Optional accents: the avatar pastel family
+
+Reuse the existing avatar tokens from `src/styles/styles.css` and `src/shared/lib/avatarPalette.ts`: soft red (#eab7ab), orange (#f0c38e), yellow (#f0d58c), green (#c5cf8e), aqua (#a8d1b3), blue (#a0c4d4), purple (#d3b3c9), and warm gray (#d5c9b8). Pastel avatar fills use dark ink (#3c3836).
+
+These are a restrained family, not a new primary color. Prefer them for Space/person identity and occasional semantic distinctions where color adds useful information. Keep the surrounding UI neutral. Do not substitute saturated indigo, red, or a pervasive sage accent. A mention, unread item, or pending request may remain entirely monochrome; use text, icons, weight, and shape to convey its state. Any colored state must also have a non-color cue and sufficient contrast.
+
+Original third-party logos and user content retain their own colors as content, not as a palette for Misty's controls.
+
 ### Named Rules
 
 **The Tonal Ladder Rule.** Establish hierarchy by moving one step through the charcoal scale; do not introduce a new gray for each component.
 
-**The Earned Color Rule.** An accent must communicate identity, state, or action. Decorative gradients, ambient color washes, and arbitrary colored cards do not belong in the product UI.
+**The Monochrome-First Rule.** Always start with black, white, and gray. Selection, focus, action importance, and notifications use neutral contrast by default; no generic green or other colored accent.
+
+**The Earned Pastel Rule.** Optional accents must come from the avatar pastel family and communicate specific identity or information. Decorative gradients, ambient color washes, and arbitrary colored cards do not belong in the product UI.
 
 ## Typography
 
@@ -264,7 +270,7 @@ Borders are one pixel and low contrast. Selected navigation is expressed through
 
 ### Chips
 
-- **Style:** Compact pills with short labels. Neutral chips use the charcoal ladder; priority or status chips may use one soft semantic fill with dark or high-contrast text.
+- **Style:** Compact pills with short labels. Neutral chips use the charcoal ladder; priority or status chips remain neutral by default; a useful semantic distinction may use one avatar-pastel fill with dark ink and an explicit label.
 - **State:** Selected filters use a single filled tonal step. Do not assemble long toolbars from many colored status pills.
 
 ### Cards / Containers
@@ -279,7 +285,7 @@ Borders are one pixel and low contrast. Selected navigation is expressed through
 
 - **Style:** Raised charcoal field, one structural border, 6px corners, compact 36px control height, and ash placeholder text.
 - **Focus:** Strengthen the border and add a restrained focus ring; do not change layout or add luminous effects.
-- **Error / Disabled:** Errors use concise copy and a controlled red state. Disabled controls retain their full shape and readable label, step down to canvas charcoal and muted ash, and remove interactive depth. Dependency-disabled rows may also move one tonal step darker so the unavailable relationship is visible at a glance.
+- **Error / Disabled:** Errors use concise copy, an explicit error icon or label, and a clear recovery action. Default to neutral contrast; optional error color uses the soft avatar-red token, never a saturated red accent. Disabled controls retain their full shape and readable label, step down to canvas charcoal and muted ash, and remove interactive depth. Dependency-disabled rows may also move one tonal step darker so the unavailable relationship is visible at a glance.
 
 **The Disabled-Is-a-State Rule.** A disabled control must differ from both its enabled and ordinary off states through surface, border, and marker treatment; opacity alone is never sufficient.
 
@@ -287,17 +293,23 @@ Borders are one pixel and low contrast. Selected navigation is expressed through
 
 Persistent navigation is quiet by default: ash labels and icons on workspace black or sidebar charcoal. Hover moves toward cream and may add one raised-charcoal tonal step. The current location uses bright cream plus a small edge marker or a single selected row fill. Section headings are compact and stronger than their children, not oversized.
 
+### Activity
+
+Activity uses one feed with a Discover-style horizontal section container: All, Unread, Mentions, System. Each section shows its matching entry count after search and filters, independently of selection. Counts remain neutral, including zero, and differ from the bell’s attention badge. Place background-free filter, sort, and search controls on the right; on mobile, place them below the horizontally scrollable sections. Search expands to a full-width input. Use a prominent 20px title and 22px bell. Use compact containers and spacing for hierarchy, without divider rules between the header, toolbar, feed, footer, or card contents. Keep the title row 48px high, section buttons and icon controls 28px high, using Discover’s actual toolbar classes and spacing (including its coarse-pointer sizing), and the popup capped at 560px or 75dvh. The footer contains Mark all read and Clear all, changing to Mark filtered read and Clear filtered when narrowed. Actions affect all matching entries, preserving unresolved requests. Read entries stay in All. Keep source names and compact source-header cards without repeated Activity icons. All generic icons, labels, focus indicators and badges are monochrome; existing avatar identity colors may remain pastel. The popup preserves the workspace, with Close in the title row and an independently scrollable feed.
+
 ### Tables and Lists
 
 Rows share one continuous surface, separated by hairlines. Unread, selected, or focused state may change weight and move one tonal step. Preserve stable columns, predictable truncation, and right-aligned metadata so dense information remains easy to compare.
 
 ### Discover apps and details
 
-Discover shares the active workspace theme variables, native system typography, and hairline structure. App names use compact semibold type (15px); descriptions and actions step down to 13px, with metadata at 12px. Featured, Apps, and Installed are the only section destinations. Rows use the existing official app icons and sage verification mark, with theme-card emphasis on hover or focus. The bright filled Add action retains canvas-colored text through hover; Open uses a quiet bordered action.
+Discover shares the active workspace theme variables, native system typography, and hairline structure. App names use compact semibold type (15px); descriptions and actions step down to 13px, with metadata at 12px. Featured, Apps, and Installed are the only section destinations. Rows use the existing official app icons and monochrome verification mark, with theme-card emphasis on hover or focus. The bright filled Add action retains canvas-colored text through hover; Open uses a quiet bordered action.
 
 Selecting an app or Add opens a focused details dialog with About, Permissions, and Where it appears. The body scrolls independently while the heading and action footer remain visible; closing restores focus to the originating control. Catalog facts and action states come from the existing official app catalog and installations, including update, unavailable, and removal states. Preserve that review-before-install flow and the existing install/remove semantics. Approved mockups are visual references only; generated mockup imagery is not a shipped asset.
 
 ### Workspace Chrome
+
+Virtual windows own layout tabs; each layout tab owns headerless panes with one app view per pane. Keep the original 38px top bar and compact tab buttons. Multi-pane tabs show a pane-count dropdown with focus and close controls for each pane; single-pane tabs show only a close button. Tab names follow the focused pane unless renamed. Split controls create blank panes with a Choose app button. New tabs and final-tab fallbacks open the blank Choose app page. Closing with the tab shortcut removes the focused pane before closing the final single-pane tab. Pane focus defaults to 15% inactive dimming with no active border; dimming and optional outlines/borders are independent Appearance settings.
 
 Tabs, split panes, title bands, rail controls, and bottom status bars should read as one operating system. Keep their heights, border strength, hover behavior, and icon scale consistent across tools. Product content must never compete visually with window or workspace chrome.
 
@@ -310,7 +322,7 @@ Tabs, split panes, title bands, rail controls, and bottom status bars should rea
 - **Do** establish hierarchy through alignment, weight, brightness, and one-pixel structure.
 - **Do** keep controls compact, scannable, keyboard operable, and understandable without hover.
 - **Do** make disabled controls visibly inert while keeping their labels readable and their original shape intact.
-- **Do** use accent color only for identity, semantic status, file type, collaboration, or direct targeting.
+- **Do** keep UI chrome, interaction states, and notifications monochrome by default. Use only the avatar pastel family for optional, meaningful accents.
 - **Do** let large working canvases remain open when empty space serves the task.
 
 ### Don't:
@@ -320,5 +332,5 @@ Tabs, split panes, title bands, rail controls, and bottom status bars should rea
 - **Don't** use oversized headings, oversized empty-state illustrations, or generous landing-page spacing in dense tools.
 - **Don't** turn every control into a pill or apply large radii to small elements.
 - **Don't** use pure black and white when the established charcoal and cream tokens provide the intended lower-glare contrast.
-- **Don't** add color merely to make a monochrome page feel more exciting.
+- **Don't** add color merely to make a monochrome page feel more exciting, or treat sage, green, indigo, or red as a default accent.
 - **Don't** rewrite factual product copy or invent integrations, proof, testimonials, or capabilities while polishing the UI.

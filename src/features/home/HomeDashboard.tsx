@@ -1,3 +1,4 @@
+import { useAppsStore } from "@/features/apps";
 import { spacesApi } from "@/api/spaces/api";
 import { homeApi } from "@/api/home/api";
 import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
@@ -57,6 +58,17 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   const mobile = presentation !== "desktop";
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
+  const installations = useAppsStore((state) => state.bySpace);
+  const installedApps = useMemo(
+    () =>
+      new Set(
+        (installations[spaceId] ?? [])
+          .filter((app) => app.state === "installed")
+          .map((app) => app.app_id),
+      ),
+    [installations, spaceId],
+  );
+  const plannerInstalled = installedApps.has("planner");
   const recentTools = useRecentToolsStore((state) => state.recentTools);
   const hydrateRecentTools = useRecentToolsStore((state) => state.hydrateRecentTools);
   const [agenda, setAgenda] = useState<SpaceAgendaEntry[]>([]);
@@ -75,7 +87,7 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
   const agendaPath = `/spaces/${encodeURIComponent(spaceId)}/planner/agenda/day`;
 
   const loadAgenda = useCallback(async () => {
-    if (!space || space.permissions?.["tasks.view"] === false) {
+    if (!space || !plannerInstalled || space.permissions?.["tasks.view"] === false) {
       setAgenda([]);
       setAgendaState("ready");
       return;
@@ -98,7 +110,7 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
       setAgenda([]);
       setAgendaState("error");
     }
-  }, [space, spaceId]);
+  }, [space, spaceId, plannerInstalled]);
 
   useEffect(() => {
     void loadAgenda();
@@ -155,11 +167,12 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
       .filter((toolId) => {
         if (seen.has(toolId) || toolId === "home" || toolId === "marketplace") return false;
         seen.add(toolId);
+        if (!installedApps.has(toolId === "social" ? "chat" : toolId)) return false;
         if (!space) return !isSpaceTool(toolId);
         return !isSpaceTool(toolId) || spaceToolIsAvailable(space, toolId);
       })
       .slice(0, 4);
-  }, [recentTools, space]);
+  }, [recentTools, space, installedApps]);
 
   const visibleSpaces = useMemo(
     () =>
@@ -195,6 +208,28 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
         </header>
 
         <div className="space-y-6">
+          {installations[spaceId] && installedApps.size === 0 && (
+            <div className="rounded-xl border border-charcoal-border p-4">
+              <p className="text-sm font-medium">
+                {space.role === "owner" || space.permissions?.["apps.manage"]
+                  ? "Choose apps for this Space"
+                  : "This environment needs setup"}
+              </p>
+              <p className="mt-1 text-sm text-cream-muted">
+                {space.role === "owner" || space.permissions?.["apps.manage"]
+                  ? "Choose the tools everyone will use here."
+                  : "A Space manager needs to choose its apps."}
+              </p>
+              {(space.role === "owner" || space.permissions?.["apps.manage"]) && (
+                <DashboardLink
+                  className="mt-3 inline-block text-sm underline"
+                  to={`/spaces/${encodeURIComponent(spaceId)}/settings/apps`}
+                >
+                  Manage apps
+                </DashboardLink>
+              )}
+            </div>
+          )}
           <section aria-labelledby="jump-back-in-title">
             <SectionHeading id="jump-back-in-title" title="Jump back in" />
             <div
@@ -246,7 +281,11 @@ export function HomeDashboard({ spaceId }: { spaceId: string }) {
                 }
               />
               <div className="min-h-0 flex-1 rounded-2xl border border-charcoal-border bg-charcoal-card/55 p-2">
-                <AgendaRows state={agendaState} entries={agenda} onRetry={loadAgenda} />
+                <AgendaRows
+                  state={plannerInstalled ? agendaState : "ready"}
+                  entries={plannerInstalled ? agenda : []}
+                  onRetry={loadAgenda}
+                />
               </div>
             </section>
 
