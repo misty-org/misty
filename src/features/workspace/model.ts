@@ -288,6 +288,8 @@ export interface DockWidgetDescriptor<TState = unknown> {
 }
 
 export interface WorkspaceTab {
+  /** A newly split pane can be filled by the next app launch. */
+  placeholder?: boolean;
   /** Stable identity of this pane’s app group, independent of its label. */
   groupInstanceId?: string;
   id: string;
@@ -307,6 +309,7 @@ export interface WorkspacePane {
   id: string;
   tabs: WorkspaceTab[];
   activeTabId: string | null;
+  history?: { entries: WorkspaceTab[]; index: number };
 }
 
 export interface WorkspaceSplit {
@@ -321,6 +324,19 @@ export interface WorkspaceSplit {
 export type WorkspaceDockNode = WorkspacePane | WorkspaceSplit;
 
 export interface WorkspaceLayout {
+  /** Active tab projection, retained for pane/runtime consumers. */
+  root: WorkspaceDockNode;
+  focusedPaneId: string;
+  tabs?: WorkspaceLayoutTab[];
+  activeLayoutTabId?: string;
+}
+
+/** A window tab owns a split tree; each leaf contains one app view. */
+export interface WorkspaceLayoutTab {
+  id: string;
+  /** Legacy native aliases are resolved after account preferences load. */
+  legacyNameKeys?: string[];
+  title?: string;
   root: WorkspaceDockNode;
   focusedPaneId: string;
 }

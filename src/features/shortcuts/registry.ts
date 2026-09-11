@@ -4,8 +4,8 @@ import { filesShortcutCommands } from "./filesCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
-  command("search.toggle", "Open Misty", {
-    description: "Open or close the floating Search and Ask window.",
+  command("search.toggle", "Search", {
+    description: "Find apps, files, and commands.",
     category: "Navigation",
     aliases: ["launcher", "search", "ask", "ai"],
     mac: "Cmd+K",
@@ -14,7 +14,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
     nativeMenu: true,
     allowShadowing: true,
   }),
-  command("misty.contextual_companion", "Open Misty desktop panel", {
+  command("misty.contextual_companion", "Open Misty", {
     description: "Open the floating Misty panel from the desktop pet.",
     category: "Misty",
     aliases: ["desktop pet", "floating ai", "ask misty"],

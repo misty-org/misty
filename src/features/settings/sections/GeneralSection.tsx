@@ -60,7 +60,7 @@ export function GeneralSection(props: SettingsContentProps) {
         {!isNativeMobileBuild ? (
           <SettingsRow
             label="Default tab"
-            description="The tab opened in every new panel and virtual window."
+            description="The starting page in a new virtual window. New tabs and splits start with the app grid."
             last
           >
             <SelectControl

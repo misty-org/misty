@@ -11,17 +11,26 @@ describe("WorkspaceWindowMenu", () => {
     const second = createWorkspaceVirtualWindow(undefined, "Research");
     const onCreate = vi.fn();
     const onClose = vi.fn();
-    render(
-      <WorkspaceWindowMenu
-        windows={[first, second]}
-        activeWindowId={first.id}
-        canReopen
-        onSelect={vi.fn()}
-        onCreate={onCreate}
-        onClose={onClose}
-        onReopen={vi.fn()}
-      />,
+    const { container } = render(
+      <>
+        <div id="misty-virtual-window-controls" />
+        <WorkspaceWindowMenu
+          titlebar
+          windows={[first, second]}
+          activeWindowId={first.id}
+          canReopen
+          onSelect={vi.fn()}
+          onCreate={onCreate}
+          onClose={onClose}
+          onReopen={vi.fn()}
+        />
+      </>,
     );
+
+    const trigger = screen.getByRole("button", { name: "Manage virtual windows" });
+    expect(trigger.parentElement?.id).toBe("misty-virtual-window-controls");
+    expect(container.querySelectorAll('[aria-label="Manage virtual windows"]')).toHaveLength(1);
+    expect(trigger.querySelector(".lucide-chevron-down")).not.toBeNull();
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
       button: 0,

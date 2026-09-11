@@ -1,5 +1,6 @@
 import {
   createDockLeaf,
+  insertDockSplit,
   type WorkspaceTab,
   type WorkspaceVirtualWindow,
 } from "@/features/workspace";
@@ -61,6 +62,32 @@ describe("WorkspaceDockTree tab lifecycle", () => {
 
     const journalElement = view.container.querySelector(`[data-workspace-surface="${journal.id}"]`);
     const plannerElement = view.container.querySelector(`[data-workspace-surface="${planner.id}"]`);
+    const otherPane = createDockLeaf([]);
+    const split = insertDockSplit(pane, pane.id, otherPane, "right");
+    view.rerender(<WorkspaceDockTree {...props} node={split} />);
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(
+      journalElement,
+    );
+    if (split.type !== "split") throw new Error("Expected split");
+    view.rerender(
+      <WorkspaceDockTree
+        {...props}
+        node={{ ...split, first: split.second, second: split.first }}
+      />,
+    );
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(
+      journalElement,
+    );
+    const stacked = insertDockSplit(otherPane, otherPane.id, pane, "down");
+    view.rerender(<WorkspaceDockTree {...props} node={stacked} />);
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(
+      journalElement,
+    );
+    view.rerender(<WorkspaceDockTree {...props} node={pane} />);
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(
+      journalElement,
+    );
+
     const nextPane = { ...pane, tabs: [planner, journal], activeTabId: planner.id };
     act(() => {
       view.rerender(
@@ -75,8 +102,12 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     });
 
     expect(view.container.querySelectorAll("[data-workspace-surface]")).toHaveLength(2);
-    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(journalElement);
-    expect(view.container.querySelector(`[data-workspace-surface="${planner.id}"]`)).toBe(plannerElement);
+    expect(view.container.querySelector(`[data-workspace-surface="${journal.id}"]`)).toBe(
+      journalElement,
+    );
+    expect(view.container.querySelector(`[data-workspace-surface="${planner.id}"]`)).toBe(
+      plannerElement,
+    );
     expect(
       view.container
         .querySelector(`[data-workspace-surface="${journal.id}"]`)

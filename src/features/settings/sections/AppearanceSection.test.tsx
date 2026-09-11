@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsControlsModule from "../settingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
@@ -11,6 +11,7 @@ const zoomMocks = vi.hoisted(() => ({
 
 vi.mock("@/shared/hooks/useAppZoom", () => ({
   appZoomDefault: 1,
+  appZoomRenderScale: (zoom: number) => Math.round(zoom * 110) / 100,
   appZoomMin: 0.8,
   appZoomMax: 2,
   appZoomStep: 0.1,
@@ -73,18 +74,18 @@ describe("AppearanceSection app zoom", () => {
     onSettingChange.mockClear();
   });
 
-  it("starts at 100% and updates the app while the slider moves", async () => {
+  it("previews the percentage without moving the slider, then applies on commit", async () => {
     render(<AppearanceSection {...props} />);
     expect(screen.getByText("100%")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Preview zoom" }));
     expect(screen.getByText("110%")).toBeTruthy();
-    await waitFor(() => expect(zoomMocks.setAppZoom).toHaveBeenCalledWith(1.1));
+    expect(zoomMocks.setAppZoom).not.toHaveBeenCalled();
     expect(onSettingChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Commit zoom" }));
     expect(zoomMocks.setAppZoom).toHaveBeenCalledWith(1.1);
-    expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.1);
+    expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.21);
   });
 
   it("resets a non-default zoom to 100%", () => {
@@ -93,6 +94,6 @@ describe("AppearanceSection app zoom", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(zoomMocks.setAppZoom).toHaveBeenCalledWith(1);
-    expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1);
+    expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.1);
   });
 });
