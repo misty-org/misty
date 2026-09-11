@@ -1,3 +1,4 @@
+import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
 import {
   revealSearchResultInPane,
   searchResultNavigationTarget,
@@ -69,7 +70,7 @@ export function useGlobalMistyResults(input: {
 
     input.closePanel();
     const target = searchResultNavigationTarget(fileResult);
-    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}`;
+    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}${fileResult.entry.kind === "file" ? `&select=${encodeURIComponent(fileResult.entry.name)}` : ""}`;
     const surface = workspaceSurfaceFromRoute(filesRoute);
     if (surface) {
       const tab = useWorkspaceStore.getState().openSurface({
@@ -80,6 +81,8 @@ export function useGlobalMistyResults(input: {
       useWorkspaceStore.getState().focusTab(tab.id);
     }
     navigate(filesRoute);
+    // The downloaded Files view restores its own granted folder and selection.
+    if (supportsPackagedDocuments() && !fileResult.match?.mediaSegmentId) return;
 
     const reveal = async (): Promise<boolean> => {
       const paneId =

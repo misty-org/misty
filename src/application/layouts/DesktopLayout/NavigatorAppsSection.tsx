@@ -1,6 +1,6 @@
+import { WorkspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { routes } from "@/features/app-shell";
 import {
-  OfficialAppIcon,
   navigatorAppIdForOfficialApp,
   useAppsStore,
   usePinnedNavigatorAppIds,
@@ -13,7 +13,7 @@ import {
   cn,
   navigationMenuActionClass,
 } from "@/shared/ui";
-import { Check, Plus, Search } from "lucide-react";
+import { Check, Compass, Plus, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { navigatorFocusRingClass } from "./styles";
@@ -21,6 +21,9 @@ import { navigatorFocusRingClass } from "./styles";
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const ready = useAppsStore((state) => state.ready);
+  const loading = useAppsStore((state) => state.loading);
+  const error = useAppsStore((state) => state.error);
   const catalog = useAppsStore((state) => state.catalog);
   const installations = useAppsStore((state) => state.installations);
   const actionAppId = useAppsStore((state) => state.actionAppId);
@@ -75,9 +78,9 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
             align="start"
             className="w-[300px] overflow-hidden p-0"
             side="right"
-            sideOffset={8}
+            sideOffset={12}
           >
-            <div className="border-b border-charcoal-border p-2.5">
+            <div className="border-b border-charcoal-border p-2">
               <div className="relative">
                 <Search
                   className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-cream-muted"
@@ -95,7 +98,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
               </div>
             </div>
 
-            <div className="misty-transient-scrollbar max-h-[360px] overflow-y-auto p-1.5">
+            <div className="misty-transient-scrollbar max-h-[360px] overflow-y-auto p-1">
               {visibleApps.length ? (
                 visibleApps.map(({ app, installation, navigatorId }) => {
                   const selected = selectedAppIds.includes(navigatorId);
@@ -104,21 +107,22 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                       key={app.id}
                       type="button"
                       className={cn(
-                        "grid min-h-12 w-full grid-cols-[36px_minmax(0,1fr)_18px] items-center gap-3",
-                        "rounded-md px-2.5 py-1.5 text-left outline-none transition-colors",
+                        "flex min-h-9 w-full items-center gap-2 text-sm text-cream",
+                        "rounded-md px-2 py-1 text-left outline-none transition-colors disabled:opacity-50",
                         "hover:bg-charcoal-hover focus-visible:bg-charcoal-hover",
                       )}
                       aria-pressed={selected}
                       disabled={Boolean(actionAppId)}
                       onClick={() => void setPinnedApp(app.id, !installation.pinned)}
                     >
-                      <OfficialAppIcon appId={app.id} size={36} />
-                      <span className="min-w-0">
+                      <WorkspaceAppIcon
+                        appId={navigatorId}
+                        size="picker"
+                        className="[&_svg]:!size-[18px]"
+                      />
+                      <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-cream">
                           {app.name === "Chat" ? "Social" : app.name}
-                        </span>
-                        <span className="block truncate text-[11px] text-cream-muted">
-                          {app.description}
                         </span>
                       </span>
                       {selected ? (
@@ -142,7 +146,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                 to={routes.discover}
                 data-tour-target="nav-browse-apps"
                 className={cn(
-                  "flex h-9 items-center rounded-md px-2.5 text-sm text-cream-muted no-underline",
+                  "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm text-cream-muted no-underline",
                   "outline-none transition-colors hover:bg-charcoal-hover hover:text-cream-bright",
                   navigatorFocusRingClass,
                 )}
@@ -150,7 +154,8 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                   setPickerOpen(false);
                 }}
               >
-                Browse apps
+                <Compass size={14} aria-hidden="true" />
+                <span>Browse more apps</span>
               </Link>
             </div>
           </PopoverContent>
@@ -160,6 +165,15 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
       <div className="grid gap-1">
         {selectedAppIds.length ? (
           props.children
+        ) : !ready ? (
+          <button
+            type="button"
+            disabled={loading}
+            className="mx-2.5 rounded-md px-2.5 py-2 text-left text-xs text-cream-muted hover:text-cream"
+            onClick={() => void useAppsStore.getState().load(props.accountId, true)}
+          >
+            {loading ? "Loading apps…" : error ? "Apps unavailable. Try again" : "Loading apps…"}
+          </button>
         ) : (
           <button
             type="button"

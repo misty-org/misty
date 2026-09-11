@@ -203,13 +203,16 @@ export function ProfilePopover(props: {
     setAccountChooserOpen(true);
   };
 
+  const [switchError, setSwitchError] = useState("");
   const chooseAccount = async (accountId: string) => {
     if (accountId === account?.id || switchingAccountId || transitioning) return;
+    setSwitchError("");
     setSwitchingAccountId(accountId);
     try {
       await switchAccount(accountId);
       props.onClose();
     } catch (error) {
+      setSwitchError("The account could not be switched. Try selecting it again.");
       reportSystemError({
         accountId: account?.id,
         scope: "account:switch",
@@ -363,6 +366,7 @@ export function ProfilePopover(props: {
               <X size={16} />
             </Button>
           </div>
+          {switchError ? <p role="alert" className="px-2 text-sm text-cream-muted">{switchError}</p> : null}
           <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
             {accounts.map((saved) => {
               const active = saved.id === account?.id;

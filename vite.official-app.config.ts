@@ -11,6 +11,7 @@ import { componentFrameworkGlobals, officialAppComponentFactory } from "./script
 import { officialAppSDKBoundary } from "./scripts/official-app-sdk-boundary.mjs";
 import { excalidrawPackageFonts } from "./scripts/excalidraw-package-fonts.mjs";
 import { excalidrawSdkInterop } from "./scripts/excalidraw-sdk-interop.mjs";
+import { materialIconProjection, packageMaterialIcons } from "./scripts/material-icon-assets.mjs";
 
 const env = loadAppEnv(process.cwd());
 const appId = env.MISTY_OFFICIAL_APP_ID?.trim().toLowerCase() ?? "";
@@ -36,6 +37,29 @@ const source = resolve(process.cwd(), "src");
 const appsRoot = resolve(env.MISTY_APPS_ROOT || resolve(process.cwd(), "../misty-apps"));
 const mobile = platform === "mobile";
 const spaceApp = new Set(["chat", "journal", "planner", "library"]).has(appId);
+
+// PDF workers must remain real package assets. Inlining a worker as a data URL
+// makes pdf.js import it through a blob, which the desktop CSP correctly blocks.
+function packagePdfWorker(): Plugin {
+  return {
+    name: "misty-package-pdf-worker",
+    enforce: "pre",
+    resolveId(id) {
+      if (id === "pdfjs-dist/build/pdf.worker.min.mjs?url") return "\0misty-pdf-worker-url";
+    },
+    async load(id) {
+      if (id !== "\0misty-pdf-worker-url") return;
+      const reference = this.emitFile({
+        type: "asset", name: "pdf.worker.min.mjs",
+        source: await readFile(resolve(process.cwd(), "node_modules/pdfjs-dist/build/pdf.worker.min.mjs")),
+      });
+      return `export default import.meta.ROLLUP_FILE_URL_${reference};`;
+    },
+    resolveFileUrl({ relativePath }) {
+      return `new URL(${JSON.stringify(relativePath)}, import.meta.url).href`;
+    },
+  };
+}
 
 function packageSizeReport(): Plugin {
   return {
@@ -125,6 +149,8 @@ export default defineConfig({
   envDir: false,
   define: {
     ...publicAppEnv(env),
+    "import.meta.env.MISTY_PACKAGED_ICONS": JSON.stringify(!mobile),
+    "import.meta.env.MISTY_PACKAGE_BASE_URL": "MistyComponentAssetBase",
     "import.meta.env.MISTY_OFFICIAL_APP_ID": JSON.stringify(appId),
     // Official apps execute as browser scripts inside the Misty WebView. Some
     // CommonJS dependencies (notably React) branch on this exact expression;
@@ -132,7 +158,7 @@ export default defineConfig({
     // before it can register its Misty entry point.
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
-  plugins: [appSourceDependencies(process.cwd(), appsRoot), officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
+  plugins: [...(!mobile ? [packagePdfWorker()] : []), materialIconProjection(), ...(!mobile ? [packageMaterialIcons()] : []), appSourceDependencies(process.cwd(), appsRoot), officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
   resolve: {
     alias: [
       ...Object.entries(appSourceAliases(process.cwd(), appsRoot)).map(([find, replacement]) => ({ find, replacement })),

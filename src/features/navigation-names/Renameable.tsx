@@ -20,13 +20,21 @@ export function Renameable({
   nameKey,
   automatic,
   children,
+  customName,
+  onRename,
+  resetLabel = "Reset",
 }: {
+  customName?: string;
+  onRename?: (name: string | null) => void;
+  resetLabel?: string;
   nameKey: string;
   automatic: string;
   children: ReactElement;
 }) {
-  const name = useNavigationName(nameKey, automatic);
-  const custom = useNavigationNames((s) => s.names[nameKey] !== undefined);
+  const storedName = useNavigationName(nameKey, automatic);
+  const storedCustom = useNavigationNames((s) => s.names[nameKey] !== undefined);
+  const name = onRename ? customName || automatic : storedName;
+  const custom = onRename ? Boolean(customName) : storedCustom;
   const [editing, setEditing] = useState(false),
     [menu, setMenu] = useState(false),
     [error, setError] = useState("");
@@ -62,7 +70,8 @@ export function Renameable({
     }
     done.current = true;
     try {
-      await setNavigationName(nameKey, value);
+      if (onRename) onRename(value);
+      else await setNavigationName(nameKey, value);
       close();
     } catch (e) {
       done.current = false;
@@ -107,10 +116,13 @@ export function Renameable({
           </ContextMenuItem>
           <ContextMenuItem
             disabled={!custom}
-            onSelect={() => void setNavigationName(nameKey, null).catch((e) => setError(String(e)))}
+            onSelect={() => {
+              if (onRename) onRename(null);
+              else void setNavigationName(nameKey, null).catch((e) => setError(String(e)));
+            }}
           >
             <RotateCcw aria-hidden="true" />
-            Reset
+            {resetLabel}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

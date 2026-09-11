@@ -12,9 +12,6 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::document_intelligence::{
-        prepare_document, PrepareAgentDocumentRequest, PreparedAgentDocument,
-    },
     infra::environment::AppEnvironmentService,
 };
 
@@ -75,18 +72,15 @@ impl AgentService {
         open_path(&target, page)
     }
 
-    pub async fn prepare_scoped_document(
+    pub async fn scoped_document_path(
         &self,
         request: PrepareScopedAgentDocumentRequest,
-    ) -> ApiResult<PreparedAgentDocument> {
+    ) -> ApiResult<PathBuf> {
         let target = run_db(self.database_path.clone(), move |connection| {
             scoped_file_path_sync(connection, &request.scope_id, &request.relative_path)
         })
         .await?;
-        prepare_document(PrepareAgentDocumentRequest {
-            path: target.to_string_lossy().into_owned(),
-        })
-        .await
+        Ok(target)
     }
 }
 
@@ -368,14 +362,14 @@ mod tests {
             .unwrap();
         let scope_id = scope["id"].as_str().unwrap().to_owned();
         assert!(service
-            .prepare_scoped_document(PrepareScopedAgentDocumentRequest {
+            .scoped_document_path(PrepareScopedAgentDocumentRequest {
                 scope_id: scope_id.clone(),
                 relative_path: "inside.txt".to_owned()
             })
             .await
             .is_ok());
         assert!(service
-            .prepare_scoped_document(PrepareScopedAgentDocumentRequest {
+            .scoped_document_path(PrepareScopedAgentDocumentRequest {
                 scope_id,
                 relative_path: "../outside.txt".to_owned()
             })

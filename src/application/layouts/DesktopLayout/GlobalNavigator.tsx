@@ -106,6 +106,7 @@ export function GlobalNavigator(props: {
     reportSystemError({
       accountId,
       scope: "spaces:load",
+      intent: "background",
       title: "Spaces could not be loaded",
       error: spacesError,
       target: { kind: "route", href: routes.spaces },
@@ -273,7 +274,16 @@ export function GlobalNavigator(props: {
         appId: officialAppIdForNavigator(item.id),
         instanceId: activeTab?.id,
       });
-    if (registration)
+    const retainedRegistration =
+      registration ||
+      (!item.disabled && item.id === "agents"
+        ? savedProviderNavigation(providerCache, {
+            accountId,
+            spaceId: scopedSpace?.id,
+            appId: "agents",
+          })
+        : undefined);
+    if (retainedRegistration)
       return (
         <DownloadedAppNavigator
           key={item.id}
@@ -282,7 +292,7 @@ export function GlobalNavigator(props: {
           label={item.label}
           active={active}
           activeRoute={activeRoute}
-          items={registration.items}
+          items={retainedRegistration.items}
         />
       );
 

@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/auth";
 import { officialAppRoute, useAppsStore } from "@/features/apps";
-import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
+import { useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -22,7 +22,9 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const add = useAppsStore((state) => state.install);
   const remove = useAppsStore((state) => state.uninstall);
   const [embeddedAppId, setEmbeddedAppId] = useState("");
-  const activeSpace = preferredDefaultSpace(spaces);
+  const [embeddedReview, setEmbeddedReview] = useState(false);
+  const activeSpaceId = useAppsStore((state) => state.spaceId);
+  const activeSpace = spaces.find((space) => space.id === activeSpaceId);
   const requestedAppId = searchParams.get("app") ?? "";
 
   useEffect(() => {
@@ -31,17 +33,21 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
 
   // A Discover pane keeps its local selection independent of other workspace tabs.
   useEffect(() => {
-    if (embedded && requestedAppId) setEmbeddedAppId(requestedAppId);
-  }, [embedded, requestedAppId, location.key]);
+    if (embedded && requestedAppId) {
+      setEmbeddedAppId(requestedAppId);
+      setEmbeddedReview(searchParams.get("review") === "permissions");
+    }
+  }, [embedded, requestedAppId, location.key, searchParams]);
 
   const selectApp = (id: string) => {
     if (embedded) {
       setEmbeddedAppId(id);
-      return;
+      setEmbeddedReview(false);
     }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
+        next.delete("review");
         if (id) next.set("app", id);
         else next.delete("app");
         return next;
@@ -61,6 +67,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
         actionAppId={actionAppId}
         mobile={isNativeMobileBuild}
         selectedAppId={embedded ? embeddedAppId : requestedAppId}
+        reviewPermissions={embedded ? embeddedReview : searchParams.get("review") === "permissions"}
         requestKey={location.key}
         requestedSection={searchParams.get("section") === "installed" ? "installed" : undefined}
         onSelect={selectApp}

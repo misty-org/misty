@@ -122,7 +122,8 @@ export const aiSurfaceApi = {
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
-  conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
+  activity: (spaceId: string) => apiRequest<{entries: import("@/features/misty/activity").MistyActivityEntry[]}>(`/ai/activity?space_id=${encodeURIComponent(spaceId)}`),
+    conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
   conversation: (conversationId: string) =>
     apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
   updatePreference: (

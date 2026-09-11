@@ -10,9 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAiSurfaceStore } from "./store";
-import { AiProactiveNudge } from "./AiRecap";
 import type { AiCompanionAnchor, AiSurfaceAdapter, AiSuggestedAction } from "./types";
-import { useControlledProactivity } from "./useControlledProactivity";
 import "./aiSurface.css";
 
 export type {
@@ -62,7 +60,6 @@ export function AiPaneHost({
   const updatePaneAdapter = useAiSurfaceStore((state) => state.updatePaneAdapter);
   const summonCompanion = useAiSurfaceStore((state) => state.summon);
   const setContextBoundary = useAiSurfaceStore((state) => state.setContextBoundary);
-  const proactive = useControlledProactivity(accountId, adapter);
 
   const register = useCallback((adapter: AiSurfaceAdapter) => {
     const registration = Symbol("ai-surface-registration");
@@ -110,20 +107,6 @@ export function AiPaneHost({
     <AiPaneContext.Provider value={context}>
       <div ref={hostRef} className="misty-ai-pane-host">
         <div className="misty-ai-pane-content">{children}</div>
-        {active && proactive && adapter ? (
-          <AiProactiveNudge
-            accountId={accountId}
-            paneId={paneId}
-            adapter={adapter}
-            reason={proactive.reason}
-            onDismiss={() => void proactive.dismiss()}
-            onSnooze={() => void proactive.snooze()}
-            onOpen={() => {
-              proactive.reviewed();
-              summon();
-            }}
-          />
-        ) : null}
       </div>
     </AiPaneContext.Provider>
   );

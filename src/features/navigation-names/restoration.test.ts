@@ -1,6 +1,7 @@
+import { dockTabs } from "@/features/workspace/dockTree";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { dockTabs } from "@/features/workspace/dockTree";
 import { normalizeWorkspaceLayout } from "@/features/workspace/virtualWindows";
 import { clearNavigationRestoreHistory } from "./clearHistory";
 import { navigationName, tabNameKey, groupNameKey, useNavigationNames } from "./store";
@@ -28,7 +29,7 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
     route: "/browser",
     instancePolicy: "multiple",
   });
-  const persisted = dockTabs(useWorkspaceStore.getState().layout.root).find(
+  const persisted = allLayoutViews(useWorkspaceStore.getState().layout).find(
     (t) => t.id === tab.id,
   )!;
   useNavigationNames.setState({
@@ -76,7 +77,7 @@ it("only prunes discarded restore aliases and keeps open group and sidebar alias
     route: "/browser",
     instancePolicy: "multiple",
   });
-  const group = dockTabs(useWorkspaceStore.getState().layout.root).find(
+  const group = allLayoutViews(useWorkspaceStore.getState().layout).find(
     (t) => t.id === open.id,
   )!.groupInstanceId!;
   useNavigationNames.setState({

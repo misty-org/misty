@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it } from "vitest";
+const handoff = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/features/misty/handoff", () => ({ openMisty: handoff }));
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { testingConciseSpeech, useAiSurfaceStore } from "./store";
 import { consumeInvocationEvent } from "./storeRuntime";
 import type { AiSurfaceAdapter } from "./types";
@@ -25,7 +27,7 @@ describe("embodied Misty state", () => {
     expect(useAiSurfaceStore.getState().sessions["account-b:pane-a"]).toBeUndefined();
   });
 
-  it("summons into composing and returns home without canceling work", () => {
+  it("hands the source pane to Misty and returns home without canceling work", async () => {
     const element = document.createElement("div");
     document.body.appendChild(element);
     const adapter: AiSurfaceAdapter = {
@@ -42,17 +44,16 @@ describe("embodied Misty state", () => {
       x: 20,
       y: 30,
     });
-    expect(useAiSurfaceStore.getState().companion).toMatchObject({
-      phase: "composing",
-      paneId: "pane-a",
-    });
+    await vi.waitFor(() =>
+      expect(handoff).toHaveBeenCalledWith(expect.objectContaining({ paneId: "pane-a" })),
+    );
     useAiSurfaceStore.getState().returnHome();
     expect(useAiSurfaceStore.getState().companion.phase).toBe("home");
     stop();
     element.remove();
   });
 
-  it("releases Misty into cursor-following mode before opening the composer", () => {
+  it("keeps legacy follow state from creating another composer", async () => {
     const element = document.createElement("div");
     document.body.appendChild(element);
     const adapter: AiSurfaceAdapter = {
@@ -78,7 +79,10 @@ describe("embodied Misty state", () => {
     });
 
     useAiSurfaceStore.getState().summon("account-a", "pane-generated");
-    expect(useAiSurfaceStore.getState().companion.phase).toBe("composing");
+    await vi.waitFor(() =>
+      expect(handoff).toHaveBeenCalledWith(expect.objectContaining({ paneId: "pane-generated" })),
+    );
+    expect(useAiSurfaceStore.getState().companion.phase).toBe("following");
     stop();
     element.remove();
   });

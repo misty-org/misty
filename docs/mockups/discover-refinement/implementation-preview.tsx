@@ -8,6 +8,6 @@ function Preview() {
   const [selected, select] = useState("");
   const installations = catalog.filter(a => !["chat", "journal", "code"].includes(a.id)).map(a => ({app_id:a.id,state:"installed",installed_version:a.version,permission_version:a.id === "planner"?0:a.permission_version,granted_scopes:a.scopes,pinned:false,pin_rank:0,installed_at:"2026-09-05",updated_at:"2026-09-05"}));
   installations.push({app_id:"journal",state:"recoverable",granted_scopes:[],permission_version:0});
-  return <DiscoverBrowser catalog={catalog} installations={installations} loading={false} ready={true} error="" actionAppId="" mobile={false} selectedAppId={selected} onSelect={select} onRefresh={()=>{}} onInstall={()=>select("")} onOpen={()=>{}} onRemove={()=>{}}/>;
+  return <DiscoverBrowser catalog={new URLSearchParams(location.search).has("empty") ? [] : catalog} installations={installations} loading={false} ready={true} error="" actionAppId="" mobile={false} selectedAppId={selected} onSelect={select} onRefresh={()=>{}} onInstall={()=>select("")} onOpen={()=>{}} onRemove={()=>{}}/>;
 }
 createRoot(document.getElementById("root")!).render(<Preview/>);

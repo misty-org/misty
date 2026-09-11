@@ -123,7 +123,8 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-8 min-w-0 font-medium text-cream-muted",
+            "h-8 min-w-0",
+            "font-medium text-cream-muted",
             selected && "text-cream-bright",
             className,
           )}
@@ -165,7 +166,8 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-8 min-w-0 font-medium text-cream-muted",
+            "h-8 min-w-0",
+            "font-medium text-cream-muted",
             selected && "text-cream-bright",
             className,
           )}
@@ -226,7 +228,8 @@ export const NavigationTreeItem = forwardRef<
         aria-current={selected ? "page" : undefined}
         className={cn(
           navigationTreeRowClass,
-          "misty-navigator-row-target ml-[27px] h-8 min-w-0 bg-transparent font-medium text-cream-muted no-underline transition-none hover:text-cream-bright",
+          "misty-navigator-row-target ml-[27px] h-8 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
+          "font-medium text-cream-muted",
           focusClass,
           !nested && "mx-0",
           selected && "text-cream-bright",

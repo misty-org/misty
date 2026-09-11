@@ -101,3 +101,27 @@ it("a send completion cannot refresh a different account after switching account
   expect(backend.persist).not.toHaveBeenCalled();
   disposeInboxStore(store);
 });
+
+
+it("keeps provider authorization failures visible and does not retry on folder changes", async () => {
+  const account = { connection_id: "mail", provider: "google" as const, account_id: "mail", email: "a@example.test", display_name: "Mail", total: 0, unread: 0 };
+  const failure = Object.assign(new Error("Reconnect this email account."), { code: "mail_provider_authorization_failed" });
+  const api = {
+    accounts: vi.fn(async () => ({ accounts: [account] })),
+    folders: vi.fn(async () => ({ folders: [] })),
+    threads: vi.fn().mockRejectedValue(failure),
+  };
+  const store = createInboxStoreWithRuntime(runtime(api));
+  store.getState().setAccount("owner");
+  await store.getState().load();
+  expect(store.getState().accounts[0].status).toBe("needs_attention");
+  await store.getState().selectFolderKind("sent");
+  await store.getState().search("hello");
+  expect(api.threads).toHaveBeenCalledTimes(1);
+  expect(store.getState().accountErrorCodes.mail).toBe("mail_provider_authorization_failed");
+  api.threads.mockResolvedValue({ threads: [] });
+  await store.getState().load(true);
+  expect(api.threads).toHaveBeenCalledTimes(2);
+  expect(store.getState().accountErrors.mail).toBeUndefined();
+  disposeInboxStore(store);
+});

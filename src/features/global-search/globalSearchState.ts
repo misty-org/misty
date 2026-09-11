@@ -12,6 +12,14 @@ import type {
 export type MistySubmissionPresentation = "panel" | "workspace";
 
 export interface GlobalSearchState {
+  artifactPaneId?: string;
+  pendingArtifact?: import("@/features/ai-surface/types").AiArtifact;
+  screenLabel?: string;
+  selectedSpaceId?: string;
+  targets?: import("@/features/misty/context").MistyContextTarget[];
+  handoff?: import("@/features/misty/handoff").MistyHandoff;
+  invocationId?: string;
+  captureEnabled?: boolean;
   browserRequest?: import("./browserAskContext").BrowserAskRequest;
   accountId: string;
   panel: UnifiedMistyPanel;

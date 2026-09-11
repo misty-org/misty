@@ -142,7 +142,9 @@
       "react-icons/fa6": [
         "./node_modules/react-icons/fa6/index.d.ts"
       ],
-      "react-icons/bi": ["./node_modules/react-icons/bi/index.d.ts"],
+      "react-icons/bi": [
+        "./node_modules/react-icons/bi/index.d.ts"
+      ],
       "react-icons/si": [
         "./node_modules/react-icons/si/index.d.ts"
       ],
@@ -391,6 +393,9 @@
       ],
       "@tauri-apps/api/window": [
         "./node_modules/@tauri-apps/api/window.d.ts"
+      ],
+      "@noble/hashes/*": [
+        "./node_modules/@noble/hashes/*"
       ]
     },
     "resolveJsonModule": true,

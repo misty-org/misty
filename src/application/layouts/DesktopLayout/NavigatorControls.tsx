@@ -5,7 +5,7 @@ import type { NavigatorLayout, NavigatorVisibility } from "./navigatorMode";
 import { navigatorFocusRingClass } from "./styles";
 
 const controlButtonClass = [
-  "misty-navigator-icon-target grid size-6 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
+  "misty-navigator-icon-target grid size-7 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted",
   "transition-colors hover:bg-charcoal-card hover:text-cream-bright",
   navigatorFocusRingClass,
 ].join(" ");
@@ -15,6 +15,7 @@ const controlButtonClass = [
  * or slides away (hidden) until the edge is hovered.
  */
 export function NavigatorControls(props: {
+  iconSize?: number;
   layout?: NavigatorLayout;
   visibility?: NavigatorVisibility;
   onToggleVisibility: () => void;
@@ -35,9 +36,9 @@ export function NavigatorControls(props: {
               onClick={props.onToggleVisibility}
             >
               {sticky ? (
-                <PanelLeftClose size={18} aria-hidden="true" />
+                <PanelLeftClose size={props.iconSize ?? 18} aria-hidden="true" />
               ) : (
-                <PanelLeftOpen size={18} aria-hidden="true" />
+                <PanelLeftOpen size={props.iconSize ?? 18} aria-hidden="true" />
               )}
             </button>
           </TooltipTrigger>
