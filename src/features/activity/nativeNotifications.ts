@@ -10,6 +10,9 @@ import type { ActivityItem, NativeNotificationPermission } from "./types";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { useActivityStore } from "./useActivityStore";
 
+import { activityAccountKey } from "./activityState";
+import { activityCategory, isActivityMuted, shouldNotifyActivity } from "./activityPolicy";
+
 const permissionDeniedStorageKey = "misty:activity:notification-permission-denied";
 
 export async function nativeNotificationPermission(): Promise<NativeNotificationPermission> {
@@ -44,7 +47,20 @@ export async function requestNativeNotificationPermission(): Promise<NativeNotif
 }
 
 export async function publishNativeActivity(item: ActivityItem): Promise<boolean> {
-  if (!hasTauriInternals()) return false;
+  if (!hasTauriInternals() || !shouldNotifyActivity(item)) return false;
+  const activity = useActivityStore.getState();
+  if (
+    activity.accountId !== item.accountId ||
+    (item.deploymentScope ?? "hosted") !== activity.deploymentScope
+  )
+    return false;
+  const context = activityAccountKey(activity);
+  const category = activityCategory(item);
+  if (
+    isActivityMuted(item, activity.mutedSourcesByAccount[context]) ||
+    (category && activity.categoriesByAccount[context]?.[category] === false)
+  )
+    return false;
   const preferences = selectNotificationPreferences(useSettingsStore.getState().settings?.document);
   if (
     !preferences.desktopNotificationsEnabled ||
@@ -55,6 +71,7 @@ export async function publishNativeActivity(item: ActivityItem): Promise<boolean
   }
   if (await mistyWindowIsFocused()) return false;
   if ((await nativeNotificationPermission()) !== "granted") return false;
+  if (activityAccountKey(useActivityStore.getState()) !== context) return false;
   try {
     const mobileCount = Math.max(1, useActivityStore.getState().attentionCount);
     sendNotification({

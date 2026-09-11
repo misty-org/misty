@@ -1,9 +1,9 @@
+import { useOperationActivity } from "./useOperationActivity";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { activityItemsFromSpaces, activityTargetMatchesLocation } from "./activityModel";
+import { activityItemsFromSpaces } from "./activityModel";
 import { syncNativeBadge } from "./nativeNotifications";
 import {
   capabilityApprovalActivities,
@@ -20,28 +20,33 @@ import { useActivityStore } from "./useActivityStore";
  * Destination surfaces render and clear their own contextual badges.
  */
 export function ActivityBridge() {
-  const location = useLocation();
   const { user } = useAuth();
   const accountId = user?.id ?? "";
+  useOperationActivity(accountId);
   const approvals = useCapabilityApprovals();
   const interventions = useAgentInterventions();
   const [sourceReadyAccount, setSourceReadyAccount] = useState("");
-  const { inbox, invitations } = useSpacesStore(
-    useShallow((state) => ({ inbox: state.inbox, invitations: state.invitations })),
-  );
-  const { allItems, attentionCount, setAccount, syncSources, load, refresh, markRead, setOffline } =
-    useActivityStore(
+  const { inbox, invitations, snapshotReady, referenceOnly, spacesLoading, spacesError } =
+    useSpacesStore(
       useShallow((state) => ({
-        allItems: state.allItems,
-        attentionCount: state.attentionCount,
-        setAccount: state.setAccount,
-        syncSources: state.syncSources,
-        load: state.load,
-        refresh: state.refresh,
-        markRead: state.markRead,
-        setOffline: state.setOffline,
+        inbox: state.inbox,
+        invitations: state.invitations,
+        snapshotReady: state.snapshotReady,
+        referenceOnly: state.referenceOnly,
+        spacesLoading: state.loading,
+        spacesError: state.error,
       })),
     );
+  const { attentionCount, setAccount, syncSources, load, refresh, setOffline } = useActivityStore(
+    useShallow((state) => ({
+      attentionCount: state.attentionCount,
+      setAccount: state.setAccount,
+      syncSources: state.syncSources,
+      load: state.load,
+      refresh: state.refresh,
+      setOffline: state.setOffline,
+    })),
+  );
 
   useEffect(() => {
     const store = useCapabilityApprovals.getState();
@@ -70,7 +75,8 @@ export function ActivityBridge() {
     setAccount(accountId);
     if (accountId) {
       void load().then(() => {
-        if (active && !useActivityStore.getState().offline) setSourceReadyAccount(accountId);
+        if (active && !useActivityStore.getState().offline && !useActivityStore.getState().error)
+          setSourceReadyAccount(accountId);
       });
     }
     return () => {
@@ -79,32 +85,66 @@ export function ActivityBridge() {
   }, [accountId, load, setAccount]);
 
   useEffect(() => {
-    if (!accountId || sourceReadyAccount !== accountId) return;
-    syncSources(accountId, [
-      ...activityItemsFromSpaces(accountId, inbox, invitations),
-      ...(interventions.accountId === accountId
-        ? agentInterventionActivities(accountId, interventions.items)
-        : []),
-      ...(approvals.accountId === accountId
-        ? capabilityApprovalActivities(accountId, approvals.items)
-        : []),
-    ]);
+    if (!accountId || useActivityStore.getState().accountId !== accountId) return;
+    syncSources(
+      accountId,
+      [
+        ...activityItemsFromSpaces(
+          accountId,
+          sourceReadyAccount === accountId ? inbox : { unreads: [], mentions: [] },
+          snapshotReady && !referenceOnly ? invitations : [],
+        ),
+        ...(interventions.accountId === accountId
+          ? agentInterventionActivities(accountId, interventions.items)
+          : []),
+        ...(approvals.accountId === accountId
+          ? capabilityApprovalActivities(accountId, approvals.items)
+          : []),
+      ],
+      [
+        ...(approvals.loaded && !approvals.loading && !approvals.error && !approvals.nextCursor
+          ? ["capabilities" as const]
+          : []),
+        ...(interventions.loaded && !interventions.loading && !interventions.error
+          ? ["interventions" as const]
+          : []),
+        ...(snapshotReady && !referenceOnly && !spacesLoading && !spacesError
+          ? ["invitation" as const]
+          : []),
+      ],
+      sourceReadyAccount === accountId ? ["spaces"] : [],
+    );
   }, [
     accountId,
     inbox,
     invitations,
+    snapshotReady,
+    referenceOnly,
+    spacesLoading,
+    spacesError,
     sourceReadyAccount,
     syncSources,
     interventions.accountId,
     interventions.items,
     approvals.accountId,
     approvals.items,
+    approvals.loaded,
+    approvals.loading,
+    approvals.error,
+    approvals.nextCursor,
+    interventions.loaded,
+    interventions.loading,
+    interventions.error,
   ]);
 
   useEffect(() => {
     const online = () => {
       setOffline(false);
-      void refresh().then(() => setSourceReadyAccount(accountId));
+      void refresh().then(() => {
+        const current = useActivityStore.getState();
+        if (current.accountId === accountId && !current.offline && !current.error)
+          setSourceReadyAccount(accountId);
+      });
     };
     const offline = () => setOffline(true);
     window.addEventListener("online", online);
@@ -115,14 +155,6 @@ export function ActivityBridge() {
       window.removeEventListener("offline", offline);
     };
   }, [accountId, refresh, setOffline]);
-
-  useEffect(() => {
-    for (const item of allItems) {
-      if (!item.readAt && activityTargetMatchesLocation(item.target, location.pathname)) {
-        markRead(item.id);
-      }
-    }
-  }, [allItems, location.pathname, markRead]);
 
   useEffect(() => {
     void syncNativeBadge(attentionCount);

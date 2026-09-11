@@ -1,3 +1,4 @@
+import { useActivityStore } from "./useActivityStore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActivityItem } from "./types";
 
@@ -60,6 +61,8 @@ import {
 describe("nativeNotifications", () => {
   beforeEach(() => {
     localStorage.clear();
+    useActivityStore.setState(useActivityStore.getInitialState(), true);
+    useActivityStore.getState().setAccount("account-1");
     mocks.tauri = true;
     mocks.mobile = false;
     mocks.focused = false;
@@ -163,3 +166,30 @@ function itemFixture(): ActivityItem {
     target: { kind: "workspace-tool", tool: "transfers" },
   };
 }
+
+describe("Activity delivery policy", () => {
+  it("applies category controls and ignores read updates", async () => {
+    useActivityStore.setState(useActivityStore.getInitialState(), true);
+    useActivityStore.getState().setAccount("account-1");
+    mocks.sendNotification.mockClear();
+    useActivityStore.getState().setCategoryEnabled("completions", false);
+    expect(await publishNativeActivity({ ...itemFixture(), kind: "completion" })).toBe(false);
+    expect(
+      await publishNativeActivity({
+        ...itemFixture(),
+        kind: "mention",
+        readAt: "2026-09-09T00:00:00Z",
+      }),
+    ).toBe(false);
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+  });
+  it("suppresses a muted request banner and all cross-account delivery", async () => {
+    useActivityStore.setState(useActivityStore.getInitialState(), true);
+    useActivityStore.getState().setAccount("account-1");
+    useActivityStore.getState().setSourceMuted("app:files", true);
+    mocks.sendNotification.mockClear();
+    expect(await publishNativeActivity({ ...itemFixture(), appId: "files" })).toBe(false);
+    expect(await publishNativeActivity({ ...itemFixture(), accountId: "other" })).toBe(false);
+    expect(mocks.sendNotification).not.toHaveBeenCalled();
+  });
+});
