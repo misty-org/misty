@@ -1,4 +1,3 @@
-import { useActivityStore } from "@/features/activity";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
 import { errorText } from "@/shared/lib/format";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -77,7 +76,7 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
       if (message) set({ operationError: null });
       return message;
     },
-    pushNotification: (message, type = "info", durationMs = 3000, showInActivity = true) => {
+    pushNotification: (message, type = "info", durationMs = 3000, showInActivity = false) => {
       const trimmed = message.trim();
       if (!trimmed) return 0;
       const notificationPreferences = selectNotificationPreferences(
@@ -106,24 +105,6 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
           ? [...state.notificationHistory, notification].slice(-200)
           : state.notificationHistory,
       }));
-      if (recordActivity) {
-        useActivityStore.getState().ingestLocal({
-          id: `explorer-${id}`,
-          kind: type === "error" ? "failure" : type === "success" ? "completion" : "system",
-          title:
-            type === "error"
-              ? "Misty needs attention"
-              : type === "success"
-                ? "Misty completed an action"
-                : "Misty activity",
-          body: trimmed,
-          attention: type === "error",
-          target: /transfer|upload|download|copy|move/i.test(trimmed)
-            ? { kind: "workspace-tool", tool: "transfers" }
-            : { kind: "workspace-tool", tool: "files" },
-          notify: true,
-        });
-      }
       if (showToast && durationMs > 0) {
         window.setTimeout(() => {
           getExplorerStore().getState().dismissNotification(id);
@@ -146,17 +127,6 @@ export function createShellActions(set: ExplorerSet, get: ExplorerGet): Partial<
       set((state) => ({
         notificationHistory: [...state.notificationHistory, notification].slice(-200),
       }));
-      useActivityStore.getState().ingestLocal({
-        id: `explorer-${id}`,
-        kind: type === "error" ? "failure" : type === "success" ? "completion" : "system",
-        title: type === "error" ? "Misty needs attention" : "Misty activity",
-        body: trimmed,
-        attention: type === "error",
-        target: /transfer|upload|download|copy|move/i.test(trimmed)
-          ? { kind: "workspace-tool", tool: "transfers" }
-          : { kind: "workspace-tool", tool: "files" },
-        notify: true,
-      });
       return id;
     },
     dismissNotification: (id) =>

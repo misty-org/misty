@@ -1,3 +1,4 @@
+import { packageExtensionServices } from "./package-extension-services.mjs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -34,14 +35,16 @@ for (const entry of index) {
     await cp(source, stage, { recursive: true });
     const manifestPath = path.join(stage, "manifest.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-    if (manifest.id !== entry.id || manifest.version !== packageVersion) {
+    if (manifest.id !== entry.id || manifest.version !== JSON.parse(await readFile(path.join(repo, `catalog/${entry.id}.json`), "utf8")).version) {
       throw new Error(
-        `${entry.id} build identity does not match v${packageVersion}.`,
+        `${entry.id} build identity does not match its catalog release.`,
       );
     }
     if ((manifest.tools ?? []).length > 0) {
       throw new Error(`${entry.id} may not ship executable tools.`);
     }
+    await rm(path.join(stage, "native"), { recursive: true, force: true });
+    await packageExtensionServices(repo, manifest, stage, { release: true, platform: target });
     const zipName = `${entry.id}-${target}.zip`;
     const zipPath = path.join(artifacts, zipName);
     if (process.platform === "win32")

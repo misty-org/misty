@@ -2,7 +2,7 @@ import { openTerminalAtPath } from "@/features/files/native";
 import { reportSystemError } from "@/features/activity";
 import { Button } from "@/shared/ui";
 import { PanelsTopLeft, Terminal } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { explorerTrayStyles } from "../ExplorerDesktopPluginStyles";
 
 export function ExplorerTray(props: {
@@ -10,9 +10,12 @@ export function ExplorerTray(props: {
   terminalPath: string;
   onToggleFileManagerMode: () => void;
 }) {
+  const [errorMessage, setErrorMessage] = useState("");
   const openTerminal = useCallback(() => {
     if (!props.terminalEnabled) return;
+    setErrorMessage("");
     void openTerminalAtPath(props.terminalPath).catch((error: unknown) => {
+      setErrorMessage("Terminal could not be opened. Try again.");
       reportSystemError({
         error,
         scope: "files:terminal",
@@ -24,6 +27,7 @@ export function ExplorerTray(props: {
 
   return (
     <>
+      {errorMessage ? <span role="alert" className="text-xs text-cream-muted">{errorMessage}</span> : null}
       <Button
         className={explorerTrayStyles.trigger}
         type="button"

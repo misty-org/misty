@@ -17,21 +17,25 @@ export function NewDrawingDialogView(props: {
   onCreate: (title: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const [failed, setFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!props.open) return;
     setTitle("");
+    setFailed(false);
     setSubmitting(false);
   }, [props.open]);
 
   const submit = async () => {
     if (submitting) return;
     setSubmitting(true);
+    setFailed(false);
     try {
       await props.onCreate(title);
       props.onOpenChange(false);
     } catch (cause) {
+      setFailed(true);
       props.reportError({
         error: cause,
         scope: "drawings:create",
@@ -64,6 +68,7 @@ export function NewDrawingDialogView(props: {
             }}
           />
         </div>
+        {failed ? <p role="alert" className="text-sm text-cream-muted">Drawing could not be created. Your title is saved here; try Create drawing again.</p> : null}
         <DialogFooter>
           <Button type="button" variant="ghost" size="sm" onClick={() => props.onOpenChange(false)}>
             Cancel

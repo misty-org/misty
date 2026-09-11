@@ -1,3 +1,4 @@
+import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
 import type {
   AnalysisResult,
   AndroidAllFilesAccessStatus,
@@ -94,24 +95,30 @@ export function explorerCalculateDirectorySizes(
   return invoke("explorer_calculate_directory_sizes", { request });
 }
 
+async function invokeSearch<T>(command:string,args:Record<string,unknown> = {}):Promise<T> {
+  if (!supportsPackagedDocuments()) return invoke<T>(command,args);
+  const {invokeFilesSearch}=await import("@/features/apps/nativeSearchService");
+  return invokeFilesSearch<T>(command,args);
+}
+
 export function searchInit(): Promise<SearchStatus> {
-  return invoke("search_init");
+  return invokeSearch("search_init");
 }
 
 export function searchGetStatus(): Promise<SearchStatus> {
-  return invoke("search_get_status");
+  return invokeSearch("search_get_status");
 }
 
 export function searchStartScan(request: SearchScanRequest): Promise<SearchStatus> {
-  return invoke("search_start_scan", { request });
+  return invokeSearch("search_start_scan", { request });
 }
 
 export function searchCancelScan(): Promise<SearchStatus> {
-  return invoke("search_cancel_scan");
+  return invokeSearch("search_cancel_scan");
 }
 
 export function searchQuery(request: SearchQueryRequest): Promise<SearchResult[]> {
-  return invoke("search_query", { request });
+  return invokeSearch("search_query", { request });
 }
 
 export function explorerCreateItem(request: CreateItemRequest): Promise<ExplorerOperationResult> {
@@ -147,6 +154,7 @@ export function explorerCancelDragPreparation(sessionId: string): Promise<void> 
 }
 
 export function explorerPreviewItem(path: string): Promise<ExplorerPreviewPayload> {
+  if (supportsPackagedDocuments()) return import("@/features/apps/nativeImageService").then(({invokeFilesImage})=>invokeFilesImage<ExplorerPreviewPayload>("explorer_preview_item",{path}));
   return invoke("explorer_preview_item", { path });
 }
 
@@ -165,13 +173,15 @@ export function explorerGenerateImageThumbnail(
     sizeBytes?: number | null;
   } = {},
 ): Promise<GeneratedImageThumbnail> {
-  return invoke("explorer_generate_image_thumbnail", {
+  const args = {
     path,
     maxDimension,
     modifiedMs: options.modifiedMs ?? null,
     remoteModified: options.remoteModified ?? null,
     sizeBytes: options.sizeBytes ?? null,
-  });
+  };
+  if (supportsPackagedDocuments()) return import("@/features/apps/nativeImageService").then(({invokeFilesImage})=>invokeFilesImage<GeneratedImageThumbnail>("explorer_generate_image_thumbnail",args));
+  return invoke("explorer_generate_image_thumbnail",args);
 }
 
 export function fileMetadataSnapshot(path: string): Promise<FileMetadataSnapshot> {
@@ -216,11 +226,17 @@ export function smartLibraryPreflightImport(paths: string[]): Promise<SmartLibra
   return invoke("smart_library_preflight_import", { request: { paths } });
 }
 
-export function smartLibraryPreparePreviews(
+export async function smartLibraryPreparePreviews(
   assetIds: string[],
   maxDimension = 512,
+  originSpaceId?: string,
 ): Promise<PreparedSmartLibraryPreview[]> {
-  return invoke("smart_library_prepare_previews", { request: { assetIds, maxDimension } });
+  if (!supportsPackagedDocuments()) return invoke("smart_library_prepare_previews", {request:{assetIds,maxDimension}});
+  const [{ withNativeDocumentService }, {useAppsStore}] = await Promise.all([
+    import("@/features/apps/nativeDocumentService"), import("@/features/apps/useAppsStore"),
+  ]);
+  const spaceId = originSpaceId ?? useAppsStore.getState().spaceId;
+  return withNativeDocumentService("library", spaceId, instance => invoke("smart_library_prepare_previews", {instance, request:{assetIds,maxDimension}}));
 }
 
 export function smartLibraryApplyResults(results: AnalysisResult[]): Promise<SmartLibrarySnapshot> {

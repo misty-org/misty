@@ -1,4 +1,4 @@
-import { flushSync } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,9 +55,12 @@ export function ExplorerContextMenuView({
         if (!next) onClose();
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <span aria-hidden="true" className="fixed size-0" style={{ left: x, top: y }} />
-      </DropdownMenuTrigger>
+      {createPortal(
+        <DropdownMenuTrigger asChild>
+          <span aria-hidden="true" className="fixed size-0" style={{ left: x, top: y }} />
+        </DropdownMenuTrigger>,
+        document.body,
+      )}
       <DropdownMenuContent
         align="start"
         side="bottom"

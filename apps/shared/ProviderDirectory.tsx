@@ -29,13 +29,14 @@ export function ProviderDirectory({
       generation = 0;
     const refresh = () => {
       const run = ++generation;
-      void loadProviderDirectory(misty, appId)
-        .then((value) => {
-          if (!closed && run === generation) {
-            setState(value);
-            setError("");
-          }
-        })
+      const apply = (value: ProviderDirectoryState) => {
+        if (!closed && run === generation) {
+          setState(value);
+          setError("");
+        }
+      };
+      void loadProviderDirectory(misty, appId, apply)
+        .then(apply)
         .catch(() => {
           if (!closed) setError("Profiles could not be loaded. Try again.");
         });
@@ -105,7 +106,13 @@ export function ProviderDirectory({
             <strong>Misty</strong>
             <small>Conversations in your Space.</small>
           </span>
-          <button onClick={() => void open("misty")}>Open Misty</button>
+          <button
+            className="platform-action"
+            disabled={!!busy}
+            onClick={() => void open("misty")}
+          >
+            Open
+          </button>
         </div>
       )}
     </PlatformDirectory>

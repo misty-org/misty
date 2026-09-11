@@ -1,3 +1,6 @@
+import { loadMailWebsiteAccounts } from "./mailWebsiteAccounts";
+import { providerLaunchUrl, providerLoginUrls } from "./providerLoginUrls";
+import { integrationSectionUrl } from "./integrationSections";
 import { providerNavigationTitles } from "./navigationTitles";
 import { WebsiteLoader } from "./WebsiteLoader";
 import { WebsiteHeader } from "./WebsiteHeader";
@@ -14,7 +17,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   MistyAppSDK,
   MistyComponentContext,
-  MailAccount,
   MistyBrowserEvent,
 } from "@misty/sdk";
 import { SDKBrowserView } from "@misty/browser-view";
@@ -44,7 +46,9 @@ export function ProviderWorkspace({
   const [accounts, setAccounts] = useState<WebsiteAccount[]>([]);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
-  const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
+  const [mailAccounts, setMailAccounts] = useState<
+    Awaited<ReturnType<typeof loadMailWebsiteAccounts>>
+  >([]);
   const [availability, setAvailability] = useState<{
     available: boolean;
     persistent: boolean;
@@ -123,9 +127,9 @@ export function ProviderWorkspace({
       .catch(fail);
   };
   const refreshMail = useCallback(async () => {
-    const result = await misty.server.call("mail.accounts.list");
-    if (alive.current) setMailAccounts(result.accounts);
-    return result.accounts;
+    const accounts = await loadMailWebsiteAccounts(misty);
+    if (alive.current) setMailAccounts(accounts);
+    return accounts;
   }, [misty]);
   useEffect(() => {
     let cancelled = false;
@@ -154,11 +158,13 @@ export function ProviderWorkspace({
         }
       })
       .catch(fail);
-    if (appId === "inbox") void refreshMail().catch(fail);
+    // Optional API metadata must never turn a healthy website into an error.
+    // Website sessions are restored independently from local profile storage.
+    if (appId === "inbox") void refreshMail().catch(report);
     return () => {
       cancelled = true;
     };
-  }, [appId, misty, fail, refreshMail, attempt]);
+  }, [appId, misty, fail, refreshMail, report, attempt]);
   useEffect(() => {
     let cancelled = false;
     void misty.browser
@@ -234,7 +240,7 @@ export function ProviderWorkspace({
   if (launch.current?.key !== launchKey)
     launch.current = {
       key: launchKey,
-      url: account?.websiteUrl ?? providers[provider].url,
+      url: providerLaunchUrl(provider, account?.websiteUrl),
     };
   const rememberMailbox = useRef<(url: string) => void>(() => {});
   rememberMailbox.current = (url) => {
@@ -256,7 +262,7 @@ export function ProviderWorkspace({
   useEffect(() => {
     setView(null);
     setPageTitle("");
-    setPageUrl(account?.websiteUrl ?? providers[provider].url);
+    setPageUrl(providerLaunchUrl(provider, account?.websiteUrl));
     setRuntime(undefined);
   }, [provider, account?.id]);
   useEffect(() => {
@@ -375,7 +381,9 @@ export function ProviderWorkspace({
       pinned={pin.pinned}
       pinBusy={pin.busy}
       canPin={!!view && pin.ready && !!savedWebsiteUrl(provider, pageUrl)}
-      canOpenExternal={!!savedWebsiteUrl(provider, pageUrl)}
+      canOpenExternal={
+        pageUrl === providerLoginUrls[provider] || !!savedWebsiteUrl(provider, pageUrl)
+      }
       report={fail}
     />
   );
@@ -426,9 +434,10 @@ export function ProviderWorkspace({
             context={context}
             provider={{ id: provider, accountId: account.id }}
             initialUrl={
-              destination?.accountId === account.id
+              integrationSectionUrl(provider, context.route) ??
+              (destination?.accountId === account.id
                 ? destination.url
-                : launch.current.url
+                : launch.current.url)
             }
             onView={onView}
           />

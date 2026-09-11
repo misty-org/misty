@@ -79,6 +79,11 @@ export function createCodingWorkspace(services: CodeWorkspaceServices) {
     ranges: Array<{ from: number; to: number }>;
   }
   function CodingWorkspace({ tab }: { tab?: WorkspaceTab }) {
+    const [actionFailed, setActionFailed] = useState(false);
+    const reportActionFailure = useCallback((error: unknown) => {
+      setActionFailed(true);
+      services.report(error);
+    }, []);
     const documentSymbolsTitle = useShortcutTitle("Document symbols", "code.document_symbols");
     const codeActionsTitle = useShortcutTitle("Code actions", "code.code_actions");
     const inlineAiTitle = useShortcutTitle("Inline AI", "code.inline_ai");
@@ -156,7 +161,7 @@ export function createCodingWorkspace(services: CodeWorkspaceServices) {
         try {
           return await useWorkspaceStore.getState().openSurface(request);
         } catch (error) {
-          if (generation === requestGeneration.current) services.report(error);
+          if (generation === requestGeneration.current) reportActionFailure(error);
           return null;
         }
       },
@@ -444,7 +449,7 @@ export function createCodingWorkspace(services: CodeWorkspaceServices) {
       async (direction: DockSplitDirection | "current" = "down") => {
         if (!codeTab) return;
         if (services.toggleTerminal) {
-          try { await services.toggleTerminal(direction); } catch (error) { services.report(error); }
+          try { await services.toggleTerminal(direction); } catch (error) { reportActionFailure(error); }
           return;
         }
         const workspace = useWorkspaceStore.getState();
@@ -600,7 +605,7 @@ export function createCodingWorkspace(services: CodeWorkspaceServices) {
           expired: true,
         });
       } catch (error) {
-        services.report(error);
+        reportActionFailure(error);
       } finally {
         setRenameBusy(false);
       }
@@ -805,6 +810,10 @@ export function createCodingWorkspace(services: CodeWorkspaceServices) {
         data-interface-scale={editorAppearance.interfaceScale}
         className="coding-workspace relative grid h-full min-h-0 bg-charcoal-workspace"
       >
+        {actionFailed ? <div role="alert" className="absolute bottom-10 left-3 right-3 z-20 flex items-center gap-2 rounded-md border border-charcoal-border bg-charcoal-card p-3 text-sm text-cream">
+          <span>The action could not finish. Check your connection and try the command again.</span>
+          <button type="button" className="min-h-11 px-2 underline" onClick={() => setActionFailed(false)}>Dismiss</button>
+        </div> : null}
         <CodeCommandCenter
           viewId={codeTab.id}
           rootPath={rootPath}

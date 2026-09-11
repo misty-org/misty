@@ -47,13 +47,18 @@ export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
     const activeTab = pane.tabs.find((tab) => tab.id === pane.activeTabId);
     return (
       activeTab?.surfaceId === "browser" ||
-      (activeTab?.surfaceId === "official-app" && (
-        activeTab.groupKey === "app:browser" ||
-        (activeTab.groupKey === "app:inbox" && !!providerWebsiteFromRoute(activeTab.route, "inbox")) ||
-        (activeTab.groupKey === "app:chat" && !!providerWebsiteFromRoute(activeTab.route, "chat")) ||
-        (activeTab.groupKey === "app:journal" && !!providerWebsiteFromRoute(activeTab.route, "journal")) ||
-        (activeTab.groupKey === "app:planner" && !!providerWebsiteFromRoute(activeTab.route, "planner"))
-      ))
+      (activeTab?.surfaceId === "official-app" &&
+        (activeTab.groupKey === "app:browser" ||
+          (activeTab.groupKey === "app:inbox" &&
+            !!providerWebsiteFromRoute(activeTab.route, "inbox")) ||
+          (activeTab.groupKey === "app:chat" &&
+            !!providerWebsiteFromRoute(activeTab.route, "chat")) ||
+          (activeTab.groupKey === "app:journal" &&
+            !!providerWebsiteFromRoute(activeTab.route, "journal")) ||
+          (activeTab.groupKey === "app:planner" &&
+            !!providerWebsiteFromRoute(activeTab.route, "planner")) ||
+          (activeTab.groupKey === "app:library" &&
+            !!providerWebsiteFromRoute(activeTab.route, "library"))))
     );
   });
 }
@@ -206,7 +211,8 @@ export function BrowserRuntimeBridge() {
   }, [navigate]);
 
   useEffect(() => {
-    const reorder = (event: Event) => setBrowserWebviewsSuspended((event as CustomEvent<boolean>).detail, "pointer-reorder");
+    const reorder = (event: Event) =>
+      setBrowserWebviewsSuspended((event as CustomEvent<boolean>).detail, "pointer-reorder");
     window.addEventListener("misty:pointer-reorder", reorder);
     const beginPointerGesture = () => setBrowserPointerGestureActive(true);
     const endPointerGesture = () => setBrowserPointerGestureActive(false);
@@ -352,10 +358,18 @@ export function BrowserRuntimeBridge() {
       listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
         if (disposed) return;
         focusBrowserRuntimeTab(payload.id);
-        void import("@/features/global-search/browserAskContext").then(({ openBrowserAsk }) => openBrowserAsk(payload)).catch((error: unknown) => {
-          const tabId = browserTabIdForRuntime(payload.id);
-          if (tabId) useBrowserRuntimeStore.getState().setError(tabId, error instanceof Error ? error.message : "Misty could not open this context.");
-        });
+        void import("@/features/global-search/browserAskContext")
+          .then(({ openBrowserAsk }) => openBrowserAsk(payload))
+          .catch((error: unknown) => {
+            const tabId = browserTabIdForRuntime(payload.id);
+            if (tabId)
+              useBrowserRuntimeStore
+                .getState()
+                .setError(
+                  tabId,
+                  error instanceof Error ? error.message : "Misty could not open this context.",
+                );
+          });
       }),
       listen<BrowserCompanionEvent>("misty://browser-companion", ({ payload }) => {
         if (disposed) return;
@@ -393,7 +407,17 @@ export function BrowserRuntimeBridge() {
           .then(({ dataUrl, width, height }) =>
             captureAttachmentFromDataUrl(dataUrl, width, height),
           )
-          .then((capture) => ai.setCapture(registration.accountId, pane.id, capture))
+          .then(async (capture) => {
+            const { openMisty } = await import("@/features/misty/handoff");
+            const { mistyContextRef } = await import("@/features/misty/context");
+            await openMisty({
+              accountId: registration.accountId,
+              paneId: pane.id,
+              surfaceId: registration.adapter.surfaceId,
+              context: registration.adapter.getContext().map(mistyContextRef),
+              capture,
+            });
+          })
           .catch((error: unknown) =>
             useBrowserRuntimeStore
               .getState()
@@ -416,7 +440,8 @@ export function BrowserRuntimeBridge() {
         if (disposed) return;
         const tab = openBrowserPopup(payload);
         if (!tab) return;
-        if (tab.groupKey === "app:browser") useRecentToolsStore.getState().recordToolUsage("browser");
+        if (tab.groupKey === "app:browser")
+          useRecentToolsStore.getState().recordToolUsage("browser");
         navigate(tab.route);
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {

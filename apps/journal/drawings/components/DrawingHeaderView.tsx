@@ -109,6 +109,7 @@ export function DrawingHeaderView(props: {
           </Button>
         ) : null}
       </div>
+      {saveFailed ? <span role="alert" className="text-xs text-cream-muted">Title not saved. Press Enter in the title to retry.</span> : null}
     </header>
   );
 }

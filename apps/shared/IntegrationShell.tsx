@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { unmountReactRoot } from "./unmountReactRoot";
 import { useState } from "react";
 import type { MistyAppSDK, MistyComponentDefinition } from "@misty/sdk";
 import { ProviderDirectory } from "./ProviderDirectory";
@@ -80,7 +81,7 @@ export function withIntegrationShell(
           context: childContext(),
         });
       } catch (error) {
-        root.unmount();
+        await unmountReactRoot(root);
         shell.remove();
         throw error;
       }
@@ -94,7 +95,7 @@ export function withIntegrationShell(
         async unmount() {
           if (closed) return;
           closed = true;
-          root.unmount();
+          await unmountReactRoot(root);
           await child.unmount();
           shell.remove();
         },

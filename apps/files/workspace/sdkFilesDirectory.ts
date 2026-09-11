@@ -45,9 +45,12 @@ export async function openSdkFilesDirectory(
     writable: directory.writable,
     close: directory.close,
     watch: directory.watch,
+    index: directory.index,
+    shareForPeers: directory.shareForPeers,
     stat: directory.stat,
     readText: directory.readText,
     readBytes: directory.readBytes,
+    readChunks: directory.readChunks,
     writeText: directory.writeText,
     saveBytes: directory.saveBytes,
     openExternal: directory.openExternal,
@@ -76,14 +79,18 @@ export async function openSdkFilesDirectory(
         mimeType: null,
         remoteModified: null,
         sizeBytes: entry.bytes ?? null,
-        modifiedMs: null,
-        createdMs: null,
-        readonly: !directory.writable || !["file", "directory"].includes(entry.kind),
+        modifiedMs: entry.modifiedMs ?? null,
+        createdMs: entry.createdMs ?? null,
+        readonly:
+          !directory.writable ||
+          entry.readonly === true ||
+          !["file", "directory"].includes(entry.kind),
         hidden: entry.name.startsWith("."),
         location:
           options.source && options.source.kind !== "local"
             ? {
-                kind: options.source.kind === "device" ? "peer_device" : "remote",
+                kind:
+                  options.source.kind === "device" ? "peer_device" : "remote",
                 providerType: options.source.providerType,
                 remoteName: options.source.name,
                 remotePath: null,
@@ -97,19 +104,26 @@ export async function openSdkFilesDirectory(
         location:
           options.source && options.source.kind !== "local"
             ? {
-                kind: options.source.kind === "device" ? "peer_device" : "remote",
+                kind:
+                  options.source.kind === "device" ? "peer_device" : "remote",
                 providerType: options.source.providerType,
                 remoteName: options.source.name,
                 remotePath: null,
               }
             : { ...local },
-        entries: request.showHidden ? entries : entries.filter((entry) => !entry.hidden),
+        entries: request.showHidden
+          ? entries
+          : entries.filter((entry) => !entry.hidden),
         totalCount: entries.length,
         hiddenCount: entries.filter((entry) => entry.hidden).length,
       };
     },
     async create(request: CreateItemRequest) {
-      if (!request.name || /[/\\\0]/.test(request.name) || [".", ".."].includes(request.name))
+      if (
+        !request.name ||
+        /[/\\\0]/.test(request.name) ||
+        [".", ".."].includes(request.name)
+      )
         throw new Error("Enter a file or folder name without path separators.");
       const created = await directory.create(
         `${request.directory}/${request.name}`,
@@ -134,7 +148,9 @@ function childrenTitle(path: string) {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
-export type SdkFilesDirectory = NonNullable<Awaited<ReturnType<typeof openSdkFilesDirectory>>>;
+export type SdkFilesDirectory = NonNullable<
+  Awaited<ReturnType<typeof openSdkFilesDirectory>>
+>;
 
 export function transferSdkFilesEntry(
   source: SdkFilesDirectory,
@@ -146,6 +162,14 @@ export function transferSdkFilesEntry(
 ) {
   const from = directories.get(source),
     to = directories.get(destination);
-  if (!from || !to) throw new Error("Choose folders belonging to this Files view.");
-  return transferSdkCodeEntry(from, to, path, destinationPath, operation, options);
+  if (!from || !to)
+    throw new Error("Choose folders belonging to this Files view.");
+  return transferSdkCodeEntry(
+    from,
+    to,
+    path,
+    destinationPath,
+    operation,
+    options,
+  );
 }

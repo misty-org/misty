@@ -3,6 +3,7 @@ import {
   type WebsiteIntegrationId,
 } from "./websiteIntegrations";
 import { mistyBrowserProviders, type MistyBrowserProvider } from "@misty/sdk";
+import { providerLoginUrls } from "./providerLoginUrls";
 export type ProviderFamily =
   "inbox" | "chat" | "journal" | "planner" | "library";
 export type ProviderId = MistyBrowserProvider["id"];
@@ -15,7 +16,7 @@ export const providers: Record<
       id,
       {
         label: websiteIntegrations[id as WebsiteIntegrationId]?.label ?? id,
-        url: policy.url,
+        url: providerLoginUrls[id as ProviderId],
         family: policy.owner,
       },
     ]),
@@ -25,48 +26,48 @@ export const providers: Record<
   >),
   slack: {
     label: "Slack",
-    url: mistyBrowserProviders.slack.url,
+    url: providerLoginUrls.slack,
     family: "chat",
   },
   "microsoft-teams": {
     label: "Microsoft Teams",
-    url: mistyBrowserProviders["microsoft-teams"].url,
+    url: providerLoginUrls["microsoft-teams"],
     family: "chat",
   },
   icloud: {
     label: "iCloud Mail",
-    url: mistyBrowserProviders.icloud.url,
+    url: providerLoginUrls.icloud,
     family: "inbox",
   },
   yahoo: {
     label: "Yahoo Mail",
-    url: mistyBrowserProviders.yahoo.url,
+    url: providerLoginUrls.yahoo,
     family: "inbox",
   },
   google: {
     label: "Gmail",
-    url: "https://mail.google.com/mail/u/0/#inbox",
+    url: providerLoginUrls.google,
     family: "inbox",
   },
   microsoft: {
     label: "Outlook",
-    url: "https://outlook.live.com/mail/",
+    url: providerLoginUrls.microsoft,
     family: "inbox",
   },
   instagram: {
     label: "Instagram",
-    url: "https://www.instagram.com/direct/inbox/",
+    url: providerLoginUrls.instagram,
     family: "chat",
   },
   messenger: {
     label: "Messenger",
-    url: "https://www.messenger.com/",
+    url: providerLoginUrls.messenger,
     family: "chat",
   },
-  x: { label: "X", url: "https://x.com/messages", family: "chat" },
+  x: { label: "X", url: providerLoginUrls.x, family: "chat" },
   discord: {
     label: "Discord",
-    url: "https://discord.com/channels/@me",
+    url: providerLoginUrls.discord,
     family: "chat",
   },
 };
@@ -137,6 +138,7 @@ export function parseWebsiteAccounts(value: unknown): WebsiteAccount[] {
           item.websiteUrl !== undefined &&
           (item.provider !== "microsoft" ||
             ![
+              providerLoginUrls.microsoft,
               "https://outlook.live.com/mail/",
               "https://outlook.live.com/mail/?prompt=select_account",
               "https://outlook.office365.com/mail/",

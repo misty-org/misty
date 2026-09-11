@@ -1,3 +1,12 @@
+import { useSdkFilesShortcuts } from "./useSdkFilesShortcuts";
+import { createSdkFilesDuplicates } from "./sdkFilesDuplicates";
+import { DuplicateFinderDialogView } from "./explorer/workspace/ExplorerDuplicateFinderDialogView";
+import { createSdkFilesCompareRuntime } from "./sdkFilesCompare";
+import {
+  CompareDialogView,
+  type CompareDialogSeed,
+} from "./explorer/workspace/ExplorerCompareDialogView";
+import { createFilesAiAdapter } from "./createFilesAiAdapter";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MistyAppSDK } from "@misty/sdk";
 import type { DirectorySizeRecord, FileEntry } from "@/native/contracts";
@@ -17,7 +26,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { MultiPanelWorkspace } from "@/features/workspace/MultiPanelWorkspace";
+import { MultiPanelWorkspaceView as MultiPanelWorkspace } from "@/features/workspace/MultiPanelWorkspaceView";
 import type { SdkFilesWorkspace } from "./sdkFilesWorkspace";
 import { SdkFilesPaneView } from "./SdkFilesPaneView";
 import { useSdkFilesToolbarProps } from "./SdkFilesToolbar";
@@ -76,8 +85,11 @@ export function SdkFilesWorkspaceView({
     history = files.history();
   const sidebar = services.useSidebar();
   const sourceStatus = services.useSourceStatus?.();
+  const [duplicates, setDuplicates] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<CompareDialogSeed | null>(null);
   const [preview, setPreview] = useState<FileEntry | null>(null);
   const [sizes, setSizes] = useState<Record<string, DirectorySizeRecord>>({});
+  const sharedRoots = new Set(model.sharedRoots);
   const [showTransfers, setShowTransfers] = useState(false);
   useEffect(
     () =>
@@ -112,7 +124,10 @@ export function SdkFilesWorkspaceView({
       );
     }
     const thumbnails = createSdkFilesThumbnails(files, signal);
-    const preview = createSdkFilesPreviewRuntime(files, { Error: ErrorView });
+    const preview = createSdkFilesPreviewRuntime(files, {
+      Error: ErrorView,
+      shortcuts: misty.shortcuts,
+    });
     const search = createSdkFilesSearch(files, signal);
     return {
       Error: ErrorView,
@@ -208,7 +223,51 @@ export function SdkFilesWorkspaceView({
       ) => <ExplorerToolbarSearchView {...props} runtime={searchRuntime} />,
     };
   }, [files, runtime, services]);
+  const duplicatesRuntime = useMemo(
+    () => createSdkFilesDuplicates(files, signal, runtime.Error),
+    [files, signal, runtime],
+  );
+  const comparisonRuntime = useMemo(
+    () =>
+      createSdkFilesCompareRuntime(files, signal, {
+        Error: runtime.Error,
+        notify: () => {
+          void files.refresh().catch(files.error);
+        },
+      }),
+    [files, signal, runtime],
+  );
   const selected = files.selected();
+  const aiAdapter = useMemo(
+    () =>
+      createFilesAiAdapter({
+        viewId: paneId,
+        canMutate: true,
+        selected: files.selected,
+        rename: (entry, name) => files.rename(entry.path, name),
+        trash: () => files.deleteSelected(),
+      }),
+    [files, paneId, state.pane],
+  );
+  useEffect(() => {
+    if (!model.active || !model.focused || signal.aborted) return;
+    let closed = false;
+    let remove: (() => void) | undefined;
+    void misty.surfaces
+      .register(aiAdapter)
+      .then((next) => {
+        if (closed || signal.aborted) next();
+        else remove = next;
+      })
+      .catch((error) => {
+        if (!closed && !signal.aborted) files.error(error);
+      });
+    return () => {
+      closed = true;
+      remove?.();
+    };
+  }, [aiAdapter, misty, files, signal, model.active, model.focused]);
+
   const openPreview = (entry: FileEntry) => {
     files.recordRecent(entry);
     setPreview(entry);
@@ -277,51 +336,146 @@ export function SdkFilesWorkspaceView({
     pluginCommands: [],
     onRunCommand: (command) => run(() => services.runCommand(command)),
   });
+  useSdkFilesShortcuts(
+    misty,
+    model.active && model.focused && !comparison && !duplicates && !preview,
+    {
+      "explorer.new_folder": toolbar.canCreateFolder
+        ? toolbar.onCreateFolder
+        : undefined,
+      "explorer.search": () => files.setQueryMode("search"),
+      "explorer.copy": toolbar.canCopy ? toolbar.onCopy : undefined,
+      "explorer.cut": toolbar.canCut ? toolbar.onCut : undefined,
+      "explorer.paste": toolbar.canPaste ? toolbar.onPaste : undefined,
+      "explorer.rename": toolbar.canRename ? toolbar.onRename : undefined,
+      "explorer.batch_rename":
+        toolbar.canRename || selected.length > 1
+          ? () => files.startBatchRename(paneId)
+          : undefined,
+      "explorer.delete": toolbar.canDelete ? toolbar.onDelete : undefined,
+      "explorer.download": selected.length ? toolbar.onDownload : undefined,
+      "explorer.open_with": toolbar.canOpenWithSelected
+        ? toolbar.onOpenWith
+        : undefined,
+      "explorer.copy_path": () =>
+        toolbar.onCopyPath(selected[0]?.path ?? toolbar.path),
+      "explorer.undo": toolbar.canUndo ? toolbar.onUndo : undefined,
+      "explorer.redo": toolbar.canRedo ? toolbar.onRedo : undefined,
+      "explorer.refresh": toolbar.onRefresh,
+      "explorer.toggle_hidden": toolbar.onToggleHidden,
+      "explorer.preview.toggle": () =>
+        workspace.setPreviewVisible(!model.previewVisible),
+      "explorer.sidebar.toggle": () =>
+        workspace.setSidebarVisible(!model.sidebarVisible),
+      "explorer.duplicate_finder": () => {
+        if (state.pane.listing) setDuplicates(state.pane.listing.path);
+      },
+      "explorer.compare_with": () => {
+        if (selected[0])
+          setComparison({
+            paneId,
+            leftPath: selected[0].path,
+            rightPath:
+              selected[1]?.kind === selected[0].kind
+                ? selected[1].path
+                : undefined,
+            mode: selected[0].kind === "folder" ? "folder" : "file",
+          });
+      },
+    },
+    files.error,
+  );
   useEffect(() => {
     const element = root.current;
     if (!element || !model.active || !model.focused) return;
-    const keydown = (event: KeyboardEvent) => {
+    const selectAll = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "a" ||
         (event.target instanceof Element &&
           event.target.closest("input,textarea,[contenteditable=true]"))
       )
         return;
-      const mod = event.metaKey || event.ctrlKey;
-      const actions: Record<string, (() => void) | undefined> = {
-        c: toolbar.canCopy ? toolbar.onCopy : undefined,
-        x: toolbar.canCut ? toolbar.onCut : undefined,
-        v: toolbar.canPaste ? toolbar.onPaste : undefined,
-        z: event.shiftKey
-          ? toolbar.canRedo
-            ? toolbar.onRedo
-            : undefined
-          : toolbar.canUndo
-            ? toolbar.onUndo
-            : undefined,
-        a: () => {
-          const entries = files.store.getState().pane.listing?.entries ?? [];
-          files.clearSelection();
-          entries.forEach((entry) => files.select(entry.id, { toggle: true }));
-        },
-        r: toolbar.onRefresh,
-      };
-      const action = mod
-        ? actions[event.key.toLowerCase()]
-        : event.key === "Backspace" || event.key === "Delete"
-          ? toolbar.onDelete
-          : event.key === "F2"
-            ? toolbar.onRename
-            : undefined;
-      if (action) {
-        event.preventDefault();
-        action();
-      }
+      event.preventDefault();
+      files.clearSelection();
+      files.store
+        .getState()
+        .pane.listing?.entries.forEach((entry) =>
+          files.select(entry.id, { toggle: true }),
+        );
     };
-    element.addEventListener("keydown", keydown);
-    return () => element.removeEventListener("keydown", keydown);
-  }, [files, model.active, model.focused, toolbar]);
+    element.addEventListener("keydown", selectAll);
+    return () => element.removeEventListener("keydown", selectAll);
+  }, [files, model.active, model.focused]);
   const menuEntries = (entry: FileEntry | null): ContextMenuEntry[] => [
+    ...(!entry &&
+    state.pane.listing &&
+    state.folders.some(
+      (folder) =>
+        (!folder.source || folder.source.kind === "local") &&
+        (state.pane.listing!.path === folder.root ||
+          state.pane.listing!.path.startsWith(folder.root + "/")),
+    )
+      ? [
+          {
+            id: "share-folder",
+            icon: <FolderOpen size={15} />,
+            label: `${sharedRoots.has(files.owner(state.pane.listing!.path).root) ? "Stop sharing" : "Share"} ${files.owner(state.pane.listing!.path).name} with my devices in this Space`,
+            onRun: () => run(async () => {
+              const folder = files.owner(state.pane.listing!.path);
+              const shared = !sharedRoots.has(folder.root);
+              await folder.shareForPeers(shared);
+              workspace.model.setState(state => ({ sharedRoots: shared ? [...new Set([...state.sharedRoots, folder.root])] : state.sharedRoots.filter(root => root !== folder.root) }));
+              await services.retrySources?.();
+            }),
+          },
+          {
+            id: "reindex",
+            icon: <RotateCcw size={15} />,
+            label: "Rebuild search index",
+            onRun: () =>
+              run(() =>
+                runtime.search.rebuild(state.pane.listing!.path, signal),
+              ),
+          },
+        ]
+      : []),
+    ...(entry?.kind === "folder" ||
+    (!entry &&
+      !["misty://recent", "misty://starred", "misty://trash"].includes(
+        state.pane.listing?.path ?? "",
+      ) &&
+      state.pane.listing)
+      ? [
+          {
+            id: "duplicates",
+            icon: <Copy size={15} />,
+            label: "Find duplicates",
+            onRun: () => setDuplicates(entry?.path ?? state.pane.listing!.path),
+          },
+        ]
+      : []),
+    ...(selected.length === 2 &&
+    selected[0].kind === selected[1].kind &&
+    ["file", "folder"].includes(selected[0].kind)
+      ? [
+          {
+            id: "compare",
+            icon: <Columns2 size={15} />,
+            label: "Compare selected items",
+            onRun: () =>
+              setComparison({
+                paneId,
+                leftPath: selected[0].path,
+                rightPath: selected[1].path,
+                mode: selected[0].kind === "folder" ? "folder" : "file",
+              }),
+          },
+        ]
+      : []),
     ...(entry
       ? [
           {
@@ -442,6 +596,27 @@ export function SdkFilesWorkspaceView({
       >
         <ExplorerDragProviderView runtime={services.drag}>
           <FileBrowserRuntimeProvider value={runtime.browser}>
+            {model.restoreErrors.length > 0 && (
+              <div
+                role="alert"
+                className="flex items-center gap-3 border-b border-charcoal-border px-3 py-2 text-sm text-cream-muted"
+              >
+                <span className="min-w-0 flex-1">
+                  Some saved folders could not reopen. {model.restoreErrors[0]}
+                </span>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    run(async () => {
+                      await workspace.retryRestore();
+                      await services.retrySources?.();
+                    })
+                  }
+                >
+                  Retry saved folders
+                </Button>
+              </div>
+            )}
             {sourceStatus?.error && (
               <div
                 role="alert"
@@ -672,7 +847,13 @@ export function SdkFilesWorkspaceView({
                           </Button>
                           <Button
                             variant="ghost"
-                            onClick={() => run(() => misty.navigation.open("/apps/files?view=transfers"))}
+                            onClick={() =>
+                              run(() =>
+                                misty.navigation.open(
+                                  "/apps/files?view=transfers",
+                                ),
+                              )
+                            }
                           >
                             Transfers
                             {state.transfers.some(
@@ -688,6 +869,21 @@ export function SdkFilesWorkspaceView({
                 )}
               />
             </div>
+            {duplicates && (
+              <DuplicateFinderDialogView
+                paneId={paneId}
+                defaultRoot={duplicates}
+                runtime={duplicatesRuntime}
+                onClose={() => setDuplicates(null)}
+              />
+            )}
+            {comparison && (
+              <CompareDialogView
+                seed={comparison}
+                runtime={comparisonRuntime}
+                onClose={() => setComparison(null)}
+              />
+            )}
             {preview && (
               <GlobalPreviewDialogView
                 runtime={runtime.preview}

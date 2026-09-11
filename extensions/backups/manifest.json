@@ -2,19 +2,29 @@
   "schema_version": 3,
   "id": "backups",
   "name": "Backups",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Create encrypted Restic snapshots in a local folder you choose.",
   "author": "Misty",
   "enabled": true,
-  "platforms": ["web"],
-  "runtime": { "type": "web", "entry": "web/index.html?plugin=backups" },
+  "platforms": [
+    "web"
+  ],
+  "runtime": {
+    "type": "web",
+    "entry": "web/index.html?plugin=backups"
+  },
   "launcher": {
-    "views": ["all"],
+    "views": [
+      "all"
+    ],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
   },
-  "plugin": { "runtime": "web", "entry": "web/index.html?plugin=backups" },
+  "plugin": {
+    "runtime": "web",
+    "entry": "web/index.html?plugin=backups"
+  },
   "panels": [
     {
       "id": "backups.panel",
@@ -23,9 +33,17 @@
       "default_width": 720,
       "default_height": 620,
       "entry": "web/index.html?plugin=backups",
-      "launcher": { "views": ["all"] }
+      "launcher": {
+        "views": [
+          "all"
+        ]
+      }
     }
   ],
-  "runtime_capabilities": ["files.read", "files.write", "backups.manage"],
+  "runtime_capabilities": [
+    "files.read",
+    "files.write",
+    "backups.manage"
+  ],
   "tools": []
 }

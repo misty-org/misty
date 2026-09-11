@@ -43,11 +43,12 @@ export async function loadAssetsByIds(assetIds: Set<string>): Promise<SmartLibra
 export async function prepareSemanticReindexInputs(
   library: FolderLibraryStatus,
   planned: SemanticReindexPlan["assets"],
+  originSpaceId?: string,
 ): Promise<SemanticReindexInput[]> {
   const localAssets = new Map(library.assets.map((asset) => [asset.assetId, asset]));
   const preparedIds = planned.map((asset) => asset.assetId);
   const previews =
-    preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512) : [];
+    preparedIds.length > 0 ? await smartLibraryPreparePreviews(preparedIds, 512, originSpaceId) : [];
   const previewsById = new Map(previews.map((preview) => [preview.assetId, preview]));
   return planned.map((asset) => {
     const local = localAssets.get(asset.assetId);

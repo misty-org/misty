@@ -1,3 +1,4 @@
+import type { MistyActivityOperation } from "@misty/sdk";
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
@@ -18,6 +19,8 @@ import type {
   deleteMistyImage,
 } from "@/features/global-search/mistyImageAttachments";
 export interface AgentsRuntime {
+  openMisty(input?:{spaceId?:string;conversationId?:string}):Promise<void>;
+  reportActivity?(event: MistyActivityOperation, accountId: string): void;
   agentsApi: typeof agentsApi;
   assistantApi: typeof assistantApi;
   aiSurfaceApi: typeof aiSurfaceApi;
@@ -53,6 +56,7 @@ function service<K extends keyof AgentsRuntime>(name: K): AgentsRuntime[K] {
         (agentsRuntime()[name] as unknown as Record<string | symbol, Function>)[key](...args)),
   }) as AgentsRuntime[K];
 }
+export const openAgentsMisty = service("openMisty");
 export const runtimeAgentsApi = service("agentsApi"),
   runtimeAssistantApi = service("assistantApi"),
   runtimeAiApi = service("aiSurfaceApi"),
@@ -73,3 +77,5 @@ export const AgentsError = (props: React.ComponentProps<typeof SystemErrorActivi
   const View = agentsRuntime().Error;
   return <View {...props} />;
 };
+
+export function captureAgentActivityReporter() { return current?.reportActivity; }

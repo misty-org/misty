@@ -1,8 +1,16 @@
-import type { MistyBrowserSDK, MistyBrowserBounds, MistyBrowserEvent } from "@misty/sdk";
+import type {
+  MistyBrowserSDK,
+  MistyBrowserBounds,
+  MistyBrowserEvent,
+} from "@misty/sdk";
 
 const closingControllers = new WeakMap<MistyBrowserSDK, Promise<void>>();
 
-type Geometry = { bounds: MistyBrowserBounds; visible: boolean; nativeLiveResize: boolean };
+type Geometry = {
+  bounds: MistyBrowserBounds;
+  visible: boolean;
+  nativeLiveResize: boolean;
+};
 type View = Awaited<ReturnType<MistyBrowserSDK["create"]>>;
 
 /** Owns a single SDK view and coalesces layout changes while RPC is busy. */
@@ -13,12 +21,16 @@ export function createSdkBrowserController(
     event(event: MistyBrowserEvent): void;
     error(error: unknown): void;
   },
-  options: Pick<Parameters<MistyBrowserSDK["create"]>[0], "url" | "provider"> = {},
+  options: Pick<
+    Parameters<MistyBrowserSDK["create"]>[0],
+    "url" | "provider"
+  > = {},
 ) {
   let view: View | undefined;
   let closed = false;
   let latest: Geometry | undefined;
   let lastKey = "";
+  let correction = 0;
   let running: Promise<void> | undefined;
   let cleanup: Promise<void> | undefined;
   let unlisten: (() => void) | undefined;
@@ -26,8 +38,10 @@ export function createSdkBrowserController(
     while (!closed && latest) {
       const geometry = latest;
       latest = undefined;
+      const revision = correction;
       const key = JSON.stringify(geometry);
       if (key === lastKey) continue;
+      let created = false;
       if (!view) {
         if (!geometry.visible) continue;
         const previousClose = closingControllers.get(browser);
@@ -39,17 +53,26 @@ export function createSdkBrowserController(
           nativeLiveResize: geometry.nativeLiveResize,
         });
         if (closed) return;
-        callbacks.ready(view);
+        created = true;
+      }
+      // A failed subscription must be retried even when native creation worked.
+      // Publish the handle only once page events can keep the UI responsive.
+      if (!unlisten) {
         unlisten = await browser.subscribe(view.handle, (event) => {
           if (closed) return;
-          if (event.type === "layout") lastKey = "";
+          if (event.type === "layout") {
+            correction++;
+            lastKey = "";
+          }
           callbacks.event(event);
         });
         if (closed) return;
-      } else {
+        callbacks.ready(view);
+      }
+      if (!created) {
         await browser.layout(view.handle, geometry);
       }
-      lastKey = key;
+      lastKey = correction === revision ? key : "";
     }
   };
   const flush = () => {
@@ -68,7 +91,10 @@ export function createSdkBrowserController(
     update(geometry: Geometry, force = false) {
       if (closed) return;
       latest = geometry;
-      if (force) lastKey = "";
+      if (force) {
+        correction++;
+        lastKey = "";
+      }
       flush();
     },
     view: () => view,

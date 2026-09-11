@@ -7,8 +7,6 @@ import {
   type MistyAgentOperation,
 } from "@misty/sdk";
 import { configureAgentsRuntime, type AgentsRuntime } from "./agentsRuntime";
-import { useGlobalSearchStore } from "@/features/global-search/useGlobalSearchStore";
-import { replaceActiveGlobalInvocationStream } from "@/features/global-search/globalSearchStoreHelpers";
 import type { MistyImageAttachment, GlobalSearchResult } from "@/features/global-search/types";
 import type { AiInvocationEvent } from "@/features/ai-surface/types";
 
@@ -55,6 +53,12 @@ export async function createSdkAgentsRuntime(
   const streams = new Set<() => void>(),
     images = new Set<string>();
   const runtime: AgentsRuntime = {
+    openMisty: (input) => misty.ai.open({conversationId:input?.conversationId}),
+    reportActivity(event, accountId) {
+      if (!signal.aborted && identity.user?.id === accountId) {
+        void misty.activity.operation(event).catch(report);
+      }
+    },
     agentsApi: domain("agentsApi", "agents"),
     assistantApi: domain("assistantApi", "assistant"),
     aiSurfaceApi: domain("aiSurfaceApi", "ai"),
@@ -178,13 +182,10 @@ export async function createSdkAgentsRuntime(
     },
   };
   const release = configureAgentsRuntime(runtime);
-  useGlobalSearchStore.getState().setAccount(identity.user.id);
   return {
     update(_next: MistyComponentContext) {},
     close() {
       for (const close of streams) close();
-      replaceActiveGlobalInvocationStream();
-      useGlobalSearchStore.getState().setAccount("");
       for (const url of images) URL.revokeObjectURL(url);
       images.clear();
       release();

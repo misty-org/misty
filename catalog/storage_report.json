@@ -1,7 +1,7 @@
 {
   "published": true,
   "featured_rank": 1,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "overview": "Find the files and types consuming space in one local folder.",
   "status": "available",
   "capabilities": [
@@ -9,14 +9,19 @@
     "Sortable largest-file list",
     "File-type distribution and skipped-entry reporting"
   ],
-  "where_it_appears": ["Workspace app tab from Files"],
-  "permissions": ["Read-only access to one selected local folder"],
+  "where_it_appears": [
+    "Workspace app tab from Files"
+  ],
+  "permissions": [
+    "Read-only access to one selected local folder"
+  ],
   "getting_started": [
     "Open Storage Report.",
     "Choose a folder and approve access for this session.",
     "Scan the folder, then sort the report or refresh it after its contents change."
   ],
   "changelog": [
+    "v0.4.1 - Runs archive or file scanning work in the signed app package.",
     "v0.4.0 - Replaced selected Host paths with an explicit native folder grant, bounded scanning, and revocation.",
     "v0.3.0 - Initial production release."
   ],
@@ -35,7 +40,9 @@
   ],
   "verified": true,
   "launcher": {
-    "views": ["Files"],
+    "views": [
+      "Files"
+    ],
     "show_in_launcher": true,
     "requires_selected_file": false,
     "open_mode": "tab"
@@ -45,14 +52,16 @@
     "artifacts": [
       {
         "platform": "macos-aarch64",
-        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/storage_report-macos-aarch64.zip"
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.1/storage_report-macos-aarch64.zip"
       },
       {
         "platform": "macos-x86_64",
-        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/storage_report-macos-x86_64.zip"
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.1/storage_report-macos-x86_64.zip"
       }
     ]
   },
   "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/storage_report/assets/logo.svg",
-  "runtime_capabilities": ["files.read"]
+  "runtime_capabilities": [
+    "files.read"
+  ]
 }

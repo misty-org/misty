@@ -10,15 +10,38 @@ import type {
   PreviewResource,
 } from "../../model/interfaces/components/GlobalPreview";
 import { sourceExtension } from "./previewFormat";
-import { audioMimeTypes, imageMimeTypes, videoMimeTypes } from "./previewMediaTables";
-import { extractDocumentText, globalPreviewKindForSource } from "./previewDocument";
-export { extractDocumentText, globalPreviewKindForSource } from "./previewDocument";
+import {
+  audioMimeTypes,
+  imageMimeTypes,
+  videoMimeTypes,
+} from "./previewMediaTables";
+import { globalPreviewKindForSource } from "./previewDocument";
+export {
+  extractDocumentText,
+  globalPreviewKindForSource,
+} from "./previewDocument";
 import { usePreviewResource } from "./usePreviewResource";
 export function useGlobalPreviewResource(source: GlobalPreviewSource) {
-  return usePreviewResource(source, loadGlobalPreview);
+  const load = useHostDocumentLoader();
+  return usePreviewResource(source, load);
+}
+import { useContext, useCallback } from "react";
+import { FilePreviewRenderersContext } from "@/features/apps/FilePdfPreview";
+export function useHostDocumentLoader() {
+  const parser = useContext(FilePreviewRenderersContext).extractDocumentText;
+  return useCallback(
+    (source: GlobalPreviewSource) => loadGlobalPreview(source, parser),
+    [parser],
+  );
 }
 
-export async function loadGlobalPreview(source: GlobalPreviewSource): Promise<PreviewResource> {
+export async function loadGlobalPreview(
+  source: GlobalPreviewSource,
+  extractDocumentText?: (
+    extension: string,
+    bytes: Uint8Array,
+  ) => Promise<string>,
+): Promise<PreviewResource> {
   const extension = sourceExtension(source);
   const mimeType =
     source.mimeType ||
@@ -39,8 +62,10 @@ export async function loadGlobalPreview(source: GlobalPreviewSource): Promise<Pr
         })
       ).localPath
     : source.path;
-  if (kind === "video") return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
-  if (kind === "audio") return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
+  if (kind === "video")
+    return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
+  if (kind === "audio")
+    return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
   if (kind === "archive") {
     const archive = await archiveList({ path: preparedPath });
     return {
@@ -50,7 +75,8 @@ export async function loadGlobalPreview(source: GlobalPreviewSource): Promise<Pr
       archiveFormat: archive.format,
     };
   }
-  if (kind === "image") return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
+  if (kind === "image")
+    return { kind, url: safeTauriAssetUrl(preparedPath), mimeType };
   const payload = await explorerPreviewItem(preparedPath);
   const bytes = new Uint8Array(payload.bytes);
   if (kind === "pdf" || payload.mimeType === "application/pdf")
@@ -66,9 +92,20 @@ export async function loadGlobalPreview(source: GlobalPreviewSource): Promise<Pr
     payload.mimeType.includes("json")
   ) {
     const text = new TextDecoder().decode(bytes);
-    return { kind: kind === "markdown" ? "markdown" : "text", text, mimeType: payload.mimeType };
+    return {
+      kind: kind === "markdown" ? "markdown" : "text",
+      text,
+      mimeType: payload.mimeType,
+    };
   }
-  if (kind === "document")
-    return { kind, text: await extractDocumentText(extension, bytes), mimeType: payload.mimeType };
+  if (kind === "document") {
+    if (!extractDocumentText)
+      throw new Error("Update Files to load its document readers.");
+    return {
+      kind,
+      text: await extractDocumentText(extension, bytes),
+      mimeType: payload.mimeType,
+    };
+  }
   return { kind: "generic", mimeType: payload.mimeType };
 }

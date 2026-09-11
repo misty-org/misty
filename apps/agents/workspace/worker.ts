@@ -175,7 +175,8 @@ async function executeWorkflowNodeOnDevice(
   const document = await agentsPrepareScopedDocument({
     scopeId: ref.scopeId,
     relativePath: ref.relativePath,
-  });
+    spaceId: job.spaceId ?? "",
+  }, signal);
   const content = {
     sourceKind: ref.sourceKind || "local_file",
     providerId: ref.providerId || "device",
@@ -296,6 +297,8 @@ class DeviceOperationNotAttempted extends Error {
 
 export function deviceWorkflowErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("Add Files")) return "files_app_required";
+  if (message.includes("document service") || message.includes("processor")) return "document_service_unavailable";
   if (message.startsWith("browser_snapshot_stale:")) return "browser_snapshot_stale";
   if (message.includes("unsupported_content")) return "unsupported_content";
   if (message.includes("invalid_device_scope")) return "invalid_scope";
@@ -337,6 +340,7 @@ function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
 
 export interface ClaimedWorkflowNodeJob {
   job: {
+    spaceId?: string;
     id: string;
     runId: string;
     nodeId: string;

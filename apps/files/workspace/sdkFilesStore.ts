@@ -4,7 +4,10 @@ import type { MistyFileTransferStatus } from "@misty/sdk";
 import { createSdkFilesTrash, type SdkFilesTrashItem } from "./sdkFilesTrash";
 import type { MistyAppSDK, MistyArchiveFormat } from "@misty/sdk";
 import type { FileEntry } from "@/native/contracts";
-import type { ExplorerSortState, PaneExplorerState } from "./explorer/model/interfaces/store/types";
+import type {
+  ExplorerSortState,
+  PaneExplorerState,
+} from "./explorer/model/interfaces/store/types";
 import type {
   ExplorerCommandQueryMode,
   ExplorerSortColumn,
@@ -19,7 +22,10 @@ import {
   type SdkFilesDirectory,
 } from "./sdkFilesDirectory";
 
-import { createSdkFilesEditing, type SdkFilesEditingState } from "./sdkFilesEditing";
+import {
+  createSdkFilesEditing,
+  type SdkFilesEditingState,
+} from "./sdkFilesEditing";
 
 interface FilesState extends SdkFilesEditingState {
   folders: SdkFilesDirectory[];
@@ -42,20 +48,31 @@ interface FilesState extends SdkFilesEditingState {
   busy: boolean;
   error: string | null;
 }
-type Clipboard = { folder: SdkFilesDirectory; entries: FileEntry[]; operation: "copy" | "move" };
+type Clipboard = {
+  folder: SdkFilesDirectory;
+  entries: FileEntry[];
+  operation: "copy" | "move";
+};
 
 /** One mounted Files view owns its grants, requests and explorer state. */
-export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: AbortSignal) {
+export function createSdkFilesStore(
+  misty: Pick<MistyAppSDK, "files"> & Partial<Pick<MistyAppSDK, "activity">>,
+  signal: AbortSignal,
+) {
   const lifetime = new AbortController();
   const folders = new Set<SdkFilesDirectory>();
   const history = createSdkFilesHistory(lifetime.signal);
-  const transfers = new Map<string, { cancel: AbortController; retry: () => Promise<unknown> }>();
+  const transfers = new Map<
+    string,
+    { cancel: AbortController; retry: () => Promise<unknown> }
+  >();
   let closed = false,
     navigation = 0,
     queued = 0;
   let tail = Promise.resolve<unknown>(undefined);
   let clipboard: Clipboard | null = null;
-  let trash: Promise<Awaited<ReturnType<typeof createSdkFilesTrash>>> | undefined;
+  let trash:
+    Promise<Awaited<ReturnType<typeof createSdkFilesTrash>>> | undefined;
   const store = create<FilesState>(() => ({
     folders: [],
     transfers: [],
@@ -95,11 +112,15 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     const folder = [...folders].find(
       (folder) => path === folder.root || path.startsWith(`${folder.root}/`),
     );
-    if (!folder) throw new Error("Choose the folder before accessing its files.");
+    if (!folder)
+      throw new Error("Choose the folder before accessing its files.");
     return folder;
   };
   const error = (cause: unknown) => {
-    if (!closed) store.setState({ error: cause instanceof Error ? cause.message : String(cause) });
+    if (!closed)
+      store.setState({
+        error: cause instanceof Error ? cause.message : String(cause),
+      });
   };
   const currentPath = () => {
     const path = store.getState().pane.listing?.path;
@@ -108,7 +129,11 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
   };
   const selected = () => {
     const { pane } = store.getState();
-    return pane.listing?.entries.filter((entry) => pane.selectedIds.includes(entry.id)) ?? [];
+    return (
+      pane.listing?.entries.filter((entry) =>
+        pane.selectedIds.includes(entry.id),
+      ) ?? []
+    );
   };
   const getTrash = () => {
     assert();
@@ -133,7 +158,9 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       const entries = store
         .getState()
         [path === "misty://recent" ? "recent" : "starred"].filter((entry) =>
-          [...folders].some((folder) => entry.path.startsWith(`${folder.root}/`)),
+          [...folders].some((folder) =>
+            entry.path.startsWith(`${folder.root}/`),
+          ),
         );
       return {
         path,
@@ -151,7 +178,10 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       };
     }
     if (path !== "misty://trash")
-      return owner(path).list({ path, showHidden: store.getState().showHidden });
+      return owner(path).list({
+        path,
+        showHidden: store.getState().showHidden,
+      });
     const service = await getTrash(),
       items = await service.list();
     assert();
@@ -160,7 +190,12 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       path,
       title: "Trash",
       parentPath: null,
-      location: { kind: "local" as const, providerType: null, remoteName: null, remotePath: null },
+      location: {
+        kind: "local" as const,
+        providerType: null,
+        remoteName: null,
+        remotePath: null,
+      },
       entries: items.map((item) => item.entry),
       totalCount: items.length,
       hiddenCount: 0,
@@ -168,9 +203,11 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
   }
   async function navigate(path: string, mode: NavigationMode = "push") {
     assert();
-    if (!["misty://trash", "misty://recent", "misty://starred"].includes(path)) owner(path);
+    if (!["misty://trash", "misty://recent", "misty://starred"].includes(path))
+      owner(path);
     const request = ++navigation;
-    if (path !== store.getState().pane.listing?.path) editing.cancelInlineEdit();
+    if (path !== store.getState().pane.listing?.path)
+      editing.cancelInlineEdit();
     store.setState((state) => ({
       error: null,
       pane: { ...state.pane, loading: true, error: null },
@@ -180,7 +217,11 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       assert();
       if (request !== navigation) return;
       store.setState((state) => ({
-        pane: applyNavigationResult(state.pane, sortListing(listing, state.sort), mode),
+        pane: applyNavigationResult(
+          state.pane,
+          sortListing(listing, state.sort),
+          mode,
+        ),
       }));
     } catch (cause) {
       if (!closed && request === navigation) {
@@ -194,8 +235,22 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     }
   }
   async function refresh() {
+    assert();
     const path = store.getState().pane.listing?.path;
-    if (path) await navigate(path, "replace");
+    if (!path) return;
+    const request = ++navigation;
+    // Keep the mounted list, scroll position and inline editor while observing changes.
+    // Home can receive events from anywhere below it; unchanged listings are a no-op.
+    const listing = await loadListing(path);
+    assert();
+    if (request !== navigation) return;
+    store.setState((state) => {
+      if (state.pane.listing?.path !== path) return state;
+      const sorted = sortListing(listing, state.sort);
+      if (!state.error && !state.pane.error &&
+          JSON.stringify(sorted) === JSON.stringify(state.pane.listing)) return state;
+      return { error: null, pane: applyNavigationResult(state.pane, sorted, "replace") };
+    });
   }
   function perform<T>(operation: () => Promise<T>): Promise<T> {
     assert();
@@ -230,10 +285,15 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       });
   }
   async function openFolder(
-    options: Parameters<typeof openSdkFilesDirectory>[1] & { activate?: boolean } = {},
+    options: Parameters<typeof openSdkFilesDirectory>[1] & {
+      activate?: boolean;
+    } = {},
   ) {
     assert();
-    const folder = await openSdkFilesDirectory(misty, { ...options, signal: lifetime.signal });
+    const folder = await openSdkFilesDirectory(misty, {
+      ...options,
+      signal: lifetime.signal,
+    });
     if (!folder) return null;
     if (closed) {
       await folder.close();
@@ -260,20 +320,33 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     folder.rename = async (request) => {
       const result = await rename(request);
       let current = result.affectedPaths[0];
-      const originalName = request.path.slice(request.path.lastIndexOf("/") + 1);
+      const originalName = request.path.slice(
+        request.path.lastIndexOf("/") + 1,
+      );
       history.record({
         title: `Rename ${originalName}`,
         undo: async () => {
-          current = (await rename({ path: current, newName: originalName })).affectedPaths[0];
+          current = (await rename({ path: current, newName: originalName }))
+            .affectedPaths[0];
         },
         redo: async () => {
-          current = (await rename({ path: current, newName: request.newName })).affectedPaths[0];
+          current = (await rename({ path: current, newName: request.newName }))
+            .affectedPaths[0];
         },
       });
       return result;
     };
     folders.add(folder);
     store.setState({ folders: [...folders] });
+    let watchFailure: unknown;
+    const reportWatchFailure = (cause: unknown) => {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      error(
+        new Error(
+          `Automatic folder updates are unavailable. Use Refresh to update the listing. ${detail}`,
+        ),
+      );
+    };
     try {
       await folder.watch(() => {
         const path = store.getState().pane.listing?.path;
@@ -285,8 +358,16 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
           owner(path) === folder
         )
           void refresh().catch(error);
-      }, error);
+      }, reportWatchFailure);
+    } catch (cause) {
+      // Observation is optional. Retain the granted folder and allow browsing
+      // instead of failing initialization and asking for access again on retry.
+      watchFailure = cause;
+    }
+    try {
+      assert();
       if (options.activate !== false) await navigate(folder.root);
+      if (watchFailure !== undefined) reportWatchFailure(watchFailure);
       return folder;
     } catch (cause) {
       if (closed) await folder.close();
@@ -296,7 +377,11 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
   }
   function select(
     entryId: string,
-    options: { toggle?: boolean; range?: boolean; visibleEntryIds?: string[] } = {},
+    options: {
+      toggle?: boolean;
+      range?: boolean;
+      visibleEntryIds?: string[];
+    } = {},
   ) {
     assert();
     store.setState((state) => {
@@ -308,13 +393,18 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       let selectedIds: string[];
       if (options.range) {
         const ids =
-          options.visibleEntryIds?.filter((id) => entries.some((entry) => entry.id === id)) ??
-          entries.map((entry) => entry.id);
+          options.visibleEntryIds?.filter((id) =>
+            entries.some((entry) => entry.id === id),
+          ) ?? entries.map((entry) => entry.id);
         const target = ids.indexOf(entryId);
-        const previous = entries[pane.lastSelectedIndexByPath[path] ?? index]?.id;
+        const previous =
+          entries[pane.lastSelectedIndexByPath[path] ?? index]?.id;
         const previousIndex = ids.indexOf(previous);
         const anchor = previousIndex >= 0 ? previousIndex : target;
-        selectedIds = ids.slice(Math.min(anchor, target), Math.max(anchor, target) + 1);
+        selectedIds = ids.slice(
+          Math.min(anchor, target),
+          Math.max(anchor, target) + 1,
+        );
       } else if (options.toggle)
         selectedIds = pane.selectedIds.includes(entryId)
           ? pane.selectedIds.filter((id) => id !== entryId)
@@ -325,7 +415,10 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
           ...pane,
           selectedIds,
           selectedIdsByPath: { ...pane.selectedIdsByPath, [path]: selectedIds },
-          lastSelectedIndexByPath: { ...pane.lastSelectedIndexByPath, [path]: index },
+          lastSelectedIndexByPath: {
+            ...pane.lastSelectedIndexByPath,
+            [path]: index,
+          },
         },
       };
     });
@@ -341,17 +434,19 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     transfers.clear();
     signal.removeEventListener("abort", onAbort);
     clipboard = null;
-    closing = Promise.all([...folders].map((folder) => folder.close())).then(() => {
-      folders.clear();
-      store.setState({
-        folders: [],
-        busy: false,
-        inlineEdit: null,
-        dialog: null,
-        trashItems: [],
-        clipboard: null,
-      });
-    });
+    closing = Promise.all([...folders].map((folder) => folder.close())).then(
+      () => {
+        folders.clear();
+        store.setState({
+          folders: [],
+          busy: false,
+          inlineEdit: null,
+          dialog: null,
+          trashItems: [],
+          clipboard: null,
+        });
+      },
+    );
     return closing;
   }
   const onAbort = () => {
@@ -359,10 +454,36 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
   };
   signal.addEventListener("abort", onAbort, { once: true });
   if (signal.aborted) onAbort();
-  async function transfer(paths: string[], destinationPath: string, operation: "copy" | "move") {
+  async function transfer(
+    paths: string[],
+    destinationPath: string,
+    operation: "copy" | "move",
+    activity?: { id: string; revision: number },
+  ) {
+    const occurrence = activity ?? { id: crypto.randomUUID(), revision: 0 };
+    const operationId = occurrence.id;
+    const report = (
+      status: "running" | "completed" | "blocked" | "resolved",
+    ) => {
+      void misty.activity
+        ?.operation({
+          operationId,
+          revision: ++occurrence.revision,
+          status,
+          title:
+            status === "completed"
+              ? "File transfer completed"
+              : status === "resolved"
+                ? "File transfer canceled"
+                : "File transfer needs attention",
+          body: `${paths.length} ${paths.length === 1 ? "item" : "items"}. Open Files to review the result.`,
+        })
+        .catch(() => undefined);
+    };
     const destination = owner(destinationPath);
     const sources = paths.map((path) => ({ path, folder: owner(path) }));
     return perform(async () => {
+      report("running");
       const results = [];
       for (const source of sources) {
         assert();
@@ -385,7 +506,13 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
         }));
         transfers.set(id, {
           cancel,
-          retry: () => transfer([source.path], destinationPath, operation),
+          retry: () =>
+            transfer(
+              paths.slice(paths.indexOf(source.path)),
+              destinationPath,
+              operation,
+              occurrence,
+            ),
         });
         try {
           const result = await transferSdkFilesEntry(
@@ -405,18 +532,24 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
                         ? "completed"
                         : "failed",
                   message: status.message,
+                  bytes: status.bytes,
                 }),
             },
           );
           results.push(result);
-          update({ status: "completed", message: operation === "copy" ? "Copied" : "Moved" });
+          update({
+            status: "completed",
+            message: operation === "copy" ? "Copied" : "Moved",
+          });
           let current = result.path,
             receipt: string | undefined;
           history.record({
             title: `${operation === "copy" ? "Copy" : "Move"} ${name}`,
             undo: async () => {
               if (operation === "copy")
-                receipt = (await (await getTrash()).moveFrom(destination, current)).id;
+                receipt = (
+                  await (await getTrash()).moveFrom(destination, current)
+                ).id;
               else
                 current = (
                   await transferSdkFilesEntry(
@@ -431,7 +564,8 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
             },
             redo: async () => {
               if (operation === "copy") {
-                if (!receipt) throw new Error("The recovery record is unavailable.");
+                if (!receipt)
+                  throw new Error("The recovery record is unavailable.");
                 current = (await (await getTrash()).restore(receipt)).path;
               } else
                 current = (
@@ -451,9 +585,11 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
             status: cancel.signal.aborted ? "cancelled" : "failed",
             message: cause instanceof Error ? cause.message : String(cause),
           });
+          report(cancel.signal.aborted ? "resolved" : "blocked");
           throw cause;
         }
       }
+      report("completed");
       return results;
     });
   }
@@ -475,7 +611,10 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     select,
     recordRecent(entry: FileEntry) {
       store.setState((state) => ({
-        recent: [entry, ...state.recent.filter((item) => item.path !== entry.path)].slice(0, 100),
+        recent: [
+          entry,
+          ...state.recent.filter((item) => item.path !== entry.path),
+        ].slice(0, 100),
       }));
     },
     toggleStar(entry: FileEntry) {
@@ -487,9 +626,15 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       if (currentPath() === "misty://starred") void refresh().catch(error);
     },
     openTrash: () => navigate("misty://trash"),
+    trashPath: (path: string) =>
+      perform(async () => {
+        const service = await getTrash();
+        return service.moveFrom(owner(path), path);
+      }),
     trashSelected: () => {
       const entries = selected();
-      if (currentPath() === "misty://trash") throw new Error("These items are already in Trash.");
+      if (currentPath() === "misty://trash")
+        throw new Error("These items are already in Trash.");
       return perform(async () => {
         const service = await getTrash(),
           results = [];
@@ -498,13 +643,19 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
         return results;
       });
     },
-    restoreSelected: (target?: { directory: SdkFilesDirectory; path: string }) => {
+    restoreSelected: (target?: {
+      directory: SdkFilesDirectory;
+      path: string;
+    }) => {
       const ids = store.getState().pane.selectedIds;
-      const items = store.getState().trashItems.filter((item) => ids.includes(item.entry.id));
+      const items = store
+        .getState()
+        .trashItems.filter((item) => ids.includes(item.entry.id));
       return perform(async () => {
         const service = await getTrash(),
           results = [];
-        for (const item of items) results.push(await service.restore(item.id, target));
+        for (const item of items)
+          results.push(await service.restore(item.id, target));
         return results;
       });
     },
@@ -512,7 +663,9 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       if (currentPath() !== "misty://trash") return actions.trashSelected();
       const paths = selected().map((entry) => entry.path);
       if (paths.length)
-        store.setState({ dialog: { kind: "delete", paneId, paths, permanent: true } });
+        store.setState({
+          dialog: { kind: "delete", paneId, paths, permanent: true },
+        });
       return Promise.resolve();
     },
     confirmDelete: async () => {
@@ -524,12 +677,15 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       await perform(async () => {
         const service = await getTrash();
         for (const item of items) await service.purge(item.id);
-        if (store.getState().dialog === dialog) store.setState({ dialog: null });
+        if (store.getState().dialog === dialog)
+          store.setState({ dialog: null });
       });
     },
     purgeSelected: () => {
       const ids = store.getState().pane.selectedIds;
-      const items = store.getState().trashItems.filter((item) => ids.includes(item.entry.id));
+      const items = store
+        .getState()
+        .trashItems.filter((item) => ids.includes(item.entry.id));
       return perform(async () => {
         const service = await getTrash();
         for (const item of items) await service.purge(item.id);
@@ -550,15 +706,21 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     },
     setQuery: (query: string) => {
       assert();
-      store.setState((state) => ({ pane: { ...state.pane, commandQuery: query } }));
+      store.setState((state) => ({
+        pane: { ...state.pane, commandQuery: query },
+      }));
     },
     setQueryMode: (commandQueryMode: ExplorerCommandQueryMode) => {
       assert();
-      store.setState((state) => ({ pane: { ...state.pane, commandQueryMode } }));
+      store.setState((state) => ({
+        pane: { ...state.pane, commandQueryMode },
+      }));
     },
     setItemScale: (itemScale: number) => {
       assert();
-      store.setState({ itemScale: Math.min(2, Math.max(0, Math.round(itemScale))) });
+      store.setState({
+        itemScale: Math.min(2, Math.max(0, Math.round(itemScale))),
+      });
     },
     setViewMode: (viewMode: ExplorerViewMode) => {
       assert();
@@ -570,13 +732,17 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
         const sort: ExplorerSortState = {
           column,
           direction:
-            state.sort.column === column && state.sort.direction === "asc" ? "desc" : "asc",
+            state.sort.column === column && state.sort.direction === "asc"
+              ? "desc"
+              : "asc",
         };
         return {
           sort,
           pane: {
             ...state.pane,
-            listing: state.pane.listing ? sortListing(state.pane.listing, sort) : null,
+            listing: state.pane.listing
+              ? sortListing(state.pane.listing, sort)
+              : null,
           },
         };
       });
@@ -608,16 +774,24 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
       const folder = owner(path);
       return perform(() => folder.rename({ path, newName: name }));
     },
-    listArchive: (path: string, format: MistyArchiveFormat, signal?: AbortSignal) =>
-      owner(path).listArchive(path, format, signal),
+    listArchive: (
+      path: string,
+      format: MistyArchiveFormat,
+      signal?: AbortSignal,
+    ) => owner(path).listArchive(path, format, signal),
     openExternal: (path: string) => owner(path).openExternal(path),
     saveBytes: (path: string, bytes: ArrayBuffer, copy = false) => {
       const folder = owner(path);
       return perform(() => folder.saveBytes(path, bytes, copy));
     },
     readText: (path: string) => owner(path).readText(path),
-    readBytes: (path: string, maxBytes: number) => owner(path).readBytes(path, maxBytes),
-    writeText: (path: string, contents: string, lineEnding: "lf" | "crlf" = "lf") => {
+    readBytes: (path: string, maxBytes: number) =>
+      owner(path).readBytes(path, maxBytes),
+    writeText: (
+      path: string,
+      contents: string,
+      lineEnding: "lf" | "crlf" = "lf",
+    ) => {
       const folder = owner(path);
       return perform(() => folder.writeText(path, contents, lineEnding));
     },
@@ -628,9 +802,13 @@ export function createSdkFilesStore(misty: Pick<MistyAppSDK, "files">, signal: A
     copy: (operation: "copy" | "move") => {
       assert();
       const entries = selected();
-      clipboard = entries.length ? { folder: owner(entries[0].path), entries, operation } : null;
+      clipboard = entries.length
+        ? { folder: owner(entries[0].path), entries, operation }
+        : null;
       store.setState({
-        clipboard: clipboard ? { operation, paths: entries.map((entry) => entry.path) } : null,
+        clipboard: clipboard
+          ? { operation, paths: entries.map((entry) => entry.path) }
+          : null,
       });
     },
     paste: async (path = currentPath()) => {

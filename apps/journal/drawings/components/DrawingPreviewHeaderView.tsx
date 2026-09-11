@@ -19,6 +19,7 @@ export function DrawingPreviewHeaderView(props: {
 }) {
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(props.drawing.title);
+  const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const canRename = props.drawing.role !== "viewer";
@@ -49,11 +50,13 @@ export function DrawingPreviewHeaderView(props: {
       return;
     }
     setSaving(true);
+    setFailed(false);
     try {
       await props.onRename(nextTitle);
       setTitle(nextTitle);
       setRenaming(false);
     } catch (error) {
+      setFailed(true);
       props.reportError({
         title: "Drawing title could not be saved",
         error,
@@ -108,6 +111,7 @@ export function DrawingPreviewHeaderView(props: {
         </h2>
       )}
 
+      {failed && renaming ? <span role="alert" className="text-xs text-cream-muted">Not saved. Try Save again.</span> : null}
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

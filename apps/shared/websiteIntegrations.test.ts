@@ -1,3 +1,4 @@
+import { providerLoginUrls } from "./providerLoginUrls";
 import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { mistyBrowserProviders, type MistyAppSDK } from "@misty/sdk";
@@ -9,6 +10,7 @@ import {
 } from "./websiteIntegrations";
 import {
   addWebsiteService,
+  ensureWebsiteSession,
   createWebsiteAccount,
   loadWebsiteState,
   saveWebsitePin,
@@ -175,15 +177,19 @@ it("preserves concurrent account and pin records, ordering and native sidebar hi
   expect(state.accounts).toHaveLength(2);
   expect(state.pins.map((p) => p.id)).toEqual(["two", "one"]);
   const navigation = websiteNavigation("journal", state, "space-1");
-  expect(navigation.map(n => n.id)).toEqual(["misty", "google-docs"]);
-  expect(navigation.filter(n => integrationIds("journal").some(id => id === n.id)).map(n => n.id)).toEqual(["google-docs"]);
+  expect(navigation.map((n) => n.id)).toEqual(["misty", "google-docs"]);
+  expect(
+    navigation
+      .filter((n) => integrationIds("journal").some((id) => id === n.id))
+      .map((n) => n.id),
+  ).toEqual(["google-docs"]);
   expect(navigation[0].children?.map((n) => n.label)).toEqual([
     "Notes",
     "Drawings",
   ]);
-  expect(navigation.find(n => n.id === "google-docs")?.children?.[0].route).toContain(
-    `account=${b.id}&pin=two`,
-  );
+  expect(
+    navigation.find((n) => n.id === "google-docs")?.children?.[0].route,
+  ).toContain(`account=${b.id}&pin=two`);
   expect(
     websiteNavigation("planner", {
       services: [],
@@ -274,4 +280,39 @@ it("removes only the selected account and its pins, retaining retryable cleanup 
   await removeWebsiteService(misty, state.services[0], state.accounts);
   state = await loadWebsiteState(storage, "journal");
   expect(state).toEqual({ services: [], accounts: [], pins: [] });
+});
+
+it.each(["planner", "journal", "library"] as const)(
+  "opens each %s integration without profile setup and reuses its session",
+  async (app) => {
+    const { storage } = websiteFixture();
+    for (const provider of integrationIds(app)) {
+      const [first, concurrent] = await Promise.all([
+        ensureWebsiteSession(storage, provider),
+        ensureWebsiteSession(storage, provider),
+      ]);
+      expect(concurrent.id).toBe(first.id);
+      expect(first.websiteUrl).toBe(providerLoginUrls[provider]);
+      expect(await restoredWebsitePage(storage, first)).toBe(providerLoginUrls[provider]);
+      expect((await ensureWebsiteSession(storage, provider)).id).toBe(first.id);
+      expect(
+        (await loadWebsiteState(storage, app)).accounts.some(
+          (account) => account.id === first.id,
+        ),
+      ).toBe(true);
+    }
+  },
+);
+
+it("upgrades stored default landing pages while preserving custom documents and profile identity", async () => {
+  const { storage } = websiteFixture();
+  await addWebsiteService(storage, "google-docs");
+  const account = await createWebsiteAccount(storage, "google-docs", "Work", mistyBrowserProviders["google-docs"].url);
+  expect((await ensureWebsiteSession(storage, "google-docs")).id).toBe(account.id);
+  expect(await restoredWebsitePage(storage, account)).toBe(providerLoginUrls["google-docs"]);
+  await saveWebsitePage(storage, account, mistyBrowserProviders["google-docs"].url);
+  expect(await restoredWebsitePage(storage, account)).toBe(providerLoginUrls["google-docs"]);
+  const document = "https://docs.google.com/document/d/existing/edit";
+  await saveWebsitePage(storage, account, document);
+  expect(await restoredWebsitePage(storage, account)).toBe(document);
 });

@@ -1,4 +1,4 @@
-import { appZoomChangedEvent, getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
+import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import type { RefObject } from "react";
 import { useLayoutEffect, useRef } from "react";
 import {
@@ -127,6 +127,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     document.addEventListener("visibilitychange", schedule);
     schedule();
     const recoverLayout = () => requestBrowserWebviewLayout(effectTab);
+    window.addEventListener("misty:workspace-geometry-changed", recoverLayout);
     recoveryTimers.push(window.setTimeout(recoverLayout, 50));
     recoveryTimers.push(window.setTimeout(recoverLayout, 200));
     recoveryTimers.push(window.setTimeout(recoverLayout, 600));
@@ -137,6 +138,7 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (settleTimer) window.clearTimeout(settleTimer);
       recoveryTimers.forEach((timer) => window.clearTimeout(timer));
       observer.disconnect();
+      window.removeEventListener("misty:workspace-geometry-changed", recoverLayout);
       window.removeEventListener("resize", observeWindowResize);
       window.removeEventListener("scroll", schedule, true);
       window.removeEventListener(browserRuntimeResumeEvent, schedule);
@@ -173,7 +175,7 @@ function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
   const width = right - x;
   const height = bottom - y;
   if (width < 2 || height < 2) return null;
-  return browserBoundsAtAppZoom({ x, y, width, height }, getAppliedAppZoom());
+  return browserBoundsAtAppZoom({ x, y, width, height }, getAppliedAppRenderScale());
 }
 
 function isMacNativeRuntime(): boolean {

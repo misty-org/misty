@@ -102,7 +102,9 @@ export default defineComponentApp({
       render();
     } catch (error) {
       unsubscribeSettings();
-      reactRoot?.unmount();
+      const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      queueMicrotask(() => detachedRoot?.unmount());
       throw error;
     }
     return {
@@ -116,7 +118,9 @@ export default defineComponentApp({
         if (closed) return;
         closed = true;
         unsubscribeSettings();
-        reactRoot?.unmount();
+        const detachedRoot = reactRoot;
+      reactRoot = undefined;
+      queueMicrotask(() => detachedRoot?.unmount());
         killTerminalTab(context.instanceId);
       },
     };
