@@ -127,6 +127,7 @@ enum CheckTarget {
     Scripts,
     App,
     Server,
+    GoSizes,
     Website,
     Tools,
     Cli,
@@ -471,6 +472,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 .args(["run", "test:scripts"])
                 .run(&settings.workspace.misty),
             CheckTarget::Server => checks::server(&settings.workspace),
+            CheckTarget::GoSizes => checks::go_file_sizes(&settings.workspace.server),
             CheckTarget::Website => checks::website(&settings.workspace),
             CheckTarget::Tools => checks::builtin_tools(&settings.workspace),
             CheckTarget::Cli => checks::cli(&settings.workspace),

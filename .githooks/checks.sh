@@ -31,7 +31,10 @@ billing() {
   (cd "$billing_root" && MISTY_SERVER_REPO="$root" bash .githooks/checks.sh go)
 }
 server() { parallel server-go billing-contract agent-runtime journal-collab; }
-server_go() { bash "$hooks/server-tests.sh"; }
+server_go() {
+  cargo run --quiet --locked --manifest-path "$root/cli/Cargo.toml" -- check go-sizes
+  bash "$hooks/server-tests.sh"
+}
 billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
