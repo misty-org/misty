@@ -1,4 +1,4 @@
-import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 
 const LIBRARY_ITEM_SCALE_MIN = 0;
 const LIBRARY_ITEM_SCALE_MAX = 2;

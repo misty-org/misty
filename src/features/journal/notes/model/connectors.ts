@@ -1,5 +1,5 @@
-import type { NoteConnectorCapabilities, NoteSourceKind } from "../types/capabilities";
-import type { NoteBodyFormat, NoteProviderStatus, NoteSource, UnifiedNote } from "../types/types";
+import type { NoteConnectorCapabilities, NoteSourceKind } from "./capabilities";
+import type { NoteBodyFormat, NoteProviderStatus, NoteSource, UnifiedNote } from "./types";
 
 export interface CreateNoteInput {
   title: string;

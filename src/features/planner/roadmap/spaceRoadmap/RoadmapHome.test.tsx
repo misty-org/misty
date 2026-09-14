@@ -1,4 +1,4 @@
-import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

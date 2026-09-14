@@ -1,4 +1,4 @@
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
+import type { ChatComposerSuggestion } from "@/api/spaces/dto/SpaceChat";
 import { SocialError as SystemErrorNotice } from "../SocialRuntime";
 import {
   Command,

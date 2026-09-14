@@ -2,8 +2,8 @@ import type { FileEntry } from "@/native/ipc";
 import { memo, useDeferredValue, useEffect, useMemo } from "react";
 import { useExplorerDropZone } from "../drag/ExplorerDragHooks";
 import { storageIdForPath } from "../drag/operations";
-import type { FileBrowserProps } from "../model/interfaces/components/FileBrowser";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../model/interfaces/drag/types";
+import type { FileBrowserProps } from "../model/FileBrowser";
+import type { ExplorerDragModifiers, ExplorerDragPayload } from "../model/drag";
 import { entrySizeBytes } from "../utils/entrySize";
 import { formatBytes } from "../utils/fileFormat";
 import { selectedEntriesForListing } from "./fileBrowser/EntryPresentation";
@@ -14,7 +14,7 @@ import { transferDropAcceptance } from "./FileBrowserDrag";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./FileBrowserFilters";
 import { FileBrowserSkeleton } from "./FileBrowserSkeleton";
 import { fileBrowserStyles } from "./FileBrowserStyles";
-export type { FileBrowserProps } from "../model/interfaces/components/FileBrowser";
+export type { FileBrowserProps } from "../model/FileBrowser";
 const emptyEntries: FileEntry[] = [];
 
 export const FileBrowserView = memo(function FileBrowserView(props: FileBrowserProps) {

@@ -3,7 +3,7 @@ import type {
   SpaceRoadmapEdge,
   SpaceRoadmapGoal,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import { buildRoadmapExecutionPlan } from "./roadmapExecutionPlan";
 
 describe("buildRoadmapExecutionPlan", () => {

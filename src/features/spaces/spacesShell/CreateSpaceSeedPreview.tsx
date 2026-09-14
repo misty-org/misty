@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Library, ListTodo, MessagesSquare, NotebookPen } from "lucide-react";
-import type { Space, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceTemplate } from "@/api/spaces/dto/entities";
 import { Skeleton } from "@/shared/ui";
 
 /** "You'll get": exactly what the chosen starting point creates. */

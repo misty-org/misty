@@ -1,4 +1,4 @@
-import type { SpaceEvent } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceEvent } from "@/api/spaces/dto/entities";
 
 export type SpacePresenceViewer = { user_id: string; active: boolean };
 

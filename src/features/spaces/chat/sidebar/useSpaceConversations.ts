@@ -1,5 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation } from "@/api/spaces/dto/entities";
 import { readApiSessionGeneration } from "@/api/client/session";
 import { useCallback, useEffect, useState } from "react";
 

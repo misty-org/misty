@@ -1,8 +1,8 @@
 export * from "./AuthContext";
 export { bootstrapDemoSession } from "./demoSessionBootstrap";
 export * from "./hooks/useAccountAvatarUrl";
-export type * from "./model/stores/account/interfaces/useAccountStore";
-export type * from "./model/stores/account/interfaces/useAuthTokenStore";
+export type * from "./model/stores/account/useAccountStore";
+export type * from "./model/stores/account/useAuthTokenStore";
 export { default as RegisterPage } from "./RegisterPage";
 export { SavedAccountSessionUnavailableError } from "./sessionErrors";
 export { default as SignInPage } from "./SignInPage";

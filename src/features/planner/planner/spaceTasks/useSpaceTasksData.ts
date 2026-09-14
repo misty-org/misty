@@ -1,6 +1,6 @@
 import type { PlannerTaskServices } from "./taskServices";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { mergeTasks } from "./taskOrdering";

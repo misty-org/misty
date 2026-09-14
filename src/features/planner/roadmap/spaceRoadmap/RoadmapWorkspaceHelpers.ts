@@ -3,7 +3,7 @@ import type {
   SpaceRoadmapEdgeEndpoint,
   SpaceRoadmapMilestone,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import type { RoadmapNode } from "./RoadmapCanvas";
 
 export function normalizeRoadmapSnapshot(snapshot: SpaceRoadmapSnapshot): SpaceRoadmapSnapshot {

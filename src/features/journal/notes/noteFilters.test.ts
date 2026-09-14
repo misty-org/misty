@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { UnifiedNote } from "./model/types/types";
+import type { UnifiedNote } from "./model/types";
 import { notesInGroup, searchNotes, selectVisibleNotes } from "./noteFilters";
 
 const now = Date.parse("2026-07-20T12:00:00.000Z");

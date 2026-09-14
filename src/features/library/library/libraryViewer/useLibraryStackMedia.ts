@@ -1,4 +1,4 @@
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useEffect, useState } from "react";
 import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import { libraryMediaKind, type LibraryMediaKind } from "./libraryMediaKind";

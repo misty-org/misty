@@ -2,7 +2,7 @@ import { act, useEffect } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import { SpaceTasksView } from "./SpaceTasksView";
 import type { PlannerTaskServices } from "./spaceTasks/taskServices";
 import type { PlannerTaskIntegration } from "./spaceTasks/taskRuntime";

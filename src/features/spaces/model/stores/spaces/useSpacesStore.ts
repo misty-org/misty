@@ -7,8 +7,8 @@ import type {
   SpaceMessage,
   SpaceNode,
   SpacesSnapshot,
-} from "@/api/spaces/dto/interfaces/types";
-import type { SpacePresenceViewer } from "../types/useSpacesBackendStore";
+} from "@/api/spaces/dto/entities";
+import type { SpacePresenceViewer } from "./useSpacesBackendStore";
 
 export interface SpacesStore {
   spaces: Space[];

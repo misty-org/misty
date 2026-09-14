@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { AuthUser } from "../authSession";
-import type { SavedAccountSession } from "../model/stores/account/interfaces/useAuthTokenStore";
+import type { SavedAccountSession } from "../model/stores/account/useAuthTokenStore";
 
 export type SetUserState = Dispatch<SetStateAction<AuthUser | null>>;
 export type SetAccounts = Dispatch<SetStateAction<SavedAccountSession[]>>;

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AccountMeResponse } from "../model/stores/account/interfaces/useAccountStore";
+import type { AccountMeResponse } from "../model/stores/account/useAccountStore";
 
 export const useUserStore = create<UserStore>((set) => ({
   me: null,

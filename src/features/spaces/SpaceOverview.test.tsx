@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { SpaceOverview } from "./SpaceOverview";
 vi.mock("@/features/auth", () => ({
   accountScopeResetEvent: "misty:test-account-reset",

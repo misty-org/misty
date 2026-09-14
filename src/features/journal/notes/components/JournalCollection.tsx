@@ -20,7 +20,7 @@ import {
   CollectionSkeleton,
   itemTones,
 } from "@/shared/ui";
-import type { UnifiedNote } from "../model/types/types";
+import type { UnifiedNote } from "../model/types";
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
 
 export function JournalCollection(props: {

@@ -1,4 +1,4 @@
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { WorkspaceSidebarHeading } from "@/shared/ui";
 import { SpaceManagementNavigation } from "./SpaceManagementNavigation";
 import { SpaceAvatar } from "./SpaceAvatar";

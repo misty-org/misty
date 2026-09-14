@@ -2,7 +2,7 @@ import { Button, TableHead } from "@/shared/ui";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { memo } from "react";
-import type { FileTableColumn } from "../../model/types/components/FileBrowser";
+import type { FileTableColumn } from "../../model/FileBrowser";
 import type { ExplorerSortState } from "../../store/index";
 import { fileBrowserStyles } from "../FileBrowserStyles";
 

@@ -1,5 +1,5 @@
-import type { CommonClientProperties } from "@/telemetry/model/interfaces/types";
-import type { DistributionChannel, Platform, ReleaseChannel } from "@/telemetry/model/types/types";
+import type { CommonClientProperties } from "@/telemetry/model/events";
+import type { DistributionChannel, Platform, ReleaseChannel } from "@/telemetry/model/environment";
 import { getVersion } from "@tauri-apps/api/app";
 import { arch, platform, version } from "@tauri-apps/plugin-os";
 let cached: Promise<CommonClientProperties> | undefined;

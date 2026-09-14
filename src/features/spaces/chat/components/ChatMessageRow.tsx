@@ -1,6 +1,6 @@
 import type { SpaceChatMessagesProps } from "./ChatMessages";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import type { MessageSpan } from "@/api/spaces/dto/types/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { MessageSpan } from "@/api/spaces/dto/common";
 import { Avatar, AvatarFallback, AvatarImage, Badge, Button } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, memo, type FormEvent } from "react";

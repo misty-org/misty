@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 import { Pencil } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";

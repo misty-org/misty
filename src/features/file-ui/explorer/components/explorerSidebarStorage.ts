@@ -1,4 +1,4 @@
-import type { DeviceCustomizationState } from "../model/interfaces/components/ExplorerSidebarSupport";
+import type { DeviceCustomizationState } from "../model/ExplorerSidebarSupport";
 import { normalizeExplorerPath } from "@/shared/lib/pathNormalization";
 
 /** The sidebar's per-device layout: hidden and ordered Quick access rows, devices, collapsed sections. */

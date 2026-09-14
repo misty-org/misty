@@ -26,7 +26,7 @@ import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { conversationName } from "./sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
 import { SpaceSocial } from "./SpaceChat";
-import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation } from "@/api/spaces/dto/entities";
 
 export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceSocial>) {
   const location = useLocation();

@@ -10,8 +10,8 @@ import type {
   SpaceRoadmapNode,
   SpaceRoadmapSaveState,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

@@ -1,7 +1,7 @@
 import type { AiSurfaceAdapter as MistySurfaceAdapter } from "@/features/ai-surface/types";
 import type { ReactNode } from "react";
 
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 import type { PlannerTaskServices } from "./taskServices";
 
 export interface PlannerTaskIntegration {

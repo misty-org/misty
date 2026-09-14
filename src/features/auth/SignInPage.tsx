@@ -12,7 +12,7 @@ import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
 import ForgotPasswordForm from "./components/ForgotPasswordForm";
 import GoogleSignInButton from "./components/GoogleSignInButton";
-import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import type { SavedAccountSession } from "./model/stores/account/useAuthTokenStore";
 import { accountSignIn } from "./store/useAccountStore";
 
 export default function SignIn() {

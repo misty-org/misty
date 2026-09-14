@@ -9,7 +9,7 @@ import { notesApi } from "@/api/notes/api";
 import { drawingsApi } from "@/api/drawings/api";
 import { spacesApi } from "@/api/spaces/api";
 import { agentArtifactCredit, agentArtifactsApi } from "@/api/spaces/agent-artifacts";
-import type { Space, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   createContext,
   createElement,

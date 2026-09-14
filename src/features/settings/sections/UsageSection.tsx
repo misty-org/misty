@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiRequest, readApiSessionGeneration } from "@/api/client";
 import { ApiRequestError } from "@/api/client/errors";
 import type { AccountMeResponse } from "@/api/account/types";
-import type { AiLimit, BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import type { AiLimit, BillingUsage } from "@/api/spaces/dto/agentUsageTypes";
 import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { Button, Progress, Skeleton } from "@/shared/ui";
 import {

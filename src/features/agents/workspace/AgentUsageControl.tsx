@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest, readApiSessionGeneration } from "@/api/client";
-import type { AiLimit } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import type { AiLimit } from "@/api/spaces/dto/agentUsageTypes";
 import {
   CommandEstimateDetails,
   formatUsagePercent,

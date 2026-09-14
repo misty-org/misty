@@ -6,10 +6,10 @@ import { useMemo } from "react";
 import { NewNoteDialog } from "./components/NewNoteDialog";
 import { NotePreview } from "./components/NotePreview";
 import { NoteReadingPane } from "./components/NoteReadingPane";
-import type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
+import type { SpaceNotesProps } from "./model/SpaceNotes";
 import { SpaceNotesView, type NotesViewRuntime } from "./SpaceNotesView";
 import { useNotesStore } from "./store";
-export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
+export type { SpaceNotesProps } from "./model/SpaceNotes";
 const emptyMembers: never[] = [];
 function Integration(props: Parameters<NotesViewRuntime["renderIntegration"]>[0]) {
   useWorkspaceViewTitle(props.workspaceTabId, props.title);

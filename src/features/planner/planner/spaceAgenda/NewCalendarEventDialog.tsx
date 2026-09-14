@@ -1,4 +1,4 @@
-import type { SpaceCalendarEvent } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceCalendarEvent } from "@/api/spaces/dto/entities";
 import {
   Button,
   Dialog,

@@ -1,8 +1,4 @@
-import type {
-  SpaceConversation,
-  SpaceMember,
-  SpaceMessage,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation, SpaceMember, SpaceMessage } from "@/api/spaces/dto/entities";
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import "../SocialRuntime";
 import { socialApi as spacesApi } from "../SocialRuntime";

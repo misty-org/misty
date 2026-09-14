@@ -1,5 +1,5 @@
 import type { LibraryItemMenuState } from "../components/LibraryItemContextMenu";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { useEffect, useRef, useState } from "react";
 
 /**

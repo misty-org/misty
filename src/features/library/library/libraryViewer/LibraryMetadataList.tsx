@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { formatBytes, formatTime } from "../libraryFormat";
 import { LibraryMetadataRow } from "../SpaceLibraryViewerUtils";
 

@@ -1,5 +1,5 @@
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceTaskStatus } from "@/api/spaces/dto/common";
 
 const RANK_STEP = 1024;
 

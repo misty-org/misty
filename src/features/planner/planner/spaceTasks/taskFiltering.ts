@@ -1,5 +1,5 @@
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
 
 export const FILTER_PARAM_KEYS = ["status", "assignee", "priority", "due", "mine"] as const;
 

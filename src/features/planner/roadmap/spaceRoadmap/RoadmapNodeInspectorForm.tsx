@@ -2,7 +2,7 @@ import type {
   SpaceRoadmapFieldDefinition,
   SpaceRoadmapNode,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import {
   Button,
   Checkbox,

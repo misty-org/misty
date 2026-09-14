@@ -1,6 +1,6 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { confirmLibraryAction as confirmAction } from "../LibraryRuntime";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";

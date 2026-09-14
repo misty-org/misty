@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   MenuTrigger,
 } from "@/shared/ui";
-import type { AgentScope } from "../model/interfaces/types";
+import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot, codeChooseProject } from "../store/useAgentsStore";
 import { useConversationProject } from "../store/useConversationProject";
 import { FromGitHubDialog, NewProjectDialog } from "./ProjectDialogs";

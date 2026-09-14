@@ -11,11 +11,8 @@ import {
 import { RotateCcw } from "lucide-react";
 import type { MouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FileBrowserProps } from "../../model/interfaces/components/FileBrowser";
-import type {
-  FileTableColumn,
-  FileTableColumnWidths,
-} from "../../model/types/components/FileBrowser";
+import type { FileBrowserProps } from "../../model/FileBrowser";
+import type { FileTableColumn, FileTableColumnWidths } from "../../model/FileBrowser";
 import type { ExplorerSortColumn } from "../../store/index";
 import { dragItemsForEntry } from "../FileBrowserDrag";
 import { InlineCreateTableRow } from "../FileBrowserInline";

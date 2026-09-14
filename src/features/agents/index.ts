@@ -1,6 +1,6 @@
 export { default as AgentsPage } from "./AgentsPage";
 export * from "./flags";
-export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
+export type { GlobalSpaceLibraryHit } from "./model/personal";
 export { agentsDeviceSnapshot, codeRemoveProject } from "./store/useAgentsStore";
 export {
   deviceAccount,
@@ -23,7 +23,7 @@ export { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./panel/mistyPanelStore";
 export { MistyPanelSprite } from "./panel/MistyPanelSprite";
 export { AgentTabAway, useTabAway } from "./dock/AgentTabAway";
 
-export type { AgentScope } from "./model/interfaces/types";
+export type { AgentScope } from "./model/types";
 
 export type { DisplayCapture } from "./companion/protocol";
 

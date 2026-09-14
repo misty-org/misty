@@ -1,4 +1,4 @@
-import type { LibraryAssetStack } from "../interfaces/types";
+import type { LibraryAssetStack } from "./entities";
 
 export type LibraryAssetStackInput = Pick<
   LibraryAssetStack,

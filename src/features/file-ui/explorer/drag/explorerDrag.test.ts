@@ -13,7 +13,7 @@ import {
   operationForInternalDrop,
   storageIdForPath,
 } from "./operations";
-import type { ExplorerDragItem, ExplorerDragPayload } from "../model/interfaces/drag/types";
+import type { ExplorerDragItem, ExplorerDragPayload } from "../model/drag";
 
 describe("Explorer pointer drag geometry", () => {
   it("converts Tauri physical coordinates through DPI and app zoom", () => {

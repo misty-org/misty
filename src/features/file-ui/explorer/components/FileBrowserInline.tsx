@@ -1,10 +1,10 @@
 import { Input, TableCell, TableRow } from "@/shared/ui";
 import { useLayoutEffect, useRef } from "react";
-import type { PassiveRenameDraft } from "../model/types/components/FileBrowserInline";
+import type { PassiveRenameDraft } from "../model/FileBrowser";
 import type { ExplorerInlineEditState, ExplorerSortColumn } from "../store/index";
 import { FileNameIcon } from "./FileBrowserIcons";
 import { fileBrowserStyles } from "./FileBrowserStyles";
-export type { PassiveRenameDraft } from "../model/types/components/FileBrowserInline";
+export type { PassiveRenameDraft } from "../model/FileBrowser";
 
 export function InlineCreateTableRow(props: {
   edit: ExplorerInlineEditState;

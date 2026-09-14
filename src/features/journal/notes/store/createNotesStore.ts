@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { NotesConnectorRegistry } from "../connectors/NotesConnectorRegistry";
 import { nowIso } from "../connectorUtils";
-import type { CreateNoteInput } from "../model/interfaces/connectors";
-import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "../model/types/types";
+import type { CreateNoteInput } from "../model/connectors";
+import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "../model/types";
 
 export function createNotesStore(services: {
   createRegistry: (

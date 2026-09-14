@@ -1,6 +1,6 @@
 import type { RefObject } from "react";
-import type { LibraryEditDefinition } from "../types/types";
-import type { LibraryAssetStack, SpaceLibraryItem } from "./types";
+import type { LibraryEditDefinition } from "./common";
+import type { LibraryAssetStack, SpaceLibraryItem } from "./entities";
 
 export type LibraryItemMetadataPatch = Partial<
   Pick<SpaceLibraryItem, "display_name" | "caption" | "favorite" | "hidden" | "tags">

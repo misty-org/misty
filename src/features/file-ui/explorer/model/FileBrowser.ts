@@ -6,8 +6,8 @@ import type {
   ExplorerSortColumn,
   ExplorerSortState,
   ExplorerViewMode,
-} from "../../../store/index";
-import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
+} from "../store/index";
+import type { ExplorerDragItem, ExplorerDragModifiers, ExplorerDragPayload } from "./drag";
 
 export interface FileBrowserProps {
   paneId: string;
@@ -42,3 +42,17 @@ export interface FileBrowserProps {
   onInlineEditCommit: () => void;
   onInlineEditCancel: () => void;
 }
+
+export type FileTableColumn = ExplorerSortColumn;
+
+export type FileTableColumnWidths = Record<FileTableColumn, number>;
+
+export type GridThumbnailSubscriber = (url: string | null) => void;
+
+export type FileBrowserDragItem = ExplorerDragItem;
+
+export type PassiveRenameDraft = {
+  value: string;
+  lockedExtension: string;
+  error: string | null;
+};

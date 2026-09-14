@@ -1,7 +1,4 @@
-import type {
-  FileTableColumn,
-  FileTableColumnWidths,
-} from "../../model/types/components/FileBrowser";
+import type { FileTableColumn, FileTableColumnWidths } from "../../model/FileBrowser";
 
 export const TABLE_OVERSCAN_ROWS = 4;
 export const GRID_ITEM_HEIGHT = 156;

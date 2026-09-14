@@ -14,7 +14,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import type { SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTemplate } from "@/api/spaces/dto/entities";
 
 /** Template icon keys from the server, drawn as monochrome glyphs. */
 const icons: Record<string, LucideIcon> = {

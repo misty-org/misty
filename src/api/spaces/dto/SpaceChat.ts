@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "../interfaces/types";
+import type { SpaceLibraryItem } from "./entities";
 
 export type ChatComposerSuggestion =
   | { kind: "member"; id: string; label: string; detail: string }

@@ -4,7 +4,7 @@ import {
   isAccountSessionTransitioning,
   readAccountSessionGeneration,
 } from "@/features/auth";
-import type { CurrentLicense, CurrentUser, NativeSession } from "../model/types/types";
+import type { CurrentLicense, CurrentUser, NativeSession } from "../model/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";

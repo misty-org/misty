@@ -2,7 +2,7 @@ import { FolderCode, FolderPlus, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Switch } from "@/shared/ui";
-import type { AgentDevice, AgentScope } from "../model/interfaces/types";
+import type { AgentDevice, AgentScope } from "../model/types";
 import { ProjectGitRows } from "./ProjectGitRows";
 import {
   agentsDeviceSnapshot,

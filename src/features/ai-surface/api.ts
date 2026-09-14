@@ -7,7 +7,7 @@ import {
   readApiAuthToken,
   resolveRequiredApiBase,
 } from "@/api/client";
-import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import type { BillingUsage } from "@/api/spaces/dto/agentUsageTypes";
 import type {
   AiProgressItem,
   AiArtifact,

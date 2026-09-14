@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type {
-  SpaceAgendaEntry,
-  SpaceRoadmap,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceAgendaEntry, SpaceRoadmap } from "@/api/spaces/dto/plannerExpansionTypes";
 
 export type TaskFilters = NonNullable<Parameters<typeof spacesApi.tasks>[1]>;
 export type PlannerSection = "all" | "tasks" | "agenda" | "roadmaps";

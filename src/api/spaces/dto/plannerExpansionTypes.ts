@@ -1,4 +1,4 @@
-import type { SpaceTask } from "./types";
+import type { SpaceTask } from "./entities";
 
 type SpaceAgendaEntryKind = "task" | "event" | "goal" | "milestone" | "roadmap_node";
 

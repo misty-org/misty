@@ -1,5 +1,5 @@
 import { useRoadmapRuntime } from "./RoadmapRuntime";
-import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import { Background, BackgroundVariant, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMemo } from "react";

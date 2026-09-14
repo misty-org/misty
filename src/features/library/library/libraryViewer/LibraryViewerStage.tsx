@@ -1,5 +1,5 @@
 import { LibraryPreview as EmbeddedUniversalPreview } from "../LibraryRuntime";
-import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAssetStack } from "@/api/spaces/dto/entities";
 import { Button, IconButton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";

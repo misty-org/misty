@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "@/api/client";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 const api = vi.hoisted(() => ({ request: vi.fn(), generation: 1 }));
 vi.mock("@/api/client", async (original) => ({
   ...(await original<typeof ApiClient>()),

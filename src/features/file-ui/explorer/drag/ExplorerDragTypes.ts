@@ -1,9 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type {
-  ExplorerDragItem,
-  ExplorerDragViewState,
-  ExplorerDropZoneSpec,
-} from "../model/interfaces/drag/types";
+import type { ExplorerDragItem, ExplorerDragViewState, ExplorerDropZoneSpec } from "../model/drag";
 export interface ExplorerDragContextValue {
   state: ExplorerDragViewState;
   armSource: (items: ExplorerDragItem[], event: ReactPointerEvent<HTMLElement>) => void;

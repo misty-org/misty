@@ -1,2 +1,2 @@
-export type * from "./model/types/types";
+export type * from "./model/types";
 export * from "./store/useNativeSessionStore";

@@ -4,7 +4,7 @@ import type {
   Environment,
   Platform,
   ReleaseChannel,
-} from "@/telemetry/model/types/types";
+} from "@/telemetry/model/environment";
 
 export interface CommonClientProperties {
   platform: Platform;
