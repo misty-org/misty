@@ -1,299 +1,26 @@
-import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model";
-import { enableModernWindowStyle } from "@/native";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { invoke } from "@tauri-apps/api/core";
-import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
-import { platform as osPlatform } from "@tauri-apps/plugin-os";
-import type { PointerEvent as ReactPointerEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
-const WINDOW_DRAG_SUPPRESS_SELECTOR = [
-  "button",
-  "a",
-  "input",
-  "textarea",
-  "select",
-  "[role='button']",
-  "[draggable='true']",
-  "[data-misty-window-drag-block='true']",
-  "[data-pointer-drag-source='true']",
-  "[data-explorer-drag-source='true']",
-  "[data-reorder-drag-source='true']",
-  "[data-drag-handle]",
-  "[data-drag-handle='true']",
-].join(",");
-export function shouldSuppressWindowDrag(target: EventTarget | null) {
-  const element = typeof Element === "undefined" || !(target instanceof Element) ? null : target;
-  return Boolean(element?.closest(WINDOW_DRAG_SUPPRESS_SELECTOR));
-}
-export function windowRectsMatch(actual: WindowRect, expected: WindowRect, tolerance = 4) {
-  return (
-    Math.abs(actual.x - expected.x) <= tolerance &&
-    Math.abs(actual.y - expected.y) <= tolerance &&
-    Math.abs(actual.width - expected.width) <= tolerance &&
-    Math.abs(actual.height - expected.height) <= tolerance
-  );
-}
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useCallback } from "react";
+import { useDesktopPlatform, useWindowStyleSetup } from "./useDesktopPlatformSetup";
+import { useTitlebarPointerHandlers } from "./useTitlebarPointerHandlers";
+import { useTitlebarZoom } from "./useTitlebarZoom";
+import { useWindowMaximizedState } from "./useWindowMaximizedState";
+import { useWindowsSnapLayouts } from "./useWindowsSnapLayouts";
+
+export { shouldSuppressWindowDrag, windowRectsMatch } from "./windowChromeHelpers";
+
 export function useDesktopWindowChrome() {
-  const [desktopPlatform, setDesktopPlatform] = useState<DesktopPlatform>("unknown");
-  const customZoomRestoreBoundsRef = useRef<WindowBounds | null>(null);
-  const customZoomAnimatingRef = useRef(false);
-  const lastTitlebarPressRef = useRef(0);
-  const [isWindowMaximized, setIsWindowMaximized] = useState(false);
-  useEffect(() => {
-    if (!hasTauriInternals()) {
-      setDesktopPlatform("browser");
-      return;
-    }
-    try {
-      setDesktopPlatform(osPlatform() as DesktopPlatform);
-    } catch {
-      setDesktopPlatform("unknown");
-    }
-  }, []);
-  useEffect(() => {
-    if (!hasTauriInternals()) return;
-    let disposed = false;
-    const configureWindow = async () => {
-      await enableModernWindowStyle(getCurrentWindow());
-      if (disposed) return;
-      // macOS uses native AppKit autoresizing, configured by the command.
-      // Enabling Tauri's proportional sizing here adds delayed frame writes.
-      if (osPlatform() !== "macos") await getCurrentWebview().setAutoResize(true);
-    };
-    void configureWindow().catch(() => undefined);
-    return () => {
-      disposed = true;
-    };
-  }, []);
-  useEffect(() => {
-    if (!hasTauriInternals()) return;
-    let disposed = false;
-    let unlistenResize: (() => void) | undefined;
-    let resizeStatusTimer: ReturnType<typeof setTimeout> | undefined;
-    const window = getCurrentWindow();
-    const syncMaximizedState = async () => {
-      const maximized = await window.isMaximized();
-      if (!disposed) setIsWindowMaximized(maximized);
-    };
-    void syncMaximizedState().catch(() => undefined);
-    void window
-      .onResized(() => {
-        // Only titlebar status needs this query. Keep native IPC round trips
-        // out of the live-resize hot path; AppKit sizes and paints immediately.
-        if (disposed) return;
-        clearTimeout(resizeStatusTimer);
-        resizeStatusTimer = setTimeout(() => {
-          void syncMaximizedState().catch(() => undefined);
-        }, 120);
-      })
-      .then((unlisten) => {
-        if (disposed) unlisten();
-        else unlistenResize = unlisten;
-      })
-      .catch(() => undefined);
-    return () => {
-      disposed = true;
-      clearTimeout(resizeStatusTimer);
-      unlistenResize?.();
-    };
-  }, []);
-  const startTitlebarDrag = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || event.detail > 1) {
-      return;
-    }
-    if (shouldSuppressWindowDrag(event.target)) {
-      return;
-    }
-    event.preventDefault();
-    if (!hasTauriInternals()) return;
-    void getCurrentWindow()
-      .startDragging()
-      .catch(() => undefined);
-  }, []);
-  const animateWindowRect = useCallback(
-    async (from: WindowRect, to: WindowRect, durationMs = 500) => {
-      if (!hasTauriInternals()) {
-        return;
-      }
-      if (customZoomAnimatingRef.current) {
-        return;
-      }
-      customZoomAnimatingRef.current = true;
-      const window = getCurrentWindow();
-      if (desktopPlatform === "windows") {
-        try {
-          await window.setPosition(new PhysicalPosition(to.x, to.y));
-          await window.setSize(new PhysicalSize(to.width, to.height));
-        } finally {
-          customZoomAnimatingRef.current = false;
-        }
-        return;
-      }
-      const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-      return new Promise<void>((resolve, reject) => {
-        const start = performance.now();
-        const step = (now: number) => {
-          const progress = Math.min(1, (now - start) / durationMs);
-          const eased = easeOutCubic(progress);
-          const x = Math.round(from.x + (to.x - from.x) * eased);
-          const y = Math.round(from.y + (to.y - from.y) * eased);
-          const width = Math.round(from.width + (to.width - from.width) * eased);
-          const height = Math.round(from.height + (to.height - from.height) * eased);
-
-          // Keep only one native frame commit in flight. Fire-and-forget IPC
-          // lets older size requests finish after newer ones, which makes the
-          // window and WKWebView visibly jump and can miss the restore target.
-          void Promise.all([
-            window.setPosition(new PhysicalPosition(x, y)),
-            window.setSize(new PhysicalSize(width, height)),
-          ]).then(
-            () => {
-              if (progress < 1) {
-                requestAnimationFrame(step);
-                return;
-              }
-              customZoomAnimatingRef.current = false;
-              resolve();
-            },
-            (error: unknown) => {
-              customZoomAnimatingRef.current = false;
-              reject(error);
-            },
-          );
-        };
-        requestAnimationFrame(step);
-      });
-    },
-    [desktopPlatform],
+  const desktopPlatform = useDesktopPlatform();
+  useWindowStyleSetup();
+  const [isWindowMaximized, setIsWindowMaximized] = useWindowMaximizedState();
+  const { togglePseudoMaximize, toggleTitlebarMaximize } = useTitlebarZoom(
+    desktopPlatform,
+    setIsWindowMaximized,
   );
-  const togglePseudoMaximize = useCallback(async () => {
-    if (!hasTauriInternals()) return;
-    if (customZoomAnimatingRef.current) return;
-    const window = getCurrentWindow();
-    if (await window.isFullscreen()) {
-      return;
-    }
-    const [position, size, monitor] = await Promise.all([
-      window.outerPosition(),
-      window.outerSize(),
-      currentMonitor().then((current) => current ?? primaryMonitor()),
-    ]);
-    const currentRect = {
-      x: position.x,
-      y: position.y,
-      width: size.width,
-      height: size.height,
-    };
-    if (!monitor) return;
-    const workAreaRect = {
-      x: monitor.workArea.position.x,
-      y: monitor.workArea.position.y,
-      width: monitor.workArea.size.width,
-      height: monitor.workArea.size.height,
-    };
-    const isActuallyZoomed = windowRectsMatch(currentRect, workAreaRect);
-    if (!isActuallyZoomed) {
-      // A manual resize, move, monitor change, or hot reload can invalidate an
-      // in-memory zoom flag. The actual frame is authoritative: any window
-      // that is not filling the current work area must expand from here.
-      customZoomRestoreBoundsRef.current = {
-        position,
-        size,
-      };
-      await animateWindowRect(currentRect, workAreaRect);
-      setIsWindowMaximized(true);
-      return;
-    }
-    const restoreBounds = customZoomRestoreBoundsRef.current;
-    if (!restoreBounds) {
-      setIsWindowMaximized(true);
-      return;
-    }
-    await animateWindowRect(currentRect, {
-      x: restoreBounds.position.x,
-      y: restoreBounds.position.y,
-      width: restoreBounds.size.width,
-      height: restoreBounds.size.height,
-    });
-    setIsWindowMaximized(false);
-  }, [animateWindowRect]);
-  const toggleTitlebarMaximize = useCallback(async () => {
-    if (!hasTauriInternals()) return;
-    if (desktopPlatform === "windows" || desktopPlatform === "linux") {
-      const window = getCurrentWindow();
-      await window.toggleMaximize();
-      setIsWindowMaximized(await window.isMaximized());
-      return;
-    }
-    await togglePseudoMaximize();
-  }, [desktopPlatform, togglePseudoMaximize]);
-
-  // The native drag loop consumes the DOM dblclick event, so recognize the
-  // second press here. Drive zoom/restore through explicit animation frames:
-  // AppKit's built-in zoom snapshots WKWebView instead of giving WebKit each
-  // intermediate viewport size.
-  const handleMacTitlebarPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (event.button !== 0) return;
-      if (shouldSuppressWindowDrag(event.target)) return;
-      event.preventDefault();
-      if (!hasTauriInternals()) return;
-      const now = Date.now();
-      const isDoublePress = now - lastTitlebarPressRef.current <= 500;
-      lastTitlebarPressRef.current = isDoublePress ? 0 : now;
-      if (isDoublePress) {
-        void togglePseudoMaximize().catch(() => undefined);
-        return;
-      }
-      void getCurrentWindow()
-        .startDragging()
-        .catch(() => undefined);
-    },
-    [togglePseudoMaximize],
-  );
-
-  // Windows/Linux titlebar: drag on press, toggle native maximize on a
-  // double-press. The native path preserves Windows snap behavior and its
-  // minimize/maximize/restore animations.
-  const handleWindowsTitlebarPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (event.button !== 0) return;
-      if (shouldSuppressWindowDrag(event.target)) return;
-      event.preventDefault();
-      if (!hasTauriInternals()) return;
-      const now = Date.now();
-      const isDoublePress = now - lastTitlebarPressRef.current <= 500;
-      lastTitlebarPressRef.current = isDoublePress ? 0 : now;
-      if (isDoublePress) {
-        void toggleTitlebarMaximize().catch(() => undefined);
-        return;
-      }
-      void getCurrentWindow()
-        .startDragging()
-        .catch(() => undefined);
-    },
-    [toggleTitlebarMaximize],
-  );
-  const handleDesktopTitlebarPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      if (desktopPlatform === "macos") {
-        handleMacTitlebarPointerDown(event);
-        return;
-      }
-      if (desktopPlatform === "windows" || desktopPlatform === "linux") {
-        handleWindowsTitlebarPointerDown(event);
-        return;
-      }
-      startTitlebarDrag(event);
-    },
-    [
-      desktopPlatform,
-      handleMacTitlebarPointerDown,
-      handleWindowsTitlebarPointerDown,
-      startTitlebarDrag,
-    ],
+  const { startTitlebarDrag, handleDesktopTitlebarPointerDown } = useTitlebarPointerHandlers(
+    desktopPlatform,
+    togglePseudoMaximize,
+    toggleTitlebarMaximize,
   );
   const minimizeTitlebarWindow = useCallback(() => {
     if (!hasTauriInternals()) return;
@@ -309,22 +36,7 @@ export function useDesktopWindowChrome() {
   }, []);
   const shouldShowWindowsTitlebarControls =
     desktopPlatform === "windows" || desktopPlatform === "linux";
-  // Windows opens Snap Layouts when the pointer rests on a maximize button.
-  // Misty's is drawn in the page, so it asks for the flyout itself.
-  const snapLayoutsTimerRef = useRef<number | undefined>(undefined);
-  const cancelSnapLayouts = useCallback(() => {
-    window.clearTimeout(snapLayoutsTimerRef.current);
-    snapLayoutsTimerRef.current = undefined;
-  }, []);
-  const showSnapLayoutsSoon = useCallback(() => {
-    if (!hasTauriInternals() || desktopPlatform !== "windows") return;
-    cancelSnapLayouts();
-    snapLayoutsTimerRef.current = window.setTimeout(() => {
-      snapLayoutsTimerRef.current = undefined;
-      void invoke("window_show_snap_layouts").catch(() => undefined);
-    }, 500);
-  }, [cancelSnapLayouts, desktopPlatform]);
-  useEffect(() => cancelSnapLayouts, [cancelSnapLayouts]);
+  const { showSnapLayoutsSoon, cancelSnapLayouts } = useWindowsSnapLayouts(desktopPlatform);
 
   return {
     desktopPlatform,
