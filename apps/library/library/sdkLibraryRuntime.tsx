@@ -1,4 +1,4 @@
-import { createSdkFilePicker } from "@/features/picker/createSdkFilePicker";
+import { createSdkFilePicker } from "../../files/workspace/createSdkFilePicker";
 import { useEffect } from "react";
 import { create } from "zustand";
 import {

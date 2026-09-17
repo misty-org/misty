@@ -1,4 +1,6 @@
-# Library
+# Storage
+
+`library` remains the stable package and route ID for the Storage app. Storage uses Lucide’s Package icon; built-in Space Library uses the book icon.
 
 `index.tsx` is this app's SDK component entry. The adjacent folders own its collections and shared resources, including their colocated tests.
 

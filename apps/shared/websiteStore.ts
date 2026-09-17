@@ -1,4 +1,4 @@
-import { uniquePagePins } from "./pagePins";
+import { uniquePagePins, resolvePinLabel } from "./pagePins";
 import { providerLaunchUrl, providerLoginUrls } from "./providerLoginUrls";
 import {
   mistyBrowserProviders,
@@ -331,39 +331,7 @@ export function websiteNavigation(
   state: WebsiteState,
   spaceId?: string,
 ): MistyNavigationItem[] {
-  const base = `/apps/${app}`;
-  const native = (view: string) =>
-    `${base}?provider=misty&view=${view}${app === "library" ? `&collection=${view}` : ""}${spaceId ? `&space=${encodeURIComponent(spaceId)}` : ""}`;
-  const sections =
-    app === "library"
-      ? [
-          ["recent", "All items"],
-          ["favorites", "Favorites"],
-          ["collections", "Collections"],
-          ["albums", "Albums"],
-          ["deleted", "Recently deleted"],
-        ]
-      : app === "journal"
-        ? [
-            ["notes", "Notes"],
-            ["drawings", "Drawings"],
-          ]
-        : [
-            ["tasks", "Tasks"],
-            ["agenda", "Agenda"],
-            ["roadmaps", "Roadmaps"],
-          ];
   return [
-    {
-      id: "misty",
-      label: "Misty",
-      route: native(sections[0][0]),
-      children: sections.map(([id, label]) => ({
-        id,
-        label,
-        route: native(id),
-      })),
-    },
     ...state.services
       .filter((s) => !s.removing)
       .map((s) => ({
@@ -376,11 +344,27 @@ export function websiteNavigation(
               p.provider === s.id &&
               state.accounts.some((a) => a.id === p.accountId && !a.removing),
           )
-          .map((p) => ({
-            id: `pin-${p.id}`,
-            label: p.label,
-            route: integrationRoute(app, s.id, p.accountId, p.id),
-          })),
+          .map((p) => {
+            const account = state.accounts.find(
+              (a) => a.id === p.accountId && !a.removing,
+            );
+            const accountProfile =
+              account?.label &&
+              account.label.trim().toLowerCase() !==
+                websiteIntegrations[s.id].label.toLowerCase()
+                ? account.label.trim()
+                : undefined;
+            return {
+              id: `pin-${p.id}`,
+              label: resolvePinLabel(
+                p.label,
+                websiteIntegrations[s.id].label,
+                accountProfile,
+                app,
+              ),
+              route: integrationRoute(app, s.id, p.accountId, p.id),
+            };
+          }),
       })),
   ];
 }

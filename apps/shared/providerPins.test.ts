@@ -66,6 +66,44 @@ it("preserves pins from separate accounts and routes each link to its owning pro
   await deleteProviderPin(storage, first.id);
   expect(await loadProviderPins(storage)).toEqual([second]);
 });
+
+it("resolves generic default pin names like Inbox to the account profile in navigation", () => {
+  const genericPin = {
+    id: "gmail-pin-1",
+    accountId: "acct-1",
+    provider: "google" as const,
+    label: "Inbox",
+    url: "https://mail.google.com/mail/u/0/#inbox",
+    order: 1,
+  };
+  const specificPin = {
+    id: "gmail-pin-2",
+    accountId: "acct-1",
+    provider: "google" as const,
+    label: "Tax Documents 2026",
+    url: "https://mail.google.com/mail/u/0/#search/taxes",
+    order: 2,
+  };
+  const navigation = providerNavigationItems("inbox", {
+    accounts: [
+      {
+        id: "acct-1",
+        provider: "google",
+        label: "mattdev727@gmail.com",
+        email: "mattdev727@gmail.com",
+      },
+    ],
+    added: new Set(["google"]),
+    hidden: new Set(),
+    pins: [genericPin, specificPin],
+  });
+  const googleSection = navigation.find((item) => item.id === "google");
+  expect(googleSection).toBeDefined();
+  expect(googleSection?.children?.map((c) => c.label)).toEqual([
+    "mattdev727@gmail.com",
+    "Tax Documents 2026",
+  ]);
+});
 it.each([
   ["google", "https://accounts.google.com/signin?code=secret"],
   ["discord", "https://discord.com/login"],

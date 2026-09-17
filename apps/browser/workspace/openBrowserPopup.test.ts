@@ -14,7 +14,7 @@ vi.mock("@/shared/platform/openExternalLink", () => ({
 }));
 const resolveRuntime = vi.hoisted(() => vi.fn());
 const activeRuntime = vi.hoisted(() => vi.fn());
-vi.mock("./browserRuntime", () => ({
+vi.mock("@/features/webviews/browserRuntime", () => ({
   browserTabIdForRuntime: resolveRuntime,
   browserRuntimeIdForTabId: activeRuntime,
   useBrowserRuntimeStore: { getState: () => ({ setError }) },

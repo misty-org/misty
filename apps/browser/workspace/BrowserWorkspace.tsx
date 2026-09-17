@@ -1,6 +1,6 @@
+import { Notification } from "@/shared/ui/notification";
 import {
   blankBrowserUrl,
-  browserSearchUrl,
   browserTabTitle,
   createBrowserTabState,
   parseBrowserTabState,
@@ -20,6 +20,7 @@ import { useShortcutHandler } from "@/features/shortcuts";
 import { SystemErrorActivity } from "@/features/activity";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { useMobileSurfaceChrome } from "@/shared/mobile";
+import { normalizeBrowserAddress } from "./browserAddress";
 import { invoke } from "@tauri-apps/api/core";
 import {
   ArrowLeft,
@@ -29,7 +30,6 @@ import {
   Pencil,
   RotateCw,
   ShieldCheck,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -67,18 +67,14 @@ function browserThemeFromDocument(): BrowserTheme {
     : "dark";
 }
 
-export function normalizeBrowserAddress(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return blankBrowserUrl;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.includes(".") && !trimmed.includes(" ")) return `https://${trimmed}`;
-  return browserSearchUrl(trimmed);
-}
+export { normalizeBrowserAddress } from "./browserAddress";
 
 export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
-    const pane = panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ?? panes[0];
+    const pane =
+      panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ??
+      panes[0];
     const candidate = pane?.tabs.find((item) => item.id === pane.activeTabId);
     return candidate?.surfaceId === "browser" ? candidate : undefined;
   });
@@ -94,21 +90,37 @@ export function BrowserWorkspace(props: { tab?: WorkspaceTab }) {
 }
 
 function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
+  const active = useWorkspaceStore((state) =>
+    dockLeaves(state.layout.root).some((pane) => pane.activeTabId === tab.id),
+  );
   const nativeRuntime = hasTauriInternals();
   const state = parseBrowserTabState(tab.state);
-  useMobileSurfaceChrome({ title: tab.title || browserTabTitle(state.url), level: "root" });
+  useMobileSurfaceChrome({
+    title: tab.title || browserTabTitle(state.url),
+    level: "root",
+  });
   const pageHostRef = useRef<HTMLDivElement | null>(null);
-  const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
+  const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(
+    browserThemeFromDocument,
+  );
   const [annotationsActive, setAnnotationsActive] = useState(false);
   const [viewport, setViewport] = useState<BrowserViewport>("responsive");
   const [mistyPage, setMistyPage] = useState<BrowserMistyPage | null>(null);
   const [mistyPageLoading, setMistyPageLoading] = useState(false);
-  const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
-  const storedHistory = useBrowserRuntimeStore((runtime) => runtime.histories[tab.id]);
+  const storedGrants = useBrowserRuntimeStore(
+    (runtime) => runtime.grants[tab.id],
+  );
+  const storedHistory = useBrowserRuntimeStore(
+    (runtime) => runtime.histories[tab.id],
+  );
   const grants = storedGrants ?? [];
   const history = storedHistory ?? { entries: [state.url], index: 0 };
-  const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
-  const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
+  const runtimeError = useBrowserRuntimeStore(
+    (runtime) => runtime.errors[tab.id] ?? null,
+  );
+  const downloadNotice = useBrowserRuntimeStore(
+    (runtime) => runtime.notices[tab.id] ?? null,
+  );
   const compatibilityIssue = useBrowserRuntimeStore(
     (runtime) => runtime.compatibilityIssues[tab.id] ?? null,
   );
@@ -119,7 +131,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   );
   const lightChrome = false;
   const browserChromeBackground = "#18191c";
-  const browserMessageVisible = Boolean(runtimeError || downloadNotice || compatibilityIssue);
   const iconButtonClass = codexIconButtonClass(lightChrome);
   const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
@@ -148,9 +159,15 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
         return null;
       const operations = artifact.operations as {
         tab_scope_id?: string;
-        steps?: Array<{ action?: string; target?: string; value?: string; effect?: string }>;
+        steps?: Array<{
+          action?: string;
+          target?: string;
+          value?: string;
+          effect?: string;
+        }>;
       };
-      if (operations.tab_scope_id !== scopeId || operations.steps?.length !== 1) return null;
+      if (operations.tab_scope_id !== scopeId || operations.steps?.length !== 1)
+        return null;
       const step = operations.steps[0];
       if (step.action === "navigate" && typeof step.value === "string") {
         try {
@@ -198,7 +215,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                 id: scopeId,
                 revision: mistyPage.urlFingerprint,
               },
-              anchors: { capture: "visible-page-text", truncated: mistyPage.truncated },
+              anchors: {
+                capture: "visible-page-text",
+                truncated: mistyPage.truncated,
+              },
               contentHash: browserContentHash(content),
             }
           : null,
@@ -208,7 +228,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               {
                 id: "browser.summary",
                 label: "Summarize page",
-                prompt: "Summarize this page and cite the page context for the key claims.",
+                prompt:
+                  "Summarize this page and cite the page context for the key claims.",
                 trigger: "object",
               },
               {
@@ -329,9 +350,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
 
   useEffect(() => {
     if (!nativeRuntime) return;
-    void invoke("browser_webview_set_theme", { request: { theme: browserTheme } }).catch(
-      (error: unknown) => setBrowserError(tab.id, error),
-    );
+    void invoke("browser_webview_set_theme", {
+      request: { theme: browserTheme },
+    }).catch((error: unknown) => setBrowserError(tab.id, error));
   }, [browserTheme, nativeRuntime, tab.id]);
 
   useEffect(() => {
@@ -377,21 +398,27 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           expiresAt: new Date(Date.now() + 2 * 60_000).toISOString(),
         },
       });
-      const snapshot = await invoke<BrowserInspection>("browser_agent_execute", {
-        request: {
-          scopeId,
-          grantId,
-          agentId,
-          operation: "browser.inspect",
-          input: {},
+      const snapshot = await invoke<BrowserInspection>(
+        "browser_agent_execute",
+        {
+          request: {
+            scopeId,
+            grantId,
+            agentId,
+            operation: "browser.inspect",
+            input: {},
+          },
         },
-      });
+      );
       const text = String(snapshot.text ?? "").slice(0, 32 * 1024);
-      if (!text.trim()) throw new Error("The page did not expose readable text.");
+      if (!text.trim())
+        throw new Error("The page did not expose readable text.");
       setMistyPage({
         title: String(snapshot.title || tab.title || "Browser page"),
         text,
-        truncated: Boolean(snapshot.truncated) || String(snapshot.text ?? "").length > text.length,
+        truncated:
+          Boolean(snapshot.truncated) ||
+          String(snapshot.text ?? "").length > text.length,
         urlFingerprint: browserContentHash(String(snapshot.url || state.url)),
         interactive: (snapshot.interactive ?? []).slice(0, 100),
       });
@@ -406,7 +433,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   };
 
   const travel = (direction: -1 | 1): boolean => {
-    const url = useBrowserRuntimeStore.getState().moveHistory(tab.id, direction);
+    const url = useBrowserRuntimeStore
+      .getState()
+      .moveHistory(tab.id, direction);
     if (!url) return false;
     useWorkspaceStore.getState().updateBrowserTab(tab.id, {
       url,
@@ -414,9 +443,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     });
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);
     if (nativeRuntime) {
-      void invoke(direction < 0 ? "browser_webview_back" : "browser_webview_forward", {
-        request: { id: browserRuntimeId(tab) },
-      }).catch((error: unknown) => setBrowserError(tab.id, error));
+      void invoke(
+        direction < 0 ? "browser_webview_back" : "browser_webview_forward",
+        {
+          request: { id: browserRuntimeId(tab) },
+        },
+      ).catch((error: unknown) => setBrowserError(tab.id, error));
     }
     return true;
   };
@@ -447,9 +479,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
     <section
       className={cn(
         "grid h-full min-h-0 overflow-hidden",
-        browserMessageVisible
-          ? "grid-rows-[44px_auto_minmax(0,1fr)]"
-          : "grid-rows-[44px_minmax(0,1fr)]",
+        "grid-rows-[44px_minmax(0,1fr)]",
         lightChrome ? "text-[#202020]" : "text-cream",
       )}
       style={{ backgroundColor: browserChromeBackground }}
@@ -535,9 +565,13 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
                       ? "bg-black/[0.06] text-[#202020]"
                       : "bg-white/[0.06] text-[#e9e9e9]"),
                 )}
-                aria-label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                aria-label={
+                  annotationsActive ? "Exit annotation mode" : "Annotate page"
+                }
                 aria-pressed={annotationsActive}
-                title={annotationsActive ? "Exit annotation mode" : "Annotate page"}
+                title={
+                  annotationsActive ? "Exit annotation mode" : "Annotate page"
+                }
                 onClick={() => setAnnotationsActive((active) => !active)}
               >
                 <Pencil size={20} strokeWidth={1.7} />
@@ -551,7 +585,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               />
             </>
           ) : null}
-          <Popover open={agentMenuOverlay.open} onOpenChange={agentMenuOverlay.onOpenChange}>
+          <Popover
+            open={agentMenuOverlay.open}
+            onOpenChange={agentMenuOverlay.onOpenChange}
+          >
             <PopoverTrigger asChild>
               <button
                 type="button"
@@ -574,8 +611,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
             >
               <p className="m-0 text-sm font-medium">Run-bound Agent access</p>
               <p className="mb-3 mt-1 text-xs text-cream-muted">
-                Attach this tab when you ask an Agent to work. Access belongs only to that run,
-                stays inside its Space, and expires automatically.
+                Attach this tab when you ask an Agent to work. Access belongs
+                only to that run, stays inside its Space, and expires
+                automatically.
               </p>
               <p className="m-0 text-xs text-cream-muted">
                 {agentAccess
@@ -585,8 +623,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
               <div className="mt-3 border-t border-charcoal-border pt-3">
                 <p className="m-0 text-xs font-medium">Misty page context</p>
                 <p className="mb-2 mt-1 text-[11px] text-cream-muted">
-                  A one-time inspection captures bounded page text. The temporary read grant is
-                  revoked immediately after capture.
+                  A one-time inspection captures bounded page text. The
+                  temporary read grant is revoked immediately after capture.
                 </p>
                 <button
                   type="button"
@@ -619,64 +657,76 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
       </div>
 
       {runtimeError ? (
-        <SystemErrorActivity
-          error={runtimeError}
-          scope={`browser:${tab.id}`}
-          title="Browser needs attention"
-          target={{ kind: "route", href: "/browser" }}
-        />
+        <>
+          <SystemErrorActivity
+            intent="background"
+            error={runtimeError}
+            scope={`browser:${tab.id}`}
+            title="Browser needs attention"
+            target={{ kind: "route", href: "/browser" }}
+          />
+          <Notification
+            key={runtimeError}
+            title="Browser needs attention"
+            tone="error"
+            active={active}
+            onDismiss={() =>
+              useBrowserRuntimeStore.getState().setError(tab.id, null)
+            }
+          >
+            {runtimeError}
+          </Notification>
+        </>
       ) : null}
 
       {downloadNotice || compatibilityIssue ? (
-        <div
-          className={cn(
-            "border-b px-4 py-1.5 text-xs",
-            compatibilityIssue
-              ? "border-amber-400/20 bg-amber-400/10 text-cream"
-              : "border-emerald-500/20 bg-emerald-500/10 text-cream",
-          )}
-          role="status"
+        <Notification
+          key={downloadNotice ?? compatibilityIssue?.url}
+          title="Browser"
+          active={active}
+          onDismiss={() => {
+            useBrowserRuntimeStore.getState().setError(tab.id, null);
+            useBrowserRuntimeStore.getState().setNotice(tab.id, null);
+            useBrowserRuntimeStore
+              .getState()
+              .setCompatibilityIssue(tab.id, null);
+          }}
         >
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate">
-              {downloadNotice ?? "This site rejected Misty’s embedded browser verification."}
-            </span>
-            {compatibilityIssue ? (
-              <button
-                type="button"
-                className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-medium hover:bg-white/15"
-                onClick={() => {
-                  void openSystemExternalLink(compatibilityIssue.url).catch((error: unknown) =>
-                    setBrowserError(tab.id, error),
-                  );
-                }}
-              >
-                Open in browser
-              </button>
-            ) : null}
+          <p>
+            {downloadNotice ??
+              "This site rejected Misty’s embedded browser verification."}
+          </p>
+          {compatibilityIssue ? (
             <button
               type="button"
-              className="grid size-5 shrink-0 place-items-center rounded hover:bg-white/10"
-              aria-label="Dismiss browser message"
+              className="shrink-0 rounded-md bg-white/10 px-2 py-1 font-medium hover:bg-white/15"
               onClick={() => {
-                useBrowserRuntimeStore.getState().setError(tab.id, null);
-                useBrowserRuntimeStore.getState().setNotice(tab.id, null);
-                useBrowserRuntimeStore.getState().setCompatibilityIssue(tab.id, null);
+                void openSystemExternalLink(compatibilityIssue.url).catch(
+                  (error: unknown) => setBrowserError(tab.id, error),
+                );
               }}
             >
-              <X size={13} />
+              Open in browser
             </button>
-          </div>
-        </div>
+          ) : null}
+        </Notification>
       ) : null}
 
       <div
         className={cn(
           "flex min-h-0 min-w-0 justify-center overflow-hidden",
           viewport === "responsive" ? "p-0" : "p-3",
-          viewport === "responsive" ? undefined : lightChrome ? "bg-[#e8e8e8]" : "bg-[#101010]",
+          viewport === "responsive"
+            ? undefined
+            : lightChrome
+              ? "bg-[#e8e8e8]"
+              : "bg-[#101010]",
         )}
-        style={viewport === "responsive" ? { backgroundColor: browserChromeBackground } : undefined}
+        style={
+          viewport === "responsive"
+            ? { backgroundColor: browserChromeBackground }
+            : undefined
+        }
         data-browser-page-stage
       >
         <div
@@ -690,7 +740,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
           )}
           style={{
             width: viewportWidth ? `min(100%, ${viewportWidth}px)` : "100%",
-            backgroundColor: annotationsActive ? "transparent" : browserChromeBackground,
+            backgroundColor: annotationsActive
+              ? "transparent"
+              : browserChromeBackground,
           }}
           data-browser-page-host
           data-browser-viewport={viewport}
@@ -723,7 +775,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceTab }) {
   );
 }
 
-function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () => void }) {
+function BrowserNativeRuntimeRequired(props: {
+  url: string;
+  onOpenExternal: () => void;
+}) {
   return (
     <div
       className="absolute inset-0 grid place-items-center overflow-y-auto bg-charcoal-bg p-6"
@@ -737,8 +792,8 @@ function BrowserNativeRuntimeRequired(props: { url: string; onOpenExternal: () =
           Open this page in the Misty desktop app
         </h1>
         <p className="mt-2 max-w-sm text-sm leading-5 text-cream-muted">
-          Misty runs websites in a separate native browser view. The web companion does not use
-          embedded page frames.
+          Misty runs websites in a separate native browser view. The web
+          companion does not use embedded page frames.
         </p>
         <p className="mt-4 max-w-full truncate rounded-md bg-charcoal-card px-3 py-2 font-mono text-xs text-cream-muted">
           {props.url}

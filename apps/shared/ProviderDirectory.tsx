@@ -9,14 +9,13 @@ import {
 import { ProviderBrandIcon } from "./ProviderBrandIcon";
 import { providers, type ProviderId } from "./providers";
 import { PlatformDirectory } from "./PlatformDirectory";
-import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
 
 export function ProviderDirectory({
   appId,
   misty,
   embedded = false,
 }: {
-  appId: "chat" | "inbox";
+  appId: "chat" | "inbox" | "music" | "media";
   misty: MistyAppSDK;
   embedded?: boolean;
 }) {
@@ -48,12 +47,17 @@ export function ProviderDirectory({
       window.removeEventListener(providerAccountsChanged, refresh);
     };
   }, [misty, appId, attempt]);
+  const title =
+    appId === "chat"
+      ? "Social"
+      : appId === "music"
+        ? "Music"
+        : appId === "media"
+          ? "Media"
+          : "Inbox";
   useEffect(() => {
-    if (!embedded)
-      void misty.workspace
-        .setTitle(appId === "chat" ? "Social" : "Inbox")
-        .catch(() => {});
-  }, [misty, appId, embedded]);
+    if (!embedded) void misty.workspace.setTitle(title).catch(() => {});
+  }, [misty, title, embedded]);
   const open = async (id: string) => {
     setBusy(id);
     try {
@@ -66,7 +70,7 @@ export function ProviderDirectory({
   };
   return (
     <PlatformDirectory
-      title={appId === "chat" ? "Social" : "Inbox"}
+      title={title}
       embedded={embedded}
       loading={!state}
       error={error || state?.mailError}
@@ -97,24 +101,7 @@ export function ProviderDirectory({
           : []
       }
     >
-      {appId === "chat" && !embedded && (
-        <div className="provider-integration-row">
-          <span className="provider-integration-icon">
-            <MistyBrandIcon size={24} />
-          </span>
-          <span className="provider-integration-copy">
-            <strong>Misty</strong>
-            <small>Conversations in your Space.</small>
-          </span>
-          <button
-            className="platform-action"
-            disabled={!!busy}
-            onClick={() => void open("misty")}
-          >
-            Open
-          </button>
-        </div>
-      )}
+
     </PlatformDirectory>
   );
 }

@@ -1,3 +1,4 @@
+import {registerAgentDestinations} from "./registerAgentDestinations";
 import { withIntegrationShell } from "./IntegrationShell";
 import { createRoot } from "react-dom/client";
 import { unmountReactRoot } from "./unmountReactRoot";
@@ -29,9 +30,6 @@ export function createWebsiteApp(
       appId,
       protocol: 2,
       async mount(input) {
-        const identity = await input.misty.context.get();
-        if (identity.platform !== "desktop" || !/Mac/.test(navigator.platform))
-          return native.mount(input);
         let context = input.context,
           closed = false,
           mode = "",
@@ -54,10 +52,12 @@ export function createWebsiteApp(
             input.misty.storage.local,
             appId,
           );
-          if (!closed && run === navigationGeneration)
+          if (!closed && run === navigationGeneration) {
+            await registerAgentDestinations(input.misty,state.accounts.filter(a=>!a.removing&&state.services.some(service=>service.id===a.provider&&!service.removing)).map(a=>({provider:{id:a.provider,accountId:a.id},label:a.label,url:a.websiteUrl})));
             await input.misty.navigation.setItems(
-              websiteNavigation(appId, state, identity.space?.id),
+              websiteNavigation(appId, state),
             );
+          }
         };
         const changed = () => {
           void refreshNavigation().catch(report);
@@ -72,15 +72,9 @@ export function createWebsiteApp(
         };
         const render = async () => {
           if (closed) return;
-          const url = new URL(context.route, "https://misty.local");
           const provider = integrationFromRoute(context.route, appId);
-          const nextMode = provider
-            ? `website:${provider}`
-            : url.searchParams.get("view") === "integrations"
-              ? "directory"
-              : identity.space?.id
-                ? "native"
-                : "no-space";
+          // Shared Misty views are built into Spaces; personal apps open websites.
+          const nextMode = provider ? `website:${provider}` : "directory";
           if (mode !== nextMode) {
             lifetime?.abort();
             await child?.unmount();

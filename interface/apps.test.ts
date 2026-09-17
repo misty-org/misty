@@ -22,6 +22,8 @@ describe("official app catalog", () => {
       "browser",
       "code",
       "terminal",
+      "music",
+      "media",
     ]);
     expect(officialCatalog.apps.some((app) => app.id === "transfers")).toBe(
       false,

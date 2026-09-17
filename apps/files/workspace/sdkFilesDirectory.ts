@@ -54,6 +54,7 @@ export async function openSdkFilesDirectory(
     writeText: directory.writeText,
     saveBytes: directory.saveBytes,
     openExternal: directory.openExternal,
+    previewUrl: directory.previewUrl,
     previewImage: directory.previewImage,
     startDrag: directory.startDrag,
     withDragHandle: directory.withDragHandle,

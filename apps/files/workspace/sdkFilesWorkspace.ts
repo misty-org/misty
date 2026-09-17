@@ -357,7 +357,7 @@ export function createSdkFilesWorkspace(
       const own = snapshot.views.find((view) => view.viewId === options.viewId);
       if (!own)
         throw new Error("This Files view is no longer in the workspace.");
-      model.setState({ hasSavedState: own.state !== null });
+      model.setState({ hasSavedState: !!own.state && typeof own.state === "object" && !Array.isArray(own.state) && own.state.kind === "sdk-files" });
       await restore(parse(own.state));
       assert();
     } catch (cause) {

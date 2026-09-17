@@ -1,3 +1,6 @@
+import {registerAgentDestinations} from "./registerAgentDestinations";
+import {providers} from "./providers";
+import {mistyBrowserProviders} from "@misty/sdk";
 import { withIntegrationShell } from "./IntegrationShell";
 import { createWebsiteApp } from "./createWebsiteApp";
 import { createRoot } from "react-dom/client";
@@ -20,10 +23,10 @@ import {
 
 /** Third-party views belong to the downloaded App. Native messaging retains its existing mount. */
 export function createProviderApp(
-  appId: "chat" | "inbox" | "planner" | "journal",
+  appId: "chat" | "inbox" | "planner" | "journal" | "music" | "media",
   legacy?: MistyComponentDefinition,
 ) {
-  if (appId !== "inbox" && !legacy)
+  if (!["inbox", "music", "media"].includes(appId) && !legacy)
     throw new Error(`${appId} requires a native workspace.`);
   if (appId === "planner" || appId === "journal")
     return createWebsiteApp(appId, legacy!);
@@ -33,12 +36,6 @@ export function createProviderApp(
       appId,
       protocol: 2,
       async mount(input) {
-        const identity = await input.misty.context.get();
-        if (
-          appId !== "inbox" &&
-          (identity.platform !== "desktop" || !/Mac/.test(navigator.platform))
-        )
-          return legacy!.mount(input);
         let context = input.context,
           closed = false,
           generation = 0;
@@ -57,10 +54,12 @@ export function createProviderApp(
         const refreshNavigation = async () => {
           const run = ++navigationGeneration;
           const apply = async (state: ProviderDirectoryState) => {
-            if (!closed && run === navigationGeneration)
+            if (!closed && run === navigationGeneration) {
+              await registerAgentDestinations(input.misty,state.accounts.filter(a=>providers[a.provider]?.family===appId&&!state.hidden.has(a.provider)).map(a=>({provider:{id:a.provider,accountId:a.id},label:a.label,url:mistyBrowserProviders[a.provider].url})));
               await input.misty.navigation.setItems(
                 providerNavigationItems(appId, state),
               );
+            }
           };
           const state = await loadProviderDirectory(input.misty, appId, apply);
           await apply(state);
@@ -79,16 +78,8 @@ export function createProviderApp(
           },
         };
         const render = async () => {
-          const url = new URL(context.route, "https://misty.local");
-          const directory =
-            appId === "inbox"
-              ? !providerWebsiteFromRoute(context.route, appId)
-              : !url.searchParams.has("provider") &&
-                url.searchParams.get("experience") !== "api";
-          const nextNative =
-            appId !== "inbox" &&
-            !directory &&
-            !providerWebsiteFromRoute(context.route, appId);
+          const directory = !providerWebsiteFromRoute(context.route, appId);
+          const nextNative = false;
           if (nextNative !== nativeMode) {
             generation++;
             childLifetime?.abort();

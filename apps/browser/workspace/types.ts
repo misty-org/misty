@@ -1,8 +1,2 @@
-export interface BrowserBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export type BrowserTheme = "dark" | "light" | "system";
+// Compatibility export for legacy integration consumers. The host owns native webviews.
+export * from "@/features/webviews/types";

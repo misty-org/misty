@@ -86,7 +86,7 @@ export async function ensureServerAgentDevice(
       )
         throw error;
       if (error.status === 401) {
-        // A signed heartbeat can fail after the OS keychain is restored,
+        // A signed heartbeat can fail after the local credential files are restored,
         // cleared, or contains a partial legacy identity. Prove account auth is
         // still valid before rotating anything; otherwise preserve the binding
         // and let the normal sign-in recovery handle the unauthorized session.
@@ -275,7 +275,7 @@ async function loadOrCreateDeviceIdentity(
     return rotateDeviceIdentity(localDeviceId);
   })();
   // Keep a rejected attempt for the rest of this app session. The background
-  // job poller must not reopen a Keychain permission prompt every few seconds
+  // job poller must not repeat a failed credential read every few seconds
   // after the user denies or dismisses it. Restarting Misty is the retry path.
   identityLoadAttempts.set(localDeviceId, attempt);
   return attempt;

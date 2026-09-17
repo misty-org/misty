@@ -1,3 +1,4 @@
+import { Notification } from "@/shared/ui/notification";
 import { loadMailWebsiteAccounts } from "./mailWebsiteAccounts";
 import { providerLaunchUrl, providerLoginUrls } from "./providerLoginUrls";
 import { integrationSectionUrl } from "./integrationSections";
@@ -7,6 +8,7 @@ import { WebsiteHeader } from "./WebsiteHeader";
 import { usePagePin } from "./usePagePin";
 import { savedWebsiteUrl } from "./websiteIntegrations";
 import { loadProviderPins } from "./providerPins";
+import { extractAccountEmail } from "./pagePins";
 import {
   loadWebsiteAccounts,
   saveWebsiteAccounts,
@@ -35,14 +37,20 @@ export function ProviderWorkspace({
   context,
   report,
 }: {
-  appId: "chat" | "inbox";
+  appId: "chat" | "inbox" | "music" | "media";
   misty: MistyAppSDK;
   context: MistyComponentContext;
   report(error: unknown): void;
 }) {
-  const provider =
-    providerFromRoute(context.route, appId) ??
-    (appId === "inbox" ? "google" : "instagram");
+  const defaultProvider =
+    appId === "inbox"
+      ? "google"
+      : appId === "music"
+        ? "youtube-music"
+        : appId === "media"
+          ? "youtube"
+          : "instagram";
+  const provider = providerFromRoute(context.route, appId) ?? defaultProvider;
   const [accounts, setAccounts] = useState<WebsiteAccount[]>([]);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [ready, setReady] = useState(false);
@@ -233,6 +241,12 @@ export function ProviderWorkspace({
   const account =
     visibleAccounts.find((account) => account.id === selected[provider]) ??
     visibleAccounts[0];
+  const currentAccount = useRef(account);
+  currentAccount.current = account;
+  const currentAccounts = useRef(accounts);
+  currentAccounts.current = accounts;
+  const saveAccounts = useRef(save);
+  saveAccounts.current = save;
   // Saving an observed landing address must not navigate the open message.
   // A new profile/view uses its saved address; explicit choices use destination.
   const launch = useRef<{ key: string; url: string } | null>(null);
@@ -320,11 +334,20 @@ export function ProviderWorkspace({
     };
   }, [context.route, misty, provider, fail]);
   const onView = useCallback((next: View | null) => setView(next), []);
+  const accountProfile =
+    (account?.label &&
+    account.label.trim().toLowerCase() !==
+      providers[provider].label.toLowerCase()
+      ? account.label.trim()
+      : undefined) ??
+    account?.email ??
+    extractAccountEmail(pageTitle);
   const pin = usePagePin({
     misty,
     appId,
     provider,
     accountId: account?.id,
+    accountLabel: accountProfile,
     url: pageUrl,
     title: pageTitle,
     label: providers[provider].label,
@@ -338,7 +361,37 @@ export function ProviderWorkspace({
       .subscribe(view.handle, (event) => {
         if (closed) return;
         if (event.type === "state") setRuntime(event);
-        if (event.type === "title") setPageTitle(event.title);
+        if (event.type === "title") {
+          setPageTitle(event.title);
+          const detectedEmail = extractAccountEmail(event.title);
+          const active = currentAccount.current;
+          const all = currentAccounts.current;
+          if (
+            detectedEmail &&
+            active &&
+            (!active.email ||
+              !active.label ||
+              active.label.trim().toLowerCase() ===
+                providers[provider].label.toLowerCase())
+          ) {
+            saveAccounts.current(
+              all.map((item) =>
+                item.id === active.id
+                  ? {
+                      ...item,
+                      email: item.email || detectedEmail,
+                      label:
+                        item.label &&
+                        item.label.trim().toLowerCase() !==
+                          providers[provider].label.toLowerCase()
+                          ? item.label
+                          : detectedEmail,
+                    }
+                  : item,
+              ),
+            );
+          }
+        }
         if (event.type === "page") {
           setPageUrl(event.url);
           if (
@@ -382,7 +435,8 @@ export function ProviderWorkspace({
       pinBusy={pin.busy}
       canPin={!!view && pin.ready && !!savedWebsiteUrl(provider, pageUrl)}
       canOpenExternal={
-        pageUrl === providerLoginUrls[provider] || !!savedWebsiteUrl(provider, pageUrl)
+        pageUrl === providerLoginUrls[provider] ||
+        !!savedWebsiteUrl(provider, pageUrl)
       }
       report={fail}
     />
@@ -390,16 +444,25 @@ export function ProviderWorkspace({
   const notices = (
     <>
       {!availability?.persistent && availability?.available && (
-        <p className="provider-notice">
+        <Notification
+          title="Website sign-in"
+          active={context.active}
+          duration={8000}
+        >
           This macOS version cannot persist isolated website logins. Sign-in may
           be required again after closing the view.
-        </p>
+        </Notification>
       )}
       {error && (
-        <p className="provider-notice" role="alert">
+        <Notification
+          key={error}
+          title={providers[provider].label}
+          tone="error"
+          active={context.active}
+          onDismiss={() => setError("")}
+        >
           {error}
-          <button onClick={() => setError("")}>Dismiss</button>
-        </p>
+        </Notification>
       )}
     </>
   );

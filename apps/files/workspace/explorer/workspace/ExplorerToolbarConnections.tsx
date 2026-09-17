@@ -213,6 +213,7 @@ export const ConnectedExplorerToolbar = memo(function ConnectedExplorerToolbar(p
       paneId={props.paneId}
       locationResults={props.locationResults}
       pluginCommands={props.pluginCommands}
+      onOpenTransfers={() => props.onNavigateRoute("/apps/files?view=transfers")}
       onNavigate={onNavigate}
       onNavigateLocation={onNavigateLocation}
       onNavigateSearchResult={onNavigateSearchResult}

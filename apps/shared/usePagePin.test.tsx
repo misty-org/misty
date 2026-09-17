@@ -160,3 +160,90 @@ it("deduplicates destinations without merging hash routes or legacy native sessi
   expect(uniquePagePins([a, { ...a }, b, c])).toEqual([a, b, c]);
   expect(pagePinKey(a)).not.toBe(pagePinKey(b));
 });
+
+it("defaults pin label to account profile when title is generic like Inbox", async () => {
+  const f = fixture();
+  const hook = renderHook(() =>
+    usePagePin({
+      ...f.props,
+      appId: "inbox",
+      provider: "google",
+      accountId: "acct-1",
+      accountLabel: "mattdev727@gmail.com",
+      url: "https://mail.google.com/mail/u/0/#inbox",
+      title: "Inbox (1,200) - mattdev727@gmail.com - Gmail",
+      label: "Gmail",
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.ready).toBe(true));
+  await act(async () => {
+    await hook.result.current.toggle();
+  });
+  expect(hook.result.current.pinned).toBe(true);
+  const rows = [...f.rows.values()];
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ label: "mattdev727@gmail.com" });
+});
+
+it("extracts email from page title as account profile fallback when title is generic", async () => {
+  const f = fixture();
+  const hook = renderHook(() =>
+    usePagePin({
+      ...f.props,
+      appId: "inbox",
+      provider: "google",
+      accountId: "default-google",
+      accountLabel: "Gmail",
+      url: "https://mail.google.com/mail/u/0/#inbox",
+      title: "Inbox - user@example.com - Gmail",
+      label: "Gmail",
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.ready).toBe(true));
+  await act(async () => {
+    await hook.result.current.toggle();
+  });
+  expect(hook.result.current.pinned).toBe(true);
+  const rows = [...f.rows.values()];
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ label: "user@example.com" });
+});
+
+it("preserves specific document title instead of overriding with account profile", async () => {
+  const f = fixture();
+  f.rows.set(
+    "website-integration-v1:service:google-docs",
+    JSON.stringify({ id: "google-docs", order: 1 }),
+  );
+  f.rows.set(
+    "website-integration-v1:account:acct-1",
+    JSON.stringify({
+      id: "acct-1",
+      provider: "google-docs",
+      label: "Work",
+      websiteUrl: "https://docs.google.com/document/d/one/edit",
+    }),
+  );
+  const hook = renderHook(() =>
+    usePagePin({
+      ...f.props,
+      appId: "journal",
+      provider: "google-docs" as any,
+      accountId: "acct-1",
+      accountLabel: "Work",
+      url: "https://docs.google.com/document/d/one/edit",
+      title: "Q3 Roadmap - Google Docs",
+      label: "Google Docs",
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.ready).toBe(true));
+  await act(async () => {
+    await hook.result.current.toggle();
+  });
+  expect(hook.result.current.pinned).toBe(true);
+  const rows = [...f.rows.entries()]
+    .filter(([k]) => k.includes(":pin:"))
+    .map(([, v]) => (typeof v === "string" ? JSON.parse(v) : v));
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ label: "Q3 Roadmap" });
+});

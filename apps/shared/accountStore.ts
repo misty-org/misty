@@ -57,5 +57,7 @@ export async function mailProfileId(connectionId: string) {
 // Invalidations carry no account data. Each mounted instance rereads its own scoped SDK storage.
 export const providerAccountsChanged = "misty:provider-accounts-changed";
 export function notifyProviderAccounts() {
-  window.dispatchEvent(new Event(providerAccountsChanged));
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new Event(providerAccountsChanged));
+  }
 }

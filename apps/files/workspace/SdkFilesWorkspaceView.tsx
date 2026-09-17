@@ -273,6 +273,7 @@ export function SdkFilesWorkspaceView({
     setPreview(entry);
   };
   const toolbar = useSdkFilesToolbarProps(files, paneId, {
+    onOpenTransfers: () => run(() => misty.navigation.open("/apps/files?view=transfers")),
     canUndo: !!history.undo.length && !state.busy,
     canRedo: !!history.redo.length && !state.busy,
     undoTitle: history.undo.slice(-1)[0]?.title ?? "Undo",

@@ -1,3 +1,5 @@
+import { semanticCache, semanticInFlight, semanticCacheVersion } from "@/features/global-search/semanticSearchCache";
+export { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 export type { ExplorerSearchOptions } from "../model/interfaces/utils/globalSearch";
 export { mediaHitsToSearchResults } from "./globalSearch/resultMapping";
 export { isPathWithin } from "./globalSearch/searchPaths";
@@ -44,9 +46,6 @@ export const semanticQueryMinimumCharacters = 3;
 export const semanticSearchDebounceMs = 650;
 const semanticCacheTtlMs = 2 * 60 * 1000;
 const semanticCacheMaxEntries = 50;
-const semanticCache = new Map<string, { expiresAt: number; results: SearchResult[] }>();
-const semanticInFlight = new Map<string, Promise<SearchResult[]>>();
-let semanticCacheGeneration = 0;
 
 export async function queryIndexedExplorerSearch(
   query: string,
@@ -83,14 +82,14 @@ export async function querySemanticExplorerSearch(
     return [];
   const limit = clampLimit(options.limit ?? 100);
   const cacheKey = semanticCacheKey(trimmed, options, limit);
-  const cacheGeneration = semanticCacheGeneration;
+  const cacheGeneration = semanticCacheVersion.generation;
   const cached = semanticCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.results;
   if (cached) semanticCache.delete(cacheKey);
   const inFlight = semanticInFlight.get(cacheKey);
   if (inFlight) {
     const results = await inFlight;
-    return cacheGeneration === semanticCacheGeneration ? results : [];
+    return cacheGeneration === semanticCacheVersion.generation ? results : [];
   }
   let cacheable = false;
   const request = (async () => {
@@ -125,7 +124,7 @@ export async function querySemanticExplorerSearch(
   semanticInFlight.set(cacheKey, request);
   try {
     const results = await request;
-    if (cacheGeneration !== semanticCacheGeneration) return [];
+    if (cacheGeneration !== semanticCacheVersion.generation) return [];
     if (cacheable) {
       semanticCache.set(cacheKey, { expiresAt: Date.now() + semanticCacheTtlMs, results });
       while (semanticCache.size > semanticCacheMaxEntries)
@@ -178,11 +177,6 @@ function spaceLibraryHitsToSearchResults(hits: GlobalSpaceLibraryHit[]): SearchR
   });
 }
 
-export function clearSemanticExplorerSearchCache(): void {
-  semanticCacheGeneration += 1;
-  semanticCache.clear();
-  semanticInFlight.clear();
-}
 
 /**
  * Weighted reciprocal-rank fusion avoids comparing incompatible native-index and

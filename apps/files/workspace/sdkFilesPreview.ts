@@ -47,6 +47,16 @@ export function createSdkFilesPreviewRuntime(
         };
       }
       if (kind === "generic") return { kind, mimeType };
+      if (kind === "video" || kind === "audio") {
+        const url = await files.previewUrl(source.path);
+        if (signal.aborted) throw new Error("This preview is closed.");
+        return { kind, mimeType, url };
+      }
+      if (kind === "image") {
+        const bytes = await files.previewImage(source.path, 2048);
+        if (signal.aborted) throw new Error("This preview is closed.");
+        return { kind, mimeType: "image/png", url: URL.createObjectURL(new Blob([bytes], { type: "image/png" })) };
+      }
       const bytes = new Uint8Array(
         await files.readBytes(source.path, 64 * 1024 * 1024),
       );

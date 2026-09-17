@@ -1,6 +1,7 @@
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { useAppsStore } from "@/features/apps/useAppsStore";
 import type { SmartLibraryPreviewInput, SmartLibraryProgress } from "@/features/files/explorer";
-import { clearSemanticExplorerSearchCache } from "@/features/files/explorer";
+import { clearSemanticExplorerSearchCache } from "@/features/global-search/semanticSearchCache";
 import {
   smartLibraryApplyResults,
   smartLibraryDelete,
@@ -80,7 +81,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   addFiles: async (paths) => {
-    const originSpaceId = useAppsStore.getState().spaceId;
+    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
     const selected = [...new Set(paths.map((path) => path.trim()).filter(Boolean))];
     if (selected.length === 0 || get().phase === "uploading" || get().phase === "processing")
       return;
@@ -196,7 +197,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   rescan: async () => get().discoverChanges(),
 
   trySample: async () => {
-    const originSpaceId = useAppsStore.getState().spaceId;
+    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
     const current = get().library;
     if (!current || current.preflight.sampleAssetIds.length === 0) return;
     set({ phase: "uploading", error: null });
@@ -231,7 +232,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   analyzeFolder: async () => {
-    const originSpaceId = useAppsStore.getState().spaceId;
+    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
     const current = get().library;
     if (!current) return;
     set({ phase: "uploading", error: null });
@@ -308,7 +309,7 @@ export const useSmartLibraryStore = create<SmartLibraryStore>((set, get) => ({
   },
 
   upgradeIndex: async () => {
-    const originSpaceId = useAppsStore.getState().spaceId;
+    const originSpaceId = (useWorkspaceStore.getState().activeScopeKey.startsWith("space:") ? useWorkspaceStore.getState().activeScopeKey.slice(6) : "");
     const library = get().library;
     const folderId = library?.serverFolderId;
     if (!library || !folderId) return;

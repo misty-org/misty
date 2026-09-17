@@ -24,6 +24,7 @@ const services = (): SdkFilesToolbarServices => ({
   onDownload: vi.fn(),
   pluginCommands: [],
   onRunCommand: vi.fn(),
+  onOpenTransfers: vi.fn(),
 });
 it("renders granted-folder labels and wires the shared toolbar's real SDK navigation and edits", async () => {
   const fixture = createSdkCodeFileFixture(),
@@ -50,6 +51,8 @@ it("renders granted-folder labels and wires the shared toolbar's real SDK naviga
   );
   try {
     expect(screen.getByRole("button", { name: "Project" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Transfers" }));
+    expect(dependencies.onOpenTransfers).toHaveBeenCalledOnce();
     expect(view.container.textContent).not.toContain("misty-project");
     await act(async () => hook.result.current.onNavigateLocation("Project/src"));
     await vi.waitFor(() =>

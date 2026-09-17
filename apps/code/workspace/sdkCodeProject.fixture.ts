@@ -205,6 +205,9 @@ export function createSdkCodeFileFixture(
         return new TextEncoder()
           .encode(owned.node.text ?? "")
           .slice(input.offset, input.offset + input.length).buffer;
+      if (method === "files.previewUrl") return `asset://localhost/${encodeURIComponent(owned.node.name)}`;
+      if (method === "files.previewImage")
+        return new Uint8Array([1, 2, 3, 4]).buffer;
       if (method === "files.listDirectory")
         return {
           entries: [...dir!.values()]

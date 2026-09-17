@@ -346,3 +346,30 @@ it.each(["journal", "planner", "library"] as const)(
     );
   },
 );
+
+it("puts sign-in status in the notification corner and clears it on return", async () => {
+  const f = await fixture("planner", "/apps/planner?provider=todoist");
+  const ui = within(document.body);
+  await ui.findByTestId("website-canvas");
+  await waitFor(() => expect(f.misty.browser.subscribe).toHaveBeenCalled());
+  await act(async () =>
+    f.emit({
+      type: "page",
+      url: "https://accounts.google.com/signin",
+      phase: "started",
+    } as MistyBrowserEvent),
+  );
+  const notice = await ui.findByText(/You are temporarily outside Todoist/);
+  expect(notice.closest("#misty-notification-viewport")).not.toBeNull();
+  expect(f.root.querySelector(".provider-notice")).toBeNull();
+  await act(async () =>
+    f.emit({
+      type: "page",
+      url: "https://app.todoist.com/app/today",
+      phase: "finished",
+    } as MistyBrowserEvent),
+  );
+  await waitFor(() =>
+    expect(ui.queryByText(/You are temporarily outside Todoist/)).toBeNull(),
+  );
+});

@@ -35,6 +35,7 @@ export interface ExplorerToolbarProps {
   canDelete?: boolean;
   canRestore?: boolean;
   onRestore?: () => void;
+  onOpenTransfers?: () => void;
   paneId: string;
   path: string;
   commandQuery: string;
