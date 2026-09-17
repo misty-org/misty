@@ -67,6 +67,17 @@ import brand65 from "./brand-icons/x.svg?inline";
 import brand66 from "./brand-icons/yahoo.svg?inline";
 import brand67 from "./brand-icons/yandex.svg?inline";
 import brand68 from "./brand-icons/zoho.svg?inline";
+import brand69 from "./brand-icons/youtube-music.svg?inline";
+import brand70 from "./brand-icons/spotify.svg?inline";
+import brand71 from "./brand-icons/apple-music.svg?inline";
+import brand72 from "./brand-icons/soundcloud.svg?inline";
+import brand73 from "./brand-icons/youtube.svg?inline";
+import brand74 from "./brand-icons/twitch.svg?inline";
+import brand75 from "./brand-icons/netflix.svg?inline";
+import brand76 from "./brand-icons/crunchyroll.svg?inline";
+import brand77 from "./brand-icons/prime-video.svg?inline";
+import brand78 from "./brand-icons/reddit.svg?inline";
+import brand79 from "./brand-icons/linkedin.svg?inline";
 
 /** Canonical artwork shared by packages, navigation, tabs, Discover, and connections. */
 export const brandIcons = {
@@ -139,11 +150,25 @@ export const brandIcons = {
   yahoo: brand66,
   yandex: brand67,
   zoho: brand68,
+  "youtube-music": brand69,
+  spotify: brand70,
+  "apple-music": brand71,
+  soundcloud: brand72,
+  youtube: brand73,
+  twitch: brand74,
+  netflix: brand75,
+  crunchyroll: brand76,
+  "prime-video": brand77,
+  reddit: brand78,
+  linkedin: brand79,
 } as const;
 
 export type BrandId = keyof typeof brandIcons;
 
 const aliases: Record<string, BrandId> = {
+  youtubemusic: "youtube-music",
+  applemusic: "apple-music",
+  primevideo: "prime-video",
   google: "gmail",
   microsoft: "outlook",
   "outlook-calendar": "outlook",

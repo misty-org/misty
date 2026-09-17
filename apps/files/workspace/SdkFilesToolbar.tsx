@@ -24,6 +24,7 @@ export type SdkFilesToolbarServices = Pick<
   | "onDownload"
   | "pluginCommands"
   | "onRunCommand"
+  | "onOpenTransfers"
 >;
 
 export function useSdkFilesToolbarProps(

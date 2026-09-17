@@ -311,5 +311,5 @@ export interface SearchStore {
 // Search presentation is private to the current Space. In-flight work retains
 // its originating native session, but its results must not populate another Space.
 useAppsStore.subscribe((state, previous) => {
-  if (state.spaceId !== previous.spaceId) resetSearchAccountState();
+  if (state.accountId !== previous.accountId) resetSearchAccountState();
 });

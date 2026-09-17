@@ -1,9 +1,11 @@
+import { Notification } from "@/shared/ui/notification";
 import { integrationSectionUrl } from "./integrationSections";
 import { providerLoginUrls } from "./providerLoginUrls";
 import { providerNavigationTitles } from "./navigationTitles";
 import { WebsiteLoader } from "./WebsiteLoader";
 import { WebsiteHeader } from "./WebsiteHeader";
 import { usePagePin } from "./usePagePin";
+import { extractAccountEmail } from "./pagePins";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type MistyAppSDK,
@@ -20,6 +22,7 @@ import {
 } from "./websiteIntegrations";
 import {
   ensureWebsiteSession,
+  renameWebsiteAccount,
   restoredWebsitePage,
   saveWebsitePage,
   selectWebsiteAccount,
@@ -175,10 +178,24 @@ export function WebsiteWorkspace({
       .subscribe(view.handle, (event) => {
         if (closed) return;
         if (event.type === "state") setRuntime(event);
-        if (event.type === "title")
-          setTitle(
-            event.title.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 200),
-          );
+        if (event.type === "title") {
+          const cleanTitle = event.title
+            .replace(/[\u0000-\u001f\u007f]/g, "")
+            .slice(0, 200);
+          setTitle(cleanTitle);
+          const detectedEmail = extractAccountEmail(cleanTitle);
+          if (
+            detectedEmail &&
+            account &&
+            account.label.trim().toLowerCase() === info.label.toLowerCase()
+          ) {
+            void renameWebsiteAccount(
+              misty.storage.local,
+              account,
+              detectedEmail,
+            ).catch(report);
+          }
+        }
         if (event.type === "page") {
           setUrl(event.url);
           if (event.phase === "finished")
@@ -219,11 +236,17 @@ export function WebsiteWorkspace({
       : !supported
         ? `Update Misty to open ${info.label} here.`
         : undefined);
+  const accountProfile =
+    (account?.label &&
+    account.label.trim().toLowerCase() !== info.label.toLowerCase()
+      ? account.label.trim()
+      : undefined) ?? extractAccountEmail(title);
   const pin = usePagePin({
     misty,
     appId,
     provider,
     accountId: account?.id,
+    accountLabel: accountProfile,
     url,
     title,
     label: info.label,
@@ -281,7 +304,8 @@ export function WebsiteWorkspace({
         pinBusy={pin.busy}
         canPin={!!canvas && pin.ready && !!savedWebsiteUrl(provider, url)}
         canOpenExternal={
-          url === providerLoginUrls[provider] || !!savedWebsiteUrl(provider, url)
+          url === providerLoginUrls[provider] ||
+          !!savedWebsiteUrl(provider, url)
         }
         report={(reason) =>
           void run(async () => {
@@ -290,14 +314,16 @@ export function WebsiteWorkspace({
         }
       />
       {(error || loadError) && (
-        <p className="provider-notice" role="alert">
+        <Notification
+          key={error || loadError}
+          title={info.label}
+          tone="error"
+          active={context.active}
+          onDismiss={() => setError("")}
+        >
           {error || loadError}{" "}
-          {loadError ? (
-            <button onClick={retry}>Retry</button>
-          ) : (
-            <button onClick={() => setError("")}>Dismiss</button>
-          )}
-        </p>
+          {loadError ? <button onClick={retry}>Retry</button> : null}
+        </Notification>
       )}
       {(!state && !loadError) || !availability ? (
         <WebsiteLoader />
@@ -331,10 +357,14 @@ export function WebsiteWorkspace({
         </div>
       )}
       {canvas && url && !savedWebsiteUrl(provider, url) && (
-        <p className="provider-notice" role="status">
+        <Notification
+          key={`${provider}:${account.id}`}
+          title={info.label}
+          active={context.active}
+        >
           You are temporarily outside {info.label}. Complete sign-in to
           continue.
-        </p>
+        </Notification>
       )}
     </section>
   );

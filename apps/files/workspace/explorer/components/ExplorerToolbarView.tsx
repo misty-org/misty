@@ -9,6 +9,7 @@ import {
   Input,
 } from "@/shared/ui";
 import {
+  ArrowDownUp,
   ChevronDown,
   ChevronRight,
   Clipboard,
@@ -170,18 +171,32 @@ export const ExplorerToolbarView = memo(function ExplorerToolbarView(
           )}
         </div>
 
-        <Search
-          paneId={props.paneId}
-          path={props.path}
-          commandQuery={props.commandQuery}
-          commandQueryMode={props.commandQueryMode}
-          locationResults={props.locationResults}
-          pluginCommands={props.pluginCommands}
-          onCommandQuery={props.onCommandQuery}
-          onNavigateLocation={props.onNavigateLocation}
-          onNavigateSearchResult={props.onNavigateSearchResult}
-          onRunCommand={props.onRunCommand}
-        />
+        <div className="flex min-w-0 items-center gap-2">
+          <Search
+            paneId={props.paneId}
+            path={props.path}
+            commandQuery={props.commandQuery}
+            commandQueryMode={props.commandQueryMode}
+            locationResults={props.locationResults}
+            pluginCommands={props.pluginCommands}
+            onCommandQuery={props.onCommandQuery}
+            onNavigateLocation={props.onNavigateLocation}
+            onNavigateSearchResult={props.onNavigateSearchResult}
+            onRunCommand={props.onRunCommand}
+          />
+          {props.onOpenTransfers && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 gap-1.5 px-2 text-xs text-cream-muted hover:text-cream"
+              onClick={props.onOpenTransfers}
+            >
+              <ArrowDownUp size={16} aria-hidden="true" />
+              Transfers
+            </Button>
+          )}
+        </div>
       </div>
 
       <div role="toolbar" aria-label="File actions" className={toolbarStyles.actionRow}>

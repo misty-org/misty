@@ -573,6 +573,9 @@ export async function openSdkCodeProject(
         }
       });
     },
+    async previewUrl(path: string) {
+      return withFile(path, false, (handle) => ownedCall(() => misty.files.previewUrl(handle)));
+    },
     async previewImage(path: string, dimension: number) {
       return withFile(path, false, (handle) =>
         ownedCall(() => misty.files.previewImage(handle, dimension)),
@@ -779,6 +782,7 @@ export async function openSdkCodeProject(
       format: MistyArchiveFormat,
       signal?: AbortSignal,
     ) => schedule(() => project.listArchive(path, format, signal)),
+    previewUrl: (path: string) => schedule(() => project.previewUrl(path)),
     previewImage: (path: string, dimension: number) =>
       schedule(() => project.previewImage(path, dimension)),
     withDragHandle: project.withDragHandle,

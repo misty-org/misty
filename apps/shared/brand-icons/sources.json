@@ -340,5 +340,49 @@
   "storj": {
     "collection": "Tabler brand SVG via existing react-icons",
     "color": "#2683FF"
+  },
+  "youtube-music": {
+    "collection": "YouTube Brand Resources",
+    "color": "#FF0000"
+  },
+  "spotify": {
+    "collection": "Spotify Design",
+    "color": "#1ED760"
+  },
+  "apple-music": {
+    "collection": "Apple Design Resources",
+    "color": "#FA233B"
+  },
+  "soundcloud": {
+    "collection": "Simple Icons (react-icons/si SiSoundcloud)",
+    "color": "#FF5500"
+  },
+  "youtube": {
+    "collection": "YouTube Brand Resources",
+    "color": "#FF0000"
+  },
+  "twitch": {
+    "collection": "Twitch Brand Assets",
+    "color": "#9146FF"
+  },
+  "netflix": {
+    "collection": "Netflix Brand Assets",
+    "color": "#E50914"
+  },
+  "crunchyroll": {
+    "collection": "Crunchyroll Brand Assets",
+    "color": "#F47521"
+  },
+  "prime-video": {
+    "collection": "Amazon Prime Video",
+    "color": "#00A8E1"
+  },
+  "reddit": {
+    "collection": "Reddit Brand",
+    "color": "#FF4500"
+  },
+  "linkedin": {
+    "collection": "LinkedIn Brand Resources",
+    "color": "#0A66C2"
   }
 }

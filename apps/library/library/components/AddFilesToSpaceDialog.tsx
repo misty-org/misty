@@ -1,6 +1,6 @@
 import { readAccountSessionGeneration } from "@/features/auth";
 import { LibraryError as SystemErrorActivity } from "@/features/spaces/library/libraryRuntime";
-import { useExplorerStore } from "@/features/files/explorer";
+import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useLibrarySpaces as useSpacesStore } from "@/features/spaces/library/libraryRuntime";
 import { spaceNavigationName } from "@/features/spaces/defaultSpace";
 import { libraryApi as spacesApi } from "@/features/spaces/library/libraryRuntime";
@@ -168,9 +168,7 @@ export function AddFilesToSpaceDialog({
         ? `${succeeded} added to ${destination}; ${failed} failed.`
         : `${succeeded} ${succeeded === 1 ? "copy" : "copies"} added to ${destination}.`;
     setMessage(summary);
-    useExplorerStore
-      .getState()
-      .pushNotification(summary, failed || controller.signal.aborted ? "info" : "success", 5000);
+    useActivityStore.getState().ingestLocal({ title: summary, kind: failed || controller.signal.aborted ? "system" : "completion", appId: "library", spaceId });
     if (succeeded > 0) {
       window.dispatchEvent(
         new CustomEvent("misty:space-library-event", { detail: { space_id: spaceId } }),

@@ -1,26 +1,17 @@
 # Files
 
-`index.tsx` is this app's SDK component entry. The adjacent folders own its file workspace and previews, including their colocated tests.
+`index.tsx` mounts the package-owned SDK workspace. Explorer, previews, file operations, persistent workspace state, and transfer presentation belong to this downloaded app. Misty does not mount a built-in Files workspace.
 
-From the misty-apps repository, run:
+From misty-apps, build the package with:
 
 ```sh
-npm run build:apps -- files
+npm run build:apps -- files --desktop-only
 ```
 
-The host's shared build tooling writes `.build/official-apps/files/desktop/app.js` and `app.css`. Reload dev desktop to load the rebuilt component directly.
+The host build tooling writes `.build/official-apps/files/desktop/app.js` and `app.css`. Shared stateless UI primitives and native services remain in Misty; app behavior uses scoped SDK services. The host bundle rejects rendered modules from `apps/files` and `apps/browser`.
 
-Shared UI, API adapters, and native infrastructure remain in the adjacent Misty host. Build aliases preserve those imports and use the host's dependency versions. This source checkout is not yet a standalone SDK-only package.
+The workspace uses `misty.files` for local, remote, and paired-device handles, and `misty.workspace` for persistent view state. Existing legacy tab locations are restored through the compatibility bridge. Switching between Explorer and Transfers retains the Explorer component and disables its shortcuts while hidden.
 
-Files composes `misty.fileSystem.mountWorkspace` for both Explorer and Transfers.
-This shared workspace is the original full desktop UI, including split panes,
-previews, connected disks, QR-paired devices, and the native SQLite transfer
-history. Its implementation is retained under `workspace/explorer`; shared host
-contexts supply the existing device and workspace services. Do not replace it
-with `SdkFilesWorkspaceView` or a per-view transfer list.
+Transfers includes durable native SQLite history through `misty.fileSystem.transfers`, with pause, resume, cancel, retry, pagination, and history removal. SDK-owned transfer records use app-scoped persistent storage and retain their originating view's grants. Neither history is deleted or rewritten during migration.
 
-Native operations are also available independently through `misty.fileSystem`
-(e.g. `listDirectory`, `queueTransfer`, `transfers`, `pause`, `resume`). They use
-installation scopes and the existing Rust IPC services. They do not request an
-additional folder grant. The older handle-based `misty.files` API remains for
-apps that explicitly use chosen-file handles.
+`fileSystem.mountWorkspace` is obsolete. Older Files packages receive an update-required error instead of a built-in fallback. Host filesystem, account, download, and webview services remain available through scoped SDK interfaces. This source checkout still builds against shared Misty UI and contract sources.

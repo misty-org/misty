@@ -1,5 +1,5 @@
 import { loadMailWebsiteAccounts } from "./mailWebsiteAccounts";
-import { uniquePagePins } from "./pagePins";
+import { uniquePagePins, resolvePinLabel } from "./pagePins";
 import { loadProviderPins, type ProviderPin } from "./providerPins";
 import type { MistyAppSDK, MistyNavigationItem } from "@misty/sdk";
 import { loadWebsiteAccounts, notifyProviderAccounts } from "./accountStore";
@@ -12,11 +12,11 @@ export interface ProviderDirectoryState {
   hidden: Set<ProviderId>;
   mailError?: string;
 }
-export const providerAppPath = (appId: "chat" | "inbox") =>
-  `/apps/${appId === "chat" ? "social" : "inbox"}`;
+export const providerAppPath = (appId: "chat" | "inbox" | "music" | "media") =>
+  appId === "chat" ? "/apps/social" : `/apps/${appId}`;
 export async function loadProviderDirectory(
   misty: MistyAppSDK,
-  appId: "chat" | "inbox",
+  appId: "chat" | "inbox" | "music" | "media",
   onLocal?: (state: ProviderDirectoryState) => void | Promise<void>,
 ): Promise<ProviderDirectoryState> {
   const accounts = await loadWebsiteAccounts(misty.storage.local);
@@ -60,19 +60,10 @@ export async function loadProviderDirectory(
   };
 }
 export function providerNavigationItems(
-  appId: "chat" | "inbox",
+  appId: "chat" | "inbox" | "music" | "media",
   state: ProviderDirectoryState,
 ): MistyNavigationItem[] {
   return [
-    ...(appId === "chat"
-      ? [
-          {
-            id: "misty",
-            label: "Misty",
-            route: `${providerAppPath(appId)}?provider=misty`,
-          },
-        ]
-      : []),
     ...Object.entries(providers)
       .filter(
         ([id, p]) =>
@@ -90,11 +81,19 @@ export function providerNavigationItems(
               pin.provider === id &&
               state.accounts.some((a) => a.id === pin.accountId),
           )
-          .map((pin) => ({
-            id: `pin-${pin.id}`,
-            label: pin.label,
-            route: `${providerAppPath(appId)}?provider=${id}&websiteAccount=${encodeURIComponent(pin.accountId)}&pin=${encodeURIComponent(pin.id)}`,
-          })),
+          .map((pin) => {
+            const account = state.accounts.find((a) => a.id === pin.accountId);
+            const accountProfile =
+              account?.label &&
+              account.label.trim().toLowerCase() !== p.label.toLowerCase()
+                ? account.label.trim()
+                : account?.email;
+            return {
+              id: `pin-${pin.id}`,
+              label: resolvePinLabel(pin.label, p.label, accountProfile, appId),
+              route: `${providerAppPath(appId)}?provider=${id}&websiteAccount=${encodeURIComponent(pin.accountId)}&pin=${encodeURIComponent(pin.id)}`,
+            };
+          }),
       })),
   ];
 }

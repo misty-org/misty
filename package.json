@@ -38,8 +38,8 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-648bd1a66454e7ef.tgz",
-    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-df8b73eeef2bb25f.tgz"
+    "@misty/sdk": "file:vendor/misty-sdk/misty-sdk-0.1.0-e771fc1b027579db.tgz",
+    "@misty/contracts": "file:vendor/misty-sdk/misty-contracts-0.1.0-1a294cec8f43e236.tgz"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

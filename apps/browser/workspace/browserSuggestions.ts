@@ -1,4 +1,5 @@
 import { blankBrowserUrl, browserSearchEngine, browserSearchUrl } from "@/features/workspace/model";
+import { resolveDirectAddress } from "./browserAddress";
 
 export interface BrowserSuggestion {
   id: string;
@@ -50,15 +51,10 @@ export function buildBrowserSuggestions(
 }
 
 function directBrowserUrl(value: string): string | null {
-  if (!value || value.includes(" ")) return null;
-  const candidate = /^https?:\/\//i.test(value)
-    ? value
-    : value.includes(".")
-      ? `https://${value}`
-      : null;
-  if (!candidate) return null;
+  const direct = resolveDirectAddress(value);
+  if (!direct || direct === blankBrowserUrl) return null;
   try {
-    const url = new URL(candidate);
+    const url = new URL(direct);
     return /^https?:$/.test(url.protocol) && url.hostname ? url.toString() : null;
   } catch {
     return null;
@@ -84,11 +80,11 @@ function describeUrl(value: string) {
   try {
     const url = new URL(value);
     if (!/^https?:$/.test(url.protocol) || !url.hostname) return null;
-    const hostname = url.hostname.replace(/^www\./, "");
+    const host = (url.host || url.hostname).replace(/^www\./, "");
     const path = `${url.pathname === "/" ? "" : url.pathname}${url.search}`;
     return {
-      title: hostname,
-      detail: `${hostname}${path}`,
+      title: host,
+      detail: `${host}${path}`,
       faviconUrl: `${url.origin}/favicon.ico`,
     };
   } catch {
