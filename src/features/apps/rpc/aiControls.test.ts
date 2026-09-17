@@ -32,23 +32,28 @@ vi.mock("@/features/workspace/useWorkspaceStore", () => ({
     },
   },
 }));
+const openMistyMock = vi.fn(async (..._args: unknown[]) => {});
+vi.mock("@/features/misty/handoff", () => ({
+  openMisty: (...args: unknown[]) => openMistyMock(...args),
+}));
 const cleanup: Array<() => void> = [];
 afterEach(() => {
   cleanup.splice(0).forEach((close) => close());
   stores.listeners.clear();
+  openMistyMock.mockClear();
 });
-async function fixture(grants = ["ai.use"]) {
+async function fixture(grants = ["ai.use"], appId = "journal") {
   let account = "account-a";
   const scope = createAppRpcScope({
-    identity: { appId: "journal", accountId: account, spaceId: "space-a", instanceId: "tab-a" },
+    identity: { appId, accountId: account, spaceId: "space-a", instanceId: "tab-a" },
     scopes: grants,
     expiresAt: "2099-01-01T00:00:00Z",
     isCurrentAccount: (id) => id === account,
   });
   const bridge = createAppSurfaceBridge(scope, () => {});
   const source: MistySurfaceAdapter = {
-    surfaceId: "notes",
-    label: "Note",
+    surfaceId: appId === "agents" ? "agents" : "notes",
+    label: appId === "agents" ? "Agents" : "Note",
     getContext: () => [
       { kind: "note", id: "note-a", spaceId: "space-a", title: "Note", privacy: "shared" },
     ],
@@ -74,7 +79,7 @@ async function fixture(grants = ["ai.use"]) {
     type: "leaf",
     id: "pane-a",
     activeTabId: "tab-a",
-    tabs: [{ id: "tab-a", groupKey: "app:journal" }],
+    tabs: [{ id: "tab-a", groupKey: `app:${appId}` }],
   };
   stores.workspace = { layout: { root: pane } };
   const artifact = {
@@ -230,4 +235,22 @@ it("deduplicates view snapshots, removes failing listeners and stops notificatio
   stores.listeners.forEach((emit) => emit());
   expect(listener).toHaveBeenCalledTimes(2);
   expect(stores.listeners.size).toBe(0);
+});
+it("allows agents app with ai.use permission to open Misty companion, and rejects without ai.use", async () => {
+  const granted = await fixture(["ai.use"], "agents");
+  await expect(
+    granted.sdk.ai.open({ conversationId: "conv-123", prompt: "Hello agent" }),
+  ).resolves.toBeUndefined();
+  expect(openMistyMock).toHaveBeenCalledWith({
+    accountId: "account-a",
+    spaceId: "space-a",
+    prompt: "Hello agent",
+    conversationId: "conv-123",
+  });
+
+  const denied = await fixture([], "agents");
+  await expect(denied.sdk.ai.open({ conversationId: "conv-123" })).rejects.toMatchObject({
+    code: "capability_denied",
+    message: "This App does not have ai.use permission.",
+  });
 });

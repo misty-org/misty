@@ -3,6 +3,12 @@ import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deploymen
 import type { CurrentLicense } from "@/features/installer";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState, useSpacesStore } from "@/features/spaces";
+import { useAppRouteMemoryStore } from "@/features/app-shell";
+import { resetAppsAccountState } from "@/features/apps";
+import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
+import { resetProvidersAccountState } from "@/features/providers";
+import { resetAiSurfaceAccountState } from "@/features/ai-surface";
+import { notifyAccountScopeReset } from "./store/accountEvents";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
@@ -17,14 +23,21 @@ function scopedAuthUserStorageKey(): string {
   return deploymentStorageKey(authUserStorageKey);
 }
 
-export function resetAccountScopedState(): void {
+export function resetAccountScopedState(previousAccountId?: string): void {
   useUserStore.getState().clear();
   useActivityStore.getState().setAccount("");
   resetSpacesAccountState();
   resetConnectionsAccountState();
+  resetAppsAccountState();
+  resetWorkspaceAccountState();
+  useAppRouteMemoryStore.getState().resetAppRoute();
+  useRecentToolsStore.getState().resetRecentTools();
+  resetProvidersAccountState();
+  resetAiSurfaceAccountState(previousAccountId);
+  notifyAccountScopeReset();
 }
-export function refreshAuthenticatedAccountState(): void {
-  void useSpacesStore.getState().load();
+export function refreshAuthenticatedAccountState(accountId?: string): void {
+  void useSpacesStore.getState().load({ force: true, accountId });
 }
 
 export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {

@@ -25,10 +25,10 @@ import { emailName, initialsForProfile } from "./helpers";
 import { adjacentPanelLeft, fitFloatingPanel } from "./popupGeometry";
 import { accountChooserPopoverClass, profileMenuItemClass, profilePopoverClass } from "./styles";
 
-const profilePopoverWidth = 286;
-const profilePopoverFallbackHeight = 332;
-const accountChooserWidth = 320;
-const accountChooserFallbackHeight = 392;
+const profilePopoverWidth = 256;
+const profilePopoverFallbackHeight = 210;
+const accountChooserWidth = 280;
+const accountChooserFallbackHeight = 260;
 const viewportGutter = 8;
 
 export function ProfilePopover(props: {
@@ -55,6 +55,7 @@ export function ProfilePopover(props: {
   const [accountChooserStyle, setAccountChooserStyle] = useState<CSSProperties>({});
   const [accountChooserOpen, setAccountChooserOpen] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
+  const [switchError, setSwitchError] = useState("");
   const previouslyOpenRef = useRef(false);
   const account = user ?? currentUser;
   const accountMe = me.id === account?.id ? me : null;
@@ -176,6 +177,7 @@ export function ProfilePopover(props: {
     if (props.open) return;
     setAccountChooserOpen(false);
     setSwitchingAccountId("");
+    setSwitchError("");
   }, [props.open]);
 
   useEffect(() => {
@@ -203,14 +205,13 @@ export function ProfilePopover(props: {
     setAccountChooserOpen(true);
   };
 
-  const [switchError, setSwitchError] = useState("");
   const chooseAccount = async (accountId: string) => {
     if (accountId === account?.id || switchingAccountId || transitioning) return;
     setSwitchError("");
     setSwitchingAccountId(accountId);
     try {
-      await switchAccount(accountId);
       props.onClose();
+      await switchAccount(accountId);
     } catch (error) {
       setSwitchError("The account could not be switched. Try selecting it again.");
       reportSystemError({
@@ -246,23 +247,23 @@ export function ProfilePopover(props: {
         role="menu"
         aria-label="Profile"
       >
-        <div className="grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 border-b border-charcoal-border px-2 pb-3 pt-1">
+        <div className="grid grid-cols-[32px_minmax(0,1fr)] items-center gap-2.5 border-b border-charcoal-border px-2 pb-2 pt-1">
           <span
             className={[
-              "relative grid h-10 w-10 place-items-center rounded-full",
-              "bg-charcoal-active text-sm font-bold",
+              "relative grid size-8 place-items-center rounded-full",
+              "bg-charcoal-active text-xs font-bold",
             ].join(" ")}
           >
-            {account ? initials : <UserCircle size={24} strokeWidth={1.75} />}
+            {account ? initials : <UserCircle size={20} strokeWidth={1.75} />}
           </span>
           <span className="min-w-0">
-            <strong className="block truncate text-sm">{displayName}</strong>
-            <small className="block truncate text-xs text-cream-muted">
+            <strong className="block truncate text-xs font-medium text-cream">{displayName}</strong>
+            <small className="block truncate text-[11px] text-cream-muted">
               {email || "Not signed in"}
             </small>
           </span>
         </div>
-        <div className="grid gap-1 py-2">
+        <div className="grid gap-0.5 pt-1">
           {!account ? (
             <Button
               className={profileMenuItemClass}
@@ -314,7 +315,9 @@ export function ProfilePopover(props: {
                 aria-haspopup="menu"
                 aria-expanded={accountChooserOpen}
                 disabled={transitioning}
-                onClick={() => (accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts())}
+                onClick={() =>
+                  accountChooserOpen ? setAccountChooserOpen(false) : switchAccounts()
+                }
               >
                 <Repeat2 size={18} strokeWidth={2} />
                 <span>Switch accounts</span>
@@ -324,11 +327,7 @@ export function ProfilePopover(props: {
                 />
               </Button>
               <Button
-                className={[
-                  profileMenuItemClass,
-                  "text-cream-bright hover:text-cream-bright",
-                  "hover:text-cream-bright",
-                ].join(" ")}
+                className={profileMenuItemClass}
                 type="button"
                 role="menuitem"
                 disabled={transitioning}
@@ -349,40 +348,44 @@ export function ProfilePopover(props: {
           role="menu"
           aria-label="Switch accounts"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-charcoal-border px-2 pb-2 pt-1">
-            <div>
-              <strong className="block text-sm">Switch accounts</strong>
-              <small className="text-[11px] text-cream-muted">Your saved Misty sessions</small>
-            </div>
+          <div className="flex items-center justify-between gap-2 border-b border-charcoal-border px-2 pb-1.5 pt-1">
+            <strong className="block text-xs font-medium text-cream">Switch accounts</strong>
             <Button
               className={[
-                "grid size-8 place-items-center rounded-lg border-0 bg-transparent",
-                "text-cream-muted hover:text-cream-bright",
+                "grid size-6 place-items-center rounded-md border-0 bg-transparent",
+                "text-cream-muted hover:bg-charcoal-hover hover:text-cream-bright",
               ].join(" ")}
               type="button"
               aria-label="Close account chooser"
               onClick={() => setAccountChooserOpen(false)}
             >
-              <X size={16} />
+              <X size={14} />
             </Button>
           </div>
-          {switchError ? <p role="alert" className="px-2 text-sm text-cream-muted">{switchError}</p> : null}
-          <div className="grid max-h-[268px] gap-1 overflow-auto py-2">
+          {switchError ? (
+            <p role="alert" className="px-2 py-1 text-xs text-cream-muted">
+              {switchError}
+            </p>
+          ) : null}
+          <div className="grid max-h-[268px] gap-0.5 overflow-auto py-1">
             {accounts.map((saved) => {
               const active = saved.id === account?.id;
               const savedInitials = initialsForProfile(saved.name, saved.email);
+              const label =
+                switchingAccountId === saved.id ? "Switching…" : saved.name || saved.email;
               return (
                 <Button
-                  className={`${profileMenuItemClass} min-h-[54px] grid-cols-[36px_minmax(0,1fr)_20px]`}
+                  className={`${profileMenuItemClass} h-auto min-h-10 py-1 grid-cols-[32px_minmax(0,1fr)_20px]`}
                   type="button"
                   role="menuitem"
                   key={saved.id}
+                  title={saved.email}
                   disabled={Boolean(switchingAccountId) || transitioning}
                   onClick={() => void chooseAccount(saved.id)}
                 >
                   <span
                     className={[
-                      "grid size-9 place-items-center rounded-full",
+                      "grid size-8 place-items-center rounded-full",
                       "bg-charcoal-active",
                       "text-xs font-bold text-cream",
                     ].join(" ")}
@@ -390,10 +393,7 @@ export function ProfilePopover(props: {
                     {savedInitials}
                   </span>
                   <span className="min-w-0">
-                    <strong className="block truncate text-xs text-cream">{saved.name}</strong>
-                    <small className="block truncate text-[10px] text-cream-muted">
-                      {switchingAccountId === saved.id ? "Switching…" : saved.email}
-                    </small>
+                    <strong className="block truncate text-xs text-cream">{label}</strong>
                   </span>
                   {active ? (
                     <Check size={15} className="text-sage-fg" aria-label="Active account" />
@@ -402,25 +402,23 @@ export function ProfilePopover(props: {
               );
             })}
             {accounts.length === 0 ? (
-              <p className="m-0 px-2 py-3 text-xs text-cream-muted">
+              <p className="m-0 px-2 py-2 text-xs text-cream-muted">
                 No saved accounts are available yet.
               </p>
             ) : null}
           </div>
-          <Button
-            className={profileMenuItemClass}
-            type="button"
-            role="menuitem"
-            disabled={Boolean(switchingAccountId) || transitioning}
-            onClick={addAccount}
-          >
-            <Plus size={18} strokeWidth={2} />
-            <span>Add another account</span>
-          </Button>
-          <p className="m-0 px-2.5 pb-1 pt-2 text-[10px] leading-relaxed text-cream-muted">
-            Accounts remain signed in securely on this device. Only one account is active in the app
-            at a time.
-          </p>
+          <div className="border-t border-charcoal-border pt-1">
+            <Button
+              className={profileMenuItemClass}
+              type="button"
+              role="menuitem"
+              disabled={Boolean(switchingAccountId) || transitioning}
+              onClick={addAccount}
+            >
+              <Plus size={18} strokeWidth={2} />
+              <span>Add another account</span>
+            </Button>
+          </div>
         </div>
       ) : null}
     </>,

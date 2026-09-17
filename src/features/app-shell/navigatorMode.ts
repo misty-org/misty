@@ -7,6 +7,7 @@ export type NavigatorVisibility = "sticky" | "hidden";
 
 export interface NavigatorLayout {
   width: NavigatorWidth;
+  widthPx?: number;
   visibility: NavigatorVisibility;
 }
 
@@ -19,6 +20,17 @@ export const navigatorWidths: Record<NavigatorWidth | "hidden", number> = {
   hidden: 0,
 };
 
+export const navigatorMinWidth = 220;
+export const navigatorMaxWidth = 480;
+export function clampNavigatorWidth(width: number): number {
+  return Number.isFinite(width)
+    ? Math.round(Math.min(navigatorMaxWidth, Math.max(navigatorMinWidth, width)))
+    : navigatorWidths.full;
+}
+export function navigatorPixelWidth(layout: NavigatorLayout): number {
+  return clampNavigatorWidth(layout.widthPx ?? navigatorWidths.full);
+}
+
 export function readNavigatorLayout(
   storage: Pick<Storage, "getItem"> = window.localStorage,
 ): NavigatorLayout {
@@ -28,6 +40,9 @@ export function readNavigatorLayout(
       const parsed = JSON.parse(saved) as Partial<NavigatorLayout>;
       return {
         width: "full",
+        ...(typeof parsed.widthPx === "number"
+          ? { widthPx: clampNavigatorWidth(parsed.widthPx) }
+          : {}),
         visibility: parsed.visibility === "hidden" ? "hidden" : "sticky",
       };
     } catch {

@@ -1,15 +1,4 @@
-import { supportsPackagedDocuments } from "@/shared/platform/nativeServices";
-import {
-  revealSearchResultInPane,
-  searchResultNavigationTarget,
-  useExplorerStore,
-} from "@/features/files/explorer";
-import { filesMultiPanelStore } from "@/features/files/dockStores";
-import {
-  useMultiPanelStore,
-  useWorkspaceStore,
-  workspaceSurfaceFromRoute,
-} from "@/features/workspace";
+import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import type { SearchResult } from "@/native/contracts";
 import { useNavigate } from "react-router-dom";
 import type { GlobalAiContextRef, GlobalSearchResult } from "./types";
@@ -23,7 +12,6 @@ export function useGlobalMistyResults(input: {
 }) {
   const navigate = useNavigate();
   const openResult = async (result: GlobalSearchResult) => {
-    let targetFilesWorkspaceId = "";
     if (input.onNavigate) {
       input.closePanel();
       input.onNavigate(result.href);
@@ -69,43 +57,16 @@ export function useGlobalMistyResults(input: {
     };
 
     input.closePanel();
-    const target = searchResultNavigationTarget(fileResult);
     const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}${fileResult.entry.kind === "file" ? `&select=${encodeURIComponent(fileResult.entry.name)}` : ""}`;
     const surface = workspaceSurfaceFromRoute(filesRoute);
     if (surface) {
       const tab = useWorkspaceStore.getState().openSurface({
         ...surface,
-        state: { version: 1, path: target.path },
       });
-      targetFilesWorkspaceId = tab.id;
       useWorkspaceStore.getState().focusTab(tab.id);
     }
     navigate(filesRoute);
-    // The downloaded Files view restores its own granted folder and selection.
-    if (supportsPackagedDocuments() && !fileResult.match?.mediaSegmentId) return;
 
-    const reveal = async (): Promise<boolean> => {
-      const paneId =
-        (targetFilesWorkspaceId
-          ? filesMultiPanelStore(targetFilesWorkspaceId).getState().activePaneId
-          : input.activePaneId) ||
-        useMultiPanelStore.getState().activePaneId ||
-        Object.keys(useExplorerStore.getState().panes)[0] ||
-        useMultiPanelStore.getState().tabs[0]?.activePaneId ||
-        "explorer-pane-0";
-      if (!paneId) return false;
-      await revealSearchResultInPane(paneId, target);
-      return true;
-    };
-
-    if (await reveal()) return;
-    let attempts = 0;
-    const retry = window.setInterval(() => {
-      attempts += 1;
-      void reveal().then((revealed) => {
-        if (revealed || attempts >= 20) window.clearInterval(retry);
-      });
-    }, 75);
   };
   const addResultContext = (result: GlobalSearchResult) => {
     const localPath =

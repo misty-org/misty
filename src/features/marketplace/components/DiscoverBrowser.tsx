@@ -1,3 +1,4 @@
+import { officialAppPresentation } from "@/api/apps/appPresentation";
 import { compareDiscoverItems } from "./discoverSort";
 import { appDownloadKey, useAppDownloads } from "@/features/apps/useAppDownloads";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -10,6 +11,7 @@ import {
 } from "./DiscoverViewControls";
 import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { OfficialAppIcon } from "@/features/apps/OfficialAppIcon";
+import { officialAppNeedsReview } from "@/features/apps/appInstallationStatus";
 import {
   Puzzle,
   Download,
@@ -38,7 +40,7 @@ const sections = [
   { id: "featured", label: "Featured", icon: Star },
   { id: "apps", label: "Apps", icon: Grid2X2 },
   { id: "extensions", label: "Extensions", icon: Puzzle },
-  { id: "installed", label: "Downloaded", icon: Download },
+  { id: "installed", label: "Installed", icon: Download },
 ] as const;
 
 export interface DiscoverBrowserProps {
@@ -61,6 +63,7 @@ export interface DiscoverBrowserProps {
 }
 
 export function DiscoverBrowser(props: DiscoverBrowserProps) {
+  const catalog = useMemo(() => props.catalog.map(officialAppPresentation), [props.catalog]);
   const [section, setSection] = useState<DiscoverSection>(props.requestedSection ?? "apps");
   const [sort, setSort] = useState<DiscoverSort>("catalog");
   const [accessFilter, setAccessFilter] = useState<DiscoverAccessFilter>("all");
@@ -88,12 +91,12 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
   const downloads = useAppDownloads((state) => state.ready);
   const checkDownloads = useAppDownloads((state) => state.check);
   useEffect(() => {
-    void checkDownloads(props.catalog);
-  }, [props.catalog, checkDownloads]);
-  const selected = props.catalog.find((app) => app.id === props.selectedAppId);
+    void checkDownloads(catalog);
+  }, [catalog, checkDownloads]);
+  const selected = catalog.find((app) => app.id === props.selectedAppId);
   const entries = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const apps = props.catalog.filter((app) => {
+    const apps = catalog.filter((app) => {
       const added = installationById.get(app.id)?.state === "installed";
       const downloaded =
         !removed[app.id] && (hasTauriInternals() ? Boolean(downloads[appDownloadKey(app)]) : added);
@@ -125,7 +128,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
       : apps;
   }, [
     installationById,
-    props.catalog,
+    catalog,
     query,
     section,
     accessFilter,
@@ -162,8 +165,8 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
         }
       : section === "installed"
         ? {
-            title: "Apps added to this Space will appear here",
-            description: "Find an app in the catalog and add it to your workspace.",
+            title: "Your installed apps will appear here",
+            description: "Find an app in the catalog and install it for your account.",
           }
         : { title: "No apps available yet", description: "Refresh to check the catalog again." };
 
@@ -265,7 +268,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
             !query.trim() ? (
               <DiscoverAppPreviews apps={entries} onSelect={selectApp} />
             ) : null}
-            {props.catalog.length > 0 && (
+            {catalog.length > 0 && (
               <div className="discover-filters" role="group" aria-label="App categories">
                 {discoverCategories.map((item) => (
                   <button
@@ -301,13 +304,15 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                       ? action
                       : removed[app.id]
                         ? "Get"
-                        : hasTauriInternals()
-                          ? downloads[appDownloadKey(app)]
-                            ? "Manage"
-                            : "Get"
-                          : action === "Install"
-                            ? "Get"
-                            : "Manage";
+                        : officialAppNeedsReview(app, installationById.get(app.id))
+                          ? "Update"
+                          : hasTauriInternals()
+                            ? downloads[appDownloadKey(app)]
+                              ? "Manage"
+                              : "Get"
+                            : action === "Install"
+                              ? "Get"
+                              : "Manage";
                   return (
                     <li
                       key={app.id}
@@ -324,7 +329,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                         <span className="discover-app-copy">
                           <span className="discover-app-name">
                             {discoverAppName(app)}
-                            {app.official && !props.catalog.every((item) => item.official) ? (
+                            {app.official && !catalog.every((item) => item.official) ? (
                               <ShieldCheck
                                 size={15}
                                 className="discover-verified"
@@ -338,7 +343,7 @@ export function DiscoverBrowser(props: DiscoverBrowserProps) {
                       <div className="discover-action-group">
                         <button
                           type="button"
-                          className={`discover-action ${actionLabel === "Get" ? "discover-action-primary" : ""}`}
+                          className={`discover-action ${actionLabel === "Get" || actionLabel === "Update" ? "discover-action-primary" : ""}`}
                           disabled={Boolean(props.actionAppId) || action === "Unavailable"}
                           aria-label={`${actionLabel} ${discoverAppName(app)}`}
                           onClick={() => selectApp(app)}

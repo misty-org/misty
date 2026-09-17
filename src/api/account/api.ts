@@ -1,6 +1,10 @@
 import { resolveApiBase } from "@/api/deployment/api";
 import { httpRequest } from "@/api/client/http";
-import { readApiAuthToken, readApiSessionGeneration } from "@/api/client/session";
+import {
+  notifyApiSessionInvalid,
+  readApiAuthToken,
+  readApiSessionGeneration,
+} from "@/api/client/session";
 import { attachSelfHostEntitlementProof } from "@/api/self-host/proof";
 import { isAndroidBuild, isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
@@ -53,6 +57,9 @@ async function requestJson<T>(method: AccountMethod, path: string, body?: unknow
       credentials: "include",
     });
     assertAccountGeneration(accountGeneration);
+    if (response.status === 401 && shouldAttachAuthToken(path) && !token) {
+      notifyApiSessionInvalid();
+    }
     const result = await parseResponse<T>(response, method, path, url);
     assertAccountGeneration(accountGeneration);
     return result;
@@ -170,7 +177,7 @@ function accountClientPlatform(): "windows" | "macos" | "linux" | "android" | "i
 }
 
 function shouldAttachAuthToken(path: string): boolean {
-  return path !== "/login" && path !== "/register";
+  return !["/login", "/register", "/self-host/bootstrap", "/self-host/enroll"].includes(path);
 }
 
 function recordAccountApiDebugEvent(event: {

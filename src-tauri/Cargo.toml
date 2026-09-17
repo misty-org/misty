@@ -29,7 +29,7 @@ ciborium = "0.2"
 dirs = "6.0.0"
 hex = "0.4"
 jsonwebtoken = "9"
-keyring = "3.6"
+misty-credential-store = { path = "vendor/misty-credential-store" }
 libc = "0.2"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -46,7 +46,7 @@ tauri-plugin-os = "2"
 tauri-plugin-notification = "2.3.3"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"] }
-reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "multipart", "rustls-no-provider", "stream"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "cookies", "json", "multipart", "rustls-no-provider", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
@@ -91,6 +91,7 @@ tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging"] }
 
 [features]

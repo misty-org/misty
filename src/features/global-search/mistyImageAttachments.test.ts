@@ -9,7 +9,7 @@ describe("Misty image validation", () => {
       ).not.toThrow();
     }
     expect(() => validateMistyImage(new File(["no"], "image.gif", { type: "image/gif" }))).toThrow(
-      "must be a JPEG, PNG, or WebP",
+      "must be an image, PDF, Word",
     );
   });
 

@@ -47,7 +47,7 @@ pub async fn space_peer_local_identity(
         let p = &registry.get(&instance).ok_or("App is closed.")?.permissions;
         p.authorize("files.read")?;
         p.authorize("connections.read")?;
-        if p.app_id != "files" || !p.space_owned {
+        if p.app_id != "files" || !p.account_owned {
             return Err("Peer identity requires a Space Files instance.".into());
         }
         (

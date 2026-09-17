@@ -128,11 +128,19 @@ function TabPreview(props: {
       >
         <span className="block aspect-[4/3] border-b border-charcoal-border bg-charcoal-bg px-4 pb-4 pt-14">
           <span className="grid h-full place-items-center rounded-lg bg-charcoal-workspace">
-            <WorkspaceAppIcon appId={toolId} size="marketplace" />
+            <WorkspaceAppIcon
+              appId={toolId}
+              context={props.entry.tab.surfaceId === "space" ? "space" : "app"}
+              size="marketplace"
+            />
           </span>
         </span>
         <span className="flex min-h-16 items-center gap-2 px-3">
-          <WorkspaceAppIcon appId={toolId} size="picker" />
+          <WorkspaceAppIcon
+            appId={toolId}
+            context={props.entry.tab.surfaceId === "space" ? "space" : "app"}
+            size="picker"
+          />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-cream-bright">
               {props.entry.tab.title}

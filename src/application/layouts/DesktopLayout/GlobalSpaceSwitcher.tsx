@@ -1,11 +1,6 @@
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { unreadActivityCountForSpace, useActivityStore } from "@/features/activity";
-import {
-  GlobalCreateSpaceDialog,
-  SpaceAvatar,
-  SpaceRowActions,
-  spaceNavigationName,
-} from "@/features/spaces";
+import { GlobalCreateSpaceDialog, SpaceAvatar, spaceNavigationName } from "@/features/spaces";
 import { spaceLandingRoute } from "@/features/spaces/navigation";
 import { useWorkspaceStore } from "@/features/workspace";
 import {
@@ -21,14 +16,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
   cn,
-  navigationMenuRowClass,
-  navigationMenuDisclosureLayoutClass,
   NavigationChevron,
 } from "@/shared/ui";
 import { Plus } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { navigatorFocusRingClass } from "./styles";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { navigatorHierarchyTriggerClass } from "./styles";
 
 export function GlobalSpaceSwitcher(props: {
   activeSpace: Space | undefined;
@@ -38,7 +31,10 @@ export function GlobalSpaceSwitcher(props: {
   userId: string;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const activityItems = useActivityStore((state) => state.allItems);
   const activeName = props.activeSpace ? spaceNavigationName(props.activeSpace) : "Misty";
   const activeUnread = props.activeSpace
@@ -48,7 +44,49 @@ export function GlobalSpaceSwitcher(props: {
     ? `Switch Space, current Space: ${spaceNavigationName(props.activeSpace)}${activeUnread > 0 ? `, ${activeUnread} unread` : ""}`
     : "Choose a Space";
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node) {
+        if (
+          triggerRef.current?.contains(target) ||
+          contentRef.current?.contains(target) ||
+          (target instanceof Element && target.closest('[data-slot="popover-content"]'))
+        ) {
+          return;
+        }
+      }
+      setMenuOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleBlur = () => {
+      setMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [menuOpen]);
+
   const switchSpace = (space: Space) => {
+    setMenuOpen(false);
     if (space.id === props.activeSpaceId) return;
     useWorkspaceStore.getState().setScope(`space:${space.id}`);
     navigate(spaceLandingRoute(space.id, props.userId));
@@ -57,47 +95,44 @@ export function GlobalSpaceSwitcher(props: {
   return (
     <GlobalCreateSpaceDialog>
       {(openCreateSpaceDialog) => (
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenu modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
           <TooltipProvider delayDuration={450}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
                   <button
+                    ref={triggerRef}
                     type="button"
-                    className={cn(
-                      navigationMenuRowClass,
-                      navigationMenuDisclosureLayoutClass,
-                      "flex-1 max-w-[calc(100%_-_2.5rem)]",
-                      navigatorFocusRingClass,
-                    )}
+                    className={cn(navigatorHierarchyTriggerClass, "w-fit max-w-full")}
                     aria-label={switcherLabel}
                     data-misty-window-drag-block="true"
                     data-space-menu-open={menuOpen ? "true" : "false"}
                   >
-                    <span className="relative flex size-[18px] shrink-0 items-center justify-center">
+                    <span className="relative flex size-6 shrink-0 items-center justify-center">
                       {props.activeSpace ? (
                         <>
                           <SpaceAvatar
                             space={props.activeSpace}
-                            className="size-[18px] rounded border-0 bg-transparent"
+                            className="size-6 border-0 bg-transparent"
+                            fallbackClassName="text-[10px] font-bold"
                           />
                           {activeUnread > 0 ? (
                             <span
-                              className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-notification-red ring-2 ring-charcoal-workspace"
+                              className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-notification-red ring-2 ring-charcoal-workspace"
                               aria-hidden="true"
                             />
                           ) : null}
                         </>
                       ) : (
                         <span
-                          className="size-[18px] rounded border border-charcoal-border bg-charcoal-card"
+                          className="size-6 rounded-md border border-charcoal-border bg-charcoal-card"
                           aria-hidden="true"
                         />
                       )}
                     </span>
-                    <span className="flex min-w-0 items-center gap-1">
+                    <span className="flex min-w-0 items-center gap-1.5">
                       <OverflowFadeText
-                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-[13px] font-medium text-cream"
+                        className="min-w-0 max-w-[150px] overflow-hidden whitespace-nowrap text-sm font-semibold text-inherit tracking-[-0.015em]"
                         data-active-space-name="true"
                         title={activeName}
                       >
@@ -113,6 +148,7 @@ export function GlobalSpaceSwitcher(props: {
           </TooltipProvider>
 
           <DropdownMenuContent
+            ref={contentRef}
             align="start"
             sideOffset={6}
             className="w-[240px] grid-cols-[minmax(0,1fr)]"
@@ -123,22 +159,17 @@ export function GlobalSpaceSwitcher(props: {
                 const active = space.id === props.activeSpaceId;
                 const unread = unreadActivityCountForSpace(activityItems, space.id);
                 return (
-                  <div className="group/space-menu-row relative min-w-0" key={space.id}>
+                  <div className="min-w-0" key={space.id}>
                     <DropdownMenuItem
                       className={cn(
                         "h-8 min-w-0 gap-2.5 overflow-hidden",
-                        "group-hover/space-menu-row:bg-charcoal-hover",
-                        "group-has-[[data-state=open]]/space-menu-row:bg-charcoal-hover",
                         active && "bg-charcoal-hover text-cream",
                       )}
                       aria-current={active ? "page" : undefined}
                       onSelect={() => switchSpace(space)}
                     >
                       <span className="relative grid size-6 shrink-0 place-items-center">
-                        <SpaceAvatar
-                          space={space}
-                          className="size-6 rounded-md border-0 bg-transparent"
-                        />
+                        <SpaceAvatar space={space} className="size-6 border-0 bg-transparent" />
                         {unread > 0 ? (
                           <span
                             className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-notification-red ring-2 ring-charcoal-card"
@@ -155,18 +186,6 @@ export function GlobalSpaceSwitcher(props: {
                       </OverflowFadeText>
                       {unread > 0 ? <span className="sr-only">{unread} unread</span> : null}
                     </DropdownMenuItem>
-                    <div
-                      className={cn(
-                        "pointer-events-none absolute inset-y-0 right-1 z-10 flex w-[86px] items-center justify-end bg-charcoal-hover opacity-0 transition-opacity",
-                        "before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-[18px] before:bg-gradient-to-r before:from-transparent before:to-charcoal-hover",
-                        "group-hover/space-menu-row:pointer-events-auto group-hover/space-menu-row:opacity-100",
-                        "group-focus-within/space-menu-row:pointer-events-auto group-focus-within/space-menu-row:opacity-100",
-                        "has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100",
-                      )}
-                      data-space-row-actions={space.id}
-                    >
-                      <SpaceRowActions space={space} />
-                    </div>
                   </div>
                 );
               })}
@@ -179,7 +198,10 @@ export function GlobalSpaceSwitcher(props: {
             <DropdownMenuItem
               disabled={!props.canAddSpace}
               title={props.canAddSpace ? undefined : "Space limit reached"}
-              onSelect={openCreateSpaceDialog}
+              onSelect={() => {
+                setMenuOpen(false);
+                openCreateSpaceDialog();
+              }}
             >
               <Plus size={14} aria-hidden="true" />
               New Space

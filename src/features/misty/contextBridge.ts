@@ -1,3 +1,5 @@
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { currentMistySpace } from "./availability";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -90,10 +92,10 @@ export async function installMistyContextBridge() {
   const broadcastSpace = () =>
     current.emitTo("misty-bot-pet", "misty://active-space", {
       accountId: useAppsStore.getState().accountId,
-      spaceId: useAppsStore.getState().spaceId,
+      spaceId: currentMistySpace(),
     });
-  const removeSpace = useAppsStore.subscribe((state, previous) => {
-    if (state.spaceId !== previous.spaceId) void broadcastSpace().catch(() => undefined);
+  const removeSpace = useWorkspaceStore.subscribe((state, previous) => {
+    if (state.activeScopeKey !== previous.activeScopeKey) void broadcastSpace().catch(() => undefined);
   });
   let removeFocus = () => {};
   try {

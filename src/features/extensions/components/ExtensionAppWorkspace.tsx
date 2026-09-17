@@ -1,6 +1,6 @@
 import { useAppsStore } from "@/features/apps/useAppsStore";
 import type { WorkspaceTab } from "@/features/workspace";
-import { ExplorerPluginPanelHost } from "@/features/files/explorer";
+import { ExplorerPluginPanelHost } from "./PluginPanelHost";
 import type { PluginPanelEntry } from "@/native/contracts";
 import { pluginCommandsSnapshot } from "@/native/settings-plugins";
 import { Button, ErrorState } from "@/shared/ui";

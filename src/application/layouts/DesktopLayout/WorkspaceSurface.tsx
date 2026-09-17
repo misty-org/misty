@@ -1,14 +1,27 @@
+import { spaceToolRouteFromAppRoute } from "@/features/spaces/spaceAppRoute";
+import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces/core";
+import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
+import { GlobalHomeDashboard } from "@/features/home/GlobalHomeDashboard";
 import { DiscoverPage } from "@/features/marketplace";
 import { OfficialAppRuntimePage } from "@/features/apps";
 import { canonicalSpaceRoute, socialProviderFromRoute, SpaceSectionView } from "@/features/spaces";
 import { WorkspaceTabRouteScope, type WorkspaceTab } from "@/features/workspace";
-import { cn, ComingSoonSurface, ErrorState } from "@/shared/ui";
+import { cn, ErrorState } from "@/shared/ui";
 import { Plus } from "lucide-react";
 
 /** Static surface for a workspace tab that isn't the currently-routed one. */
 export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; active?: boolean }) {
-  const scopedTab =
-    tab.surfaceId === "space" ? { ...tab, route: canonicalSpaceRoute(tab.route) } : tab;
+  const fallbackSpaceId = useSpacesStore((state) => preferredDefaultSpace(state.spaces)?.id);
+  const migratedRoute = spaceToolRouteFromAppRoute(tab.route, fallbackSpaceId);
+  const migrated =
+    migratedRoute || tab.surfaceId === "space"
+      ? workspaceSurfaceFromRoute(migratedRoute ?? tab.route)
+      : null;
+  const scopedTab = migrated
+    ? { ...tab, ...migrated, state: tab.state }
+    : tab.surfaceId === "space"
+      ? { ...tab, route: canonicalSpaceRoute(tab.route) }
+      : tab;
   return (
     <WorkspaceTabRouteScope tab={scopedTab}>
       <WorkspaceSurfaceContent tab={scopedTab} active={active} />
@@ -19,7 +32,7 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceTab; ac
 function WorkspaceSurfaceContent({ tab, active }: { tab: WorkspaceTab; active: boolean }) {
   switch (tab.surfaceId) {
     case "home":
-      return <ComingSoonSurface feature="Home" />;
+      return <GlobalHomeDashboard />;
     case "official-app":
       return <OfficialAppRuntimePage appId={appIdFromTab(tab)} tab={tab} active={active} />;
     case "marketplace":

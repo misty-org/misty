@@ -1,5 +1,5 @@
 import type { DesktopPlatform, WindowBounds, WindowRect } from "@/application/layouts/model/types";
-import { enableModernWindowStyle, repositionTrafficLights } from "@/native";
+import { enableModernWindowStyle } from "@/native";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
@@ -163,16 +163,10 @@ export function useDesktopWindowChrome() {
                 return;
               }
               customZoomAnimatingRef.current = false;
-              if (desktopPlatform === "macos") {
-                void repositionTrafficLights(getCurrentWindow()).catch(() => undefined);
-              }
               resolve();
             },
             (error: unknown) => {
               customZoomAnimatingRef.current = false;
-              if (desktopPlatform === "macos") {
-                void repositionTrafficLights(getCurrentWindow()).catch(() => undefined);
-              }
               reject(error);
             },
           );

@@ -367,6 +367,7 @@ function builtInAppRoute(appId: NavigatorAppId, spaceId: string | undefined, acc
     return spaceId ? rememberedPlannerRoute(accountId, spaceId) : routes.spaces;
   if (appId === "library")
     return spaceId ? `/spaces/${encodeURIComponent(spaceId)}/library` : routes.spaces;
+  if (appId === "music" || appId === "media") return `/apps/${appId}`;
   return routes[appId];
 }
 

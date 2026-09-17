@@ -17,7 +17,7 @@ export function AppsLibraryPage() {
   const installations = useAppsStore((state) => state.installations);
   const actionAppId = useAppsStore((state) => state.actionAppId);
   const setPinned = useAppsStore((state) => state.setPinned);
-  const activeSpaceId = useAppsStore((state) => state.spaceId);
+  const activeSpaceId = "";
   const activeSpace = spaces.find((space) => space.id === activeSpaceId);
   const installed = useMemo(
     () =>
@@ -43,7 +43,7 @@ export function AppsLibraryPage() {
         {!isNativeMobileBuild ? (
           <header className="mb-5">
             <h1 className="text-xl font-semibold tracking-tight text-cream-bright">Apps</h1>
-            <p className="mt-1 text-sm text-cream-muted">The tools available in this Space.</p>
+            <p className="mt-1 text-sm text-cream-muted">Your personal apps and connected tools.</p>
           </header>
         ) : null}
 
@@ -62,9 +62,7 @@ export function AppsLibraryPage() {
                       "flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-md px-1.5",
                       "text-left transition-colors hover:bg-charcoal-hover active:bg-charcoal-active",
                     )}
-                    onClick={() =>
-                      navigate(officialAppRoute(app.id, activeSpace?.id, user?.id ?? ""))
-                    }
+                    onClick={() => navigate(officialAppRoute(app.id, undefined, user?.id ?? ""))}
                   >
                     <OfficialAppIcon appId={app.id} size={38} />
                     <span className="min-w-0 flex-1">

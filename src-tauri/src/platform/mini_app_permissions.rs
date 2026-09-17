@@ -100,7 +100,7 @@ pub struct PermissionSet {
     folder_security_scopes: HashMap<String, Arc<directory_bookmark_macos::SecurityScope>>,
     pub(super) owner_namespace: Option<String>,
     pub(super) native_owner: Option<super::NativeOwner>,
-    pub(super) space_owned: bool,
+    pub(super) account_owned: bool,
     consent_declaration: String,
     consent_loaded: bool,
     app_id: String,
@@ -224,7 +224,7 @@ impl PermissionSet {
             folder_security_scopes: HashMap::new(),
             owner_namespace: None,
             native_owner: None,
-            space_owned: false,
+            account_owned: false,
             consent_declaration,
             consent_loaded: false,
             app_id: app_id.into(),
@@ -1449,7 +1449,7 @@ pub fn mini_app_duplicate_file_grant(
             .ok_or("Source view closed.")?
             .permissions;
         p.authorize("files.read")?;
-        if !p.space_owned || p.native_owner.is_none() {
+        if !p.account_owned || p.native_owner.is_none() {
             return Err("A Space app is required.".into());
         }
         let source = p
@@ -1474,7 +1474,7 @@ pub fn mini_app_duplicate_file_grant(
         .ok_or("Target view closed.")?
         .permissions;
     p.authorize("files.read")?;
-    if !p.space_owned || p.native_owner != owner || p.app_id != app || p.version != version {
+    if !p.account_owned || p.native_owner != owner || p.app_id != app || p.version != version {
         return Err("File grants cannot cross accounts, Spaces, apps, or releases.".into());
     }
     if p.files.len() >= 256 {

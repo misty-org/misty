@@ -46,7 +46,13 @@ export function officialAppComponentFactory(appId, { framework = false, runtime 
           createSession(input) {
             if (input.signal.aborted) throw new Error("The downloaded App session is closed.");
             const definition = instantiate(input.libraries);
-            return definition.createSession(input);
+            if (typeof definition.createSession === "function") {
+              return definition.createSession(input);
+            }
+            return {
+              mount(context) { return definition.mount(context); },
+              close() {},
+            };
           },
           mount(input) { return instantiate(input.libraries).mount(input); }
         });`;

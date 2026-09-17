@@ -1,3 +1,4 @@
+import { WorkspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -113,4 +114,12 @@ describe("integration brand artwork", () => {
       brandIconAsset(id)!.src,
     );
   });
+});
+
+it("distinguishes native Space Library from the downloadable Storage app", () => {
+  const library = renderToStaticMarkup(<WorkspaceAppIcon appId="library" context="space" />);
+  const storage = renderToStaticMarkup(<OfficialAppIcon appId="library" />);
+  expect(library).toContain("lucide-book-open-text");
+  expect(library).not.toContain("lucide-package");
+  expect(storage).toContain("lucide-package");
 });

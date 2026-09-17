@@ -309,6 +309,9 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     let app_id = std::env::var("MISTY_SDK_PROBE_APP").unwrap_or_else(|_| "terminal".into());
     let names_probe = std::env::var("MISTY_NAVIGATION_NAMES_PROBE").as_deref() == Ok("1");
     let page = match app_id.as_str() {
+        _ if std::env::var("MISTY_SDK_PROBE_GMAIL_SIGNIN").as_deref() == Ok("1") => {
+            "sdk-gmail-signin-probe.html"
+        }
         _ if names_probe => "navigation-names-probe.html",
         _ if std::env::var("MISTY_SDK_PROBE_BROWSER_RENDERING").as_deref() == Ok("1") => {
             "sdk-browser-render-probe.html"

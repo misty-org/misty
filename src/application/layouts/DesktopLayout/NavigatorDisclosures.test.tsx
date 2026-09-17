@@ -161,7 +161,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(useInboxStore.getState().selectedProvider).toBe("");
   });
 
-  it("retains Agents SDK navigation after its view closes on Discover", async () => {
+  it("keeps native Agents navigation independent of legacy SDK registration", async () => {
     const scope = createAppRpcScope({
       identity: {
         appId: "agents",
@@ -177,14 +177,14 @@ describe("GlobalNavigator disclosures", () => {
       { id: "activity", label: "Current agent activity", route: "/apps/agents" },
     ]);
     await renderNavigator("/discover");
-    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Agents"]');
-    if (trigger?.getAttribute("aria-expanded") !== "true") {
-      await act(async () => trigger?.click());
-    }
-    expect(container.textContent).toContain("Current agent activity");
+    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
+      "/apps/agents",
+    );
+    expect(container.textContent).not.toContain("Current agent activity");
     await act(async () => scope.close());
-    expect(container.textContent).toContain("Current agent activity");
-    expect(container.textContent).not.toContain("Automations");
+    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
+      "/apps/agents",
+    );
     useAppNavigationStore.setState({ entries: [], providerCache: [] });
   });
 
@@ -216,19 +216,10 @@ describe("GlobalNavigator disclosures", () => {
 
     await renderNavigator("/apps/agents?view=automations");
 
-    const trigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Agents"][data-navigator-disclosure-trigger="true"]',
-    );
-    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
-
-    const items = [
-      ...container.querySelectorAll<HTMLAnchorElement>(
-        '[role="group"][aria-label="Agents destinations"] a',
-      ),
-    ];
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["Activity"]);
-    expect(items.map((item) => item.getAttribute("href"))).toEqual(["/apps/agents"]);
-    expect(items[0]?.getAttribute("aria-current")).toBe("page");
+    const link = container.querySelector('a[aria-label="Agents"]');
+    expect(link?.getAttribute("href")).toBe("/apps/agents");
+    expect(link?.getAttribute("aria-current")).toBe("page");
+    expect(container.querySelector('[aria-label="Agents destinations"]')).toBeNull();
   });
 
   it("opens Planner destinations and highlights only the active section", async () => {
@@ -513,7 +504,9 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     const triggerClasses = trigger?.className.split(/\s+/) ?? [];
     expect(triggerClasses).toContain("box-border");
-    expect(triggerClasses).toContain("grid-cols-[18px_minmax(0,1fr)]");
+    expect(triggerClasses).toContain(
+      "grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)]",
+    );
     expect(triggerClasses).not.toContain("hover:bg-charcoal-active");
     expect(triggerClasses).not.toContain("hover:text-cream");
 
@@ -524,7 +517,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(items[1]?.getAttribute("aria-current")).toBe("page");
     expect(featureIconNames(destinations)).toEqual(["explorer", "transfers"]);
     expect(destinations?.className).toContain("gap-[var(--navigation-tree-gap)]");
-    expect(items.every((item) => item.className.includes("h-8"))).toBe(true);
+    expect(items.every((item) => item.className.includes("h-7"))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-branch="true"]'))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
     expect(

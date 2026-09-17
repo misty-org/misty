@@ -28,6 +28,8 @@ const supportedApps = new Set([
   "browser",
   "code",
   "terminal",
+  "music",
+  "media",
 ]);
 
 if (!supportedApps.has(appId)) throw new Error(`Unsupported official app: ${appId || "(missing)"}`);

@@ -2,8 +2,7 @@
 use super::*;
 
 /// Keep WebKit's original popup configuration (including window.opener and the website
-/// data store). Integration popups remain native auxiliary windows; ordinary
-/// Browser popups are adopted into Browser tabs.
+/// data store). All popups, including authentication, are adopted into Browser tabs.
 #[cfg(target_os = "macos")]
 pub(super) fn provider_popup(
     app: &AppHandle,
@@ -12,7 +11,7 @@ pub(super) fn provider_popup(
     features: tauri::webview::NewWindowFeatures,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
     let state = app.state::<BrowserSessionState>();
-    let (provider, profile, oauth_callback, origin_space_id, attached) = {
+    let (provider, profile, oauth_callback, origin_space_id) = {
         let sessions = state.sessions.lock().ok()?;
         let source = sessions.get(source_id)?;
         let provider = source.profile_provider.clone();
@@ -27,11 +26,10 @@ pub(super) fn provider_popup(
             source.profile_id.clone(),
             source.oauth_callback.clone(),
             source.origin_space_id.clone(),
-            source.provider_id.is_some() || source.popup_parent.is_some(),
         )
     };
-    // For integration windows, failure must never fall back to a fresh Browser tab.
-    let result = create_popup(
+    // Do not fall back to a fresh view: it would discard the opener and profile.
+    Some(create_popup(
         app,
         source_id,
         url,
@@ -40,13 +38,7 @@ pub(super) fn provider_popup(
         profile,
         oauth_callback,
         origin_space_id,
-        attached,
-    );
-    if attached {
-        Some(result.unwrap_or(NewWindowResponse::Deny))
-    } else {
-        result
-    }
+    ).unwrap_or(NewWindowResponse::Deny))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -62,7 +54,6 @@ fn create_popup(
         std::time::Instant,
     )>,
     origin_space_id: Option<String>,
-    attached: bool,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
     let state = app.state::<BrowserSessionState>();
     // WebKit's target configuration shares the opener's user-content controller.
@@ -76,12 +67,6 @@ fn create_popup(
             .target_configuration
             .setUserContentController(&objc2_web_kit::WKUserContentController::new(main_thread));
     }
-    let parent = if attached {
-        let source = app.get_webview(&webview_label(source_id).ok()?)?;
-        Some(source.window().ns_window().ok()?)
-    } else {
-        None
-    };
     let key = format!("popup-{}", uuid::Uuid::new_v4());
     let id = format!("tab-{key}");
     let label = webview_label(&id).ok()?;
@@ -91,7 +76,7 @@ fn create_popup(
         let session = sessions.get_mut(&id)?;
         session.profile_id = profile;
         session.profile_provider = provider;
-        session.popup_parent = attached.then(|| source_id.to_owned());
+        session.popup_parent = None;
         session.provider_id = None;
         session.oauth_callback = oauth_callback;
         session.origin_space_id = origin_space_id;
@@ -144,7 +129,7 @@ fn create_popup(
             }
             let _ = apply_browser_pointer_tracking(
                 webview,
-                BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+                renderer(webview.window().label()).tracking,
             );
             let _ = page_app.emit(
                 "misty://browser-page",
@@ -161,6 +146,7 @@ fn create_popup(
             }
         })
         .on_document_title_changed(move |window, title| {
+            let _ = window.set_title(&format!("{title} · Misty"));
             let _ = title_app.emit(
                 "misty://browser-title",
                 BrowserTitleEvent {
@@ -190,16 +176,6 @@ fn create_popup(
             }
             NewWindowResponse::Deny
         });
-    let builder = if let Some(parent) = parent {
-        builder
-            .parent_raw(parent)
-            .title("Sign in · Misty")
-            .inner_size(520.0, 700.0)
-            .min_inner_size(360.0, 420.0)
-            .center()
-    } else {
-        builder
-    };
     let builder = if let Some(agent) = native_macos_safari_user_agent() {
         builder.user_agent(&agent)
     } else {
@@ -215,52 +191,10 @@ fn create_popup(
             return None;
         }
     };
-    if attached {
-        let close_app = app.clone();
-        let close_id = id.clone();
-        let source_id = source_id.to_owned();
-        window.on_window_event(move |event| {
-            if !matches!(event, tauri::WindowEvent::Destroyed) {
-                return;
-            }
-            let state = close_app.state::<BrowserSessionState>();
-            // Remove descendants as well when the user cancels an outer sign-in window.
-            let children = state
-                .sessions
-                .lock()
-                .map(|mut sessions| {
-                    sessions.remove(&close_id);
-                    sessions
-                        .iter()
-                        .filter(|(_, session)| session.popup_parent.as_deref() == Some(&close_id))
-                        .map(|(id, _)| id.clone())
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            forget_shortcut_token(&state, &close_id);
-            forget_close_handler(&close_id);
-            for id in children {
-                let _ = browser_webview_close(
-                    close_app.clone(),
-                    close_app.state::<BrowserSessionState>(),
-                    BrowserWebviewIdRequest { id },
-                );
-            }
-            if let Some(source) = webview_label(&source_id)
-                .ok()
-                .and_then(|label| close_app.get_webview(&label))
-            {
-                let _ = source.window().set_focus();
-                let _ = source.set_focus();
-            }
-        });
-        if install_close_handler(app, window.as_ref(), &id).is_err() {
-            let _ = window.destroy();
-            return Some(NewWindowResponse::Deny);
-        }
-        let _ = window.show();
-        let _ = window.set_focus();
-        return Some(NewWindowResponse::Create { window });
+    if focus_messages::install(app, window.as_ref(), &id).is_err() ||
+        install_close_handler(app, window.as_ref(), &id).is_err() {
+        let _ = window.destroy();
+        return Some(NewWindowResponse::Deny);
     }
     state.pending_popups.lock().ok()?.insert(id.clone());
     let _ = app.emit(

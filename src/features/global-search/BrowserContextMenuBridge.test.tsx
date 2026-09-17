@@ -8,7 +8,7 @@ const native = vi.hoisted(() => ({
   focus: vi.fn(async () => {}),
   stop: vi.fn(),
 }));
-vi.mock("@/features/browser/browserRuntime", () => ({
+vi.mock("@/features/webviews/browserRuntime", () => ({
   browserOverlayReady: vi.fn(async () => {}),
   setBrowserWebviewsSuspended: native.suspend,
 }));
@@ -97,7 +97,8 @@ it("grants menu focus to the local host without granting remote pages native acc
     readFileSync(`${process.cwd()}/src-tauri/capabilities/default.json`, "utf8"),
   );
   expect(capability.permissions).toContain("core:webview:allow-set-webview-focus");
-  expect(capability.webviews).toEqual(["main"]);
+  expect(capability.webviews).toEqual(["main", "misty-agent-*"]);
+  expect(capability.webviews).not.toContain("misty-browser-*");
   expect(capability.windows).toBeUndefined();
   expect(capability.remote).toBeUndefined();
   expect(capability.local).not.toBe(false);

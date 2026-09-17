@@ -395,3 +395,19 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
 
 export const testingAiPaneSession = aiPaneSession;
 export const testingConciseSpeech = conciseSpeech;
+
+export function resetAiSurfaceAccountState(accountId?: string): void {
+  if (accountId) {
+    useAiSurfaceStore.getState().clearAccount(accountId);
+  } else {
+    for (const [, stop] of streamStops) {
+      stop();
+    }
+    streamStops.clear();
+    useAiSurfaceStore.setState({
+      sessions: {},
+      registrations: {},
+      companion: { phase: "home", completedCount: 0 },
+    });
+  }
+}

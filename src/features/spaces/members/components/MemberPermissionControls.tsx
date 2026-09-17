@@ -314,11 +314,6 @@ const permissionGroups = [
     title: "Planner and connections",
     items: [
       {
-        id: "apps.manage",
-        label: "Manage Space apps",
-        description: "Choose apps, review permissions, and change the shared app order.",
-      },
-      {
         id: "tasks.view",
         label: "View tasks and calendars",
         description: "See shared tasks and published events.",

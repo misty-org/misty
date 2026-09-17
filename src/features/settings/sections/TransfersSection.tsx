@@ -1,4 +1,4 @@
-import { useOperationQueueStore } from "@/features/files/explorer";
+import { useOperationQueueStore } from "@/features/transfers/store/useOperationQueueStore";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,

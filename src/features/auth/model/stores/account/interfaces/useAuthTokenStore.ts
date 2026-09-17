@@ -10,6 +10,7 @@ export interface SavedAccountSession {
 
 export interface SecureAccountSession {
   account: SavedAccountSession;
+  /** Non-secret cookie-session:<account-id> handle. JWTs remain in native storage. */
   token: string;
   deploymentScope?: string;
 }

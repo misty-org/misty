@@ -1,3 +1,5 @@
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { httpRequest } from "@/api/client/http";
 import type { LibraryUploadResult, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import {
   isApiSessionTransitioning,
@@ -172,6 +174,21 @@ export async function transferLibraryObject(
   const token = direct ? "" : await readApiAuthToken();
   assertStableSpaceAccount(accountGeneration);
   const url = direct ? transfer.url : `${base}${transfer.url}`;
+  if (!direct && hasTauriInternals()) {
+    const response = await httpRequest(url, {
+      method: transfer.method || "PUT",
+      headers: transfer.headers,
+      body: file,
+      signal: options?.signal,
+      onUploadProgress: options?.onProgress,
+    });
+    assertStableSpaceAccount(accountGeneration);
+    if (!response.ok) throw new Error(`Upload failed (${response.status}).`);
+    await response.body?.cancel();
+    options?.onProgress?.(1);
+    return;
+  }
+
   await new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
     const abort = () => request.abort();
@@ -181,6 +198,7 @@ export async function transferLibraryObject(
       if (!value || /^(host|content-length|connection|origin)$/i.test(name)) continue;
       request.setRequestHeader(name, value);
     }
+    if (!direct) request.setRequestHeader("X-Misty-CSRF", "1");
     if (!direct && token) request.setRequestHeader("Authorization", `Bearer ${token}`);
     request.upload.onprogress = (event) => {
       if (isApiSessionTransitioning() || accountGeneration !== readApiSessionGeneration()) {
@@ -221,7 +239,7 @@ export function directTransferErrorMessage(direct: boolean, status: number): str
   return "The direct R2 upload failed.";
 }
 
-export {libraryReauthenticationHeaders,libraryPreviewPath} from "./library-transfer-paths";
+export { libraryReauthenticationHeaders, libraryPreviewPath } from "./library-transfer-paths";
 export async function downloadProtectedFile(
   path: string,
   filename: string,
@@ -247,7 +265,7 @@ export async function fetchProtectedBlob(path: string, init?: RequestInit): Prom
   if (token) headers.set("Authorization", `Bearer ${token}`);
   let response: Response;
   try {
-    response = await fetch(`${base}${path}`, { credentials: "include", ...init, headers });
+    response = await httpRequest(`${base}${path}`, { credentials: "include", ...init, headers });
   } catch (error) {
     assertStableSpaceAccount(accountGeneration);
     throw error;

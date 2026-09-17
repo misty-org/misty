@@ -1,33 +1,33 @@
+import { LoadingScreen } from "@/shared/ui/loading-screen";
+import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
 import { ActivityPanel } from "@/features/activity/ActivityPanel";
 import { configurePluginSpaceAuthority } from "@/native/settings-plugins";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { lazy, Suspense, useEffect } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
-import { accountNeedsOnboarding } from "@/features/onboarding/onboardingState";
-import { useSpacesStore } from "@/features/spaces";
 import { desktopNavItems, desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { preferredDefaultSpace } from "@/features/spaces/defaultSpace";
 import { useAppsStore } from "@/features/apps";
 
 const PlatformLayout = lazy(() => import("@/application/platform-layout"));
 
 export function AppFrameLayout() {
-  const { user } = useAuth();
-  const spaces = useSpacesStore((state) => state.spaces);
-  const scope = useWorkspaceStore((state) => state.activeScopeKey);
-  const spaceId = scope.startsWith("space:")
-    ? scope.slice(6)
-    : (preferredDefaultSpace(spaces)?.id ?? "");
-  const snapshotReady = useSpacesStore((state) => state.snapshotReady);
-  const needsOnboarding = accountNeedsOnboarding(user?.id, snapshotReady, spaces);
+  const { user, transitioning } = useAuth();
+  const location = useLocation();
+  const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
+  const isInviteRoute = location.pathname.startsWith("/invite/");
 
   useEffect(() => {
-    if (user?.id) useAppsStore.getState().selectSpace(user.id, spaceId);
-    else useAppsStore.getState().reset();
-  }, [user?.id, spaceId]);
+    if (!user?.id) {
+      useAppsStore.getState().reset();
+      return;
+    }
+    if (user?.id) {
+      useAppsStore.getState().selectAccount(user.id);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const refresh = (event: Event) => {
@@ -43,33 +43,45 @@ export function AppFrameLayout() {
     () =>
       configurePluginSpaceAuthority(async () => {
         const initial = useAppsStore.getState();
-        if (!initial.spaceId || !initial.accountId) return new Set<string>();
-        await initial.load(initial.accountId, true, initial.spaceId);
+        if (!initial.accountId) return new Set<string>();
+        await initial.load(initial.accountId, true);
         const current = useAppsStore.getState();
-        if (
-          current.accountId !== initial.accountId ||
-          current.spaceId !== initial.spaceId ||
-          current.error
-        )
-          return new Set<string>();
+        if (current.accountId !== initial.accountId || current.error) return new Set<string>();
         return new Set(
-          current.installations.filter((app) => app.state === "installed").map((app) => app.app_id),
+          current.installations
+            .filter((app) => app.state === "installed" && !app.consent_required)
+            .map((app) => app.app_id),
         );
       }),
     [],
   );
 
-  if (needsOnboarding) {
-    return <OnboardingFlow />;
+  // Keep hook order stable as identity changes, and let account transitions
+  // finish before deciding that the user needs to sign in.
+  if (transitioning && !isAuthRoute) return <LoadingScreen fullScreen label="Restoring account" />;
+
+  if (!user && !isAuthRoute && !isInviteRoute) {
+    return (
+      <Navigate to="/signin" state={{ from: `${location.pathname}${location.search}` }} replace />
+    );
+  }
+
+  if (isAuthRoute) {
+    return (
+      <Suspense fallback={<LoadingScreen fullScreen />}>
+        <PlatformLayout getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />
+      </Suspense>
+    );
   }
 
   return (
     <>
-      <Suspense fallback={null}>
+      <Suspense fallback={<LoadingScreen fullScreen />}>
         <ConnectedDevicesProvider>
           <PlatformLayout getRouteId={desktopRouteIdFromPath} navItems={desktopNavItems} />
         </ConnectedDevicesProvider>
       </Suspense>
+      <AgentExecutionSurface />
       <ActivityPanel />
       <OnboardingFlow />
       <UpdateNotices accountId={user?.id ?? ""} />

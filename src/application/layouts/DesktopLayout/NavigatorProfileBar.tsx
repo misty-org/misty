@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
 import { Settings } from "lucide-react";
 import type { RefObject } from "react";
-import { ActivityMenu } from "./ActivityMenu";
+import { HelpMenu } from "./HelpMenu";
 import { ProfileNavButton } from "./NavRail";
 import {
   navigatorFloatingIslandClass,
@@ -9,13 +9,7 @@ import {
   navigatorIslandActionClass,
 } from "./styles";
 
-/**
- * The account dock, floating over the navigator's scrolling body.
- *
- * It sits on top of the rail rather than in the column flow so the Spaces and
- * Tools lists can scroll the full height behind it and it never scrolls away.
- * The navigation list reserves room for it with its own bottom padding.
- */
+/** Fixed account island below the navigation scroll area. */
 export function NavigatorProfileBar(props: {
   profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
@@ -25,8 +19,8 @@ export function NavigatorProfileBar(props: {
 }) {
   return (
     <div
-      className="absolute inset-x-2 bottom-2 z-20"
-      data-navigator-profile-bar="floating"
+      className="relative z-20 mx-2 mb-2 mt-1 shrink-0"
+      data-navigator-profile-bar="fixed"
       data-misty-window-drag-block="true"
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -45,7 +39,6 @@ export function NavigatorProfileBar(props: {
           avatarClassName="size-7 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
           showAccountName
         />
-        <ActivityMenu className={cn(navigatorIslandActionClass)} />
         <TooltipProvider delayDuration={450}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -64,6 +57,7 @@ export function NavigatorProfileBar(props: {
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <HelpMenu className={navigatorIslandActionClass} />
       </div>
     </div>
   );

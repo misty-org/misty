@@ -57,6 +57,7 @@ async function fixture(
   appId: "chat" | "inbox" = "chat",
   records = new Map<string, unknown>(),
   platform = "MacIntel",
+  serverCall?: (method: string) => Promise<unknown>,
 ) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
@@ -87,7 +88,8 @@ async function fixture(
     appearance: { mode: "dark" },
   };
   const call = vi.fn(async (method: string) => {
-    if (method === "mail.accounts.list") return { accounts: [] };
+    if (serverCall) return serverCall(method);
+    if (method === "connections.list") return { connections: [] };
     throw new Error(`Unexpected server call ${method}`);
   });
   const listeners = new Map<string, (event: MistyBrowserEvent) => void>();
@@ -164,12 +166,12 @@ async function menu(f: Awaited<ReturnType<typeof fixture>>, label: string) {
 function selectedProfile(f: Awaited<ReturnType<typeof fixture>>) {
   return f.root.querySelector("[data-website]")?.getAttribute("data-account");
 }
-it("opens Instagram's DM view and preserves a saved native session without profile controls", async () => {
+it("opens Instagram's sign-in view and preserves a saved native session without profile controls", async () => {
   const f = await fixture("/apps/social?provider=instagram");
   await waitFor(() =>
     expect(opened).toHaveBeenCalledWith(
       { id: "instagram", accountId: "default-instagram" },
-      "https://www.instagram.com/direct/inbox/",
+      "https://www.instagram.com/accounts/login/?next=%2Fdirect%2Finbox%2F",
     ),
   );
   expect(f.ui.queryByRole("button", { name: /profiles/ })).toBeNull();
@@ -256,7 +258,14 @@ it.each(["/apps/inbox?provider=misty", "/apps/inbox?experience=api"])(
 it("loads only API-connected mail providers into navigation and exposes partial failure in the directory", async () => {
   const f = await fixture("/apps/inbox", "inbox");
   vi.mocked(f.sdk.server.call).mockResolvedValue({
-    accounts: [{ connection_id: "mail-1", provider: "microsoft", email: "test@example.com" }],
+    connections: [
+      {
+        id: "mail-1",
+        provider: "microsoft",
+        account_display: "test@example.com",
+        capabilities: ["mail"],
+      },
+    ],
   } as never);
   const { notifyProviderAccounts } =
     await import("../../../../../misty-apps/apps/shared/accountStore");
@@ -268,8 +277,44 @@ it("loads only API-connected mail providers into navigation and exposes partial 
   );
   vi.mocked(f.sdk.server.call).mockRejectedValue(new Error("offline"));
   act(() => notifyProviderAccounts());
-  await waitFor(() => expect(f.ui.getByText(/Mail connections could not be checked/)).toBeTruthy());
+  await waitFor(() =>
+    expect(f.ui.getByText(/Saved mail integrations could not be loaded/)).toBeTruthy(),
+  );
   expect(f.ui.getByRole("button", { name: "Add Gmail" })).toBeTruthy();
+});
+
+it.each(["pending", "failed"])(
+  "keeps Gmail and its toolbar usable when optional mail discovery is %s",
+  async (status) => {
+    const call = vi.fn(() =>
+      status === "pending"
+        ? new Promise<never>(() => {})
+        : Promise.reject(new Error("Mail API is offline")),
+    );
+    const f = await fixture("/apps/inbox?provider=google", "inbox", new Map(), "MacIntel", call);
+    await waitFor(() => expect(selectedProfile(f)).toBe("default-google"));
+    expect(call).toHaveBeenCalled();
+    expect(f.ui.queryByText(/Mail connections could not be checked/)).toBeNull();
+    await waitFor(() => expect(f.listeners.has("default-google")).toBe(true));
+    fireEvent.click(f.ui.getByRole("button", { name: "Refresh" }));
+    expect(f.sdk.browser.reload).toHaveBeenCalledWith("default-google");
+    await menu(f, "Open link");
+    expect(f.sdk.links.openExternal).toHaveBeenCalledWith(
+      "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F%23inbox",
+    );
+  },
+);
+
+it("shows the integration directory and lets users open Gmail while mail discovery is pending", async () => {
+  const f = await fixture(
+    "/apps/inbox",
+    "inbox",
+    new Map(),
+    "MacIntel",
+    () => new Promise<never>(() => {}),
+  );
+  fireEvent.click(await f.ui.findByRole("button", { name: "Add Gmail" }));
+  expect(f.sdk.navigation.open).toHaveBeenCalledWith("/apps/inbox?provider=google");
 });
 
 it.each([
@@ -311,7 +356,7 @@ it("keeps Inbox provider-only when embedded websites are unavailable", async () 
   expect(opened).not.toHaveBeenCalled();
   fireEvent.click(f.ui.getByRole("button", { name: "More website actions" }));
   fireEvent.click(await within(document.body).findByRole("button", { name: "Open link" }));
-  expect(f.sdk.links.openExternal).toHaveBeenCalledWith("https://mail.google.com/mail/u/0/#inbox");
+  expect(f.sdk.links.openExternal).toHaveBeenCalledWith("https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2F%23inbox");
 });
 
 it("remembers Outlook's work mailbox across remount without changing profile or navigating the active message", async () => {
@@ -333,7 +378,7 @@ it("remembers Outlook's work mailbox across remount without changing profile or 
   expect(JSON.stringify([...f.records.values()])).not.toContain("temporary");
   expect(f.sdk.browser.navigate).not.toHaveBeenCalled();
   expect(f.root.querySelector("[data-website]")?.getAttribute("data-initial-url")).toBe(
-    "https://outlook.live.com/mail/",
+    "https://outlook.live.com/owa/?nlp=1",
   );
   expect(opened).toHaveBeenCalledTimes(1);
   await act(f.close);
@@ -355,6 +400,8 @@ it("toggles one pin without opening a form, tracks page navigation, and removes 
     await act(async () => f.listeners.get("default-instagram")!(event));
   };
   const url = "https://www.instagram.com/direct/inbox/";
+  expect((f.ui.getByRole("button", { name: "Pin" }) as HTMLButtonElement).disabled).toBe(true);
+  await emit({ type: "page", phase: "finished", url });
   await emit({ type: "title", title: "(1) Instagram · Messages" });
   await waitFor(() =>
     expect((f.ui.getByRole("button", { name: "Pin" }) as HTMLButtonElement).disabled).toBe(false),

@@ -37,16 +37,28 @@ export function StablePaneLayout({
         id: slot.dataset.paneLayoutSlot,
         rect: slot.getBoundingClientRect(),
       }));
+      let changed = false;
       for (const { id, rect } of bounds) {
         const content = contents.get(id);
         if (!content) continue;
-        Object.assign(content.style, {
+        const next = {
           left: `${(rect.left - origin.left) / scaleX}px`,
           top: `${(rect.top - origin.top) / scaleY}px`,
           width: `${rect.width / scaleX}px`,
           height: `${rect.height / scaleY}px`,
-        });
+        };
+        if (
+          Object.entries(next).some(
+            ([key, value]) => content.style[key as keyof typeof next] !== value,
+          )
+        ) {
+          Object.assign(content.style, next);
+          changed = true;
+        }
       }
+      // Native webviews are siblings of the renderer, outside this CSS layout.
+      // Notify after all pane writes, including position-only moves/reparenting.
+      if (changed) window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
     };
     position();
     const observer = new ResizeObserver(position);

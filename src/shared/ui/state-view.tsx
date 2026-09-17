@@ -1,4 +1,4 @@
-import { Spinner } from "./spinner";
+import { LoadingScreen } from "./loading-screen";
 import { cn } from "./utils";
 import * as React from "react";
 
@@ -55,27 +55,8 @@ function PermissionState(props: StateViewProps) {
   return <StateView tone="permission" {...props} />;
 }
 
-/**
- * Loading keeps its spinner, inline with the label.
- *
- * Unlike the icons removed above, a spinner is not decoration: it is the only
- * signal that work is still in progress. It sits beside the text rather than
- * stacked above it.
- */
-function LoadingState({ label = "Loading", title = "Loading", ...props }: LoadingStateProps) {
-  return (
-    <StateView
-      aria-live="polite"
-      title={
-        <span className="inline-flex items-center gap-2">
-          <Spinner label={label} size="sm" />
-          {title}
-        </span>
-      }
-      tone="loading"
-      {...props}
-    />
-  );
+function LoadingState({ label = "Loading", className }: LoadingStateProps) {
+  return <LoadingScreen label={label} className={className} />;
 }
 export { EmptyState, ErrorState, LoadingState, PermissionState };
 

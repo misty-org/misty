@@ -13,6 +13,7 @@ import {
 import { AppRpcError, type AppRpcScope } from "./session";
 
 export interface BrowserRpcBackend {
+  setDestinations?(destinations:Array<{provider:MistyBrowserProvider;label:string;url:string}>):Promise<void>;
   availability?(): Promise<{
     available: boolean;
     persistent: boolean;
@@ -167,6 +168,10 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
         return contract.result.parse(
           (await backend.availability?.()) ?? { available: true, persistent: true },
         );
+      if (method === "browser.destinations.set") {
+        if(!backend.setDestinations)throw new AppRpcError("unsupported_method","Update Misty to register integration destinations.");
+        await backend.setDestinations((input as {destinations:Array<{provider:MistyBrowserProvider;label:string;url:string}>}).destinations);return undefined;
+      }
       if (method === "browser.removeAccount") {
         if (!backend.removeAccount)
           throw new AppRpcError("unsupported_method", "Update Misty to remove website accounts.");
@@ -309,7 +314,7 @@ export function createBrowserRpc(scope: AppRpcScope, backend: BrowserRpcBackend)
               if (
                 !inspection ||
                 inspection.documentId !== options.documentId ||
-                (action.elementRef &&
+                ("elementRef" in action && action.elementRef &&
                   !inspection.interactive.some((element) => element.ref === action.elementRef))
               )
                 throw new AppRpcError(
