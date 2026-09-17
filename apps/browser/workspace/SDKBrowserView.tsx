@@ -1,3 +1,4 @@
+import { Notification } from "@/shared/ui/notification";
 import "../../shared/browserChrome.css";
 import { WebsiteLoader } from "../../shared/WebsiteLoader";
 import "@/styles/styles.css";
@@ -22,9 +23,9 @@ import {
   RotateCw,
   Pencil,
   MessageCirclePlus,
-  X,
 } from "lucide-react";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
+import { normalizeSdkBrowserAddress } from "./browserAddress";
 import { BrowserOmniboxView } from "@/features/browser/BrowserOmniboxView";
 import { BrowserMenuView } from "@/features/browser/BrowserMenuView";
 import {
@@ -43,7 +44,6 @@ import { sdkBrowserSurface } from "@/features/browser/sdkBrowserSurface";
 import {
   blankBrowserUrl,
   browserHomeUrl,
-  browserSearchUrl,
   configureBrowserHomeUrl,
   configureBrowserSearchEngine,
 } from "@/features/workspace/model";
@@ -71,14 +71,7 @@ const emptyState: RuntimeState = {
 };
 const iconClass =
   "grid size-[30px] shrink-0 place-items-center rounded-md text-cream-muted hover:bg-charcoal-hover hover:text-cream disabled:pointer-events-none disabled:opacity-35";
-export function normalizeSdkBrowserAddress(value: string) {
-  const text = value.trim();
-  if (!text) return blankBrowserUrl;
-  if (/^https?:\/\//i.test(text) || text === blankBrowserUrl) return text;
-  return text.includes(".") && !text.includes(" ")
-    ? `https://${text}`
-    : browserSearchUrl(text);
-}
+export { normalizeSdkBrowserAddress } from "./browserAddress";
 
 export function SDKBrowserView({
   services,
@@ -312,7 +305,10 @@ export function SDKBrowserView({
     schedule();
     return () => {
       closed = true;
-      window.removeEventListener("misty:workspace-geometry-changed", paneLayout);
+      window.removeEventListener(
+        "misty:workspace-geometry-changed",
+        paneLayout,
+      );
       cancelAnimationFrame(frame);
       window.clearTimeout(resizeTimer);
       observer.disconnect();
@@ -597,9 +593,15 @@ export function SDKBrowserView({
           </div>
         )}
         {(notice || compatibility) && (
-          <div
-            role="status"
-            className="flex shrink-0 items-center gap-2 border-b border-charcoal-border px-4 py-2 text-xs"
+          <Notification
+            key={notice || compatibility}
+            title="Browser"
+            active={context.active}
+            onDismiss={() => {
+              setMessage(null);
+              setCompatibility(null);
+              setRuntime((value) => ({ ...value, error: null, notice: null }));
+            }}
           >
             <span className="min-w-0 flex-1">
               {notice || "This site rejected Misty's browser verification."}
@@ -625,22 +627,7 @@ export function SDKBrowserView({
                 Open in Misty Browser
               </button>
             )}
-            <button
-              className={iconClass}
-              aria-label="Dismiss browser message"
-              onClick={() => {
-                setMessage(null);
-                setCompatibility(null);
-                setRuntime((value) => ({
-                  ...value,
-                  error: null,
-                  notice: null,
-                }));
-              }}
-            >
-              <X size={14} />
-            </button>
-          </div>
+          </Notification>
         )}
         <div
           className="relative min-h-0 flex-1 overflow-hidden"

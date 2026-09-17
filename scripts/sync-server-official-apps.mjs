@@ -125,7 +125,7 @@ func NormalizeIDs(ids []string) ([]App, bool) {
 }
 
 func Defaults() []App {
-\titems, ok := NormalizeIDs([]string{"inbox", "chat", "journal", "files", "agents"})
+\titems, ok := NormalizeIDs([]string{"inbox", "chat", "journal", "files"})
 \tif !ok {
 \t\tpanic("default Misty Apps are missing from the catalog")
 \t}

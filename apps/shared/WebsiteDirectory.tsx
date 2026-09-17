@@ -28,7 +28,7 @@ export function WebsiteDirectory({
     if (embedded) return;
     void misty.workspace
       .setTitle(
-        `${appId === "journal" ? "Journal" : appId === "library" ? "Library" : "Planner"}`,
+        `${appId === "journal" ? "Journal" : appId === "library" ? "Storage" : "Planner"}`,
       )
       .catch(() => {});
   }, [misty, appId, embedded]);
@@ -55,7 +55,7 @@ export function WebsiteDirectory({
         appId === "journal"
           ? "Journal"
           : appId === "library"
-            ? "Library"
+            ? "Storage"
             : "Planner"
       }
       embedded={embedded}

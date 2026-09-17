@@ -17,7 +17,7 @@ export async function readApiKey(providerId: string): Promise<string | null> {
     }
   }
 
-  // Check for existing plaintext key in localStorage and migrate it to keyring.
+  // Check for existing plaintext key in localStorage and migrate it to the native credential file store.
   try {
     const legacyKey = window.localStorage.getItem(`${PREFIX}${providerId}`);
     if (legacyKey) {

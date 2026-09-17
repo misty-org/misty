@@ -780,6 +780,9 @@ export function createSdkFilesStore(
       signal?: AbortSignal,
     ) => owner(path).listArchive(path, format, signal),
     openExternal: (path: string) => owner(path).openExternal(path),
+    previewUrl: (path: string) => owner(path).previewUrl(path),
+    previewImage: (path: string, maxDimension = 1024) =>
+      owner(path).previewImage(path, maxDimension),
     saveBytes: (path: string, bytes: ArrayBuffer, copy = false) => {
       const folder = owner(path);
       return perform(() => folder.saveBytes(path, bytes, copy));

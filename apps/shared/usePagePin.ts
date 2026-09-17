@@ -18,7 +18,12 @@ import {
   type WebsiteAppId,
 } from "./websiteIntegrations";
 import type { ProviderId } from "./providers";
-import { pagePinId, pagePinKey, pagePinLabel } from "./pagePins";
+import {
+  pagePinId,
+  pagePinKey,
+  pagePinLabel,
+  extractAccountEmail,
+} from "./pagePins";
 
 type PagePin = {
   id: string;
@@ -32,17 +37,18 @@ type PagePin = {
 /** A single-click pin toggle shared by every embedded website family. */
 export function usePagePin(props: {
   misty: MistyAppSDK;
-  appId: "chat" | "inbox" | WebsiteAppId;
+  appId: "chat" | "inbox" | "music" | "media" | WebsiteAppId;
   provider: PagePin["provider"];
   accountId?: string;
+  accountLabel?: string;
   url: string;
   title: string;
   label: string;
   report(error: unknown): void;
 }) {
-  const { misty, appId, provider, accountId, report } = props;
+  const { misty, appId, provider, accountId, accountLabel, report } = props;
   const storage = misty.storage.local;
-  const scope = JSON.stringify([appId, provider, accountId]);
+  const scope = `${appId}:${provider}:${accountId ?? ""}`;
   const [state, setState] = useState<{
     scope: string;
     pins: PagePin[];
@@ -54,7 +60,13 @@ export function usePagePin(props: {
   current.current = scope;
   const generation = useRef(0);
   const load = useCallback(async (): Promise<PagePin[]> => {
-    if (appId === "chat" || appId === "inbox") return loadProviderPins(storage);
+    if (
+      appId === "chat" ||
+      appId === "inbox" ||
+      appId === "music" ||
+      appId === "media"
+    )
+      return loadProviderPins(storage);
     return (await loadWebsiteState(storage, appId)).pins;
   }, [storage, appId]);
   const refresh = useCallback(async () => {
@@ -89,21 +101,37 @@ export function usePagePin(props: {
       const matches = (await load()).filter((pin) => pagePinKey(pin) === key);
       if (matches.length) {
         for (const pin of matches) {
-          if (appId === "chat" || appId === "inbox")
+          if (
+            appId === "chat" ||
+            appId === "inbox" ||
+            appId === "music" ||
+            appId === "media"
+          )
             await deleteProviderPin(storage, pin.id);
           else await deleteWebsitePin(storage, pin.id);
         }
       } else {
+        const resolvedAccount =
+          (accountLabel &&
+          accountLabel.trim().toLowerCase() !== props.label.toLowerCase()
+            ? accountLabel.trim()
+            : undefined) ?? extractAccountEmail(props.title);
         const pin = {
           ...destination,
           id: await pagePinId(destination),
           label: pagePinLabel(
             providerPageTitle(props.title, props.label),
             props.label,
+            resolvedAccount,
           ),
           order: Date.now(),
         };
-        if (appId === "chat" || appId === "inbox")
+        if (
+          appId === "chat" ||
+          appId === "inbox" ||
+          appId === "music" ||
+          appId === "media"
+        )
           await saveProviderPin(storage, {
             ...pin,
             provider: provider as ProviderId,

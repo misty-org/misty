@@ -8,13 +8,15 @@ import { PlatformPanel } from "./PlatformPanel";
 import "./websiteChrome.css";
 
 export type IntegrationAppId =
-  "chat" | "inbox" | "planner" | "journal" | "library";
+  "chat" | "inbox" | "planner" | "journal" | "library" | "music" | "media";
 const labels = {
   chat: "Social",
   inbox: "Inbox",
   planner: "Planner",
   journal: "Journal",
-  library: "Library",
+  library: "Storage",
+  music: "Music",
+  media: "Media",
 };
 export function integrationDrawerRoute(route: string, open = true) {
   const url = new URL(route, "https://misty.local");
@@ -35,8 +37,8 @@ export function withIntegrationShell(
     async mount(input) {
       const identity = await input.misty.context.get();
       if (
-        appId !== "inbox" &&
-        (identity.platform !== "desktop" || !/Mac/.test(navigator.platform))
+        !["inbox", "music", "media"].includes(appId) &&
+        (identity.platform !== "desktop" || !/Mac|Win/.test(navigator.platform))
       )
         return app.mount(input);
       let context = input.context;
@@ -130,7 +132,10 @@ function IntegrationChrome({
       }
     >
       {error && <p role="alert">{error}</p>}
-      {appId === "chat" || appId === "inbox" ? (
+      {appId === "chat" ||
+      appId === "inbox" ||
+      appId === "music" ||
+      appId === "media" ? (
         <ProviderDirectory appId={appId} misty={misty} embedded />
       ) : (
         <WebsiteDirectory appId={appId} misty={misty} embedded />

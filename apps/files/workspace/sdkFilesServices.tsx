@@ -83,7 +83,7 @@ export async function createSdkFilesServices(
   };
   let legacyPending = true;
   const restoreLegacyLocation = async () => {
-    if (!legacyPending || workspace.model.getState().hasSavedState) return;
+    if (!legacyPending || workspace.model?.getState().hasSavedState) return;
     try {
       const saved = await misty.files.restoreLocation();
       signal.throwIfAborted();
@@ -95,7 +95,7 @@ export async function createSdkFilesServices(
         await files.navigate(`misty://${saved.virtual}`, "replace");
         signal.throwIfAborted();
         legacyPending = false;
-        workspace.model.setState({ hasSavedState: true, restoreErrors: [] });
+        workspace.model?.setState({ hasSavedState: true, restoreErrors: [] });
         return;
       }
       if ("unavailable" in saved)
@@ -108,24 +108,16 @@ export async function createSdkFilesServices(
       signal.throwIfAborted();
       if (!folder)
         throw new Error("Allow access to the saved folder to reopen this tab.");
-      let path = folder.root;
-      for (const name of saved.relative) {
-        const listing = await folder.list({ path, showHidden: true });
-        signal.throwIfAborted();
-        const child = listing.entries.find(
-          (entry) => entry.name === name && entry.kind === "folder",
-        );
-        if (!child)
-          throw new Error("A saved folder moved or is no longer available.");
-        path = child.path;
-      }
+      const path = saved.relative.length
+        ? `${folder.root}/${saved.relative.join("/")}`
+        : folder.root;
       await files.navigate(path, "replace");
       signal.throwIfAborted();
       legacyPending = false;
-      workspace.model.setState({ hasSavedState: true, restoreErrors: [] });
+      workspace.model?.setState({ hasSavedState: true, restoreErrors: [] });
     } catch (error) {
       signal.throwIfAborted();
-      workspace.model.setState({
+      workspace.model?.setState({
         restoreErrors: [error instanceof Error ? error.message : String(error)],
       });
     }
@@ -137,7 +129,18 @@ export async function createSdkFilesServices(
         (item) =>
           path === sourcePath(item) || path.startsWith(`${sourcePath(item)}/`),
       );
-    if (!source) return path;
+    if (!source) {
+      if (path.startsWith("misty://")) return path;
+      const resolved = await misty.files.resolveLocation(path);
+      signal.throwIfAborted();
+      if (!resolved || "unavailable" in resolved) throw new Error("The folder's source is unavailable.");
+      if ("virtual" in resolved) return `misty://${resolved.virtual}`;
+      const nativeSource = sources.getState().items.find(item => item.id === resolved.sourceId);
+      if (!nativeSource) throw new Error("Reconnect the folder's source.");
+      const folder = await openSource(nativeSource, false);
+      if (!folder) throw new Error("The source is unavailable.");
+      return folder.root + (resolved.relative.length ? `/${resolved.relative.join("/")}` : "");
+    }
     const folder = await openSource(source, false);
     if (!folder) throw new Error("The source is unavailable.");
     return folder.root + path.slice(sourcePath(source).length);
@@ -225,7 +228,7 @@ export async function createSdkFilesServices(
     await workspace.ready;
     await restoreLegacyLocation();
     if (
-      !workspace.model.getState().restoreErrors.length &&
+      !workspace.model?.getState().restoreErrors?.length &&
       !files.store.getState().pane.listing
     ) {
       const home = sources
@@ -253,7 +256,7 @@ export async function createSdkFilesServices(
         .items.find((item) => item.id === "local:home");
       if (
         home &&
-        !workspace.model.getState().restoreErrors.length &&
+        !workspace.model?.getState().restoreErrors?.length &&
         !files.store.getState().folders.length &&
         !files.store.getState().pane.listing
       )

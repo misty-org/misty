@@ -22,7 +22,7 @@ const catalogPath = process.env.MISTY_OFFICIAL_APP_CATALOG_PATH
 const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
 const packagedApps = catalog.apps.filter(
   (app) =>
-    app.desktop?.runtime === "downloaded" || app.mobile?.runtime === "hosted",
+    app.id!=="agents" && (app.desktop?.runtime === "downloaded" || app.mobile?.runtime === "hosted"),
 );
 if (!packagedApps.length) {
   throw new Error(
