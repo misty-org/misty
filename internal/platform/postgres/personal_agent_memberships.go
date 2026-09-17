@@ -40,7 +40,7 @@ func askExecutionContextTx(ctx context.Context, tx *sql.Tx, userID, spaceID, ide
 		return nil, err
 	}
 	identity := &AskIdentity{}
-	err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND system_managed AND enabled AND deleted_at IS NULL`, identityID, userID), identity)
+	err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND enabled AND deleted_at IS NULL`, identityID, userID), identity)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrPersonalAgentNotFound
 	}

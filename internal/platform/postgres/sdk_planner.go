@@ -17,7 +17,7 @@ func ensureSDKPlannerTargetTx(ctx context.Context, tx *sql.Tx, userID, spaceID s
 	}
 	var version, name string
 	var installed time.Time
-	err := tx.QueryRowContext(ctx, `SELECT i.installed_version,i.installed_at,s.name FROM space_app_installations i JOIN spaces s ON s.id=i.space_id AND s.id=$2 AND s.lifecycle_state='active' JOIN space_members m ON m.space_id=s.id AND m.user_id=$1 WHERE i.space_id=$2 AND i.app_id='planner' AND i.state='installed' AND i.granted_scopes ? 'tasks.write'`, userID, spaceID).Scan(&version, &installed, &name)
+	err := tx.QueryRowContext(ctx, `SELECT 'builtin-1',s.created_at,s.name FROM spaces s JOIN space_members m ON m.space_id=s.id AND m.user_id=$1 WHERE s.id=$2 AND s.lifecycle_state='active'`, userID, spaceID).Scan(&version, &installed, &name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -66,7 +66,7 @@ func sdkPlannerProviderTx(ctx context.Context, tx *sql.Tx, userID, spaceID strin
 		return p, appVersion, installed, ErrSDKProviderUnavailable
 	}
 	var raw []byte
-	err = tx.QueryRowContext(ctx, `SELECT i.installed_version,i.installed_at,v.definition FROM space_app_installations i JOIN sdk_provider_versions v ON v.user_id=$1 AND v.app_id=i.app_id AND v.provider_id='planner/tasks' AND v.version=1 WHERE i.space_id=$2 AND i.app_id='planner' AND i.state='installed' AND i.granted_scopes ? 'tasks.write' FOR SHARE OF i`, userID, spaceID).Scan(&appVersion, &installed, &raw)
+	err = tx.QueryRowContext(ctx, `SELECT 'builtin-1',s.created_at,v.definition FROM spaces s JOIN space_members m ON m.space_id=s.id AND m.user_id=$1 JOIN sdk_provider_versions v ON v.user_id=$1 AND v.app_id='planner' AND v.provider_id='planner/tasks' AND v.version=1 WHERE s.id=$2 AND s.lifecycle_state='active'`, userID, spaceID).Scan(&appVersion, &installed, &raw)
 	expected, _ := json.Marshal(p)
 	if errors.Is(err, sql.ErrNoRows) || err == nil && !cap.EqualJSON(raw, expected) {
 		return p, appVersion, installed, ErrSDKProviderUnavailable

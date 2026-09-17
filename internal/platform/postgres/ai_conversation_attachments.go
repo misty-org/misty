@@ -48,7 +48,7 @@ func (db *Database) CreateAIConversationAttachment(ctx context.Context, item AIC
 				return err
 			}
 			if count >= 10 {
-				return errors.New("Misty accepts up to 10 images per turn")
+				return errors.New("Misty accepts up to 10 attachments per turn")
 			}
 		}
 		_, err := tx.ExecContext(ctx, `INSERT INTO ai_conversation_attachments(id,user_id,conversation_id,scope,display_name,mime_type,byte_size,sha256,width,height,object_key,model_mime_type,model_byte_size,model_sha256,model_width,model_height,model_object_key,expires_at) VALUES($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
@@ -101,7 +101,7 @@ func (db *Database) BindAIConversationAttachments(ctx context.Context, userID, c
 		return nil
 	}
 	if len(attachmentIDs) > 10 {
-		return errors.New("Misty accepts up to 10 images per turn")
+		return errors.New("Misty accepts up to 10 attachments per turn")
 	}
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		for _, id := range attachmentIDs {
@@ -122,7 +122,7 @@ func (db *Database) ValidateAIConversationAttachments(ctx context.Context, userI
 		return nil
 	}
 	if len(attachmentIDs) > 10 {
-		return errors.New("Misty accepts up to 10 images per turn")
+		return errors.New("Misty accepts up to 10 attachments per turn")
 	}
 	seen := map[string]bool{}
 	return db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
@@ -143,10 +143,11 @@ func (db *Database) ValidateAIConversationAttachments(ctx context.Context, userI
 	})
 }
 
-func (db *Database) AIConversationAttachmentsForInvocation(ctx context.Context, userID, invocationID string) ([]AIConversationAttachment, error) {
+func (db *Database) AIConversationAttachmentsForInvocation(ctx context.Context, userID, invocationID string, includeConversation ...bool) ([]AIConversationAttachment, error) {
 	items := []AIConversationAttachment{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT `+aiConversationAttachmentColumns+` FROM ai_conversation_attachments WHERE user_id=$1 AND invocation_id=$2 AND lifecycle_state='ready' ORDER BY created_at`, userID, invocationID)
+		history := len(includeConversation) > 0 && includeConversation[0]
+		rows, err := tx.QueryContext(ctx, `SELECT `+aiConversationAttachmentColumns+` FROM ai_conversation_attachments WHERE user_id=$1 AND (invocation_id=$2 OR ($3 AND invocation_id IS NOT NULL AND conversation_id=(SELECT conversation_id FROM ai_invocations WHERE id=$2 AND user_id=$1))) AND lifecycle_state='ready' AND (expires_at IS NULL OR expires_at>NOW()) ORDER BY (invocation_id=$2) DESC,created_at DESC LIMIT 12`, userID, invocationID, history)
 		if err != nil {
 			return err
 		}

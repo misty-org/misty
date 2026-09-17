@@ -31,6 +31,9 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 			items := make([]mistyConversation, 0, len(summaries))
 			for _, summary := range summaries {
+				if id := r.URL.Query().Get("agent_id"); id != "" && summary.AgentID != id {
+					continue
+				}
 				if query != "" && !strings.Contains(strings.ToLower(summary.Title), query) {
 					continue
 				}
@@ -43,6 +46,7 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			writeJSON(w, http.StatusOK, map[string]any{"conversations": items})
 		case http.MethodPost:
 			var body struct {
+				AgentID string `json:"agent_id,omitempty"`
 				Title   string `json:"title"`
 				SpaceID string `json:"space_id,omitempty"`
 			}
@@ -57,7 +61,29 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 					return
 				}
 			}
-			conversationID, err := s.database.CreateAIConversation(r.Context(), userID, body.SpaceID)
+			var identity *db.AskIdentity
+			var identityErr error
+			if body.AgentID == "" {
+				identity, identityErr = s.database.EnsureAskIdentity(r.Context(), userID, agent.FrontierDefaultModelID())
+			} else {
+				identity, identityErr = s.database.AskIdentityByID(r.Context(), userID, body.AgentID)
+			}
+			if identityErr != nil {
+				writePersonalAgentError(w, identityErr)
+				return
+			}
+			var conversationID string
+			var err error
+			if body.SpaceID != "" {
+				conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, body.SpaceID, identity.ID)
+			} else if identity.SystemManaged {
+				conversationID, err = s.database.CreateAIConversation(r.Context(), userID)
+				if err == nil {
+					err = s.database.BindConversationAgent(r.Context(), userID, conversationID, identity.ID)
+				}
+			} else {
+				err = db.ErrSpaceInvalid
+			}
 			if err != nil {
 				TestingWriteAIError(w, err)
 				return
@@ -71,7 +97,7 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 			modelID := agent.FrontierDefaultModelID()
 			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, "", agent.FrontierModelCatalogVersion)
 			writeJSON(w, http.StatusCreated, mistyConversation{
-				ID: conversationID, Title: title, CreatedAt: now, UpdatedAt: now,
+				ID: conversationID, AgentID: identity.ID, Title: title, CreatedAt: now, UpdatedAt: now,
 				SpaceID: body.SpaceID, Kind: "misty", ModelID: modelID,
 				Messages: []mistyConversationMessage{}, Remote: true,
 			})
@@ -265,7 +291,7 @@ func (s *AIService) MistyConversationTurn() http.HandlerFunc {
 			writeSpaceError(w, accessErr)
 			return
 		}
-		if err := s.database.RequireSpaceApp(r.Context(), userID, conversation.SpaceID, "agents"); err != nil {
+		if _, err := s.database.SpaceByID(r.Context(), userID, conversation.SpaceID); err != nil {
 			writeSpaceError(w, err)
 			return
 		}
@@ -442,7 +468,7 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 			modelID = agent.FrontierDefaultModelID()
 		}
 		return mistyConversation{
-			ID: summary.ID, Title: cleanMistyTitle(summary.Title),
+			ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 			SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
 			OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: summary.ReasoningEffort,
 			CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),
@@ -476,7 +502,7 @@ func (s *AIService) mistyConversationFromSummary(r *http.Request, userID string,
 		modelID = agent.FrontierDefaultModelID()
 	}
 	return mistyConversation{
-		ID: summary.ID, Title: cleanMistyTitle(summary.Title),
+		ID: summary.ID, AgentID: summary.AgentID, Title: cleanMistyTitle(summary.Title),
 		SpaceID: summary.SpaceID, Kind: summary.ConversationKind, OriginSurface: summary.OriginSurface,
 		OriginHref: summary.OriginHref, Privacy: summary.PrivacyBoundary, ModelID: modelID, Reasoning: summary.ReasoningEffort,
 		CreatedAt: summary.CreatedAt.UTC().Format(time.RFC3339Nano),

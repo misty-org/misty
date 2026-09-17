@@ -39,10 +39,15 @@ func buildAgentSharedSpaceContext(
 	}
 	sections := defaultSpaceContextSections
 	if agentID != "" {
-		sections, err = database.EffectivePersonalAgentContextPermissions(ctx, userID, spaceID, agentID)
-		if err != nil {
-			return agentSharedSpaceContext{}, err
+		apps, assignmentErr := database.AgentAppAssignments(ctx, userID, agentID, spaceID)
+		if assignmentErr != nil {
+			return agentSharedSpaceContext{}, assignmentErr
 		}
+		assigned := map[string]bool{}
+		for _, app := range apps {
+			assigned[app] = true
+		}
+		sections, _ = json.Marshal(map[string]bool{"space_chat": assigned["chat"], "library": assigned["library"], "tasks": assigned["planner"], "task_notes": assigned["planner"], "members": true})
 	}
 	records, err := database.PersonalAgentSpaceContext(ctx, userID, spaceID, sections)
 	if err != nil {

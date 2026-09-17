@@ -38,6 +38,7 @@ export const MistyBrowserInteractionSchema = z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("fill"), elementRef: z.string().min(1).max(128), text: z.string().max(64 * 1024) }),
     z.strictObject({ kind: z.literal("select"), elementRef: z.string().min(1).max(128), values: z.array(z.string().max(1000)).min(1).max(100) }),
     z.strictObject({ kind: z.literal("scroll"), elementRef: z.string().min(1).max(128).optional(), x: z.number().int().min(-4000).max(4000), y: z.number().int().min(-4000).max(4000) }),
+    z.strictObject({ kind: z.literal("point"), x: z.number().min(0).max(1), y: z.number().min(0).max(1) }),
     z.strictObject({ kind: z.literal("key"), elementRef: z.string().min(1).max(128), key: z.enum(["Enter", "Escape", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"]) }),
 ]);
 /** Native observations identify a local profile, never authenticate an account.
@@ -92,11 +93,13 @@ export const MistyBrowserEventSchema = z.discriminatedUnion("type", [
 ]);
 const contract = (params, result) => ({
     capability: "browser.navigate",
-    platforms: ["macos"],
+    platforms: ["macos", "windows"],
     params,
     result,
 });
+export const MistyBrowserDestinationSchema = z.strictObject({ provider: MistyBrowserProviderSchema, label: z.string().min(1).max(256), url: MistyBrowserUrlSchema });
 export const mistyBrowserContracts = {
+    "browser.destinations.set": contract(z.strictObject({ destinations: z.array(MistyBrowserDestinationSchema).max(100) }), empty),
     "browser.availability": contract(z.strictObject({}), z.strictObject({
         available: z.boolean(),
         reason: z.string().max(1000).optional(),

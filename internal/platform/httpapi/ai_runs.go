@@ -72,7 +72,7 @@ func (s *SpacesService) AIRuns() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
-		if err := s.database.RequireSpaceApp(r.Context(), userID, space.ID, "agents"); err != nil {
+		if _, err := s.database.SpaceByID(r.Context(), userID, space.ID); err != nil {
 			writeSpaceError(w, err)
 			return
 		}

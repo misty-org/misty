@@ -103,9 +103,10 @@ func (db *Database) SaveAgentSession(ctx context.Context, conversationID, userID
 // AgentSessionSummary is the listing shape: enough to render a session rail
 // without loading conversation state or events.
 type AgentSessionSummary struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Active bool   `json:"active"`
+	AgentID string `json:"agent_id,omitempty"`
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Active  bool   `json:"active"`
 
 	SpaceID          string    `json:"space_id,omitempty"`
 	ConversationKind string    `json:"kind"`
@@ -127,7 +128,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `
 			SELECT id, title, active_until > NOW(), COALESCE(space_id,''),
-				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at
+				conversation_kind,origin_surface,origin_href,privacy_boundary,model_id,reasoning_effort,created_at,updated_at,COALESCE(agent_id,'')
 			FROM misty_ask_conversations
 			WHERE user_id = $1 AND deleted_at IS NULL
 			ORDER BY updated_at DESC
@@ -138,7 +139,7 @@ func (db *Database) ListAgentSessions(ctx context.Context, userID string) ([]Age
 		defer rows.Close()
 		for rows.Next() {
 			var item AgentSessionSummary
-			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			if err := rows.Scan(&item.ID, &item.Title, &item.Active, &item.SpaceID, &item.ConversationKind, &item.OriginSurface, &item.OriginHref, &item.PrivacyBoundary, &item.ModelID, &item.ReasoningEffort, &item.CreatedAt, &item.UpdatedAt, &item.AgentID); err != nil {
 				return err
 			}
 			items = append(items, item)
@@ -243,6 +244,7 @@ func (db *Database) LinkAgentRunConversation(ctx context.Context, userID, runID,
 // created. It is read from the session row rather than taken from the request,
 // so a caller cannot point an existing session at a different Space.
 type AgentSessionContext struct {
+	AgentID         string
 	SpaceID         string
 	ModelID         string
 	ReasoningEffort string
@@ -251,9 +253,9 @@ type AgentSessionContext struct {
 func (db *Database) AgentConversationIdentity(ctx context.Context, userID, conversationID string) (AgentSessionContext, error) {
 	var bound AgentSessionContext
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		err := tx.QueryRowContext(ctx, `SELECT COALESCE(space_id,''),model_id,reasoning_effort
+		err := tx.QueryRowContext(ctx, `SELECT COALESCE(space_id,''),model_id,reasoning_effort,COALESCE(agent_id,'')
 			FROM misty_ask_conversations WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL`, conversationID, userID).
-			Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort)
+			Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}
@@ -276,10 +278,10 @@ func (db *Database) ValidateAgentSessionAccess(ctx context.Context, userID, conv
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		bound = AgentSessionContext{}
 		err := tx.QueryRowContext(ctx, `
-			SELECT COALESCE(space_id, ''), model_id, reasoning_effort
+			SELECT COALESCE(space_id, ''), model_id, reasoning_effort,COALESCE(agent_id,'')
 			FROM misty_ask_conversations
 			WHERE id=$1 AND user_id=$2 AND deleted_at IS NULL
-		`, conversationID, userID).Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort)
+		`, conversationID, userID).Scan(&bound.SpaceID, &bound.ModelID, &bound.ReasoningEffort, &bound.AgentID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return serveragent.ErrPersistedSessionNotFound
 		}

@@ -214,6 +214,9 @@ func TestingResolveAgentActionEnvelope(prompt string, focuses []db.AIConversatio
 }
 
 func requireAgentMutationTarget(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt, kind, id string, aliases ...string) error {
+	if actor.agentID != "" && isAIInvocationRuntimeID(actor.runID) {
+		return nil
+	} // Native task planning uses observed IDs; tool authorization enforces Space, assignments and execution mode.
 	lowerPrompt := strings.ToLower(prompt)
 	for _, candidate := range append([]string{id}, aliases...) {
 		candidate = strings.ToLower(strings.TrimSpace(candidate))

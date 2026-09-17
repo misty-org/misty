@@ -79,16 +79,15 @@ func TestOfficialAppRuntimeSessionIsScopedAndRevokedOnUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space := createTestSpace(t, database, ctx, user.ID, "Personal")
-	if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 1, []string{"spaces.read", "notes.read"}); err != nil {
+	if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 1, []string{"storage.read", "storage.write"}); err != nil {
 		t.Fatal(err)
 	}
 	token := "runtime-session-token"
-	session, err := database.CreateAppRuntimeSession(ctx, user.ID, "journal", security.HashToken(token), space.ID, AppRuntimeSessionTTL)
+	session, err := database.CreateAppRuntimeSession(ctx, user.ID, "journal", security.HashToken(token), "", AppRuntimeSessionTTL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.AppID != "journal" || session.SpaceID != space.ID || len(session.Scopes) != 2 {
+	if session.AppID != "journal" || session.SpaceID != "" || len(session.Scopes) != 2 {
 		t.Fatalf("runtime session = %#v", session)
 	}
 	resolved, err := database.AppRuntimeSessionByToken(ctx, security.HashToken(token))
@@ -119,7 +118,7 @@ func TestAppPermissionReductionRetiresTokenEvenAfterRegrant(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	initial := []string{"notes.read", "notes.write"}
+	initial := []string{"storage.read", "storage.write"}
 	if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 1, initial); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +126,7 @@ func TestAppPermissionReductionRetiresTokenEvenAfterRegrant(t *testing.T) {
 	if _, err := database.CreateAppRuntimeSession(ctx, user.ID, "journal", hash, "", AppRuntimeSessionTTL); err != nil {
 		t.Fatal(err)
 	}
-	for _, grants := range [][]string{{"notes.read"}, initial} {
+	for _, grants := range [][]string{{"storage.read"}, initial} {
 		if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 2, grants); err != nil {
 			t.Fatal(err)
 		}
@@ -147,7 +146,7 @@ func TestOfficialAppPurgeDeletesPrivateDataAfterRecoveryWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.InstallUserApp(ctx, user.ID, "planner", "1.0.0", 1, []string{"tasks.read"}); err != nil {
+	if _, err := database.InstallUserApp(ctx, user.ID, "planner", "1.0.0", 1, []string{"storage.read", "storage.write"}); err != nil {
 		t.Fatal(err)
 	}
 	token := "purge-runtime-session"
@@ -176,7 +175,7 @@ func TestOfficialAppPurgeDeletesPrivateDataAfterRecoveryWindow(t *testing.T) {
 	if resolved, err := database.AppRuntimeSessionByToken(ctx, security.HashToken(token)); err != nil || resolved != nil {
 		t.Fatalf("runtime session after purge = %#v, %v", resolved, err)
 	}
-	clean, err := database.InstallUserApp(ctx, user.ID, "planner", "1.0.0", 1, []string{"tasks.read"})
+	clean, err := database.InstallUserApp(ctx, user.ID, "planner", "1.0.0", 1, []string{"storage.read", "storage.write"})
 	if err != nil || clean.State != "installed" {
 		t.Fatalf("clean reinstall = %#v, %v", clean, err)
 	}
@@ -207,7 +206,7 @@ func TestOfficialAppPurgeReclaimsAStaleRunningJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 1, []string{"notes.read"}); err != nil {
+	if _, err := database.InstallUserApp(ctx, user.ID, "journal", "1.0.0", 1, []string{"storage.read"}); err != nil {
 		t.Fatal(err)
 	}
 	uninstalledAt := time.Now().UTC().Add(-AppDataRecoveryPeriod - time.Hour)

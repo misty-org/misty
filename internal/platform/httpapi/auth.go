@@ -109,25 +109,16 @@ func writeAuthSession(
 	user *db.User,
 	status int,
 ) {
-	token, err := security.GenerateSecureToken()
-	if err != nil {
+	if err := issueSessionCookies(w, r, database, user.ID, db.SessionTTL); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	tokenHash := security.HashToken(token)
-	if err := database.CreateSession(tokenHash, user.ID); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	writeSessionCookie(w, r, token, db.SessionTTL)
 
 	writeJSON(w, status, map[string]string{
 		"user_id":  user.ID,
 		"name":     user.Name,
 		"username": user.Username,
 		"email":    user.Email,
-		"token":    token,
 	})
 }
 
@@ -136,35 +127,31 @@ func writeAuthSession(
 // credentialed requests directly to the API origin, so the session should
 // never be exposed to sibling subdomains.
 func writeSessionCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	secure := TestingIsSecureRequest(r)
-	http.SetCookie(w, &http.Cookie{
-		Name:     TestingSessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: TestingSessionCookieSameSite(r, secure),
-		MaxAge:   int(ttl.Seconds()),
-	})
+	writeAuthCookie(w, r, TestingSessionCookieName, token, ttl)
 }
 
 func Logout(database *db.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if token, ok := sessionTokenFromRequest(r); ok {
-			tokenHash := security.HashToken(token)
-			_ = database.DeleteSession(tokenHash)
+		signer, err := security.SessionSignerFromEnv()
+		if err != nil {
+			http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
+			return
 		}
-
-		secure := TestingIsSecureRequest(r)
-		http.SetCookie(w, &http.Cookie{
-			Name:     TestingSessionCookieName,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   secure,
-			SameSite: TestingSessionCookieSameSite(r, secure),
-			MaxAge:   -1,
-		})
+		for _, item := range []struct{ name, kind string }{{RefreshCookieName, "refresh"}, {TestingSessionCookieName, "access"}} {
+			cookie, err := r.Cookie(item.name)
+			if err != nil {
+				continue
+			}
+			claims, err := signer.Verify(cookie.Value, item.kind)
+			if err != nil {
+				continue
+			}
+			if err := database.DeleteSession(security.HashToken(claims.SessionID)); err != nil {
+				http.Error(w, "could not revoke session", http.StatusServiceUnavailable)
+				return
+			}
+		}
+		clearAuthCookies(w, r)
 
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	}

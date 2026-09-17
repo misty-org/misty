@@ -26,7 +26,7 @@ func (s *AgentsService) UpdateSpaceConnectedDevicePresence() http.HandlerFunc {
 		if decodeAIJSON(w, r, &body) != nil {
 			return
 		}
-		spaceID := chi.URLParam(r, "spaceID")
+		spaceID := db.PersonalAppDeviceScope
 		if (body.SpaceID != "" && body.SpaceID != spaceID) || !p2pEndpointIDPattern.MatchString(body.EndpointID) || body.ProtocolVersion != db.SpacePeerProtocol || body.InstalledVersion == "" || len(body.InstalledVersion) > 128 || body.AuthorityGeneration < 1 || (body.ConnectionHint != "unknown" && body.ConnectionHint != "direct" && body.ConnectionHint != "relay") || !validJSONObject(body.Addressing) || containsLocalPath(body.Addressing) || containsClipboardValue(body.Addressing) {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
@@ -45,7 +45,7 @@ func (s *AgentsService) ListSpaceConnectedDevicePeers() http.HandlerFunc {
 		if !ok || !s.requireConnectedDevices(w) {
 			return
 		}
-		peers, err := s.database.ConnectedSpacePeers(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "deviceID"))
+		peers, err := s.database.ConnectedSpacePeers(r.Context(), userID, db.PersonalAppDeviceScope, chi.URLParam(r, "deviceID"))
 		if err != nil {
 			writeSpacePeerError(w, err)
 			return
@@ -70,7 +70,7 @@ func (s *AgentsService) IssueSpaceConnectedDeviceTicket() http.HandlerFunc {
 			http.Error(w, "invalid request", http.StatusBadRequest)
 			return
 		}
-		subject, err := s.database.SpacePeerTicketSubject(r.Context(), userID, chi.URLParam(r, "spaceID"), chi.URLParam(r, "deviceID"), body.TargetDeviceID)
+		subject, err := s.database.SpacePeerTicketSubject(r.Context(), userID, db.PersonalAppDeviceScope, chi.URLParam(r, "deviceID"), body.TargetDeviceID)
 		if err != nil {
 			writeSpacePeerError(w, err)
 			return

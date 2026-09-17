@@ -28,6 +28,17 @@ export declare const MistyBrowserProviderSchema: z.ZodObject<{
         trello: "trello";
         asana: "asana";
         jira: "jira";
+        reddit: "reddit";
+        linkedin: "linkedin";
+        "youtube-music": "youtube-music";
+        spotify: "spotify";
+        "apple-music": "apple-music";
+        soundcloud: "soundcloud";
+        youtube: "youtube";
+        twitch: "twitch";
+        netflix: "netflix";
+        crunchyroll: "crunchyroll";
+        "prime-video": "prime-video";
     }>;
     accountId: z.ZodString;
 }, z.core.$strict>;
@@ -52,6 +63,10 @@ export declare const MistyBrowserInteractionSchema: z.ZodDiscriminatedUnion<[z.Z
 }, z.core.$strict>, z.ZodObject<{
     kind: z.ZodLiteral<"scroll">;
     elementRef: z.ZodOptional<z.ZodString>;
+    x: z.ZodNumber;
+    y: z.ZodNumber;
+}, z.core.$strict>, z.ZodObject<{
+    kind: z.ZodLiteral<"point">;
     x: z.ZodNumber;
     y: z.ZodNumber;
 }, z.core.$strict>, z.ZodObject<{
@@ -142,10 +157,105 @@ export declare const MistyBrowserEventSchema: z.ZodDiscriminatedUnion<[z.ZodObje
     error: z.ZodNullable<z.ZodString>;
     notice: z.ZodNullable<z.ZodString>;
 }, z.core.$strict>], "type">;
+export declare const MistyBrowserDestinationSchema: z.ZodObject<{
+    provider: z.ZodObject<{
+        id: z.ZodEnum<{
+            "google-drive": "google-drive";
+            dropbox: "dropbox";
+            onedrive: "onedrive";
+            google: "google";
+            microsoft: "microsoft";
+            instagram: "instagram";
+            messenger: "messenger";
+            x: "x";
+            discord: "discord";
+            slack: "slack";
+            "microsoft-teams": "microsoft-teams";
+            icloud: "icloud";
+            yahoo: "yahoo";
+            "google-docs": "google-docs";
+            "microsoft-word": "microsoft-word";
+            notion: "notion";
+            "microsoft-onenote": "microsoft-onenote";
+            "google-calendar": "google-calendar";
+            "outlook-calendar": "outlook-calendar";
+            "microsoft-todo": "microsoft-todo";
+            todoist: "todoist";
+            trello: "trello";
+            asana: "asana";
+            jira: "jira";
+            reddit: "reddit";
+            linkedin: "linkedin";
+            "youtube-music": "youtube-music";
+            spotify: "spotify";
+            "apple-music": "apple-music";
+            soundcloud: "soundcloud";
+            youtube: "youtube";
+            twitch: "twitch";
+            netflix: "netflix";
+            crunchyroll: "crunchyroll";
+            "prime-video": "prime-video";
+        }>;
+        accountId: z.ZodString;
+    }, z.core.$strict>;
+    label: z.ZodString;
+    url: z.ZodString;
+}, z.core.$strict>;
 export declare const mistyBrowserContracts: {
+    readonly "browser.destinations.set": {
+        capability: "browser.navigate";
+        platforms: readonly ["macos", "windows"];
+        params: z.ZodObject<{
+            destinations: z.ZodArray<z.ZodObject<{
+                provider: z.ZodObject<{
+                    id: z.ZodEnum<{
+                        "google-drive": "google-drive";
+                        dropbox: "dropbox";
+                        onedrive: "onedrive";
+                        google: "google";
+                        microsoft: "microsoft";
+                        instagram: "instagram";
+                        messenger: "messenger";
+                        x: "x";
+                        discord: "discord";
+                        slack: "slack";
+                        "microsoft-teams": "microsoft-teams";
+                        icloud: "icloud";
+                        yahoo: "yahoo";
+                        "google-docs": "google-docs";
+                        "microsoft-word": "microsoft-word";
+                        notion: "notion";
+                        "microsoft-onenote": "microsoft-onenote";
+                        "google-calendar": "google-calendar";
+                        "outlook-calendar": "outlook-calendar";
+                        "microsoft-todo": "microsoft-todo";
+                        todoist: "todoist";
+                        trello: "trello";
+                        asana: "asana";
+                        jira: "jira";
+                        reddit: "reddit";
+                        linkedin: "linkedin";
+                        "youtube-music": "youtube-music";
+                        spotify: "spotify";
+                        "apple-music": "apple-music";
+                        soundcloud: "soundcloud";
+                        youtube: "youtube";
+                        twitch: "twitch";
+                        netflix: "netflix";
+                        crunchyroll: "crunchyroll";
+                        "prime-video": "prime-video";
+                    }>;
+                    accountId: z.ZodString;
+                }, z.core.$strict>;
+                label: z.ZodString;
+                url: z.ZodString;
+            }, z.core.$strict>>;
+        }, z.core.$strict>;
+        result: z.ZodPipe<z.ZodUnion<readonly [z.ZodUndefined, z.ZodNull]>, z.ZodTransform<undefined, null | undefined>>;
+    };
     readonly "browser.availability": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{}, z.core.$strict>;
         result: z.ZodObject<{
             available: z.ZodBoolean;
@@ -176,13 +286,24 @@ export declare const mistyBrowserContracts: {
                 trello: "trello";
                 asana: "asana";
                 jira: "jira";
+                reddit: "reddit";
+                linkedin: "linkedin";
+                "youtube-music": "youtube-music";
+                spotify: "spotify";
+                "apple-music": "apple-music";
+                soundcloud: "soundcloud";
+                youtube: "youtube";
+                twitch: "twitch";
+                netflix: "netflix";
+                crunchyroll: "crunchyroll";
+                "prime-video": "prime-video";
             }>>>;
             profileCleanup: z.ZodOptional<z.ZodBoolean>;
         }, z.core.$strict>;
     };
     readonly "browser.removeAccount": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             provider: z.ZodObject<{
                 id: z.ZodEnum<{
@@ -210,6 +331,17 @@ export declare const mistyBrowserContracts: {
                     trello: "trello";
                     asana: "asana";
                     jira: "jira";
+                    reddit: "reddit";
+                    linkedin: "linkedin";
+                    "youtube-music": "youtube-music";
+                    spotify: "spotify";
+                    "apple-music": "apple-music";
+                    soundcloud: "soundcloud";
+                    youtube: "youtube";
+                    twitch: "twitch";
+                    netflix: "netflix";
+                    crunchyroll: "crunchyroll";
+                    "prime-video": "prime-video";
                 }>;
                 accountId: z.ZodString;
             }, z.core.$strict>;
@@ -218,7 +350,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.create": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             url: z.ZodOptional<z.ZodString>;
             provider: z.ZodOptional<z.ZodObject<{
@@ -247,6 +379,17 @@ export declare const mistyBrowserContracts: {
                     trello: "trello";
                     asana: "asana";
                     jira: "jira";
+                    reddit: "reddit";
+                    linkedin: "linkedin";
+                    "youtube-music": "youtube-music";
+                    spotify: "spotify";
+                    "apple-music": "apple-music";
+                    soundcloud: "soundcloud";
+                    youtube: "youtube";
+                    twitch: "twitch";
+                    netflix: "netflix";
+                    crunchyroll: "crunchyroll";
+                    "prime-video": "prime-video";
                 }>;
                 accountId: z.ZodString;
             }, z.core.$strict>>;
@@ -266,7 +409,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.layout": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
             bounds: z.ZodObject<{
@@ -282,7 +425,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.navigate": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
             url: z.ZodString;
@@ -291,7 +434,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.back": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
         }, z.core.$strict>;
@@ -299,7 +442,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.forward": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
         }, z.core.$strict>;
@@ -307,7 +450,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.reload": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
         }, z.core.$strict>;
@@ -315,7 +458,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.setZoom": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
             factor: z.ZodNumber;
@@ -324,7 +467,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.close": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
         }, z.core.$strict>;
@@ -332,7 +475,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.inspect": {
         readonly capability: "browser.inspect";
-        readonly platforms: readonly ["macos"];
+        readonly platforms: readonly ["macos", "windows"];
         readonly params: z.ZodObject<{
             handle: z.ZodString;
         }, z.core.$strict>;
@@ -367,7 +510,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.click": {
         readonly capability: "browser.interact";
-        readonly platforms: readonly ["macos"];
+        readonly platforms: readonly ["macos", "windows"];
         readonly params: z.ZodObject<{
             handle: z.ZodString;
             documentId: z.ZodString;
@@ -377,7 +520,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.interact": {
         readonly capability: "browser.interact";
-        readonly platforms: readonly ["macos"];
+        readonly platforms: readonly ["macos", "windows"];
         readonly params: z.ZodObject<{
             handle: z.ZodString;
             documentId: z.ZodString;
@@ -392,6 +535,10 @@ export declare const mistyBrowserContracts: {
             }, z.core.$strict>, z.ZodObject<{
                 kind: z.ZodLiteral<"scroll">;
                 elementRef: z.ZodOptional<z.ZodString>;
+                x: z.ZodNumber;
+                y: z.ZodNumber;
+            }, z.core.$strict>, z.ZodObject<{
+                kind: z.ZodLiteral<"point">;
                 x: z.ZodNumber;
                 y: z.ZodNumber;
             }, z.core.$strict>, z.ZodObject<{
@@ -416,7 +563,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.type": {
         readonly capability: "browser.interact";
-        readonly platforms: readonly ["macos"];
+        readonly platforms: readonly ["macos", "windows"];
         readonly params: z.ZodObject<{
             handle: z.ZodString;
             documentId: z.ZodString;
@@ -429,7 +576,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.request": {
         readonly capability: "browser.inspect";
-        readonly platforms: readonly ["macos"];
+        readonly platforms: readonly ["macos", "windows"];
         readonly params: z.ZodObject<{
             handle: z.ZodString;
             path: z.ZodString;
@@ -442,7 +589,7 @@ export declare const mistyBrowserContracts: {
     };
     readonly "browser.overlay": {
         capability: "browser.navigate";
-        platforms: readonly ["macos"];
+        platforms: readonly ["macos", "windows"];
         params: z.ZodObject<{
             handle: z.ZodString;
             reason: z.ZodString;

@@ -34,6 +34,9 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 	if json.Unmarshal(tool.Arguments, &input) != nil || len(input.ScopeID) < 8 {
 		return nil, db.ErrSpaceInvalid
 	}
+	if err := authorizeNativeAgentBrowserScope(ctx, s.database, invocation, input.ScopeID); err != nil {
+		return nil, err
+	}
 	var schema json.RawMessage
 	for _, descriptor := range browserToolDescriptors() {
 		if descriptor.Name == tool.Name {
@@ -48,7 +51,33 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 	if agentID == "" {
 		agentID = "misty-unified"
 	}
-	config := TestingMustAPIRawJSON(map[string]any{"agentId": agentID})
+	configData := map[string]any{"agentId": agentID}
+	if isAIInvocationRuntimeID(invocation.RunID) {
+		record, lookupErr := s.database.AIInvocationByID(ctx, invocation.UserID, invocation.RunID)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		var body aiInvocationInput
+		_ = json.Unmarshal(record.RequestPayload, &body)
+		configData["taskId"] = body.TaskID
+		if body.AgentID != "" {
+			configData["agentId"] = body.AgentID
+		}
+		if tool.Name == "browser.upload" {
+			var upload struct {
+				AttachmentID string `json:"attachmentId"`
+			}
+			_ = json.Unmarshal(tool.Arguments, &upload)
+			file, lookupErr := s.database.AIConversationAttachment(ctx, invocation.UserID, upload.AttachmentID)
+			if lookupErr != nil || file.LifecycleState != "ready" || file.ConversationID != record.ConversationID || file.InvocationID == "" {
+				return nil, db.ErrSpaceForbidden
+			}
+			configData["upload"] = map[string]any{"id": file.ID, "name": file.DisplayName, "mimeType": file.MIMEType, "byteSize": file.ByteSize, "sha256": file.SHA256}
+		}
+	} else if tool.Name == "browser.upload" {
+		return nil, db.ErrSpaceForbidden
+	}
+	config := TestingMustAPIRawJSON(configData)
 	var job *db.WorkflowDeviceNodeJob
 	var err error
 	if isAIInvocationRuntimeID(invocation.RunID) {

@@ -100,16 +100,19 @@ func (s *AIService) MistyAttachments() http.HandlerFunc {
 }
 
 func validateMistyAttachmentInput(body mistyAttachmentInitiateInput) error {
+	if body.Scope == "visual_query" && !strings.HasPrefix(body.MIMEType, "image/") {
+		return errors.New("visual search requires an image")
+	}
 	if body.Scope != "conversation" && body.Scope != "visual_query" {
 		return errors.New("invalid scope")
 	}
-	if body.MIMEType != "image/jpeg" && body.MIMEType != "image/png" && body.MIMEType != "image/webp" {
+	if !validMistyAttachmentMIME(body.MIMEType) {
 		return errors.New("invalid mime")
 	}
-	if body.ModelMIMEType != "image/jpeg" && body.ModelMIMEType != "image/png" && body.ModelMIMEType != "image/webp" {
+	if body.ModelMIMEType != "image/jpeg" && body.ModelMIMEType != "image/png" && body.ModelMIMEType != "image/webp" && body.ModelMIMEType != "application/pdf" && body.ModelMIMEType != "text/plain" {
 		return errors.New("invalid model mime")
 	}
-	if body.ByteSize < 1 || body.ByteSize > maxMistyAttachmentBytes || body.ModelByteSize < 1 || body.ModelByteSize > maxMistyModelImageBytes {
+	if body.ByteSize < 1 || body.ByteSize > maxMistyAttachmentBytes || body.ModelByteSize < 1 || body.ModelByteSize > mistyModelAttachmentLimit(body.ModelMIMEType) {
 		return errors.New("invalid size")
 	}
 	if !librarySHA256Pattern.MatchString(body.SHA256) || !librarySHA256Pattern.MatchString(body.ModelSHA256) {
@@ -243,4 +246,18 @@ func (s *AIService) MistyAttachmentContent() http.HandlerFunc {
 
 func mistyAttachmentDTO(item db.AIConversationAttachment) map[string]any {
 	return map[string]any{"id": item.ID, "name": item.DisplayName, "mime_type": item.MIMEType, "byte_size": item.ByteSize, "width": item.Width, "height": item.Height, "state": item.LifecycleState, "preview_url": "/misty/attachments/" + item.ID + "/content?variant=model"}
+}
+
+func validMistyAttachmentMIME(mime string) bool {
+	switch mime {
+	case "image/jpeg", "image/png", "image/webp", "application/pdf", "text/plain", "text/markdown", "text/csv", "application/json", "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+		return true
+	}
+	return false
+}
+func mistyModelAttachmentLimit(mime string) int64 {
+	if mime == "application/pdf" {
+		return maxMistyAttachmentBytes
+	}
+	return maxMistyModelImageBytes
 }

@@ -29,7 +29,118 @@ export declare const MistyFileDropEventSchema: z.ZodObject<{
     paths: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strict>;
 export type MistyFileDropEvent = z.output<typeof MistyFileDropEventSchema>;
+export declare const MistyFileIndexDocumentSchema: z.ZodObject<{
+    path: z.ZodString;
+    name: z.ZodString;
+    extension: z.ZodString;
+    directory: z.ZodBoolean;
+    bytes: z.ZodNumber;
+    modifiedMs: z.ZodNumber;
+    hidden: z.ZodBoolean;
+}, z.core.$strict>;
+export declare const MistyFileIndexRequestSchema: z.ZodObject<{
+    directory: z.ZodString;
+    operation: z.ZodEnum<{
+        query: "query";
+        init: "init";
+        dump: "dump";
+        apply: "apply";
+    }>;
+    query: z.ZodOptional<z.ZodString>;
+    offset: z.ZodOptional<z.ZodNumber>;
+    documents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        path: z.ZodString;
+        name: z.ZodString;
+        extension: z.ZodString;
+        directory: z.ZodBoolean;
+        bytes: z.ZodNumber;
+        modifiedMs: z.ZodNumber;
+        hidden: z.ZodBoolean;
+    }, z.core.$strict>>>;
+    deletes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+}, z.core.$strict>;
+export declare const MistyFileIndexResultSchema: z.ZodObject<{
+    count: z.ZodOptional<z.ZodNumber>;
+    docs: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        path: z.ZodString;
+        name: z.ZodString;
+        extension: z.ZodString;
+        directory: z.ZodBoolean;
+        bytes: z.ZodNumber;
+        modifiedMs: z.ZodNumber;
+        hidden: z.ZodBoolean;
+    }, z.core.$strict>>>;
+    next: z.ZodOptional<z.ZodNumber>;
+    done: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strict>;
+export type MistyFileIndexRequest = z.output<typeof MistyFileIndexRequestSchema>;
+export type MistyFileIndexResult = z.output<typeof MistyFileIndexResultSchema>;
+export type MistyFileIndexDocument = z.output<typeof MistyFileIndexDocumentSchema>;
 export declare const mistyFileHostContracts: {
+    readonly "files.sources.share": {
+        readonly capability: "connections.write";
+        readonly platforms: readonly ["macos"];
+        readonly params: z.ZodObject<{
+            directory: z.ZodString;
+            shared: z.ZodBoolean;
+        }, z.core.$strict>;
+        readonly result: z.ZodNull;
+    };
+    readonly "files.index": {
+        readonly capability: "files.read";
+        readonly platforms: readonly ["macos"];
+        readonly params: z.ZodObject<{
+            directory: z.ZodString;
+            operation: z.ZodEnum<{
+                query: "query";
+                init: "init";
+                dump: "dump";
+                apply: "apply";
+            }>;
+            query: z.ZodOptional<z.ZodString>;
+            offset: z.ZodOptional<z.ZodNumber>;
+            documents: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                path: z.ZodString;
+                name: z.ZodString;
+                extension: z.ZodString;
+                directory: z.ZodBoolean;
+                bytes: z.ZodNumber;
+                modifiedMs: z.ZodNumber;
+                hidden: z.ZodBoolean;
+            }, z.core.$strict>>>;
+            deletes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        }, z.core.$strict>;
+        readonly result: z.ZodObject<{
+            count: z.ZodOptional<z.ZodNumber>;
+            docs: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                path: z.ZodString;
+                name: z.ZodString;
+                extension: z.ZodString;
+                directory: z.ZodBoolean;
+                bytes: z.ZodNumber;
+                modifiedMs: z.ZodNumber;
+                hidden: z.ZodBoolean;
+            }, z.core.$strict>>>;
+            next: z.ZodOptional<z.ZodNumber>;
+            done: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strict>;
+    };
+    readonly "files.sources.restoreLocation": {
+        readonly capability: "files.read";
+        readonly params: z.ZodObject<{}, z.core.$strict>;
+        readonly result: z.ZodUnion<readonly [z.ZodNull, z.ZodObject<{
+            virtual: z.ZodEnum<{
+                trash: "trash";
+                recent: "recent";
+                starred: "starred";
+            }>;
+        }, z.core.$strict>, z.ZodObject<{
+            unavailable: z.ZodLiteral<true>;
+        }, z.core.$strict>, z.ZodObject<{
+            sourceId: z.ZodString;
+            relative: z.ZodArray<z.ZodString>;
+        }, z.core.$strict>]>;
+    };
     readonly "files.sources.list": {
         readonly capability: "files.read";
         readonly params: z.ZodObject<{}, z.core.$strict>;

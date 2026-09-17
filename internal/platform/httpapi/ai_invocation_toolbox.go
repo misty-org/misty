@@ -83,7 +83,7 @@ func TestingExecuteAIInvocationSpaceToolWithConversation(ctx context.Context, da
 
 func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt, previousUserPrompt, previousAgentReply string) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	requested := aiInvocationRequestedSpaceTools(prompt, previousUserPrompt, previousAgentReply)
-	if database != nil && strings.TrimSpace(actor.sessionID) != "" {
+	if actor.agentID == "" && database != nil && strings.TrimSpace(actor.sessionID) != "" {
 		_, _, action, actionErr := resolveAgentConversationAction(ctx, database, actor.userID, actor.sessionID, actor.spaceID, prompt)
 		if actionErr != nil {
 			return nil, agenttools.Invocation{}, serveragent.ToolManifest{}, actionErr
@@ -113,6 +113,12 @@ func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database,
 	toolbox := spaceAgentToolboxWithBrowser(database, browserTabs, browserCapabilities, delegation)
 	for _, descriptor := range browserToolDescriptors() {
 		if browserCapabilities[descriptor.Name] {
+			requested = append(requested, descriptor.Name)
+		}
+	}
+	if actor.agentID != "" {
+		requested = []string{}
+		for _, descriptor := range toolbox.Descriptors() {
 			requested = append(requested, descriptor.Name)
 		}
 	}

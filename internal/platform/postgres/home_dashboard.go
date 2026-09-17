@@ -20,10 +20,12 @@ type HomeDashboardSnapshot struct {
 func (db *Database) HomeDashboard(ctx context.Context, userID, spaceID string) (HomeDashboardSnapshot, error) {
 	out := emptyHomeDashboardSnapshot()
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-			return err
+		if spaceID != "" {
+			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+				return err
+			}
 		}
-		return readHomeDashboardTx(ctx, tx, userID, spaceID, &out)
+		return readHomeDashboardTx(ctx, tx, userID, &out)
 	})
 	return out, err
 }
@@ -38,15 +40,25 @@ func (db *Database) RecordHomeVisit(ctx context.Context, userID, spaceID, dateKe
 		return out, ErrSpaceInvalid
 	}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-			return err
+		if spaceID != "" {
+			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
+				return err
+			}
+		}
+		if spaceID == "" {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO user_global_home_activity(user_id,activity_date)
+				VALUES($1,$2::date) ON CONFLICT(user_id,activity_date) DO UPDATE SET
+				visit_count=LEAST(user_global_home_activity.visit_count+1,1000000),updated_at=NOW()`, userID, dateKey); err != nil {
+				return err
+			}
+			return readHomeDashboardTx(ctx, tx, userID, &out)
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO user_home_activity(user_id,space_id,activity_date)
 			VALUES($1,$2,$3::date) ON CONFLICT(user_id,space_id,activity_date) DO UPDATE SET
 			visit_count=LEAST(user_home_activity.visit_count+1,1000000),updated_at=NOW()`, userID, spaceID, dateKey); err != nil {
 			return err
 		}
-		return readHomeDashboardTx(ctx, tx, userID, spaceID, &out)
+		return readHomeDashboardTx(ctx, tx, userID, &out)
 	})
 	return out, err
 }
@@ -68,10 +80,14 @@ func emptyHomeDashboardSnapshot() HomeDashboardSnapshot {
 	return HomeDashboardSnapshot{Activity: map[string]int{}, RecentApps: []string{}}
 }
 
-func readHomeDashboardTx(ctx context.Context, tx *sql.Tx, userID, spaceID string, out *HomeDashboardSnapshot) error {
-	rows, err := tx.QueryContext(ctx, `SELECT activity_date::text,SUM(visit_count) FROM user_home_activity
-		WHERE user_id=$1 AND activity_date>=CURRENT_DATE-($2::int-1)
-		GROUP BY activity_date ORDER BY activity_date`, userID, homeActivityRetentionDays)
+func readHomeDashboardTx(ctx context.Context, tx *sql.Tx, userID string, out *HomeDashboardSnapshot) error {
+	rows, err := tx.QueryContext(ctx, `SELECT activity_date::text,SUM(visit_count) FROM (
+			SELECT activity_date,visit_count FROM user_home_activity
+			WHERE user_id=$1 AND activity_date>=CURRENT_DATE-($2::int-1)
+			UNION ALL
+			SELECT activity_date,visit_count FROM user_global_home_activity
+			WHERE user_id=$1 AND activity_date>=CURRENT_DATE-($2::int-1)
+		) visits GROUP BY activity_date ORDER BY activity_date`, userID, homeActivityRetentionDays)
 	if err != nil {
 		return err
 	}

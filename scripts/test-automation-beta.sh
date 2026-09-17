@@ -12,7 +12,7 @@ docker run -d --name "$misty_test_container" \
   --tmpfs /var/lib/postgresql/data:rw,size=1536m \
   -p 127.0.0.1::5432 pgvector/pgvector:pg16 >/dev/null
 for attempt in $(seq 1 60); do
-  if docker exec "$misty_test_container" pg_isready -U postgres -d misty_automation_test >/dev/null 2>&1; then break; fi
+  if docker exec "$misty_test_container" psql -U postgres -d misty_automation_test -c "SELECT 1" >/dev/null 2>&1; then break; fi
   if [ "$attempt" = 60 ]; then echo "Disposable test database did not become ready." >&2; exit 1; fi
   sleep 1
 done
@@ -25,7 +25,7 @@ export DB_USER=misty_app DB_PASSWORD=misty-isolated-runtime
 export DB_HOST="$TEST_DB_HOST" DB_PORT="$TEST_DB_PORT" DB_NAME="$TEST_DB_NAME" DB_SSLMODE=disable
 cd "$misty_test_root"
 python3 - "$misty_test_container" <<'PY'
-import pathlib, subprocess, sys
+import os, pathlib, subprocess, sys
 container = sys.argv[1]
 def execute(sql):
     subprocess.run(["docker", "exec", "-i", container, "psql", "-q", "-v", "ON_ERROR_STOP=1",
@@ -37,10 +37,15 @@ versions = [int(path.name.split("_", 1)[0]) for path in paths]
 if len(versions) != len(set(versions)):
     raise SystemExit("Duplicate migration versions: coordinate additive migration timestamps before testing.")
 for path in paths:
+    personal_probe = os.environ.get("MISTY_PERSONAL_APP_MIGRATION_PROBE") == "1" and path.name == "20270208000000_personal_apps.sql"
+    if personal_probe:
+        execute(pathlib.Path("test/fixtures/personal-apps/before.sql").read_text())
     up = path.read_text().split("-- +goose Up", 1)[1].split("-- +goose Down", 1)[0]
     up = "\n".join(line for line in up.splitlines() if not line.startswith("-- +goose"))
     version = int(path.name.split("_", 1)[0])
     execute(f"BEGIN;\n{up}\nINSERT INTO goose_db_version(version_id,is_applied) VALUES({version},true);\nCOMMIT;")
+    if personal_probe:
+        execute(pathlib.Path("test/fixtures/personal-apps/after.sql").read_text())
 print(f"Applied {len(paths)} migrations to a disposable database.")
 PY
 if [ "${MISTY_AUTOMATION_SKIP_INTERNAL:-0}" != "1" ]; then

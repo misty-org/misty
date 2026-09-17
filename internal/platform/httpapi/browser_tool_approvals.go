@@ -121,6 +121,14 @@ func (s *SpacesService) requireAIInvocationBrowserApproval(ctx context.Context, 
 		if !found {
 			return nil, false, db.ErrSpaceConflict
 		}
+		// Routine work in an explicitly activated local task is covered by that task.
+		// Keep review for consequential controls, unknown click intent and submitting keys.
+		if nativeRoutineBrowserAction(access.prepared.body, call.Name, canonical, label) {
+			if err := authorizeNativeAgentBrowserScope(ctx, s.database, agenttools.Invocation{UserID: access.record.UserID, RunID: access.record.ID}, input.ScopeID); err != nil {
+				return nil, false, err
+			}
+			return nil, true, nil
+		}
 		if strings.TrimSpace(label) == "" {
 			label = "Unlabelled control"
 		}
@@ -141,3 +149,43 @@ func (s *SpacesService) requireAIInvocationBrowserApproval(ctx context.Context, 
 type browserApprovalRequired struct{ approval *db.AgentToolApproval }
 
 func (e *browserApprovalRequired) Error() string { return "browser_approval_required" }
+
+func nativeRoutineBrowserAction(body aiInvocationInput, name string, arguments json.RawMessage, label string) bool {
+	if body.AgentID == "" || (body.ExecutionMode != "agent" && body.ExecutionMode != "team") {
+		return false
+	}
+	var input struct {
+		Consequential *bool `json:"consequential"`
+		Action        struct {
+			Kind string `json:"kind"`
+			Key  string `json:"key"`
+		} `json:"action"`
+	}
+	if json.Unmarshal(arguments, &input) != nil {
+		return false
+	}
+	if input.Consequential != nil && *input.Consequential {
+		return false
+	}
+	if name == "browser.interact" {
+		switch input.Action.Kind {
+		case "fill", "select", "scroll":
+			return true
+		case "key":
+			return input.Action.Key != "Enter"
+		}
+	}
+	if name != "browser.click" || input.Consequential == nil || *input.Consequential {
+		return false
+	}
+	if strings.TrimSpace(label) == "" {
+		return false
+	}
+	value := strings.ToLower(label)
+	for _, term := range []string{"send", "publish", "post", "delete", "remove", "pay", "purchase", "buy", "order", "subscribe", "confirm", "transfer", "invite", "share", "submit", "authorize", "accept", "agree"} {
+		if strings.Contains(value, term) {
+			return false
+		}
+	}
+	return true
+}

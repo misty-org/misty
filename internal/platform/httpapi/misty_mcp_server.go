@@ -224,6 +224,9 @@ func aiInvocationMCPDescriptors(allowedNames []string) []agenttools.Descriptor {
 	}
 	registrations := canonicalAgentToolRegistrations(handler)
 	registrations = append(registrations, agenttools.Registration{Descriptor: weatherCurrentToolDescriptor(), Handler: handler})
+	for _, descriptor := range nativeAgentToolDescriptors() {
+		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: handler})
+	}
 	for _, descriptor := range browserToolDescriptors() {
 		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: handler})
 	}
@@ -451,7 +454,7 @@ func (s *SpacesService) executeAIInvocationMCPTool(ctx context.Context, access *
 			return nil, workflowv2.ErrCapabilityDenied
 		}
 		actor := spaceConversationToolActor{
-			userID: access.record.UserID, spaceID: prepared.spaceID, agentID: "",
+			userID: access.record.UserID, spaceID: prepared.spaceID, agentID: prepared.body.AgentID,
 			runID: access.record.ID, sessionID: access.record.ConversationID,
 		}
 		toolbox, invocation, manifest, resolveErr := resolveAIInvocationSpaceToolbox(

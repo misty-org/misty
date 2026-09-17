@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 
@@ -30,11 +31,16 @@ func newConversationTestRouter(t *testing.T, spaces *SpacesService) *chi.Mux {
 
 func newConversationTestBearerToken(t *testing.T, database *db.Database, userID string) string {
 	t.Helper()
-	token := uniqueTestEmail("token-" + userID)
-	if err := database.CreateSession(security.HashToken(token), userID); err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
+	signer, err := security.SessionSignerFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := signer.Mint(userID, uniqueTestEmail("session"), "access", time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
 	}
 	return token
+
 }
 
 func performConversationRequest(t *testing.T, router *chi.Mux, method, path, token string, body any) *httptest.ResponseRecorder {
@@ -51,7 +57,15 @@ func performConversationRequest(t *testing.T, router *chi.Mux, method, path, tok
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	if signer, err := security.SessionSignerFromEnv(); err == nil {
+		if _, err := signer.Verify(token, "access"); err == nil {
+			req.AddCookie(&http.Cookie{Name: TestingSessionCookieName, Value: token})
+		} else {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	} else {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	return rec

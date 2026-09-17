@@ -27,15 +27,18 @@ func deviceRunAuthorityTx(ctx context.Context, tx *sql.Tx, userID, runID string,
 	if state != "running" && !waiting || expectedRuntime != nil && runtime != *expectedRuntime {
 		return "", nil, ErrSpaceForbidden
 	}
+	if err := validateNativeAgentExecutionTx(ctx, tx, userID, spaceID, payload); err != nil {
+		return "", nil, err
+	}
 	authority, err := AppAuthorityFromPayload(payload)
 	if err != nil {
 		return "", nil, err
 	}
 	scope := capability
 	switch capability {
-	case "browser.click", "browser.type", "browser.interact":
+	case "browser.click", "browser.type", "browser.interact", "browser.upload":
 		scope = "browser.interact"
-	case "browser.downloads.list":
+	case "browser.downloads.list", "browser.visual":
 		scope = "browser.inspect"
 	case "browser.inspect", "browser.navigate", "files.read":
 	default:
@@ -86,6 +89,37 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 	}
 	if !valid {
 		return ErrSpaceForbidden
+	}
+	// A queued job cannot outlive an app assignment or cross its owning window.
+	if strings.HasPrefix(job.RunID, "invocation_") {
+		var payload json.RawMessage
+		var spaceID string
+		if err := tx.QueryRowContext(ctx, `SELECT request_payload,COALESCE(space_id,'') FROM ai_invocations WHERE id=$1 AND user_id=$2`, job.RunID, job.UserID).Scan(&payload, &spaceID); err != nil {
+			return err
+		}
+		var input struct {
+			AgentID     string `json:"agent_id"`
+			Mode        string `json:"execution_mode"`
+			WindowLabel string `json:"window_label"`
+		}
+		if err := json.Unmarshal(payload, &input); err != nil {
+			return err
+		}
+		if input.AgentID != "" {
+			if err := validateNativeAgentExecutionTx(ctx, tx, job.UserID, spaceID, payload); err != nil {
+				return err
+			}
+			if input.Mode == "user" && job.RequiredCapability != "browser.inspect" && job.RequiredCapability != "browser.visual" && job.RequiredCapability != "browser.downloads.list" {
+				return ErrSpaceForbidden
+			}
+			err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM ai_invocation_contexts c JOIN misty_agent_app_assignments a ON a.owner_user_id=c.user_id AND a.app_id=c.metadata->>'app_id' JOIN user_app_installations sa ON sa.user_id=a.owner_user_id AND sa.app_id=a.app_id AND sa.state='installed' AND NOT sa.consent_required WHERE c.id=$1 AND c.invocation_id=$2 AND c.user_id=$3 AND a.agent_id=$4 AND c.metadata->>'window_label'=$5)`, job.ContextID, job.RunID, job.UserID, input.AgentID, input.WindowLabel).Scan(&valid)
+			if err != nil {
+				return err
+			}
+			if !valid {
+				return ErrSpaceForbidden
+			}
+		}
 	}
 	return nil
 }

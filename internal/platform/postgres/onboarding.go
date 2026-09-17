@@ -24,8 +24,8 @@ type AppInstallSpec struct {
 }
 
 type OnboardingCompletion struct {
-	Space *Space                 `json:"space"`
-	Apps  []SpaceAppInstallation `json:"apps"`
+	Space *Space                `json:"space"`
+	Apps  []UserAppInstallation `json:"apps"`
 }
 
 func (db *Database) FinishOnboarding(
@@ -104,7 +104,8 @@ func (db *Database) FinishOnboarding(
 			return err
 		}
 		for _, item := range apps {
-			if _, err := installSpaceAppTx(ctx, tx, userID, spaceID, item, item.Metadata); err != nil {
+			scopes, _ := json.Marshal(PersonalAppScopes(item.Scopes))
+			if _, err := installUserAppTx(ctx, tx, userID, item.ID, item.Version, item.PermissionVersion, scopes); err != nil {
 				return err
 			}
 		}
@@ -120,7 +121,7 @@ func (db *Database) FinishOnboarding(
 	if err != nil {
 		return nil, err
 	}
-	installedApps, err := db.SpaceApps(ctx, userID, spaceID)
+	installedApps, err := db.UserApps(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,7 @@ import (
 )
 
 // AuthHandoffService signs a desktop user into the website. The desktop app
-// holds a bearer token in the OS keychain; the system browser has its own
+// holds its session cookies in native local storage; the system browser has its own
 // cookie jar, so without a handoff every "Account settings" click would land on
 // a sign-in wall.
 //
@@ -59,7 +59,7 @@ func NewAuthHandoffService(database *db.Database, startURL, websiteURL string) (
 	}, nil
 }
 
-// Mint is called by the desktop app with its bearer token. It returns a URL on
+// Mint is called by the desktop app with its session cookie. It returns a URL on
 // the API origin that the app opens in the system browser.
 func (s *AuthHandoffService) Mint() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -130,17 +130,10 @@ func (s *AuthHandoffService) Start() http.HandlerFunc {
 			return
 		}
 
-		sessionToken, err := security.GenerateSecureToken()
-		if err != nil {
+		if err := issueSessionCookies(w, r, s.database, userID, db.AuthHandoffSessionTTL); err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		if err := s.database.CreateSessionWithTTL(security.HashToken(sessionToken), userID, db.AuthHandoffSessionTTL); err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		writeSessionCookie(w, r, sessionToken, db.AuthHandoffSessionTTL)
 
 		// Re-validate on the way out: the stored path came from the allowlist,
 		// but a bad row must never become an open redirect.

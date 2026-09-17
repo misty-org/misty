@@ -14,7 +14,6 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/entitlement"
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
-	"github.com/kannachi323/misty/server/internal/platform/security"
 	"github.com/kannachi323/misty/server/test/testkit"
 )
 
@@ -97,11 +96,9 @@ func createEntitlementTestUser(t *testing.T, database *db.Database, suffix strin
 
 func requestEntitlement(t *testing.T, database *db.Database, userID, token string) *httptest.ResponseRecorder {
 	t.Helper()
-	if err := database.CreateSession(security.HashToken(token), userID); err != nil {
-		t.Fatal(err)
-	}
+	token = newConversationTestBearerToken(t, database, userID)
 	request := httptest.NewRequest(http.MethodPost, "/api/billing/self-host-entitlement", nil)
-	request.Header.Set("Authorization", "Bearer "+token)
+	request.AddCookie(&http.Cookie{Name: TestingSessionCookieName, Value: token})
 	recorder := httptest.NewRecorder()
 	MintSelfHostedEntitlement(database).ServeHTTP(recorder, request)
 	return recorder

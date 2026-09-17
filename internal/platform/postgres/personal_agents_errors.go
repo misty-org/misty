@@ -32,7 +32,7 @@ type AskIdentity struct {
 	DefaultRunMode  string          `json:"default_run_mode"`
 	VoiceID         string          `json:"voice_id"`
 	Enabled         bool            `json:"enabled"`
-	SystemManaged   bool            `json:"system_managed,omitempty"`
+	SystemManaged   bool            `json:"system_managed"`
 	Version         int64           `json:"version"`
 	LatestVersionID string          `json:"latest_version_id,omitempty"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -91,7 +91,7 @@ func validPersonalJSONObject(raw json.RawMessage) bool {
 func (db *Database) AskIdentityByID(ctx context.Context, userID, agentID string) (*AskIdentity, error) {
 	out := &AskIdentity{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND system_managed AND deleted_at IS NULL`, agentID, userID), out)
+		err := scanPersonalAgent(tx.QueryRowContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL`, agentID, userID), out)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrPersonalAgentNotFound
 		}

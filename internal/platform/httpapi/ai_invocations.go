@@ -48,6 +48,10 @@ type aiInvocationDeviceContext struct {
 }
 
 type aiInvocationInput struct {
+	TaskID                string                      `json:"task_id,omitempty"`
+	AgentID               string                      `json:"agent_id,omitempty"`
+	ExecutionMode         string                      `json:"execution_mode,omitempty"`
+	WindowLabel           string                      `json:"window_label,omitempty"`
 	Mode                  string                      `json:"mode"`
 	SurfaceID             string                      `json:"surface_id"`
 	Trigger               string                      `json:"trigger"`
@@ -164,10 +168,45 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "agent_runtime_unavailable", "message": "Misty's agent runtime is not configured."})
 			return
 		}
+		if body.ExecutionMode == "" {
+			body.ExecutionMode = "user"
+		}
+		if body.ExecutionMode != "user" && body.ExecutionMode != "agent" && body.ExecutionMode != "team" {
+			http.Error(w, "invalid execution mode", http.StatusBadRequest)
+			return
+		}
+		if body.ExecutionMode != "user" && strings.TrimSpace(body.WindowLabel) == "" {
+			http.Error(w, "execution window required", http.StatusBadRequest)
+			return
+		}
+		if db.AppAuthorityFromContext(r.Context()) != nil && body.ExecutionMode != "user" {
+			http.Error(w, "Only the host can activate agent execution", http.StatusForbidden)
+			return
+		}
+		var identity *db.AskIdentity
+		var identityErr error
+		if body.AgentID == "" {
+			identity, identityErr = s.database.EnsureAskIdentity(r.Context(), userID, agent.FrontierDefaultModelID())
+		} else {
+			identity, identityErr = s.database.AskIdentityByID(r.Context(), userID, body.AgentID)
+		}
+		if identityErr != nil {
+			writePersonalAgentError(w, identityErr)
+			return
+		}
+		if !identity.Enabled {
+			http.Error(w, "agent disabled", http.StatusConflict)
+			return
+		}
+		body.AgentID = identity.ID
 		conversationID := strings.TrimSpace(body.ConversationID)
 		var err error
 		modelFallbackNotice := false
 		modelID := strings.TrimSpace(body.ModelID)
+		if modelID == "" && identity.ModelMode == "pinned" {
+			modelID = identity.ModelID
+			body.ReasoningEffort = identity.ReasoningEffort
+		}
 		if modelID == "" {
 			modelID = agent.FrontierDefaultModelID()
 		}
@@ -181,7 +220,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		}
 		if conversationID != "" {
 			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
-			if boundErr != nil || conversationSpaceChanged(bound.SpaceID, spaceID) {
+			if boundErr != nil || conversationSpaceChanged(bound.SpaceID, spaceID) || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
 				writeJSON(w, http.StatusConflict, map[string]any{"code": "conversation_context_changed", "message": "Start a new Misty task for this Space."})
 				return
 			}
@@ -193,6 +232,10 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 					return
 				}
 			}
+			if bindErr := s.database.BindConversationAgent(r.Context(), userID, conversationID, body.AgentID); bindErr != nil {
+				writePersonalAgentError(w, bindErr)
+				return
+			}
 			modelID, reasoning = bound.ModelID, bound.ReasoningEffort
 			if !agent.FrontierModelAvailable(r.Context(), modelID) {
 				modelID, reasoning = agent.FrontierDefaultModelID(), ""
@@ -201,11 +244,16 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			}
 		}
 		if spaceID == "" {
-			writeJSON(w, http.StatusForbidden, map[string]any{"code": "agents_space_required", "message": "Select a Space with Agents enabled to use Misty."})
+			writeJSON(w, http.StatusForbidden, map[string]any{"code": "agents_space_required", "message": "Select a Space to use Misty."})
 			return
 		}
-		if err := s.database.RequireSpaceApp(r.Context(), userID, spaceID, "agents"); err != nil {
+		if _, err := s.database.SpaceByID(r.Context(), userID, spaceID); err != nil {
 			writeSpaceError(w, err)
+			return
+		}
+		payload, _ := json.Marshal(body)
+		if err := s.database.ValidateNativeAgentExecution(r.Context(), &db.AIInvocationRecord{UserID: userID, SpaceID: spaceID, RequestPayload: payload}); err != nil {
+			http.Error(w, "Local execution is paused or unavailable", http.StatusConflict)
 			return
 		}
 		if err := validateAIInvocationDeviceContexts(body.Context, body.DeviceContexts, spaceID); err != nil {
@@ -213,7 +261,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		if conversationID == "" && (body.Mode == "drawer" || body.Mode == "companion") && body.RequestedArtifactKind == "" {
-			conversationID, err = s.database.CreateAIConversation(r.Context(), userID, spaceID)
+			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, spaceID, body.AgentID)
 			if err != nil {
 				TestingWriteAIError(w, err)
 				return
@@ -222,7 +270,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
 		}
 		if conversationID == "" && body.Mode == "companion" {
-			conversationID, err = s.database.CreateAIConversation(r.Context(), userID, spaceID)
+			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, spaceID, body.AgentID)
 			if err != nil {
 				TestingWriteAIError(w, err)
 				return

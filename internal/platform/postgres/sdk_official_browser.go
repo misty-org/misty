@@ -15,7 +15,7 @@ func sdkOfficialBrowserProviderTx(ctx context.Context, tx *sql.Tx, userID, space
 	var installed time.Time
 	var rawScopes []byte
 	appID := strings.Split(provider.ID, "/")[0]
-	err := tx.QueryRowContext(ctx, `SELECT installed_version,installed_at,granted_scopes FROM space_app_installations WHERE space_id=$1 AND app_id=$2 AND state='installed' FOR SHARE`, spaceID, appID).Scan(&appVersion, &installed, &rawScopes)
+	err := tx.QueryRowContext(ctx, `SELECT installed_version,installed_at,granted_scopes FROM user_app_installations WHERE user_id=$1 AND app_id=$2 AND state='installed' AND NOT consent_required FOR SHARE`, userID, appID).Scan(&appVersion, &installed, &rawScopes)
 	if errors.Is(err, sql.ErrNoRows) {
 		return provider, appVersion, installed, ErrSDKProviderUnavailable
 	}

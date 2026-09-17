@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maxAIContextReferences = 12
+	maxAIContextReferences = 64
 	maxAISelectionBytes    = 32 << 10
 )
 

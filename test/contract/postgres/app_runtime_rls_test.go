@@ -25,36 +25,30 @@ func TestAppRuntimeSessionCreationWithRuntimeRLSRole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space := createTestSpace(t, database, ctx, owner.ID, "Session space")
-	invite, err := database.InviteToSpace(ctx, owner.ID, space.ID, member.Email)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = database.RespondToSpaceInvite(ctx, member.ID, invite.ID, true); err != nil {
-		t.Fatal(err)
-	}
-	spec := AppInstallSpec{ID: "planner", Version: "1", PermissionVersion: 1, Scopes: []string{"tasks.read"}}
-	if _, err = database.InstallSpaceApp(ctx, owner.ID, space.ID, spec, nil); err != nil {
-		t.Fatal(err)
+	spec := AppInstallSpec{ID: "planner", Version: "1", PermissionVersion: 1, Scopes: []string{"storage.read"}}
+	for _, userID := range []string{owner.ID, member.ID} {
+		if _, err = database.InstallUserApp(ctx, userID, spec.ID, spec.Version, spec.PermissionVersion, spec.Scopes); err != nil {
+			t.Fatal(err)
+		}
 	}
 	runtime := openRuntimeRoleDatabase(t, database)
 	for _, userID := range []string{owner.ID, member.ID} {
 		token := security.HashToken("rls-session-" + userID)
-		session, err := runtime.CreateAppRuntimeSession(ctx, userID, spec.ID, token, space.ID, AppRuntimeSessionTTL)
+		session, err := runtime.CreateAppRuntimeSession(ctx, userID, spec.ID, token, "", AppRuntimeSessionTTL)
 		if err != nil {
 			t.Fatalf("member session under restricted role: %v", err)
 		}
-		if session.SpaceID != space.ID || len(session.Scopes) != 1 || session.Scopes[0] != "tasks.read" {
+		if session.SpaceID != "" || len(session.Scopes) != 1 || session.Scopes[0] != "storage.read" {
 			t.Fatalf("unexpected authority: %#v", session)
 		}
 		if live, err := runtime.AppRuntimeSessionByToken(ctx, token); err != nil || live == nil {
 			t.Fatalf("session lookup: %v %v", live, err)
 		}
 	}
-	if _, err = runtime.CreateAppRuntimeSession(ctx, outsider.ID, spec.ID, security.HashToken("outsider"), space.ID, AppRuntimeSessionTTL); !errors.Is(err, ErrAppRuntimeForbidden) {
+	if _, err = runtime.CreateAppRuntimeSession(ctx, outsider.ID, spec.ID, security.HashToken("outsider"), "", AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
 		t.Fatalf("nonmember admitted: %v", err)
 	}
-	if _, err = runtime.CreateAppRuntimeSession(ctx, member.ID, "absent", security.HashToken("absent"), space.ID, AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
+	if _, err = runtime.CreateAppRuntimeSession(ctx, member.ID, "absent", security.HashToken("absent"), "", AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
 		t.Fatalf("absent app admitted: %v", err)
 	}
 
@@ -65,14 +59,14 @@ func TestAppRuntimeSessionCreationWithRuntimeRLSRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if _, err = tx.ExecContext(ctx, `UPDATE space_app_installations SET state='recoverable',authority_generation=authority_generation+1 WHERE space_id=$1 AND app_id=$2`, space.ID, spec.ID); err != nil {
+	if _, err = tx.ExecContext(ctx, `UPDATE user_app_installations SET state='recoverable',uninstalled_at=NOW(),data_deletion_at=NOW()+INTERVAL '30 days',authority_generation=authority_generation+1 WHERE user_id=$1 AND app_id=$2`, member.ID, spec.ID); err != nil {
 		t.Fatal(err)
 	}
 	issueCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	issued := make(chan error, 1)
 	go func() {
-		_, issueErr := runtime.CreateAppRuntimeSession(issueCtx, member.ID, spec.ID, security.HashToken("concurrent-removal"), space.ID, AppRuntimeSessionTTL)
+		_, issueErr := runtime.CreateAppRuntimeSession(issueCtx, member.ID, spec.ID, security.HashToken("concurrent-removal"), "", AppRuntimeSessionTTL)
 		issued <- issueErr
 	}()
 	ticker := time.NewTicker(10 * time.Millisecond)
@@ -86,7 +80,7 @@ waiting:
 			t.Fatal("session issuance did not reach installation lock")
 		case <-ticker.C:
 			var blocked bool
-			if err := database.Conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%FROM space_app_installations%FOR SHARE%')`).Scan(&blocked); err != nil {
+			if err := database.Conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%FROM user_app_installations%FOR SHARE%')`).Scan(&blocked); err != nil {
 				t.Fatal(err)
 			}
 			if blocked {
@@ -100,16 +94,16 @@ waiting:
 	if issueErr := <-issued; !errors.Is(issueErr, ErrAppNotInstalled) {
 		t.Fatalf("concurrent removal admitted session: %v", issueErr)
 	}
-	if _, err = runtime.RemoveSpaceApp(ctx, owner.ID, space.ID, spec.ID); err != nil {
+	if _, err = runtime.UninstallUserApp(ctx, member.ID, spec.ID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = runtime.CreateAppRuntimeSession(ctx, member.ID, spec.ID, security.HashToken("removed"), space.ID, AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
+	if _, err = runtime.CreateAppRuntimeSession(ctx, member.ID, spec.ID, security.HashToken("removed"), "", AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
 		t.Fatalf("removed app admitted: %v", err)
 	}
-	if _, err = runtime.InstallSpaceApp(ctx, owner.ID, space.ID, spec, nil); err != nil {
+	if _, err = runtime.InstallUserApp(ctx, member.ID, spec.ID, spec.Version, spec.PermissionVersion, spec.Scopes); err != nil {
 		t.Fatal(err)
 	}
-	for _, userID := range []string{owner.ID, member.ID} {
+	for _, userID := range []string{member.ID} {
 		if live, err := runtime.AppRuntimeSessionByToken(ctx, security.HashToken("rls-session-"+userID)); err != nil || live != nil {
 			t.Fatalf("revoked session revived: %v %v", live, err)
 		}

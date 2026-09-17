@@ -7,6 +7,8 @@ import (
 	"errors"
 )
 
+const PersonalAppDeviceScope = "personal"
+
 const SpacePeerProtocol = "misty-device/2"
 
 type SpaceDevicePresence struct {
@@ -28,17 +30,17 @@ type SpacePeerTicketSubject struct {
 // The app lock is shared with install/update/remove, making generation checks
 // and presence writes atomic with changes to the environment.
 func requireSpacePeerAppTx(ctx context.Context, tx *sql.Tx, userID, spaceID string) (string, int64, error) {
-	if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-		return "", 0, err
+	if spaceID != PersonalAppDeviceScope {
+		return "", 0, ErrAppRuntimeForbidden
 	}
 	if err := lockSpaceApps(ctx, tx, spaceID); err != nil {
 		return "", 0, err
 	}
 	var version string
 	var generation int64
-	err := tx.QueryRowContext(ctx, `SELECT installed_version,authority_generation FROM space_app_installations
- WHERE space_id=$1 AND app_id='files' AND state='installed'
- AND granted_scopes @> '["files.read","connections.read"]'::jsonb`, spaceID).Scan(&version, &generation)
+	err := tx.QueryRowContext(ctx, `SELECT installed_version,authority_generation FROM user_app_installations
+ WHERE user_id=$1 AND app_id='files' AND state='installed' AND NOT consent_required
+ AND granted_scopes @> '["files.read","connections.read"]'::jsonb`, userID).Scan(&version, &generation)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", 0, ErrAppRuntimeForbidden
 	}

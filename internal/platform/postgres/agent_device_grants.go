@@ -30,7 +30,7 @@ type AgentDeviceGrant struct {
 var deviceAgentCapabilities = map[string]bool{
 	"files.read": true, "files.write": true, "files.list": true, "files.search": true, "files.copy": true, "files.move": true, "files.delete": true,
 	"project.patch": true, "project.diff": true, "project.status": true, "project.checks": true, "git.commit": true, "git.push": true, "terminal.execute": true,
-	"browser.interact": true, "browser.inspect": true, "browser.navigate": true, "browser.click": true, "browser.type": true, "browser.select": true, "browser.scroll": true,
+	"browser.interact": true, "browser.inspect": true, "browser.visual": true, "browser.navigate": true, "browser.click": true, "browser.type": true, "browser.select": true, "browser.scroll": true,
 	"browser.downloads.list": true, "browser.upload": true, "browser.confirm_high_risk": true,
 }
 

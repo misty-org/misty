@@ -7,8 +7,8 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-func loadAgentMemoryContext(ctx context.Context, database *db.Database, userID, spaceID string) (string, error) {
-	items, err := database.MistyMemoryContext(ctx, userID, spaceID, 20)
+func loadAgentMemoryContext(ctx context.Context, database *db.Database, userID, spaceID string, agentIDs ...string) (string, error) {
+	items, err := database.MistyMemoryContext(ctx, userID, spaceID, 20, agentIDs...)
 	if err != nil || len(items) == 0 {
 		return "", err
 	}

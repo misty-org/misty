@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 
@@ -14,16 +15,23 @@ func (s *SpacesService) aiInvocationModelAttachments(ctx context.Context, record
 	if record == nil || s.library == nil || s.library.TestingStore == nil {
 		return items, nil
 	}
-	attachments, err := s.database.AIConversationAttachmentsForInvocation(ctx, record.UserID, record.ID)
+	var input aiInvocationInput
+	_ = json.Unmarshal(record.RequestPayload, &input)
+	attachments, err := s.database.AIConversationAttachmentsForInvocation(ctx, record.UserID, record.ID, input.AgentID != "")
 	if err != nil {
 		return nil, err
 	}
+	var total int64
 	for _, attachment := range attachments {
+		if total+attachment.ModelByteSize > 30*1024*1024 {
+			continue
+		}
+		total += attachment.ModelByteSize
 		reader, _, openErr := s.library.TestingStore.Open(ctx, attachment.ModelObjectKey)
 		if openErr != nil {
 			return nil, openErr
 		}
-		data, readErr := io.ReadAll(io.LimitReader(reader, (1<<20)+1))
+		data, readErr := io.ReadAll(io.LimitReader(reader, mistyModelAttachmentLimit(attachment.ModelMIMEType)+1))
 		closeErr := reader.Close()
 		if readErr != nil {
 			return nil, readErr
@@ -31,8 +39,8 @@ func (s *SpacesService) aiInvocationModelAttachments(ctx context.Context, record
 		if closeErr != nil {
 			return nil, closeErr
 		}
-		if len(data) > 1<<20 {
-			return nil, errors.New("model image rendition exceeds 1 MB")
+		if int64(len(data)) > mistyModelAttachmentLimit(attachment.ModelMIMEType) {
+			return nil, errors.New("model attachment exceeds its size limit")
 		}
 		items = append(items, map[string]any{
 			"id":           attachment.ID,

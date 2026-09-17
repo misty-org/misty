@@ -38,31 +38,17 @@ func (db *Database) CreateAppRuntimeSession(
 	ttl time.Duration,
 ) (*AppRuntimeSession, error) {
 	userID, appID, tokenHash, spaceID = strings.TrimSpace(userID), strings.TrimSpace(appID), strings.TrimSpace(tokenHash), strings.TrimSpace(spaceID)
-	if spaceID == "" || userID == "" || appID == "" || len(tokenHash) != 64 || ttl <= 0 || ttl > AppRuntimeSessionTTL {
+	if spaceID != "" || userID == "" || appID == "" || len(tokenHash) != 64 || ttl <= 0 || ttl > AppRuntimeSessionTTL {
 		return nil, ErrAppRuntimeForbidden
 	}
 	var result AppRuntimeSession
-	// Session issuance is server-controlled: authorize active membership below,
-	// then lock installation authority until the session is committed. PostgreSQL
-	// applies UPDATE RLS policies to FOR SHARE, so the member SELECT-only policy
-	// cannot perform this lock. Use the service policy without granting members
-	// installation mutation rights or dropping the revocation serialization lock.
+	// Hold the account installation lock through issuance so revocation and
+	// re-consent serialize with new credentials. The service transaction can
+	// acquire the shared lock under the restricted runtime database role.
 	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
-		if spaceID != "" {
-			var member bool
-			if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
-				SELECT 1 FROM space_members m JOIN spaces s ON s.id=m.space_id
-				WHERE m.user_id=$1 AND m.space_id=$2 AND s.lifecycle_state='active'
-			)`, userID, spaceID).Scan(&member); err != nil {
-				return err
-			}
-			if !member {
-				return ErrAppRuntimeForbidden
-			}
-		}
 		var scopesRaw []byte
 		if err := tx.QueryRowContext(ctx, `SELECT granted_scopes,authority_generation
-			FROM space_app_installations WHERE space_id=$1 AND app_id=$2 AND state='installed' FOR SHARE`, spaceID, appID).Scan(&scopesRaw, &result.AuthorityGeneration); err != nil {
+			FROM user_app_installations WHERE user_id=$1 AND app_id=$2 AND state='installed' AND NOT consent_required FOR SHARE`, userID, appID).Scan(&scopesRaw, &result.AuthorityGeneration); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrAppNotInstalled
 			}
@@ -92,10 +78,9 @@ func (db *Database) AppRuntimeSessionByToken(ctx context.Context, tokenHash stri
 	var scopesRaw []byte
 	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT s.user_id,s.app_id,COALESCE(s.space_id,''),s.scopes,s.expires_at,s.authority_generation
-			FROM app_runtime_sessions s JOIN space_app_installations i ON i.space_id=s.space_id AND i.app_id=s.app_id
-			WHERE s.token_hash=$1 AND s.expires_at>NOW() AND i.state='installed'
-			AND s.authority_generation=i.authority_generation AND s.scopes <@ i.granted_scopes
- AND EXISTS(SELECT 1 FROM space_members m JOIN spaces p ON p.id=m.space_id WHERE m.user_id=s.user_id AND m.space_id=s.space_id AND p.lifecycle_state='active')`, tokenHash).
+			FROM app_runtime_sessions s JOIN user_app_installations i ON i.user_id=s.user_id AND i.app_id=s.app_id
+			WHERE s.token_hash=$1 AND s.expires_at>NOW() AND i.state='installed' AND NOT i.consent_required
+			AND s.authority_generation=i.authority_generation AND s.scopes <@ i.granted_scopes`, tokenHash).
 			Scan(&result.UserID, &result.AppID, &result.SpaceID, &scopesRaw, &result.ExpiresAt, &result.AuthorityGeneration)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -124,9 +109,9 @@ func (db *Database) PutAppPersonalRecord(ctx context.Context, session AppRuntime
 		if err := validateAppExecutionAuthorityTx(ctx, tx, authority, session.UserID, session.SpaceID, "storage.write"); err != nil {
 			return err
 		}
-		return tx.QueryRowContext(ctx, `INSERT INTO app_personal_records(user_id,app_id,record_key,data,space_id)
-			VALUES($1,$2,$3,$4::jsonb,$5) ON CONFLICT(user_id,space_id,app_id,record_key) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()
-			RETURNING record_key,data,created_at,updated_at`, session.UserID, session.AppID, key, data, session.SpaceID).
+		return tx.QueryRowContext(ctx, `INSERT INTO app_personal_records(user_id,app_id,record_key,data)
+			VALUES($1,$2,$3,$4::jsonb) ON CONFLICT(user_id,app_id,record_key) DO UPDATE SET data=EXCLUDED.data,updated_at=NOW()
+			RETURNING record_key,data,created_at,updated_at`, session.UserID, session.AppID, key, data).
 			Scan(&result.Key, &result.Data, &result.CreatedAt, &result.UpdatedAt)
 	})
 	if err != nil {
@@ -146,7 +131,7 @@ func (db *Database) AppPersonalRecords(ctx context.Context, session AppRuntimeSe
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT record_key,data,created_at,updated_at FROM app_personal_records
-			WHERE user_id=$1 AND app_id=$2 AND space_id=$3 ORDER BY record_key`, session.UserID, session.AppID, session.SpaceID)
+			WHERE user_id=$1 AND app_id=$2 ORDER BY record_key`, session.UserID, session.AppID)
 		if err != nil {
 			return err
 		}
@@ -177,7 +162,7 @@ func (db *Database) DeleteAppPersonalRecord(ctx context.Context, session AppRunt
 		if err := validateAppExecutionAuthorityTx(ctx, tx, authority, session.UserID, session.SpaceID, "storage.write"); err != nil {
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `DELETE FROM app_personal_records WHERE user_id=$1 AND app_id=$2 AND record_key=$3 AND space_id=$4`, session.UserID, session.AppID, key, session.SpaceID)
+		result, err := tx.ExecContext(ctx, `DELETE FROM app_personal_records WHERE user_id=$1 AND app_id=$2 AND record_key=$3 `, session.UserID, session.AppID, key)
 		if err != nil {
 			return err
 		}
