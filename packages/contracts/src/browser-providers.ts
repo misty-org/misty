@@ -229,5 +229,90 @@ export const mistyBrowserProviders = {
       "idmsa.apple.com",
     ],
   },
+  reddit: {
+    owner: "chat",
+    url: "https://www.reddit.com/",
+    domains: ["reddit.com"],
+    auth: ["accounts.google.com", "appleid.apple.com"],
+  },
+  linkedin: {
+    owner: "chat",
+    url: "https://www.linkedin.com/feed/",
+    domains: ["linkedin.com"],
+    auth: ["accounts.google.com", "appleid.apple.com"],
+  },
+
+  "youtube-music": {
+    owner: "music",
+    url: "https://music.youtube.com/",
+    domains: ["music.youtube.com", "youtube.com"],
+    auth: ["accounts.google.com"],
+  },
+  spotify: {
+    owner: "music",
+    url: "https://open.spotify.com/",
+    domains: ["open.spotify.com", "spotify.com"],
+    auth: [
+      "accounts.spotify.com",
+      "accounts.google.com",
+      "appleid.apple.com",
+      "facebook.com",
+    ],
+  },
+  "apple-music": {
+    owner: "music",
+    url: "https://music.apple.com/",
+    domains: ["music.apple.com"],
+    auth: [
+      "idmsa.apple.com",
+      "appleid.apple.com",
+      "account.apple.com",
+    ],
+  },
+  soundcloud: {
+    owner: "music",
+    url: "https://soundcloud.com/",
+    domains: ["soundcloud.com"],
+    auth: [
+      "accounts.google.com",
+      "appleid.apple.com",
+      "facebook.com",
+    ],
+  },
+
+  youtube: {
+    owner: "media",
+    url: "https://www.youtube.com/",
+    domains: ["youtube.com"],
+    auth: ["accounts.google.com"],
+  },
+  twitch: {
+    owner: "media",
+    url: "https://www.twitch.tv/",
+    domains: ["twitch.tv"],
+    auth: [
+      "passport.twitch.tv",
+      "accounts.google.com",
+      "appleid.apple.com",
+    ],
+  },
+  netflix: {
+    owner: "media",
+    url: "https://www.netflix.com/",
+    domains: ["netflix.com"],
+    auth: ["netflix.com"],
+  },
+  crunchyroll: {
+    owner: "media",
+    url: "https://www.crunchyroll.com/",
+    domains: ["crunchyroll.com"],
+    auth: ["accounts.google.com", "appleid.apple.com"],
+  },
+  "prime-video": {
+    owner: "media",
+    url: "https://www.primevideo.com/",
+    domains: ["primevideo.com", "amazon.com"],
+    auth: ["amazon.com"],
+  },
 } as const;
 export type MistyBrowserProviderId = keyof typeof mistyBrowserProviders;

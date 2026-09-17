@@ -24,22 +24,27 @@ const queue = await misty.fileSystem.queueTransfer({
 const history = await misty.fileSystem.transfers({limit: 50});
 ```
 
-A component app can compose Misty's complete reusable workspace:
+Files owns its complete workspace in its downloadable component package. The
+host supplies native services and generic selection/preview primitives; it does
+not render Explorer or Transfers on behalf of the package.
+
+`fileSystem.mountWorkspace` is deprecated and rejected by new hosts. Update old
+Files packages rather than relying on a bundled fallback. The typed native
+operations above remain compatible.
+
+The chosen-handle API (`misty.files`) supports package-owned workspaces:
 
 ```ts
-const workspace = await misty.fileSystem.mountWorkspace(root, {view: "explorer"});
-workspace.update({view: "transfers"});
-workspace.unmount();
+const location = await misty.files.resolveLocation("/Users/me/Documents");
+// Resolve a destination into its configured source identity and relative path.
+// Unavailable destinations return { unavailable: true }.
+const url = await misty.files.previewUrl(ownedFileHandle);
+// Use this host-resolved URL for audio/video playback without buffering the file.
+const thumbnail = await misty.files.previewImage(ownedFileHandle, 256);
 ```
 
-The complete workspace requires `files.read`, `files.write`, `connections.read`,
-`connections.write`, and `navigation.write`. It includes the original file
-explorer, split panes, previews, device controls, and transfer history. Its UI is
-shared host infrastructure; the app package controls its placement and selected
-view. Mount inside the component's own root. One workspace can be mounted per
-component view, and it closes automatically with that view's session.
-
-Native file commands work through the desktop RPC transport. Mounting the shared
-workspace requires a component host supporting `mountFileWorkspace`; older hosts
-return an update requirement. The existing chosen-handle API (`misty.files`) is
-separate and remains available for apps that use individual file grants.
+Both preview methods validate the owning app instance and `files.read` scope.
+File paths remain resolved in the host. `restoreLocation()` is retained to adopt
+legacy Files tab state; new explicit navigation uses `resolveLocation(path)`.
+Workspace state and Files transfer presentation belong to the package. Native
+SQLite transfer history is preserved and queried through `fileSystem.transfers`.

@@ -1,5 +1,7 @@
 # Misty app SDK
 
+See [native personal agents](docs/native-agents.md) for agent identity contracts, configured integration discovery, and host-owned execution.
+
 Public-facing packages for apps running inside the Misty host. The host provides transport, scoped identity and capabilities; apps do not receive account credentials.
 
 - `@misty/contracts`: named methods and method-specific request/response validation.

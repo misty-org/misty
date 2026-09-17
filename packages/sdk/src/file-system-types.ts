@@ -61,7 +61,7 @@ export interface ConnectedPeerStatus {
 export interface PeerRoot {
   id: string;
   name: string;
-  kind: "system" | "volume";
+  kind: "system" | "volume" | "folder";
   readonly: true;
 }
 

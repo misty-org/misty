@@ -12,6 +12,8 @@ export interface MistyComponentLibraries {
 }
 
 export interface MistyComponentContext {
+  /** Device availability hint only; native calls still require scoped authorization. */
+  readonly devicePlatform?: "macos" | "windows" | "linux" | "android" | "ios";
   readonly instanceId: string;
   readonly route: string;
   readonly active: boolean;

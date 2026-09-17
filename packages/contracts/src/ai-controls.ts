@@ -14,6 +14,7 @@ export const MistyAiControlsSnapshotSchema = z.strictObject({
 const empty = z.union([z.null(), z.undefined()]).transform(() => undefined);
 /** Operate the registered, active App surface; never expose account AI sessions or transcripts. */
 export const mistyAiControlsContracts = {
+  "ai.open": { params: z.strictObject({agentId:z.string().min(1).max(256).optional(),prompt:z.string().max(8192).optional(),conversationId:z.string().min(1).max(256).optional(),selectionHash:z.string().min(1).max(256).optional()}), result: empty },
   "ai.snapshot": { params: z.strictObject({}), result: MistyAiControlsSnapshotSchema },
   "ai.action.run": {
     params: z.strictObject({ actionId: z.string().min(1).max(256), selectionHash: z.string().min(1).max(256).optional() }), result: empty,

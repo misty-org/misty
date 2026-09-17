@@ -1,3 +1,5 @@
+import { createDocumentsSDK, type MistyDocumentsSDK } from "./documents.js";
+export * from "./documents.js";
 import { createFileSystemSDK, type MistyFileSystemSDK } from "./file-system.js";
 export * from "./file-system.js";
 import { createCodeControlsSDK } from "./code-controls.js";
@@ -155,6 +157,7 @@ export interface MistyDownloadJob {
   } | null;
 }
 export interface MistyAppSDK extends MistyAppUiSDK {
+  readonly documents: MistyDocumentsSDK;
   readonly fileSystem: MistyFileSystemSDK;
  readonly capabilities: MistyCapabilitiesSDK;
  readonly agents:MistyAgentsSDK;
@@ -397,6 +400,7 @@ export function createMistyAppSDK(transport: MistyAppTransport): MistyAppSDK {
   });
   const server = createServerSDK(call);
   const sdk = Object.freeze({
+    documents: createDocumentsSDK(call),
     fileSystem: createFileSystemSDK(call, transport),
     capabilities: createCapabilitiesSDK(server),
     ...createAppUiSDK(call, transport),
@@ -640,3 +644,5 @@ export function readMistyAppRuntimeIdentity(
 export * from "./social.js";
 
 export * from "./agents.js";
+
+export type { AppInstallation, AppSession, SpaceAppInstallation, SpaceAppSession, PersonalSpaceTemplate } from "@misty/contracts";

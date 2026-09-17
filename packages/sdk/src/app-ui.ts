@@ -5,6 +5,7 @@ import {
   MistyDataDomainSchema,
   MistyDataChangeSchema,
   type MistyDataDomain,
+  type MistyActivityOperation,
   type MistyAppUiMethod,
   type MistyAppUiParams,
   type MistyAppUiResult,
@@ -80,6 +81,7 @@ export function createAppUiSDK(call: MistyCall, transport: MistyAppTransport) {
       openExternal: (url: string) => request("links.openExternal", { url }),
     }),
     activity: Object.freeze({
+      operation: (event: MistyActivityOperation) => request("activity.operation", event),
       report: (message: string) => request("activity.report", { message }),
     }),
   };

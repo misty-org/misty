@@ -27,6 +27,8 @@ export function createBrowserSDK(
     ) as MistyBrowserResult<M>;
   };
   return Object.freeze({
+    /** Persist configured destinations so personal agents can discover closed integrations. */
+    setDestinations:(destinations:MistyBrowserParams<"browser.destinations.set">["destinations"])=>request("browser.destinations.set",{destinations}),
     availability: () => request("browser.availability", {}),
     removeAccount: (provider: MistyBrowserParams<"browser.removeAccount">["provider"]) =>
       request("browser.removeAccount", { provider }),

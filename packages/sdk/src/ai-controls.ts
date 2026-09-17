@@ -7,6 +7,7 @@ export function createAiControlsSDK(call: MistyCall, transport: MistyAppTranspor
     return contract.result.parse(await call(method, contract.params.parse(params))) as MistyAiControlsResult<M>;
   };
   return Object.freeze({
+    open: (input: {agentId?:string;prompt?:string;conversationId?:string;selectionHash?:string} = {}) => request("ai.open",input),
     snapshot: () => request("ai.snapshot", {}),
     runAction: (actionId: string, selectionHash?: string) => request("ai.action.run", { actionId, ...(selectionHash ? { selectionHash } : {}) }),
     decideProposal: (proposalId: string, decision: MistyAiControlsParams<"ai.proposal.decide">["decision"]) => request("ai.proposal.decide", { proposalId, decision }),

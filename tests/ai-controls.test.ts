@@ -22,3 +22,12 @@ it("rejects a caller-supplied prompt, adapter, proposal body or unbounded action
   expect(() => mistyAiControlsContracts["ai.action.run"].params.parse({ actionId: "x".repeat(257) })).toThrow();
   expect(() => mistyAiControlsContracts["ai.proposal.decide"].params.parse({ proposalId: "proposal-a", decision: "accept", operations: { replacement: "bypass proposal" } })).toThrow();
 });
+
+it("opens the shared Misty controller with bounded input and no caller context authority",async()=>{
+  const request=vi.fn(async()=>undefined);
+  const sdk=createMistyAppSDK({request});
+  await sdk.ai.open({prompt:"Help with this selection",selectionHash:"revision-1"});
+  expect(request).toHaveBeenCalledWith({method:"ai.open",params:{prompt:"Help with this selection",selectionHash:"revision-1"}});
+  expect(()=>mistyAiControlsContracts["ai.open"].params.parse({prompt:"x".repeat(8193)})).toThrow();
+  expect(()=>mistyAiControlsContracts["ai.open"].params.parse({spaceId:"another-space",context:[]})).toThrow();
+});

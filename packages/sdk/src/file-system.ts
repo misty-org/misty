@@ -3,7 +3,37 @@ import { MistySDKError } from "./transport.js";
 import type * as Native from "./file-system-types.js";
 export type * from "./file-system-types.js";
 
-export interface MistyFileWorkspaceOptions { view: "explorer" | "transfers"; active?: boolean }
+export interface MistyFilePdfPreview { url: string; name: string; compact?: boolean }
+export interface MistyFileVideoPreview { url: string; name: string; persistKey?: string }
+export interface MistyFilePhotoEditor {
+  sourceKey: string;
+  name: string;
+  url: string;
+  indexLabel?: string;
+  tags?: string[];
+  outputMimeType?: string;
+  loading?: boolean;
+  error?: string;
+  readonly?: boolean;
+  onClose(): void;
+  onCancel?(): void;
+  onSave(rendered: Blob): void | Promise<void>;
+  onSaveAsCopy(rendered: Blob): void | Promise<void>;
+}
+/** Component-only renderer supplied by the verified Files package. */
+export type MistyFileRenderer<T> = (root: HTMLElement, preview: T) => {
+  update(preview: T): void;
+  unmount(): void;
+};
+export type MistyFilePdfRenderer = MistyFileRenderer<MistyFilePdfPreview>;
+export interface MistyFileWorkspaceOptions {
+  view: "explorer" | "transfers";
+  active?: boolean;
+  extractDocumentText?(extension: string, bytes: Uint8Array): Promise<string>;
+  renderPdf?: MistyFilePdfRenderer;
+  renderVideo?: MistyFileRenderer<MistyFileVideoPreview>;
+  renderPhoto?: MistyFileRenderer<MistyFilePhotoEditor>;
+}
 export interface MistyFileWorkspaceMount {
   update(options: MistyFileWorkspaceOptions): void;
   unmount(): void;
@@ -11,6 +41,7 @@ export interface MistyFileWorkspaceMount {
 /** Existing desktop filesystem services. Access is covered by the App's installation scopes. */
 export function createFileSystemSDK(call: MistyCall, transport: MistyAppTransport) {
   return Object.freeze({
+    /** @deprecated Files renders its own workspace. New hosts reject this legacy UI hook. */
     async mountWorkspace(root: HTMLElement, options: MistyFileWorkspaceOptions): Promise<MistyFileWorkspaceMount> {
       if (!transport.mountFileWorkspace) throw new MistySDKError("host_update_required", "Update Misty to use its file workspace.");
       return transport.mountFileWorkspace(root, options);

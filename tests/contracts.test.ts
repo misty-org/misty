@@ -6,6 +6,7 @@ import {
   parseMethodParams,
   parseMethodResult,
   SpaceNoteSchema,
+  MistyActivityOperationSchema,
   AppRpcErrorSchema,
 } from "@misty/contracts";
 import { createMistyAppSDK, defineComponentApp } from "@misty/sdk";
@@ -393,5 +394,15 @@ describe("Planner method coverage", () => {
       "workspace.title.set",
       "settings.snapshot",
     ]);
+  });
+});
+
+
+describe("structured Activity operation contract", () => {
+  const event = { operationId: "export-1", revision: 1, status: "completed", title: "Export ready", route: "/apps/journal" };
+  it("accepts explicit states and rejects forged authority or invalid revisions", () => {
+    expect(MistyActivityOperationSchema.parse(event)).toEqual(event);
+    for (const extra of [{source: "other"}, {appId: "other"}, {spaceId: "other"}, {notify: true}, {attention: true}, {revision: 0}, {revision: 1.5}, {status: "approval"}, {title: ""}])
+      expect(() => MistyActivityOperationSchema.parse({...event, ...extra})).toThrow();
   });
 });

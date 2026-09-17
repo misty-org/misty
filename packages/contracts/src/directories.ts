@@ -7,6 +7,9 @@ export const MistyDirectoryEntrySchema = z.strictObject({
   name: z.string().max(1024),
   kind: z.enum(["file", "directory", "symlink", "other"]),
   bytes: z.number().int().nonnegative().safe().optional(),
+  modifiedMs: z.number().int().safe().nullable().optional(),
+  createdMs: z.number().int().safe().nullable().optional(),
+  readonly: z.boolean().optional(),
 });
 export const mistyDirectoryContracts = {
   "files.openTrash": {
