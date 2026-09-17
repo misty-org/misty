@@ -33,7 +33,7 @@ import { BotMessageSquare, Workflow } from "lucide-react";
 import type { MistyNavigationItem } from "@misty/sdk";
 import { FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   Popover,
   PopoverTrigger,
@@ -62,6 +62,7 @@ export function DownloadedAppNavigator(props: {
   active: boolean;
   activeRoute: string;
   items: readonly MistyNavigationItem[];
+  children?: ReactNode;
 }) {
   const label = useNavigationName(sectionNameKey(props.appId), props.label);
   const contentId = useId();
@@ -174,6 +175,7 @@ export function DownloadedAppNavigator(props: {
             label={label}
             open={open}
             aria-label={label}
+            aria-current={props.active ? "page" : undefined}
             aria-controls={contentId}
             data-navigator-disclosure-trigger="true"
             data-active={props.active || undefined}
@@ -317,14 +319,16 @@ export function DownloadedAppNavigator(props: {
         {integrations && source && source.id !== "misty" && !sourceDestinations.length && (
           <p className="px-5 py-2 text-xs text-cream-muted">No pinned pages...</p>
         )}
-        <AppItems
-          accountId={props.accountId}
-          path={integrations && source ? [source.id] : []}
-          appId={props.appId}
-          items={integrations ? sourceDestinations : items}
-          activeRoute={props.active ? props.activeRoute : ""}
-          label={`${label} destinations`}
-        />
+        {props.children ?? (
+          <AppItems
+            accountId={props.accountId}
+            path={integrations && source ? [source.id] : []}
+            appId={props.appId}
+            items={integrations ? sourceDestinations : items}
+            activeRoute={props.active ? props.activeRoute : ""}
+            label={`${label} destinations`}
+          />
+        )}
       </CollapsibleContent>
     </Collapsible>
   );

@@ -148,7 +148,7 @@ describe("GlobalNavigator Space tools", () => {
         'button[data-navigator-disclosure-trigger="true"]',
       ) ?? []),
     ];
-    expect(disclosureToggles).toHaveLength(8);
+    expect(disclosureToggles).toHaveLength(11);
     expect(
       disclosureToggles.every((toggle) =>
         toggle.querySelector('[data-chevron-placement="inline"]'),
@@ -363,7 +363,7 @@ describe("GlobalNavigator Space tools", () => {
   it("opens personal Files without retargeting the Space", async () => {
     await renderNavigator();
     const personal = container.querySelector('[role="group"][aria-label="Apps"]')!;
-    expect(personal.querySelector('a[aria-label="Browser"]')).not.toBeNull();
+    expect(personal.querySelector('button[aria-label="Browser"]')).not.toBeNull();
     await act(async () =>
       personal.querySelector<HTMLButtonElement>('button[aria-label="Files"]')?.click(),
     );
@@ -385,7 +385,7 @@ describe("GlobalNavigator Space tools", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:space-1");
   });
 
-  it("opens Browser directly in another Space without showing cached nested destinations", async () => {
+  it("expands Browser with account pins without leaking another Space’s destinations", async () => {
     useSpacesStore.setState({
       spaces: [
         { ...spaceFixture, is_default: true },
@@ -395,7 +395,7 @@ describe("GlobalNavigator Space tools", () => {
     useAppNavigationStore.setState({
       providerCache: [
         {
-          identity: { accountId: "account-1", spaceId: "space-1", appId: "browser" },
+          identity: { accountId: "account-1", spaceId: "", appId: "browser" },
           items: [
             { id: "bookmarks", label: "Personal bookmarks", route: "/apps/browser?view=bookmarks" },
           ],
@@ -409,10 +409,10 @@ describe("GlobalNavigator Space tools", () => {
     useWorkspaceStore.getState().setScope("space:work");
     await renderNavigator("/home");
     await act(async () =>
-      container.querySelector<HTMLButtonElement>('a[aria-label="Browser"]')?.click(),
+      container.querySelector<HTMLButtonElement>('button[aria-label="Browser"]')?.click(),
     );
     const personal = container.querySelector('[role="group"][aria-label="Apps"]')!;
-    expect(personal.textContent).not.toContain("Personal bookmarks");
+    expect(personal.textContent).toContain("Personal bookmarks");
     expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]?.route).toBe("/apps/browser");
     expect(personal.textContent).not.toContain("Space-only cache");
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:work");
@@ -487,9 +487,9 @@ describe("GlobalNavigator Space tools", () => {
     expect(container.querySelector('[aria-label="Space tools"]')).toBeNull();
     expect(tools?.querySelector('button[aria-label="Inbox"]')).not.toBeNull();
     expect(
-      container.querySelector('[role="group"][aria-label="Apps"] a[aria-label="Browser"]'),
+      container.querySelector('[role="group"][aria-label="Apps"] button[aria-label="Browser"]'),
     ).not.toBeNull();
-    expect(tools?.querySelector('a[aria-label="Terminal"]')).not.toBeNull();
+    expect(tools?.querySelector('button[aria-label="Terminal"]')).not.toBeNull();
   });
 
   it("moves a Space load failure to Activity without printing it in the navigator", async () => {
@@ -745,7 +745,7 @@ describe("GlobalNavigator Space tools", () => {
     ).not.toBeNull();
     expect(
       container
-        .querySelector('[role="group"][aria-label="Apps"] a[aria-label="Browser"]')
+        .querySelector('[role="group"][aria-label="Apps"] button[aria-label="Browser"]')
         ?.getAttribute("aria-current"),
     ).toBe("page");
     expect(tools?.querySelector('button[aria-label="Journal"]')).not.toBeNull();
@@ -759,9 +759,9 @@ describe("GlobalNavigator Space tools", () => {
         .querySelector('[aria-label="Journal destinations"] a[aria-current="page"]')
         ?.textContent?.trim(),
     ).toBe("Notes");
-    expect(container.querySelector('a[aria-label="Browser"]')?.hasAttribute("aria-current")).toBe(
-      false,
-    );
+    expect(
+      container.querySelector('button[aria-label="Browser"]')?.hasAttribute("aria-current"),
+    ).toBe(false);
     expect(container.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
   });
 
@@ -808,7 +808,7 @@ describe("GlobalNavigator Space tools", () => {
     await renderNavigator("/spaces/space-1/notes");
 
     const browserLink = container.querySelector<HTMLButtonElement>(
-      '[role="group"][aria-label="Apps"] a[aria-label="Browser"]',
+      '[role="group"][aria-label="Apps"] button[aria-label="Browser"]',
     );
     expect(browserLink).not.toBeNull();
 
@@ -940,7 +940,7 @@ describe("GlobalNavigator Space tools", () => {
       ).toBe(true);
       await act(async () => scope.close());
       expect(container.textContent).not.toContain("Downloaded app view");
-      expect(container.querySelector('a[aria-label="Terminal"]')).not.toBeNull();
+      expect(container.querySelector('button[aria-label="Terminal"]')).not.toBeNull();
     } finally {
       scope.close();
       otherScope.close();

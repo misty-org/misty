@@ -84,7 +84,7 @@ it("removes built-in Misty navigation from cached personal app registrations", (
   );
   expect(
     [...ui.container.querySelectorAll('[aria-current="page"]')].map((e) => e.textContent),
-  ).toEqual([]);
+  ).toEqual(["Planner"]);
   expect(ui.queryByText("Misty")).toBeNull();
   expect(ui.queryByText("Tasks")).toBeNull();
 });
