@@ -5,6 +5,7 @@ import {
 } from "./scripts/app-source-paths.mjs";
 import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "./scripts/app-env.mjs";
 import { localAppsDirectory } from "./scripts/local-apps-directory.mjs";
+import { createDesktopAppPreparation } from "./scripts/prepare-desktop-apps.mjs";
 import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -96,6 +97,12 @@ function officialAppDevelopmentAssets(
   return {
     name: "misty-official-app-development-assets",
     configureServer(server) {
+      const prepareApp = appsDirectory
+        ? createDesktopAppPreparation(server.config.root, {
+            ...process.env,
+            VITE_MISTY_APPS_DIRECTORY: appsDirectory,
+          })
+        : undefined;
       // A package rebuild updates checksums without changing the App version.
       // Reload the host's in-memory catalog so it verifies and activates the
       // new bundle instead of keeping an old package or rejecting its hash.
@@ -143,14 +150,21 @@ function officialAppDevelopmentAssets(
             rejectDevelopmentAsset(response, 404, "Local app asset not found.");
             return;
           }
-          try {
-            if (!realpathSync(file).startsWith(`${realpathSync(root)}${sep}`))
-              throw new Error("Outside local build");
-          } catch {
-            rejectDevelopmentAsset(response, 404, "Local app asset not found. Build it first.");
-            return;
-          }
-          serveDevelopmentAsset(request.method, response, file, assetContentType(file));
+          void prepareApp!(relative.split("/")[0]).then((available: boolean) => {
+            if (response.destroyed) return;
+            try {
+              if (!available || !realpathSync(file).startsWith(`${realpathSync(root)}${sep}`))
+                throw new Error("Outside local build");
+            } catch {
+              rejectDevelopmentAsset(response, 404, "Local app asset not found.");
+              return;
+            }
+            serveDevelopmentAsset(request.method, response, file, assetContentType(file));
+          }).catch((error: Error) => {
+            server.config.logger.error(`Local app preparation failed: ${error.message}`);
+            if (!response.destroyed)
+              rejectDevelopmentAsset(response, 503, "Local app build failed. Fix the build error and reload to retry.");
+          });
           return;
         }
         if (!requestPath?.startsWith(officialAppsPublicPath)) {
