@@ -124,6 +124,18 @@ it("sleeps between layout changes, coalesces notifications, and releases observe
     }),
   );
 
+  // Split layout writes can move a native host without changing its own size.
+  browser.layout.mockClear();
+  rect = new DOMRect(180, 90, 650, 400);
+  act(() => window.dispatchEvent(new Event("misty:workspace-geometry-changed")));
+  await drain();
+  expect(browser.layout).toHaveBeenCalledExactlyOnceWith(
+    view.handle,
+    expect.objectContaining({
+      bounds: { x: 180, y: 90, width: 650, height: 400 },
+    }),
+  );
+
   // Responsive native resizing settles once, without leaving a polling loop.
   browser.layout.mockClear();
   rect = new DOMRect(80, 60, 700, 400);

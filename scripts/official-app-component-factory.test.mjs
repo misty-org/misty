@@ -3,7 +3,7 @@ import test from "node:test";
 import { rollup } from "rollup";
 import { componentFrameworkGlobals, officialAppComponentFactory } from "./official-app-component-factory.mjs";
 
-async function buildComponent(entry, extra = {}, output = {}, framework = false, runtime = false) {
+async function buildComponent(entry, extra = {}, output = {}, framework = false, runtime = false, appId = "terminal") {
   const sources = { entry, ...extra };
   const build = await rollup({
     input: "entry",
@@ -12,7 +12,7 @@ async function buildComponent(entry, extra = {}, output = {}, framework = false,
       name: "fixture",
       resolveId: (id) => id in sources ? id : null,
       load: (id) => sources[id],
-    }, officialAppComponentFactory("terminal", {framework, runtime})],
+    }, officialAppComponentFactory(appId, {framework, runtime})],
   });
   try {
     return await build.generate({
@@ -162,4 +162,50 @@ test("collaborative mounts share Yjs constructors while owning separate document
   assert.equal(b.document.getMap("private").size, 0);
   first.unmount(); second.unmount();
   assert.throws(() => definition.mount({root:{}, libraries:{...libraries, yjs:undefined}}), /Yjs 13/);
+});
+
+test("files component factory delegates createSession when present on bundle", async () => {
+  const { output } = await buildComponent(`
+    export default {
+      appId: "files", protocol: 2,
+      createSession(input) {
+        return {
+          mount(ctx) { return { update() {}, unmount() { ctx.root.closed = true; } }; },
+          close() {},
+        };
+      },
+      mount(input) { return { update() {}, unmount() {} }; }
+    };
+  `, {}, {}, true, false, "files");
+  const definition = (await import(`data:text/javascript;base64,${Buffer.from(output[0].code).toString("base64")}`)).default;
+  const libraries = { react: { version: "19.2.8" }, reactDomClient: { createRoot() {} } };
+  const controller = new AbortController();
+  const session = definition.createSession({ signal: controller.signal, libraries });
+  assert.equal(typeof session.mount, "function");
+  assert.equal(typeof session.close, "function");
+  const root = {};
+  const mounted = session.mount({ root, context: {} });
+  mounted.unmount();
+  assert.equal(root.closed, true);
+});
+
+test("files component factory falls back safely when createSession is omitted on bundle", async () => {
+  const { output } = await buildComponent(`
+    export default {
+      appId: "files", protocol: 2,
+      mount(input) {
+        return { update() {}, unmount() { input.root.closed = true; } };
+      }
+    };
+  `, {}, {}, true, false, "files");
+  const definition = (await import(`data:text/javascript;base64,${Buffer.from(output[0].code).toString("base64")}`)).default;
+  const libraries = { react: { version: "19.2.8" }, reactDomClient: { createRoot() {} } };
+  const controller = new AbortController();
+  const session = definition.createSession({ signal: controller.signal, libraries });
+  assert.equal(typeof session.mount, "function");
+  assert.equal(typeof session.close, "function");
+  const root = {};
+  const mounted = session.mount({ root, context: {} });
+  mounted.unmount();
+  assert.equal(root.closed, true);
 });

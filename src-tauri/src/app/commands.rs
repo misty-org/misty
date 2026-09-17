@@ -1782,17 +1782,17 @@ pub fn settings_apply_launch_on_login(enabled: bool) -> ApiResult<LaunchOnLoginS
 
 #[tauri::command]
 pub fn coding_ai_read_api_key(provider_id: String) -> ApiResult<Option<String>> {
-    crate::infra::keychain::read_coding_ai_key(&provider_id)
+    crate::infra::credentials::read_coding_ai_key(&provider_id)
 }
 
 #[tauri::command]
 pub fn coding_ai_write_api_key(provider_id: String, key: String) -> ApiResult<()> {
-    crate::infra::keychain::write_coding_ai_key(&provider_id, &key)
+    crate::infra::credentials::write_coding_ai_key(&provider_id, &key)
 }
 
 #[tauri::command]
 pub fn coding_ai_clear_api_key(provider_id: String) -> ApiResult<()> {
-    crate::infra::keychain::clear_coding_ai_key(&provider_id)
+    crate::infra::credentials::clear_coding_ai_key(&provider_id)
 }
 
 #[cfg(desktop)]

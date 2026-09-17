@@ -2,31 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" />
     <title>Misty</title>
     <style>
-      /*
-        Paints the window's real background before any JS runs. The Tauri
-        window is transparent with no OS chrome, so without this the OS
-        shows through as a black flash for however long it takes the app
-        bundle to load and mount (worse in `tauri dev`, where a refresh
-        re-fetches the whole module graph unbundled from Vite).
-      */
+      /* Keep startup blank and black until the app is ready to paint. */
       html,
       body {
         margin: 0;
         height: 100%;
-        background: #f1f1f1;
-      }
-      @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          background: #131313;
-        }
+        background: #000;
       }
       #root {
         height: 100%;

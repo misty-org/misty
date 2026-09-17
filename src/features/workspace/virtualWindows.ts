@@ -197,8 +197,12 @@ export function switchWorkspaceScope(
 export function adoptDefaultWorkspaceScope(
   state: VirtualWorkspaceState,
   scopeKey: WorkspaceScopeKey,
+  validScopes?: Set<string>,
 ): VirtualWorkspaceUpdate | null {
-  if (state.activeScopeKey !== "global") return null;
+  const needsAdoption =
+    state.activeScopeKey === "global" ||
+    (validScopes !== undefined && !validScopes.has(state.activeScopeKey));
+  if (!needsAdoption) return null;
   const layoutsByScope = { ...state.layoutsByScope };
   const virtualWindowsByScope = { ...state.virtualWindowsByScope };
   const activeIds = { ...state.activeVirtualWindowIdByScope };

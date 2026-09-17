@@ -1,6 +1,6 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
 import type { MistyFilePdfPreview, MistyFileRenderer, MistyFileWorkspaceOptions } from "@misty/sdk";
-import type { PreviewErrorComponent } from "@/features/files/explorer/components/globalPreview/PreviewRuntime";
+import type { PreviewErrorComponent } from "@/features/file-ui";
 
 export const FilePreviewRenderersContext = createContext<
   Pick<

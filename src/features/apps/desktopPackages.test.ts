@@ -51,16 +51,32 @@ it("reports a missing local build without falling back to the published ZIP", as
   );
   expect(invoke).not.toHaveBeenCalled();
 });
-it("keeps the signed installer for production builds", async () => {
-  vi.stubEnv("DEV", false);
-  vi.mocked(invoke).mockResolvedValue("operation");
-  expect(await stageOfficialDesktopPackage(publishedApp)).toBe("operation");
-  expect(invoke).toHaveBeenCalledWith(
-    "install_plugin_bundle",
-    expect.objectContaining({ url: publishedApp.desktop.entry, signature: "release-signature" }),
-  );
-  expect(localAppComponentReady).not.toHaveBeenCalled();
-});
+it.each(["files", "browser"])(
+  "requires the signed %s installer for production builds",
+  async (id) => {
+    const release = {
+      ...publishedApp,
+      id,
+      app_id: `com.misty.${id}`,
+      desktop: {
+        ...publishedApp.desktop,
+        entry: `https://apps.mistysys.com/official-apps/${id}/1.1.0-beta.1/desktop.zip`,
+      },
+    };
+    vi.stubEnv("DEV", false);
+    vi.mocked(invoke).mockResolvedValue("operation");
+    expect(await stageOfficialDesktopPackage(release)).toBe("operation");
+    expect(invoke).toHaveBeenCalledWith(
+      "install_plugin_bundle",
+      expect.objectContaining({
+        pluginId: id,
+        url: release.desktop.entry,
+        signature: "release-signature",
+      }),
+    );
+    expect(localAppComponentReady).not.toHaveBeenCalled();
+  },
+);
 
 it("loads immutable package URLs independently for different releases", () => {
   vi.stubEnv("DEV", false);
@@ -78,9 +94,13 @@ it("loads immutable package URLs independently for different releases", () => {
 it("downloads the signed local ZIP when a development component needs native services", async () => {
   vi.mocked(invoke).mockResolvedValue("operation");
   await stageOfficialDesktopPackage(app, true);
-  expect(invoke).toHaveBeenCalledWith("install_plugin_bundle", expect.objectContaining({
-    url: new URL(`/official-apps/files/${app.version}/desktop.zip`, window.location.origin).href,
-    sha256: app.desktop.sha256, signature: app.desktop.signature,
-  }));
+  expect(invoke).toHaveBeenCalledWith(
+    "install_plugin_bundle",
+    expect.objectContaining({
+      url: new URL(`/official-apps/files/${app.version}/desktop.zip`, window.location.origin).href,
+      sha256: app.desktop.sha256,
+      signature: app.desktop.signature,
+    }),
+  );
   expect(localAppComponentReady).not.toHaveBeenCalled();
 });

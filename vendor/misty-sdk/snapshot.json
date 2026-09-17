@@ -4,14 +4,14 @@
     {
       "name": "@misty/contracts",
       "version": "0.1.0",
-      "sha256": "df8b73eeef2bb25f5007ee489c6f92f349c6104868c56c2def2e270ade8c747c",
-      "filename": "misty-contracts-0.1.0-df8b73eeef2bb25f.tgz"
+      "sha256": "1a294cec8f43e236d53aeeaaa850ab309b5214e5a73f2875fa37c5a0304cd6e7",
+      "filename": "misty-contracts-0.1.0-1a294cec8f43e236.tgz"
     },
     {
       "name": "@misty/sdk",
       "version": "0.1.0",
-      "sha256": "648bd1a66454e7ef97d3ad394a597562fc8821c30da81f905605e0829cf19aab",
-      "filename": "misty-sdk-0.1.0-648bd1a66454e7ef.tgz"
+      "sha256": "e771fc1b027579db83909d3e43917ede22aec13c71f1892cf4f2bc2e4e72bb5e",
+      "filename": "misty-sdk-0.1.0-e771fc1b027579db.tgz"
     }
   ]
 }

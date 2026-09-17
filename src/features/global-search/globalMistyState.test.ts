@@ -15,6 +15,10 @@ import { globalMistyApi } from "./globalMistyApi";
 import { beforeEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 
+vi.mock("@/features/agents/personalAgentsStore",()=>({
+ usePersonalAgentsStore:{getState:()=>({accountId:"account-a",agents:[{id:"default-misty",system_managed:true,enabled:true}],load:async()=>{}})},
+ selectedPersonalAgent:()=>({id:"default-misty",system_managed:true,enabled:true}),
+}));
 initializeHostAgentsRuntime();
 
 describe("Global Misty state", () => {
@@ -70,7 +74,7 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",
+          id: "conversation-a",agentId:"default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-09-10",
@@ -165,7 +169,7 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",
+          id: "conversation-a",agentId:"default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
@@ -238,7 +242,7 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",
+          id: "conversation-a",agentId:"default-misty",
           title: "hello",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",
@@ -279,7 +283,7 @@ describe("Global Misty state", () => {
       activeConversationId: "conversation-a",
       conversations: [
         {
-          id: "conversation-a",
+          id: "conversation-a",agentId:"default-misty",
           title: "Misty",
           spaceId: "work",
           createdAt: "2026-08-25T00:00:00.000Z",

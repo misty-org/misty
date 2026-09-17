@@ -29,7 +29,7 @@ export function prepareDesktopApps(root, environment = process.env, run = execFi
     newestSource(resolve(root, "vite.official-app.config.ts")),
   );
   const missing = catalog.apps.filter((app) => {
-    if (app.desktop?.runtime !== "downloaded") return false;
+    if (app.id==="agents" || app.desktop?.runtime !== "downloaded") return false;
     if (!/^[a-z0-9_-]+$/.test(app.id)) throw new Error("Invalid local App identity.");
     const changed = Math.max(sharedChanged, newestSource(resolve(appsRoot, "apps", app.id)));
     return !["app.js", "app.css"].every((file) => {

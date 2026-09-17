@@ -1,3 +1,4 @@
+import { captureAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type {
   AccountAuthUser,
@@ -28,7 +29,8 @@ function authenticatedUser(data: LoginResponse, operation: string): AccountAuthU
 
 async function persistLogin(data: LoginResponse, operation: string): Promise<AccountAuthUser> {
   const user = authenticatedUser(data, operation);
-  if (data.token) await saveAccountAuthToken(data.token, user);
+  await captureAccountCookies(await accountApi.resolveBase(), user.id);
+  await saveAccountAuthToken(`cookie-session:${user.id}`, user);
   return user;
 }
 

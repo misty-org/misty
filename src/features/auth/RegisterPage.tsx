@@ -15,10 +15,16 @@ import { accountRegister } from "./store/useAccountStore";
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authenticateAccount } = useAuth();
+  const { user, authenticateAccount } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || (isNativeMobileBuild ? "/home" : "/files");
-  const addingAccount = Boolean(routeState?.addingAccount);
+  const rawFrom = routeState?.from;
+  const from =
+    rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
+      ? rawFrom
+      : isNativeMobileBuild
+        ? "/home"
+        : "/spaces";
+  const addingAccount = Boolean(routeState?.addingAccount || user);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");

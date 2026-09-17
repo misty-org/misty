@@ -22,6 +22,12 @@ Spaces are collaborative contexts where humans and agents cooperate through shar
 
 Misty holds a goal together across people, AI collaborators, shared context, and personal tools. Its differentiating mechanism is one workspace model with platform-appropriate shells: a split-capable desktop workspace and a single-surface mobile projection that preserve the same collaborative context and permission boundaries.
 
+## Navigation and Ownership
+
+The desktop navbar has three identity headers: Misty, the selected Space, and Apps. Misty contains global Home, Discover, and Agents. The Space avatar and dropdown precede built-in Chat, Journal (Notes and Drawings), Planner, and Library. These shared tools require Space membership and permissions, but no app installation. Apps has its own grid icon, title, and add action; it contains personal tools such as Browser, Files, and external service integrations. Built-in Misty collaboration is not offered as a provider inside personal Apps.
+
+Apps are installed for an account, independently of any Space. Discover offers personal installation and capability review; Spaces have no app enablement or app allowlist. Connection selection, native permissions, and agent app assignments remain explicit and revocable. Migrated installations require the account owner to review capabilities again, and conflicting old personal records remain exportable. Sharing personal app content into a Space remains explicit.
+
 ## Operating Context
 
 People use Misty for schoolwork, creative projects, community or club coordination, planning with friends, client work, and everyday personal goals. A desktop session may compare several resizable panes. On iPhone and iPad, people move through the same Space and tabs one surface at a time, with Code, Terminal, and Transfers opened on a paired online desktop when needed.

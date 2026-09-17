@@ -246,7 +246,9 @@ export default defineConfig(({ command, mode }) => {
   const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
   const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
-  const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim();
+  const isDev = command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
+  const defaultPublicUrl = isDev ? "http://localhost:5174" : "https://mistysys.com";
+  const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
   const appsDirectory =
     command === "serve" && mode === "desktop"
       ? localAppsDirectory(env.VITE_MISTY_APPS_DIRECTORY ?? env.MISTY_APPS_DIRECTORY, process.cwd())
@@ -323,6 +325,8 @@ export default defineConfig(({ command, mode }) => {
                     /(?:^|\/)PdfViewerView(?:\.tsx)?$/.test(source))
                   return resolve(process.cwd(), "src/features/apps/FilePdfPreview.tsx");
               },
+              // Space collaboration screens and Yjs are bundled with Misty.
+              // Personal app runtimes remain separately packaged.
               generateBundle(_options, bundle) {
                 const forbidden = Object.values(bundle).flatMap((item) =>
                   item.type === "chunk"
@@ -330,15 +334,17 @@ export default defineConfig(({ command, mode }) => {
                         .filter(
                           ([id, details]) =>
                             details.renderedLength > 0 &&
-                            ((mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) && /\/node_modules\/html2canvas\//.test(id)) || /\/(?:TrustedAppSurface\.mobile|SpaceNotes|SpaceDrawings|SpaceLibrary|AgentsPage|TerminalWorkspace(?:View)?|SpaceTasksView|SpaceAgendaView|SpaceRoadmapView|PdfViewerView|PhotoEditorView|VideoAnnotator)\.tsx$/.test(id) ||
-                              /\/node_modules\/(?:yjs|material-icon-theme|@noble\/hashes|mammoth|jszip|react-pdf|pdfjs-dist|react-filerobot-image-editor|react-konva|konva)\//.test(id)),
+                            !id.endsWith("/src/features/agents/AgentsPage.tsx") &&
+                            ((mode === "desktop" && ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform) && /\/node_modules\/html2canvas\//.test(id)) || /\/(?:TrustedAppSurface\.mobile|NativeAppSurface|BrowserWorkspace|PinnedBrowserWorkspace|SDKBrowserView|AgentsPage|TerminalWorkspace(?:View)?|PdfViewerView|PhotoEditorView|VideoAnnotator)\.tsx$/.test(id) ||
+                              /\/apps\/(?:files|browser)\//.test(id) ||
+                              /\/node_modules\/(?:material-icon-theme|@noble\/hashes|mammoth|jszip|react-pdf|pdfjs-dist|react-filerobot-image-editor|react-konva|konva)\//.test(id)),
                         )
                         .map(([id]) => id)
                     : [],
                 );
                 if (forbidden.length)
                   this.error(
-                    `Downloaded app screens must not ship inside the desktop Host:\n${forbidden.join("\n")}`,
+                    `Downloaded app screens must not ship inside the desktop Host:\n${forbidden.map(id => `${id} <- ${this.getModuleInfo(id)?.importers.join(", ")}`).join("\n")}`,
                   );
               },
             } satisfies Plugin,

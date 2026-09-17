@@ -23,6 +23,9 @@ export const tabletFloatingNavbarClass =
   "absolute bottom-6 left-0 top-7 z-40 shadow-[0_18px_44px_rgba(0,0,0,0.6)]";
 export const navigatorRevealStripClass = "absolute inset-y-0 left-0 z-30 w-3 cursor-pointer";
 
+// The drawer, tab inset, and titlebar controls must move on the same timeline.
+export const navigatorMotionClass = "duration-300 ease-in-out motion-reduce:transition-none";
+
 export const desktopRouteShellClass =
   "relative z-10 col-start-2 row-span-2 row-start-1 min-h-0 overflow-hidden bg-charcoal-bg";
 export const tabletRouteShellClass =
@@ -95,42 +98,47 @@ export const navigatorIslandActionClass = [
   navigatorFocusRingClass,
 ].join(" ");
 
+// Hierarchy headers share the profile island's surface with tighter controls.
+export const navigatorHierarchyIslandClass = cn(
+  navigatorFloatingIslandClass,
+  "min-w-0 gap-0.5 px-1 py-0.5",
+);
+
+export const navigatorHierarchyTriggerClass = [
+  "misty-navigator-hierarchy-trigger misty-navigator-row-target box-border flex h-8 min-w-0 items-center gap-2.5 rounded-lg border-0 bg-transparent px-1.25",
+  "text-left text-cream no-underline outline-none transition-colors duration-150 motion-reduce:transition-none",
+  "hover:text-cream-bright focus-visible:text-cream-bright active:text-cream-bright data-[state=open]:text-cream-bright",
+  navigatorFocusRingClass,
+].join(" ");
+
+export const navigatorHierarchyActionClass = cn(navigatorIslandActionClass, "size-8");
+
 export function navigatorRowClass(active: boolean): string {
   return cn(
     navigationMenuLinkClass,
     "relative w-full",
     "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-cream-muted",
-    active && "bg-charcoal-card text-cream-bright",
+    active && "text-cream-bright",
   );
 }
 
 export const profilePopoverClass = [
-  "pointer-events-auto fixed z-[2147482900] grid max-h-[calc(100dvh-44px)] w-[286px] overflow-y-auto rounded-xl",
-  "border border-charcoal-border bg-charcoal-card p-2 text-cream shadow-2xl",
+  "pointer-events-auto fixed z-[2147482900] grid max-h-[calc(100dvh-44px)] w-[256px] overflow-y-auto rounded-xl",
+  "border border-charcoal-border bg-charcoal-card p-1 text-cream shadow-2xl",
 ].join(" ");
 
 export const accountChooserPopoverClass = [
-  "pointer-events-auto fixed z-[2147482910] grid max-h-[calc(100dvh-44px)] w-[320px] overflow-y-auto rounded-xl",
-  "border border-charcoal-border bg-charcoal-card p-2 text-cream shadow-2xl",
+  "pointer-events-auto fixed z-[2147482910] grid max-h-[calc(100dvh-44px)] w-[280px] overflow-y-auto rounded-xl",
+  "border border-charcoal-border bg-charcoal-card p-1 text-cream shadow-2xl",
 ].join(" ");
 
 export const profileMenuItemClass = [
-  "grid min-h-10 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border-0 bg-transparent",
-  "px-2.5 py-2 text-left text-sm text-cream-muted transition-colors",
-  "hover:text-cream-bright",
+  "grid h-8 w-full grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border-0 bg-transparent",
+  "px-2 py-1 text-left text-sm text-cream-muted transition-colors",
+  "hover:bg-charcoal-hover hover:text-cream-bright",
+  "focus-visible:outline-none focus-visible:bg-charcoal-hover focus-visible:text-cream-bright",
 ].join(" ");
 
-export const globalNoticeLayerClass =
-  "pointer-events-none fixed left-1/2 top-14 z-[2147482800] grid -translate-x-1/2 justify-items-center";
-
-export const workStatusPopupClass = [
-  "pointer-events-none fixed left-1/2 top-11 z-[2147482850] grid max-w-[min(360px,calc(100vw-96px))]",
-  "-translate-x-1/2 grid-cols-[10px_minmax(0,1fr)] items-center gap-3 rounded-lg border",
-  "border-charcoal-border bg-charcoal-card px-3.5 py-2.5 text-sm text-cream shadow-xl",
-  "animate-in fade-in-0 slide-in-from-top-2 duration-160 ease-out",
-].join(" ");
-
-export const workStatusPulseClass = "size-2.5 rounded-full bg-status-green";
 export const workStatusToastDurationMs = 3500;
 
 // Where the top band's controls stop: traffic lights plus the shell's own

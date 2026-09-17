@@ -7,7 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/shared/ui/context-menu";
-import { setBrowserWebviewsSuspended } from "@/features/browser/browserRuntime";
+import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import {
   setNavigationName,
   useNavigationName,
@@ -23,7 +23,10 @@ export function Renameable({
   customName,
   onRename,
   resetLabel = "Reset",
+  portalEditor = true,
 }: {
+  /** Keep the editor inside a containing menu so its focus trap includes the input. */
+  portalEditor?: boolean;
   customName?: string;
   onRename?: (name: string | null) => void;
   resetLabel?: string;
@@ -80,6 +83,8 @@ export function Renameable({
     }
   };
   const rect = anchor.current?.getBoundingClientRect();
+  const renderEditor = (editor: ReactElement) =>
+    portalEditor ? createPortal(editor, document.body) : editor;
   return (
     <>
       <ContextMenu
@@ -128,15 +133,17 @@ export function Renameable({
       </ContextMenu>
       {editing &&
         rect &&
-        createPortal(
+        renderEditor(
           <div
             data-misty-window-drag-block="true"
             data-navigation-name-editor="true"
-            className="fixed z-[2147483401]"
+            className={portalEditor ? "fixed z-[2147483401]" : "absolute z-[2147483401]"}
             style={{
-              left: Math.max(4, rect.left),
-              top: rect.top,
-              width: Math.min(Math.max(rect.width, 150), window.innerWidth - rect.left - 8),
+              left: portalEditor ? Math.max(4, rect.left) : anchor.current?.offsetLeft,
+              top: portalEditor ? rect.top : anchor.current?.offsetTop,
+              width: portalEditor
+                ? Math.min(Math.max(rect.width, 150), window.innerWidth - rect.left - 8)
+                : anchor.current?.offsetWidth,
             }}
           >
             <input
@@ -162,7 +169,6 @@ export function Renameable({
               </div>
             )}
           </div>,
-          document.body,
         )}
       {!editing && error && (
         <span role="alert" className="text-xs text-cream">

@@ -90,7 +90,7 @@ export function groupTabs(tabs: WorkspaceTab[]): TabGroup[] {
             inbox: "Inbox",
             journal: "Journal",
             planner: "Planner",
-            library: "Library",
+            library: "Storage",
             browser: "Browser",
             files: "Files",
             code: "Code",
@@ -153,7 +153,7 @@ export interface WorkspaceDockTreeProps {
   node: WorkspaceDockNode;
   dockEdge?: { top: boolean; left: boolean; right: boolean };
   panelDirection?: DockSplitDirection;
-  titlebarInsets?: { left: number; right: number };
+  titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
   focusedPaneId: string;
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;

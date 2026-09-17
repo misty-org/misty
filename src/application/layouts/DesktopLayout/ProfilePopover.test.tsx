@@ -10,10 +10,12 @@ let mockUser: { id: string; email: string; name: string } | null = {
   name: "Owner",
 };
 
+let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
+
 vi.mock("@/features/auth", () => ({
   useAuth: () => ({
     user: mockUser,
-    accounts: [],
+    accounts: mockAccounts,
     transitioning: false,
     switchAccount: vi.fn(),
     logout: vi.fn(),
@@ -29,6 +31,7 @@ describe("ProfilePopover", () => {
   afterEach(() => {
     document.body.innerHTML = "";
     mockUser = { id: "account-1", email: "owner@example.com", name: "Owner" };
+    mockAccounts = [];
   });
 
   it("uses the shell overlay, dismisses outside, and restores trigger focus", async () => {
@@ -65,6 +68,35 @@ describe("ProfilePopover", () => {
     expect(onClose).toHaveBeenCalledOnce();
     await act(async () => render(false));
     expect(document.activeElement).toBe(anchor);
+    await act(async () => root.unmount());
+  });
+
+  it("opens cleanly after being mounted closed without hook count mismatch", async () => {
+    const host = document.createElement("div");
+    const overlay = document.createElement("div");
+    overlay.id = "misty-shell-overlays";
+    const anchor = document.createElement("button");
+    document.body.append(host, overlay, anchor);
+    const root = createRoot(host);
+    const anchorRef = { current: anchor };
+    const render = (open: boolean) =>
+      root.render(
+        <MemoryRouter>
+          <ProfilePopover
+            anchorRef={anchorRef}
+            currentPath="/spaces"
+            open={open}
+            onClose={vi.fn()}
+            onOpenAccountSettings={vi.fn()}
+          />
+        </MemoryRouter>,
+      );
+
+    await act(async () => render(false));
+    expect(overlay.querySelector('[role="menu"][aria-label="Profile"]')).toBeNull();
+
+    await act(async () => render(true));
+    expect(overlay.querySelector('[role="menu"][aria-label="Profile"]')).not.toBeNull();
     await act(async () => root.unmount());
   });
 
@@ -135,6 +167,57 @@ describe("ProfilePopover", () => {
       );
       expect(button).toBeUndefined();
     }
+    await act(async () => root.unmount());
+  });
+
+  it("renders clean Switch accounts popover without extraneous subtext", async () => {
+    mockAccounts = [
+      { id: "account-1", email: "owner@example.com", name: "Owner" },
+      { id: "account-2", email: "mattdev727@gmail.com", name: "Matt" },
+    ];
+    const host = document.createElement("div");
+    const overlay = document.createElement("div");
+    overlay.id = "misty-shell-overlays";
+    const anchor = document.createElement("button");
+    document.body.append(host, overlay, anchor);
+    const root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <ProfilePopover
+            anchorRef={{ current: anchor }}
+            currentPath="/spaces"
+            open
+            onClose={vi.fn()}
+            onOpenAccountSettings={vi.fn()}
+          />
+        </MemoryRouter>,
+      );
+    });
+
+    const switchAccountsButton = Array.from(overlay.querySelectorAll("button")).find((candidate) =>
+      candidate.textContent?.includes("Switch accounts"),
+    );
+    expect(switchAccountsButton).toBeDefined();
+
+    await act(async () => {
+      switchAccountsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const accountChooser = overlay.querySelector('[role="menu"][aria-label="Switch accounts"]');
+    expect(accountChooser).not.toBeNull();
+
+    // Verify main header and options are present
+    expect(accountChooser?.textContent).toContain("Switch accounts");
+    expect(accountChooser?.textContent).toContain("Owner");
+    expect(accountChooser?.textContent).toContain("Matt");
+    expect(accountChooser?.textContent).toContain("Add another account");
+
+    // Verify subtext is removed
+    expect(accountChooser?.textContent).not.toContain("Your saved Misty sessions");
+    expect(accountChooser?.textContent).not.toContain("Accounts remain signed in securely");
+    expect(accountChooser?.textContent).not.toContain("mattdev727@gmail.com");
+
     await act(async () => root.unmount());
   });
 });

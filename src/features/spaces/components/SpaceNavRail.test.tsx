@@ -52,7 +52,7 @@ describe("SpaceNavRail", () => {
     container.remove();
   });
 
-  it("renders circular Space profiles inside Misty dock slots", async () => {
+  it("renders rounded-square Space profiles inside Misty dock slots", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
@@ -67,14 +67,14 @@ describe("SpaceNavRail", () => {
     expect(active?.getAttribute("draggable")).toBe("true");
     expect(active?.dataset.reorderDragSource).toBe("true");
     expect(active?.dataset.mistyWindowDragBlock).toBe("true");
-    expect(active?.className).toContain("rounded-full");
+    expect(active?.className).toContain("rounded-[25%]");
     expect(active?.className).not.toContain("bg-charcoal-active");
     expect(active?.className).not.toContain("border-charcoal-border/70");
     expect(active?.querySelector('[data-slot="avatar"]')?.className).toContain(
       "group-hover/space:ring-cream/70",
     );
     expect(active?.querySelector('[aria-label$="default profile picture"]')?.className).toContain(
-      "rounded-full",
+      "rounded-[25%]",
     );
     expect(second?.getAttribute("href")).toBe("/spaces/space-2/chat");
     expect(

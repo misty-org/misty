@@ -188,6 +188,10 @@ export interface AiSurfaceAdapter {
 }
 
 export interface AiInvocationRequest {
+  agentId?:string;
+  taskId?:string;
+  executionMode?: "user"|"agent"|"team";
+  windowLabel?:string;
   mode: AiInvocationMode;
   surfaceId: AiSurfaceId;
   trigger: AiTrigger;

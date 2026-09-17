@@ -144,6 +144,8 @@ const OFFICIAL_APP_IDS: &[&str] = &[
     "code",
     "terminal",
     "transfers",
+    "music",
+    "media",
 ];
 
 #[derive(Debug, Serialize, Clone, Default)]

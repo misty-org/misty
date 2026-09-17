@@ -1,3 +1,5 @@
+import {useLocalExecution} from "@/features/agents/localExecution";
+import { AgentChatControls } from "@/features/agents/AgentChatControls";
 import { readOptionalSurfaceContext } from "./optionalSurfaceContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { installMistyContextBridge } from "@/features/misty/contextBridge";
@@ -93,6 +95,8 @@ export function GlobalMistySurface(props: {
     onContentVisibilityChange,
     onVoiceActivityChange,
   } = props;
+  const execution = useLocalExecution(s=>s.execution);
+  const taskSurface = props.controller === "misty" && !!execution;
   const useController = props.controller === "misty" ? useMistyStore : useGlobalSearchStore;
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -292,10 +296,10 @@ export function GlobalMistySurface(props: {
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [closePanel, open]);
   useEffect(() => {
-    if (!suspendBrowserWebviews) return;
+    if (!suspendBrowserWebviews || taskSurface) return;
     requestEmbeddedBrowserSuspension(open, "global-misty");
     return () => requestEmbeddedBrowserSuspension(false, "global-misty");
-  }, [open, suspendBrowserWebviews]);
+  }, [open, suspendBrowserWebviews, taskSurface]);
   useEffect(() => {
     if (wasOpenRef.current && !open) onClosed?.();
     wasOpenRef.current = open;
@@ -454,7 +458,7 @@ export function GlobalMistySurface(props: {
 
   return (
     <div
-      className="pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"
+      className={taskSurface?"pointer-events-none fixed right-2 top-16 z-[2147482500] flex w-[424px] flex-col items-center":"pointer-events-none fixed inset-0 z-[2147482500] flex flex-col items-center pt-[9vh]"}
       data-global-misty-root
     >
       {error || voiceError ? (
@@ -475,11 +479,11 @@ export function GlobalMistySurface(props: {
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              style={{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
+              style={taskSurface?{width:"100%"}:{ translate: `${panelOffset.x}px ${panelOffset.y}px` }}
               className="group/misty-window pointer-events-none flex origin-center flex-col items-center gap-2"
               data-html2canvas-ignore="true"
             >
-              {conversationActive ? (
+              {conversationActive && !taskSurface ? (
                 <GlobalMistyVoiceIsland
                   voice={voice}
                   conversations={conversations}
@@ -499,14 +503,15 @@ export function GlobalMistySurface(props: {
               ) : null}
               <section
                 className={cn(
-                  panelClass,
-                  conversationActive && "h-[min(640px,calc(100dvh-120px))]",
+                  taskSurface?"pointer-events-auto flex w-full h-[calc(100dvh-164px)] max-h-[calc(100dvh-164px)] flex-col overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card text-cream":panelClass,
+                  conversationActive && !taskSurface && "h-[min(640px,calc(100dvh-120px))]",
                   showShadow && panelShadowClass,
                 )}
                 aria-label="Misty Search"
                 data-misty-conversation={conversationActive ? "true" : undefined}
                 data-misty-content={contentVisible ? "true" : "false"}
               >
+                {props.controller === "misty" ? <AgentChatControls accountId={props.accountId} /> : null}
                 {browserNotice ? (
                   <p
                     role="status"
@@ -621,7 +626,7 @@ export function GlobalMisty(props: Parameters<typeof GlobalMistySurface>[0]) {
         />
       )}
       <GlobalMistySurface {...props} />
-      {!props.controller && !hasTauriInternals() && (
+      {!props.controller && (
         <GlobalMistySurface {...props} controller="misty" />
       )}
     </>

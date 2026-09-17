@@ -51,7 +51,7 @@ export function createAppSessionRequests(generation: () => number) {
           authority !== undefined &&
           session.authority_generation === authority &&
           session.app_id === appId &&
-          session.space_id === spaceId &&
+          (session.space_id ?? "") === spaceId &&
           Date.parse(session.expires_at) - Date.now() > 45_000
         ) {
           if (saved.size >= 128) saved.delete(saved.keys().next().value!);

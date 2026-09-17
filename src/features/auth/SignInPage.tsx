@@ -3,8 +3,9 @@ import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import AuthCard from "./components/AuthCard";
 import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
@@ -17,9 +18,16 @@ import { accountSignIn } from "./store/useAccountStore";
 export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { accounts, authenticateAccount, resumeAccount, removeAccount } = useAuth();
+  const { accounts, user, transitioning, authenticateAccount, resumeAccount, removeAccount } =
+    useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
-  const from = routeState?.from || (isNativeMobileBuild ? "/home" : "/files");
+  const rawFrom = routeState?.from;
+  const from =
+    rawFrom && !rawFrom.startsWith("/signin") && !rawFrom.startsWith("/register")
+      ? rawFrom
+      : isNativeMobileBuild
+        ? "/home"
+        : "/spaces";
   const addingAccount = Boolean(routeState?.addingAccount);
   const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !addingAccount ? "chooser" : "login",
@@ -54,12 +62,19 @@ export default function SignIn() {
       await resumeAccount(account.id);
       clearAccountCreating(account.id);
       navigate(from, { replace: true });
-    } catch {
-      // The saved token is no longer valid: fall to the login form for this account.
-      setEmail(account.email);
-      setPassword("");
-      setMode("login");
-      setError(`Your session for ${account.email} has expired. Please sign in again.`);
+    } catch (resumeError) {
+      if (resumeError instanceof SavedAccountSessionUnavailableError) {
+        setEmail(account.email);
+        setPassword("");
+        setMode("login");
+        setError(`Your session for ${account.email} has expired. Please sign in again.`);
+      } else {
+        const detail =
+          resumeError instanceof Error
+            ? resumeError.message
+            : String(resumeError || "Please try again.");
+        setError(`Could not resume this account. ${detail}`);
+      }
     } finally {
       setBusyAccountId("");
     }
@@ -76,11 +91,16 @@ export default function SignIn() {
     }
   }
 
+  // A route guard may reach sign-in before the saved identity finishes loading.
+  // Only an explicit Add account action should keep a signed-in user here.
+  if (user && !addingAccount && !transitioning) return <Navigate to={from} replace />;
+
   if (mode === "chooser") {
     return (
       <AuthShell
         title="Choose an account"
         description="Pick a signed-in Misty account to continue, or add another."
+        onBack={user ? () => navigate(from, { replace: true }) : undefined}
       >
         <AuthCard>
           <div className="flex flex-col gap-2">
@@ -94,7 +114,7 @@ export default function SignIn() {
                   variant="ghost"
                   className="h-auto min-w-0 flex-1 justify-start gap-3 p-1.5 text-left font-normal"
                   onClick={() => void handleSelect(account)}
-                  disabled={Boolean(busyAccountId)}
+                  disabled={Boolean(busyAccountId) || transitioning}
                 >
                   <Avatar className="size-9 shrink-0">
                     <AvatarFallback className="text-xs font-semibold">
@@ -119,17 +139,23 @@ export default function SignIn() {
                   title="Remove from this device"
                   className="mr-1 text-cream-muted opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
-                  disabled={Boolean(busyAccountId)}
+                  disabled={Boolean(busyAccountId) || transitioning}
                 >
                   <Trash2 size={15} />
                 </Button>
               </div>
             ))}
+            {transitioning && !busyAccountId ? (
+              <p role="status" className="text-sm text-cream-muted">
+                Updating session…
+              </p>
+            ) : null}
             {error ? <AuthMessage tone="error" message={error} /> : null}
             <Button
               type="button"
               variant="outline"
               className="mt-1 h-11 justify-start border-dashed px-3 text-cream-muted"
+              disabled={Boolean(busyAccountId) || transitioning}
               onClick={() => {
                 setError("");
                 setEmail("");
@@ -189,7 +215,7 @@ export default function SignIn() {
             autoComplete="email"
             placeholder="you@example.com"
             required
-            disabled={loading}
+            disabled={loading || transitioning}
             onChange={setEmail}
           />
           <AuthField
@@ -200,11 +226,16 @@ export default function SignIn() {
             autoComplete="current-password"
             placeholder="Password"
             required
-            disabled={loading}
+            disabled={loading || transitioning}
             onChange={setPassword}
           />
           {error ? <AuthMessage tone="error" message={error} /> : null}
-          <AuthSubmitButton idleLabel="Sign in" loadingLabel="Signing in..." loading={loading} />
+          <AuthSubmitButton
+            idleLabel="Sign in"
+            loadingLabel="Signing in..."
+            loading={loading}
+            disabled={transitioning}
+          />
         </form>
       </AuthCard>
     </AuthShell>

@@ -138,6 +138,7 @@ const lifecycle = new AnalyticsLifecycleManager(
   clientMetadata,
 );
 let listenersInstalled = false;
+let serverSessionAuthenticated = false;
 
 export function initializeAnalyticsLifecycle(): void {
   lifecycle.initialize();
@@ -165,8 +166,10 @@ export function initializeAnalyticsLifecycle(): void {
 }
 
 export function setAnalyticsAuthenticationState(value: boolean): void {
+  const becameAuthenticated = value && !serverSessionAuthenticated;
+  serverSessionAuthenticated = value;
   lifecycle.setAuthenticationState(value);
-  if (value) syncTelemetryPreferencesToServer();
+  if (becameAuthenticated) syncTelemetryPreferencesToServer();
 }
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
@@ -185,6 +188,7 @@ export function configureTelemetryPreferencesSync(sync: TelemetryPreferencesSync
 }
 
 function syncTelemetryPreferencesToServer(): void {
+  if (!serverSessionAuthenticated) return;
   void telemetryPreferencesSync?.(
     analytics.isAnalyticsEnabled(),
     analytics.isErrorReportingEnabled(),

@@ -1,3 +1,4 @@
+import { httpRequest } from "@/api/client/http";
 import { resolveDeploymentTarget, resolveHostedApiBase } from "@/api/deployment/api";
 import { saveSelfHostEntitlementProof, selfHostEntitlementHeader } from "@/api/self-host/proof";
 
@@ -12,12 +13,11 @@ export async function mintSelfHostEntitlement(
   if (!hostedToken) {
     throw new Error("Sign in to Misty Hosted before connecting to a self-hosted server.");
   }
-  const response = await fetch(`${resolveHostedApiBase()}/billing/self-host-entitlement`, {
+  const response = await httpRequest(`${resolveHostedApiBase()}/billing/self-host-entitlement`, {
     method: "POST",
     credentials: "include",
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${hostedToken}`,
     },
   });
   const payload = (await response.json().catch(() => null)) as
@@ -40,12 +40,11 @@ export async function renewSelfHostEntitlement(
   if (target.mode !== "self_hosted") return mintSelfHostEntitlement(hostedToken);
   if (!localToken) throw new Error("Sign in to the self-hosted server before renewing access.");
   const entitlement = await mintSelfHostEntitlement(hostedToken);
-  const response = await fetch(`${target.apiBase}/self-host/entitlement`, {
+  const response = await httpRequest(`${target.apiBase}/self-host/entitlement`, {
     method: "POST",
     credentials: "include",
     headers: {
       Accept: "application/json",
-      Authorization: `Bearer ${localToken}`,
       [selfHostEntitlementHeader]: entitlement.token,
     },
   });

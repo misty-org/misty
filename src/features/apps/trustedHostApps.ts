@@ -13,6 +13,8 @@ const identities = {
   browser: "com.misty.browser",
   code: "com.misty.code",
   terminal: "com.misty.terminal",
+  music: "com.misty.music",
+  media: "com.misty.media",
 } as const;
 
 export type TrustedHostAppId = keyof typeof identities;

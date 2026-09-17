@@ -1,6 +1,6 @@
-import { formatDate } from "@/features/files/format";
+import { formatDate } from "@/shared/lib/fileFormat";
 import { SystemErrorActivity } from "@/features/activity";
-import { useSearchStore } from "@/features/files/search";
+import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
 import type { SearchStatus } from "@/native/contracts";
 import { Badge, Button, Spinner, cn } from "@/shared/ui";
 import { Cloud, FolderOpen, HardDrive, Search } from "lucide-react";
@@ -28,7 +28,7 @@ import {
 import type { SettingsContentProps } from "../settingsTypes";
 
 export function SearchSection(props: SettingsContentProps) {
-  const { status, error, initialize, refreshStatus, startScan, cancelScan } = useSearchStore(
+  const { status, error, initialize, refreshStatus, startScan, cancelScan } = useSearchIndexStore(
     useShallow((state) => ({
       status: state.status,
       error: state.error,

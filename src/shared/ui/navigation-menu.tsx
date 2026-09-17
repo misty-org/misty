@@ -19,9 +19,9 @@ import {
 
 export const navigationMenuGroupClass = navigationTreeGroupClass;
 export const navigationMenuPrimaryLayoutClass =
-  "grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2.5";
+  "grid grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5";
 export const navigationMenuPrimaryIconClass =
-  "flex size-[18px] shrink-0 items-center justify-center [&_[data-app-icon]]:!size-[18px] [&_svg]:!size-[18px] [&_img]:!size-[18px]";
+  "flex size-[var(--navigation-primary-icon-slot,18px)] shrink-0 items-center justify-center [&_[data-app-icon]]:!size-[18px] [&_svg]:!size-[18px] [&_img]:!size-[18px]";
 
 const focusClass =
   "focus-visible:underline focus-visible:decoration-cream-muted focus-visible:underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-cream-muted";
@@ -35,7 +35,7 @@ export const navigationMenuActionClass =
 // A disclosure belongs to its row's surface, including when that row is selected.
 export const navigationMenuDisclosureActionClass = `${navigationMenuActionClass} !w-6 !bg-transparent`;
 export const navigationMenuDisclosureLayoutClass =
-  "grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2.5 px-2.5";
+  "grid grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)] items-center gap-2.5 px-2.5";
 export const navigationMenuLinkClass = `${navigationMenuRowClass} ${navigationMenuPrimaryLayoutClass} px-2.5 ${focusClass}`;
 
 export function NavigationChevron({ open }: { open: boolean }) {
@@ -123,7 +123,7 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-8 min-w-0",
+            "h-7 min-w-0",
             "font-medium text-cream-muted",
             selected && "text-cream-bright",
             className,
@@ -166,7 +166,7 @@ export const NavigationTreeItem = forwardRef<
         <div
           className={cn(
             navigationTreeRowClass,
-            "h-8 min-w-0",
+            "h-7 min-w-0",
             "font-medium text-cream-muted",
             selected && "text-cream-bright",
             className,
@@ -228,7 +228,7 @@ export const NavigationTreeItem = forwardRef<
         aria-current={selected ? "page" : undefined}
         className={cn(
           navigationTreeRowClass,
-          "misty-navigator-row-target ml-[27px] h-8 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
+          "misty-navigator-row-target ml-[27px] h-7 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
           "font-medium text-cream-muted",
           focusClass,
           !nested && "mx-0",

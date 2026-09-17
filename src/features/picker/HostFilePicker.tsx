@@ -1,8 +1,8 @@
 import { useProvidersStore } from "@/features/providers";
 import { SystemErrorActivity } from "@/features/activity";
-import { formatBytes } from "@/features/files/explorer/utils/fileFormat";
+import { formatBytes } from "@/shared/lib/fileFormat";
 import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
-import { explorerPrepareOpenItem } from "@/features/files/native";
+import { explorerPrepareOpenItem } from "@/native/filesystem";
 import type { FileEntry } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import {

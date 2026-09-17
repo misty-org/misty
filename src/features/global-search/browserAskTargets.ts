@@ -1,7 +1,7 @@
 import { apiRequest, assertStableApiSession, readApiSessionGeneration } from "@/api/client";
 import { nativeRpcBackend } from "@/features/apps/rpc/nativeBackend";
-import { providerBrowserProfile, type BrowserProviderId } from "@/features/browser/browserProviders";
-import { browserRuntimeIdForScope } from "@/features/browser/browserRuntime";
+import { providerBrowserProfile, type BrowserProviderId } from "@/features/webviews/browserProviders";
+import { browserRuntimeIdForScope } from "@/features/webviews/browserRuntime";
 import {
   MistyCapabilityTargetConfigurationSchema,
   MistyCapabilityTargetPageSchema,

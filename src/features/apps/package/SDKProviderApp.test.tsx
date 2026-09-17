@@ -1,3 +1,4 @@
+import { providerLoginUrls } from "../../../../../misty-apps/apps/shared/providerLoginUrls";
 import { act } from "react";
 import { fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -50,6 +51,7 @@ it.each([
       expiresAt: "2099-01-01T00:00:00Z",
       isCurrentAccount: () => true,
     });
+    let pageListener: Parameters<BrowserRpcBackend["subscribe"]>[1] | undefined;
     const backend = {
       initialUrl: () => "about:blank",
       constrainBounds: (value) => value,
@@ -64,7 +66,8 @@ it.each([
       hide: vi.fn(async () => {}),
       overlay: vi.fn(async () => {}),
       subscribe: vi.fn<BrowserRpcBackend["subscribe"]>(async (_id, listener) => {
-        listener({ type: "page", phase: "finished", url });
+        pageListener = listener;
+        listener({ type: "page", phase: "finished", url: providerLoginUrls[provider] });
         return () => {};
       }),
       click: vi.fn(async () => {}),
@@ -113,7 +116,7 @@ it.each([
         async request(message) {
           const params = message.params as { key: string; value?: unknown };
           if (["lifecycle.ready", "navigation.setItems"].includes(message.method)) return;
-          if (message.method === "mail.accounts.list") return { accounts: [] };
+          if (message.method === "connections.list") return { connections: [] };
           if (message.method === "context.get") return { platform: "desktop" };
           if (message.method === "storage.local.keys") return [...records.keys()];
           if (message.method === "storage.local.get") return records.get(params.key) ?? null;
@@ -138,7 +141,7 @@ it.each([
     await act(async () => mounted.ready);
     await waitFor(() => expect(backend.create).toHaveBeenCalledOnce());
     expect(backend.create.mock.calls[0][0]).toMatchObject({
-      url,
+      url: providerLoginUrls[provider],
       provider: { id: provider, accountId: `default-${provider}` },
     });
     expect(legacyMount).not.toHaveBeenCalled();
@@ -182,6 +185,9 @@ it.each([
       ),
     );
     expect(backend.create).toHaveBeenCalledOnce();
+    // The initial page is sign-in; a later navigation after authentication
+    // supplies the product page that can be pinned.
+    await act(async () => pageListener?.({ type: "page", phase: "finished", url }));
     const pin = await within(root).findByRole("button", { name: "Pin" });
     if (provider === "slack") {
       // The general sign-in page is deliberately not a pinnable workspace.

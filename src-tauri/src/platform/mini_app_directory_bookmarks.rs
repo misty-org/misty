@@ -24,20 +24,10 @@ trait Vault {
 struct OsVault;
 impl Vault for OsVault {
     fn load(&self, key: &str) -> Result<Option<String>, String> {
-        match keyring::Entry::new(SERVICE, key)
-            .map_err(|_| "The OS credential vault is unavailable.")?
-            .get_password()
-        {
-            Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("Could not read saved folder access from the OS vault.".into()),
-        }
+        crate::infra::credential_store::load(SERVICE, key).map_err(|error| error.to_string())
     }
     fn store(&self, key: &str, value: &str) -> Result<(), String> {
-        keyring::Entry::new(SERVICE, key)
-            .map_err(|_| "The OS credential vault is unavailable.")?
-            .set_password(value)
-            .map_err(|_| "Could not save folder access in the OS vault.".into())
+        crate::infra::credential_store::store(SERVICE, key, value).map_err(|error| error.to_string())
     }
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -673,7 +663,7 @@ mod tests {
         struct Cleanup(String);
         impl Drop for Cleanup {
             fn drop(&mut self) {
-                let _ = keyring::Entry::new(SERVICE, &self.0).and_then(|e| e.delete_credential());
+                let _ = crate::infra::credential_store::delete(SERVICE, &self.0);
             }
         }
         let _cleanup = Cleanup(owner.clone());
@@ -699,9 +689,8 @@ mod tests {
             "original"
         );
         assert!(!root.path().join("project/restored-by-child.txt").exists());
-        let entry = keyring::Entry::new(SERVICE, &owner).unwrap();
-        entry.delete_credential().unwrap();
-        assert!(matches!(entry.get_password(), Err(keyring::Error::NoEntry)));
+        crate::infra::credential_store::delete(SERVICE, &owner).unwrap();
+        assert!(crate::infra::credential_store::load(SERVICE, &owner).unwrap().is_none());
     }
     #[test]
     fn bookmark_child_process() {

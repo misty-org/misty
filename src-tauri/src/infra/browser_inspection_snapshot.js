@@ -8,11 +8,12 @@ function (nonce, maxText, maxElements, readSemantic) {
     const label = (element) => (
       element.getAttribute("aria-label") || element.innerText || element.textContent ||
       element.getAttribute("title") || element.getAttribute("placeholder") ||
-      (/^(button|submit|reset)$/i.test(element.getAttribute("type") || "") ? element.getAttribute("value") : "") || ""
+      (/^(button|submit|reset)$/i.test(element.getAttribute("type") || "") ? element.getAttribute("value") : "") ||
+      (element.getAttribute("type") === "file" ? `File upload (${element.getAttribute("accept") || "any file"})` : "") || ""
     ).trim().slice(0, 300);
     const fingerprint = (element) => JSON.stringify([
       element.tagName.toLowerCase(), element.getAttribute("role") || "", label(element),
-      element.getAttribute("href"), Boolean(element.disabled),
+      element.getAttribute("href"), element.getAttribute("type"), element.getAttribute("accept"), Boolean(element.multiple), Boolean(element.disabled),
       typeof element.checked === "boolean" ? element.checked : null,
       element.closest('tr,[role="row"],li,[role="listitem"]')?.textContent?.slice(0, 2000) || "",
     ]);

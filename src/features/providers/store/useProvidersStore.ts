@@ -18,4 +18,19 @@ export const useProvidersStore = create<ProvidersStore>((set, get) => ({
   ...createProviderConnectionActions(set, get),
 }));
 
+export function resetProvidersAccountState(): void {
+  useProvidersStore.setState({
+    providers: null,
+    workspaces: {},
+    remoteDraftCache: {},
+    remoteRevisions: {},
+    loading: true,
+    working: false,
+    error: null,
+    message: null,
+    connection: null,
+    disconnectTarget: null,
+  });
+}
+
 export * from "./providerWorkspaceState";

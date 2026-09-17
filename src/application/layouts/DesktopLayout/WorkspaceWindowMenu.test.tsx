@@ -1,9 +1,31 @@
 import { createWorkspaceVirtualWindow } from "@/features/workspace/virtualWindows";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 
+const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
+vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: vi.fn() }));
+import { useNavigationNames, windowNameKey } from "@/features/navigation-names/store";
+
 describe("WorkspaceWindowMenu", () => {
+  beforeEach(() => {
+    const names: Record<string, string> = {};
+    useNavigationNames.setState({
+      account: "backend/account",
+      names: {},
+      ready: true,
+      error: null,
+    });
+    native.invoke.mockReset();
+    native.invoke.mockImplementation(async (command, args) => {
+      if (command === "navigation_names_update") {
+        if (args.name === null) delete names[args.key];
+        else names[args.key] = args.name;
+      }
+      return { names: { ...names }, error: null };
+    });
+  });
   afterEach(cleanup);
 
   it("lists, creates, closes, and reopens virtual windows", () => {
@@ -13,9 +35,7 @@ describe("WorkspaceWindowMenu", () => {
     const onClose = vi.fn();
     const { container } = render(
       <>
-        <div id="misty-virtual-window-controls" />
         <WorkspaceWindowMenu
-          titlebar
           windows={[first, second]}
           activeWindowId={first.id}
           canReopen
@@ -28,7 +48,7 @@ describe("WorkspaceWindowMenu", () => {
     );
 
     const trigger = screen.getByRole("button", { name: "Manage virtual windows" });
-    expect(trigger.parentElement?.id).toBe("misty-virtual-window-controls");
+    expect(container.contains(trigger)).toBe(true);
     expect(container.querySelectorAll('[aria-label="Manage virtual windows"]')).toHaveLength(1);
     expect(trigger.querySelector(".lucide-chevron-down")).not.toBeNull();
 
@@ -47,6 +67,50 @@ describe("WorkspaceWindowMenu", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Close Writing" }));
     expect(onClose).toHaveBeenCalledWith(first.id);
+  });
+
+  it("renames through the account-backed native store without selecting the window", async () => {
+    const first = createWorkspaceVirtualWindow(undefined, "Window 1");
+    const onSelect = vi.fn();
+    const menu = (
+      <WorkspaceWindowMenu
+        windows={[first]}
+        activeWindowId={first.id}
+        canReopen={false}
+        onSelect={onSelect}
+        onCreate={vi.fn()}
+        onClose={vi.fn()}
+        onReopen={vi.fn()}
+      />
+    );
+    const view = render(menu);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.contextMenu(screen.getByRole("menuitem", { name: "Window 1" }), {
+      button: 2,
+      clientX: 30,
+      clientY: 20,
+    });
+    fireEvent.click(await screen.findByText("Rename"));
+    const input = await screen.findByRole("textbox", { name: "Rename Window 1" });
+    fireEvent.change(input, { target: { value: "Research" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.queryByRole("textbox")).toBeNull());
+    expect(native.invoke).toHaveBeenCalledWith("navigation_names_update", {
+      account: "backend/account",
+      key: windowNameKey(first.id),
+      name: "Research",
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+    view.unmount();
+    render(menu);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    expect(screen.getByRole("menuitem", { name: "Research" })).toBeTruthy();
   });
 
   it("hides a window close icon when that window is protected", () => {

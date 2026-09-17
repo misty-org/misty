@@ -1,7 +1,9 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OfficialAppDetails } from "@/features/apps/OfficialAppDetails";
 import { useState } from "react";
+import { MemoryRouter } from "react-router-dom";
 import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { DiscoverBrowser, type DiscoverBrowserProps } from "./components/DiscoverBrowser";
 
@@ -59,19 +61,26 @@ function setup(overrides: Partial<DiscoverBrowserProps> = {}) {
     const [selectedAppId, onSelect] = useState(props.selectedAppId);
     return <DiscoverBrowser {...props} selectedAppId={selectedAppId} onSelect={onSelect} />;
   }
-  render(<Host />);
+  render(
+    <MemoryRouter>
+      <Host />
+    </MemoryRouter>,
+  );
   return props;
 }
 
+beforeEach(() => useAppsStore.setState({ accountId: "test-account" }));
 afterEach(cleanup);
 
 describe("Discover compact catalog", () => {
   it("opens the requested app directly at permissions in Discover", () => {
     setup({ selectedAppId: "browser", reviewPermissions: true });
     expect(screen.getByRole("heading", { name: "App permissions" })).toBeTruthy();
-    expect(screen.getByText(/Review the permissions Browser needs/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText(/Review what Browser can access/)).toBeTruthy();
+    const back = screen.getByRole("button", { name: "Back to details" });
+    expect(back.textContent).toContain("Back to details");
+    fireEvent.click(back);
+    expect(screen.getByRole("dialog", { name: "Browser" })).toBeTruthy();
   });
 
   it("shows the approved navigation and filters the live catalog by category", () => {
@@ -103,7 +112,7 @@ describe("Discover compact catalog", () => {
       ctrlKey: false,
     });
     fireEvent.click(screen.getByRole("menuitemradio", { name: "iPhone and iPad" }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Downloaded" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Installed" }));
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Updates available" }));
     expect(
       screen
@@ -169,7 +178,7 @@ describe("Discover compact catalog", () => {
       button: 0,
       ctrlKey: false,
     });
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Added to this Space" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Installed for you" }));
     expect(screen.getByRole("menu")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
@@ -188,15 +197,23 @@ describe("Discover compact catalog", () => {
   });
 
   it("honors the Installed section requested by an update notice", () => {
-    setup({ requestedSection: "installed" });
-    expect(screen.getByRole("heading", { name: "Downloaded" })).toBeTruthy();
+    setup({
+      requestedSection: "installed",
+      installations: [{ ...installed, installed_version: "0.9.0" }],
+    });
+    expect(screen.getByRole("heading", { name: "Installed" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "View Browser details" })).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Update Browser" })
+        .classList.contains("discover-action-primary"),
+    ).toBe(true);
   });
 
   it("shows installed apps and opens details without launching or changing them", () => {
     const props = setup();
-    fireEvent.click(screen.getByRole("button", { name: "Downloaded" }));
+    fireEvent.click(screen.getByRole("button", { name: "Installed" }));
     expect(screen.getAllByRole("button", { name: /^View .* details$/ })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Manage Browser" }));
     expect(screen.getByRole("dialog", { name: "Browser" })).toBeTruthy();
@@ -224,7 +241,7 @@ describe("Discover compact catalog", () => {
     expect(props.onInstall).not.toHaveBeenCalled();
     expect(ui.getByRole("heading", { name: "App permissions" })).toBeTruthy();
     expect(ui.getByText("Read files and folders you choose.")).toBeTruthy();
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: "Agree and install" }));
     await waitFor(() => expect(ui.getByRole("heading", { name: "Journal" })).toBeTruthy());
     expect(props.onInstall).toHaveBeenCalledExactlyOnceWith(catalog[1]);
     fireEvent.click(ui.getByRole("button", { name: "Close" }));
@@ -234,27 +251,32 @@ describe("Discover compact catalog", () => {
 
   it("requires new consent when an update adds access", async () => {
     const changed = { ...catalog[2], scopes: ["files.read", "files.write"] };
-    const props = setup({ catalog: [changed] });
-    fireEvent.click(screen.getByRole("button", { name: "Get Browser" }));
+    const props = setup({
+      catalog: [changed],
+      installations: [{ ...installed, consent_required: true }],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update Browser" }));
     const ui = within(screen.getByRole("dialog"));
-    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    fireEvent.click(ui.getByRole("button", { name: "Review permissions" }));
     expect(ui.getByText("New access")).toBeTruthy();
     expect(props.onInstall).not.toHaveBeenCalled();
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    expect(ui.queryByRole("button", { name: "Agree and install" })).toBeNull();
+    fireEvent.click(ui.getByRole("button", { name: "Agree and update" }));
     await waitFor(() => expect(props.onInstall).toHaveBeenCalledExactlyOnceWith(changed));
   });
 
   it.each([
     { space_id: "space-a", authority_generation: 1, installed_version: "0.9.0" },
     { permission_version: 1 },
-  ])("uses Install without renewed consent when access is unchanged (%j)", async (previous) => {
+  ])("reviews the selected update before installing (%j)", async (previous) => {
     const props = setup({ installations: [{ ...installed, ...previous }] });
-    fireEvent.click(screen.getByRole("button", { name: "Get Browser" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update Browser" }));
     expect(props.onInstall).not.toHaveBeenCalled();
     const ui = within(screen.getByRole("dialog"));
-    fireEvent.click(ui.getByRole("button", { name: "Install" }));
+    fireEvent.click(ui.getByRole("button", { name: "Update" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Agree and/ }));
     await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[2]));
-    expect(ui.queryByRole("button", { name: "Agree" })).toBeNull();
+    expect(ui.queryByRole("button", { name: /^Agree and/ })).toBeNull();
   });
 
   it("explains recovery and requests consent before reinstalling", async () => {
@@ -263,10 +285,10 @@ describe("Discover compact catalog", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Get Journal" }));
     const ui = within(screen.getByRole("dialog"));
-    expect(ui.getByText(/restores its recoverable saved data/)).toBeTruthy();
+    expect(ui.getByText(/Reinstall within 30 days/)).toBeTruthy();
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(props.onInstall).not.toHaveBeenCalled();
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: /^Agree and/ }));
     await waitFor(() => expect(props.onInstall).toHaveBeenCalledWith(catalog[1]));
   });
 
@@ -277,7 +299,9 @@ describe("Discover compact catalog", () => {
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
     expect(ui.getByRole("alert").textContent).toContain("cannot describe");
     expect(ui.queryByText(/unknown.secret/)).toBeNull();
-    expect((ui.getByRole("button", { name: "Agree" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((ui.getByRole("button", { name: /^Agree and/ }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(props.onInstall).not.toHaveBeenCalled();
   });
 
@@ -293,12 +317,12 @@ describe("Discover compact catalog", () => {
       onInstall,
       onRemove: vi.fn(),
     };
-    const view = render(<OfficialAppDetails {...props} />);
+    const view = render(<OfficialAppDetails {...props} />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole("button", { name: "Install" }));
-    expect(screen.getByRole("button", { name: "Agree" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Agree and/ })).toBeTruthy();
     const changed = { ...catalog[1], scopes: ["files.read", "files.write"] };
     view.rerender(<OfficialAppDetails {...props} app={changed} />);
-    expect(screen.queryByRole("button", { name: "Agree" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Agree and/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Install" }));
     expect(
       screen.getByText("Create, change, rename, and delete files and folders you choose."),
@@ -317,8 +341,8 @@ describe("Discover compact catalog", () => {
     setup({ selectedAppId: "journal", onInstall });
     const ui = within(screen.getByRole("dialog"));
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: /^Agree and/ }));
+    fireEvent.click(ui.getByRole("button", { name: /^Agree and/ }));
     expect(ui.getByRole("status").textContent).toBe("Installing…");
     fireEvent.click(ui.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -334,9 +358,9 @@ describe("Discover compact catalog", () => {
     setup({ onInstall: install, selectedAppId: "journal" });
     const ui = within(screen.getByRole("dialog"));
     fireEvent.click(ui.getByRole("button", { name: "Install" }));
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: /^Agree and/ }));
     await waitFor(() => expect(ui.getByRole("alert").textContent).toBe("Download failed"));
-    fireEvent.click(ui.getByRole("button", { name: "Agree" }));
+    fireEvent.click(ui.getByRole("button", { name: /^Agree and/ }));
     await waitFor(() => expect(ui.getByRole("heading", { name: "Journal" })).toBeTruthy());
     expect(install).toHaveBeenCalledTimes(2);
   });
@@ -394,4 +418,25 @@ describe("Discover compact catalog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(props.onRefresh).toHaveBeenCalledOnce();
   });
+});
+
+it("presents the legacy Library app as Storage in the catalog and details", () => {
+  setup({
+    catalog: [
+      {
+        ...catalog[2],
+        id: "library",
+        name: "Library",
+        description: "Curated resources shared with a Space.",
+      },
+    ],
+  });
+  expect(screen.queryByText("Curated resources shared with a Space.")).toBeNull();
+  expect(screen.queryByAltText("Library’s grid of shared project resources")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "View Storage details" }));
+  const dialog = screen.getByRole("dialog", { name: "Storage" });
+  expect(
+    within(dialog).getByText("Connect and browse your personal cloud storage services."),
+  ).toBeTruthy();
+  expect(dialog.querySelector(".lucide-package")).not.toBeNull();
 });

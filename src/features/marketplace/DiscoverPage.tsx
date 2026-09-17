@@ -1,6 +1,5 @@
 import { useAuth } from "@/features/auth";
 import { officialAppRoute, useAppsStore } from "@/features/apps";
-import { useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -11,7 +10,6 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const spaces = useSpacesStore((state) => state.spaces);
   const catalog = useAppsStore((state) => state.catalog);
   const installations = useAppsStore((state) => state.installations);
   const loading = useAppsStore((state) => state.loading);
@@ -23,8 +21,6 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const remove = useAppsStore((state) => state.uninstall);
   const [embeddedAppId, setEmbeddedAppId] = useState("");
   const [embeddedReview, setEmbeddedReview] = useState(false);
-  const activeSpaceId = useAppsStore((state) => state.spaceId);
-  const activeSpace = spaces.find((space) => space.id === activeSpaceId);
   const requestedAppId = searchParams.get("app") ?? "";
 
   useEffect(() => {
@@ -59,7 +55,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
       <DiscoverBrowser
-        catalog={catalog}
+        catalog={catalog.filter(app=>app.id!=="agents")}
         installations={installations}
         loading={loading}
         ready={ready}
@@ -75,7 +71,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
           if (user?.id) void load(user.id, true);
         }}
         onInstall={add}
-        onOpen={(app) => navigate(officialAppRoute(app.id, activeSpace?.id, user?.id ?? ""))}
+        onOpen={(app) => navigate(officialAppRoute(app.id, undefined, user?.id ?? ""))}
         onRemove={(app) => remove(app.id)}
       />
     </>

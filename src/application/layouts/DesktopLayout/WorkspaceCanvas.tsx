@@ -35,7 +35,7 @@ import type { NewTabOption } from "./WorkspaceNewTabMenu";
 import { useVirtualWindowTransition } from "./useVirtualWindowTransition";
 
 export function WorkspaceCanvas(props: {
-  titlebarInsets?: { left: number; right: number };
+  titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
 }) {
   const legacyNames = useNavigationNames((state) => state.names);

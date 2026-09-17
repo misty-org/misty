@@ -1,6 +1,6 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
-import type { PreviewErrorComponent } from "@/features/files";
+import type { PreviewErrorComponent } from "@/features/file-ui";
 import { Button } from "@/shared/ui";
 import { Copy, Loader2, X } from "lucide-react";
 import {

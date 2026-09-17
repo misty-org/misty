@@ -1,4 +1,3 @@
-import { useAppsStore } from "@/features/apps";
 import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { socialProvider, socialProviderPath, useSpacesStore } from "@/features/spaces";
@@ -117,29 +116,7 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
       source: "local",
     });
   }
-  const installations = useAppsStore.getState().bySpace;
-  const owners: Record<string, string> = {
-    message: "chat",
-    conversation: "chat",
-    library: "library",
-    note: "journal",
-    drawing: "journal",
-    task: "planner",
-    calendar: "planner",
-    roadmap: "planner",
-    agent: "agents",
-    workflow: "agents",
-  };
-  return documents.filter((document) => {
-    const appId = owners[document.kind];
-    return (
-      !appId ||
-      !document.spaceId ||
-      (installations[document.spaceId] ?? []).some(
-        (app) => app.app_id === appId && app.state === "installed",
-      )
-    );
-  });
+  return documents;
 }
 
 function resourceDocument(
