@@ -11,11 +11,11 @@ use cocoa::{
         NSWindowTitleVisibility,
     },
     base::{id, nil},
-    foundation::{NSPoint, NSString},
+    foundation::NSString,
 };
 
 #[cfg(target_os = "macos")]
-use objc::{msg_send, sel, sel_impl};
+use objc::{class, msg_send, sel, sel_impl};
 
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
@@ -39,6 +39,9 @@ static WALLPAPER_LOOPER_ASSOCIATION_KEY: u8 = 0;
 
 #[cfg(target_os = "macos")]
 static WALLPAPER_VIEW_ASSOCIATION_KEY: u8 = 0;
+
+#[cfg(target_os = "macos")]
+static TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY: u8 = 0;
 
 #[cfg(target_os = "macos")]
 const OBJC_ASSOCIATION_RETAIN_NONATOMIC: usize = 1;
@@ -489,17 +492,22 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
         return;
     }
 
-    // Match the 38-point HTML titlebar's center, in content coordinates.
-    // Converting into each button's superview avoids AppKit titlebar-height
-    // and flipped-coordinate assumptions across macOS versions.
+    // Pin the native controls to the 38-point custom titlebar. One-time frame
+    // writes are replaced by AppKit's next layout; resize callbacks correcting
+    // those frames in turn cause jitter. Native anchors keep the same position
+    // as part of layout, without a Misty resize handler or frame rewrites.
     let content_view = ns_window.contentView();
-    let bounds: cocoa::foundation::NSRect = msg_send![content_view, bounds];
-    let flipped: bool = msg_send![content_view, isFlipped];
-    let center_y = if flipped {
-        19.0 + offset_y
-    } else {
-        bounds.size.height - 19.0 - offset_y
-    };
+    if content_view.is_null() {
+        return;
+    }
+    let key = &TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY as *const u8 as *const c_void;
+    let previous = objc_getAssociatedObject(ns_window, key);
+    if !previous.is_null() {
+        let _: () = msg_send![class!(NSLayoutConstraint), deactivateConstraints: previous];
+    }
+    let leading: id = msg_send![content_view, leadingAnchor];
+    let top: id = msg_send![content_view, topAnchor];
+    let mut constraints: Vec<id> = Vec::with_capacity(12);
     for (index, button) in [close_button, miniaturize_button, zoom_button]
         .iter()
         .enumerate()
@@ -509,19 +517,32 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
         }
         let button = *button;
         let frame: cocoa::foundation::NSRect = msg_send![button, frame];
-        let parent: id = msg_send![button, superview];
-        if parent.is_null() {
-            continue;
-        }
-        let rect = cocoa::foundation::NSRect::new(
-            NSPoint::new(
-                default_x + offset_x + button_spacing * index as f64,
-                center_y - frame.size.height / 2.0,
-            ),
-            frame.size,
-        );
-        let converted: cocoa::foundation::NSRect =
-            msg_send![parent, convertRect: rect fromView: content_view];
-        let _: () = msg_send![button, setFrame: converted];
+        let _: () =
+            msg_send![button, setTranslatesAutoresizingMaskIntoConstraints: cocoa::base::NO];
+        let button_leading: id = msg_send![button, leadingAnchor];
+        let button_top: id = msg_send![button, topAnchor];
+        let width: id = msg_send![button, widthAnchor];
+        let height: id = msg_send![button, heightAnchor];
+        constraints.push(msg_send![button_leading,
+            constraintEqualToAnchor: leading
+            constant: default_x + offset_x + button_spacing * index as f64]);
+        constraints.push(msg_send![button_top,
+            constraintEqualToAnchor: top
+            constant: 19.0 + offset_y - frame.size.height / 2.0]);
+        constraints.push(msg_send![width, constraintEqualToConstant: frame.size.width]);
+        constraints.push(msg_send![height, constraintEqualToConstant: frame.size.height]);
+    }
+    let constraints: id = msg_send![class!(NSArray),
+        arrayWithObjects: constraints.as_ptr() count: constraints.len()];
+    let _: () = msg_send![class!(NSLayoutConstraint), activateConstraints: constraints];
+    objc_setAssociatedObject(
+        ns_window,
+        key,
+        constraints,
+        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
+    );
+    let root: id = msg_send![content_view, superview];
+    if !root.is_null() {
+        let _: () = msg_send![root, layoutSubtreeIfNeeded];
     }
 }

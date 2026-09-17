@@ -1,3 +1,4 @@
+import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { useEffect, useState, type ReactNode } from "react";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -66,11 +67,7 @@ export function NavigationNamesBoundary({
     };
   }, [scope]);
   if (!state.ready || (scope && state.account !== scope))
-    return (
-      <div role="status" className="p-4 text-sm text-cream-muted">
-        Loading navigation…
-      </div>
-    );
+    return <LoadingScreen label="Loading navigation" />;
   return (
     <>
       {state.error && (

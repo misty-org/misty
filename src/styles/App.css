@@ -80,8 +80,8 @@
 }
 
 .app-pages-root ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 .app-pages-root ::-webkit-scrollbar-track {
@@ -98,9 +98,22 @@
 }
 
 .app-pages-root .misty-scrollbar,
+.app-pages-root .misty-transient-scrollbar,
 .app-pages-root .misty-transient-scrollbar-active {
   scrollbar-color: #3e3e3e #131313;
   scrollbar-width: thin;
+}
+
+/* Modern WebKit/Blink let scrollbar-width/color override pseudo-element
+   sizing. Keep the explicit 4px desktop track; retain thin as the fallback. */
+@supports selector(::-webkit-scrollbar) {
+  .app-pages-root .misty-scrollbar,
+  .app-pages-root .misty-transient-scrollbar,
+  .app-pages-root .misty-transient-scrollbar-active,
+  .app-pages-root [data-navigator-section-scroll] {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
 }
 
 .app-pages-root .misty-file-browser-scrollbar {
@@ -110,12 +123,44 @@
 /* Keep the navigation width and icon rasterization stable as hover/scroll
    feedback appears. Expansion chevrons retain their own state transition. */
 .app-pages-root [data-navigator-section-scroll] {
-  scrollbar-width: thin;
   scrollbar-gutter: stable;
 }
 
 .app-pages-root [data-tour-target="navigation"] .misty-navigator-row-target {
   transition: none;
+}
+
+/* Islands provide the sidebar's surfaces. Navigation feedback uses text
+   brightness, including shared tree rows, without changing other app trees. */
+[data-navigator-section-scroll] :is(.misty-navigator-row-target, [data-tree-row-surface]) {
+  background-color: transparent;
+}
+
+[data-navigator-section-scroll]
+  :is(
+    .misty-navigator-row-target:hover,
+    .misty-navigator-row-target:focus-visible,
+    .misty-navigator-row-target[aria-current="page"],
+    .misty-navigator-row-target[data-active="true"],
+    [data-tree-row-surface]:hover,
+    [data-tree-row-surface]:focus-within,
+    [data-selected="true"] > [data-tree-row-surface]
+  ) {
+  color: var(--misty-theme-text-bright);
+}
+
+/* The sidebar lives outside app-pages-root. Reveal each disclosure only when
+   its own button is hovered or keyboard-focused; reserve its slot to avoid
+   label movement. Touch devices keep the disclosure cue visible. */
+@media (hover: hover) and (pointer: fine) {
+  [data-tour-target="navigation"] button [data-chevron-placement="inline"] {
+    opacity: 0;
+  }
+
+  [data-tour-target="navigation"] button:hover [data-chevron-placement="inline"],
+  [data-tour-target="navigation"] button:focus-visible [data-chevron-placement="inline"] {
+    opacity: 1;
+  }
 }
 
 .app-pages-root [data-tour-target="navigation"] [data-app-icon],

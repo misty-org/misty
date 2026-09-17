@@ -5,10 +5,7 @@ use tauri::{
 
 pub use models::*;
 
-#[cfg(desktop)]
 mod desktop;
-#[cfg(mobile)]
-mod mobile;
 
 mod commands;
 mod error;
@@ -16,10 +13,7 @@ mod models;
 
 pub use error::{Error, Result};
 
-#[cfg(desktop)]
 use desktop::Keystore;
-#[cfg(mobile)]
-use mobile::Keystore;
 
 pub trait KeystoreExt<R: Runtime> {
     fn keystore(&self) -> &Keystore<R>;
@@ -39,9 +33,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::store
         ])
         .setup(|app, api| {
-            #[cfg(mobile)]
-            let keystore = mobile::init(app, api)?;
-            #[cfg(desktop)]
             let keystore = desktop::init(app, api)?;
             app.manage(keystore);
             Ok(())

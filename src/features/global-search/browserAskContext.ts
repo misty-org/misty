@@ -1,3 +1,6 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { providerBelongsToApp, browserProviders } from "@/features/webviews/browserProviders";
 import { useAppsStore } from "@/features/apps/useAppsStore";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "@/features/ai-surface";
 import { ensureServerAgentDevice, agentsDeviceSnapshot } from "@/features/agents";
@@ -75,6 +78,14 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
     throw new Error("Wait for the current Ask request or cancel it before starting another.");
   const accountId = useAppsStore.getState().accountId;
   const source = browserAskSource(snapshot);
+  const ownerApp = useAppsStore
+    .getState()
+    .catalog?.find(
+      (app) =>
+        snapshot.providerId &&
+        providerBelongsToApp(app.id, snapshot.providerId as keyof typeof browserProviders),
+    )?.id;
+  source.metadata = { ...source.metadata, app_id: ownerApp ?? "" };
   const deviceContexts: AiInvocationDeviceContext[] = [];
   let target: BrowserAskTarget | undefined;
   let notice: string | undefined = !snapshot.spaceId
@@ -135,6 +146,8 @@ export async function openBrowserAsk(snapshot: BrowserAskSnapshot): Promise<void
         origin: new URL(source.href!).origin,
         label: source.title,
         source: "browser-context-menu",
+        app_id: ownerApp ?? "",
+        window_label: hasTauriInternals() ? getCurrentWindow().label : "",
       },
     });
   }

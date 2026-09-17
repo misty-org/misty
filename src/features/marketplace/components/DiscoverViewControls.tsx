@@ -150,12 +150,12 @@ export function DiscoverViewControls({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {group(
-            "Download status",
+            "Installation status",
             extra.download,
             [
-              ["all", "All downloads"],
-              ["downloaded", "Downloaded"],
-              ["available", "Not downloaded"],
+              ["all", "All apps"],
+              ["downloaded", "Installed"],
+              ["available", "Not installed"],
             ],
             (value) => onExtra({ ...extra, download: value as DiscoverExtraFilters["download"] }),
           )}
@@ -163,12 +163,12 @@ export function DiscoverViewControls({
             <>
               <DropdownMenuSeparator />
               {group(
-                "Space access",
+                "Installation",
                 filter,
                 [
                   ["all", "All"],
-                  ["added", "Added to this Space"],
-                  ["available", "Not in this Space"],
+                  ["added", "Installed for you"],
+                  ["available", "Not installed"],
                 ],
                 (value) => onFilter(value as DiscoverAccessFilter),
               )}

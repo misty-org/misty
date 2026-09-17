@@ -129,7 +129,7 @@ export function createAiSurfaceApi(
     memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
     forgetMemory: (memoryId: string) =>
       apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
-    activity: (spaceId: string) => apiRequest<{entries: import("@/features/misty/activity").MistyActivityEntry[]}>(`/ai/activity?space_id=${encodeURIComponent(spaceId)}`),
+    activity: (spaceId: string,agentId?:string) => apiRequest<{entries: import("@/features/misty/activity").MistyActivityEntry[]}>(`/ai/activity?${new URLSearchParams({space_id:spaceId,...(agentId?{agent_id:agentId}:{})})}`),
     conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
     conversation: (conversationId: string) =>
       apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
@@ -265,6 +265,7 @@ function toServerInvocation(input: AiInvocationRequest) {
         }
       : undefined,
     attachment_ids: input.attachmentIds,
+    agent_id:input.agentId,task_id:input.taskId,execution_mode:input.executionMode,window_label:input.windowLabel,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

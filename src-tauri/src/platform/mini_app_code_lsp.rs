@@ -284,7 +284,7 @@ mod tests {
         let (state, root) = service_fixture();
         let (_dir, mut permissions) = fixture();
         permissions.version = "1".into();
-        permissions.space_owned = true;
+        permissions.account_owned = true;
         permissions.owner_namespace = Some("member-family".into());
         state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
         service_receipt(root.path(), &bytes, "code", "code-tools", 1);
@@ -333,7 +333,7 @@ mod tests {
         let (second_state, second_root) = service_fixture();
         let (_second_dir, mut second_permissions) = fixture();
         second_permissions.version = "1".into();
-        second_permissions.space_owned = true;
+        second_permissions.account_owned = true;
         second_permissions.owner_namespace = Some("member-work".into());
         second_state
             .0

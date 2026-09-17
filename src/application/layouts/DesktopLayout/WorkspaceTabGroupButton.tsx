@@ -29,7 +29,7 @@ import {
   type WorkspaceTab,
 } from "@/features/workspace";
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
-import { useBrowserRuntimeStore } from "@/features/browser/browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,7 +78,9 @@ function getTabAppId(tab: WorkspaceTab | undefined): string {
 }
 
 function getTabIcon(tab: WorkspaceTab | undefined, fallback: LucideIcon): LucideIcon {
-  return workspaceAppIcon(getTabAppId(tab)) ?? fallback;
+  return (
+    workspaceAppIcon(getTabAppId(tab), tab?.surfaceId === "space" ? "space" : "app") ?? fallback
+  );
 }
 
 export function TabIcon({
@@ -476,6 +478,7 @@ export function workspaceTabAutomaticTitle(
       "Planner",
       "Journal",
       "Library",
+      "Storage",
       "Agents",
     ]);
     if (!generic.has(title)) return title;

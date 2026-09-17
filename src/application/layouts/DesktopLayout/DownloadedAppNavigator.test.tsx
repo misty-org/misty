@@ -60,7 +60,7 @@ it.each(["inbox", "social", "planner", "journal", "library"] as const)(
   },
 );
 
-it("selects only the deepest destination when a parent shares its route", () => {
+it("removes built-in Misty navigation from cached personal app registrations", () => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
   const route = "/apps/planner?view=tasks";
   const ui = render(
@@ -84,7 +84,9 @@ it("selects only the deepest destination when a parent shares its route", () => 
   );
   expect(
     [...ui.container.querySelectorAll('[aria-current="page"]')].map((e) => e.textContent),
-  ).toEqual(["Tasks"]);
+  ).toEqual([]);
+  expect(ui.queryByText("Misty")).toBeNull();
+  expect(ui.queryByText("Tasks")).toBeNull();
 });
 it("uses Files destination glyphs after the downloaded app registers navigation", () => {
   const ui = render(
@@ -293,7 +295,7 @@ it("switches sources from the pill and displays their destinations without a pro
       />
     </MemoryRouter>,
   );
-  fireEvent.click(ui.getByRole("button", { name: "Planner source: Misty" }));
+  fireEvent.click(ui.getByRole("button", { name: "Planner source: Notion" }));
   fireEvent.click(ui.getByRole("button", { name: "Switch to Notion" }));
   expect(openSurface).toHaveBeenCalledWith(expect.objectContaining({ syncExistingRoute: true }));
   expect(ui.getByRole("button", { name: "Planner source: Notion" })).toBeTruthy();
@@ -317,7 +319,7 @@ it("searches available integrations, retains errors, and adds without opening th
       />
     </MemoryRouter>,
   );
-  fireEvent.click(ui.getByRole("button", { name: "Planner source: Misty" }));
+  fireEvent.click(ui.getByRole("button", { name: "Planner source: Choose integration" }));
   const search = ui.getByRole("textbox", { name: "Search Planner integrations" });
   fireEvent.change(search, { target: { value: "no-such-integration" } });
   expect(ui.getByText("No integrations found.")).toBeTruthy();
@@ -396,4 +398,71 @@ it.each([
   expect(ui.queryByText("Misty tasks")).toBeNull();
   expect(ui.queryByText("Other pin")).toBeNull();
   expect(ui.queryByText("Starred")).toBeNull();
+});
+
+it.each(["browser", "files", "inbox", "social", "planner"] as const)(
+  "opens %s directly without adding synthetic Open destinations",
+  (appId) => {
+    const openSurface = vi.spyOn(useWorkspaceStore.getState(), "openSurface").mockClear();
+    const ui = render(
+      <MemoryRouter>
+        <DownloadedAppNavigator
+          accountId="toggle-test"
+          appId={appId}
+          label={appId}
+          active={false}
+          activeRoute="/home"
+          items={[]}
+        />
+      </MemoryRouter>,
+    );
+    const header = ui.getByRole("button", { name: appId });
+    fireEvent.click(header);
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(openSurface).toHaveBeenCalledTimes(1);
+    expect(ui.queryByRole("link", { name: `Open ${appId}` })).toBeNull();
+  },
+);
+
+it("uses dark provider and Connect pills with light text", () => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+  const ui = render(
+    <MemoryRouter>
+      <DownloadedAppNavigator
+        accountId="badge-test"
+        appId="library"
+        label="Storage"
+        active={false}
+        activeRoute="/home"
+        items={[]}
+      />
+    </MemoryRouter>,
+  );
+  const connect = ui.getByRole("button", { name: "Storage source: Choose integration" });
+  expect(connect.textContent).toBe("Connect");
+  expect(connect.className).toContain("bg-charcoal-hover");
+  expect(connect.className).toContain("text-cream");
+  expect(connect.querySelector("svg")).not.toBeNull();
+  ui.rerender(
+    <MemoryRouter>
+      <DownloadedAppNavigator
+        accountId="badge-test"
+        appId="library"
+        label="Storage"
+        active={false}
+        activeRoute="/home"
+        items={[
+          {
+            id: "google-drive",
+            label: "Google Drive",
+            route: "/apps/library?provider=google-drive",
+          },
+        ]}
+      />
+    </MemoryRouter>,
+  );
+  expect(ui.getByRole("button", { name: "Storage source: Google Drive" }).className).toContain(
+    "bg-charcoal-hover",
+  );
+  expect(ui.queryByText("Open Google Drive")).toBeNull();
 });

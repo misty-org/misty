@@ -4,14 +4,9 @@ import { useAppStore } from "@/features/app-shell";
 import { reportSystemError } from "@/features/activity";
 import { useProvidersStore } from "@/features/providers";
 import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
-import { Banner } from "@/shared/ui";
+import { Notification } from "@/shared/ui/notification";
 import { memo, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { globalNoticeLayerClass } from "./styles";
-
-const globalBannerClass =
-  "pointer-events-auto mt-3 max-w-[min(520px,calc(100vw-48px))] rounded-xl shadow-xl animate-in fade-in-0 slide-in-from-top-2 duration-160 ease-out";
-
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
@@ -37,22 +32,18 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
   };
 
   useEffect(() => {
-    if (!notice.error && !notice.message) return;
-    const timeoutMs = notice.error ? 5500 : 3500;
+    if (!notice.error) return;
+    const timeoutMs = 5500;
     const timer = window.setTimeout(dismissNotice, timeoutMs);
     return () => window.clearTimeout(timer);
-  }, [notice.error, notice.message]);
+  }, [notice.error]);
 
   if (!(showMessage && notice.message)) return null;
 
   return (
-    <div className={globalNoticeLayerClass}>
-      {showMessage && notice.message ? (
-        <Banner variant="success" onDismiss={dismissNotice} className={globalBannerClass}>
-          {notice.message}
-        </Banner>
-      ) : null}
-    </div>
+    <Notification key={notice.message} tone="success" duration={3500} onDismiss={dismissNotice}>
+      {notice.message}
+    </Notification>
   );
 });
 
@@ -94,14 +85,7 @@ export const AppNoticePublisher = memo(function AppNoticePublisher() {
         continue;
       }
     }
-  }, [
-    appError,
-    appMessage,
-    providerError,
-    providerMessage,
-    settingsError,
-    settingsMessage,
-  ]);
+  }, [appError, appMessage, providerError, providerMessage, settingsError, settingsMessage]);
 
   return null;
 });
@@ -113,10 +97,7 @@ function noticeForRoute(
     { error: string | null; message: string | null }
   >,
 ) {
-  const scoped =
-    route === "providers" || route === "settings"
-      ? notices[route]
-      : notices.app;
+  const scoped = route === "providers" || route === "settings" ? notices[route] : notices.app;
   return {
     error: scoped.error ?? notices.app.error,
     message: scoped.message ?? notices.app.message,

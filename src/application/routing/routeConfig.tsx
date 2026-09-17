@@ -66,6 +66,7 @@ export const router = createBrowserRouter([
                   },
                   { path: ":spaceId/home", element: <SpaceDetail /> },
                   { path: ":spaceId/settings/:studioKind", element: <SpaceDetail /> },
+                  { path: ":spaceId/:section/*", element: <SpaceDetail /> },
                 ],
               },
               { path: "changelog", element: <Navigate to={routes.spaces} replace /> },

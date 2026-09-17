@@ -18,7 +18,7 @@ import {
 import {
   browserOverlayReady,
   setBrowserWebviewsSuspended,
-} from "@/features/browser/browserRuntime";
+} from "@/features/webviews/browserRuntime";
 import {
   DropdownMenu,
   DropdownMenuContent,

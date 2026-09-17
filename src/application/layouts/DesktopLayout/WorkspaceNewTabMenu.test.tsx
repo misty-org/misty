@@ -130,6 +130,8 @@ describe("WorkspaceNewTabMenu", () => {
       "browser",
       "code",
       "terminal",
+      "music",
+      "media",
     ]);
     expect(options.find((option) => option.appId === "social")?.route).toBe(
       "/apps/social?space=space+one",

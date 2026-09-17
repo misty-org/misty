@@ -4,6 +4,7 @@ import {
   navigatorLayoutStorageKey,
   navigatorModeStorageKey,
   navigatorWidths,
+  navigatorPixelWidth,
   readNavigatorLayout,
   writeNavigatorLayout,
 } from "./navigatorMode";
@@ -61,6 +62,21 @@ describe("navigator layout", () => {
         storage({ [navigatorLayoutStorageKey]: "{{", [navigatorModeStorageKey]: "hidden" }),
       ),
     ).toEqual({ width: "full", visibility: "hidden" });
+  });
+
+  it("persists custom widths across hide/show and bounds corrupt widths", () => {
+    const target = storage();
+    writeNavigatorLayout({ width: "full", widthPx: 350, visibility: "hidden" }, target);
+    expect(navigatorPixelWidth(readNavigatorLayout(target))).toBe(350);
+    writeNavigatorLayout({ ...readNavigatorLayout(target), visibility: "sticky" }, target);
+    expect(navigatorPixelWidth(readNavigatorLayout(target))).toBe(350);
+    for (const [widthPx, expected] of [
+      [10, 220],
+      [9999, 480],
+    ]) {
+      writeNavigatorLayout({ width: "full", widthPx, visibility: "sticky" }, target);
+      expect(navigatorPixelWidth(readNavigatorLayout(target))).toBe(expected);
+    }
   });
 
   it("resolves the expected shell widths", () => {

@@ -11,7 +11,7 @@ import {
   pathIsInside,
   pinnedPathLabel,
   quickAccessPathHidden,
-} from "@/features/files/explorer";
+} from "@/features/file-ui";
 import { providerIconForType } from "@/shared/assets/icons";
 import { AssetIcon, Button, cn } from "@/shared/ui";
 

@@ -5,18 +5,16 @@ import {
   useAppsStore,
   usePinnedNavigatorAppIds,
 } from "@/features/apps";
-import {
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  cn,
-  navigationMenuActionClass,
-} from "@/shared/ui";
-import { Check, Compass, Plus, Search } from "lucide-react";
+import { Input, Popover, PopoverContent, PopoverTrigger, cn } from "@/shared/ui";
+import { Check, Compass, Plus, Search, LayoutGrid } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { navigatorFocusRingClass } from "./styles";
+import { isGlobalNavigatorApp } from "./navigatorAppPlacement";
+import {
+  navigatorFocusRingClass,
+  navigatorHierarchyIslandClass,
+  navigatorHierarchyActionClass,
+} from "./styles";
 
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -28,45 +26,53 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
   const installations = useAppsStore((state) => state.installations);
   const actionAppId = useAppsStore((state) => state.actionAppId);
   const setPinnedApp = useAppsStore((state) => state.setPinned);
-  const selectedAppIds = usePinnedNavigatorAppIds();
+  const selectedAppIds = usePinnedNavigatorAppIds().filter((id) => !isGlobalNavigatorApp(id));
   const normalizedQuery = query.trim().toLowerCase();
   const visibleApps = useMemo(
     () =>
       installations
-        .filter((installation) => installation.state === "installed")
+        .filter(
+          (installation) =>
+            installation.state === "installed" && !isGlobalNavigatorApp(installation.app_id),
+        )
         .flatMap((installation) => {
           const app = catalog.find((candidate) => candidate.id === installation.app_id);
           const navigatorId = navigatorAppIdForOfficialApp(installation.app_id);
           return app && navigatorId ? [{ app, installation, navigatorId }] : [];
         })
-        .filter(({ app }) => {
+        .filter(({ app, navigatorId }) => {
           if (!normalizedQuery) return true;
-          return `${app.name} ${app.description}`.toLowerCase().includes(normalizedQuery);
+          return `${app.name} ${navigatorId === "library" ? "Storage" : ""} ${app.description}`
+            .toLowerCase()
+            .includes(normalizedQuery);
         }),
     [catalog, installations, normalizedQuery],
   );
 
   return (
     <div
-      className="grid min-w-0 gap-0.5"
+      className="grid min-w-0 gap-1"
       data-tour-target="apps-section"
       role="group"
       aria-label="Apps"
     >
       <div
-        className="sticky top-0 z-10 flex w-full min-w-0 items-center bg-charcoal-workspace"
+        className={cn(navigatorHierarchyIslandClass, "w-full")}
         role="group"
         aria-label="Apps controls"
       >
-        <h2 className="flex h-8 min-w-0 flex-1 items-center px-2.5 text-[13px] font-medium text-cream-muted">
-          Apps
+        <h2 className="flex h-8 min-w-0 flex-1 items-center gap-2.5 px-1.25 text-sm font-semibold tracking-[-0.015em] text-cream">
+          <span className="grid size-6 shrink-0 place-items-center">
+            <LayoutGrid className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          </span>
+          <span>Apps</span>
         </h2>
 
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
             <button
               type="button"
-              className={navigationMenuActionClass}
+              className={navigatorHierarchyActionClass}
               aria-label="Add app"
               title="Add app"
               data-tour-target="nav-add-app-button"
@@ -101,17 +107,17 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
             <div className="misty-transient-scrollbar max-h-[360px] overflow-y-auto p-1">
               {visibleApps.length ? (
                 visibleApps.map(({ app, installation, navigatorId }) => {
-                  const selected = selectedAppIds.includes(navigatorId);
+                  const selected = selectedAppIds.some((id) => id === navigatorId);
                   return (
                     <button
                       key={app.id}
                       type="button"
                       className={cn(
-                        "flex min-h-9 w-full items-center gap-2 text-sm text-cream",
+                        "group/app-option flex min-h-9 w-full items-center gap-2 text-sm text-cream",
                         "rounded-md px-2 py-1 text-left outline-none transition-colors disabled:opacity-50",
-                        "hover:bg-charcoal-hover focus-visible:bg-charcoal-hover",
                       )}
-                      aria-pressed={selected}
+                      role="checkbox"
+                      aria-checked={selected}
                       disabled={Boolean(actionAppId)}
                       onClick={() => void setPinnedApp(app.id, !installation.pinned)}
                     >
@@ -122,17 +128,25 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm text-cream">
-                          {app.name === "Chat" ? "Social" : app.name}
+                          {navigatorId === "library"
+                            ? "Storage"
+                            : app.name === "Chat"
+                              ? "Social"
+                              : app.name}
                         </span>
                       </span>
-                      {selected ? (
-                        <Check
-                          className="text-cream-bright"
-                          size={16}
-                          strokeWidth={2}
-                          aria-hidden="true"
-                        />
-                      ) : null}
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "grid size-4 shrink-0 place-items-center rounded-[4px] border transition-colors",
+                          "group-focus-visible/app-option:ring-2 group-focus-visible/app-option:ring-cream-muted group-focus-visible/app-option:ring-offset-2 group-focus-visible/app-option:ring-offset-charcoal-card",
+                          selected
+                            ? "border-cream-bright bg-cream-bright text-charcoal-bg group-hover/app-option:border-cream group-hover/app-option:bg-cream"
+                            : "border-cream-muted/60 bg-transparent group-hover/app-option:border-cream-bright group-hover/app-option:bg-cream/10",
+                        )}
+                      >
+                        {selected && <Check className="size-3" strokeWidth={3} />}
+                      </span>
                     </button>
                   );
                 })

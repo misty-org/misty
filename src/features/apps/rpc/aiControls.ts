@@ -8,7 +8,7 @@ import {
 import { AppRpcError, type AppRpcScope } from "./session";
 
 export interface AiControlsBackend {
-  open?(input: {prompt?:string;conversationId?:string;selectionHash?:string}): Promise<void>;
+  open?(input: {agentId?:string;prompt?:string;conversationId?:string;selectionHash?:string}): Promise<void>;
   snapshot(): MistyAiControlsSnapshot;
   run(input: MistyAiControlsParams<"ai.action.run">): Promise<void>;
   decide(input: MistyAiControlsParams<"ai.proposal.decide">): Promise<void>;
@@ -40,7 +40,7 @@ export function createAiControlsRpc(scope: AppRpcScope, backend: AiControlsBacke
       let result: unknown;
       if (message.method === "ai.open") {
         if (!backend.open) throw new AppRpcError("unsupported_method", "Update Misty to open the companion.");
-        result = await backend.open(params as {prompt?:string;conversationId?:string;selectionHash?:string});
+        result = await backend.open(params as {agentId?:string;prompt?:string;conversationId?:string;selectionHash?:string});
       }
       else if (message.method === "ai.snapshot") result = backend.snapshot();
       else if (message.method === "ai.action.run")

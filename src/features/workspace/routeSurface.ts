@@ -1,3 +1,5 @@
+import { spaceToolRouteFromAppRoute } from "@/features/spaces/spaceAppRoute";
+import { canonicalSpaceRoute } from "@/features/spaces/spaceRouteNormalization";
 import { routes } from "@/features/app-shell";
 import {
   canonicalAppRoute,
@@ -13,10 +15,10 @@ import {
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   pathname = canonicalAppRoute(pathname);
+  pathname = spaceToolRouteFromAppRoute(pathname) ?? pathname;
   if (pathname.startsWith(routes.settings)) return null;
-  // `/home` is a legacy entry point. The desktop shell resolves it to the
-  // active Space's Home so Home never becomes a global app tab.
-  if (pathname === routes.home) return null;
+  if (pathname === routes.home)
+    return request("home", "tool:home", "Home", routes.home, "home", "single");
   const legacyGlobalApp = legacyGlobalAppId(pathname);
   if (legacyGlobalApp) {
     const route = officialAppRoute(legacyGlobalApp);
@@ -33,18 +35,20 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     };
   }
   if (pathname.startsWith(routes.spaces)) {
+    pathname = canonicalSpaceRoute(pathname);
+    if (!pathname.startsWith(`${routes.spaces}/`))
+      return pathname.startsWith(routes.spaces) ? null : workspaceSurfaceFromRoute(pathname);
     const parts = pathname.split(/[?#]/)[0].split("/").filter(Boolean);
     const rawId = parts[1];
     if (!rawId || !parts[2]) return null;
     const spaceId = safeDecode(rawId);
     const section = parts[2];
-    const appId = appIdForLegacySpaceSection(section);
-    if (appId) {
-      const route = legacySpaceAppRoute(pathname, appId, spaceId, parts);
-      return {
-        ...request("official-app", `app:${appId}`, appTitle(appId), route, appId, "multiple"),
-        scopeKey: `space:${spaceId}`,
-      };
+    if (section === "social" && parts[3] && parts[3] !== "misty") {
+      const personal = new URL(pathname, "https://misty.local");
+      personal.pathname = "/apps/social";
+      personal.searchParams.set("provider", parts[3]);
+      personal.searchParams.set("space", spaceId);
+      return workspaceSurfaceFromRoute(`${personal.pathname}${personal.search}${personal.hash}`);
     }
     const tool = spaceToolFromSection(section);
     const scopeKey = `space:${spaceId}` as const;
@@ -63,23 +67,13 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   if (pathname.startsWith(`${routes.apps}/`)) {
     const appId = appIdFromRoute(pathname);
     if (!appId) return null;
-    const spaceId = spaceIdFromAppRoute(pathname);
     return {
       ...request("official-app", `app:${appId}`, appTitle(appId), pathname, appId, "multiple"),
-      ...(spaceId ? { scopeKey: `space:${spaceId}` as const } : {}),
     };
   }
   if (pathname.startsWith(routes.discover))
     return request("marketplace", "tool:marketplace", "Discover", pathname, undefined, "single");
   return null;
-}
-
-function spaceIdFromAppRoute(route: string): string {
-  try {
-    return new URL(route, "https://misty.local").searchParams.get("space")?.trim() ?? "";
-  } catch {
-    return "";
-  }
 }
 
 function appIdFromRoute(route: string): string {
@@ -108,35 +102,8 @@ function legacyGlobalAppId(route: string): string {
   );
 }
 
-function appIdForLegacySpaceSection(section: string | undefined): string {
-  if (section === "notes" || section === "drawings") return "journal";
-  if (section === "chat" || section === "social") return "chat";
-  if (section === "planner" || section === "library") return section;
-  return "";
-}
-
-function legacySpaceAppRoute(
-  route: string,
-  appId: string,
-  spaceId: string,
-  parts: string[],
-): string {
-  const source = new URL(route, "https://misty.local");
-  const target = new URL(officialAppRoute(appId, spaceId), "https://misty.local");
-  source.searchParams.forEach((value, key) => target.searchParams.set(key, value));
-  const section = parts[2];
-  if (appId === "journal") {
-    target.searchParams.set("view", section === "drawings" ? "drawings" : "notes");
-    if (section === "drawings" && parts[3]) target.searchParams.set("drawing", parts[3]);
-  } else if (appId === "chat" && parts[3]) {
-    target.searchParams.set("provider", parts[3]);
-  } else if ((appId === "planner" || appId === "library") && parts[3]) {
-    target.searchParams.set("view", parts[3]);
-  }
-  return `${target.pathname}${target.search}${target.hash}`;
-}
-
 function appTitle(appId: string): string {
+  if (appId === "library") return "Storage";
   if (appId === "chat") return "Social";
   return appId ? `${appId[0]?.toUpperCase()}${appId.slice(1)}` : "App";
 }
@@ -195,7 +162,7 @@ function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
 function spaceToolTitle(tool: SpaceWorkspaceTool): string {
   if (tool === "journal") return "Journal";
   if (tool === "planner") return "Planner";
-  if (tool === "social") return "Social";
+  if (tool === "social") return "Chat";
   if (tool === "library") return "Library";
   return "Space";
 }

@@ -87,11 +87,7 @@ export function MistyComposer(props: {
               key={attachment.id}
               className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/20"
             >
-              <img
-                src={attachment.previewUrl}
-                alt={attachment.name}
-                className="size-full object-cover"
-              />
+              {attachment.mimeType.startsWith("image/")?<img src={attachment.previewUrl} alt={attachment.name} className="size-full object-cover"/>:<span className="grid size-full place-items-center break-all p-1 text-xs" title={attachment.name}>{attachment.name}</span>}
               {attachment.state !== "ready" ? (
                 <div className="absolute inset-0 grid place-items-center bg-black/60">
                   {attachment.state === "failed" ? (
@@ -148,7 +144,7 @@ export function MistyComposer(props: {
           ref={fileRef}
           hidden
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={props.mode==="search"?"image/jpeg,image/png,image/webp":"image/jpeg,image/png,image/webp,.pdf,.docx,.txt,.md,.csv,.json"}
           multiple={props.maxAttachments > 1}
           onChange={(event) => {
             accept(Array.from(event.target.files ?? []));
@@ -160,7 +156,7 @@ export function MistyComposer(props: {
           variant="ghost"
           size="icon"
           className="size-7 rounded-lg text-cream-muted"
-          aria-label="Attach images"
+          aria-label="Attach files"
           onClick={() => fileRef.current?.click()}
         >
           {props.attachments.length ? (

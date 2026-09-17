@@ -5,7 +5,7 @@ const fixture = vi.hoisted(() => ({
   ready: true,
   installations: vi.fn(),
 }));
-vi.mock("@/api/apps", () => ({ appsApi: { installations: fixture.installations } }));
+vi.mock("@/api/client", () => ({ apiRequest: fixture.installations }));
 vi.mock("@/features/apps/useAppsStore", () => ({
   useAppsStore: {
     getState: () => ({ accountId: fixture.accountId, spaceId: "s", catalog: [{ id: "agents" }] }),
@@ -23,16 +23,16 @@ beforeEach(() => {
   fixture.native = true;
   fixture.installations.mockResolvedValue({ apps: [{ app_id: "agents", state: "installed" }] });
 });
-it("requires both Space enablement and a local package on desktop", async () => {
+it("works without the downloadable Agents package or Space installation", async () => {
   await expect(assertMistyAvailable("a", "s")).resolves.toBeUndefined();
   fixture.ready = false;
-  await expect(assertMistyAvailable("a", "s")).rejects.toThrow(/Install/);
+  await expect(assertMistyAvailable("a", "s")).resolves.toBeUndefined();
   fixture.ready = true;
   fixture.installations.mockResolvedValue({ apps: [] });
-  await expect(assertMistyAvailable("a", "s")).rejects.toThrow(/Enable Agents/);
+  await expect(assertMistyAvailable("a", "s")).resolves.toBeUndefined();
 });
-it("rejects missing Space and identity changes during admission", async () => {
-  await expect(assertMistyAvailable("a", "")).rejects.toThrow(/Select a Space/);
+it("supports account-only work and rejects identity changes during admission", async () => {
+  await expect(assertMistyAvailable("a", "")).resolves.toBeUndefined();
   fixture.installations.mockImplementation(async () => {
     fixture.accountId = "b";
     return { apps: [{ app_id: "agents", state: "installed" }] };

@@ -12,6 +12,8 @@ import type {
 export type MistySubmissionPresentation = "panel" | "workspace";
 
 export interface GlobalSearchState {
+  selectedAgentId?:string;
+  executionMode?: "user"|"agent"|"team";
   artifactPaneId?: string;
   pendingArtifact?: import("@/features/ai-surface/types").AiArtifact;
   screenLabel?: string;

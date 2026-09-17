@@ -1,4 +1,4 @@
-import { useOperationQueueStore } from "@/features/files/explorer";
+import { useOperationQueueStore } from "@/features/transfers/store/useOperationQueueStore";
 import type { TransferRecord } from "@/native/contracts";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

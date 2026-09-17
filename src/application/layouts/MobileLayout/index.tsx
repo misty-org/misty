@@ -42,7 +42,7 @@ import { MobileNotificationBridge } from "./MobileNotificationBridge";
 // The bridge is a platform host service, not App UI. Browser App commands will
 // move behind a dedicated SDK capability as the compatibility package migrates.
 const LazyBrowserRuntimeBridge = lazy(() =>
-  import("@/features/browser/BrowserRuntimeBridge").then((module) => ({
+  import("@/features/webviews/BrowserRuntimeBridge").then((module) => ({
     default: module.BrowserRuntimeBridge,
   })),
 );

@@ -1,4 +1,4 @@
-import type * as BrowserRuntime from "@/features/browser/browserRuntime";
+import type * as BrowserRuntime from "@/features/webviews/browserRuntime";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Renameable } from "./Renameable";
@@ -12,7 +12,7 @@ import {
 } from "./store";
 const native = vi.hoisted(() => ({ invoke: vi.fn(), overlay: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
-vi.mock("@/features/browser/browserRuntime", async (original) => ({
+vi.mock("@/features/webviews/browserRuntime", async (original) => ({
   ...(await original<typeof BrowserRuntime>()),
   setBrowserWebviewsSuspended: native.overlay,
 }));

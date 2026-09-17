@@ -1,4 +1,3 @@
-import { findDockLeaf } from "@/features/workspace/dockTree";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import type { DesktopNavItem } from "@/application/layouts/model/types";
@@ -7,8 +6,8 @@ import { ActivityBridge } from "@/features/activity";
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
-import { BrowserRuntimeBridge, setBrowserWebviewsSuspended } from "@/features/browser";
-import { MediaSearchViewer } from "@/features/files/explorer";
+import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
+import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
 import { useSettingsStore, type SettingsSection } from "@/features/settings";
 import {
@@ -38,9 +37,10 @@ import { FramePacingOverlay } from "./FramePacingOverlay";
 import { ProfilePopover } from "./ProfilePopover";
 import { GlobalNavigator } from "./GlobalNavigator";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
+import { NavigatorResizeHandle } from "./NavigatorResizeHandle";
 import { NavigatorControls } from "./NavigatorControls";
 import {
-  navigatorWidths,
+  navigatorPixelWidth,
   readNavigatorLayout,
   writeNavigatorLayout,
   type NavigatorLayout,
@@ -106,6 +106,18 @@ export function DesktopLayout(props: {
   const [navigatorRevealed, setNavigatorRevealed] = useState(false);
   const navigatorLayoutRef = useRef(navigatorLayout);
   navigatorLayoutRef.current = navigatorLayout;
+  const [navigatorResizing, setNavigatorResizing] = useState(false);
+  const navigatorWidth = navigatorPixelWidth(navigatorLayout);
+  const resizeNavigator = useCallback((widthPx: number) => {
+    const next = { ...navigatorLayoutRef.current, widthPx };
+    navigatorLayoutRef.current = next;
+    setNavigatorLayout(next);
+    writeNavigatorLayout(next);
+  }, []);
+  const changeNavigatorResizing = useCallback((resizing: boolean) => {
+    setNavigatorResizing(resizing);
+    setBrowserWebviewsSuspended(resizing, "navigator-resize");
+  }, []);
   const navigatorHidden = navigatorLayout.visibility === "hidden";
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [remotesOpen, setRemotesOpen] = useState(false);
@@ -216,18 +228,6 @@ export function DesktopLayout(props: {
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openRemotesOverlay]);
 
   useEffect(() => {
-    if (location.pathname === "/home") {
-      const workspace = useWorkspaceStore.getState();
-      const pane = findDockLeaf(workspace.layout.root, workspace.layout.focusedPaneId);
-      if (pane?.tabs[0]?.placeholder) return;
-      const homeSpace = preferredDefaultSpace(spaces);
-      if (homeSpace) {
-        navigate(`/spaces/${encodeURIComponent(homeSpace.id)}/home`, { replace: true });
-      } else if (spacesSnapshotReady) {
-        navigate("/spaces", { replace: true });
-      }
-      return;
-    }
     if (location.pathname === "/spaces") {
       const homeSpace = preferredDefaultSpace(spaces);
       if (homeSpace && spacesSnapshotReady) {
@@ -298,7 +298,7 @@ export function DesktopLayout(props: {
   const focusTool = useCallback(
     (tool: string) => {
       let route = `/${tool}`;
-      if (["home", "journal", "planner", "social", "library"].includes(tool)) {
+      if (["journal", "planner", "social", "library"].includes(tool)) {
         const availableSpaces = useSpacesStore.getState().spaces;
         const scope = useWorkspaceStore.getState().activeScopeKey;
         const activeSpaceId = scope.startsWith("space:")
@@ -309,8 +309,7 @@ export function DesktopLayout(props: {
           return;
         }
         const encoded = encodeURIComponent(activeSpaceId);
-        if (tool === "home") route = `/spaces/${encoded}/home`;
-        else if (tool === "journal") route = rememberedJournalRoute(user?.id ?? "", activeSpaceId);
+        if (tool === "journal") route = rememberedJournalRoute(user?.id ?? "", activeSpaceId);
         else if (tool === "planner") route = rememberedPlannerRoute(user?.id ?? "", activeSpaceId);
         else if (tool === "social") route = socialProviderPath(activeSpaceId, "misty");
         else route = `/spaces/${encoded}/${tool}`;
@@ -362,6 +361,7 @@ export function DesktopLayout(props: {
       ? styles.windowsTitlebarNavigationInset
       : styles.desktopTitlebarNavigationInset,
   );
+  const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(location.pathname);
   const frameClass = usesNativeWindowChrome ? styles.desktopFrameClass : styles.tabletFrameClass;
   const navbarClass = usesNativeWindowChrome ? styles.desktopNavbarClass : styles.tabletNavbarClass;
@@ -389,9 +389,16 @@ export function DesktopLayout(props: {
       <main
         className={cn(
           frameClass,
-          "transition-[grid-template-columns] duration-300 ease-in-out",
-          navigatorGridClass(navigatorHidden ? "hidden" : "full"),
+          isAuthRoute
+            ? "grid-cols-[minmax(0,1fr)]"
+            : !navigatorResizing &&
+                cn("transition-[grid-template-columns]", styles.navigatorMotionClass),
         )}
+        style={
+          isAuthRoute
+            ? undefined
+            : { gridTemplateColumns: `${navigatorHidden ? 0 : navigatorWidth}px minmax(0, 1fr)` }
+        }
         data-misty-desktop-frame
         onPointerDown={(event) => {
           const target = event.target instanceof Element ? event.target : null;
@@ -401,66 +408,71 @@ export function DesktopLayout(props: {
       >
         {usesNativeWindowChrome ? (
           <header
-            className={styles.desktopTitlebarClass}
+            className={cn(styles.desktopTitlebarClass, isAuthRoute && "border-b-0 bg-transparent")}
             onPointerDown={handleDesktopTitlebarPointerDown}
           >
-            <div
-              className={cn(styles.desktopTitlebarNavigationClass, "justify-start gap-1.5")}
-              style={{
-                left: titlebarNavigationGeometry.left,
-                width: navigatorHidden
-                  ? undefined
-                  : (navigatorWidths[navigatorLayout.width] - titlebarNavigationGeometry.left - 8) /
+            {!isAuthRoute ? (
+              <div
+                className={cn(
+                  styles.desktopTitlebarNavigationClass,
+                  "justify-start gap-1.5",
+                  !navigatorResizing && cn("transition-[width]", styles.navigatorMotionClass),
+                )}
+                style={{
+                  left: titlebarNavigationGeometry.left,
+                  width:
+                    ((navigatorHidden
+                      ? shouldShowWindowsControls
+                        ? styles.windowsTitlebarControlsEnd
+                        : styles.desktopTitlebarControlsEnd
+                      : navigatorWidth) -
+                      titlebarNavigationGeometry.left -
+                      styles.dockHeaderPadding) /
                     titlebarNavigationGeometry.scale,
-                transform: `scale(${titlebarNavigationGeometry.scale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <NavigatorControls
-                visibility={navigatorLayout.visibility}
-                onToggleVisibility={toggleNavigatorVisibility}
-                iconSize={18 * appZoom}
-              />
-              <div
-                className="flex items-center gap-1.5"
-                data-misty-window-drag-block="true"
-                data-misty-desktop-navigation-history="true"
+                  transform: `scale(${titlebarNavigationGeometry.scale})`,
+                  transformOrigin: "top left",
+                }}
               >
-                <button
-                  type="button"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go back"
-                  title={backTitle}
-                  disabled={!canGoBack}
-                  onClick={goBack}
-                >
-                  <ArrowLeft size={18 * appZoom} />
-                </button>
-                <button
-                  type="button"
-                  className={styles.desktopTitlebarNavigationButtonClass}
-                  aria-label="Go forward"
-                  title={forwardTitle}
-                  disabled={!canGoForward}
-                  onClick={goForward}
-                >
-                  <ArrowRight size={18 * appZoom} />
-                </button>
-              </div>
-              {shouldShowWindowsControls ? (
-                <div
-                  id="misty-windows-workspace-controls"
-                  className={styles.windowsWorkspaceControlsClass}
-                  data-misty-window-drag-block="true"
+                <NavigatorControls
+                  visibility={navigatorLayout.visibility}
+                  onToggleVisibility={toggleNavigatorVisibility}
+                  iconSize={16 * appZoom}
                 />
-              ) : null}
-              <div
-                id="misty-virtual-window-controls"
-                className="ml-auto flex shrink-0 items-center [&_svg:first-child]:size-[calc(18px*var(--app-zoom,1))]"
-                style={{ "--app-zoom": appZoom } as React.CSSProperties}
-                data-misty-window-drag-block="true"
-              />
-            </div>
+                <div
+                  className="flex items-center gap-1.5"
+                  data-misty-window-drag-block="true"
+                  data-misty-desktop-navigation-history="true"
+                >
+                  <button
+                    type="button"
+                    className={styles.desktopTitlebarNavigationButtonClass}
+                    aria-label="Go back"
+                    title={backTitle}
+                    disabled={!canGoBack}
+                    onClick={goBack}
+                  >
+                    <ArrowLeft size={16 * appZoom} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.desktopTitlebarNavigationButtonClass}
+                    aria-label="Go forward"
+                    title={forwardTitle}
+                    disabled={!canGoForward}
+                    onClick={goForward}
+                  >
+                    <ArrowRight size={16 * appZoom} />
+                  </button>
+                </div>
+                {shouldShowWindowsControls ? (
+                  <div
+                    id="misty-windows-workspace-controls"
+                    className={styles.windowsWorkspaceControlsClass}
+                    data-misty-window-drag-block="true"
+                  />
+                ) : null}
+              </div>
+            ) : null}
             {shouldShowWindowsControls ? (
               <div
                 className={styles.windowsTitlebarControlsClass}
@@ -502,7 +514,7 @@ export function DesktopLayout(props: {
           </header>
         ) : null}
 
-        {!usesNativeWindowChrome ? (
+        {!usesNativeWindowChrome && !isAuthRoute ? (
           <div className="absolute left-2 top-1 z-[60]" data-misty-window-drag-block="true">
             <NavigatorControls
               visibility={navigatorLayout.visibility}
@@ -511,40 +523,60 @@ export function DesktopLayout(props: {
           </div>
         ) : null}
 
-        <div
-          className={cn(
-            navbarClass,
-            "w-[264px] transition-all duration-300 ease-in-out",
-            navigatorHidden
-              ? "-translate-x-full opacity-0 pointer-events-none"
-              : "translate-x-0 opacity-100 pointer-events-auto",
-          )}
-          aria-hidden={navigatorHidden}
-          inert={navigatorHidden ? true : undefined}
-        >
-          {navigatorContent}
-        </div>
+        {!isAuthRoute ? (
+          <div
+            className={cn(
+              navbarClass,
+              "transition-[transform,opacity]",
+              styles.navigatorMotionClass,
+              navigatorHidden
+                ? "-translate-x-full opacity-0 pointer-events-none"
+                : "translate-x-0 opacity-100 pointer-events-auto",
+            )}
+            style={{ width: navigatorWidth }}
+            aria-hidden={navigatorHidden}
+            inert={navigatorHidden ? true : undefined}
+          >
+            {navigatorContent}
+            <NavigatorResizeHandle
+              width={navigatorWidth}
+              zoom={appZoom}
+              onChange={resizeNavigator}
+              onResizingChange={changeNavigatorResizing}
+            />
+          </div>
+        ) : null}
 
-        {navigatorHidden ? (
+        {!isAuthRoute && navigatorHidden ? (
           <div
             className={cn(
               usesNativeWindowChrome
                 ? styles.desktopFloatingNavbarClass
                 : styles.tabletFloatingNavbarClass,
-              "w-[264px] transition-all duration-300 ease-in-out",
+              "transition-[transform,opacity]",
+              styles.navigatorMotionClass,
               navigatorRevealed
                 ? "translate-x-0 opacity-100 shadow-[0_18px_44px_rgba(0,0,0,0.6)] pointer-events-auto"
                 : "-translate-x-full opacity-0 pointer-events-none shadow-none",
             )}
+            style={{ width: navigatorWidth }}
             aria-hidden={!navigatorRevealed}
             inert={!navigatorRevealed ? true : undefined}
-            onPointerLeave={() => setNavigatorRevealed(false)}
+            onPointerLeave={() => {
+              if (!navigatorResizing) setNavigatorRevealed(false);
+            }}
           >
             {navigatorContent}
+            <NavigatorResizeHandle
+              width={navigatorWidth}
+              zoom={appZoom}
+              onChange={resizeNavigator}
+              onResizingChange={changeNavigatorResizing}
+            />
           </div>
         ) : null}
 
-        {navigatorHidden ? (
+        {!isAuthRoute && navigatorHidden ? (
           <div
             className={styles.navigatorRevealStripClass}
             aria-hidden="true"
@@ -552,11 +584,16 @@ export function DesktopLayout(props: {
           />
         ) : null}
 
-        <section className={`${routeShellClass} route-shell`} data-misty-route-shell>
-          <AppNoticePublisher />
-          <RouteNotice routeId={routeId} />
+        <section
+          className={cn(routeShellClass, isAuthRoute && "col-start-1 row-start-2", "route-shell")}
+          data-misty-route-shell
+        >
+          {!isAuthRoute ? <AppNoticePublisher /> : null}
+          {!isAuthRoute ? <RouteNotice routeId={routeId} /> : null}
 
-          {standaloneRouteTitle ? (
+          {isAuthRoute ? (
+            <Outlet />
+          ) : standaloneRouteTitle ? (
             <StandaloneRouteSurface title={standaloneRouteTitle}>
               <Outlet />
             </StandaloneRouteSurface>
@@ -566,12 +603,13 @@ export function DesktopLayout(props: {
               titlebarInsets={
                 usesNativeWindowChrome
                   ? {
+                      animate: !navigatorResizing,
                       left: Math.max(
                         0,
                         (shouldShowWindowsControls
                           ? styles.windowsTitlebarControlsEnd
                           : styles.desktopTitlebarControlsEnd) -
-                          (navigatorHidden ? 0 : navigatorWidths[navigatorLayout.width]) -
+                          (navigatorHidden ? 0 : navigatorWidth) -
                           styles.dockHeaderPadding,
                       ),
                       right: shouldShowWindowsControls ? 140 : 0,
@@ -582,53 +620,55 @@ export function DesktopLayout(props: {
           )}
         </section>
 
-        <WorkStatusPopup />
-        <TransferCompletionNotifier />
-        <FramePacingOverlay enabled={framePacingOverlayEnabled} />
+        {!isAuthRoute ? (
+          <>
+            <WorkStatusPopup />
+            <TransferCompletionNotifier />
+          </>
+        ) : null}
+        <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         <div
           id="misty-shell-overlays"
           className="pointer-events-none fixed inset-0 z-[2147482500]"
         />
-        <ProfilePopover
-          anchorRef={profileAnchorRef}
-          currentPath={location.pathname}
-          open={profileOpen}
-          onClose={() => setProfileOpen(false)}
-          onOpenAccountSettings={openAccountSettings}
-        />
-        <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
-        <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
-        {user?.id ? (
-          <GlobalMisty
-            accountId={user.id}
-            currentPath={`${location.pathname}${location.search}`}
-            activePaneId={activePaneId}
-            activeWorkspacePaneId={activeWorkspacePaneId}
-            activePanePath={
-              activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
-            }
-          />
+        {!isAuthRoute ? (
+          <>
+            <ProfilePopover
+              anchorRef={profileAnchorRef}
+              currentPath={location.pathname}
+              open={profileOpen}
+              onClose={() => setProfileOpen(false)}
+              onOpenAccountSettings={openAccountSettings}
+            />
+            <RemotesOverlay open={remotesOpen} onClose={closeRemotesOverlay} />
+            <SettingsOverlay open={settingsOpen} onClose={closeSettingsOverlay} />
+            {user?.id ? (
+              <GlobalMisty
+                accountId={user.id}
+                currentPath={`${location.pathname}${location.search}`}
+                activePaneId={activePaneId}
+                activeWorkspacePaneId={activeWorkspacePaneId}
+                activePanePath={
+                  activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
+                }
+              />
+            ) : null}
+            <BrowserRuntimeBridge />
+            <BrowserContextMenuBridge />
+            <SpacesRealtimeBridge />
+            <ActivityBridge />
+            <AgentJobWorker />
+            <AppTour />
+          </>
         ) : null}
-        <BrowserRuntimeBridge />
-        <BrowserContextMenuBridge />
-        <MediaSearchViewer />
-        <SpacesRealtimeBridge />
-        <ActivityBridge />
-        <AgentJobWorker />
-        <AppTour />
       </main>
     </NavigationNamesBoundary>
   );
 }
 
-const navigatorGridClass = (width: "full" | "hidden") =>
-  width === "hidden" ? "grid-cols-[0px_minmax(0,1fr)]" : "grid-cols-[264px_minmax(0,1fr)]";
-
 function standaloneWorkspaceRouteTitle(pathname: string): string | null {
   if (import.meta.env.DEV && pathname === "/roadmap-preview") return "Roadmap preview";
   if (pathname === "/activity") return "Activity";
-  if (pathname === "/signin") return "Sign in";
-  if (pathname === "/register") return "Create account";
   if (pathname.startsWith("/invite/")) return "Join Space";
   if (pathname === "/spaces") return "Spaces";
   return null;

@@ -1,3 +1,4 @@
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useMistyStore } from "./useMistyStore";
 import { currentMistySpace } from "./availability";
@@ -11,6 +12,7 @@ import type {
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 
 export interface MistyHandoff {
+  agentId?:string;
   capture?: AiCaptureAttachment;
   requestId?: string;
   notice?: string;
@@ -33,6 +35,12 @@ export async function acceptMistyHandoff(input: MistyHandoff) {
     throw new Error("Wait for Misty's current response before changing its context.");
   const spaceId =
     input.spaceId || input.context?.find((ref) => ref.spaceId)?.spaceId || currentMistySpace();
+  if(input.agentId){
+    await usePersonalAgentsStore.getState().load(state.accountId);
+    if(!usePersonalAgentsStore.getState().agents.some(a=>a.id===input.agentId&&a.enabled))throw new Error("This agent is unavailable.");
+    usePersonalAgentsStore.getState().select(spaceId,input.agentId);
+    useMistyStore.setState({selectedAgentId:input.agentId});
+  }
   const current = state.conversations.find((c) => c.id === state.activeConversationId);
   if (input.conversationId) {
     await state.loadConversations();
@@ -42,7 +50,7 @@ export async function acceptMistyHandoff(input: MistyHandoff) {
     if (!conversation || conversation.spaceId !== spaceId)
       throw new Error("This conversation is unavailable in the selected Space.");
     state.selectConversation(input.conversationId);
-  } else if (current && current.spaceId !== spaceId) await state.newConversation(spaceId);
+  } else if (current && (current.spaceId !== spaceId || (input.agentId && current.agentId!==input.agentId))) await state.newConversation(spaceId);
   if (useMistyStore.getState().accountId !== state.accountId)
     throw new Error("The Misty account changed.");
   useMistyStore.setState({
@@ -58,47 +66,51 @@ export async function openMisty(input: MistyHandoff = {}) {
   if (hasTauriInternals()) {
     const { getCurrentWindow, Window } =
       await import("@tauri-apps/api/window");
-    if (getCurrentWindow().label !== "misty-bot-pet") {
+    if (!input.agentId && getCurrentWindow().label === "main") {
       const companion = await Window.getByLabel("misty-bot-pet");
-      if (!companion)
-        throw new Error("Misty's desktop window is unavailable. Restart Misty to restore it.");
-      const { useAppsStore } = await import("@/features/apps/useAppsStore");
-      const requestId = crypto.randomUUID();
-      const current = getCurrentWindow();
-      await new Promise<void>((resolve, reject) => {
-        let cleanup: (() => void) | undefined;
-        const timer = window.setTimeout(() => {
-          cleanup?.();
-          reject(new Error("Misty did not receive this context. Try opening Misty again."));
-        }, 5000);
-        void current
-          .listen<{ requestId: string; error?: string }>(
-            "misty://handoff-result",
-            ({ payload }) => {
-              if (payload.requestId !== requestId) return;
-              clearTimeout(timer);
+      if (companion) {
+        const { useAppsStore } = await import("@/features/apps/useAppsStore");
+        const requestId = crypto.randomUUID();
+        const current = getCurrentWindow();
+        try {
+          await new Promise<void>((resolve, reject) => {
+            let cleanup: (() => void) | undefined;
+            const timer = window.setTimeout(() => {
               cleanup?.();
-              if (payload.error) reject(new Error(payload.error));
-              else resolve();
-            },
-          )
-          .then((remove) => {
-            cleanup = remove;
-            return companion.emit("misty://handoff", {
-              ...input,
-              requestId,
-              accountId: useAppsStore.getState().accountId,
-              spaceId: input.spaceId || currentMistySpace(),
-            });
-          })
-          .catch((error) => {
-            clearTimeout(timer);
-            cleanup?.();
-            reject(error);
+              reject(new Error("Misty did not receive this context. Try opening Misty again."));
+            }, 5000);
+            void current
+              .listen<{ requestId: string; error?: string }>(
+                "misty://handoff-result",
+                ({ payload }) => {
+                  if (payload.requestId !== requestId) return;
+                  clearTimeout(timer);
+                  cleanup?.();
+                  if (payload.error) reject(new Error(payload.error));
+                  else resolve();
+                },
+              )
+              .then((remove) => {
+                cleanup = remove;
+                return companion.emit("misty://handoff", {
+                  ...input,
+                  requestId,
+                  accountId: useAppsStore.getState().accountId,
+                  spaceId: input.spaceId || currentMistySpace(),
+                });
+              })
+              .catch((error) => {
+                clearTimeout(timer);
+                cleanup?.();
+                reject(error);
+              });
           });
-      });
-      await companion.show();
-      return;
+          await companion.show();
+          return;
+        } catch {
+          // Fall through to in-app Misty panel if companion window handoff fails
+        }
+      }
     }
   }
   await acceptMistyHandoff(input);

@@ -1,12 +1,26 @@
 import { useAuth } from "@/features/auth";
 import { HomeDashboard } from "@/features/home";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 import { useSpacesStore } from "./store/useSpacesStore";
+
+const Notes = lazy(() =>
+  import("@/features/notes/SpaceNotes").then((m) => ({ default: m.SpaceNotes })),
+);
+const Drawings = lazy(() =>
+  import("@/features/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
+);
+const Planner = lazy(() =>
+  import("@/features/spaces/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
+);
+const Library = lazy(() =>
+  import("@/features/spaces/library/SpaceLibrary").then((m) => ({ default: m.SpaceLibrary })),
+);
+const Chat = lazy(() => import("./chat/SpaceChat").then((m) => ({ default: m.SpaceSocial })));
 
 /**
  * One Space section, rendered from props rather than the router.
@@ -89,23 +103,68 @@ export function SpaceSectionView(props: {
     );
   }
 
+  const permission =
+    section === "social" || section === "chat"
+      ? "messages.read"
+      : section === "planner"
+        ? "tasks.view"
+        : section === "library"
+          ? "library.view"
+          : null;
+  if (permission && space.permissions?.[permission] === false)
+    return (
+      <PermissionState
+        className="h-full"
+        title="You don’t have access to this Space tool"
+        description="Ask a Space owner to update your permissions."
+      />
+    );
+
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      {section === "home" ? (
-        <HomeDashboard key={`home:${spaceId}`} spaceId={spaceId} />
-      ) : section === "settings" ? (
-        <SpaceSettings
-          key={`settings:${spaceId}:${studioKind}`}
-          spaceId={spaceId}
-          section={studioKind}
-        />
-      ) : (
-        <EmptyState
-          className="h-full"
-          title="This view moved to Apps"
-          description="Open the corresponding App from the navbar or Discover. Legacy Space tool routes are no longer supported."
-        />
-      )}
+      <Suspense fallback={<SpacePageLoadingPlaceholder />}>
+        {section === "home" ? (
+          <HomeDashboard key={`home:${spaceId}`} spaceId={spaceId} />
+        ) : section === "settings" ? (
+          <SpaceSettings
+            key={`settings:${spaceId}:${studioKind}`}
+            spaceId={spaceId}
+            section={studioKind}
+          />
+        ) : section === "notes" ? (
+          <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
+        ) : section === "drawings" ? (
+          <Drawings
+            spaceId={spaceId}
+            drawingId={studioKind}
+            workspaceTabId={props.workspaceTabId}
+          />
+        ) : section === "planner" ? (
+          <Planner
+            spaceId={spaceId}
+            canManage={space.role === "owner" || space.permissions?.["tasks.manage"] === true}
+            canManageIntegrations={
+              space.role === "owner" || space.permissions?.["integrations.manage"] === true
+            }
+            workspaceTabId={props.workspaceTabId}
+          />
+        ) : section === "library" ? (
+          <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "social" || section === "chat" ? (
+          <Chat
+            spaceId={spaceId}
+            spaceName={space.name}
+            provider="misty"
+            workspaceTabId={props.workspaceTabId}
+          />
+        ) : (
+          <EmptyState
+            className="h-full"
+            title="This Space view isn’t available"
+            description="Choose a Space tool from the sidebar."
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

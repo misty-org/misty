@@ -11,7 +11,7 @@ export const discoverCategories = ["All", "Creative", "Productivity", "Utilities
 export type DiscoverCategory = (typeof discoverCategories)[number];
 
 export function discoverAppCategory(app: OfficialApp): DiscoverCategory {
-  if (["journal", "library"].includes(app.id)) return "Creative";
+  if (app.id === "journal") return "Creative";
   if (["chat", "planner", "inbox", "agents"].includes(app.id)) return "Productivity";
   return "Utilities";
 }

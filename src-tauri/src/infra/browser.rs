@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Mutex,
+        Mutex, OnceLock,
     },
     time::Duration,
 };
@@ -16,6 +16,10 @@ use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, Webview, WebviewBuilder,
 };
 use url::Url;
+
+#[cfg(target_os = "macos")]
+#[path = "browser_focus.rs"]
+mod focus_messages;
 
 #[cfg(target_os = "macos")]
 #[path = "browser_popups.rs"]
@@ -75,20 +79,17 @@ use super::browser_profile::data_store_identifier as browser_profile_identifier;
 #[cfg(not(target_os = "macos"))]
 const HTML2CANVAS_SOURCE: &str =
     include_str!("../../../node_modules/html2canvas/dist/html2canvas.min.js");
-#[cfg(any(target_os = "macos", windows))]
-static BROWSER_OVERLAY_ACTIVE: AtomicBool = AtomicBool::new(false);
-static BROWSER_POINTER_TRACKING_ENABLED: AtomicBool = AtomicBool::new(false);
-#[cfg(target_os = "macos")]
-static MAIN_WEBVIEW_VIEW: AtomicUsize = AtomicUsize::new(0);
-#[cfg(windows)]
-static MAIN_WEBVIEW_HWND: AtomicIsize = AtomicIsize::new(0);
-#[cfg(any(target_os = "macos", windows))]
-static MAIN_WEBVIEW_TRANSPARENT: AtomicBool = AtomicBool::new(false);
+#[derive(Clone,Default)]
+struct RendererState { native:usize, overlay:bool, tracking:bool, transparent:bool }
+static RENDERERS:OnceLock<Mutex<HashMap<String,RendererState>>>=OnceLock::new();
+fn renderers()->&'static Mutex<HashMap<String,RendererState>>{RENDERERS.get_or_init(Mutex::default)}
+fn renderer(label:&str)->RendererState{renderers().lock().ok().and_then(|map|map.get(label).cloned()).unwrap_or_default()}
+pub(super) fn browser_owner_label(app:&AppHandle,id:&str)->String{app.get_webview(&format!("misty-browser-{id}")).map(|view|view.window().label().to_owned()).unwrap_or_else(||"main".into())}
 
 #[derive(Default)]
 pub struct BrowserSessionState {
     #[cfg(target_os = "macos")]
-    context_menu: Mutex<Option<context_menu::PendingMenu>>,
+    context_menu: Mutex<HashMap<String,context_menu::PendingMenu>>,
     pending_popups: Mutex<HashSet<String>>,
     sessions: Mutex<HashMap<String, BrowserSession>>,
     reserved_downloads: Mutex<HashSet<PathBuf>>,
@@ -98,6 +99,7 @@ pub struct BrowserSessionState {
 
 #[derive(Default)]
 struct BrowserSession {
+    agent_input_locked: bool,
     // Native auxiliary windows stay attached to this live integration view.
     popup_parent: Option<String>,
     #[cfg(target_os = "macos")]
@@ -372,38 +374,40 @@ fn apply_macos_webview_theme(webview: &Webview, _value: &str) -> Result<(), Stri
 }
 
 #[cfg(target_os = "macos")]
-fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
+fn remember_main_macos_webview(app: &AppHandle, window_label:&str) -> Result<(), String> {
     use objc2_app_kit::NSView;
     let main_webview = app
-        .get_webview("main")
+        .get_webview(window_label)
         .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
+    let renderer_label=window_label.to_owned();
     main_webview
-        .with_webview(|platform_webview| unsafe {
+        .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            MAIN_WEBVIEW_VIEW.store(view as *const NSView as usize, Ordering::Release);
+            if let Ok(mut map)=renderers().lock(){map.entry(renderer_label.clone()).or_default().native=view as *const NSView as usize;}
         })
         .map_err(|error| error.to_string())?;
-    configure_main_webview_pointer_guard(&main_webview)?;
+    if window_label=="main" {configure_main_webview_pointer_guard(&main_webview)?;}
     // Configure the renderer's native background once, before the Browser
     // child is first presented. Reapplying this during every popup transition
     // clears WKWebView's backing layer and produces a dark compositor frame.
-    if !MAIN_WEBVIEW_TRANSPARENT.swap(true, Ordering::AcqRel) {
+    if !renderer(window_label).transparent {
         if let Err(error) = main_webview.set_background_color(Some(Color(0, 0, 0, 0))) {
-            MAIN_WEBVIEW_TRANSPARENT.store(false, Ordering::Release);
+
             return Err(error.to_string());
         }
     }
+    if let Ok(mut map)=renderers().lock(){map.entry(window_label.to_owned()).or_default().transparent=true;}
     Ok(())
 }
 
 #[cfg(windows)]
-fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
+fn remember_main_macos_webview(app: &AppHandle, window_label:&str) -> Result<(), String> {
     use windows_sys::Win32::{Foundation::HWND, UI::WindowsAndMessaging::FindWindowExW};
 
     let main_webview = app
-        .get_webview("main")
+        .get_webview(window_label)
         .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
-    if MAIN_WEBVIEW_HWND.load(Ordering::Acquire) == 0 {
+    if renderer(window_label).native == 0 {
         let window = main_webview.window();
         let parent = window.hwnd().map_err(|error| error.to_string())?;
         let class = "WRY_WEBVIEW\0".encode_utf16().collect::<Vec<_>>();
@@ -415,20 +419,21 @@ fn remember_main_macos_webview(app: &AppHandle) -> Result<(), String> {
                 std::ptr::null(),
             )
         };
-        MAIN_WEBVIEW_HWND.store(hwnd as isize, Ordering::Release);
+        if let Ok(mut map)=renderers().lock(){map.entry(window_label.to_owned()).or_default().native=hwnd as usize;}
     }
-    if MAIN_WEBVIEW_HWND.load(Ordering::Acquire) == 0 {
+    if renderer(window_label).native == 0 {
         return Err("Misty's main WebView2 window is unavailable.".to_owned());
     }
     // The renderer must stay transparent wherever CSS leaves the Browser page
     // host open, otherwise moving it above the external page paints a solid
     // rectangle instead of just the annotation or popup UI.
-    if !MAIN_WEBVIEW_TRANSPARENT.swap(true, Ordering::AcqRel) {
+    if !renderer(window_label).transparent {
         if let Err(error) = main_webview.set_background_color(Some(Color(0, 0, 0, 0))) {
-            MAIN_WEBVIEW_TRANSPARENT.store(false, Ordering::Release);
+
             return Err(error.to_string());
         }
     }
+    if let Ok(mut map)=renderers().lock(){map.entry(window_label.to_owned()).or_default().transparent=true;}
     Ok(())
 }
 
@@ -437,13 +442,14 @@ fn browser_child_should_be_below_renderer(overlay_active: bool) -> bool {
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn remember_main_macos_webview(_app: &AppHandle) -> Result<(), String> {
+fn remember_main_macos_webview(_app: &AppHandle, _window_label:&str) -> Result<(), String> {
     Ok(())
 }
 
 #[cfg(target_os = "macos")]
 fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String> {
     use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
+    let own_renderer=renderer(webview.window().label());
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
@@ -455,9 +461,9 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
                 window.contentView()
             });
             if let Some(parent) = parent {
-                let main_view = MAIN_WEBVIEW_VIEW.load(Ordering::Acquire);
+                let main_view = own_renderer.native;
                 let below_main = browser_child_should_be_below_renderer(
-                    BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire),
+                    own_renderer.overlay,
                 );
                 if main_view == 0
                     || browser_stacking_is_correct(&parent, view, main_view, below_main)
@@ -498,6 +504,7 @@ fn position_windows_webview(
     if reveal {
         webview.show().map_err(|error| error.to_string())?;
     }
+    let own_renderer=renderer(webview.window().label());
     let failure = std::sync::Arc::new(AtomicU32::new(0));
     let callback_failure = failure.clone();
     webview
@@ -507,7 +514,7 @@ fn position_windows_webview(
                 callback_failure.store(u32::MAX, Ordering::Release);
                 return;
             }
-            let main = MAIN_WEBVIEW_HWND.load(Ordering::Acquire);
+            let main = own_renderer.native;
             if main == 0 {
                 callback_failure.store(u32::MAX, Ordering::Release);
                 return;
@@ -587,7 +594,7 @@ fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     position_windows_webview(
         webview,
         true,
-        browser_child_should_be_below_renderer(BROWSER_OVERLAY_ACTIVE.load(Ordering::Acquire)),
+        browser_child_should_be_below_renderer(renderer(webview.window().label()).overlay),
     )
 }
 
@@ -712,29 +719,19 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
 // Keep this command asynchronous. WebView2 child creation needs the Windows
 // event loop to remain free while `add_child` finishes initializing the view.
 pub async fn browser_webview_create(
+    caller: Webview,
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
     let profile_identifier = browser_profile_identifier(request.profile_id.as_deref())?;
-    if let Some(provider) = &request.provider_id {
-        let adopting_blank_popup = request.url == "about:blank" && state.pending_popups.lock().map(|pending| pending.contains(&request.id)).unwrap_or(false);
-        // Layout can follow a website redirect outside its initial provider.
-        // Only an already-loaded URL may bypass the initial navigation policy.
-        let already_loaded = app.get_webview(&webview_label(&request.id)?)
-            .and_then(|view| view.url().ok())
-            .is_some_and(|url| url.as_str() == request.url);
-        if !adopting_blank_popup && !already_loaded && !super::browser_provider::allows(provider, &external_url(&request.url)?) && !provider_callback_allows(&app, &request.id, &external_url(&request.url)?) {
-            return Err("This URL is outside the selected provider.".into());
-        }
-    }
-    remember_main_macos_webview(&app)?;
+    // Integrations use Browser's navigation rules. Provider metadata identifies
+    // the account and automation permissions, not where a person may browse.
+    external_url(&request.url)?;
+    remember_main_macos_webview(&app,caller.window().label())?;
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
-    let window = app
-        .get_window("main")
-        .or_else(|| app.windows().into_values().next())
-        .ok_or_else(|| "Misty's main window is unavailable.".to_owned())?;
+    let window = caller.window();
     window
         .set_theme(browser_theme(&request.theme)?)
         .map_err(|error| error.to_string())?;
@@ -772,7 +769,7 @@ pub async fn browser_webview_create(
         apply_shortcuts(&webview, &state)?;
         apply_browser_pointer_tracking(
             &webview,
-            BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+            renderer(webview.window().label()).tracking,
         )?;
         set_webview_bounds_if_changed(&app, &webview, position, size)?;
         return present_macos_webview(&webview);
@@ -789,7 +786,7 @@ pub async fn browser_webview_create(
     let navigation_app = app.clone();
     let navigation_id = request.id.clone();
     let builder = WebviewBuilder::new(label, WebviewUrl::External(external_url(&request.url)?))
-        .background_throttling(BackgroundThrottlingPolicy::Throttle)
+        .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .data_directory(browser_data_directory(&app, request.profile_id.as_deref())?)
         .data_store_identifier(profile_identifier)
         .incognito(browser_requires_ephemeral_store());
@@ -808,7 +805,7 @@ pub async fn browser_webview_create(
         .background_color(browser_background(&request.theme))
         .initialization_script(browser_viewport_script(
             &shortcut_token,
-            BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+            renderer(caller.window().label()).tracking,
         ))
         .on_navigation(move |url| {
             #[cfg(target_os = "macos")]
@@ -823,6 +820,8 @@ pub async fn browser_webview_create(
             } else if forward_navigation(&navigation_app, &navigation_id, url) {
                 false
             } else {
+                // This callback includes frames, redirects and POST submissions.
+                // Never turn these requests into URL-only Browser handoffs.
                 external_url(url.as_str()).is_ok()
             }
         })
@@ -842,9 +841,11 @@ pub async fn browser_webview_create(
             NewWindowResponse::Deny
         })
         .on_page_load(move |webview, payload| {
+            let locked = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions|sessions.get(&page_id).map(|session|session.agent_input_locked)).unwrap_or(false);
+            let _ = apply_agent_input_lock(&webview,locked);
             let _ = apply_browser_pointer_tracking(
                 &webview,
-                BROWSER_POINTER_TRACKING_ENABLED.load(Ordering::Acquire),
+                renderer(webview.window().label()).tracking,
             );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
@@ -891,6 +892,8 @@ pub async fn browser_webview_create(
     let webview = window
         .add_child(builder, position, size)
         .map_err(|error| error.to_string())?;
+    #[cfg(target_os = "macos")]
+    focus_messages::install(&app, &webview, &request.id)?;
     configure_browser_frame_rate(&webview)?;
     apply_macos_webview_theme(&webview, &request.theme)?;
     configure_browser_webview(&webview, request.native_live_resize)?;
@@ -915,7 +918,7 @@ fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
         .unwrap_or(false);
     if trusted {
         let _ = app.emit_to(
-            "main",
+            browser_owner_label(app,id),
             "misty://browser-focus",
             BrowserFocusEvent { id: id.to_owned() },
         );
@@ -942,7 +945,7 @@ fn forward_companion_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
         return true;
     }
     let _ = app.emit_to(
-        "main",
+        browser_owner_label(app,id),
         "misty://browser-companion",
         BrowserCompanionEvent {
             id: id.to_owned(),
@@ -1040,12 +1043,12 @@ fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>
                 reserve_download_path(&state, &download_dir, &sanitize_download_name(suggested));
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
-            let _ = app.emit("misty://browser-download", record);
+            let _ = app.emit_to(browser_owner_label(app,tab_id),"misty://browser-download", record);
             true
         }
         DownloadEvent::Finished { url, path, success } => {
             let record = finish_download(&state, tab_id, &url, path.as_deref(), success);
-            let _ = app.emit("misty://browser-download", record);
+            let _ = app.emit_to(browser_owner_label(app,tab_id),"misty://browser-download", record);
             true
         }
         _ => true,
@@ -1097,7 +1100,7 @@ fn emit_download_failure(
             downloads.remove(0);
         }
     }
-    let _ = app.emit("misty://browser-download", record);
+    let _ = app.emit_to(browser_owner_label(app,tab_id),"misty://browser-download", record);
 }
 
 fn requested_download(
@@ -1146,6 +1149,7 @@ fn finish_download(
         .lock()
         .expect("browser session mutex poisoned");
     let session = sessions.entry(tab_id.to_owned()).or_default();
+    let success=success && path.is_some_and(|path|std::fs::metadata(path).is_ok_and(|meta|meta.is_file()));
     let path_text = path
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
@@ -1321,9 +1325,6 @@ pub fn browser_webview_navigate(
     {
         let mut sessions = state.sessions.lock().map_err(|_| "Browser session is unavailable.")?;
         let session = sessions.get_mut(&request.id).ok_or("Browser session is unavailable.")?;
-        if session.provider_id.as_ref().is_some_and(|provider| !super::browser_provider::allows(provider, &url)) {
-            return Err("This link is outside the current provider website.".into());
-        }
         session.oauth_callback = request.oauth_callback.map(|callback| (callback, std::time::Instant::now()));
     }
     with_webview(&app, &request.id, |webview| {
@@ -1344,18 +1345,16 @@ pub fn browser_webview_set_pane_dim(app: AppHandle, id: String, strength: f64, i
 
 #[tauri::command]
 pub fn browser_webview_set_theme(
+    caller:Webview,
     app: AppHandle,
     request: BrowserThemeRequest,
 ) -> Result<(), String> {
-    let window = app
-        .get_window("main")
-        .or_else(|| app.windows().into_values().next())
-        .ok_or_else(|| "Misty's main window is unavailable.".to_owned())?;
+    let window=caller.window();
     window
         .set_theme(browser_theme(&request.theme)?)
         .map_err(|error| error.to_string())?;
     for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") {
+        if label.starts_with("misty-browser-") && webview.window().label()==window.label() {
             // Update reused views as well as newly created ones. A transparent
             // document must not inherit Misty's dark toolbar canvas.
             webview.set_background_color(Some(browser_background(&request.theme)))
@@ -1442,14 +1441,14 @@ pub fn browser_webview_show(
 }
 
 #[tauri::command]
-pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Result<(), String> {
+pub fn browser_webviews_set_overlay_active(caller:Webview, app: AppHandle, active: bool) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        remember_main_macos_webview(&app)?;
-        BROWSER_OVERLAY_ACTIVE.store(active, Ordering::Release);
+        remember_main_macos_webview(&app,caller.window().label())?;
+        if let Ok(mut map)=renderers().lock(){map.entry(caller.window().label().to_owned()).or_default().overlay=active;}
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-") && webview.window().label() == "main" {
+            if label.starts_with("misty-browser-") && webview.window().label() == caller.window().label() {
                 if let Err(error) = position_macos_webview(&webview, false) {
                     errors.push(error);
                 }
@@ -1463,11 +1462,11 @@ pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Resu
     }
     #[cfg(windows)]
     {
-        remember_main_macos_webview(&app)?;
-        BROWSER_OVERLAY_ACTIVE.store(active, Ordering::Release);
+        remember_main_macos_webview(&app,caller.window().label())?;
+        if let Ok(mut map)=renderers().lock(){map.entry(caller.window().label().to_owned()).or_default().overlay=active;}
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-") {
+            if label.starts_with("misty-browser-") && webview.window().label()==caller.window().label() {
                 if let Err(error) = position_windows_webview(&webview, false, active) {
                     errors.push(error);
                 }
@@ -1485,7 +1484,7 @@ pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Resu
         // external pages while renderer-owned popovers are open; the frontend
         // reconciles the active page when the overlay closes.
         if active {
-            browser_webviews_hide_all(app)
+            browser_webviews_hide_all(caller,app)
         } else {
             Ok(())
         }
@@ -1493,11 +1492,11 @@ pub fn browser_webviews_set_overlay_active(app: AppHandle, active: bool) -> Resu
 }
 
 #[tauri::command]
-pub fn browser_webviews_set_pointer_tracking(app: AppHandle, enabled: bool) -> Result<(), String> {
-    BROWSER_POINTER_TRACKING_ENABLED.store(enabled, Ordering::Release);
+pub fn browser_webviews_set_pointer_tracking(caller:Webview, app: AppHandle, enabled: bool) -> Result<(), String> {
+    if let Ok(mut map)=renderers().lock(){map.entry(caller.window().label().to_owned()).or_default().tracking=enabled;}
     let mut errors = Vec::new();
     for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") {
+        if label.starts_with("misty-browser-") && webview.window().label()==caller.window().label() {
             if let Err(error) = apply_browser_pointer_tracking(&webview, enabled) {
                 errors.push(error);
             }
@@ -1551,10 +1550,10 @@ pub fn browser_webview_hide(
 }
 
 #[tauri::command]
-pub fn browser_webviews_hide_all(app: AppHandle) -> Result<(), String> {
+pub fn browser_webviews_hide_all(caller:Webview, app: AppHandle) -> Result<(), String> {
     let mut errors = Vec::new();
     for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") && webview.window().label() == "main" {
+        if label.starts_with("misty-browser-") && webview.window().label() == caller.window().label() {
             if let Err(error) = webview
                 .hide()
                 .map_err(|error| error.to_string())
@@ -1572,13 +1571,13 @@ pub fn browser_webviews_hide_all(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn browser_webviews_park_all(app: AppHandle) -> Result<(), String> {
+pub fn browser_webviews_park_all(caller:Webview, app: AppHandle) -> Result<(), String> {
     #[cfg(windows)]
     {
-        remember_main_macos_webview(&app)?;
+        remember_main_macos_webview(&app,caller.window().label())?;
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-") {
+            if label.starts_with("misty-browser-") && webview.window().label()==caller.window().label() {
                 // Keep the live page composited directly beneath the app
                 // renderer while another workspace tab is active. Returning
                 // to Browser can then reveal it without a hide/show gap.
@@ -1595,7 +1594,7 @@ pub fn browser_webviews_park_all(app: AppHandle) -> Result<(), String> {
     }
     #[cfg(not(windows))]
     {
-        browser_webviews_hide_all(app)
+        browser_webviews_hide_all(caller,app)
     }
 }
 
@@ -1615,6 +1614,8 @@ pub fn browser_webview_close(
     }
     #[cfg(target_os = "macos")]
     popups::forget_close_handler(&request.id);
+    #[cfg(target_os = "macos")]
+    focus_messages::forget(&request.id);
     if let Ok(mut pending) = state.pending_popups.lock() { pending.remove(&request.id); }
     if let Some(staging) = app.get_window(&webview_label(&request.id)?) {
         let _ = staging.destroy();
@@ -1697,7 +1698,7 @@ pub(super) fn revoke_execution_grant(state: &BrowserSessionState, scope: &str, g
 fn is_browser_capability(value: &str) -> bool {
     matches!(
         value,
-        "browser.inspect" | "browser.navigate" | "browser.click" | "browser.type" | "browser.request" | "browser.interact" | "browser.downloads.list"
+        "browser.inspect" | "browser.visual" | "browser.navigate" | "browser.click" | "browser.type" | "browser.request" | "browser.interact" | "browser.upload" | "browser.downloads.list"
     )
 }
 
@@ -1747,8 +1748,9 @@ pub async fn browser_agent_execute(
     if !is_browser_capability(&request.operation) {
         return Err("Unsupported browser agent operation.".to_owned());
     }
+    super::agent_workspace::authorize_scope(&app,&request.scope_id,&request.agent_id,request.input.get("__mistyTaskId").and_then(Value::as_str).unwrap_or(""))?;
     let (id, agent_id) = resolve_agent_webview(&app, &state, &request)?;
-    if matches!(request.operation.as_str(), "browser.click" | "browser.type" | "browser.interact" | "browser.request") {
+    if matches!(request.operation.as_str(), "browser.click" | "browser.type" | "browser.interact" | "browser.upload" | "browser.request") {
         let url = app.get_webview(&webview_label(&id)?).ok_or("Browser tab is not running.")?.url().map_err(|error| error.to_string())?;
         let sessions = state.sessions.lock().map_err(|_| "Browser state is unavailable.")?;
         let target = sessions.get(&id).map(|session| browser_target_observation(session, &url)).ok_or("Browser tab is not running.")?;
@@ -1756,8 +1758,27 @@ pub async fn browser_agent_execute(
             return Err("browser_authentication_required: complete sign-in in the original browser before continuing".into());
         }
     }
+    if request.input.get("__mistyTaskId").and_then(Value::as_str).is_some_and(|id|!id.is_empty()){
+      let _=app.emit_to(browser_owner_label(&app,&id),"misty://agent-target",json!({"id":id}));
+    }
     match request.operation.as_str() {
         "browser.inspect" => inspect_browser(&app, &state, &id, &request).await,
+        "browser.visual" => {
+            let mut observed=inspect_browser(&app,&state,&id,&request).await?;
+            if observed["target"]["authentication"]=="required"{return Ok(observed)}
+            let view=app.get_webview(&webview_label(&id)?).ok_or("browser_context_closed")?;
+            view.show().map_err(|e|e.to_string())?;
+            let size=view.size().map_err(|e|e.to_string())?.to_logical::<f64>(view.window().scale_factor().map_err(|e|e.to_string())?);
+            #[cfg(target_os="macos")]
+            let capture=super::browser_macos::capture_webview_region(view,0.0,0.0,size.width,size.height).await?;
+            #[cfg(windows)]
+            let capture=super::browser_capture_windows::capture(view).await?;
+            #[cfg(not(any(target_os="macos",windows)))]
+            let capture:Value=return Err("Visual browser inspection requires macOS or Windows".into());
+            observed["image"]=capture;
+            observed["viewport"]=json!({"width":size.width,"height":size.height});
+            Ok(observed)
+        },
         "browser.navigate" => {
             let url = request
                 .input
@@ -1804,6 +1825,7 @@ pub async fn browser_agent_execute(
             #[cfg(not(target_os = "macos"))]
             { Err("Provider requests require macOS.".into()) }
         }
+        "browser.upload" => upload_browser(&app,&state,&id,&request).await,
         "browser.interact" => interact_browser(&app, &state, &id, &request).await,
         "browser.downloads.list" => {
             let sessions = state
@@ -1871,7 +1893,7 @@ async fn inspect_browser(
         .get(&request.grant_id)
         .filter(|grant| grant.expires_at > Utc::now())
         .ok_or_else(|| "Browser agent access was revoked.".to_owned())?;
-    if !grant.capabilities.contains("browser.inspect") {
+    if !grant.capabilities.contains("browser.inspect") && !grant.capabilities.contains("browser.visual") {
         return Err("Browser inspection is not granted.".to_owned());
     }
     let interactive = replace_snapshot_targets(session, snapshot.interactive);
@@ -2015,11 +2037,11 @@ async fn interact_browser(
 ) -> Result<Value, String> {
     let action = request.input.get("action").ok_or_else(|| "A browser action is required.".to_owned())?;
     let kind = action.get("kind").and_then(Value::as_str).unwrap_or("");
-    if !matches!(kind, "fill" | "select" | "scroll" | "key") {
+    if !matches!(kind, "fill" | "select" | "scroll" | "key" | "point") {
         return Err("Unsupported browser interaction.".to_owned());
     }
     let element_ref = action.get("elementRef").and_then(Value::as_str);
-    if element_ref.is_none() && kind != "scroll" {
+    if element_ref.is_none() && kind != "scroll" && kind != "point" {
         return Err("An inspected element reference is required.".to_owned());
     }
     let target = {
@@ -2260,16 +2282,42 @@ mod tests {
 #[tauri::command]
 pub fn browser_profile_persistence() -> bool { !browser_requires_ephemeral_store() }
 
-fn provider_callback_allows(app: &AppHandle, id: &str, url: &Url) -> bool {
-    let state = app.state::<BrowserSessionState>();
-    let Ok(sessions) = state.sessions.lock() else { return false; };
-    sessions.get(id).and_then(|session| session.oauth_callback.as_ref())
-        .is_some_and(|(callback, created)| created.elapsed() < Duration::from_secs(600) && callback.allows(url))
-}
 
 #[path = "browser_profile_cleanup.rs"]
 mod profile_cleanup;
 #[tauri::command]
 pub async fn browser_profile_remove(app: AppHandle, profile_id: String) -> Result<(), String> {
     profile_cleanup::remove(app, profile_id).await
+}
+
+#[tauri::command]
+pub fn browser_runtime_for_scope(state:State<'_,BrowserSessionState>,scope_id:String)->Result<String,String>{
+ let sessions=state.sessions.lock().map_err(|_|"Browser state unavailable")?;
+ sessions.iter().find(|(_,session)|session.scope_id==scope_id).map(|(id,_)|id.clone()).ok_or_else(||"browser_context_closed".into())
+}
+
+fn apply_agent_input_lock(webview:&Webview,locked:bool)->Result<(),String>{
+ let script=format!(r#"(()=>{{ window.__MISTY_AGENT_INPUT_LOCKED__={locked}; if(window.__MISTY_AGENT_INPUT_GUARD__)return; window.__MISTY_AGENT_INPUT_GUARD__=true; for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','keydown','keyup','beforeinput','paste','drop','wheel']) window.addEventListener(type,event=>{{if(event.isTrusted&&window.__MISTY_AGENT_INPUT_LOCKED__){{event.preventDefault();event.stopImmediatePropagation()}}}},{{capture:true,passive:false}}); }})()"#);
+ webview.eval(&script).map_err(|e|e.to_string())
+}
+#[tauri::command]
+pub fn browser_agent_set_locked(caller:Webview,app:AppHandle,state:State<'_,BrowserSessionState>,request:BrowserWebviewIdRequest,locked:bool)->Result<(),String>{
+ let view=app.get_webview(&webview_label(&request.id)?).ok_or("browser_context_closed")?;
+ if view.window().label()!=caller.window().label(){return Err("browser_window_mismatch".into())}
+ if let Some(session)=state.sessions.lock().map_err(|_|"browser_state_unavailable")?.get_mut(&request.id){session.agent_input_locked=locked;}
+ apply_agent_input_lock(&view,locked)
+}
+
+async fn upload_browser(app:&AppHandle,state:&BrowserSessionState,id:&str,request:&BrowserAgentExecuteRequest)->Result<Value,String>{
+ let reference=request.input.get("elementRef").and_then(Value::as_str).ok_or("An inspected file input is required.")?;
+ let target={let mut sessions=state.sessions.lock().map_err(|_|"browser_state_unavailable")?;
+ let session=sessions.get_mut(id).ok_or("browser_context_closed")?;
+ let target=session.element_targets.get(reference).cloned().ok_or("browser_snapshot_stale: inspect the file input again")?;
+ session.element_targets.clear();target};
+ let webview=app.get_webview(&webview_label(id)?).ok_or("browser_context_closed")?;
+ let origin=webview.url().map_err(|e|e.to_string())?.origin().ascii_serialization();
+ let script=format!("({})({},{},{})",include_str!("browser_inspection_upload.js"),serde_json::to_string(&target).unwrap(),serde_json::to_string(&request.input).map_err(|e|e.to_string())?,serde_json::to_string(&origin).unwrap());
+ let result=eval_json(webview,script).await?;
+ if result["ok"]!=true{return Err(result["error"].as_str().unwrap_or("File upload failed").to_owned())}
+ Ok(result)
 }

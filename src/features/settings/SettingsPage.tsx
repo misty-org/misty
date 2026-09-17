@@ -10,7 +10,6 @@ import {
   DownloadCloud,
   Eye,
   Keyboard,
-  LifeBuoy,
   Lock,
   MessageCircle,
   Rows3,
@@ -32,7 +31,6 @@ import { PrivacySection } from "./sections/PrivacySection";
 import { ServerSection } from "./sections/ServerSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
-import { SupportRecoverySection } from "@/features/support";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import type { LucideIcon } from "lucide-react";
 
@@ -155,13 +153,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     icon: DownloadCloud,
     group: "system",
     Component: UpdatesSection,
-  },
-  {
-    id: "support",
-    label: "Help",
-    icon: LifeBuoy,
-    group: "system",
-    Component: SupportRecoverySection,
   },
   {
     id: "advanced",

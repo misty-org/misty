@@ -1,5 +1,5 @@
 import { cn } from "@/shared/ui";
-import { appIcon, appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
+import { appIcon, appIconStrokeWidth } from "@/shared/ui/app-icons";
 import type { WorkspaceToolId } from "./useRecentToolsStore";
 
 type WorkspaceAppIconSize = "picker" | "nav" | "marketplace";
@@ -21,10 +21,11 @@ export function WorkspaceAppIcon(props: {
   appId: WorkspaceToolId;
   size?: WorkspaceAppIconSize;
   className?: string;
+  context?: "app" | "space";
 }) {
   const size = props.size ?? "nav";
   const sizing = sizeDetails[size];
-  const Icon = appIcons[props.appId];
+  const Icon = appIcon(props.appId, props.context)!;
 
   return (
     <span

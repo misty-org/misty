@@ -1,4 +1,4 @@
-//! One Keychain unlock per process, shared by every App permission path.
+//! One local credential read per process, shared by every App permission path.
 //! Native records are authenticated and encrypted; the renderer never gets the key.
 use aes_gcm::{
     aead::{Aead, KeyInit, Payload},
@@ -14,25 +14,42 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-const SERVICE: &str = "com.misty.native-app.permissions.v2";
+const SERVICE: &str = "com.misty.permissions";
+const LEGACY_SERVICE: &str = "com.misty.native-app.permissions.v2";
 const KEY_ACCOUNT: &str = "installation-encryption-key";
 const MAX_BYTES: usize = 65536;
 trait KeySource: Send + Sync {
     fn unlock(&self) -> Result<[u8; 32], String>;
 }
-struct Keychain;
-impl KeySource for Keychain {
+struct LocalCredentials;
+impl KeySource for LocalCredentials {
     fn unlock(&self) -> Result<[u8; 32], String> {
-        let entry = keyring::Entry::new(SERVICE, &key_account()).map_err(|e| e.to_string())?;
-        match entry.get_password() {
-            Ok(encoded) => STANDARD_NO_PAD.decode(encoded).ok().and_then(|key| key.try_into().ok())
-                .ok_or_else(|| "The app-permission encryption key is invalid.".into()),
-            Err(keyring::Error::NoEntry) => {
-                let mut key = [0; 32]; OsRng.fill_bytes(&mut key);
-                entry.set_password(&STANDARD_NO_PAD.encode(key)).map_err(|_| "Could not save the app-permission encryption key.")?;
+        let account = key_account();
+        let loaded = crate::infra::credential_store::load(SERVICE, &account);
+        let loaded = match loaded {
+            Ok(Some(value)) => Ok(Some(value)),
+            Ok(None) => crate::infra::credential_store::load(LEGACY_SERVICE, &account),
+            Err(err) => Err(err),
+        };
+        match loaded {
+            Ok(Some(encoded)) => {
+                let key: [u8; 32] = STANDARD_NO_PAD
+                    .decode(&encoded)
+                    .ok()
+                    .and_then(|key| key.try_into().ok())
+                    .ok_or_else(|| "The app-permission encryption key is invalid.".to_string())?;
+                let _ = crate::infra::credential_store::store(SERVICE, &account, &encoded);
                 Ok(key)
             }
-            Err(_) => Err("App permission storage is locked. Keychain access will not be requested again until Misty restarts.".into()),
+            Ok(None) => {
+                let mut key = [0; 32];
+                OsRng.fill_bytes(&mut key);
+                let encoded = STANDARD_NO_PAD.encode(key);
+                crate::infra::credential_store::store(SERVICE, &account, &encoded)
+                    .map_err(|_| "Could not save the app-permission encryption key.".to_string())?;
+                Ok(key)
+            }
+            Err(_) => Err("App permission storage is unavailable. Check access to ~/.misty/.auth and restart Misty.".into()),
         }
     }
 }
@@ -134,7 +151,7 @@ fn store() -> Result<&'static Store, String> {
         .get_or_init(|| {
             Ok(Store {
                 root: root()?,
-                source: Box::new(Keychain),
+                source: Box::new(LocalCredentials),
                 key: OnceLock::new(),
                 io: Mutex::new(()),
             })
@@ -146,34 +163,7 @@ pub(super) fn read(owner: &str) -> Result<Option<String>, String> {
     if let Some(value) = store()?.read(owner)? {
         return Ok(Some(value));
     }
-    if let Some(value) = legacy(owner) {
-        store()?.write(owner, &value)?;
-        return Ok(Some(value));
-    }
     Ok(None)
-}
-#[cfg(target_os = "macos")]
-fn legacy(owner: &str) -> Option<String> {
-    unsafe extern "C" {
-        fn misty_permission_read_legacy(owner: *const std::ffi::c_char) -> *mut std::ffi::c_char;
-    }
-    let owner = std::ffi::CString::new(owner).ok()?;
-    unsafe {
-        let value = misty_permission_read_legacy(owner.as_ptr());
-        if value.is_null() {
-            return None;
-        }
-        let result = std::ffi::CStr::from_ptr(value)
-            .to_str()
-            .ok()
-            .map(str::to_owned);
-        libc::free(value.cast());
-        result
-    }
-}
-#[cfg(not(target_os = "macos"))]
-fn legacy(_: &str) -> Option<String> {
-    None
 }
 fn key_account() -> String {
     #[cfg(test)]
@@ -311,7 +301,7 @@ mod tests {
         assert_eq!(writer.read("owner-0").unwrap().as_deref(), Some("grant"));
     }
     #[test]
-    fn denial_is_shared_without_retrying_keychain_or_writing_records() {
+    fn denial_is_shared_without_retrying_credential_io_or_writing_records() {
         let root = tempfile::tempdir().unwrap();
         let calls = Arc::new(AtomicUsize::new(0));
         let store = Store {

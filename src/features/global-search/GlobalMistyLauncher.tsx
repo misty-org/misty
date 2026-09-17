@@ -157,7 +157,7 @@ export function GlobalMistyLauncher(props: {
         <Button
           type="button"
           size="icon"
-          className="size-10 shrink-0 rounded-xl bg-cream text-charcoal-bg hover:bg-cream-bright"
+          className="size-10 shrink-0 rounded-xl bg-cream text-charcoal-bg hover:bg-cream-action-hover"
           disabled={!props.query.trim() || commandOnly}
           aria-label="Search"
           onClick={(event) => {

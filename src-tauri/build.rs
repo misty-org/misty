@@ -10,11 +10,9 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyPermissionMigration.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyFolderBookmarks.m")
-            .file("native/macos/MistyPermissionMigration.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");

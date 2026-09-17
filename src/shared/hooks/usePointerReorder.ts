@@ -1,7 +1,9 @@
 import "./pointerReorder.css";
 import {
   useEffect,
+  useMemo,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
@@ -392,7 +394,10 @@ export function usePointerReorder(options: {
   onDrop(drag: ReorderDrag, targetId: string, after: boolean): void;
   onKeyboardMove(id: string, direction: -1 | 1): void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // Disclosure content mounts independently of the component owning this hook.
+  // Track the actual node so closing/reopening a category replaces its drop target.
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  const ref = useMemo(() => ({ current: element }), [element]);
   const cancel = useRef<(() => void) | undefined>(undefined);
   const items = () =>
     [...(ref.current?.querySelectorAll<HTMLElement>("[data-reorder-item]") ?? [])].filter(
@@ -433,7 +438,7 @@ export function usePointerReorder(options: {
   });
   useEffect(() => () => cancel.current?.(), [options.scope]);
   return {
-    ref,
+    ref: setElement,
     "data-reorder-list": options.scope,
     onDragStartCapture: (event: React.DragEvent) => {
       if ((event.target as Element).closest("[data-reorder-handle]")) event.preventDefault();

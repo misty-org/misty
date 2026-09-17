@@ -122,6 +122,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             disabled={props.working}
             onChange={(value) =>
               publishNavigatorLayout({
+                ...navigatorLayout,
                 width: "full",
                 visibility: value ? "hidden" : "sticky",
               })

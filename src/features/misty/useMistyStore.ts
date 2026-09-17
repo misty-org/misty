@@ -1,3 +1,15 @@
+import {
+  startLocalExecution,
+  pauseLocalExecution,
+  settleLocalExecution,
+  finishLocalExecution,
+  isAgentWorkerWindow,
+  useLocalExecution,
+} from "@/features/agents/localExecution";
+import {
+  selectedPersonalAgent,
+  usePersonalAgentsStore,
+} from "@/features/agents/personalAgentsStore";
 import type { AiCaptureAttachment } from "@/features/ai-surface/types";
 import { assertMistyAvailable, currentMistySpace } from "./availability";
 import { requestHostContext } from "./contextBridge";
@@ -41,12 +53,16 @@ export type {
 export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   ...createGlobalSearchPanelState(set, get),
   mode: "ask",
+  executionMode: "user",
   setAccount: (accountId) => {
     if (get().accountId === accountId) return;
+    void finishLocalExecution();
     replaceActiveGlobalInvocationStream();
     createGlobalSearchPanelState(set, get).setAccount(accountId);
     set({
       mode: "ask",
+      selectedAgentId: undefined,
+      executionMode: "user",
       selectedSpaceId: "",
       targets: [],
       handoff: undefined,
@@ -86,7 +102,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   newConversation: async (spaceId) => {
     const accountId = get().accountId;
     const conversation = normalizeConversation(
-      await globalMistyApi.createConversation("New conversation", spaceId),
+      await globalMistyApi.createConversation(
+        "New conversation",
+        spaceId || currentMistySpace(),
+        get().selectedAgentId || selectedPersonalAgent(spaceId || currentMistySpace())?.id,
+      ),
     );
     // A browser handoff can await the server while the user switches accounts.
     // Its response belongs to the original account, including local fallbacks.
@@ -141,6 +161,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
   },
   selectConversation: (activeConversationId) =>
     set({
+      selectedAgentId: get().conversations.find((c) => c.id === activeConversationId)?.agentId,
       browserRequest: undefined,
       handoff: undefined,
       targets: [],
@@ -245,9 +266,23 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       currentMistySpace();
     try {
       await assertMistyAvailable(accountId, spaceId);
+      if (
+        usePersonalAgentsStore.getState().accountId !== accountId ||
+        !usePersonalAgentsStore.getState().agents.length
+      )
+        await usePersonalAgentsStore.getState().load(accountId);
+      const agent = get().selectedAgentId || selectedPersonalAgent(spaceId)?.id;
+      if (!agent) throw new Error("Agents could not be loaded. Reopen Misty to retry.");
+      set({ selectedAgentId: agent });
       const external =
         get().captureEnabled && (await (await import("./screenContext")).screenStatus()).external;
-      if (!origin && !browserRequest && !handoff?.selection && !external) {
+      if (
+        !isAgentWorkerWindow() &&
+        !origin &&
+        !browserRequest &&
+        !handoff?.selection &&
+        !external
+      ) {
         const snapshot = await requestHostContext({
           accountId,
           spaceId,
@@ -295,13 +330,74 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       if (get().accountId === accountId) set({ working: false, error: globalMistyError(error) });
       return;
     }
+    if (get().executionMode === "team" && !isAgentWorkerWindow()) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const agent = usePersonalAgentsStore
+          .getState()
+          .agents.find((a) => a.id === get().selectedAgentId);
+        if (!agent) throw new Error("Select an agent first.");
+        const conversationId = await conversationForGlobalPrompt(
+          () => ({ ...requestState, selectedAgentId: agent.id, context: requestContext }),
+          normalized,
+        );
+        if (get().accountId !== accountId) return;
+        await invoke("agent_window_open", {
+          request: {
+            accountId,
+            agentId: agent.id,
+            spaceId,
+            name: agent.name,
+            task: {
+              accountId,
+              agentId: agent.id,
+              spaceId,
+              prompt: normalized,
+              attachments,
+              conversationId,
+            },
+          },
+        });
+        set({ working: false, query: "", error: null });
+      } catch (error) {
+        set({ working: false, error: globalMistyError(error) });
+      }
+      return;
+    }
+    let executionTaskId: string | undefined;
+    if (get().executionMode !== "user") {
+      try {
+        const execution = await startLocalExecution(
+          accountId,
+          get().selectedAgentId!,
+          spaceId,
+          get().executionMode === "team" ? "team" : "agent",
+        );
+        executionTaskId = execution.taskId;
+        requestContext = [
+          ...requestContext.filter((ref) => ref.kind !== "browser-tab"),
+          ...execution.context,
+        ];
+        deviceContexts = execution.deviceContexts;
+      } catch (error) {
+        set({ working: false, error: globalMistyError(error) });
+        return;
+      }
+    } else if (useLocalExecution.getState().execution?.state === "running") {
+      await settleLocalExecution("paused");
+    }
     let conversationId: string;
     try {
       conversationId = await conversationForGlobalPrompt(
-        () => ({ ...requestState, context: requestContext }),
+        () => ({
+          ...requestState,
+          selectedAgentId: get().selectedAgentId,
+          context: requestContext,
+        }),
         normalized,
       );
     } catch (error) {
+      if (executionTaskId) await settleLocalExecution("paused", executionTaskId);
       if (get().accountId === accountId) set({ working: false, error: globalMistyError(error) });
       return;
     }
@@ -326,6 +422,14 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     replaceActiveGlobalInvocationStream();
     try {
       const created = await aiSurfaceApi.createInvocation({
+        agentId:
+          get().conversations.find((c) => c.id === conversationId)?.agentId ||
+          get().selectedAgentId,
+        taskId: executionTaskId,
+        executionMode: get().executionMode ?? "user",
+        windowLabel: (await import("@/shared/platform/tauri")).hasTauriInternals()
+          ? (await import("@tauri-apps/api/window")).getCurrentWindow().label
+          : undefined,
         mode: "drawer",
         surfaceId: handoff?.surfaceId ?? "global",
         trigger: selection ? "selection" : "message",
@@ -342,13 +446,46 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         ...(conversationId.startsWith("local-") ? {} : { conversationId }),
         idempotencyKey: `global-answer-${globalMistyId()}`,
       });
-      if (get().accountId !== accountId) return;
+      if (
+        get().accountId !== accountId ||
+        (executionTaskId &&
+          (useLocalExecution.getState().execution?.taskId !== executionTaskId ||
+            useLocalExecution.getState().execution?.state !== "running"))
+      ) {
+        await aiSurfaceApi.cancelInvocation(created.invocationId).catch(() => {});
+        return;
+      }
       set({ invocationId: created.invocationId });
       replaceActiveGlobalInvocationStream(
         subscribeToAiInvocation(created.eventsUrl, {
           onEvent: (event) => {
             if (get().accountId !== accountId) return;
+            if (get().invocationId !== created.invocationId) return;
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
+            if (
+              executionTaskId &&
+              event.type === "assistant.status" &&
+              event.phase === "awaiting_intervention"
+            ) {
+              void pauseLocalExecution(executionTaskId);
+              set({
+                error:
+                  event.text ||
+                  "The task needs your help. Complete the requested action in its page, then select Resume.",
+              });
+            }
+            if (
+              ["invocation.completed", "invocation.failed", "invocation.canceled"].includes(
+                event.type,
+              )
+            ) {
+              if (executionTaskId)
+                void settleLocalExecution(
+                  event.type === "invocation.completed" ? "finished" : "paused",
+                  executionTaskId,
+                );
+              void usePersonalAgentsStore.getState().load(accountId);
+            }
             if (event.type === "artifact.proposed" || event.type === "approval.required")
               set({ pendingArtifact: event.artifact, artifactPaneId: sourcePaneId });
             if (event.type === "effect.applied") set({ pendingArtifact: undefined });
@@ -362,7 +499,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               }).catch((error) => set({ error: globalMistyError(error) }));
           },
           onError: (streamError) => {
-            if (get().accountId !== accountId) return;
+            if (get().accountId !== accountId || get().invocationId !== created.invocationId)
+              return;
             patchConversationMessage(set, get, conversationId, assistantMessage.id, {
               content: "Misty lost the response stream. You can retry without affecting search.",
               state: "failed",
@@ -370,6 +508,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               activity: undefined,
             });
             set({ working: false, error: streamError.message });
+            if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
           },
         }),
       );
@@ -382,6 +521,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         activity: undefined,
       });
       set({ working: false, error: globalMistyError(error) });
+      if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
     }
   },
   submitAgentTask: async (prompt, _paneId, presentation = "panel") =>

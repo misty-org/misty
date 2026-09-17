@@ -202,7 +202,7 @@ function activeSpaceIdFromPath(pathname: string): string {
 
 function spaceRailLinkClass(active: boolean, dropTarget: boolean): string {
   return cn(
-    "misty-navbar-marker-side group/space relative grid size-[50px] shrink-0 place-items-center rounded-full bg-transparent outline-none",
+    "misty-navbar-marker-side group/space relative grid size-[50px] shrink-0 place-items-center rounded-[25%] bg-transparent outline-none",
     "transition-all",
     "focus-visible:ring-2 focus-visible:ring-charcoal-active",
     active && "text-cream",

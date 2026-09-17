@@ -1,3 +1,4 @@
+import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { lazy, Suspense } from "react";
 import { useLocation } from "react-router-dom";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
@@ -43,7 +44,7 @@ export function TrustedAppSurface(props: TrustedAppSurfaceProps) {
         spaceId={props.space?.id ?? ""}
         route={props.route}
       >
-        <Suspense fallback={<div role="status">Opening {props.app.name}…</div>}>
+        <Suspense fallback={<LoadingScreen label={`Opening ${props.app.name}`} />}>
           <TrustedFeature {...props} />
         </Suspense>
       </TrustedAppRouteScope>

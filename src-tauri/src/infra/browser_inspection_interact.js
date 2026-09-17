@@ -19,6 +19,15 @@ function (target, action, expectedOrigin, expectedDocument) {
     snapshot.consumed = true;
     targets?.clear();
     switch (action.kind) {
+      case "point": {
+        if(![action.x,action.y].every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=1))throw new Error("Point coordinates must be within the inspected viewport.");
+        const x=action.x*innerWidth,y=action.y*innerHeight;
+        const pointed=document.elementFromPoint(x,y);
+        if(!pointed||pointed.closest('input[type="password"],input[type="file"]'))throw new Error("This point requires human interaction.");
+        for(const type of ["pointerdown","pointerup"])pointed.dispatchEvent(new PointerEvent(type,{clientX:x,clientY:y,bubbles:true,cancelable:true,pointerType:"mouse",button:0}));
+        pointed.dispatchEvent(new MouseEvent("click",{clientX:x,clientY:y,bubbles:true,cancelable:true,button:0}));
+        break;
+      }
       case "fill": {
         if (typeof action.text !== "string" || action.text.length > 65536) throw new Error("Invalid text input.");
         if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {

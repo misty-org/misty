@@ -23,6 +23,11 @@ describe("browser homepage", () => {
     );
   });
 
+  it("completes bare local addresses to HTTP", () => {
+    expect(normalizeBrowserHomeUrl("localhost:3000")).toBe("http://localhost:3000/");
+    expect(normalizeBrowserHomeUrl("127.0.0.1:8080")).toBe("http://127.0.0.1:8080/");
+  });
+
   it("keeps an explicit http or https address", () => {
     expect(normalizeBrowserHomeUrl("http://localhost:3000/")).toBe("http://localhost:3000/");
     expect(normalizeBrowserHomeUrl("https://example.com/start")).toBe("https://example.com/start");

@@ -96,4 +96,21 @@ describe("analytics lifecycle", () => {
     await manager.trackOnboardingCompleted();
     expect(client.events.filter((item) => item.event === "onboarding_completed")).toHaveLength(1);
   });
+
+  it("waits for a verified server session before syncing preferences and stops after sign-out", async () => {
+    const lifecycle = await import("./lifecycle");
+    const sync = vi.fn().mockResolvedValue(undefined);
+    lifecycle.configureTelemetryPreferencesSync(sync);
+    lifecycle.setAnalyticsAuthenticationState(false);
+    lifecycle.telemetryPreferencesChanged(false, false);
+    expect(sync).not.toHaveBeenCalled();
+    lifecycle.setAnalyticsAuthenticationState(true);
+    lifecycle.setAnalyticsAuthenticationState(true);
+    expect(sync).toHaveBeenCalledTimes(1);
+    lifecycle.telemetryPreferencesChanged(false, true);
+    expect(sync).toHaveBeenCalledTimes(2);
+    lifecycle.setAnalyticsAuthenticationState(false);
+    lifecycle.telemetryPreferencesChanged(false, false);
+    expect(sync).toHaveBeenCalledTimes(2);
+  });
 });

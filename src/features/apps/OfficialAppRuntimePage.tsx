@@ -1,3 +1,5 @@
+import { LoadingScreen } from "@/shared/ui/loading-screen";
+import NativeAgentsPage from "@/features/agents/AgentsPage";
 import { retainAppAccessRefresh } from "./appAccessRefresh";
 import { installedDevelopmentRelease } from "@/api/apps/developmentRelease";
 import { errorText } from "@/shared/lib/format";
@@ -6,16 +8,17 @@ import { workspaceSurfaceFromRoute } from "@/features/workspace/routeSurface";
 import { discoverAppName } from "./appDetailsModel";
 import { useAppDownloads } from "./useAppDownloads";
 import { appConsentKey, useAppConsent } from "./useAppConsent";
+import { hasInvalidDesktopAppRuntime } from "./desktopAppPolicy";
 import { assertAppCompatible } from "./appCompatibility";
 import { appsApi, type OfficialApp, type OfficialAppSession } from "@/api/apps";
 import { resolveRequiredApiBase } from "@/api/client";
 import { useAuth } from "@/features/auth";
 import { officialDesktopPackageReady } from "@/features/apps/desktop-package-runtime";
-import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces/core";
+
 import type { WorkspaceTab } from "@/features/workspace/core";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { Button } from "@/shared/ui";
-import { AlertCircle, LoaderCircle, RotateCw, Store } from "lucide-react";
+import { AlertCircle, RotateCw, Store } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { MiniAppRuntime } from "./MiniAppRuntime";
@@ -30,6 +33,15 @@ import { TrustedAppSurface } from "@/features/apps/TrustedAppSurface";
 const refreshBeforeExpiryMs = 45_000;
 
 export function OfficialAppRuntimePage(
+  props: { appId?: string; spaceId?: string; tab?: WorkspaceTab; active?: boolean } = {},
+) {
+  const params = useParams();
+  if ((props.appId ?? params.appId) === "agents")
+    return <NativeAgentsPage spaceId={props.spaceId} />;
+  return <InstalledAppRuntimePage {...props} />;
+}
+
+function InstalledAppRuntimePage(
   props: { appId?: string; spaceId?: string; tab?: WorkspaceTab; active?: boolean } = {},
 ) {
   const params = useParams();
@@ -53,19 +65,12 @@ export function OfficialAppRuntimePage(
       : props.tab;
   const catalog = useAppsStore((state) => state.catalog);
 
-  const installationsBySpace = useAppsStore((state) => state.bySpace);
-
+  const installations = useAppsStore((state) => state.installations);
+  const appsReady = useAppsStore((state) => state.ready);
+  const appsError = useAppsStore((state) => state.error);
   const loadApps = useAppsStore((state) => state.load);
-  const spaces = useSpacesStore((state) => state.spaces);
-  const requestedSpaceId = props.spaceId ?? workspaceRoute.searchParams.get("space") ?? "";
-  const space = requestedSpaceId
-    ? spaces.find((candidate) => candidate.id === requestedSpaceId)
-    : preferredDefaultSpace(spaces);
-  const appsReady = installationsBySpace[space?.id ?? ""] !== undefined;
-  const installation = (installationsBySpace[space?.id ?? ""] ?? []).find(
-    (candidate) => candidate.app_id === appId,
-  );
-  const appsError = useAppsStore((state) => state.bySpaceErrors[space?.id ?? ""] ?? "");
+  const installation = installations.find((candidate) => candidate.app_id === appId);
+  const space = undefined;
   const savedRelease = installation?.release_metadata;
   const offeredCandidate = useMemo(
     () =>
@@ -89,11 +94,9 @@ export function OfficialAppRuntimePage(
   const pinnedApp = useRef<{ key: string; app: OfficialApp } | null>(null);
   const pinnedKey = JSON.stringify([
     user?.id,
-    space?.id,
     appId,
     props.tab?.id,
-    installationsBySpace[space?.id ?? ""]?.find((item) => item.app_id === appId)
-      ?.authority_generation,
+    installation?.authority_generation,
   ]);
   if (pinnedApp.current?.key !== pinnedKey) pinnedApp.current = null;
   const app = pinnedApp.current?.app ?? offeredApp;
@@ -102,12 +105,7 @@ export function OfficialAppRuntimePage(
     Boolean(app && user?.id && state.agreed[appConsentKey(user.id, app)]),
   );
   const trustedHostApp = app ? isTrustedHostApp(app) : false;
-  const sessionContext = JSON.stringify([
-    user?.id,
-    appId,
-    space?.id,
-    installation?.authority_generation,
-  ]);
+  const sessionContext = JSON.stringify([user?.id, appId, installation?.authority_generation]);
   const [connection, setConnection] = useState<{
     context: string;
     session: OfficialAppSession;
@@ -120,14 +118,15 @@ export function OfficialAppRuntimePage(
   const needsReview = app && !pinnedApp.current ? officialAppNeedsReview(app, installation) : false;
 
   useEffect(() => {
-    if (!user?.id || !space?.id) return;
-    return retainAppAccessRefresh(user.id, space.id);
-  }, [loadApps, user?.id, space?.id]);
+    if (!user?.id) return;
+    return retainAppAccessRefresh(user.id, "");
+  }, [loadApps, user?.id]);
 
   const connect = useCallback(async () => {
     const runtime = isNativeMobileBuild ? app?.mobile.runtime : app?.desktop.runtime;
     if (
       !app ||
+      (!isNativeMobileBuild && hasInvalidDesktopAppRuntime(app)) ||
       !personalConsent ||
       removed ||
       (trustedHostApp && runtime === "embedded") ||
@@ -147,7 +146,7 @@ export function OfficialAppRuntimePage(
       if (attempt !== connectionAttempt.current || useAppDownloads.getState().removed[app.id])
         return;
       const [nextSession, nextServerBase] = await Promise.all([
-        appsApi.createSession(app.id, space?.id, installation.authority_generation),
+        appsApi.createSession(app.id, undefined, installation.authority_generation),
         resolveRequiredApiBase(),
       ]);
       if (attempt !== connectionAttempt.current) return;
@@ -166,8 +165,8 @@ export function OfficialAppRuntimePage(
   }, [
     app,
     installation?.state,
+    installation?.authority_generation,
     needsReview,
-    space?.id,
     sessionContext,
     trustedHostApp,
     pinnedKey,
@@ -200,17 +199,17 @@ export function OfficialAppRuntimePage(
         description={appsError}
         action="Try again"
         onAction={() => {
-          if (user?.id && space?.id) void loadApps(user.id, true, space.id);
+          if (user?.id) void loadApps(user.id, true);
         }}
       />
     );
-  if (!appsReady) return <RuntimeLoading label="Checking installed apps" />;
+  if (!appsReady) return <LoadingScreen label="Checking installed apps" />;
   if (!app || installation?.state !== "installed") {
     return (
       <RuntimeState
         icon={Store}
-        title="This app is not available in this Space"
-        description="A Space manager can add or restore it from Discover."
+        title="This app is not installed"
+        description="Install or restore it for your account from Discover."
         action="Open Discover"
         onAction={() => navigate("/discover")}
       />
@@ -241,6 +240,18 @@ export function OfficialAppRuntimePage(
   }
 
   const runtime = isNativeMobileBuild ? app.mobile.runtime : app.desktop.runtime;
+  if (!isNativeMobileBuild && hasInvalidDesktopAppRuntime(app)) {
+    return (
+      <RuntimeState
+        icon={Store}
+        app={app}
+        title={`${app.name} update required`}
+        description={`Get the downloadable ${app.name} package from Discover to continue.`}
+        action="Open Discover"
+        onAction={() => navigate(`/discover?app=${encodeURIComponent(app.id)}`)}
+      />
+    );
+  }
   if (runtime === "unsupported") {
     return (
       <RuntimeState
@@ -256,7 +267,7 @@ export function OfficialAppRuntimePage(
         icon={Store}
         app={app}
         title={discoverAppName(app)}
-        description="Removed from this device. Get it again to use it in your Spaces."
+        description="Removed from this device. Install it again to use it."
         action="Get app"
         onAction={() => navigate(`/discover?app=${encodeURIComponent(app.id)}`)}
       />
@@ -283,7 +294,7 @@ export function OfficialAppRuntimePage(
   if (trustedHostApp && runtime === "embedded" && user) {
     return (
       <TrustedAppSurface
-        key={`${user.id}:${app.id}:${space?.id ?? ""}`}
+        key={`${user.id}:${app.id}:${""}`}
         app={app}
         space={space}
         tab={runtimeTab}
@@ -315,7 +326,7 @@ export function OfficialAppRuntimePage(
     );
   }
   if (!session || !user || !serverBase) {
-    return <RuntimeLoading label={`Opening ${app.name}`} />;
+    return <LoadingScreen label={`Opening ${app.name}`} />;
   }
 
   if (trustedHostApp && !isNativeMobileBuild && runtime === "downloaded") {
@@ -410,15 +421,6 @@ function RuntimeState(props: {
           </Button>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function RuntimeLoading({ label }: { label: string }) {
-  return (
-    <div className="grid h-full place-items-center bg-charcoal-bg" role="status">
-      <LoaderCircle className="animate-spin text-cream-muted" size={22} aria-hidden="true" />
-      <span className="sr-only">{label}</span>
     </div>
   );
 }

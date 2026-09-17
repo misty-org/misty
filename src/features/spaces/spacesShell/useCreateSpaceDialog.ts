@@ -1,6 +1,4 @@
-import { appsApi, type OfficialApp } from "@/api/apps";
 import { personalSpaceTemplatesApi } from "@/api/spaces/templates";
-import { selectionComplete } from "./SpaceAppSelection";
 import { reportSystemError } from "@/features/activity";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
@@ -32,23 +30,19 @@ export function useCreateSpaceDialog(options: {
   const [step, setStep] = useState(0);
   const [templates, setTemplates] = useState<SpaceTemplate[]>([]);
   const [templateId, setTemplateIdValue] = useState("blank");
-  const [catalog, setCatalog] = useState<OfficialApp[]>([]);
-  const [selectedApps, setSelectedApps] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [createError, setCreateError] = useState("");
   const setTemplateId = (id: string) => {
     setTemplateIdValue(id);
-    setSelectedApps(templates.find((template) => template.id === id)?.app_ids ?? []);
   };
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!open || templates.length) return;
     let active = true;
-    Promise.all([spacesApi.templates(), appsApi.catalog(), personalSpaceTemplatesApi.list()])
-      .then(([curated, apps, personal]) => {
+    Promise.all([spacesApi.templates(), personalSpaceTemplatesApi.list()])
+      .then(([curated, personal]) => {
         if (!active) return;
-        setCatalog(apps.apps);
         setTemplates([
           ...curated.templates,
           ...personal.templates.map((item) => ({
@@ -56,7 +50,7 @@ export function useCreateSpaceDialog(options: {
             name: item.name,
             description: item.description,
             version: item.version,
-            app_ids: item.apps.map((app) => app.app_id),
+            app_ids: [],
             personal: true,
             recommended_integrations: [],
             seed_summary: { task_count: 0, note_count: 0, collection_count: 0 },
@@ -100,13 +94,7 @@ export function useCreateSpaceDialog(options: {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = name.trim();
-    if (
-      !trimmed ||
-      creating ||
-      !selectionComplete(catalog, selectedApps) ||
-      step < CREATE_STEP_COUNT - 1
-    )
-      return;
+    if (!trimmed || creating || step < CREATE_STEP_COUNT - 1) return;
     setCreating(true);
     setCreateError("");
     try {
@@ -114,12 +102,8 @@ export function useCreateSpaceDialog(options: {
         name: trimmed,
         template_id: templateId,
         integration_providers: [],
-        app_ids: selectedApps,
-        app_permissions: Object.fromEntries(
-          catalog
-            .filter((app) => selectedApps.includes(app.id))
-            .map((app) => [app.id, app.permission_version]),
-        ),
+        app_ids: [],
+        app_permissions: {},
       });
       setOpen(false);
       restoreDocumentInteractivityAfterModalClose();
@@ -150,12 +134,8 @@ export function useCreateSpaceDialog(options: {
     templateId,
     setTemplateId,
     creating,
-    catalog,
-    selectedApps,
-    setSelectedApps,
     loadError,
     createError,
-    selectionValid: selectionComplete(catalog, selectedApps),
     close,
     start,
     submit,

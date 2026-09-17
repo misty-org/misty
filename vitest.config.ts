@@ -29,7 +29,7 @@ export default defineConfig({
     environment: "jsdom",
     include: [
       "src/**/*.test.{ts,tsx}",
-      `${appSourceRoot(process.cwd())}/apps/{journal,planner,library,agents,files,browser,code,terminal,chat,inbox,shared}/**/*.test.{ts,tsx}`,
+      `${appSourceRoot(process.cwd())}/apps/{journal,planner,library,agents,files,browser,code,terminal,chat,inbox,music,media,shared}/**/*.test.{ts,tsx}`,
     ],
     restoreMocks: true,
     setupFiles: ["./src/tests/setup.ts"],
