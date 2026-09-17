@@ -85,3 +85,45 @@ func TestHomeDashboardPersistsPerAccountActivityAndRecentApps(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobalHomeWorksWithoutSpaceAndPreservesAccountHistory(t *testing.T) {
+	database := openTestDatabase(t)
+	ctx := context.Background()
+	owner, err := database.CreateUser("Global Home Owner", "global-home-owner@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dateKey := time.Now().UTC().Format("2006-01-02")
+	snapshot, err := database.RecordHomeVisit(ctx, owner.ID, "", dateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Activity[dateKey] != 1 {
+		t.Fatalf("global visit count = %d", snapshot.Activity[dateKey])
+	}
+	space, err := database.CreateSpace(ctx, owner.ID, "Legacy Home")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := database.RecordHomeVisit(ctx, owner.ID, space.ID, dateKey); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err = database.HomeDashboard(ctx, owner.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Activity[dateKey] != 2 {
+		t.Fatalf("combined visit count = %d", snapshot.Activity[dateKey])
+	}
+	outsider, err := database.CreateUser("Global Home Outsider", "global-home-outsider@example.com", "password123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err = database.HomeDashboard(ctx, outsider.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Activity) != 0 {
+		t.Fatalf("leaked account history: %#v", snapshot.Activity)
+	}
+}

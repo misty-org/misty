@@ -101,7 +101,7 @@ func (s *SpacesService) GlobalSearch() http.HandlerFunc {
 		var embedding []float64
 		semanticUsed := false
 		if r.URL.Query().Get("assist") == "1" {
-			if err := s.database.RequireSpaceApp(r.Context(), userID, strings.TrimSpace(r.URL.Query().Get("space_id")), "agents"); err != nil {
+			if _, err := s.database.SpaceByID(r.Context(), userID, strings.TrimSpace(r.URL.Query().Get("space_id"))); err != nil {
 				writeSpaceError(w, err)
 				return
 			}

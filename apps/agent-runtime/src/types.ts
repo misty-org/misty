@@ -34,7 +34,7 @@ export interface SpaceTaskContext {
   attachments?: Array<{
     id: string;
     name: string;
-    mime_type: "image/jpeg" | "image/png" | "image/webp";
+    mime_type: "image/jpeg" | "image/png" | "image/webp" | "application/pdf" | "text/plain";
     data_url: string;
     width: number;
     height: number;

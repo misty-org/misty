@@ -27,14 +27,12 @@ func TestAuthLifecycle(t *testing.T) {
 	if registerBody["username"] != "ada_lovelace" {
 		t.Fatalf("register username = %#v, want ada_lovelace", registerBody["username"])
 	}
-	registerToken, ok := registerBody["token"].(string)
-	if !ok || registerToken == "" {
-		t.Fatalf("register response missing token: %#v", registerBody)
+	if _, ok := registerBody["token"]; ok {
+		t.Fatal("login credentials must not be returned in JSON")
 	}
-
-	registerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, registerToken)
+	registerMeRec := performJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, registerCookie)
 	if registerMeRec.Code != http.StatusOK {
-		t.Fatalf("register bearer /me status = %d, want %d, body = %q", registerMeRec.Code, http.StatusOK, registerMeRec.Body.String())
+		t.Fatalf("register /me=%d: %s", registerMeRec.Code, registerMeRec.Body.String())
 	}
 	registerMeBody := decodeJSONResponse(t, registerMeRec)
 	if registerMeBody["username"] != "ada_lovelace" {
@@ -63,9 +61,12 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Fatal("session cookie should be HttpOnly")
 	}
 	loginBody := decodeJSONResponse(t, loginRec)
-	sessionToken, ok := loginBody["token"].(string)
-	if !ok || sessionToken == "" {
-		t.Fatalf("login response missing token: %#v", loginBody)
+	if _, ok := loginBody["token"]; ok {
+		t.Fatal("login credentials must not be returned in JSON")
+	}
+	refreshCookie := requireCookie(t, loginRec, api.RefreshCookieName)
+	if !refreshCookie.HttpOnly {
+		t.Fatal("refresh cookie must be HttpOnly")
 	}
 
 	meRec := performJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionCookie)
@@ -73,20 +74,37 @@ func TestAuthLifecycle(t *testing.T) {
 		t.Fatalf("/me status = %d, want %d, body = %q", meRec.Code, http.StatusOK, meRec.Body.String())
 	}
 
-	bearerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionToken)
-	if bearerMeRec.Code != http.StatusOK {
-		t.Fatalf("bearer /me status = %d, want %d, body = %q", bearerMeRec.Code, http.StatusOK, bearerMeRec.Body.String())
+	bearerMeRec := performBearerJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionCookie.Value)
+	if bearerMeRec.Code != http.StatusUnauthorized {
+		t.Fatalf("account JWT accepted as bearer: %d", bearerMeRec.Code)
 	}
-
-	logoutRec := performBearerJSONRequest(t, api.Logout(database), http.MethodPost, "/logout", nil, sessionToken)
+	refreshRec := performJSONRequest(t, api.RefreshSession(database), http.MethodPost, "/auth/refresh", nil, refreshCookie)
+	if refreshRec.Code != http.StatusNoContent {
+		t.Fatalf("refresh=%d: %s", refreshRec.Code, refreshRec.Body.String())
+	}
+	nextRefresh := requireCookie(t, refreshRec, api.RefreshCookieName)
+	if nextRefresh.Value == refreshCookie.Value {
+		t.Fatal("refresh cookie was not rotated")
+	}
+	logoutRec := performJSONRequest(t, api.Logout(database), http.MethodPost, "/logout", nil, nextRefresh)
 	if logoutRec.Code != http.StatusOK {
-		t.Fatalf("logout status = %d, want %d", logoutRec.Code, http.StatusOK)
+		t.Fatalf("logout=%d", logoutRec.Code)
+	}
+	for _, cookie := range logoutRec.Result().Cookies() {
+		if cookie.MaxAge != -1 {
+			t.Fatal("logout must expire both cookies")
+		}
+	}
+	replayRec := performJSONRequest(t, api.RefreshSession(database), http.MethodPost, "/auth/refresh", nil, nextRefresh)
+	if replayRec.Code != http.StatusUnauthorized {
+		t.Fatalf("refresh after logout=%d", replayRec.Code)
+	}
+	// Stateless access credentials remain valid until their five-minute expiry.
+	meAfterLogout := performJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionCookie)
+	if meAfterLogout.Code != http.StatusOK {
+		t.Fatalf("access token should remain valid until expiry: %d", meAfterLogout.Code)
 	}
 
-	meAfterLogout := performJSONRequest(t, api.GetMe(database), http.MethodGet, "/me", nil, sessionCookie)
-	if meAfterLogout.Code != http.StatusUnauthorized {
-		t.Fatalf("/me after logout status = %d, want %d", meAfterLogout.Code, http.StatusUnauthorized)
-	}
 }
 
 func TestAuthHandlersErrorPaths(t *testing.T) {

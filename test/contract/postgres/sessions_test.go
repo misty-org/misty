@@ -38,6 +38,7 @@ func TestSessionCRUDAndExpiry(t *testing.T) {
 	if _, err := database.Conn.Exec(`UPDATE sessions SET expires_at = NOW() - INTERVAL '1 minute' WHERE token_hash = $1`, tokenHash); err != nil {
 		t.Fatalf("expire session update error = %v", err)
 	}
+	TestingClearSessionCache()
 
 	userID, err = database.GetSessionUserID(tokenHash)
 	if err != nil {
@@ -49,6 +50,40 @@ func TestSessionCRUDAndExpiry(t *testing.T) {
 
 	if err := database.DeleteSession(tokenHash); err != nil {
 		t.Fatalf("DeleteSession() error = %v", err)
+	}
+}
+
+func TestSessionCacheHitsAndEviction(t *testing.T) {
+	database := openTestDatabase(t)
+	TestingClearSessionCache()
+
+	user, err := database.CreateUser("Cache User", "cache@example.com", "password123")
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+
+	tokenHash := security.HashToken("cached-session-token")
+	if err := database.CreateSession(tokenHash, user.ID); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// First lookup (cache hit from CreateSession)
+	userID, err := database.GetSessionUserID(tokenHash)
+	if err != nil || userID != user.ID {
+		t.Fatalf("GetSessionUserID() = %q, err = %v, want %q", userID, err, user.ID)
+	}
+
+	// Delete session should evict from cache
+	if err := database.DeleteSession(tokenHash); err != nil {
+		t.Fatalf("DeleteSession() error = %v", err)
+	}
+
+	userID, err = database.GetSessionUserID(tokenHash)
+	if err != nil {
+		t.Fatalf("GetSessionUserID() after delete error = %v", err)
+	}
+	if userID != "" {
+		t.Fatalf("GetSessionUserID() after delete = %q, want empty", userID)
 	}
 }
 

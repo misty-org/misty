@@ -798,6 +798,18 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         ),
         execute: (value, options) =>
           execution.executeCapability(options.toolCallId, descriptor.name, value),
+        toModelOutput: ({output}) => {
+          if (descriptor.name === "browser.visual" && output && typeof output === "object") {
+            const result = output as Record<string, unknown>;
+            const image = result.image as {dataUrl?: string} | undefined;
+            const match = image?.dataUrl?.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+            if (match?.[1] && match[2]) {
+              const {image: _image, ...observed} = result;
+              return {type:"content", value:[{type:"text",text:JSON.stringify(observed)},{type:"image-data",data:match[2],mediaType:match[1]}]};
+            }
+          }
+          return {type:"text",value:JSON.stringify(output) ?? "null"};
+        },
       }),
     ]),
   );
@@ -977,14 +989,14 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
             {
               role: "user",
               content: [
-                { type: "text", text: context.prompt },
+                { type: "text", text: context.prompt + "\nSupplied task files (use these IDs for upload):\n" + (context.attachments ?? []).map(file => JSON.stringify({attachmentId:file.id,name:file.name,mimeType:file.mime_type})).join("\n") },
                 ...images.map(
                   (image) =>
-                    ({
-                      type: "image",
-                      image: image.data_url,
-                      mediaType: image.mime_type,
-                    }) as const,
+                    image.mime_type === "text/plain"
+                      ? {type:"text" as const,text:`Attachment ${image.name}:\n${Buffer.from(image.data_url.split(",")[1]??"","base64").toString("utf8")}`}
+                      : image.mime_type === "application/pdf"
+                        ? {type:"file" as const,data:image.data_url,mediaType:"application/pdf",filename:image.name}
+                        : {type:"image" as const,image:image.data_url,mediaType:image.mime_type},
                 ),
               ],
             },

@@ -25,10 +25,6 @@ func TestConnectedAccountRemovalRPCRequiresOwnershipAndWriteScope(t *testing.T) 
 		return user.ID
 	}
 	owner, other := newUser(), newUser()
-	space, err := database.CreateSpace(t.Context(), owner, "Connections")
-	if err != nil {
-		t.Fatal(err)
-	}
 	spaces, err := NewSpacesService(database, nil, base64.StdEncoding.EncodeToString([]byte(strings.Repeat("c", 32))))
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +54,7 @@ func TestConnectedAccountRemovalRPCRequiresOwnershipAndWriteScope(t *testing.T) 
 			t.Fatal(err)
 		}
 		token := "connection-rpc-" + uuid.NewString()
-		if _, err := database.CreateAppRuntimeSession(t.Context(), owner, app.ID, security.HashToken(token), space.ID, db.AppRuntimeSessionTTL); err != nil {
+		if _, err := database.CreateAppRuntimeSession(t.Context(), owner, app.ID, security.HashToken(token), "", db.AppRuntimeSessionTTL); err != nil {
 			t.Fatal(err)
 		}
 		return token

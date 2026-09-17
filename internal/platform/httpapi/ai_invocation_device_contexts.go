@@ -7,8 +7,8 @@ import (
 )
 
 func validateAIInvocationDeviceContexts(references []aiContextReference, contexts []aiInvocationDeviceContext, spaceID string) error {
-	if len(contexts) > 2 {
-		return errors.New("at most two browser workspaces can be attached")
+	if len(contexts) > 50 {
+		return errors.New("at most 50 browser workspaces can be attached")
 	}
 	if len(contexts) > 0 && strings.TrimSpace(spaceID) == "" {
 		return errors.New("browser workspaces require a bound Space")
@@ -28,7 +28,7 @@ func validateAIInvocationDeviceContexts(references []aiContextReference, context
 		}
 		matched := false
 		for _, reference := range references {
-			if reference.Kind == "browser-tab" && reference.Privacy == "device" && reference.Attached && reference.OpaqueScopeID == deviceContext.OpaqueRef {
+			if reference.Kind == "browser-tab" && reference.Privacy == "device" && reference.Attached && (reference.SpaceID == "" || reference.SpaceID == spaceID) && reference.OpaqueScopeID == deviceContext.OpaqueRef {
 				matched = true
 				break
 			}

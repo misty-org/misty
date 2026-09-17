@@ -52,6 +52,7 @@ export declare const mistyTerminalCommands: readonly ["terminal.clear", "termina
 export declare const mistyPlannerCommands: readonly ["planner.create", "roadmap.create", "roadmap.copy", "roadmap.paste", "roadmap.duplicate", "roadmap.delete", "roadmap.undo", "roadmap.redo"];
 export declare const mistyBrowserCommands: readonly ["navigation.back", "navigation.forward", "navigation.refresh", "browser.annotation_undo", "browser.annotation_redo"];
 export declare const mistyCodeCommands: readonly ["code.add_cursor_above", "code.add_cursor_below", "code.apply_inline_ai", "code.code_actions", "code.command_palette", "code.document_symbols", "code.format_document", "code.go_to_definition", "code.harpoon", "code.inline_ai", "code.open_multibuffer_excerpt", "code.previous_file", "code.quick_open", "code.references", "code.rename", "code.save", "code.search_project", "code.select_all_occurrences", "code.select_next_occurrence", "code.show_hover", "code.toggle_explorer", "code.toggle_terminal", "code.undo_selection"];
+export declare const mistyFilesCommands: readonly ["explorer.new_folder", "explorer.search", "explorer.rename", "explorer.batch_rename", "explorer.delete", "explorer.download", "explorer.open_with", "explorer.copy", "explorer.cut", "explorer.paste", "explorer.copy_path", "explorer.undo", "explorer.redo", "explorer.refresh", "explorer.duplicate_finder", "explorer.compare_with", "explorer.toggle_hidden", "explorer.preview.toggle", "explorer.preview_save", "explorer.sidebar.toggle"];
 export declare const MistyAppCommandSchema: z.ZodEnum<{
     "terminal.clear": "terminal.clear";
     "terminal.search": "terminal.search";
@@ -96,6 +97,26 @@ export declare const MistyAppCommandSchema: z.ZodEnum<{
     "code.toggle_explorer": "code.toggle_explorer";
     "code.toggle_terminal": "code.toggle_terminal";
     "code.undo_selection": "code.undo_selection";
+    "explorer.new_folder": "explorer.new_folder";
+    "explorer.search": "explorer.search";
+    "explorer.rename": "explorer.rename";
+    "explorer.batch_rename": "explorer.batch_rename";
+    "explorer.delete": "explorer.delete";
+    "explorer.download": "explorer.download";
+    "explorer.open_with": "explorer.open_with";
+    "explorer.copy": "explorer.copy";
+    "explorer.cut": "explorer.cut";
+    "explorer.paste": "explorer.paste";
+    "explorer.copy_path": "explorer.copy_path";
+    "explorer.undo": "explorer.undo";
+    "explorer.redo": "explorer.redo";
+    "explorer.refresh": "explorer.refresh";
+    "explorer.duplicate_finder": "explorer.duplicate_finder";
+    "explorer.compare_with": "explorer.compare_with";
+    "explorer.toggle_hidden": "explorer.toggle_hidden";
+    "explorer.preview.toggle": "explorer.preview.toggle";
+    "explorer.preview_save": "explorer.preview_save";
+    "explorer.sidebar.toggle": "explorer.sidebar.toggle";
 }>;
 export declare function commandsForApp(appId: string): readonly MistyAppCommand[];
 export declare const MistyWorkspaceOpenSchema: z.ZodObject<{
@@ -112,6 +133,21 @@ export declare const MistyWorkspaceOpenSchema: z.ZodObject<{
     sidebarVisible: z.ZodOptional<z.ZodBoolean>;
 }, z.core.$strict>;
 export type MistyWorkspaceOpen = z.input<typeof MistyWorkspaceOpenSchema>;
+/** One ID per requested background job; increment revision only on a state transition. */
+export declare const MistyActivityOperationSchema: z.ZodObject<{
+    operationId: z.ZodString;
+    revision: z.ZodNumber;
+    status: z.ZodEnum<{
+        running: "running";
+        blocked: "blocked";
+        completed: "completed";
+        resolved: "resolved";
+    }>;
+    title: z.ZodString;
+    body: z.ZodOptional<z.ZodString>;
+    route: z.ZodOptional<z.ZodString>;
+}, z.core.$strict>;
+export type MistyActivityOperation = z.input<typeof MistyActivityOperationSchema>;
 export declare const mistyAppUiContracts: {
     readonly "workspace.dirty.set": {
         readonly params: z.ZodObject<{
@@ -181,6 +217,22 @@ export declare const mistyAppUiContracts: {
     readonly "links.openExternal": {
         readonly params: z.ZodObject<{
             url: z.ZodString;
+        }, z.core.$strict>;
+        readonly result: z.ZodPipe<z.ZodUnion<readonly [z.ZodNull, z.ZodUndefined]>, z.ZodTransform<undefined, null | undefined>>;
+    };
+    readonly "activity.operation": {
+        readonly params: z.ZodObject<{
+            operationId: z.ZodString;
+            revision: z.ZodNumber;
+            status: z.ZodEnum<{
+                running: "running";
+                blocked: "blocked";
+                completed: "completed";
+                resolved: "resolved";
+            }>;
+            title: z.ZodString;
+            body: z.ZodOptional<z.ZodString>;
+            route: z.ZodOptional<z.ZodString>;
         }, z.core.$strict>;
         readonly result: z.ZodPipe<z.ZodUnion<readonly [z.ZodNull, z.ZodUndefined]>, z.ZodTransform<undefined, null | undefined>>;
     };

@@ -50,7 +50,9 @@ export const mistyBrowserCommands = [
     "browser.annotation_undo", "browser.annotation_redo",
 ];
 export const mistyCodeCommands = ["code.add_cursor_above", "code.add_cursor_below", "code.apply_inline_ai", "code.code_actions", "code.command_palette", "code.document_symbols", "code.format_document", "code.go_to_definition", "code.harpoon", "code.inline_ai", "code.open_multibuffer_excerpt", "code.previous_file", "code.quick_open", "code.references", "code.rename", "code.save", "code.search_project", "code.select_all_occurrences", "code.select_next_occurrence", "code.show_hover", "code.toggle_explorer", "code.toggle_terminal", "code.undo_selection"];
+export const mistyFilesCommands = ["explorer.new_folder", "explorer.search", "explorer.rename", "explorer.batch_rename", "explorer.delete", "explorer.download", "explorer.open_with", "explorer.copy", "explorer.cut", "explorer.paste", "explorer.copy_path", "explorer.undo", "explorer.redo", "explorer.refresh", "explorer.duplicate_finder", "explorer.compare_with", "explorer.toggle_hidden", "explorer.preview.toggle", "explorer.preview_save", "explorer.sidebar.toggle"];
 export const MistyAppCommandSchema = z.enum([
+    ...mistyFilesCommands,
     ...mistyTerminalCommands,
     ...mistyPlannerCommands,
     ...mistyBrowserCommands,
@@ -58,6 +60,8 @@ export const MistyAppCommandSchema = z.enum([
 ]);
 export function commandsForApp(appId) {
     switch (appId) {
+        case "files":
+            return mistyFilesCommands;
         case "code":
             return mistyCodeCommands;
         case "terminal":
@@ -84,6 +88,15 @@ export const MistyWorkspaceOpenSchema = z.strictObject({
 const voidResult = z
     .union([z.null(), z.undefined()])
     .transform(() => undefined);
+/** One ID per requested background job; increment revision only on a state transition. */
+export const MistyActivityOperationSchema = z.strictObject({
+    operationId: z.string().min(1).max(160),
+    revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    status: z.enum(["running", "blocked", "completed", "resolved"]),
+    title: z.string().trim().min(1).max(160),
+    body: z.string().max(1000).optional(),
+    route: z.string().max(2048).optional(),
+});
 export const mistyAppUiContracts = {
     ...mistyWorkspaceContracts,
     "workspace.dirty.set": { params: z.strictObject({ dirty: z.boolean() }), result: voidResult },
@@ -122,6 +135,7 @@ export const mistyAppUiContracts = {
         }),
         result: voidResult,
     },
+    "activity.operation": { params: MistyActivityOperationSchema, result: voidResult },
     "activity.report": {
         params: z.strictObject({ message: z.string().min(1).max(2000) }),
         result: voidResult,

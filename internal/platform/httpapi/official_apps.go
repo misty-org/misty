@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kannachi323/misty/server/internal/appcatalog"
@@ -49,7 +51,7 @@ func MyOfficialApps(database *db.Database) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		items, err := database.SpaceApps(r.Context(), userID, chi.URLParam(r, "spaceID"))
+		items, err := database.UserApps(r.Context(), userID)
 		if err != nil {
 			writeSpaceError(w, err)
 			return
@@ -63,9 +65,9 @@ func MyOfficialApp(database *db.Database) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		spaceID, appID := chi.URLParam(r, "spaceID"), chi.URLParam(r, "appID")
+		appID := chi.URLParam(r, "appID")
 		if r.Method == http.MethodDelete {
-			item, err := database.RemoveSpaceApp(r.Context(), userID, spaceID, appID)
+			item, err := database.UninstallUserApp(r.Context(), userID, appID, time.Now())
 			if err != nil {
 				writeOfficialAppError(w, err)
 				return
@@ -89,7 +91,7 @@ func MyOfficialApp(database *db.Database) http.HandlerFunc {
 			return
 		}
 		metadata, _ := json.Marshal(app)
-		item, err := database.InstallSpaceApp(r.Context(), userID, spaceID, db.AppInstallSpec{ID: app.ID, Version: app.Version, PermissionVersion: app.PermissionVersion, Scopes: app.Scopes}, metadata)
+		item, err := database.InstallUserApp(r.Context(), userID, app.ID, app.Version, app.PermissionVersion, app.Scopes, metadata)
 		if err != nil {
 			writeOfficialAppError(w, err)
 			return
@@ -109,7 +111,7 @@ func ReorderSpaceApps(database *db.Database) http.HandlerFunc {
 		if decodeJSON(w, r, &body) != nil {
 			return
 		}
-		if err := database.ReorderSpaceApps(r.Context(), userID, chi.URLParam(r, "spaceID"), body.AppIDs); err != nil {
+		if err := database.ReorderUserApps(r.Context(), userID, body.AppIDs); err != nil {
 			writeOfficialAppError(w, err)
 			return
 		}
@@ -147,14 +149,14 @@ func CreateOfficialAppSession(database *db.Database) http.HandlerFunc {
 			return
 		}
 		session, err := database.CreateAppRuntimeSession(
-			r.Context(), userID, catalogApp.ID, security.HashToken(token), chi.URLParam(r, "spaceID"), db.AppRuntimeSessionTTL,
+			r.Context(), userID, catalogApp.ID, security.HashToken(token), body.SpaceID, db.AppRuntimeSessionTTL,
 		)
 		if err != nil {
 			writeOfficialAppError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"token": token, "app_id": session.AppID, "space_id": session.SpaceID,
+			"token": token, "app_id": session.AppID,
 			"scopes": session.Scopes, "expires_at": session.ExpiresAt, "authority_generation": session.AuthorityGeneration,
 			"sdk_base_url": "/v1/app-runtime",
 		})
@@ -262,6 +264,10 @@ func writeOfficialAppError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_app_record"})
 	case errors.Is(err, db.ErrSpaceInvalid):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_request"})
+	case errors.Is(err, context.Canceled):
+		return
+	case errors.Is(err, context.DeadlineExceeded):
+		writeJSON(w, http.StatusGatewayTimeout, map[string]string{"code": "request_timeout"})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"code": "internal_error", "message": "The app request could not be completed."})
 	}

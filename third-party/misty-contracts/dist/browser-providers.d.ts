@@ -144,5 +144,71 @@ export declare const mistyBrowserProviders: {
         readonly domains: readonly ["atlassian.net"];
         readonly auth: readonly ["id.atlassian.com", "auth.atlassian.com", "api.atlassian.com", "accounts.google.com", "login.live.com", "login.microsoftonline.com", "account.live.com", "appleid.apple.com", "idmsa.apple.com"];
     };
+    readonly reddit: {
+        readonly owner: "chat";
+        readonly url: "https://www.reddit.com/";
+        readonly domains: readonly ["reddit.com"];
+        readonly auth: readonly ["accounts.google.com", "appleid.apple.com"];
+    };
+    readonly linkedin: {
+        readonly owner: "chat";
+        readonly url: "https://www.linkedin.com/feed/";
+        readonly domains: readonly ["linkedin.com"];
+        readonly auth: readonly ["accounts.google.com", "appleid.apple.com"];
+    };
+    readonly "youtube-music": {
+        readonly owner: "music";
+        readonly url: "https://music.youtube.com/";
+        readonly domains: readonly ["music.youtube.com", "youtube.com"];
+        readonly auth: readonly ["accounts.google.com"];
+    };
+    readonly spotify: {
+        readonly owner: "music";
+        readonly url: "https://open.spotify.com/";
+        readonly domains: readonly ["open.spotify.com", "spotify.com"];
+        readonly auth: readonly ["accounts.spotify.com", "accounts.google.com", "appleid.apple.com", "facebook.com"];
+    };
+    readonly "apple-music": {
+        readonly owner: "music";
+        readonly url: "https://music.apple.com/";
+        readonly domains: readonly ["music.apple.com"];
+        readonly auth: readonly ["idmsa.apple.com", "appleid.apple.com", "account.apple.com"];
+    };
+    readonly soundcloud: {
+        readonly owner: "music";
+        readonly url: "https://soundcloud.com/";
+        readonly domains: readonly ["soundcloud.com"];
+        readonly auth: readonly ["accounts.google.com", "appleid.apple.com", "facebook.com"];
+    };
+    readonly youtube: {
+        readonly owner: "media";
+        readonly url: "https://www.youtube.com/";
+        readonly domains: readonly ["youtube.com"];
+        readonly auth: readonly ["accounts.google.com"];
+    };
+    readonly twitch: {
+        readonly owner: "media";
+        readonly url: "https://www.twitch.tv/";
+        readonly domains: readonly ["twitch.tv"];
+        readonly auth: readonly ["passport.twitch.tv", "accounts.google.com", "appleid.apple.com"];
+    };
+    readonly netflix: {
+        readonly owner: "media";
+        readonly url: "https://www.netflix.com/";
+        readonly domains: readonly ["netflix.com"];
+        readonly auth: readonly ["netflix.com"];
+    };
+    readonly crunchyroll: {
+        readonly owner: "media";
+        readonly url: "https://www.crunchyroll.com/";
+        readonly domains: readonly ["crunchyroll.com"];
+        readonly auth: readonly ["accounts.google.com", "appleid.apple.com"];
+    };
+    readonly "prime-video": {
+        readonly owner: "media";
+        readonly url: "https://www.primevideo.com/";
+        readonly domains: readonly ["primevideo.com", "amazon.com"];
+        readonly auth: readonly ["amazon.com"];
+    };
 };
 export type MistyBrowserProviderId = keyof typeof mistyBrowserProviders;

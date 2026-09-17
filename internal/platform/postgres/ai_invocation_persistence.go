@@ -180,6 +180,9 @@ func (db *Database) ValidateAIInvocationRuntime(ctx context.Context, invocationI
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrSpaceForbidden
 	}
+	if err == nil {
+		err = db.ValidateNativeAgentExecution(ctx, out)
+	}
 	return out, err
 }
 

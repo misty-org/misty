@@ -122,6 +122,9 @@ func (db *Database) ResetPasswordWithToken(hashedToken, newPassword string, now 
 			return err
 		}
 
+		if _, err := tx.ExecContext(context.Background(), `DELETE FROM sessions WHERE user_id=$1`, userID); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

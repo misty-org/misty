@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	cap "github.com/kannachi323/misty/server/internal/capabilities"
@@ -59,7 +60,7 @@ func InstallSDKApp(database *db.Database) http.HandlerFunc {
 		if !decodeCapabilityRequest(w, r, &body) {
 			return
 		}
-		installed, err := database.InstallVerifiedSDKApp(r.Context(), userID, body.Manifest, body.ReviewedDigest, chi.URLParam(r, "spaceID"))
+		installed, err := database.InstallVerifiedSDKApp(r.Context(), userID, body.Manifest, body.ReviewedDigest, "")
 		if err != nil {
 			writeSDKError(w, err)
 			return
@@ -77,7 +78,7 @@ func CreateSDKAppSession(database *db.Database) http.HandlerFunc {
 			return
 		}
 		appID := chi.URLParam(r, "appID")
-		installed, err := database.IsVerifiedSDKAppInstalled(r.Context(), userID, appID, chi.URLParam(r, "spaceID"))
+		installed, err := database.IsVerifiedSDKAppInstalled(r.Context(), userID, appID, "")
 		if err != nil {
 			writeSDKError(w, err)
 			return
@@ -97,13 +98,13 @@ func CreateSDKAppSession(database *db.Database) http.HandlerFunc {
 			writeSDKError(w, err)
 			return
 		}
-		session, err := database.CreateAppRuntimeSession(r.Context(), userID, appID, security.HashToken(token), chi.URLParam(r, "spaceID"), db.AppRuntimeSessionTTL)
+		session, err := database.CreateAppRuntimeSession(r.Context(), userID, appID, security.HashToken(token), "", db.AppRuntimeSessionTTL)
 		if err != nil {
 			writeSDKError(w, err)
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, http.StatusCreated, map[string]any{"token": token, "app_id": session.AppID, "space_id": session.SpaceID, "scopes": session.Scopes, "expires_at": session.ExpiresAt, "authority_generation": session.AuthorityGeneration, "sdk_base_url": "/v1/app-runtime"})
+		writeJSON(w, http.StatusCreated, map[string]any{"token": token, "app_id": session.AppID, "scopes": session.Scopes, "expires_at": session.ExpiresAt, "authority_generation": session.AuthorityGeneration, "sdk_base_url": "/v1/app-runtime"})
 	}
 }
 func UninstallSDKApp(database *db.Database) http.HandlerFunc {
@@ -113,7 +114,7 @@ func UninstallSDKApp(database *db.Database) http.HandlerFunc {
 			return
 		}
 		appID := chi.URLParam(r, "appID")
-		installed, err := database.IsVerifiedSDKAppInstalled(r.Context(), userID, appID, chi.URLParam(r, "spaceID"))
+		installed, err := database.IsVerifiedSDKAppInstalled(r.Context(), userID, appID, "")
 		if err != nil {
 			writeSDKError(w, err)
 			return
@@ -122,7 +123,7 @@ func UninstallSDKApp(database *db.Database) http.HandlerFunc {
 			writeSDKError(w, db.ErrAppNotFound)
 			return
 		}
-		result, err := database.RemoveSpaceApp(r.Context(), userID, chi.URLParam(r, "spaceID"), appID)
+		result, err := database.UninstallUserApp(r.Context(), userID, appID, time.Now())
 		if err != nil {
 			writeSDKError(w, err)
 			return

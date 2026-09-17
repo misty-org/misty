@@ -122,11 +122,6 @@ func (db *Database) CreateSpaceWithTemplateIdempotent(
 				return err
 			}
 		}
-		for _, app := range selectedApps {
-			if _, err := installSpaceAppTx(ctx, tx, userID, result.Space.ID, app, app.Metadata); err != nil {
-				return err
-			}
-		}
 		if err := seedSpaceTemplateTx(ctx, tx, result.Space.ID, userID, *template); err != nil {
 			return err
 		}

@@ -451,18 +451,18 @@ export declare const MistyRoutineManualRunSchema: z.ZodObject<{
 export declare const MistyRoutineReportSchema: z.ZodObject<{
     state: z.ZodEnum<{
         failed: "failed";
+        completed: "completed";
         partial: "partial";
         uncertain: "uncertain";
-        completed: "completed";
         cancelled: "cancelled";
     }>;
     steps: z.ZodArray<z.ZodObject<{
         stepId: z.ZodString;
         state: z.ZodEnum<{
             failed: "failed";
+            completed: "completed";
             partial: "partial";
             uncertain: "uncertain";
-            completed: "completed";
             skipped: "skipped";
             not_run: "not_run";
         }>;
@@ -565,9 +565,9 @@ export declare const MistyRoutineRunRecordSchema: z.ZodObject<{
     }, z.core.$strict>>;
     state: z.ZodEnum<{
         failed: "failed";
-        queued: "queued";
         running: "running";
         completed: "completed";
+        queued: "queued";
         canceled: "canceled";
         awaiting_approval: "awaiting_approval";
         awaiting_device: "awaiting_device";
@@ -578,26 +578,26 @@ export declare const MistyRoutineRunRecordSchema: z.ZodObject<{
     outcome: z.ZodEnum<{
         "": "";
         failed: "failed";
+        completed: "completed";
         partial: "partial";
         uncertain: "uncertain";
-        completed: "completed";
         cancelled: "cancelled";
     }>;
     report: z.ZodNullable<z.ZodObject<{
         state: z.ZodEnum<{
             failed: "failed";
+            completed: "completed";
             partial: "partial";
             uncertain: "uncertain";
-            completed: "completed";
             cancelled: "cancelled";
         }>;
         steps: z.ZodArray<z.ZodObject<{
             stepId: z.ZodString;
             state: z.ZodEnum<{
                 failed: "failed";
+                completed: "completed";
                 partial: "partial";
                 uncertain: "uncertain";
-                completed: "completed";
                 skipped: "skipped";
                 not_run: "not_run";
             }>;

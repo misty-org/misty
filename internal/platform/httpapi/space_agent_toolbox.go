@@ -84,6 +84,11 @@ func spaceAgentToolboxWithBrowserProvidersAndExtra(database *db.Database, browse
 	for _, descriptor := range memoryAgentToolDescriptors() {
 		registrations = append(registrations, agenttools.Registration{Descriptor: withToolTriggers(descriptor, messageTriggers), Handler: legacyHandler})
 	}
+	for _, descriptor := range nativeAgentToolDescriptors() {
+		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: func(ctx context.Context, i agenttools.Invocation, r serveragent.ToolRequest) (json.RawMessage, error) {
+			return executeNativeAgentTool(ctx, database, i, r)
+		}})
+	}
 	if database != nil && len(browserTabs) > 0 {
 		browserHandler := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 			service := &SpacesService{database: database}
@@ -217,6 +222,21 @@ func authorizeSpaceAgentTool(database *db.Database) agenttools.Authorizer {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {
 		if allowed, err := authorizeAppRuntimeTool(ctx, database, invocation, descriptor); err != nil || !allowed {
 			return false, err
+		}
+		if native, allowed, err := nativeAgentInvocationPolicy(ctx, database, invocation, descriptor); native {
+			if err != nil || !allowed {
+				return false, err
+			}
+			if descriptor.OwnerOnly {
+				space, err := database.SpaceByID(ctx, invocation.UserID, invocation.SpaceID)
+				if err != nil || space.OwnerUserID != invocation.UserID {
+					return false, err
+				}
+			}
+			if descriptor.RequiredPermission != "" {
+				return database.HasSpacePermission(ctx, invocation.UserID, invocation.SpaceID, descriptor.RequiredPermission)
+			}
+			return true, nil
 		}
 		if invocation.ConversationScopeKind == db.ConversationScopePrivate && descriptor.Locality == agenttools.LocalityProvider && descriptor.Risk != serveragent.RiskRead {
 			return false, nil

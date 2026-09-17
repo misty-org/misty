@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 
@@ -62,6 +63,7 @@ func (db *Database) Start() error {
 		log.Println("Failed to connect to database:", err)
 		return err
 	}
+	configureConnectionPool(conn)
 	warnIfRoleBypassesRLS(conn)
 
 	db.Conn = conn
@@ -69,6 +71,38 @@ func (db *Database) Start() error {
 		return err
 	}
 	return nil
+}
+
+func configureConnectionPool(conn *sql.DB) {
+	maxOpen := 50
+	if raw := envconfig.Getenv("DB_MAX_OPEN_CONNS"); raw != "" {
+		if val, err := strconv.Atoi(raw); err == nil && val > 0 {
+			maxOpen = val
+		}
+	}
+	maxIdle := 25
+	if raw := envconfig.Getenv("DB_MAX_IDLE_CONNS"); raw != "" {
+		if val, err := strconv.Atoi(raw); err == nil && val > 0 {
+			maxIdle = val
+		}
+	}
+	connMaxLifetime := 15 * time.Minute
+	if raw := envconfig.Getenv("DB_CONN_MAX_LIFETIME"); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			connMaxLifetime = d
+		}
+	}
+	connMaxIdleTime := 5 * time.Minute
+	if raw := envconfig.Getenv("DB_CONN_MAX_IDLE_TIME"); raw != "" {
+		if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+			connMaxIdleTime = d
+		}
+	}
+
+	conn.SetMaxOpenConns(maxOpen)
+	conn.SetMaxIdleConns(maxIdle)
+	conn.SetConnMaxLifetime(connMaxLifetime)
+	conn.SetConnMaxIdleTime(connMaxIdleTime)
 }
 
 // checkSchemaVersion fails fast with a clear error when the database hasn't

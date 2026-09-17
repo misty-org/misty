@@ -69,9 +69,6 @@ func noteAccessForTx(ctx context.Context, tx *sql.Tx, userID, noteID string) (No
 	if err != nil {
 		return noteAccessDenied, err
 	}
-	if err := requireSpaceAppTx(ctx, tx, spaceID, "journal"); err != nil {
-		return noteAccessDenied, err
-	}
 	role, err := requireSpaceMemberTx(ctx, tx, spaceID, userID)
 	if err != nil {
 		if errors.Is(err, ErrSpaceForbidden) {
@@ -202,9 +199,6 @@ func (db *Database) CreateSpaceNoteWithAudience(ctx context.Context, creatorUser
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, creatorUserID); err != nil {
 			return err
 		}
-		if err := requireSpaceAppTx(ctx, tx, spaceID, "journal"); err != nil {
-			return err
-		}
 		normalized, err := NormalizeResourceAudience(audience.Kind, audience.ConversationID)
 		if err != nil {
 			return err
@@ -237,9 +231,6 @@ func (db *Database) AccessibleSpaceNotes(ctx context.Context, userID, spaceID st
 	notes := []SpaceNote{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
-			return err
-		}
-		if err := requireSpaceAppTx(ctx, tx, spaceID, "journal"); err != nil {
 			return err
 		}
 		rows, err := tx.QueryContext(ctx,

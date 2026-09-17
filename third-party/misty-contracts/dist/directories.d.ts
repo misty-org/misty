@@ -9,6 +9,9 @@ export declare const MistyDirectoryEntrySchema: z.ZodObject<{
         other: "other";
     }>;
     bytes: z.ZodOptional<z.ZodNumber>;
+    modifiedMs: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    createdMs: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    readonly: z.ZodOptional<z.ZodBoolean>;
 }, z.core.$strict>;
 export declare const mistyDirectoryContracts: {
     readonly "files.openTrash": {
@@ -101,6 +104,9 @@ export declare const mistyDirectoryContracts: {
                     other: "other";
                 }>;
                 bytes: z.ZodOptional<z.ZodNumber>;
+                modifiedMs: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+                createdMs: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+                readonly: z.ZodOptional<z.ZodBoolean>;
             }, z.core.$strict>>;
             nextOffset: z.ZodNullable<z.ZodNumber>;
         }, z.core.$strict>;

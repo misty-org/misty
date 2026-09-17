@@ -208,6 +208,8 @@ services:
     restart: unless-stopped
     env_file: ${MISTY_ENV_FILE:-.env}
     environment:
+      MISTY_AUTH_SIGNING_KEY: ${MISTY_AUTH_SIGNING_KEY:?Set MISTY_AUTH_SIGNING_KEY to a base64-encoded 32-byte random key}
+      MISTY_AUTH_SIGNING_KEY_PREVIOUS: ${MISTY_AUTH_SIGNING_KEY_PREVIOUS:-}
       MISTY_DEPLOYMENT_MODE: self_hosted
       MISTY_ENVIRONMENT: production
       PORT: "8080"

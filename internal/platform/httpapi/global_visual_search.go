@@ -28,7 +28,7 @@ func (s *SpacesService) GlobalVisualSearch() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_visual_query"})
 			return
 		}
-		if err := s.database.RequireSpaceApp(r.Context(), userID, strings.TrimSpace(body.SpaceID), "agents"); err != nil {
+		if _, err := s.database.SpaceByID(r.Context(), userID, strings.TrimSpace(body.SpaceID)); err != nil {
 			writeSpaceError(w, err)
 			return
 		}

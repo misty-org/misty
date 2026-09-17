@@ -87,7 +87,7 @@ func (db *Database) CreateCreatorAgentRun(ctx context.Context, ownerUserID, spac
 	contextBindings := mustJSON(input.ContextReferences)
 	out := &SpaceRun{ID: "run_" + uuid.NewString()}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		if err := requireSpaceAppTx(ctx, tx, spaceID, "agents"); err != nil {
+		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, ownerUserID); err != nil {
 			return err
 		}
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, ownerUserID); err != nil {
@@ -167,7 +167,7 @@ func (db *Database) CreateCreatorAgentRun(ctx context.Context, ownerUserID, spac
 			if owner != ownerUserID || space != spaceID {
 				return ErrSpaceForbidden
 			}
-			if err := requireSpaceAppTx(ctx, tx, spaceID, "agents"); err != nil {
+			if _, err := requireSpaceMemberTx(ctx, tx, spaceID, ownerUserID); err != nil {
 				return err
 			}
 			var count int

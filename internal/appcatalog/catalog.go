@@ -66,28 +66,21 @@ const generatedCatalog = `{
       "slug": "social",
       "name": "Social",
       "publisher": "Misty",
-      "description": "Conversations with people and agents in a Space.",
+      "description": "Your social accounts and conversations in one place.",
       "version": "1.2.0-beta.1",
-      "permission_version": 5,
+      "permission_version": 6,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "spaces.read",
-        "messages.read",
-        "messages.write",
         "connections.read",
         "connections.write",
         "ai.read",
         "ai.write",
         "navigation.write",
-        "activity.write",
-        "library.read",
-        "library.write",
         "files.read",
         "agents.read",
         "agents.write",
-        "roadmaps.read",
         "clipboard.write",
         "browser.navigate",
         "browser.inspect",
@@ -108,7 +101,7 @@ const generatedCatalog = `{
       "mobile": {
         "runtime": "embedded"
       },
-      "about": "Keep conversations with people and agents together in your Space. Connect supported social apps and keep their websites alongside your work.",
+      "about": "Connect your social accounts and use their websites with your personal agents.",
       "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/chat"
     },
     {
@@ -119,7 +112,7 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Notes and drawings for ideas worth keeping.",
       "version": "1.1.0-beta.3",
-      "permission_version": 6,
+      "permission_version": 7,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
@@ -131,16 +124,11 @@ const generatedCatalog = `{
         "clipboard.write",
         "connections.read",
         "connections.write",
-        "drawings.read",
-        "drawings.write",
         "files.read",
         "files.write",
         "links.open",
         "navigation.write",
-        "notes.read",
-        "notes.write",
         "profile.read",
-        "spaces.read",
         "storage.read",
         "storage.write",
         "network.fetch",
@@ -161,7 +149,7 @@ const generatedCatalog = `{
         "runtime": "embedded"
       },
       "minimum_host_version": "0.1.0-beta.1",
-      "about": "Write notes, collect ideas, and create drawings in your Space. Keep your thinking close to the conversations and projects it belongs to.",
+      "about": "Connect your personal journal tools and use them with your agents. Shared Misty content lives in Spaces.",
       "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/journal"
     },
     {
@@ -172,20 +160,13 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Tasks, agenda, and roadmaps for work in motion.",
       "version": "1.1.0",
-      "permission_version": 6,
+      "permission_version": 7,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "spaces.read",
-        "tasks.read",
-        "tasks.write",
-        "calendar.read",
-        "calendar.write",
         "connections.read",
         "connections.write",
-        "roadmaps.read",
-        "roadmaps.write",
         "ai.read",
         "ai.write",
         "storage.read",
@@ -209,25 +190,22 @@ const generatedCatalog = `{
       "mobile": {
         "runtime": "embedded"
       },
-      "about": "Organize tasks, plan your agenda, and track roadmaps in your Space. Connect supported planning apps alongside your work.",
+      "about": "Connect your personal planner tools and use them with your agents. Shared Misty content lives in Spaces.",
       "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/planner"
     },
     {
       "id": "library",
       "app_id": "com.misty.library",
       "slug": "library",
-      "name": "Library",
+      "name": "Storage",
       "publisher": "Misty",
-      "description": "Curated resources shared with a Space.",
+      "description": "Connect and browse your personal cloud storage services.",
       "version": "1.1.4",
-      "permission_version": 4,
+      "permission_version": 5,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "spaces.read",
-        "library.read",
-        "library.write",
         "profile.read",
         "files.read",
         "files.write",
@@ -236,7 +214,6 @@ const generatedCatalog = `{
         "ai.read",
         "ai.write",
         "navigation.write",
-        "activity.write",
         "clipboard.write",
         "links.open",
         "browser.navigate",
@@ -257,7 +234,7 @@ const generatedCatalog = `{
       "mobile": {
         "runtime": "embedded"
       },
-      "about": "Keep shared files and resources organized in your Space. Browse collections and find the material your team needs.",
+      "about": "Connect your personal storage services and use them with your agents. Shared Misty content lives in Space Library.",
       "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/library"
     },
     {
@@ -268,13 +245,11 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Updates and conversations that need attention.",
       "version": "1.2.0-beta.1",
-      "permission_version": 5,
+      "permission_version": 6,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "activity.read",
-        "activity.write",
         "ai.read",
         "ai.use",
         "ai.write",
@@ -284,9 +259,7 @@ const generatedCatalog = `{
         "links.open",
         "mail.read",
         "mail.write",
-        "messages.read",
         "navigation.write",
-        "spaces.read",
         "storage.read",
         "storage.write",
         "browser.navigate",
@@ -316,12 +289,11 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Create and manage AI collaborators.",
       "version": "1.1.1",
-      "permission_version": 4,
+      "permission_version": 5,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "spaces.read",
         "agents.read",
         "agents.write",
         "profile.read",
@@ -335,7 +307,6 @@ const generatedCatalog = `{
         "devices.read",
         "devices.write",
         "navigation.write",
-        "activity.write",
         "browser.read",
         "browser.write",
         "search.read",
@@ -364,12 +335,11 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Browse local and connected files, and manage file transfers.",
       "version": "1.1.11",
-      "permission_version": 3,
+      "permission_version": 4,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "activity.write",
         "connections.read",
         "connections.write",
         "files.read",
@@ -379,7 +349,6 @@ const generatedCatalog = `{
         "navigation.write",
         "profile.read",
         "search.read",
-        "spaces.read",
         "storage.read",
         "storage.write"
       ],
@@ -406,12 +375,11 @@ const generatedCatalog = `{
       "publisher": "Misty",
       "description": "Research beside your work.",
       "version": "1.2.0-beta.1",
-      "permission_version": 3,
+      "permission_version": 4,
       "minimum_host_protocol": 2,
       "official": true,
       "age_rating": "4+",
       "scopes": [
-        "spaces.read",
         "browser.navigate",
         "browser.inspect",
         "browser.interact",
@@ -506,6 +474,78 @@ const generatedCatalog = `{
       },
       "about": "Run commands and work with command-line tools inside Misty. Keep terminal sessions alongside your files and projects.",
       "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/terminal"
+    },
+    {
+      "id": "music",
+      "app_id": "com.misty.music",
+      "slug": "music",
+      "name": "Music",
+      "publisher": "Misty",
+      "description": "Stream your favorite music services inside Misty.",
+      "version": "1.0.0",
+      "permission_version": 2,
+      "minimum_host_protocol": 2,
+      "official": true,
+      "age_rating": "4+",
+      "scopes": [
+        "links.open",
+        "navigation.write",
+        "storage.read",
+        "storage.write",
+        "browser.navigate",
+        "browser.inspect",
+        "browser.interact"
+      ],
+      "desktop": {
+        "runtime": "downloaded",
+        "entry": "https://apps.mistysys.com/official-apps/music/1.0.0/desktop.zip",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "signature": "",
+        "signature_key_id": "misty-development-2026-01",
+        "download_bytes": 400000,
+        "additional_storage_bytes": 1200000
+      },
+      "mobile": {
+        "runtime": "embedded"
+      },
+      "about": "Connect your favorite music streaming services like YouTube Music, Spotify, Apple Music, and SoundCloud. Listen and manage your music right alongside your workspace.",
+      "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/music"
+    },
+    {
+      "id": "media",
+      "app_id": "com.misty.media",
+      "slug": "media",
+      "name": "Media",
+      "publisher": "Misty",
+      "description": "Watch video and entertainment platforms inside Misty.",
+      "version": "1.0.0",
+      "permission_version": 2,
+      "minimum_host_protocol": 2,
+      "official": true,
+      "age_rating": "4+",
+      "scopes": [
+        "links.open",
+        "navigation.write",
+        "storage.read",
+        "storage.write",
+        "browser.navigate",
+        "browser.inspect",
+        "browser.interact"
+      ],
+      "desktop": {
+        "runtime": "downloaded",
+        "entry": "https://apps.mistysys.com/official-apps/media/1.0.0/desktop.zip",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "signature": "",
+        "signature_key_id": "misty-development-2026-01",
+        "download_bytes": 400000,
+        "additional_storage_bytes": 1200000
+      },
+      "mobile": {
+        "runtime": "embedded"
+      },
+      "about": "Enjoy video and streaming entertainment platforms like YouTube, Twitch, Netflix, Crunchyroll, and Prime Video directly inside Misty.",
+      "repository_url": "https://github.com/misty-org/misty-apps/tree/main/apps/media"
     }
   ],
   "signing": {
@@ -563,7 +603,7 @@ func NormalizeIDs(ids []string) ([]App, bool) {
 }
 
 func Defaults() []App {
-	items, ok := NormalizeIDs([]string{"inbox", "chat", "journal", "files", "agents"})
+	items, ok := NormalizeIDs([]string{"inbox", "chat", "journal", "files"})
 	if !ok {
 		panic("default Misty Apps are missing from the catalog")
 	}

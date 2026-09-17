@@ -77,34 +77,10 @@ func (db *Database) SavePersonalSpaceTemplate(ctx context.Context, userID, id, s
 		}
 		var raw []byte
 		if spaceID != "" {
-			if err := requireSpacePermissionTx(ctx, tx, userID, spaceID, PermissionAppsManage); err != nil {
+			if err := requireSpaceOwnerTx(ctx, tx, spaceID, userID); err != nil {
 				return err
 			}
-			if err := lockSpaceApps(ctx, tx, spaceID); err != nil {
-				return err
-			}
-			rows, err := tx.QueryContext(ctx, `SELECT app_id,release_metadata FROM space_app_installations WHERE space_id=$1 AND state='installed' ORDER BY pin_rank,app_id`, spaceID)
-			if err != nil {
-				return err
-			}
-			apps := []SpaceTemplateApp{}
-			for rows.Next() {
-				var app SpaceTemplateApp
-				if err := rows.Scan(&app.AppID, &app.ReleaseMetadata); err != nil {
-					rows.Close()
-					return err
-				}
-				apps = append(apps, app)
-			}
-			err = rows.Err()
-			rows.Close()
-			if err != nil {
-				return err
-			}
-			raw, err = json.Marshal(apps)
-			if err != nil {
-				return err
-			}
+			raw = []byte("[]")
 		}
 		var err error
 		if create {

@@ -1,5 +1,6 @@
+/** @deprecated Legacy downloadable Agents transport. New apps use ai.open and browser.setDestinations; the host owns agent configuration and execution. */
 import { z } from 'zod';
-export declare const agentOperations: readonly ["agents.run", "agents.cancelRun", "agents.retryRun", "agents.decideApproval", "assistant.search", "assistant.visualSearch", "assistant.conversations", "assistant.createConversation", "assistant.deleteConversation", "assistant.renameConversation", "assistant.bindConversationSpace", "assistant.updateConversationSettings", "assistant.frontierModels", "assistant.turn", "assistant.complete", "assistant.decideProposal", "automations.flows", "automations.callTool", "mcp.list", "mcp.add", "mcp.test", "mcp.discover", "mcp.tools", "mcp.remove", "ai.status", "ai.usage", "ai.settings", "ai.updateSettings", "ai.memories", "ai.forgetMemory", "ai.conversations", "ai.conversation", "ai.updatePreference", "ai.recordProactiveEvent", "ai.recaps", "ai.updateRecap", "ai.markRecapSeen", "ai.feedback", "ai.createInvocation", "ai.createRun", "ai.cancelInvocation", "ai.decideArtifact", "ai.completeArtifact"];
+export declare const agentOperations: readonly ["agents.run", "agents.cancelRun", "agents.retryRun", "agents.decideApproval", "assistant.search", "assistant.visualSearch", "assistant.conversations", "assistant.createConversation", "assistant.deleteConversation", "assistant.renameConversation", "assistant.bindConversationSpace", "assistant.updateConversationSettings", "assistant.frontierModels", "assistant.turn", "assistant.complete", "assistant.decideProposal", "automations.flows", "automations.callTool", "mcp.list", "mcp.add", "mcp.test", "mcp.discover", "mcp.tools", "mcp.remove", "ai.activity", "ai.status", "ai.usage", "ai.settings", "ai.updateSettings", "ai.memories", "ai.forgetMemory", "ai.conversations", "ai.conversation", "ai.updatePreference", "ai.recordProactiveEvent", "ai.recaps", "ai.updateRecap", "ai.markRecapSeen", "ai.feedback", "ai.createInvocation", "ai.createRun", "ai.cancelInvocation", "ai.decideArtifact", "ai.completeArtifact"];
 export declare const mistyAgentsContracts: {
     readonly 'agents.perform': {
         readonly params: z.ZodObject<{
@@ -28,6 +29,7 @@ export declare const mistyAgentsContracts: {
                 "mcp.discover": "mcp.discover";
                 "mcp.tools": "mcp.tools";
                 "mcp.remove": "mcp.remove";
+                "ai.activity": "ai.activity";
                 "ai.status": "ai.status";
                 "ai.usage": "ai.usage";
                 "ai.settings": "ai.settings";

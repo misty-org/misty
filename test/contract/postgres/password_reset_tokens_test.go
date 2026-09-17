@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,6 +26,9 @@ func TestPasswordResetTokenLifecycle(t *testing.T) {
 	if err := database.ValidatePasswordResetToken(tokenHash, time.Now()); err != nil {
 		t.Fatalf("ValidatePasswordResetToken() error = %v", err)
 	}
+	if err := database.CreateRefreshSession(context.Background(), "family", "refresh", user.ID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	if err := database.ResetPasswordWithToken(tokenHash, "new-password", time.Now()); err != nil {
 		t.Fatalf("ResetPasswordWithToken() error = %v", err)
 	}
@@ -32,6 +36,9 @@ func TestPasswordResetTokenLifecycle(t *testing.T) {
 		t.Fatalf("ValidatePasswordResetToken() after reset error = %v, want %v", err, ErrPasswordResetTokenInvalid)
 	}
 
+	if ok, err := database.RotateRefreshSession(context.Background(), "family", "refresh", "next", user.ID); err != nil || ok {
+		t.Fatalf("password reset did not revoke refresh session: %v %v", ok, err)
+	}
 	_, hash, err := database.GetUserByEmail("reset-repo@example.com")
 	if err != nil {
 		t.Fatalf("GetUserByEmail() error = %v", err)

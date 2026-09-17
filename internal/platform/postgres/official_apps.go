@@ -18,25 +18,28 @@ var (
 )
 
 type UserAppInstallation struct {
-	AppID             string     `json:"app_id"`
-	State             string     `json:"state"`
-	InstalledVersion  string     `json:"installed_version"`
-	PermissionVersion int        `json:"permission_version"`
-	GrantedScopes     []string   `json:"granted_scopes"`
-	Pinned            bool       `json:"pinned"`
-	PinRank           int64      `json:"pin_rank"`
-	InstalledAt       time.Time  `json:"installed_at"`
-	UninstalledAt     *time.Time `json:"uninstalled_at,omitempty"`
-	DataDeletionAt    *time.Time `json:"data_deletion_at,omitempty"`
-	PurgedAt          *time.Time `json:"purged_at,omitempty"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	AuthorityGeneration int64           `json:"authority_generation"`
+	ReleaseMetadata     json.RawMessage `json:"release_metadata"`
+	ConsentRequired     bool            `json:"consent_required"`
+	AppID               string          `json:"app_id"`
+	State               string          `json:"state"`
+	InstalledVersion    string          `json:"installed_version"`
+	PermissionVersion   int             `json:"permission_version"`
+	GrantedScopes       []string        `json:"granted_scopes"`
+	Pinned              bool            `json:"pinned"`
+	PinRank             int64           `json:"pin_rank"`
+	InstalledAt         time.Time       `json:"installed_at"`
+	UninstalledAt       *time.Time      `json:"uninstalled_at,omitempty"`
+	DataDeletionAt      *time.Time      `json:"data_deletion_at,omitempty"`
+	PurgedAt            *time.Time      `json:"purged_at,omitempty"`
+	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
 func (db *Database) UserApps(ctx context.Context, userID string) ([]UserAppInstallation, error) {
 	items := []UserAppInstallation{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		rows, err := tx.QueryContext(ctx, `SELECT app_id,state,installed_version,permission_version,
-			granted_scopes,pinned,pin_rank,installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at
+			granted_scopes,pinned,pin_rank,installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at,authority_generation,release_metadata,consent_required
 			FROM user_app_installations WHERE user_id=$1 AND state<>'purged'
 			ORDER BY CASE WHEN state='installed' THEN 0 ELSE 1 END,pinned DESC,pin_rank,app_id`, userID)
 		if err != nil {
@@ -60,21 +63,34 @@ func (db *Database) InstallUserApp(
 	userID, appID, version string,
 	permissionVersion int,
 	scopes []string,
+	metadata ...json.RawMessage,
 ) (*UserAppInstallation, error) {
+	if AppAuthorityFromContext(ctx) != nil {
+		return nil, ErrAppRuntimeForbidden
+	}
 	appID = strings.TrimSpace(appID)
 	version = strings.TrimSpace(version)
 	if userID == "" || appID == "" || len(appID) > 80 || version == "" || len(version) > 40 || permissionVersion < 1 {
 		return nil, ErrSpaceInvalid
 	}
-	encodedScopes, err := json.Marshal(scopes)
+	encodedScopes, err := json.Marshal(PersonalAppScopes(scopes))
 	if err != nil {
 		return nil, ErrSpaceInvalid
 	}
 	var result UserAppInstallation
 	err = db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		item, err := installUserAppTx(ctx, tx, userID, appID, version, permissionVersion, encodedScopes)
+		if err != nil {
+			return err
+		}
+		if len(metadata) > 0 {
+			if err = tx.QueryRowContext(ctx, `UPDATE user_app_installations SET release_metadata=$3 WHERE user_id=$1 AND app_id=$2 RETURNING authority_generation`, userID, appID, metadata[0]).Scan(&item.AuthorityGeneration); err != nil {
+				return err
+			}
+			item.ReleaseMetadata = metadata[0]
+		}
 		result = item
-		return err
+		return nil
 	})
 	return &result, err
 }
@@ -107,18 +123,21 @@ func installUserAppTx(
 			pinned=CASE WHEN user_app_installations.state='installed' THEN user_app_installations.pinned ELSE TRUE END,
 			pin_rank=CASE WHEN user_app_installations.state='installed' THEN user_app_installations.pin_rank ELSE EXCLUDED.pin_rank END,
 			installed_at=CASE WHEN user_app_installations.state='installed' THEN user_app_installations.installed_at ELSE NOW() END,
-			uninstalled_at=NULL,data_deletion_at=NULL,purged_at=NULL,updated_at=NOW()
+			uninstalled_at=NULL,data_deletion_at=NULL,purged_at=NULL,updated_at=NOW(),consent_required=FALSE,authority_generation=user_app_installations.authority_generation+1
 		RETURNING app_id,state,installed_version,permission_version,granted_scopes,pinned,pin_rank,
-			installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at`, userID, appID, version, permissionVersion, encodedScopes)
+			installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at,authority_generation,release_metadata,consent_required`, userID, appID, version, permissionVersion, encodedScopes)
 	item, err := scanUserApp(row)
 	if err != nil {
+		return UserAppInstallation{}, err
+	}
+	if err := revokeUserAppRuntimeTx(ctx, tx, userID, appID); err != nil {
 		return UserAppInstallation{}, err
 	}
 	// A reviewed permission change retires the previous token. Issuance holds a
 	// shared lock on this installation row so an old grant cannot be minted
 	// after this update commits. Regranting later must not revive retired tokens.
 	if _, err := tx.ExecContext(ctx, `DELETE FROM app_runtime_sessions
-		WHERE user_id=$1 AND app_id=$2 AND (scopes <> $3::jsonb OR $4)`, userID, appID, encodedScopes, previousVersion != "" && previousVersion != version); err != nil {
+		WHERE user_id=$1 AND app_id=$2 `, userID, appID); err != nil {
 		return UserAppInstallation{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM app_data_deletion_jobs WHERE user_id=$1 AND app_id=$2`, userID, appID); err != nil {
@@ -147,7 +166,7 @@ func (db *Database) SetUserAppPinned(ctx context.Context, userID, appID string, 
 			updated_at=NOW()
 			WHERE user_id=$1 AND app_id=$2 AND state='installed'
 			RETURNING app_id,state,installed_version,permission_version,granted_scopes,pinned,pin_rank,
-				installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at`, userID, appID, pinned)
+				installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at,authority_generation,release_metadata,consent_required`, userID, appID, pinned)
 		item, err := scanUserApp(row)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrAppNotInstalled
@@ -166,6 +185,9 @@ func (db *Database) SetUserAppPinned(ctx context.Context, userID, appID string, 
 }
 
 func (db *Database) UninstallUserApp(ctx context.Context, userID, appID string, now time.Time) (*UserAppInstallation, error) {
+	if AppAuthorityFromContext(ctx) != nil {
+		return nil, ErrAppRuntimeForbidden
+	}
 	var result UserAppInstallation
 	now = now.UTC()
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
@@ -173,7 +195,7 @@ func (db *Database) UninstallUserApp(ctx context.Context, userID, appID string, 
 			return err
 		}
 		currentRow := tx.QueryRowContext(ctx, `SELECT app_id,state,installed_version,permission_version,granted_scopes,
-			pinned,pin_rank,installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at
+			pinned,pin_rank,installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at,authority_generation,release_metadata,consent_required
 			FROM user_app_installations WHERE user_id=$1 AND app_id=$2 FOR UPDATE`, userID, appID)
 		current, err := scanUserApp(currentRow)
 		if errors.Is(err, sql.ErrNoRows) || current.State == "purged" {
@@ -189,16 +211,19 @@ func (db *Database) UninstallUserApp(ctx context.Context, userID, appID string, 
 		if current.State == "purging" {
 			return ErrAppAlreadyPurging
 		}
+		if err := revokeUserAppRuntimeTx(ctx, tx, userID, appID); err != nil {
+			return err
+		}
 		// Reinstall must not revive a still-unexpired credential from this install.
 		if _, err := tx.ExecContext(ctx, `DELETE FROM app_runtime_sessions WHERE user_id=$1 AND app_id=$2`, userID, appID); err != nil {
 			return err
 		}
 		deleteAt := now.Add(AppDataRecoveryPeriod)
-		row := tx.QueryRowContext(ctx, `UPDATE user_app_installations SET state='recoverable',pinned=FALSE,
+		row := tx.QueryRowContext(ctx, `UPDATE user_app_installations SET state='recoverable',pinned=FALSE,authority_generation=authority_generation+1,
 			uninstalled_at=$3,data_deletion_at=$4,purged_at=NULL,updated_at=$3
 			WHERE user_id=$1 AND app_id=$2 AND state='installed'
 			RETURNING app_id,state,installed_version,permission_version,granted_scopes,pinned,pin_rank,
-				installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at`, userID, appID, now, deleteAt)
+				installed_at,uninstalled_at,data_deletion_at,purged_at,updated_at,authority_generation,release_metadata,consent_required`, userID, appID, now, deleteAt)
 		item, err := scanUserApp(row)
 		if err != nil {
 			return err
@@ -223,7 +248,7 @@ func scanUserApp(row rowScanner) (UserAppInstallation, error) {
 	var scopes []byte
 	err := row.Scan(&item.AppID, &item.State, &item.InstalledVersion, &item.PermissionVersion,
 		&scopes, &item.Pinned, &item.PinRank, &item.InstalledAt, &item.UninstalledAt,
-		&item.DataDeletionAt, &item.PurgedAt, &item.UpdatedAt)
+		&item.DataDeletionAt, &item.PurgedAt, &item.UpdatedAt, &item.AuthorityGeneration, &item.ReleaseMetadata, &item.ConsentRequired)
 	if err != nil {
 		return item, err
 	}

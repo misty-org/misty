@@ -19,6 +19,8 @@ const (
 
 func memoryAgentToolDescriptors() []agenttools.Descriptor {
 	return []agenttools.Descriptor{
+		{Name: "memory.list", Version: 1, Description: "Review this agent's remembered preferences in this Space and personal preferences. Only these scopes are returned.", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources},
+		{Name: "memory.update", Version: 1, Description: "Correct a durable preference only when the user explicitly asks to change what is remembered. Preserve the existing scope. Use the memory ID from memory.list.", Risk: serveragent.RiskWrite, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "required": []string{"memoryId", "content"}, "properties": map[string]any{"memoryId": map[string]any{"type": "string", "maxLength": 200}, "content": map[string]any{"type": "string", "minLength": 1, "maxLength": 1000}}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalExplicitIntent, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources, AuditEvent: "misty.memory.updated"},
 		{
 			Name: toolboxMemoryRemember, Version: 1,
 			Description: "Remember a concise fact, preference, or standing instruction only when the user explicitly asks Misty to remember it. Never store credentials, secrets, financial identifiers, health records, or inferred sensitive traits.",
@@ -53,11 +55,32 @@ func memoryAgentToolDescriptors() []agenttools.Descriptor {
 }
 
 func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, originalPrompt string, tool serveragent.ToolRequest) (json.RawMessage, bool, error) {
-	if tool.Name != toolboxMemoryRemember && tool.Name != toolboxMemoryForget {
+	if tool.Name != toolboxMemoryRemember && tool.Name != toolboxMemoryForget && tool.Name != "memory.list" && tool.Name != "memory.update" {
 		return nil, false, nil
 	}
-	if database == nil || !explicitMistyMemoryIntent(originalPrompt, tool.Name) {
+	if database == nil || (actor.agentID == "" && !explicitMistyMemoryIntent(originalPrompt, tool.Name)) {
 		return nil, true, workflowv2.ErrCapabilityDenied
+	}
+	if tool.Name == "memory.list" {
+		items, err := database.MistyMemories(ctx, actor.userID, actor.spaceID, 100, actor.agentID)
+		if err != nil {
+			return nil, true, err
+		}
+		result, err := json.Marshal(map[string]any{"memories": items})
+		return result, true, err
+	}
+	if tool.Name == "memory.update" {
+		var input struct {
+			MemoryID string `json:"memoryId"`
+			Content  string `json:"content"`
+		}
+		if json.Unmarshal(tool.Arguments, &input) != nil || mistyMemoryLooksSensitive(input.Content) {
+			return nil, true, db.ErrSpaceInvalid
+		}
+		if err := database.UpdateAgentMemory(ctx, actor.userID, actor.agentID, actor.spaceID, input.MemoryID, input.Content); err != nil {
+			return nil, true, err
+		}
+		return TestingMustAPIRawJSON(map[string]any{"updated": true, "memory_id": input.MemoryID}), true, nil
 	}
 	if tool.Name == toolboxMemoryForget {
 		var input struct {
@@ -66,7 +89,7 @@ func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor sp
 		if json.Unmarshal(tool.Arguments, &input) != nil || strings.TrimSpace(input.MemoryID) == "" {
 			return nil, true, db.ErrSpaceInvalid
 		}
-		if err := database.ForgetMistyMemory(ctx, actor.userID, input.MemoryID); err != nil {
+		if err := database.ForgetMistyMemory(ctx, actor.userID, input.MemoryID, actor.agentID); err != nil {
 			return nil, true, err
 		}
 		return TestingMustAPIRawJSON(map[string]any{"forgotten": true, "memory_id": input.MemoryID}), true, nil
@@ -84,7 +107,7 @@ func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor sp
 	if input.Scope != "personal" && input.Scope != "space" || input.Scope == "space" && actor.spaceID == "" {
 		return nil, true, db.ErrSpaceInvalid
 	}
-	if !mistyMemoryGroundedInPrompt(originalPrompt, input.Content) || mistyMemoryLooksSensitive(input.Content) {
+	if (actor.agentID == "" && !mistyMemoryGroundedInPrompt(originalPrompt, input.Content)) || mistyMemoryLooksSensitive(input.Content) {
 		return nil, true, workflowv2.ErrCapabilityDenied
 	}
 	spaceID := ""
@@ -92,7 +115,7 @@ func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor sp
 		spaceID = actor.spaceID
 	}
 	item, err := database.RememberMistyMemory(ctx, actor.userID, db.RememberMistyMemoryInput{
-		SpaceID: spaceID, Kind: input.Kind, Content: input.Content, Reason: input.Reason,
+		AgentID: actor.agentID, SpaceID: spaceID, Kind: input.Kind, Content: input.Content, Reason: input.Reason,
 		SourceConversationID: actor.sessionID, SourceInvocationID: actor.runID,
 	})
 	if err != nil {

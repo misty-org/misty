@@ -48,22 +48,21 @@ func TestSDKProviderVerifiedInstallOwnershipAndRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space := createTestSpace(t, database, ctx, user.ID, "SDK Space")
 	document, key := sdkInstallFixture(t, "example.habits")
 	signed, digest := sdkSignFixture(t, document, key)
-	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, "wrong digest", space.ID); !errors.Is(err, ErrAppRuntimeForbidden) {
+	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, "wrong digest"); !errors.Is(err, ErrAppRuntimeForbidden) {
 		t.Fatalf("unreviewed install: %v", err)
 	}
-	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest, space.ID); err != nil {
+	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest); err != nil {
 		t.Fatal(err)
 	}
 	tokenHash := security.HashToken("sdk-runtime-credential")
-	session, err := database.CreateAppRuntimeSession(ctx, user.ID, document.AppID, tokenHash, space.ID, AppRuntimeSessionTTL)
+	session, err := database.CreateAppRuntimeSession(ctx, user.ID, document.AppID, tokenHash, "", AppRuntimeSessionTTL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	appctx := WithAppExecutionAuthority(ctx, *session)
-	if _, err := database.InstallVerifiedSDKApp(appctx, user.ID, signed, digest, space.ID); !errors.Is(err, ErrAppRuntimeForbidden) {
+	if _, err := database.InstallVerifiedSDKApp(appctx, user.ID, signed, digest); !errors.Is(err, ErrAppRuntimeForbidden) {
 		t.Fatalf("self-install: %v", err)
 	}
 	provider := document.Capabilities.Providers[0]
@@ -124,13 +123,13 @@ func TestSDKProviderVerifiedInstallOwnershipAndRevocation(t *testing.T) {
 	if _, err := database.RegisterSDKProvider(appctx, user.ID, digest, provider); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := database.RemoveSpaceApp(ctx, user.ID, space.ID, document.AppID); err != nil {
+	if _, err := database.UninstallUserApp(ctx, user.ID, document.AppID, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.RegisterSDKProvider(appctx, user.ID, digest, provider); !errors.Is(err, ErrAppRuntimeForbidden) {
 		t.Fatalf("register after uninstall: %v", err)
 	}
-	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest, space.ID); err != nil {
+	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest); err != nil {
 		t.Fatal(err)
 	}
 	resolved, err := database.AppRuntimeSessionByToken(ctx, tokenHash)
@@ -150,15 +149,14 @@ func TestSDKProviderVersionsAndSemanticCollisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space := createTestSpace(t, database, ctx, user.ID, "SDK Space")
 	document, key := sdkInstallFixture(t, "example.habits")
 	signed, digest := sdkSignFixture(t, document, key)
 	install := func(d cap.InstallDocument, key ed25519.PrivateKey) error {
 		s, h := sdkSignFixture(t, d, key)
-		_, err := database.InstallVerifiedSDKApp(ctx, user.ID, s, h, space.ID)
+		_, err := database.InstallVerifiedSDKApp(ctx, user.ID, s, h)
 		return err
 	}
-	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest, space.ID); err != nil {
+	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest); err != nil {
 		t.Fatal(err)
 	}
 	_, wrongKey := sdkInstallFixture(t, document.AppID)
@@ -187,7 +185,7 @@ func TestSDKProviderVersionsAndSemanticCollisions(t *testing.T) {
 	if err := install(peer, peerKey); !errors.Is(err, ErrSDKVersionConflict) {
 		t.Fatalf("conflicting semantic contract accepted: %v", err)
 	}
-	apps, err := database.SpaceApps(ctx, user.ID, space.ID)
+	apps, err := database.UserApps(ctx, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +207,6 @@ func TestSDKProviderDiscoveryGrantCeilingAndPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space := createTestSpace(t, database, ctx, user.ID, "SDK Space")
 	document, key := sdkInstallFixture(t, "example.habits")
 	for _, id := range []string{"second", "third"} {
 		provider := document.Capabilities.Providers[0]
@@ -217,10 +214,10 @@ func TestSDKProviderDiscoveryGrantCeilingAndPagination(t *testing.T) {
 		document.Capabilities.Providers = append(document.Capabilities.Providers, provider)
 	}
 	signed, digest := sdkSignFixture(t, document, key)
-	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest, space.ID); err != nil {
+	if _, err := database.InstallVerifiedSDKApp(ctx, user.ID, signed, digest); err != nil {
 		t.Fatal(err)
 	}
-	session, err := database.CreateAppRuntimeSession(ctx, user.ID, document.AppID, security.HashToken("sdk-paging"), space.ID, AppRuntimeSessionTTL)
+	session, err := database.CreateAppRuntimeSession(ctx, user.ID, document.AppID, security.HashToken("sdk-paging"), "", AppRuntimeSessionTTL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +253,7 @@ func TestSDKProviderDiscoveryGrantCeilingAndPagination(t *testing.T) {
 	if err != nil || len(page.Providers) != 0 {
 		t.Fatalf("escaped admission ceiling: %#v %v", page, err)
 	}
-	if _, err := database.InstallSpaceApp(ctx, user.ID, space.ID, AppInstallSpec{ID: document.AppID, Version: document.Version, PermissionVersion: 2, Scopes: []string{"capabilities.read", "capabilities.providers.write"}}, nil); err != nil {
+	if _, err := database.InstallUserApp(ctx, user.ID, document.AppID, document.Version, 2, []string{"capabilities.read", "capabilities.providers.write"}); err != nil {
 		t.Fatal(err)
 	}
 	page, err = database.DiscoverSDKProviders(appctx, user.ID, SDKProviderDiscovery{})
@@ -268,14 +265,14 @@ func TestSDKProviderDiscoveryGrantCeilingAndPagination(t *testing.T) {
 	}
 }
 
-func TestSDKProviderSpaceMemberUsesSharedVerifiedInstallation(t *testing.T) {
+func TestSDKPersonalInstallDoesNotGrantSpaceMembersAndCanReconsent(t *testing.T) {
 	database := openTestDatabase(t)
-	ctx := context.Background()
-	owner, err := database.CreateUser("SDK Space owner", "sdk-space-owner@example.com", "password123")
+	ctx := t.Context()
+	owner, err := database.CreateUser("SDK owner", "sdk-personal-owner@example.invalid", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := database.CreateUser("SDK Space member", "sdk-space-member@example.com", "password123")
+	member, err := database.CreateUser("SDK member", "sdk-personal-member@example.invalid", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,29 +286,26 @@ func TestSDKProviderSpaceMemberUsesSharedVerifiedInstallation(t *testing.T) {
 	}
 	document, key := sdkInstallFixture(t, "example.habits")
 	signed, digest := sdkSignFixture(t, document, key)
-	if _, err = database.InstallVerifiedSDKApp(ctx, owner.ID, signed, digest, space.ID); err != nil {
+	if _, err = database.InstallVerifiedSDKApp(ctx, owner.ID, signed, digest); err != nil {
 		t.Fatal(err)
 	}
-	session, err := database.CreateAppRuntimeSession(ctx, member.ID, document.AppID, security.HashToken("shared-sdk-member"), space.ID, AppRuntimeSessionTTL)
+	if _, err = database.CreateAppRuntimeSession(ctx, member.ID, document.AppID, security.HashToken("member"), "", AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
+		t.Fatalf("shared membership granted personal app: %v", err)
+	}
+	if _, err = database.Conn.Exec(`UPDATE user_app_installations SET consent_required=TRUE,granted_scopes='[]' WHERE user_id=$1 AND app_id=$2`, owner.ID, document.AppID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = database.CreateAppRuntimeSession(ctx, owner.ID, document.AppID, security.HashToken("unreviewed"), "", AppRuntimeSessionTTL); !errors.Is(err, ErrAppNotInstalled) {
+		t.Fatal(err)
+	}
+	restored, err := database.InstallVerifiedSDKApp(ctx, owner.ID, signed, digest)
 	if err != nil {
+		t.Fatalf("same signed version cannot reconsent: %v", err)
+	}
+	if restored.ConsentRequired || len(restored.GrantedScopes) != len(document.Scopes) {
+		t.Fatalf("review failed: %#v", restored)
+	}
+	if _, err = database.CreateAppRuntimeSession(ctx, owner.ID, document.AppID, security.HashToken("reviewed"), "", AppRuntimeSessionTTL); err != nil {
 		t.Fatal(err)
-	}
-	memberCtx := WithAppExecutionAuthority(ctx, *session)
-	if _, err = database.RegisterSDKProvider(memberCtx, member.ID, digest, document.Capabilities.Providers[0]); err != nil {
-		t.Fatalf("member requires personal installation: %v", err)
-	}
-	if err = database.SetSpaceMemberPermission(ctx, owner.ID, space.ID, member.ID, PermissionAppsManage, "allow"); err != nil {
-		t.Fatal(err)
-	}
-	_, otherKey := sdkInstallFixture(t, document.AppID)
-	forged, forgedDigest := sdkSignFixture(t, document, otherKey)
-	if _, err = database.InstallVerifiedSDKApp(ctx, member.ID, forged, forgedDigest, space.ID); !errors.Is(err, ErrSDKPublisherChanged) {
-		t.Fatalf("manager replaced shared publisher: %v", err)
-	}
-	if _, err = database.InstallVerifiedSDKApp(ctx, member.ID, signed, digest, space.ID); err != nil {
-		t.Fatalf("delegated manager cannot review existing release: %v", err)
-	}
-	if _, err = database.RegisterSDKProvider(memberCtx, member.ID, digest, document.Capabilities.Providers[0]); !errors.Is(err, ErrAppRuntimeForbidden) {
-		t.Fatalf("old generation remained live: %v", err)
 	}
 }

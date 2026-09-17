@@ -727,11 +727,11 @@ export declare const mistyCapabilityServerContracts: {
             requestId: z.ZodString;
             state: z.ZodEnum<{
                 failed: "failed";
+                running: "running";
+                completed: "completed";
                 uncertain: "uncertain";
                 queued: "queued";
-                running: "running";
                 waiting: "waiting";
-                completed: "completed";
                 cancelled: "cancelled";
             }>;
             outcome: z.ZodNullable<z.ZodDiscriminatedUnion<[z.ZodObject<{

@@ -246,6 +246,7 @@ var allowedCORSRequestHeaders = []string{
 	"Idempotency-Key",
 	"X-Request-ID",
 	"X-Misty-Platform",
+	"X-Misty-CSRF",
 	"X-Misty-Release-Channel",
 	"X-Misty-Session-Id",
 	"X-Misty-Analytics-Enabled",
@@ -280,6 +281,7 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 	s.Router.MethodFunc(http.MethodPut, prefix+"/settings", aiService.Settings())
 	s.Router.Get(prefix+"/memories", aiService.Memories())
 	s.Router.Delete(prefix+"/memories/{memoryID}", aiService.Memory())
+	s.Router.Put(prefix+"/memories/{memoryID}", aiService.Memory())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/preferences/{surfaceID}", aiService.SurfacePreference())
 	s.Router.Post(prefix+"/preferences/{surfaceID}/proactive-events", aiService.ProactiveEvent())
 	s.Router.Get(prefix+"/recaps", aiService.Recaps())
@@ -297,6 +299,15 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 }
 
 func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
+	s.Router.Post(prefix+"/misty/agent-followup", aiService.AgentFollowup())
+	s.Router.Post(prefix+"/misty/agent-execution", aiService.AgentExecutionLease())
+	s.Router.Delete(prefix+"/misty/agent-execution/{taskID}", aiService.AgentExecutionLease())
+	s.Router.Get(prefix+"/misty/agents", aiService.PersonalAgents())
+	s.Router.Post(prefix+"/misty/agents", aiService.PersonalAgents())
+	s.Router.Put(prefix+"/misty/agents/{agentID}", aiService.PersonalAgent())
+	s.Router.Delete(prefix+"/misty/agents/{agentID}", aiService.PersonalAgent())
+	s.Router.Get(prefix+"/misty/agents/{agentID}/apps", aiService.AgentAppAssignments())
+	s.Router.Put(prefix+"/misty/agents/{agentID}/apps", aiService.AgentAppAssignments())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/misty/conversations", aiService.MistyConversations())
 	s.Router.MethodFunc(http.MethodPost, prefix+"/misty/conversations", aiService.MistyConversations())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/misty/conversations/{conversationID}", aiService.MistyConversation())
