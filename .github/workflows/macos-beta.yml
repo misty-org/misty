@@ -16,7 +16,8 @@ on:
         required: true
         type: string
 permissions:
-  contents: read
+  # GitHub requires push access to read unpublished draft release assets.
+  contents: write
 jobs:
   notarize:
     runs-on: macos-15
