@@ -43,8 +43,14 @@ func nativeAgentToolAllowed(name, risk, mode string, apps map[string]bool) bool 
 	if strings.HasPrefix(name, "memory.") {
 		return true
 	}
-	if name == "ask.delegate" || strings.HasPrefix(name, "mcp.") {
+	if name == "ask.delegate" {
 		return false
+	}
+	if strings.HasPrefix(name, "mcp.") {
+		if risk != serveragent.RiskRead && mode == "user" {
+			return false
+		}
+		return true
 	}
 	if risk != serveragent.RiskRead && mode == "user" {
 		return false
@@ -82,8 +88,21 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 		allowed[id] = true
 	}
 	if descriptor.ProviderBinding != nil {
+		if descriptor.ProviderBinding.ProviderID != "" && allowed[descriptor.ProviderBinding.ProviderID] {
+			return true, nativeAgentToolAllowed(descriptor.Name, descriptor.Risk, body.ExecutionMode, allowed), nil
+		}
 		return true, false, nil
-	} // Browser/native app tools are the v1 execution path.
+	}
+	if strings.HasPrefix(descriptor.Name, "mcp.") {
+		authorized, err := authorizeMCPAgentTool(ctx, database, invocation, descriptor)
+		if err != nil {
+			return true, false, err
+		}
+		if !authorized {
+			return true, false, nil
+		}
+		return true, nativeAgentToolAllowed(descriptor.Name, descriptor.Risk, body.ExecutionMode, allowed), nil
+	}
 	if strings.HasPrefix(descriptor.Name, "browser.") {
 		contexts, err := database.AIInvocationContexts(ctx, record.UserID, record.ID)
 		if err != nil {

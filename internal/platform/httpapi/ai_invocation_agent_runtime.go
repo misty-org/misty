@@ -192,7 +192,13 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 	}
 	registrations, sdkErr := s.aiSDKRegistrations(ctx, record)
 	if body.AgentID != "" {
-		registrations = nil
+		filtered := []agenttools.Registration{}
+		for _, reg := range registrations {
+			if reg.Descriptor.ProviderBinding != nil && assignedApps[reg.Descriptor.ProviderBinding.ProviderID] {
+				filtered = append(filtered, reg)
+			}
+		}
+		registrations = filtered
 		sdkErr = nil
 	}
 	if sdkErr != nil {
@@ -201,6 +207,18 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 	allowedTools = withoutReplacedSDKTools(allowedTools, registrations)
 	for _, registration := range registrations {
 		allowedTools = append(allowedTools, registration.Descriptor.Name)
+	}
+	if body.AgentID != "" {
+		mcpHandler := func(toolCtx context.Context, _ agenttools.Invocation, tool serveragent.ToolRequest) (json.RawMessage, error) {
+			return s.executeMCPAgentTool(toolCtx, &db.SpaceRun{
+				ID:                 record.ID,
+				OwnerUserID:        record.UserID,
+				RequestingMemberID: record.UserID,
+				AgentID:            body.AgentID,
+				SpaceID:            spaceID,
+			}, tool, body.ExecutionMode != "user", "space_conversation")
+		}
+		registrations, allowedTools = s.appendPersonalAgentMCPTools(ctx, record.UserID, body.AgentID, registrations, allowedTools, mcpHandler)
 	}
 	modelID := strings.TrimSpace(body.ModelID)
 	reasoning := strings.TrimSpace(body.ReasoningEffort)

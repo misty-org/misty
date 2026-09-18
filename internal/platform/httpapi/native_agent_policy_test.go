@@ -22,9 +22,11 @@ func TestNativeAgentModesAndAssignmentsAreIndependentOfPlanning(t *testing.T) {
 		{"agents.list", serveragent.RiskRead, "team", nil, true},
 		{"memory.remember", serveragent.RiskWrite, "user", nil, true},
 		{"browser.upload", serveragent.RiskWrite, "user", nil, false},
-		{"browser.visual", serveragent.RiskRead, "user", nil, true},
 		{"ask.delegate", serveragent.RiskWrite, "team", nil, false},
-		{"mcp.call", serveragent.RiskRead, "agent", nil, false},
+		{"mcp.call", serveragent.RiskRead, "agent", nil, true},
+		{"mcp.call", serveragent.RiskRead, "user", nil, true},
+		{"mcp.mutate", serveragent.RiskWrite, "user", nil, false},
+		{"mcp.mutate", serveragent.RiskWrite, "agent", nil, true},
 		{"unknown.execute", serveragent.RiskWrite, "agent", nil, false},
 	}
 	for _, c := range cases {
