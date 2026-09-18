@@ -46,6 +46,7 @@ import {
   NavigationTreeItem,
   navigationMenuGroupClass,
   navigationTreeContinuationClass,
+  Button,
   cn,
 } from "@/shared/ui";
 import {
@@ -196,17 +197,15 @@ export function DownloadedAppNavigator(props: {
               }}
             >
               <PopoverTrigger asChild>
-                <button
-                  type="button"
+                <Button
+                  variant="pill"
+                  size="pill"
+                  reveal={source ? "always" : "row-hover"}
                   data-reorder-ignore="true"
                   data-misty-window-drag-block="true"
                   aria-label={`${label} source: ${source?.label ?? "Choose integration"}`}
                   title={`Switch ${label} source`}
-                  className={cn(
-                    "mr-1 flex h-[22px] min-w-0 max-w-[50%] shrink-0 items-center gap-1 rounded-full bg-charcoal-hover px-2 text-[13px] font-medium text-cream outline-none cursor-pointer transition duration-150 hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card motion-reduce:transition-none [&_svg]:!size-3.5 [&_img]:!size-3.5",
-                    !source &&
-                      "opacity-0 pointer-events-none group-hover/app-row:opacity-100 group-hover/app-row:pointer-events-auto group-focus-within/app-row:opacity-100 group-focus-within/app-row:pointer-events-auto data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto",
-                  )}
+                  className="mr-1"
                 >
                   {source ? (
                     <DestinationIcon appId={props.appId} item={source} />
@@ -214,7 +213,7 @@ export function DownloadedAppNavigator(props: {
                     <Plug aria-hidden="true" />
                   )}
                   <span className="truncate">{source?.label ?? "Connect"}</span>
-                </button>
+                </Button>
               </PopoverTrigger>
               <PopoverContent
                 side="right"
@@ -477,9 +476,10 @@ function AppItem(props: AppItemsProps & { item: MistyNavigationItem; last: boole
           label={item.label}
           action={
             pinned ? (
-              <button
-                type="button"
-                className={`${navigationMenuActionClass} !bg-transparent hover:!bg-transparent active:!bg-transparent transition-colors hover:text-cream-bright focus-visible:text-cream-bright !opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100 disabled:cursor-wait`}
+              <Button
+                variant="nav-action"
+                size="icon-sm"
+                reveal="tree-hover"
                 aria-label={`Unpin ${label}`}
                 title="Unpin"
                 aria-busy={unpinning || undefined}
@@ -493,7 +493,7 @@ function AppItem(props: AppItemsProps & { item: MistyNavigationItem; last: boole
                 }}
               >
                 <PinOff aria-hidden className="size-4" />
-              </button>
+              </Button>
             ) : undefined
           }
           selected={

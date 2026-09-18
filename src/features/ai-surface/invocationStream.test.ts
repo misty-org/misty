@@ -67,4 +67,13 @@ describe("AI response stream recovery", () => {
       expect(connect).toHaveBeenCalledOnce();
     },
   );
+  it("processes trailing terminal event on EOF without trailing newlines", async () => {
+    const onEvent = vi.fn();
+    const connect = vi.fn(async () =>
+      response('id: 1\ndata: {"id":"1","type":"invocation.completed"}'),
+    );
+    await readInvocationStream(connect, new AbortController().signal, { onEvent }, 0);
+    expect(connect).toHaveBeenCalledOnce();
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "invocation.completed" }));
+  });
 });
