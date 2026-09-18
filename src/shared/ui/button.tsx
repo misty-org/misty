@@ -26,6 +26,11 @@ const buttonVariants = cva(
           "bg-charcoal-card text-cream hover:text-cream-bright aria-expanded:text-cream-bright",
         ghost: "hover:text-cream-bright aria-expanded:text-cream-bright",
         link: "text-cream-bright underline-offset-4 hover:underline",
+        pill: "rounded-full border-0 bg-charcoal-hover text-cream hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card",
+        "pill-subtle":
+          "rounded-full border-charcoal-border bg-transparent text-cream-muted hover:border-charcoal-active hover:text-cream-bright",
+        "nav-action":
+          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-charcoal-card hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-cream-muted disabled:cursor-wait",
       },
       size: {
         default:
@@ -38,24 +43,34 @@ const buttonVariants = cva(
           "size-6 rounded-md in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8 rounded-md in-data-[slot=button-group]:rounded-md",
         "icon-lg": "size-10",
+        pill: "h-[22px] min-w-0 max-w-[50%] px-2 text-[13px] gap-1 [&_svg]:!size-3.5 [&_img]:!size-3.5",
+      },
+      reveal: {
+        always: "",
+        "row-hover":
+          "opacity-0 pointer-events-none group-hover/app-row:opacity-100 group-hover/app-row:pointer-events-auto group-focus-within/app-row:opacity-100 group-focus-within/app-row:pointer-events-auto data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto",
+        "tree-hover":
+          "!opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100",
       },
     },
     defaultVariants: {
       variant: "default",
       size: "default",
+      reveal: "always",
     },
   },
 );
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, reveal, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
         data-slot="button"
         data-variant={variant ?? "default"}
         data-size={size ?? "default"}
-        className={cn(buttonVariants({ variant, size, className }))}
+        data-reveal={reveal ?? "always"}
+        className={cn(buttonVariants({ variant, size, reveal, className }))}
         ref={ref}
         {...props}
       />

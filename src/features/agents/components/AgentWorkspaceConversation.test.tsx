@@ -9,6 +9,13 @@ vi.mock("@/features/global-search/MistyModelPicker", () => ({ MistyModelPicker: 
 vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,
 }));
+const finishExecutionMock = vi.fn(async () => {});
+vi.mock("@/features/agents/localExecution", () => ({
+  finishLocalExecution: () => finishExecutionMock(),
+}));
+vi.mock("@/shared/platform/tauri", () => ({
+  hasTauriInternals: () => true,
+}));
 const submit = vi.fn(async () => {});
 const agent = {
   id: "writer",
@@ -41,11 +48,35 @@ beforeEach(() => {
     error: null,
     loadConversations: async () => {},
     submitAnswer: submit,
+    executionMode: "user",
+  });
+  Object.defineProperty(window.navigator, "platform", {
+    value: "MacIntel",
+    configurable: true,
   });
 });
 afterEach(cleanup);
 
 describe("Agents workspace conversations", () => {
+  it("switches execution mode when mode selector pills are clicked", async () => {
+    renderWorkspace();
+    const userRadio = screen.getByRole("radio", { name: "User" });
+    const agentRadio = screen.getByRole("radio", { name: "Agent" });
+    const teamRadio = screen.getByRole("radio", { name: "Team" });
+
+    expect(userRadio).toBeDefined();
+    expect(agentRadio).toBeDefined();
+    expect(teamRadio).toBeDefined();
+    expect(useMistyStore.getState().executionMode).toBe("user");
+
+    fireEvent.click(agentRadio);
+    await waitFor(() => expect(useMistyStore.getState().executionMode).toBe("agent"));
+    expect(finishExecutionMock).toHaveBeenCalled();
+
+    fireEvent.click(teamRadio);
+    await waitFor(() => expect(useMistyStore.getState().executionMode).toBe("team"));
+  });
+
   it("submits to the displayed agent and Space without opening another panel", async () => {
     renderWorkspace();
     fireEvent.change(screen.getByLabelText("Message Misty"), {

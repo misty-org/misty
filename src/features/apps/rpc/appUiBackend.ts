@@ -200,7 +200,12 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
     },
     openWorkspace({ route, placement = "tab", state: appState, title, sidebarVisible }) {
       const { state, pane } = ownedPane();
-      const request = workspaceSurfaceFromRoute(route);
+      const normalizedRoute = appOwnedRoute(
+        route,
+        officialAppSlug(scope.identity.appId),
+        scope.identity.spaceId,
+      );
+      const request = workspaceSurfaceFromRoute(normalizedRoute);
       if (
         !request ||
         request.groupKey !== `app:${scope.identity.appId}` ||
