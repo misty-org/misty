@@ -616,16 +616,37 @@ fn remember_main_macos_webview(app: &AppHandle, window_label: &str) -> Result<()
     if renderer(window_label).native == 0 {
         return Err("Misty's main WebView2 window is unavailable.".to_owned());
     }
-    // The renderer must stay transparent wherever CSS leaves the Browser page
-    // host open, otherwise moving it above the external page paints a solid
-    // rectangle instead of just the annotation or popup UI.
-    if !renderer(window_label).transparent {
-        if let Err(error) = main_webview.set_background_color(Some(Color(0, 0, 0, 0))) {
-            return Err(error.to_string());
-        }
+    Ok(())
+}
+
+/// The renderer is transparent only while an overlay needs the external page
+/// beneath it to show through. Otherwise it is opaque: a permanently
+/// transparent WebView2 composites against a white backdrop for a frame
+/// whenever the page content changes, which flashes on every page switch.
+#[cfg(windows)]
+fn set_windows_renderer_transparency(
+    app: &AppHandle,
+    window_label: &str,
+    transparent: bool,
+) -> Result<(), String> {
+    if renderer(window_label).transparent == transparent {
+        return Ok(());
     }
+    let main_webview = app
+        .get_webview(window_label)
+        .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
+    let color = if transparent {
+        Color(0, 0, 0, 0)
+    } else if matches!(main_webview.window().theme(), Ok(tauri::Theme::Light)) {
+        Color(255, 255, 255, 255)
+    } else {
+        Color(19, 19, 19, 255)
+    };
+    main_webview
+        .set_background_color(Some(color))
+        .map_err(|error| error.to_string())?;
     if let Ok(mut map) = renderers().lock() {
-        map.entry(window_label.to_owned()).or_default().transparent = true;
+        map.entry(window_label.to_owned()).or_default().transparent = transparent;
     }
     Ok(())
 }
@@ -817,8 +838,58 @@ fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     position_macos_webview(webview, true)
 }
 
+/// Views created but not yet painted. They stay parked offscreen so Misty's
+/// own canvas shows instead of WebView2's blank surface, like a browser that
+/// holds the previous frame until the new page paints.
+#[cfg(windows)]
+fn held_views() -> &'static Mutex<HashSet<String>> {
+    static HELD: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    HELD.get_or_init(Default::default)
+}
+
+#[cfg(windows)]
+fn hold_until_first_paint(app: &AppHandle, id: &str) {
+    if let Ok(mut held) = held_views().lock() {
+        held.insert(id.to_owned());
+    }
+    let app = app.clone();
+    let id = id.to_owned();
+    // A page that never paints must still appear.
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        release_first_paint(&app, &id);
+    });
+}
+
+/// Lets a held view appear. Safe to call for any view, any number of times.
+pub(super) fn release_first_paint(app: &AppHandle, id: &str) {
+    #[cfg(windows)]
+    {
+        let was_held = held_views()
+            .lock()
+            .map(|mut held| held.remove(id))
+            .unwrap_or(false);
+        if was_held {
+            let _ = app.emit_to(
+                browser_owner_label(app, id),
+                "misty://browser-reveal",
+                json!({ "id": id }),
+            );
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (app, id);
+}
+
 #[cfg(windows)]
 fn present_macos_webview(webview: &Webview) -> Result<(), String> {
+    let held = webview
+        .label()
+        .strip_prefix("misty-browser-")
+        .is_some_and(|id| held_views().lock().is_ok_and(|held| held.contains(id)));
+    if held {
+        return park_windows_webview(webview);
+    }
     position_windows_webview(
         webview,
         true,
@@ -1238,6 +1309,7 @@ pub async fn browser_webview_create(
                 },
             );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                release_first_paint(&page_app, &page_id);
                 if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                     let _ = apply_shortcuts(&webview, &state);
                 }
@@ -1305,6 +1377,10 @@ pub async fn browser_webview_create(
     apply_shortcuts(&webview, &state)?;
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
+    #[cfg(windows)]
+    if !preview_only {
+        hold_until_first_paint(&app, &request.id);
+    }
     present_macos_webview(&webview)
 }
 
@@ -1902,9 +1978,21 @@ pub fn browser_webview_set_theme(
         if label.starts_with("misty-browser-") && webview.window().label() == window.label() {
             // Update reused views as well as newly created ones. A transparent
             // document must not inherit Misty's dark toolbar canvas.
-            webview
-                .set_background_color(Some(browser_background(&request.theme)))
-                .map_err(|error| error.to_string())?;
+            // A page that already reported its color keeps it; resetting it to
+            // the default canvas flashes white when the tab is shown again.
+            #[cfg(any(target_os = "macos", windows))]
+            let reported = label
+                .strip_prefix("misty-browser-")
+                .and_then(host_messages::reported_page_background);
+            #[cfg(not(any(target_os = "macos", windows)))]
+            let reported: Option<String> = None;
+            match reported {
+                #[cfg(any(target_os = "macos", windows))]
+                Some(hex) => host_messages::apply_page_background(&webview, hex),
+                _ => webview
+                    .set_background_color(Some(browser_background(&request.theme)))
+                    .map_err(|error| error.to_string())?,
+            }
             webview
                 .eval("document.getElementById('__misty_pane_dim__')?.remove();")
                 .map_err(|error| error.to_string())?;
@@ -2040,6 +2128,7 @@ pub fn browser_webviews_set_overlay_active(
     #[cfg(windows)]
     {
         remember_main_macos_webview(&app, caller.window().label())?;
+        set_windows_renderer_transparency(&app, caller.window().label(), active)?;
         if let Ok(mut map) = renderers().lock() {
             map.entry(caller.window().label().to_owned())
                 .or_default()
@@ -2156,8 +2245,59 @@ pub fn browser_webview_hide(
     if detached_from(&caller, &webview) {
         return Ok(());
     }
+    // Switching tabs parks the page offscreen on Windows instead of hiding it.
+    // WebView2 drops its render surface when hidden and paints its default
+    // color until the first new frame, which flashes on the next switch back.
+    #[cfg(windows)]
+    park_windows_webview(&webview)?;
+    #[cfg(not(windows))]
     webview.hide().map_err(|error| error.to_string())?;
     refresh_browser_cursor_ownership(&webview)
+}
+
+/// Moves the page's window far outside the app and returns keyboard focus to
+/// the renderer, keeping the page live and painted. Reconciling its bounds
+/// brings it back, because the position then differs from the wanted one.
+#[cfg(windows)]
+fn park_windows_webview(webview: &Webview) -> Result<(), String> {
+    use windows_sys::Win32::{
+        Foundation::HWND,
+        UI::{
+            Input::KeyboardAndMouse::{GetFocus, SetFocus},
+            WindowsAndMessaging::{
+                IsChild, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+            },
+        },
+    };
+
+    let renderer = renderer(webview.window().label()).native;
+    webview
+        .with_webview(move |platform_webview| {
+            let mut child = Default::default();
+            if unsafe { platform_webview.controller().ParentWindow(&mut child) }.is_err() {
+                return;
+            }
+            let child = child.0 as HWND;
+            unsafe {
+                SetWindowPos(
+                    child,
+                    std::ptr::null_mut(),
+                    -32_000,
+                    -32_000,
+                    0,
+                    0,
+                    SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER,
+                );
+                let focused = GetFocus();
+                if renderer != 0
+                    && !focused.is_null()
+                    && (focused == child || IsChild(child, focused) != 0)
+                {
+                    SetFocus(renderer as HWND);
+                }
+            }
+        })
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -2223,7 +2363,7 @@ pub(super) fn close_account_views_except(
         {
             continue;
         }
-        browser_webview_close(
+        close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             BrowserWebviewIdRequest { id },
@@ -2232,8 +2372,20 @@ pub(super) fn close_account_views_except(
     Ok(())
 }
 
+/// Async so it never runs on the UI thread. While the UI thread builds another
+/// webview it holds Tauri's webview-context lock and pumps messages, which can
+/// deliver this very request; closing there would take the lock again and
+/// freeze the app. A worker thread just waits its turn.
 #[tauri::command]
-pub fn browser_webview_close(
+pub async fn browser_webview_close(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewIdRequest,
+) -> Result<(), String> {
+    close_browser_webview(app, state, request)
+}
+
+pub fn close_browser_webview(
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
@@ -2257,7 +2409,7 @@ pub fn browser_webview_close(
         (children, private_session_ended)
     };
     for id in children {
-        browser_webview_close(
+        close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             BrowserWebviewIdRequest { id },

@@ -50,7 +50,6 @@ mod tests {
                 "cursor_companion_snap",
                 "cursor_companion_capture_region",
                 "cursor_companion_watch_clicks",
-                "ensure_local_access_token",
                 "browser_sync_state",
                 "code_read_text_file",
             ] {
@@ -114,7 +113,6 @@ mod tests {
             assert!(allows("main", command));
             for label in [
                 "browser-a",
-                "misty-mini-app-a",
                 "misty-agent-01951d32-40ac-7000-8000-000000000001",
                 "main-spoof",
             ] {
@@ -171,13 +169,10 @@ mod tests {
 
     #[test]
     fn content_views_cannot_inherit_host_commands() {
-        for label in ["misty-mini-app-a", "browser-a", "unknown", "main-spoof"] {
+        for label in ["browser-a", "unknown", "main-spoof"] {
             for command in [
-                "ensure_local_access_token",
                 "code_read_text_file",
                 "terminal_create",
-                "builtin_service_open",
-                "mini_app_close",
                 "save_authenticated_user",
                 "auth_cookie_restore",
                 "auth_cookie_capture",
@@ -189,9 +184,6 @@ mod tests {
                 assert!(!allows(label, command), "{label}: {command}");
             }
         }
-        assert!(allows("main", "builtin_service_open"));
         assert!(!allows("misty-bot-pet", "app_snapshot"));
-        assert!(!allows("misty-mini-app-a", "mini_app_rpc"));
-        assert!(!allows("browser-a", "mini_app_rpc"));
     }
 }

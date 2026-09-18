@@ -1,23 +1,14 @@
 use crate::app::runtime::MistyRuntime;
 use crate::infra::paths;
-use aes_gcm::{
-    aead::{Aead, KeyInit},
-    Aes256Gcm, Nonce,
-};
-use base64::{engine::general_purpose, Engine as _};
-use chrono::{SecondsFormat, Utc};
-use hmac::{Hmac, Mac};
-use rand::{rngs::OsRng, RngCore};
-use rusqlite::{params, Connection, OptionalExtension};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
     io::{self},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::Mutex,
 };
-use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct NativeSystemInfo {
@@ -67,16 +58,6 @@ pub struct CurrentLicense {
     verification_expired: bool,
 }
 
-#[derive(Debug, Serialize)]
-struct LocalAccessClaims {
-    user_id: String,
-    email: String,
-    jti: String,
-    iat: i64,
-    exp: i64,
-}
-const LOCAL_REFRESH_TOKEN_DAYS: i64 = 60;
-const LOCAL_ACCESS_TOKEN_REFRESH_WINDOW_MINUTES: i64 = 15;
 const LICENSE_REFRESH_AFTER_DAYS: i64 = 7;
 const LICENSE_VERIFIED_DAYS: i64 = 14;
 #[derive(Debug, Serialize, Clone, Default)]
@@ -161,10 +142,154 @@ struct GithubReleaseAsset {
     browser_download_url: String,
 }
 
+/// The account this device last signed in with. The server owns the account;
+/// this only lets the app show who is signed in and whether the license was
+/// verified recently, so it is one small private file rather than a database
+/// (a database folder that cannot be read must never be able to freeze
+/// sign-in).
+#[derive(Default, Serialize, Deserialize)]
+struct StoredSession {
+    user: Option<CurrentUser>,
+    license: Option<CurrentLicense>,
+}
+
+static SESSION_LOCK: Mutex<()> = Mutex::new(());
+
+fn session_path() -> Result<PathBuf, String> {
+    misty_home_dir().map(|home| home.join("session.json"))
+}
+
+fn read_session() -> StoredSession {
+    // A missing or damaged file is a signed-out device, never an error.
+    session_path()
+        .ok()
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+fn write_session(session: &StoredSession) -> Result<(), String> {
+    let path = session_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Could not create the Misty folder: {error}"))?;
+    }
+    let bytes = serde_json::to_vec_pretty(session).map_err(|error| error.to_string())?;
+    let staging = path.with_extension("json.tmp");
+    fs::write(&staging, bytes)
+        .map_err(|error| format!("Could not save the Misty session: {error}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&staging, fs::Permissions::from_mode(0o600))
+            .map_err(|error| format!("Could not secure the Misty session: {error}"))?;
+    }
+    fs::rename(&staging, &path)
+        .map_err(|error| format!("Could not save the Misty session: {error}"))
+}
+
+fn parse_time(value: Option<&str>) -> Option<DateTime<Utc>> {
+    value
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+        .map(|time| time.with_timezone(&Utc))
+}
+
+/// A license stamped as verified now, with when it should be rechecked and
+/// when it stops allowing use if it never is.
+fn verified_license(license: &CurrentLicense) -> CurrentLicense {
+    let verified_at = Utc::now();
+    let stamp = |time: DateTime<Utc>| Some(time.to_rfc3339_opts(SecondsFormat::Secs, true));
+    CurrentLicense {
+        verified_at: stamp(verified_at),
+        refresh_after: stamp(verified_at + chrono::Duration::days(LICENSE_REFRESH_AFTER_DAYS)),
+        verified_until: stamp(verified_at + chrono::Duration::days(LICENSE_VERIFIED_DAYS)),
+        needs_refresh: false,
+        verification_expired: false,
+        ..license.clone()
+    }
+}
+
+/// The stored license as the app sees it now: due for a recheck, or no longer
+/// allowing use because it went unverified for too long.
+fn license_now(mut license: CurrentLicense) -> CurrentLicense {
+    let now = Utc::now();
+    license.needs_refresh =
+        parse_time(license.refresh_after.as_deref()).is_none_or(|due| due <= now);
+    license.verification_expired =
+        parse_time(license.verified_until.as_deref()).is_some_and(|until| until <= now);
+    if license.verification_expired {
+        license.allows_use = false;
+    }
+    license
+}
+
+fn session_info() -> Result<NativeSystemInfo, String> {
+    let stored = read_session();
+    build_system_info(stored.user, stored.license.map(license_now))
+}
+
+/// Async so the file work never runs on the UI thread.
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
-pub fn check_system() -> Result<NativeSystemInfo, String> {
-    ensure_database()?;
-    build_system_info(current_user()?, current_license()?)
+pub async fn check_system() -> Result<NativeSystemInfo, String> {
+    blocking(session_info).await
+}
+
+#[tauri::command]
+pub async fn sign_out_misty(
+    _state: tauri::State<'_, MistyRuntime>,
+) -> Result<NativeSystemInfo, String> {
+    blocking(|| {
+        let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
+        write_session(&StoredSession::default())?;
+        build_system_info(None, None)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn save_authenticated_user(
+    user: CurrentUser,
+    license: Option<CurrentLicense>,
+) -> Result<NativeSystemInfo, String> {
+    blocking(move || {
+        let license = license.ok_or_else(|| "Misty license could not be verified.".to_string())?;
+        if !license_allows_local_use(&license) {
+            return Err("Misty license is not active for local use.".to_string());
+        }
+        let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
+        write_session(&StoredSession {
+            user: Some(user),
+            license: Some(verified_license(&license)),
+        })?;
+        session_info()
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn save_verified_license(license: CurrentLicense) -> Result<NativeSystemInfo, String> {
+    blocking(move || {
+        if !license_allows_local_use(&license) {
+            return Err("Misty license is not active for local use.".to_string());
+        }
+        let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
+        let mut stored = read_session();
+        if stored.user.is_none() {
+            return Err("No signed in Misty user.".to_string());
+        }
+        stored.license = Some(verified_license(&license));
+        write_session(&stored)?;
+        session_info()
+    })
+    .await
 }
 
 fn build_system_info(
@@ -200,462 +325,10 @@ pub fn stop_misty() -> Result<String, String> {
     Ok("Misty stops when the app exits.".to_string())
 }
 
-#[tauri::command]
-pub fn sign_out_misty(state: tauri::State<'_, MistyRuntime>) -> Result<NativeSystemInfo, String> {
-    ensure_database()?;
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    let system_info = build_system_info(None, None)?;
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|error| format!("Could not start Misty sign-out: {error}"))?;
-    tx.execute_batch(
-        r#"
-        UPDATE access_tokens SET revoked = 1;
-        DELETE FROM refresh_tokens;
-        DELETE FROM access_tokens;
-        DELETE FROM license_cache;
-        DELETE FROM revoked_access_tokens;
-        DELETE FROM users;
-        "#,
-    )
-    .map_err(|error| format!("Could not sign out of Misty: {error}"))?;
-    tx.commit()
-        .map_err(|error| format!("Could not finish Misty sign-out: {error}"))?;
-    Ok(system_info)
-}
-
-#[tauri::command]
-pub fn save_authenticated_user(
-    user: CurrentUser,
-    license: Option<CurrentLicense>,
-) -> Result<NativeSystemInfo, String> {
-    let license = license.ok_or_else(|| "Misty license could not be verified.".to_string())?;
-    if !license_allows_local_use(&license) {
-        return Err("Misty license is not active for local use.".to_string());
-    }
-
-    ensure_database()?;
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    // Build the response before mutating authentication state so a filesystem
-    // status error cannot turn a successful identity commit into an ambiguous
-    // command failure for the frontend.
-    let system_info = build_system_info(Some(user.clone()), Some(license.clone()))?;
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|error| format!("Could not start Misty auth update: {error}"))?;
-    save_current_user_and_license(&tx, &user, &license)?;
-    issue_local_refresh_token(&tx, &user)?;
-    issue_local_access_token(&tx, &user)?;
-    tx.commit()
-        .map_err(|error| format!("Could not finish Misty auth update: {error}"))?;
-
-    Ok(system_info)
-}
-
-#[tauri::command]
-pub fn ensure_local_access_token() -> Result<NativeSystemInfo, String> {
-    ensure_database()?;
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    if let Some(user) = current_user()? {
-        if has_fresh_local_access_token(&conn, &user.id)? {
-            return check_system();
-        }
-        if has_active_refresh_token(&conn, &user.id)? {
-            issue_local_access_token(&conn, &user)?;
-        } else {
-            conn.execute(
-                "UPDATE access_tokens SET revoked = 1 WHERE user_id = ?1 AND revoked = 0",
-                params![&user.id],
-            )
-            .map_err(|error| format!("Could not revoke expired local access tokens: {error}"))?;
-        }
-    }
-    check_system()
-}
-
-#[tauri::command]
-pub fn save_verified_license(license: CurrentLicense) -> Result<NativeSystemInfo, String> {
-    if !license_allows_local_use(&license) {
-        return Err("Misty license is not active for local use.".to_string());
-    }
-
-    ensure_database()?;
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-    let user = current_user()?.ok_or_else(|| "No signed in Misty user.".to_string())?;
-    cache_verified_license(&conn, &user.id, &license)?;
-    check_system()
-}
-
-fn save_current_user_and_license(
-    conn: &Connection,
-    user: &CurrentUser,
-    license: &CurrentLicense,
-) -> Result<(), String> {
-    conn.execute("DELETE FROM refresh_tokens", params![])
-        .map_err(|error| format!("Could not clear previous refresh tokens: {error}"))?;
-    conn.execute("DELETE FROM access_tokens", params![])
-        .map_err(|error| format!("Could not clear previous access tokens: {error}"))?;
-    conn.execute("DELETE FROM revoked_access_tokens", params![])
-        .map_err(|error| format!("Could not clear previous revoked tokens: {error}"))?;
-    conn.execute("DELETE FROM license_cache", params![])
-        .map_err(|error| format!("Could not clear previous license cache: {error}"))?;
-    conn.execute("DELETE FROM users", params![])
-        .map_err(|error| format!("Could not clear previous Misty user: {error}"))?;
-    conn.execute(
-        "INSERT INTO users (id, name, username, email) VALUES (?1, ?2, ?3, ?4)",
-        params![&user.id, &user.name, &user.username, &user.email],
-    )
-    .map_err(|error| format!("Could not save Misty user: {error}"))?;
-
-    let verified_at = Utc::now();
-    let refresh_after = verified_at + chrono::Duration::days(LICENSE_REFRESH_AFTER_DAYS);
-    let verified_until = verified_at + chrono::Duration::days(LICENSE_VERIFIED_DAYS);
-    conn.execute(
-        r#"
-        INSERT INTO license_cache (
-            user_id, tier, status, allows_use, expires_at, trial_started_at, license_device,
-            updated_at, verified_at, refresh_after, verified_until
-        )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-        "#,
-        params![
-            &user.id,
-            &license.tier,
-            &license.status,
-            i64::from(license.allows_use),
-            license.expires_at.as_deref(),
-            license.trial_started_at.as_deref(),
-            license.license_device.as_deref(),
-            verified_at.to_rfc3339_opts(SecondsFormat::Secs, true),
-            verified_at.to_rfc3339_opts(SecondsFormat::Secs, true),
-            refresh_after.to_rfc3339_opts(SecondsFormat::Secs, true),
-            verified_until.to_rfc3339_opts(SecondsFormat::Secs, true),
-        ],
-    )
-    .map_err(|error| format!("Could not save Misty license cache: {error}"))?;
-
-    Ok(())
-}
-
-fn license_cache_window() -> (String, String, String) {
-    let verified_at = Utc::now();
-    let refresh_after = verified_at + chrono::Duration::days(LICENSE_REFRESH_AFTER_DAYS);
-    let verified_until = verified_at + chrono::Duration::days(LICENSE_VERIFIED_DAYS);
-    (
-        verified_at.to_rfc3339_opts(SecondsFormat::Secs, true),
-        refresh_after.to_rfc3339_opts(SecondsFormat::Secs, true),
-        verified_until.to_rfc3339_opts(SecondsFormat::Secs, true),
-    )
-}
-
-fn cache_verified_license(
-    conn: &Connection,
-    user_id: &str,
-    license: &CurrentLicense,
-) -> Result<(), String> {
-    let (verified_at, refresh_after, verified_until) = license_cache_window();
-    conn.execute(
-        r#"
-        INSERT INTO license_cache (
-            user_id, tier, status, allows_use, expires_at, trial_started_at, license_device,
-            updated_at, verified_at, refresh_after, verified_until
-        )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-        ON CONFLICT(user_id) DO UPDATE SET
-            tier = excluded.tier,
-            status = excluded.status,
-            allows_use = excluded.allows_use,
-            expires_at = excluded.expires_at,
-            trial_started_at = excluded.trial_started_at,
-            license_device = excluded.license_device,
-            updated_at = excluded.updated_at,
-            verified_at = excluded.verified_at,
-            refresh_after = excluded.refresh_after,
-            verified_until = excluded.verified_until
-        "#,
-        params![
-            user_id,
-            &license.tier,
-            &license.status,
-            i64::from(license.allows_use),
-            license.expires_at.as_deref(),
-            license.trial_started_at.as_deref(),
-            license.license_device.as_deref(),
-            &verified_at,
-            &verified_at,
-            &refresh_after,
-            &verified_until,
-        ],
-    )
-    .map_err(|error| format!("Could not save Misty license cache: {error}"))?;
-    Ok(())
-}
-
 fn license_allows_local_use(license: &CurrentLicense) -> bool {
     matches!(license.tier.as_str(), "basic" | "personal" | "pro" | "max")
         && matches!(license.status.as_str(), "active" | "trialing")
         && license.allows_use
-}
-
-/// A standard HS256 JWT: base64url(header).base64url(claims).base64url(HMAC-SHA256).
-fn sign_hs256(claims: &impl Serialize, secret: &[u8]) -> Result<String, String> {
-    let encode = |bytes: &[u8]| general_purpose::URL_SAFE_NO_PAD.encode(bytes);
-    let payload = serde_json::to_vec(claims).map_err(|error| error.to_string())?;
-    let signing_input = format!(
-        "{}.{}",
-        encode(br#"{"typ":"JWT","alg":"HS256"}"#),
-        encode(&payload)
-    );
-    let mut mac =
-        <Hmac<Sha256> as Mac>::new_from_slice(secret).map_err(|error| error.to_string())?;
-    mac.update(signing_input.as_bytes());
-    Ok(format!(
-        "{signing_input}.{}",
-        encode(&mac.finalize().into_bytes())
-    ))
-}
-
-fn issue_local_access_token(conn: &Connection, user: &CurrentUser) -> Result<(), String> {
-    let secret = read_or_create_jwt_secret()?;
-    let issued_at = Utc::now();
-    let expires_at = issued_at + chrono::Duration::hours(1);
-    let token_id = Uuid::new_v4().to_string();
-    let claims = LocalAccessClaims {
-        user_id: user.id.clone(),
-        email: user.email.clone(),
-        jti: token_id.clone(),
-        iat: issued_at.timestamp(),
-        exp: expires_at.timestamp(),
-    };
-    let token = sign_hs256(&claims, &secret)
-        .map_err(|error| format!("Could not sign local Misty access token: {error}"))?;
-
-    conn.execute(
-        "UPDATE access_tokens SET revoked = 1 WHERE user_id = ?1 AND revoked = 0",
-        params![&user.id],
-    )
-    .map_err(|error| format!("Could not revoke previous local access tokens: {error}"))?;
-    conn.execute(
-        r#"
-        INSERT INTO access_tokens (id, user_id, token, expires_at, revoked)
-        VALUES (?1, ?2, ?3, ?4, 0)
-        "#,
-        params![
-            token_id,
-            &user.id,
-            token,
-            expires_at.to_rfc3339_opts(SecondsFormat::Secs, true),
-        ],
-    )
-    .map_err(|error| format!("Could not store local Misty access token: {error}"))?;
-    Ok(())
-}
-
-fn issue_local_refresh_token(conn: &Connection, user: &CurrentUser) -> Result<(), String> {
-    let token = generate_local_refresh_token();
-    let token_hash = hash_token(&token);
-    let encrypted_token = encrypt_refresh_token(&token)?;
-    let expires_at = (Utc::now() + chrono::Duration::days(LOCAL_REFRESH_TOKEN_DAYS))
-        .to_rfc3339_opts(SecondsFormat::Secs, true);
-
-    conn.execute(
-        "UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?1 AND revoked = 0",
-        params![&user.id],
-    )
-    .map_err(|error| format!("Could not revoke previous local refresh tokens: {error}"))?;
-    conn.execute(
-        r#"
-        INSERT INTO refresh_tokens (id, user_id, token_hash, encrypted_token, expires_at, revoked)
-        VALUES (?1, ?2, ?3, ?4, ?5, 0)
-        "#,
-        params![
-            Uuid::new_v4().to_string(),
-            &user.id,
-            token_hash,
-            encrypted_token,
-            expires_at,
-        ],
-    )
-    .map_err(|error| format!("Could not store local refresh token: {error}"))?;
-    Ok(())
-}
-
-fn has_active_refresh_token(conn: &Connection, user_id: &str) -> Result<bool, String> {
-    let now = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-    let encrypted_token: Option<String> = conn
-        .query_row(
-            r#"
-            SELECT encrypted_token
-            FROM refresh_tokens
-            WHERE user_id = ?1
-              AND revoked = 0
-              AND datetime(expires_at) > datetime(?2)
-            ORDER BY datetime(created_at) DESC
-            LIMIT 1
-            "#,
-            params![user_id, now],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|error| format!("Could not read local refresh token: {error}"))?;
-
-    match encrypted_token {
-        Some(value) => decrypt_refresh_token(&value).map(|token| !token.is_empty()),
-        None => Ok(false),
-    }
-}
-
-fn has_fresh_local_access_token(conn: &Connection, user_id: &str) -> Result<bool, String> {
-    let refresh_after = (Utc::now()
-        + chrono::Duration::minutes(LOCAL_ACCESS_TOKEN_REFRESH_WINDOW_MINUTES))
-    .to_rfc3339_opts(SecondsFormat::Secs, true);
-    let count: i64 = conn
-        .query_row(
-            r#"
-            SELECT COUNT(1)
-            FROM access_tokens
-            WHERE user_id = ?1
-              AND revoked = 0
-              AND datetime(expires_at) > datetime(?2)
-            "#,
-            params![user_id, refresh_after],
-            |row| row.get(0),
-        )
-        .map_err(|error| format!("Could not inspect local access token: {error}"))?;
-    Ok(count > 0)
-}
-
-fn generate_local_refresh_token() -> String {
-    let mut token = [0_u8; 32];
-    OsRng.fill_bytes(&mut token);
-    general_purpose::URL_SAFE.encode(token)
-}
-
-fn hash_token(raw: &str) -> String {
-    hex::encode(Sha256::digest(raw.as_bytes()))
-}
-
-fn encrypt_refresh_token(raw: &str) -> Result<String, String> {
-    let key = read_or_create_token_encryption_key()?;
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|error| format!("Could not initialize token cipher: {error}"))?;
-    let mut nonce = [0_u8; 12];
-    OsRng.fill_bytes(&mut nonce);
-    let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), raw.as_bytes())
-        .map_err(|error| format!("Could not encrypt refresh token: {error}"))?;
-    let mut payload = Vec::with_capacity(nonce.len() + ciphertext.len());
-    payload.extend_from_slice(&nonce);
-    payload.extend_from_slice(&ciphertext);
-    Ok(general_purpose::STANDARD.encode(payload))
-}
-
-fn decrypt_refresh_token(encrypted: &str) -> Result<String, String> {
-    let key = read_or_create_token_encryption_key()?;
-    let payload = general_purpose::STANDARD
-        .decode(encrypted)
-        .map_err(|error| format!("Could not decode refresh token: {error}"))?;
-    if payload.len() < 12 {
-        return Err("Encrypted refresh token is too short".to_string());
-    }
-    let (nonce, ciphertext) = payload.split_at(12);
-    let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|error| format!("Could not initialize token cipher: {error}"))?;
-    let plaintext = cipher
-        .decrypt(Nonce::from_slice(nonce), ciphertext)
-        .map_err(|error| format!("Could not decrypt refresh token: {error}"))?;
-    String::from_utf8(plaintext).map_err(|error| format!("Refresh token was not UTF-8: {error}"))
-}
-
-fn read_or_create_token_encryption_key() -> Result<[u8; 32], String> {
-    if let Ok(raw) = std::env::var("MISTY_TOKEN_ENCRYPTION_KEY") {
-        let trimmed = raw.trim();
-        if !trimmed.is_empty() {
-            let decoded = general_purpose::STANDARD
-                .decode(trimmed)
-                .map_err(|error| format!("Could not decode MISTY_TOKEN_ENCRYPTION_KEY: {error}"))?;
-            return decoded
-                .try_into()
-                .map_err(|_| "MISTY_TOKEN_ENCRYPTION_KEY must decode to 32 bytes".to_string());
-        }
-    }
-
-    let path = token_encryption_key_path()?;
-    if let Ok(raw) = fs::read_to_string(&path) {
-        let decoded = general_purpose::STANDARD
-            .decode(raw.trim())
-            .map_err(|error| format!("Could not decode token key: {error}"))?;
-        return decoded
-            .try_into()
-            .map_err(|_| "Token key must decode to 32 bytes".to_string());
-    }
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Could not create token key directory: {error}"))?;
-    }
-    let mut key = [0_u8; 32];
-    OsRng.fill_bytes(&mut key);
-    fs::write(&path, general_purpose::STANDARD.encode(key))
-        .map_err(|error| format!("Could not write token key: {error}"))?;
-    set_user_only_file_permissions(&path)?;
-    Ok(key)
-}
-
-fn token_encryption_key_path() -> Result<PathBuf, String> {
-    let db_path = misty_db_path()?;
-    let parent = db_path
-        .parent()
-        .ok_or_else(|| format!("Misty database path has no parent: {}", db_path.display()))?;
-    Ok(parent.join("token.key"))
-}
-
-fn read_or_create_jwt_secret() -> Result<Vec<u8>, String> {
-    let path = jwt_secret_path()?;
-    if let Ok(raw) = fs::read_to_string(&path) {
-        let trimmed = raw.trim();
-        if let Ok(decoded) = general_purpose::STANDARD.decode(trimmed) {
-            if !decoded.is_empty() {
-                return Ok(decoded);
-            }
-        }
-        if !trimmed.is_empty() {
-            return Ok(trimmed.as_bytes().to_vec());
-        }
-    }
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Could not create JWT secret directory: {error}"))?;
-    }
-    let mut secret = [0_u8; 32];
-    OsRng.fill_bytes(&mut secret);
-    fs::write(&path, general_purpose::STANDARD.encode(secret))
-        .map_err(|error| format!("Could not write JWT secret: {error}"))?;
-    set_user_only_file_permissions(&path)?;
-    Ok(secret.to_vec())
-}
-
-fn set_user_only_file_permissions(path: &Path) -> Result<(), String> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Could not secure {}: {error}", path.display()))?;
-    }
-    Ok(())
 }
 
 fn authed_get(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
@@ -683,15 +356,6 @@ fn github_auth_token() -> Option<String> {
     }
 
     None
-}
-
-fn ensure_database() -> Result<(), String> {
-    fs::create_dir_all(misty_db_dir()?)
-        .map_err(|error| format!("Could not create Misty database directory: {error}"))?;
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))
 }
 
 fn probe_path(path: &Path) -> PathProbe {
@@ -727,207 +391,6 @@ fn open_url_in_system_browser(url: &str) -> io::Result<()> {
 
 fn can_open_external_url(url: &str) -> bool {
     url.starts_with("https://") || url.starts_with("http://") || url.starts_with("mailto:")
-}
-
-fn bootstrap_database(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(
-        r#"
-        PRAGMA foreign_keys = ON;
-
-        CREATE TABLE IF NOT EXISTS files (
-            file_path TEXT PRIMARY KEY,
-            mtime INTEGER NOT NULL,
-            size INTEGER NOT NULL,
-            is_dir INTEGER NOT NULL DEFAULT 0,
-            hash TEXT NOT NULL DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            username TEXT NOT NULL DEFAULT '',
-            email TEXT NOT NULL UNIQUE,
-            token_valid_after TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            token_hash TEXT NOT NULL UNIQUE,
-            encrypted_token TEXT NOT NULL DEFAULT '',
-            expires_at TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            revoked INTEGER NOT NULL DEFAULT 0
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id
-            ON refresh_tokens(user_id);
-        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash
-            ON refresh_tokens(token_hash);
-
-        CREATE TABLE IF NOT EXISTS access_tokens (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            token TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            revoked INTEGER NOT NULL DEFAULT 0
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_access_tokens_user_id
-            ON access_tokens(user_id);
-        CREATE INDEX IF NOT EXISTS idx_access_tokens_expires_at
-            ON access_tokens(expires_at);
-
-        CREATE TABLE IF NOT EXISTS revoked_access_tokens (
-            token_id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            revoked_at TEXT NOT NULL
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_revoked_access_tokens_user_id
-            ON revoked_access_tokens(user_id);
-        CREATE INDEX IF NOT EXISTS idx_revoked_access_tokens_expires_at
-            ON revoked_access_tokens(expires_at);
-
-        CREATE TABLE IF NOT EXISTS license_cache (
-            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-            tier TEXT NOT NULL,
-            status TEXT NOT NULL,
-            allows_use INTEGER NOT NULL,
-            expires_at TEXT,
-            trial_started_at TEXT,
-            license_device TEXT,
-            verified_at TEXT,
-            refresh_after TEXT,
-            verified_until TEXT,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        "#,
-    )?;
-    ensure_column(conn, "license_cache", "verified_at", "TEXT")?;
-    ensure_column(conn, "license_cache", "refresh_after", "TEXT")?;
-    ensure_column(conn, "license_cache", "verified_until", "TEXT")?;
-    ensure_column(conn, "users", "username", "TEXT NOT NULL DEFAULT ''")?;
-    conn.execute_batch(
-        r#"
-        UPDATE license_cache
-        SET
-            verified_at = COALESCE(verified_at, updated_at),
-            refresh_after = COALESCE(refresh_after, datetime(updated_at, '+7 days')),
-            verified_until = COALESCE(verified_until, datetime(updated_at, '+14 days'));
-        "#,
-    )?;
-    Ok(())
-}
-
-fn ensure_column(
-    conn: &Connection,
-    table: &str,
-    column: &str,
-    definition: &str,
-) -> rusqlite::Result<()> {
-    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
-    let mut rows = stmt.query(params![])?;
-    while let Some(row) = rows.next()? {
-        let name: String = row.get(1)?;
-        if name == column {
-            return Ok(());
-        }
-    }
-    conn.execute_batch(&format!(
-        "ALTER TABLE {table} ADD COLUMN {column} {definition}"
-    ))
-}
-
-fn current_user() -> Result<Option<CurrentUser>, String> {
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-
-    conn.query_row(
-        "SELECT id, name, username, email FROM users ORDER BY rowid ASC LIMIT 1",
-        params![],
-        |row| {
-            Ok(CurrentUser {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                username: row.get(2)?,
-                email: row.get(3)?,
-            })
-        },
-    )
-    .optional()
-    .map_err(|error| format!("Could not read signed in Misty user: {error}"))
-}
-
-fn current_local_access_token() -> Result<Option<String>, String> {
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-
-    conn.query_row(
-        r#"
-        SELECT token
-        FROM access_tokens
-        WHERE revoked = 0
-          AND datetime(expires_at) > datetime('now')
-        ORDER BY datetime(created_at) DESC
-        LIMIT 1
-        "#,
-        params![],
-        |row| row.get::<_, String>(0),
-    )
-    .optional()
-    .map_err(|error| format!("Could not read local Misty access token: {error}"))
-}
-
-fn current_license() -> Result<Option<CurrentLicense>, String> {
-    let conn = Connection::open(misty_db_path()?)
-        .map_err(|error| format!("Could not open Misty database: {error}"))?;
-    bootstrap_database(&conn)
-        .map_err(|error| format!("Could not initialize Misty database: {error}"))?;
-
-    conn.query_row(
-        r#"
-        SELECT tier, status, allows_use, expires_at, trial_started_at, license_device,
-               verified_at, refresh_after, verified_until,
-               datetime(refresh_after) <= datetime('now') AS needs_refresh,
-               datetime(verified_until) <= datetime('now') AS verification_expired
-        FROM license_cache
-        ORDER BY updated_at DESC
-        LIMIT 1
-        "#,
-        params![],
-        |row| {
-            Ok(CurrentLicense {
-                tier: row.get(0)?,
-                status: row.get(1)?,
-                allows_use: row.get::<_, i64>(2)? != 0,
-                expires_at: row.get(3)?,
-                trial_started_at: row.get(4)?,
-                license_device: row.get(5)?,
-                verified_at: row.get(6)?,
-                refresh_after: row.get(7)?,
-                verified_until: row.get(8)?,
-                needs_refresh: row.get::<_, i64>(9)? != 0,
-                verification_expired: row.get::<_, i64>(10)? != 0,
-            })
-        },
-    )
-    .optional()
-    .map(|license| {
-        license.map(|mut license| {
-            if license.verification_expired {
-                license.allows_use = false;
-            }
-            license
-        })
-    })
-    .map_err(|error| format!("Could not read Misty license cache: {error}"))
 }
 
 fn misty_home_dir() -> Result<PathBuf, String> {
@@ -979,10 +442,6 @@ fn legacy_misty_bin_dir() -> Result<PathBuf, String> {
     misty_home_dir().map(|home| home.join("local").join("bin"))
 }
 
-fn misty_db_dir() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join("db"))
-}
-
 fn misty_db_path() -> Result<PathBuf, String> {
     misty_home_dir().map(|home| home.join("db").join("data.db"))
 }
@@ -1001,10 +460,6 @@ fn read_installed_version(home: &Path) -> Result<Option<String>, String> {
         .trim()
         .to_string();
     Ok((!version.is_empty()).then_some(version))
-}
-
-fn jwt_secret_path() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join("config").join("jwt.secret"))
 }
 
 fn runtime_binary_name(base: &str) -> String {
@@ -1056,12 +511,9 @@ mod tests {
         assert!(license_allows_local_use(&license));
     }
 
-    #[test]
-    fn authenticated_identity_write_rolls_back_with_its_outer_transaction() {
-        let conn = Connection::open_in_memory().expect("database should open");
-        bootstrap_database(&conn).expect("database should bootstrap");
-        let license = CurrentLicense {
-            tier: "personal".to_string(),
+    fn license(tier: &str) -> CurrentLicense {
+        CurrentLicense {
+            tier: tier.to_string(),
             status: "active".to_string(),
             allows_use: true,
             expires_at: None,
@@ -1072,36 +524,43 @@ mod tests {
             verified_until: None,
             needs_refresh: false,
             verification_expired: false,
-        };
-        let previous = CurrentUser {
-            id: "account-a".to_string(),
-            name: "Account A".to_string(),
-            username: "account-a".to_string(),
-            email: "a@example.test".to_string(),
-        };
-        let target = CurrentUser {
-            id: "account-b".to_string(),
-            name: "Account B".to_string(),
-            username: "account-b".to_string(),
-            email: "b@example.test".to_string(),
-        };
-        save_current_user_and_license(&conn, &previous, &license)
-            .expect("previous identity should save");
-
-        {
-            let tx = conn
-                .unchecked_transaction()
-                .expect("transaction should start");
-            save_current_user_and_license(&tx, &target, &license)
-                .expect("target identity should stage");
-            // Simulate a later token-issuance failure by dropping without a
-            // commit. The original identity must remain intact.
         }
+    }
 
-        let current_id: String = conn
-            .query_row("SELECT id FROM users LIMIT 1", params![], |row| row.get(0))
-            .expect("previous identity should remain");
-        assert_eq!(current_id, previous.id);
+    #[test]
+    fn a_fresh_license_is_not_due_and_a_stale_one_stops_allowing_use() {
+        let fresh = license_now(verified_license(&license("pro")));
+        assert!(!fresh.needs_refresh && !fresh.verification_expired && fresh.allows_use);
+
+        let mut stale = verified_license(&license("pro"));
+        stale.refresh_after = Some("2020-01-01T00:00:00Z".to_string());
+        stale.verified_until = Some("2020-01-15T00:00:00Z".to_string());
+        let stale = license_now(stale);
+        assert!(stale.needs_refresh && stale.verification_expired && !stale.allows_use);
+    }
+
+    #[test]
+    fn a_license_without_timestamps_is_rechecked() {
+        assert!(license_now(license("pro")).needs_refresh);
+    }
+
+    #[test]
+    fn a_damaged_session_file_reads_as_signed_out() {
+        let parsed: Option<StoredSession> = serde_json::from_slice(b"{ not json").ok();
+        assert!(parsed.is_none());
+        let stored = StoredSession {
+            user: Some(CurrentUser {
+                id: "a".into(),
+                name: "A".into(),
+                username: "a".into(),
+                email: "a@example.test".into(),
+            }),
+            license: Some(verified_license(&license("pro"))),
+        };
+        let round: StoredSession =
+            serde_json::from_slice(&serde_json::to_vec(&stored).unwrap()).unwrap();
+        assert_eq!(round.user.unwrap().id, "a");
+        assert!(round.license.unwrap().refresh_after.is_some());
     }
 
     #[cfg(debug_assertions)]

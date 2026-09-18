@@ -36,14 +36,12 @@ use crate::domain::explorer::{
     PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem, PreparedOpenItem,
     RenameItemRequest,
 };
-use crate::domain::file_transfer::now_epoch_ms;
-use crate::domain::file_transfer::{FileTransferItemType, FileTransferRecord, FileTransferType};
+use crate::domain::clock::now_epoch_ms;
 use crate::domain::listing_cache::ListingCache;
 use crate::error::{ApiError, ApiResult};
 use crate::infra::{
     environment::AppEnvironmentService,
     explorer_library::{ExplorerLibraryItem, ExplorerLibraryService},
-    transfers::TransferService,
 };
 
 const VIRTUAL_PATH_RECENT: &str = "misty://recent";
@@ -69,7 +67,6 @@ static TEMPORARY_THUMBNAIL_COUNTER: AtomicU64 = AtomicU64::new(0);
 pub struct ExplorerService {
     home_dir: PathBuf,
     mount_root: PathBuf,
-    transfers: TransferService,
     explorer_library: ExplorerLibraryService,
     listing_cache: ListingCache,
     drag_preparation_cancellations: Arc<Mutex<HashMap<String, Arc<AtomicBool>>>>,
@@ -77,39 +74,19 @@ pub struct ExplorerService {
     clipboard_blob_cache_dir: PathBuf,
     trash_dir: PathBuf,
     image_thumbnail_cache_dir: PathBuf,
-    #[cfg(target_os = "macos")]
-    image_service: Option<Arc<crate::infra::document_intelligence::ServiceLease>>,
 }
 
 impl ExplorerService {
+    /// Image previews are not available on macOS: they need a confined worker
+    /// and no caller provides one. The error return type is uninhabited so
+    /// every code path past it is statically unreachable.
     #[cfg(target_os = "macos")]
-    pub(crate) fn with_image_service(
-        mut self,
-        service: Arc<crate::infra::document_intelligence::ServiceLease>,
-    ) -> Self {
-        let key = hex::encode(Sha256::digest(service.namespace.as_bytes()));
-        self.image_thumbnail_cache_dir = self
-            .image_thumbnail_cache_dir
-            .join("space-owned-v1")
-            .join(key);
-        self.image_service = Some(service);
-        self
-    }
-    #[cfg(target_os = "macos")]
-    fn image_service(&self) -> ApiResult<Arc<crate::infra::document_intelligence::ServiceLease>> {
-        let service = self
-            .image_service
-            .as_ref()
-            .ok_or_else(|| ApiError::Message("Open Files in this Space to use previews.".into()))?;
-        if service.cancelled() {
-            return Err(ApiError::Message("Files preview access changed.".into()));
-        }
-        Ok(service.clone())
+    fn image_service(&self) -> ApiResult<std::convert::Infallible> {
+        Err(ApiError::Message("Image previews are unavailable.".into()))
     }
 
     pub fn new(
         environment: AppEnvironmentService,
-        transfers: TransferService,
         explorer_library: ExplorerLibraryService,
     ) -> Self {
         let cache_dir = environment.cache_dir();
@@ -117,7 +94,6 @@ impl ExplorerService {
         Self {
             home_dir: environment.home_dir(),
             mount_root,
-            transfers,
             explorer_library,
             listing_cache: ListingCache::new(cache_dir.join("remotes"), cache_dir.join("listings")),
             drag_preparation_cancellations: Arc::new(Mutex::new(HashMap::new())),
@@ -125,8 +101,6 @@ impl ExplorerService {
             clipboard_blob_cache_dir: cache_dir.join("clipboard-paste").join("blob"),
             trash_dir: cache_dir.join("trash"),
             image_thumbnail_cache_dir: cache_dir.join("thumbnails"),
-            #[cfg(target_os = "macos")]
-            image_service: None,
         }
     }
 }
@@ -139,6 +113,7 @@ mod local_mutations;
 mod local_use;
 mod misc;
 mod mutations;
+mod paste_guard;
 mod path_helpers;
 mod preview;
 mod preview_render;
@@ -149,7 +124,6 @@ mod test_support;
 mod tests_local;
 #[cfg(test)]
 mod tests_preview;
-mod transfer_progress;
 
 use cancellation::*;
 use local_mutations::*;

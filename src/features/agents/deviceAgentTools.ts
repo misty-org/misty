@@ -79,10 +79,7 @@ export async function runDeviceAgentOperation(
     case "files.read": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
-      const document = await agentsPrepareScopedDocument(
-        { ...target, spaceId: job.spaceId ?? "" },
-        signal,
-      );
+      const document = await agentsPrepareScopedDocument(target, signal);
       let text = document.sections.map((section) => section.text).join("\n\n");
       const truncated = document.truncated || text.length > readLimit;
       text = text.slice(0, readLimit);

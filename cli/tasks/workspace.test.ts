@@ -14,7 +14,6 @@ test("built-in tools share the host runtime without public app packages", () => 
     "packages/sdk/package.json",
     "packages/contracts/package.json",
     "examples/habit-tracker/package.json",
-    "src-tauri/src/platform/mini_app_bridge.js",
   ]) assert.equal(existsSync(resolve(root, retired)), false, retired);
   assert.equal(host.workspaces, undefined);
   assert.equal(host.dependencies["@misty/sdk"], undefined);

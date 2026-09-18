@@ -92,8 +92,8 @@ Client:
 
 - Remove `iroh` (`src-tauri/Cargo.toml`) and `services/peer-transport`, along with its `build.rs`
   embedding.
-- Remove the `connected_devices*.rs` transport, `peer_files.rs`, `space_peer_*.rs`,
-  `mini_app_peer.rs` and `domain/lan.rs`. Also remove the LAN candidate and endpoint-address helpers
+- Remove the `connected_devices*.rs` transport, `peer_files.rs`, `space_peer_*.rs`
+  and `domain/lan.rs`. Also remove the LAN candidate and endpoint-address helpers
   in `device_channel.rs`, `connected_devices_links.rs`, `device_trust.rs` and `device_records.rs`.
 - Remove the `misty://device/` branches in `app/commands.rs`, plus the picker's `peer_device`
   handling (`HostFilePicker.tsx`, `preparePickerSelections.ts`, `FileBrowserView.tsx`).

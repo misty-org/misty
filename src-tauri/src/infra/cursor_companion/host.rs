@@ -243,50 +243,70 @@ fn displays() -> Result<Vec<Display>, String> {
         .collect()
 }
 async fn rebuild(app: &AppHandle) -> Result<(), String> {
-    on_main(app, |app| {
+    if !host_state(app).enabled.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    // Enumerating monitors makes GDI calls per display (on Windows each
+    // property query opens a device context). Never do that on the UI thread:
+    // this runs every two seconds and on every reload or sign-out.
+    let frames = tauri::async_runtime::spawn_blocking(displays)
+        .await
+        .map_err(|e| e.to_string())??;
+    // Reloads, sign-out and the topology poll can overlap; build one set at a time.
+    static REBUILD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _serialized = REBUILD.lock().await;
+    let state = host_state(app);
+    if !state.enabled.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let old = state
+        .data
+        .lock()
+        .map_err(|_| "Companion unavailable")?
+        .displays
+        .clone();
+    if old == frames
+        && frames
+            .iter()
+            .all(|d| app.get_webview_window(&format!("{PREFIX}{}", d.id)).is_some())
+    {
+        return Ok(());
+    }
+    // Create the webviews here, off the UI thread. WebView2 creation needs the
+    // UI thread's message loop to run; building from inside a task on that
+    // thread waits on itself and freezes the app on Windows. The build call
+    // hands the work to the UI thread and waits for it from a worker instead.
+    for (label, window) in app.webview_windows() {
+        if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
+            let _ = window.destroy();
+        }
+    }
+    for d in &frames {
+        WebviewWindowBuilder::new(
+            app,
+            format!("{PREFIX}{}", d.id),
+            WebviewUrl::App("companion.html".into()),
+        )
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
+        .title("Misty cursor")
+        .transparent(true)
+        .decorations(false)
+        .shadow(false)
+        .resizable(false)
+        .visible(false)
+        .focused(false)
+        .focusable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    }
+    on_main(app, move |app| {
         let state = host_state(&app);
-        if !state.enabled.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        let frames = displays()?;
-        let old = state
-            .data
-            .lock()
-            .map_err(|_| "Companion unavailable")?
-            .displays
-            .clone();
-        if old == frames
-            && frames.iter().all(|d| {
-                app.get_webview_window(&format!("{PREFIX}{}", d.id))
-                    .is_some()
-            })
-        {
-            return Ok(());
-        }
-        for (label, window) in app.webview_windows() {
-            if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
-                let _ = window.destroy();
-            }
-        }
         for d in &frames {
-            let window = WebviewWindowBuilder::new(
-                &app,
-                format!("{PREFIX}{}", d.id),
-                WebviewUrl::App("companion.html".into()),
-            )
-            .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
-            .title("Misty cursor")
-            .transparent(true)
-            .decorations(false)
-            .shadow(false)
-            .resizable(false)
-            .visible(false)
-            .focused(false)
-            .focusable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .build()
-            .map_err(|e| e.to_string())?;
+            let Some(window) = app.get_webview_window(&format!("{PREFIX}{}", d.id)) else {
+                continue;
+            };
             #[cfg(target_os = "macos")]
             platform::position_overlay(&window, d)?;
             #[cfg(windows)]

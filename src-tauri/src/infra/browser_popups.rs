@@ -298,7 +298,7 @@ fn close_from_page(app: AppHandle, id: String) {
     tauri::async_runtime::spawn(async move {
         let close_app = app.clone();
         let _ = app.run_on_main_thread(move || {
-            let _ = browser_webview_close(
+            let _ = close_browser_webview(
                 close_app.clone(),
                 close_app.state::<BrowserSessionState>(),
                 BrowserWebviewIdRequest { id },

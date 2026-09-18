@@ -120,6 +120,20 @@ pub(super) fn forget_page_background(id: &str) {
     }
 }
 
+/// The page's last reported color, if it has reported one.
+pub(super) fn reported_page_background(id: &str) -> Option<String> {
+    page_backgrounds()
+        .lock()
+        .ok()
+        .and_then(|values| values.get(id).cloned())
+}
+
+/// Re-applies a reported page color to the native view.
+#[cfg(any(target_os = "macos", windows))]
+pub(super) fn apply_page_background(webview: &Webview, hex: String) {
+    set_under_page_background(webview, hex);
+}
+
 pub(super) fn replay_page_background(app: &AppHandle, id: &str) {
     let color = page_backgrounds()
         .lock()
@@ -205,6 +219,11 @@ impl HostChannel for Channel {
             #[cfg(any(target_os = "macos", windows))]
             if let Some(webview) = app.get_webview(message.webview) {
                 set_under_page_background(&webview, background.background.clone());
+            }
+            // Before a page's styles apply, its color reads as the default
+            // white. Only a real color, or the page finishing, shows the view.
+            if !background.background.eq_ignore_ascii_case("#ffffff") {
+                super::release_first_paint(app, id);
             }
             if let Ok(mut values) = page_backgrounds().lock() {
                 values.insert(id.to_owned(), background.background.clone());

@@ -25,10 +25,15 @@ export function selectDevelopmentIdentity(listing: string, requested?: string): 
 
 // Tauri uses `cargo run` on every native reload. Cargo's target runner runs
 // after linking, immediately before launch; a beforeDevCommand runs too early.
-export function signedDevArguments(args: string[], node: string, runner: string): string[] {
+export function signedDevArguments(
+  args: string[],
+  node: string,
+  runner: string,
+  targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"],
+): string[] {
   const separator = args.indexOf("--");
   const split = separator < 0 ? args.length : separator;
-  const cargoConfig = ["aarch64-apple-darwin", "x86_64-apple-darwin"].flatMap((target) => [
+  const cargoConfig = targets.flatMap((target) => [
     "--config",
     `target.${target}.runner = [${JSON.stringify(node)}, ${JSON.stringify(runner)}]`,
   ]);
@@ -37,14 +42,18 @@ export function signedDevArguments(args: string[], node: string, runner: string)
 }
 
 export function prepareTauriDevelopment(args: string[]): string[] {
-  if (
-    process.platform !== "darwin" ||
-    args[0] !== "dev" ||
-    args.includes("--help") ||
-    args.includes("-h")
-  ) {
-    return args;
+  if (args[0] !== "dev" || args.includes("--help") || args.includes("-h")) return args;
+  if (process.platform === "win32") {
+    // Windows locks a running executable, so Cargo could not relink the one the
+    // app runs from. Launch a copy instead; macOS gets the same from its bundle.
+    return signedDevArguments(
+      args,
+      process.execPath,
+      fileURLToPath(new URL("./run-windows-desktop.ts", import.meta.url)),
+      ["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"],
+    );
   }
+  if (process.platform !== "darwin") return args;
   if (args.some((arg) => arg === "--runner" || arg === "-r" || arg.startsWith("--runner="))) {
     throw new Error(
       "A custom Tauri runner would bypass Misty's stable dev signing. Use `npm run tauri -- dev`.",

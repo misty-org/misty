@@ -25,20 +25,6 @@ export type SmartLibrarySourceKind = "local" | "cloud";
 export type SmartLibraryAssetStatus =
   "pending" | "queued" | "analyzed" | "failed" | "changed" | "unsupported";
 
-export type TransferType =
-  "upload" | "download" | "create" | "copy" | "move" | "rename" | "delete" | "archive";
-
-export type TransferStatus =
-  | "queued"
-  | "pending"
-  | "in_progress"
-  | "waiting_for_resolution"
-  | "completed"
-  | "failed"
-  | "canceled"
-  | "skipped"
-  | "interrupted";
-
 export type OperationKind =
   "copy" | "move" | "create" | "rename" | "delete" | "upload" | "download" | "archive";
 

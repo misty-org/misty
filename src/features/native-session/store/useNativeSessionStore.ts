@@ -61,10 +61,7 @@ export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
         return;
       }
       let session = await invoke<NativeSession>("check_system");
-      if (session.current_user) {
-        session = await invoke<NativeSession>("ensure_local_access_token");
-        session = await refreshVerifiedLicenseIfDue(session);
-      }
+      if (session.current_user) session = await refreshVerifiedLicenseIfDue(session);
       if (!isCurrentSessionRequest(request)) return;
       set({ status: session, systemError: "" });
     } catch (error) {
@@ -72,11 +69,11 @@ export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
       set({ systemError: String(error) });
     }
   },
-  refreshLocalAccessToken: async () => {
+  refreshSession: async () => {
     if (isAccountSessionTransitioning() || !hasTauriInternals()) return;
     const request = beginSessionRequest();
     try {
-      const session = await invoke<NativeSession>("ensure_local_access_token");
+      const session = await invoke<NativeSession>("check_system");
       const refreshed = session.current_user ? await refreshVerifiedLicenseIfDue(session) : session;
       if (!isCurrentSessionRequest(request)) return;
       set({ status: refreshed, systemError: "" });
@@ -120,7 +117,7 @@ export type NativeSessionStore = {
   status: NativeSession | null;
   systemError: string;
   loadSystem: () => Promise<void>;
-  refreshLocalAccessToken: () => Promise<void>;
+  refreshSession: () => Promise<void>;
   saveAuthenticatedUser: (user: CurrentUser, license?: CurrentLicense | null) => Promise<void>;
   signOut: () => Promise<void>;
 };
