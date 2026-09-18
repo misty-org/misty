@@ -141,6 +141,24 @@ export declare const mistyFileHostContracts: {
             relative: z.ZodArray<z.ZodString>;
         }, z.core.$strict>]>;
     };
+    readonly "files.sources.resolveLocation": {
+        readonly capability: "files.read";
+        readonly params: z.ZodObject<{
+            path: z.ZodString;
+        }, z.core.$strict>;
+        readonly result: z.ZodUnion<readonly [z.ZodNull, z.ZodObject<{
+            virtual: z.ZodEnum<{
+                trash: "trash";
+                recent: "recent";
+                starred: "starred";
+            }>;
+        }, z.core.$strict>, z.ZodObject<{
+            unavailable: z.ZodLiteral<true>;
+        }, z.core.$strict>, z.ZodObject<{
+            sourceId: z.ZodString;
+            relative: z.ZodArray<z.ZodString>;
+        }, z.core.$strict>]>;
+    };
     readonly "files.sources.list": {
         readonly capability: "files.read";
         readonly params: z.ZodObject<{}, z.core.$strict>;
@@ -200,6 +218,13 @@ export declare const mistyFileHostContracts: {
             }>>;
         }, z.core.$strict>;
         readonly result: z.ZodPipe<z.ZodUnion<readonly [z.ZodNull, z.ZodUndefined]>, z.ZodTransform<undefined, null | undefined>>;
+    };
+    readonly "files.previewUrl": {
+        readonly capability: "files.read";
+        readonly params: z.ZodObject<{
+            handle: z.ZodString;
+        }, z.core.$strict>;
+        readonly result: z.ZodString;
     };
     readonly "files.previewImage": {
         readonly capability: "files.read";

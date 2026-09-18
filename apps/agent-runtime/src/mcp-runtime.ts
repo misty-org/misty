@@ -12,6 +12,7 @@ import type {
   MCPRemoteTool,
   RuntimeToolContext,
 } from "./types.js";
+import { normalizeToolInputSchema } from "./tool-schema.js";
 import { collectToolPages } from "./tool-discovery.js";
 
 function rethrowMCPError(error: unknown): never {
@@ -178,7 +179,7 @@ export async function discoverRemoteMCPTools(
           0,
           2_000,
         ),
-        inputSchema: item.inputSchema as Record<string, unknown>,
+        inputSchema: normalizeToolInputSchema(item.inputSchema as Record<string, unknown>),
       })),
     };
   } finally {

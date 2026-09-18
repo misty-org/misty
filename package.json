@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "contracts:sync": "node scripts/contracts/sync-contracts.mjs && node scripts/contracts/sync-go-contracts.mjs",
-    "contracts:check": "node scripts/contracts/sync-go-contracts.mjs --check",
-    "contracts:check-source": "node scripts/contracts/sync-contracts.mjs --check",
+    "contracts:sync": "node scripts/contracts/sync-contracts.ts && node scripts/contracts/sync-go-contracts.ts",
+    "contracts:check": "node scripts/contracts/sync-go-contracts.ts --check",
+    "contracts:check-source": "node scripts/contracts/sync-contracts.ts --check",
     "dev:payments": "tsx watch apps/payments/src/main.ts",
     "build:payments": "tsc -p tsconfig.build.json",
     "start:payments": "node dist/apps/payments/src/main.js",

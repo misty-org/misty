@@ -8,8 +8,8 @@ import (
 
 func TestOfficialCatalogHasStableUniqueApps(t *testing.T) {
 	apps := All()
-	if len(apps) != 10 {
-		t.Fatalf("All() returned %d apps, want 10", len(apps))
+	if len(apps) != 12 {
+		t.Fatalf("All() returned %d apps, want 12", len(apps))
 	}
 	seen := map[string]bool{}
 	for _, item := range apps {
@@ -20,7 +20,13 @@ func TestOfficialCatalogHasStableUniqueApps(t *testing.T) {
 			t.Fatalf("duplicate app id %q", item.ID)
 		}
 		seen[item.ID] = true
-		if item.Desktop.Runtime != RuntimeDownloaded || item.Version == "" || item.PermissionVersion < 2 || item.MinimumHost != 2 || item.Desktop.Entry == "" || len(item.Desktop.SHA256) != 64 || item.Desktop.Signature == "" || item.Desktop.SignatureKeyID == "" {
+		if item.ID == "agents" {
+			if item.Desktop.Runtime != RuntimeEmbedded || item.Desktop.Entry != "" || item.Desktop.SHA256 != "" {
+				t.Fatal("Agents must remain a host-owned surface")
+			}
+			continue
+		}
+		if item.Desktop.Runtime != RuntimeDownloaded || item.Version == "" || item.PermissionVersion < 1 || item.MinimumHost != 2 || item.Desktop.Entry == "" || len(item.Desktop.SHA256) != 64 || item.Desktop.Signature == "" || item.Desktop.SignatureKeyID == "" {
 			t.Fatalf("%s must carry its signed download and reviewed permissions: %#v", item.ID, item)
 		}
 	}
@@ -30,7 +36,7 @@ func TestOfficialCatalogHasStableUniqueApps(t *testing.T) {
 			t.Fatalf("%s mobile runtime = %#v, want unsupported", desktopOnly, item.Mobile)
 		}
 	}
-	for _, embedded := range []string{"chat", "journal", "planner", "library", "inbox", "agents", "files", "browser"} {
+	for _, embedded := range []string{"chat", "journal", "planner", "library", "inbox", "agents", "files", "browser", "music", "media"} {
 		item, ok := Find(embedded)
 		if !ok || item.Mobile.Runtime != RuntimeEmbedded || item.Mobile.Entry != "" || item.Mobile.SHA256 != "" || item.Mobile.StyleSHA256 != "" {
 			t.Fatalf("%s mobile app is not Host-embedded: %#v", embedded, item.Mobile)

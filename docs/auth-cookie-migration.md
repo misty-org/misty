@@ -29,6 +29,11 @@ refresh. Scoped app credentials and third-party downloads do not trigger refresh
    random bytes, consistently on every API instance. Production refuses startup
    without this key. Keep it in the deployment secret store. Development without
    a key uses a process-local random key and signs users out on restart.
+   For `compose.dev.yml`, persist this key in the ignored
+   `.env/dev/crypto/services.env` file, which the API already loads. Generate it
+   once, retain it across rebuilds, and recreate only the API service to apply it.
+   A 30-day refresh-token expiry cannot preserve a session after its signing
+   key has been lost.
 2. Apply `20270206000000_jwt_refresh_sessions.sql` using the normal migration role.
 3. Release the server, desktop and website changes together. Old opaque account
    sessions do not authenticate against this version: users must sign in again.
