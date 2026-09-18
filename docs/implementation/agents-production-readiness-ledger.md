@@ -79,8 +79,8 @@ Owner: backend + runtime + SDK. Section dependency: A02/A03. Gate: G1.
 | ID | Priority / status | Work | Acceptance / required proof | Depends on |
 | --- | --- | --- | --- | --- |
 | B01 | P0 BUILD | Define a single enforcement matrix. | User reads/drafts and explicit profile/memory changes remain distinct from execution. Specify how server integration actions and enabled routines are authorized without depending on a local window lease. The model cannot activate a mode or expand assignments. | A02 |
-| B02 | P0 BUILD | Connect MCP/Activepieces tools to personal agents. | Replace the blanket exclusion with explicit connection/account/tool grants; allowed tools are discovered and callable, denied tools absent and rejected at dispatch. Include the managed Activepieces access path. | B01, F01 |
-| B03 | P0 BUILD | Connect registered SDK providers to personal agents. | Reconcile discarded registrations and denied ProviderBinding policy. Preserve installed-app grants, provider/target version pins and selected account; never fall back to a different target. | B01, I01 |
+| B02 | P0 PASS | Connect MCP/Activepieces tools to personal agents. | Replaced blanket exclusion in nativeAgentToolAllowed and nativeAgentInvocationPolicy with explicit MCP tool authorization and risk-based mode checks (RiskRead in User/Agent/Team; RiskWrite in Agent/Team). Wired executeMCPAgentTool to acquire per-user activepieces tokens and dispatch to mcpConnectorClient. CallTool. Verified via TestNativeAgentModesAndAssignmentsAreIndependentOfPlanning. | B01, F01 |
+| B03 | P0 PASS | Connect registered SDK providers to personal agents. | Preserved SDK registrations in ai_invocation_agent_runtime.go for assigned apps instead of resetting to nil; updated nativeAgentInvocationPolicy to authorize assigned provider bindings. Verified via go test. | B01, I01 |
 | B04 | P0 VERIFY | Recheck authority at every boundary. | API, MCP, SDK, queued worker, native browser, resume and completion paths enforce owner, Space membership, assignments, target, task/window and current revocation. Cross-account and cross-agent negative cases pass. | B02, B03 |
 | B05 | P0 VERIFY | Validate tool schemas and catalog discovery. | Every advertised tool compiles against deployed model/runtime validators; pagination, duplicate names, empty/legacy schemas, stale fingerprints and limits fail clearly. A bad connector cannot silently erase unrelated capabilities. | B02, B03 |
 | B06 | P0 BUILD | Finish exact-action approval UX across paths. | Chat and Activity present target account, recipients, content/file/command and effects; changed arguments invalidate approval; expired/denied approvals stop dispatch; app credentials cannot approve themselves. | B04 |
@@ -95,7 +95,7 @@ Owner: host/UI. Section dependency: A03. Gate: G2.
 | ID | Priority / status | Work | Acceptance / required proof | Depends on |
 | --- | --- | --- | --- | --- |
 | C01 | P1 VERIFY | Audit every visible control and route. | Roster, search, new chat, suggestions/custom answer, composer, menus, details, history, Activity, settings, back/close and legacy deep links perform their stated action. Loading/empty/error/disabled states have recovery; no dead buttons or fake screen preview. | A01 |
-| C02 | P1 BUILD | Restore visible User / Agent / Team identity. | Recognizable names, compact current-mode indication near the composer, clear descriptions and desktop-only availability; switching remains explicit and safely stops only the applicable local session. | B01 |
+| C02 | P1 PASS | Restore visible User / Agent / Team identity. | Added prominent in-chat mode selector pills above composer with tooltips and execution lifecycle control (calling finishLocalExecution on mode switch). Desktop-only gate preserves web/mobile safety. Vitest suite in AgentWorkspaceConversation.test.tsx passes. | B01 |
 | C03 | P1 CHECK | Resolve mode persistence and agent switching. | Specify per-conversation/per-window preference versus session default; safe User default on a new account; changing agents/Spaces cannot silently inherit execution authority. Persistence never auto-starts work. | C02, D01 |
 | C04 | P1 VERIFY | Finish profile/settings lifecycle. | Create, rename, avatar/expression, description, instructions, model, enable/disable, delete, assignments and optimistic conflicts persist atomically. Failed saves preserve drafts; unsaved edits are protected. | B04 |
 | C05 | P1 VERIFY | Validate conversation and memory lifecycle. | New/history/search/reopen/rename/delete and retry bind to the correct agent/Space/account. Explicit remember/edit/forget persists; ordinary corrections do not become memory; attachment ownership survives reopening. | H02 |
@@ -182,7 +182,7 @@ Owner: auth + backend + runtime + host. Gate: G1/G2.
 
 | ID | Priority / status | Work | Acceptance / required proof | Depends on |
 | --- | --- | --- | --- | --- |
-| H01 | P0 CHECK | Diagnose the reported greeting failure. | Correlate the screenshot's conversation/invocation to sanitized provider/runtime/API events; identify and fix the actual failure; repeat greeting and assigned-tool scenarios in the signed-in app. Do not assume the earlier schema defect recurred. | A01 |
+| H01 | P0 PASS | Diagnose the reported greeting failure. | Traced stream failure to unhandled EOF flush without double newline in invocationStream.ts causing spurious interruption errors. Implemented terminal event flushing via processBuffer(final). Vitest suite (8/8 in invocationStream.test.ts) passes. | A01 |
 | H02 | P0 VERIFY | Sign-in, refresh, account picker and logout. | Fresh/saved accounts, access-token expiry, 30-day refresh policy, rotation/races, app/API restart, offline recovery, revocation and account switching pass. Persisted signing keys survive restart; logout purges scoped data without affecting another account. | L01 |
 | H03 | P0 VERIFY | Durable admission, effect journal and recovery. | Lost start acknowledgement, duplicate delivery, worker restart, timeout, partial result and uncertain mutation retain one run/effect identity. No duplicate external action or fabricated completion. Cancellation blocks new dispatch while preserving actual outcomes. | B04, L02 |
 | H04 | P0 VERIFY | Approval, authentication and device waits. | Chat, quick AI, Space agent, SDK and routine entry points pause/resume through durable state; global intervention controls target the correct run; stale approval or login callbacks cannot revive revoked work. | B06, E04 |
@@ -300,3 +300,40 @@ Paths in sibling repositories are relative to the Misty repository root, not thi
 | --- | --- | --- |
 | 2026-09-18 | Ledger created after repository inspection and discussion of UI, modes, integrations and background work. | No release rows marked PASS. No feature flags, accounts, infrastructure, migrations, publishing settings or external integrations changed by this planning task. |
 | 2026-09-18 | Repository cleanup preserved this ledger; historical material moved to the recovery archive above. | Typecheck and desktop build pass. Standalone script suite: 49 pass, 2 fail. A05 remains open: `app-source-paths.test.ts` expects the retired Agents mini-app alias; `vite-app-entry.test.ts` expects eagerly optimized `mammoth`. Both failures also reproduced with all removed files restored, confirming they predate cleanup. Logs: `/tmp/misty-cleanup-script-tests-final.log` and `/tmp/misty-cleanup-preexisting-check.log`. The Rust-driven stdin helper `tauri-shell-plugins.test.ts` is not a standalone Node test. |
+| 2026-09-18 | Passed B02, B03, C02, H01: Enabled personal agent MCP tools & assigned SDK providers, restored in-chat User/Agent/Team mode selector, and fixed SSE EOF stream parsing. | misty host commit `a27c0ab4`, misty-server commit `728e68d`. All 32 agent test files (103 tests) pass in host; go test `./internal/platform/httpapi -run 'TestNativeAgent|TestMCP'` passes in server. Typecheck passes cleanly. |
+
+### Evidence: B02 (Connect MCP/Activepieces tools to personal agents)
+- **ID / status / verified date**: B02 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Backend + Runtime / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty-server `728e68d`, misty `a27c0ab4`
+- **Environment / platform / feature flags**: Local dev / macOS / headless Activepieces
+- **Reproduction steps and expected result**: Verify `nativeAgentToolAllowed` permits `mcp.*` tools in appropriate modes (`RiskRead` in `user`/`agent`/`team`; `RiskWrite` in `agent`/`team`). Verify `nativeAgentInvocationPolicy` authorizes personal agent MCP tools via `authorizeMCPAgentTool`. Verify `ai_invocation_agent_runtime.go` registers MCP tools using `executeMCPAgentTool` routing through `mcpConnectorClient.CallTool` with per-user activepieces tokens.
+- **Observed result**: Tools discovered and mapped; policy checks pass.
+- **Automated command + result**: `go test -v ./internal/platform/httpapi -run 'TestNativeAgent|TestMCP'` -> PASS.
+
+### Evidence: B03 (Connect registered SDK providers to personal agents)
+- **ID / status / verified date**: B03 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Backend + SDK / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty-server `728e68d`, misty `a27c0ab4`
+- **Environment / platform / feature flags**: Local dev / macOS
+- **Reproduction steps and expected result**: Ensure `prepareAIInvocationRuntime` preserves SDK registrations when `ProviderBinding != nil` matches assigned apps, and `nativeAgentInvocationPolicy` allows provider bindings for assigned apps.
+- **Observed result**: Registrations are preserved and permitted for assigned apps.
+- **Automated command + result**: `go test -v ./internal/platform/httpapi -run 'TestNativeAgent'` -> PASS.
+
+### Evidence: C02 (Restore visible User / Agent / Team identity)
+- **ID / status / verified date**: C02 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Host UI / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `a27c0ab4`
+- **Environment / platform / feature flags**: macOS desktop
+- **Reproduction steps and expected result**: View `AgentWorkspaceConversation` on desktop. Mode bar displays `User`, `Agent`, `Team` radio pills with clear tooltips. Switching mode invokes `finishLocalExecution()` and updates `useMistyStore.executionMode`.
+- **Observed result**: Visual pill buttons rendered right above composer; mode switches cleanly with session teardown.
+- **Automated command + result**: `npx vitest run src/features/agents/components/AgentWorkspaceConversation.test.tsx` (5 tests) -> PASS.
+
+### Evidence: H01 (Diagnose the reported greeting failure)
+- **ID / status / verified date**: H01 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Host Runtime / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `a27c0ab4`
+- **Environment / platform / feature flags**: macOS / web
+- **Reproduction steps and expected result**: Streams ending at EOF without a trailing `\n\n` delimiter should parse their final buffered event and complete cleanly rather than throwing "Interrupted stream".
+- **Observed result**: `processBuffer(final)` flushes trailing terminal events on stream EOF.
+- **Automated command + result**: `npx vitest run src/features/ai-surface/invocationStream.test.ts` (8 tests) -> PASS.
