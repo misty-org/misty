@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "nitro dev",
     "build": "nitro build",
-    "start": "node .output/server/index.mjs",
+    "start": "node .output/server/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "world:setup": "bootstrap",
-    "postinstall": "node scripts/patch-workflow-schema.mjs"
+    "postinstall": "node scripts/patch-workflow-schema.ts"
   },
   "dependencies": {
     "@ai-sdk/workflow": "1.0.67",

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node index.mjs",
-    "test": "node --test control.test.mjs"
+    "start": "node index.ts",
+    "test": "node --test control.test.ts"
   },
   "dependencies": {
     "lib0": "0.2.117",

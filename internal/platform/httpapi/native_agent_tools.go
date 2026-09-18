@@ -11,6 +11,11 @@ import (
 
 func nativeAgentToolDescriptors() []agenttools.Descriptor {
 	schema := func(properties map[string]any, required []string) json.RawMessage {
+		// JSON Schema requires an array. A nil Go slice serializes as null and
+		// prevents the runtime from compiling the entire tool catalog.
+		if required == nil {
+			required = []string{}
+		}
 		return TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false})
 	}
 	text := map[string]any{"type": "string", "maxLength": 16000}

@@ -1,11 +1,12 @@
 import { z } from "zod";
-/** Space installation authority. Package caches and member preferences are separate. */
-export declare const SpaceAppInstallationSchema: z.ZodObject<{
-    space_id: z.ZodString;
+/** Account installation authority, independent of collaborative Spaces. */
+export declare const AppInstallationSchema: z.ZodObject<{
     app_id: z.ZodString;
     state: z.ZodEnum<{
         installed: "installed";
         recoverable: "recoverable";
+        purging: "purging";
+        purged: "purged";
     }>;
     installed_version: z.ZodString;
     permission_version: z.ZodNumber;
@@ -14,18 +15,47 @@ export declare const SpaceAppInstallationSchema: z.ZodObject<{
     authority_generation: z.ZodNumber;
     release_metadata: z.ZodRecord<z.ZodString, z.ZodJSONSchema>;
     installed_at: z.ZodString;
-    uninstalled_at: z.ZodOptional<z.ZodString>;
+    uninstalled_at: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    consent_required: z.ZodDefault<z.ZodBoolean>;
     updated_at: z.ZodString;
 }, z.core.$loose>;
-export type SpaceAppInstallation = z.output<typeof SpaceAppInstallationSchema>;
-export declare const SpaceAppSessionSchema: z.ZodObject<{
+export type AppInstallation = z.output<typeof AppInstallationSchema>;
+/** @deprecated Use AppInstallation; apps are account-owned. */
+export declare const SpaceAppInstallationSchema: z.ZodObject<{
     app_id: z.ZodString;
-    space_id: z.ZodString;
+    state: z.ZodEnum<{
+        installed: "installed";
+        recoverable: "recoverable";
+        purging: "purging";
+        purged: "purged";
+    }>;
+    installed_version: z.ZodString;
+    permission_version: z.ZodNumber;
+    granted_scopes: z.ZodArray<z.ZodString>;
+    pin_rank: z.ZodNumber;
+    authority_generation: z.ZodNumber;
+    release_metadata: z.ZodRecord<z.ZodString, z.ZodJSONSchema>;
+    installed_at: z.ZodString;
+    uninstalled_at: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    consent_required: z.ZodDefault<z.ZodBoolean>;
+    updated_at: z.ZodString;
+}, z.core.$loose>;
+export type SpaceAppInstallation = AppInstallation;
+export declare const AppSessionSchema: z.ZodObject<{
+    app_id: z.ZodString;
     token: z.ZodString;
     scopes: z.ZodArray<z.ZodString>;
     expires_at: z.ZodString;
 }, z.core.$loose>;
-export type SpaceAppSession = z.output<typeof SpaceAppSessionSchema>;
+export type AppSession = z.output<typeof AppSessionSchema>;
+/** @deprecated Use AppSession; runtime sessions carry no Space authority. */
+export declare const SpaceAppSessionSchema: z.ZodObject<{
+    app_id: z.ZodString;
+    token: z.ZodString;
+    scopes: z.ZodArray<z.ZodString>;
+    expires_at: z.ZodString;
+}, z.core.$loose>;
+export type SpaceAppSession = AppSession;
 export declare const PersonalSpaceTemplateSchema: z.ZodObject<{
     id: z.ZodString;
     name: z.ZodString;

@@ -51,7 +51,7 @@ test("signed controls bootstrap, advance ACL, and purge durable state", async (t
   const collabPort = await availablePort();
   const { publicKey } = generateKeyPairSync("ed25519");
   const rawPublicKey = publicKey.export({ format: "der", type: "spki" }).subarray(-32).toString("base64");
-  const child = spawn(process.execPath, ["index.mjs"], {
+  const child = spawn(process.execPath, ["index.ts"], {
     cwd: new URL(".", import.meta.url),
     env: {
       ...process.env,
