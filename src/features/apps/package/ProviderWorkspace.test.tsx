@@ -8,7 +8,7 @@ import type {
   MistyComponentDefinition,
   MistyComponentMount,
 } from "@misty/sdk";
-import { createProviderApp } from "../../../../../misty-apps/apps/shared/createProviderApp";
+import { createProviderApp } from "../../../.././apps/shared/createProviderApp";
 const opened = vi.hoisted(() => vi.fn());
 vi.mock("@misty/browser-view", () => ({
   SDKBrowserView: (props: {
@@ -268,7 +268,7 @@ it("loads only API-connected mail providers into navigation and exposes partial 
     ],
   } as never);
   const { notifyProviderAccounts } =
-    await import("../../../../../misty-apps/apps/shared/accountStore");
+    await import("../../../.././apps/shared/accountStore");
   act(() => notifyProviderAccounts());
   await waitFor(() =>
     expect(f.sdk.navigation.setItems).toHaveBeenLastCalledWith([
@@ -304,6 +304,26 @@ it.each(["pending", "failed"])(
     );
   },
 );
+
+it("uses the shared Gmail session even when an API mail account is already connected", async () => {
+  const f = await fixture(
+    "/apps/inbox?provider=google",
+    "inbox",
+    new Map(),
+    "MacIntel",
+    async () => ({
+      connections: [{
+        id: "oauth-mail-connection",
+        provider: "google",
+        account_display: "person@example.com",
+        capabilities: ["mail"],
+      }],
+    }),
+  );
+  await waitFor(() => expect(selectedProfile(f)).toBe("default-google"));
+  expect(opened.mock.calls.every(([p]) => p.accountId === "default-google")).toBe(true);
+  expect([...f.records.keys()].some((key) => key.includes("mail-"))).toBe(false);
+});
 
 it("shows the integration directory and lets users open Gmail while mail discovery is pending", async () => {
   const f = await fixture(

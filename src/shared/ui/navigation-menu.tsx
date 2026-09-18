@@ -228,7 +228,7 @@ export const NavigationTreeItem = forwardRef<
         aria-current={selected ? "page" : undefined}
         className={cn(
           navigationTreeRowClass,
-          "misty-navigator-row-target ml-[27px] h-7 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
+          "misty-navigator-row-target h-7 min-w-0 bg-transparent no-underline transition-none hover:text-cream-bright",
           "font-medium text-cream-muted",
           focusClass,
           !nested && "mx-0",

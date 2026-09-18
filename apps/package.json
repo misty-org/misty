@@ -1,0 +1,48 @@
+{
+  "name": "@misty/apps",
+  "private": true,
+  "version": "0.4.0",
+  "type": "module",
+  "exports": {
+    "./mobile-sdk": "./interface/mobile-sdk.ts",
+    "./sdk": "./interface/sdk.ts",
+    "./catalog": "./interface/catalog.ts",
+    "./react": "./interface/react.tsx",
+    "./store": "./interface/store.tsx",
+    "./styles.css": "./interface/styles.css",
+    "./apps": "./interface/apps.ts"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174",
+    "build": "npm run build:sdk && npm run build:extensions",
+    "build:release": "npm run build:sdk && npm run build:extensions -- --release",
+    "build:sdk": "node -e \"import('@misty/sdk').then(({createMistyAppSDK}) => { if (typeof createMistyAppSDK !== 'function') throw new Error('The public SDK package is incomplete'); })\"",
+    "build:extensions": "tsc && vite build && node ../cli/tasks/apps/build-plugins.ts",
+    "package:release": "node ../cli/tasks/apps/package-release.ts",
+    "test": "vitest run --config ../vitest.config.ts --root .. apps cli/tasks/apps",
+    "validate": "node ../cli/tasks/apps/validate-catalog.ts",
+    "sync:server-apps": "node ../cli/tasks/apps/sync-server-official-apps.ts",
+    "preview": "vite preview --host 127.0.0.1 --port 4174",
+    "package:official-apps": "node ../cli/tasks/apps/build-official-apps.ts",
+    "build:apps": "node ../cli/tasks/apps/build-apps.ts",
+    "build:native-services": "node ../cli/tasks/apps/build-native-services.ts",
+    "test:native-services": "node --test ../cli/tasks/apps/package-native-services.test.ts && cargo test --locked --manifest-path native-services/document-processing/Cargo.toml && cargo test --locked --manifest-path native-services/file-search/Cargo.toml"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "lucide-react": "^1.24.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "@misty/sdk": "0.1.0",
+    "@misty/contracts": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.3.1",
+    "typescript": "5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}

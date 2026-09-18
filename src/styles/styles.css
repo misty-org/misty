@@ -1,6 +1,7 @@
 @config "../../tailwind.config.js";
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./overflow-fade.css";
 
 /* Semantic charcoal/cream palette. Utilities resolve through these variables
    so the Themes extension can preview and persist one coherent app palette. */

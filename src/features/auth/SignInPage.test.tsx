@@ -222,7 +222,9 @@ describe("SignInPage", () => {
       });
       expect(mocks.navigate).not.toHaveBeenCalled();
       if (outcome === "expired") {
-        expect(container.textContent).toContain("Your session for alice@example.com has expired");
+        expect(container.textContent).toContain(
+          "Your saved sign-in for alice@example.com is no longer available",
+        );
         expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(
           "alice@example.com",
         );

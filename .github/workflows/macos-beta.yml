@@ -11,49 +11,47 @@ concurrency:
   cancel-in-progress: false
 jobs:
   packages:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    runs-on: macos-15
+    timeout-minutes: 90
     outputs:
       version: ${{ steps.pins.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           path: misty
-          submodules: true
       - id: pins
         working-directory: misty
         run: |
-          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("release/pins.json")); for(const k of ["sdk","apps"])fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${p[k]}\n`);fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
-      - uses: actions/checkout@v4
-        with:
-          repository: misty-org/misty-sdk
-          ref: ${{ steps.pins.outputs.sdk }}
-          path: misty-sdk
-      - uses: actions/checkout@v4
-        with:
-          repository: misty-org/misty-apps
-          ref: ${{ steps.pins.outputs.apps }}
-          path: misty-apps
+          node --input-type=module -e 'import fs from "node:fs"; fs.appendFileSync(process.env.GITHUB_OUTPUT,`version=${JSON.parse(fs.readFileSync("package.json")).version}\n`);'
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm ci && npm run check && npm run test:packed
-        working-directory: misty-sdk
-      - run: npm ci
-        working-directory: misty-apps
+          node-version: 24.12.0
       - run: npm ci && npm run typecheck
+        working-directory: misty
+      - run: npm run sdk:check && npm run sdk:packed
         working-directory: misty
       - name: Verify Code, app installation, and release scripts
         working-directory: misty
         run: |
-          npm test -- src/features/coding-workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts src/features/apps/runtimeInspection.test.ts
-          node --test scripts/release/*.test.mjs
-      - name: Package and verify ten signed downloadable apps
+          npm test -- apps/code/workspace src/features/apps/rpc/codeLspProject.test.ts src/features/apps/DownloadedAppSurface.test.tsx src/features/apps/appCompatibility.test.ts src/features/apps/appUpdateSafety.test.ts src/features/apps/runtimeInspection.test.ts
+          node --test cli/tasks/release/*.test.ts
+      - uses: dtolnay/rust-toolchain@1.91.0
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Build both native service architectures
+        working-directory: misty
+        run: |
+          for platform in macos-aarch64 macos-x86_64; do
+            for service in document-processing file-search file-operations backup-archive terminal code-tools peer-transport; do
+              cargo run --manifest-path cli/Cargo.toml --locked -- task apps/build-native-services "$platform" "$service"
+            done
+          done
+      - name: Package and verify signed downloadable apps
         working-directory: misty
         env:
           MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY: ${{ secrets.MISTY_OFFICIAL_APP_SIGNING_PRIVATE_KEY }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/release/package-apps.mjs
+        run: node cli/tasks/release/package-apps.ts
       - uses: actions/upload-artifact@v4
         with:
           name: beta-packages
@@ -79,8 +77,6 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
       - name: Validate Apple notarization credentials before building
         env:
           APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
@@ -92,7 +88,7 @@ jobs:
           rm "$RUNNER_TEMP/notary-history.json"
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.12.0
       - uses: dtolnay/rust-toolchain@1.91.0
         with:
           targets: ${{ matrix.target }}
@@ -130,8 +126,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           npm run tauri build -- --target ${{ matrix.target }} --bundles app,dmg --ci
-          node scripts/release/sign-dmg.mjs ${{ matrix.target }}
-      - run: node scripts/release/collect-macos.mjs ${{ matrix.target }}
+          node cli/tasks/release/sign-dmg.ts ${{ matrix.target }}
+      - run: node cli/tasks/release/collect-macos.ts ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
           name: beta-${{ matrix.target }}
@@ -148,7 +144,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.12.0
       - uses: actions/download-artifact@v4
         with:
           pattern: beta-*
@@ -157,4 +153,4 @@ jobs:
       - name: Create immutable draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/release/finalize-draft.mjs
+        run: node cli/tasks/release/finalize-draft.ts

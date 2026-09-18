@@ -1,201 +1,722 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-17T13:48:07.067008+00:00",
-  "title": "Design System: Misty Agents Roster and Profile Editor",
+  "generatedAt": "2026-09-18T18:19:52.903215+00:00",
+  "title": "Design System: Misty Agents — Operate",
   "extensions": {
     "colorMeta": {
-      "canvas-charcoal": {
+      "canvas": {
         "role": "neutral",
-        "displayName": "Canvas Charcoal",
+        "displayName": "Canvas",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
         ]
       },
-      "structural-line": {
+      "sidebar": {
         "role": "neutral",
-        "displayName": "Structural Line",
+        "displayName": "Sidebar",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
         ]
       },
-      "active-charcoal": {
+      "bubble": {
+        "role": "neutral",
+        "displayName": "Bubble",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "Field",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "text": {
         "role": "primary",
-        "displayName": "Active Charcoal",
+        "displayName": "Text",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
         ]
       },
-      "primary-cream": {
-        "role": "primary",
-        "displayName": "Primary Cream",
-        "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
-        ]
-      },
-      "muted-ash": {
+      "muted": {
         "role": "neutral",
-        "displayName": "Muted Ash",
+        "displayName": "Muted",
         "tonalRamp": [
-          "oklch(15% 0 0)",
-          "oklch(26% 0 0)",
-          "oklch(38% 0 0)",
-          "oklch(49% 0 0)",
-          "oklch(61% 0 0)",
-          "oklch(72% 0 0)",
-          "oklch(84% 0 0)",
-          "oklch(95% 0 0)"
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "divider": {
+        "role": "neutral",
+        "displayName": "Divider",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "search": {
+        "role": "neutral",
+        "displayName": "Search",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "search-border": {
+        "role": "neutral",
+        "displayName": "Search Border",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "search-hover": {
+        "role": "neutral",
+        "displayName": "Search Hover",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "selected-row": {
+        "role": "neutral",
+        "displayName": "Selected Row",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "avatar": {
+        "role": "neutral",
+        "displayName": "Avatar",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "account-avatar": {
+        "role": "neutral",
+        "displayName": "Account Avatar",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "option-border": {
+        "role": "neutral",
+        "displayName": "Option Border",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "option-hover": {
+        "role": "neutral",
+        "displayName": "Option Hover",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "option-letter": {
+        "role": "neutral",
+        "displayName": "Option Letter",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "option-text": {
+        "role": "neutral",
+        "displayName": "Option Text",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "composer-border": {
+        "role": "neutral",
+        "displayName": "Composer Border",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "attachment-border": {
+        "role": "neutral",
+        "displayName": "Attachment Border",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "voice-text": {
+        "role": "neutral",
+        "displayName": "Voice Text",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "voice-hover": {
+        "role": "neutral",
+        "displayName": "Voice Hover",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "send": {
+        "role": "primary",
+        "displayName": "Send",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "send-disabled": {
+        "role": "neutral",
+        "displayName": "Send Disabled",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "send-disabled-text": {
+        "role": "neutral",
+        "displayName": "Send Disabled Text",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "selection": {
+        "role": "neutral",
+        "displayName": "Selection",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "selection-text": {
+        "role": "neutral",
+        "displayName": "Selection Text",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "preview": {
+        "role": "neutral",
+        "displayName": "Preview",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "preview-border": {
+        "role": "neutral",
+        "displayName": "Preview Border",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "preview-hover": {
+        "role": "neutral",
+        "displayName": "Preview Hover",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "recipient-hover": {
+        "role": "neutral",
+        "displayName": "Recipient Hover",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "dialog": {
+        "role": "neutral",
+        "displayName": "Dialog",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "dialog-selected": {
+        "role": "neutral",
+        "displayName": "Dialog Selected",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "dialog-muted": {
+        "role": "neutral",
+        "displayName": "Dialog Muted",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-canvas": {
+        "role": "neutral",
+        "displayName": "Light Canvas",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-sidebar": {
+        "role": "neutral",
+        "displayName": "Light Sidebar",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-bubble": {
+        "role": "neutral",
+        "displayName": "Light Bubble",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-field": {
+        "role": "neutral",
+        "displayName": "Light Field",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-line": {
+        "role": "neutral",
+        "displayName": "Light Line",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-text": {
+        "role": "neutral",
+        "displayName": "Light Text",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
+        ]
+      },
+      "light-muted": {
+        "role": "neutral",
+        "displayName": "Light Muted",
+        "tonalRamp": [
+          "#080808",
+          "#111111",
+          "#262626",
+          "#494949",
+          "#737373",
+          "#a0a0a0",
+          "#ccc",
+          "#eee"
         ]
       }
     },
-    "breakpoints": [
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body",
+        "purpose": "Compact interface and conversational copy."
+      },
+      "metadata": {
+        "displayName": "Metadata",
+        "purpose": "Dates, status, option letters, and history."
+      },
+      "account-initials": {
+        "displayName": "Account Initials",
+        "purpose": "Context-specific identity typography."
+      },
+      "avatar": {
+        "displayName": "Avatar",
+        "purpose": "Context-specific identity typography."
+      },
+      "avatar-large": {
+        "displayName": "Avatar Large",
+        "purpose": "Context-specific identity typography."
+      },
+      "avatar-header": {
+        "displayName": "Avatar Header",
+        "purpose": "Context-specific identity typography."
+      },
+      "avatar-recipient": {
+        "displayName": "Avatar Recipient",
+        "purpose": "Context-specific identity typography."
+      },
+      "avatar-search": {
+        "displayName": "Avatar Search",
+        "purpose": "Context-specific identity typography."
+      },
+      "composer": {
+        "displayName": "Composer",
+        "purpose": "Single bottom composer textarea."
+      },
+      "compact-field": {
+        "displayName": "Compact Field",
+        "purpose": "General narrow-container form fields; composer keeps its explicit size."
+      }
+    },
+    "shadows": [
       {
-        "name": "md",
-        "value": "48rem"
+        "name": "workspace-chrome",
+        "value": "none",
+        "purpose": "Composer and search dialog explicitly stay flat; inherited transcript details are separate."
       }
     ],
-    "evidence": {
-      "artifact": "../AgentsPage.tsx",
-      "incumbent": [
-        "../../../../PRODUCT.md",
-        "../../../../DESIGN.md",
-        "../../../styles/styles.css"
-      ],
-      "mode": "Isolated browser rendering with explicitly labeled synthetic data",
-      "captures": [
-        "/tmp/misty-native-agents-preview/screenshots/profile-desktop.png",
-        "/tmp/misty-native-agents-preview/screenshots/profile-narrow.png",
-        "/tmp/misty-native-agents-preview/screenshots/profile-focus-final.png",
-        "/tmp/misty-native-agents-preview/screenshots/create-disabled-final.png"
-      ],
-      "limitations": [
-        "No native execution or native window evidence.",
-        "No live account or backend permission validation.",
-        "No raster assets.",
-        "Synthesized neutral tonal ramps are preview metadata, not additional product tokens."
-      ]
-    },
-    "review": {
-      "disposition": "fix",
-      "resolved": [
-        "Neutral checkbox selection",
-        "Readable disabled action state"
-      ],
-      "unresolved": [
-        "Visible keyboard focus is suppressed by important global outline and Tailwind ring overrides."
-      ],
-      "nextRound": "Permission pending",
-      "sampleFocus": "Samples show component-local focus declarations only. They exclude global suppression and do not demonstrate a host-page fix."
-    }
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "panel-replacement-container",
+        "value": "860px"
+      },
+      {
+        "name": "single-surface-container",
+        "value": "600px"
+      }
+    ]
   },
   "components": [
     {
-      "name": "Save action",
+      "name": "Icon action",
       "kind": "button",
-      "refersTo": "button-primary",
-      "description": "Component-local styles; host keyboard focus remains unresolved.",
-      "html": "<button class=\"ds-primary\">Save changes</button>",
-      "css": ".ds-primary {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:var(--misty-theme-active,#3e3e3e);} .ds-primary:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-primary:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-primary:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+      "refersTo": "icon-button",
+      "description": "Compact desktop action; mobile expands to 44px square.",
+      "html": "<button class=\"ds-icon\" aria-label=\"New chat\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
+      "css": ".ds-icon {font:400 14px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:7px;color:#a0a0a0;background:transparent;cursor:pointer;}.ds-icon:hover{color:#eee;background:#262626;}.ds-icon:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     },
     {
-      "name": "Secondary action",
+      "name": "Send action",
       "kind": "button",
-      "refersTo": "button-secondary",
-      "description": "Component-local styles; host keyboard focus remains unresolved.",
-      "html": "<button class=\"ds-secondary\">Save changes</button>",
-      "css": ".ds-secondary {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:transparent;} .ds-secondary:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-secondary:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-secondary:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+      "refersTo": "send-button",
+      "description": "Enabled circular send action; sending remains an application operation.",
+      "html": "<button class=\"ds-send\" aria-label=\"Send to Misty\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 19V5m-7 7 7-7 7 7\"/></svg></button>",
+      "css": ".ds-send{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:50%;background:#f4f4f4;color:#111;cursor:pointer;}.ds-send:disabled{background:#4b4b4b;color:#b7b7b7;cursor:not-allowed;}.ds-send:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     },
     {
-      "name": "Disabled action",
+      "name": "Search trigger",
       "kind": "button",
-      "refersTo": "button-disabled",
-      "description": "Component-local styles; host keyboard focus remains unresolved.",
-      "html": "<button class=\"ds-disabled\" disabled>Save changes</button>",
-      "css": ".ds-disabled {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);background:var(--misty-theme-bg,#131313);} .ds-disabled:enabled:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-disabled:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-disabled:disabled {background:var(--misty-theme-bg,#131313);color:var(--misty-theme-text-muted,#8c8c8c);opacity:1;cursor:not-allowed;}"
+      "refersTo": "search-trigger",
+      "description": "Opens command search for agents, conversations, and actions.",
+      "html": "<button class=\"ds-search\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"10\" cy=\"10\" r=\"6\"/><path d=\"m15 15 5 5\"/></svg>Search</button>",
+      "css": ".ds-search{font:400 14px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:7px;width:258px;height:32px;padding:0 9px;border:1px solid #2d2d2d;border-radius:8px;background:#242424;color:#a0a0a0;text-align:left;cursor:pointer;}.ds-search:hover{background:#292929;}.ds-search:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     },
     {
-      "name": "Profile field",
-      "kind": "input",
-      "refersTo": "input-default",
-      "description": "Shared profile text field with a visible label; isolated focus declaration only.",
-      "html": "<label class=\"ds-label\">Name<input class=\"ds-field\" value=\"Example agent\"></label>",
-      "css": ".ds-label {display:block;font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text,#e0e0e0);} .ds-field {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);display:block;width:100%;background:var(--misty-theme-bg,#131313);outline:none;} .ds-field:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); }"
-    },
-    {
-      "name": "Selected roster row",
+      "name": "Selected agent",
       "kind": "nav",
       "refersTo": "roster-selected",
-      "description": "Selected agent with secondary responsibility, using synthetic content.",
-      "html": "<button class=\"ds-roster\" aria-pressed=\"true\"><span>Example agent</span><small class=\"ds-role\">Personal agent</small></button>",
-      "css": ".ds-roster {font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;border:1px solid var(--misty-theme-border,#262626);border-radius:6px;padding:8px 12px;color:var(--misty-theme-text,#e0e0e0);padding:12px;display:block;width:100%;text-align:left;font-weight:500;border:0;background:var(--misty-theme-active,#3e3e3e);} .ds-roster:hover {background:var(--misty-theme-active,#3e3e3e);} .ds-roster:focus-visible { box-shadow:0 0 0 2px var(--misty-theme-text-muted,#8c8c8c); } .ds-role {display:block;font:400 12px/16px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text-muted,#8c8c8c);}"
+      "description": "One-line selected agent with a custom emoji override; default identities use cloud artwork.",
+      "html": "<button class=\"ds-roster\" aria-pressed=\"true\"><span class=\"ds-avatar\">✏️</span><span>Assistant</span></button>",
+      "css": ".ds-roster{font:400 16px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:12px;width:258px;height:68px;padding:10px;border:0;border-radius:11px;background:#323232;color:#eee;text-align:left;cursor:pointer;}.ds-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:#3c3c3c;font-size:24px;font-weight:500;}.ds-roster[aria-pressed=\"false\"]{background:transparent;}.ds-roster[aria-pressed=\"false\"]:hover{background:#242424;}.ds-roster:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     },
     {
-      "name": "App assignment",
-      "kind": "custom",
-      "description": "Native cream checkbox with explicit app label; isolated outline declaration only.",
-      "html": "<label class=\"ds-assignment\"><input type=\"checkbox\" checked>Example app</label>",
-      "css": ".ds-assignment {display:flex;align-items:center;gap:12px;padding:8px 0;font:400 14px/20px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;color:var(--misty-theme-text,#e0e0e0);} .ds-assignment input {width:16px;height:16px;accent-color:var(--misty-theme-text,#e0e0e0);} .ds-assignment input:focus-visible {outline:2px solid var(--misty-theme-text-muted,#8c8c8c);outline-offset:3px;}"
+      "name": "Custom answer",
+      "kind": "input",
+      "refersTo": "custom-answer",
+      "description": "Editable answer inside the suggestion group.",
+      "html": "<input class=\"ds-answer\" aria-label=\"Custom answer\" placeholder=\"Type your own answer\">",
+      "css": ".ds-answer{font:400 14px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;width:260px;height:32px;padding:0 10px;background:#080808;border:1px solid #292929;border-radius:8px;color:#eee;}.ds-answer::placeholder{color:#a0a0a0;}.ds-answer:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
+    },
+    {
+      "name": "Lettered choices",
+      "kind": "card",
+      "refersTo": "starter-group",
+      "description": "Four actionable choices grouped beneath the conversational introduction.",
+      "html": "<section class=\"ds-starters\"><h3>What can I take off your plate?</h3><div class=\"ds-options\"><button><span>A</span>Catch me up on my projects</button><button><span>B</span>Plan my next steps</button><button><span>C</span>Turn an idea into a draft</button><button><span>D</span>Think through a decision</button></div></section>",
+      "css": ".ds-starters{font:400 14px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;max-width:440px;padding:12px;border-radius:18px;background:#262626;color:#eee;}.ds-starters h3{font:inherit;margin:0 0 10px;}.ds-options{border:1px solid #404040;border-radius:9px;overflow:hidden;}.ds-options button{font:400 14px/1.45 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;display:flex;align-items:center;gap:9px;width:100%;min-height:38px;padding:8px 9px;background:#303030;color:#eee;border:0;text-align:left;cursor:pointer;}.ds-options button+button{border-top:1px solid #404040;}.ds-options button:hover{background:#393939;}.ds-options button span{display:grid;place-items:center;flex-shrink:0;width:19px;height:21px;border-radius:4px;background:#494949;color:#ddd;font-size:12px;}.ds-options button:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;outline-offset:-3px;}"
+    },
+    {
+      "name": "Activity tile",
+      "kind": "card",
+      "refersTo": "activity-tile",
+      "description": "Truthful activity destination, not a computer stream.",
+      "html": "<button class=\"ds-activity\" aria-label=\"View agent activity\"><svg width=\"25\" height=\"25\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M8 21h8m-4-5v5\"/></svg></button>",
+      "css": ".ds-activity{display:grid;place-items:center;width:268px;aspect-ratio:1.6;background:#1a1a1a;border:1px solid #282828;border-radius:7px;color:#a0a0a0;cursor:pointer;}.ds-activity:hover{background:#232323;}.ds-activity:focus-visible{outline:2px solid #a0a0a0;outline-offset:3px;}"
     }
   ],
   "narrative": {
-    "northStar": "The Quiet Operating Desk",
-    "overview": "This scoped record extends the incumbent root DESIGN.md for the roster and profile editor in AgentsPage.tsx. It preserves Misty's restrained charcoal workspace, compact controls, familiar labels, and clear distinction between personal identity and Space app assignments. Root PRODUCT.md and DESIGN.md remain the wider product authority.\n\nThe evidence is source code and isolated browser renders of the actual React component with explicitly labeled synthetic profiles, assignments, and memories. It covers desktop and narrow profile layout, neutral checkbox selection, and readable disabled actions. It does not establish native execution, native window behavior, live account integration, or backend permission enforcement. Activity, connection sheets, conversations, and other Agents surfaces are outside this record. No raster assets were created or adopted.",
+    "northStar": "Operate",
+    "overview": "**Creative North Star: \"Operate\"**\n\nThe user-pinned Grok Bot layout is the structural authority for this scoped Agents surface: a quiet, dense roster and an open conversation, with details revealed alongside. Misty's identity, truthful capability language, and PRODUCT.md remain normative. This record replaces the rejected Agents design; it does not redefine other Misty surfaces or the root design record.\n\nThe composition begins with conversational greeting bubbles and four lettered choices, followed by a custom-answer field. A single bottom composer anchors the canvas. There is no centered hero, runtime exposition, Marketplace entry, or persistent mode/model/context toolbar. Misty uses the original blue cloud logo. Personal agents use stable cloud color/expression variants unless a custom emoji is configured. The avatar picker offers Sky (original), Lavender (wink), Mint (focused), and Peach (joyful).\n\nSource authority is AgentsPage.tsx, agentsWorkspace.css, components/AgentWorkspaceConversation.tsx, AgentSearchDialog.tsx, AgentAvatar.tsx, and AgentConversationView.tsx. WorkspaceCanvas.tsx supplies the conditional host-chrome treatment. Evidence is the real React component rendered with synthetic data: repository-root .impeccable/review/agents/grok-desktop.png (1045 × 768), grok-user-1111.png (1111 × 823), grok-mobile.png (390 × 844), grok-details.png, grok-settings.png, and grok-search.png; grok-reference-native.png is the actual Grok reference. The reviewer found desktop structural fidelity met and requested documentation replacement and larger mobile targets. The final verdict pass scored both the documentation and mobile-target corrections resolved (ship at that scope). These captures do not verify native Misty chrome, voice recording, live account integration, or AI backend execution. Native Misty was unavailable in the application inventory.",
     "keyCharacteristics": [
-      "Compact charcoal surfaces with cream text and muted metadata.",
-      "A roster beside a bounded form, stacking at narrow widths.",
-      "Flat sections separated by hairlines and spacing.",
-      "Explicit personal and Space context in concise labels."
+      "Single-line roster, compact header, and top-aligned conversational content.",
+      "Near-black grayscale surfaces with small tonal steps and native system type.",
+      "A single pill composer and full-height details, settings, or history panel.",
+      "Container-responsive navigation with larger compact-screen controls."
     ],
     "rules": [
       {
-        "name": "The Neutral Selection Rule",
-        "body": "App selection and roster selection use the established cream and charcoal palette.",
+        "name": "The Structural Fidelity Rule",
+        "body": "Preserve the reference's tonal hierarchy and layout while retaining truthful Misty content and capabilities.",
         "section": "colors"
       },
       {
-        "name": "The Flat-at-Rest Rule",
-        "body": "Use spacing, a divider, or a tonal step for profile structure; do not add shadows to resting rows and fields.",
+        "name": "The Flat Chrome Rule",
+        "body": "Separate roster, conversation, and panels through tone and boundaries rather than decorative depth.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "**Do** reuse the incumbent semantic charcoal and cream theme variables.",
-      "**Do** keep profile sections flat, compact, and separated by spacing or a single divider.",
-      "**Do** retain explicit personal and Space context in labels.",
-      "**Do** preserve readable disabled labels and full control shape."
+      "Do preserve the user-pinned Grok structure and Misty identity together.",
+      "Do use the scoped grayscale tokens and existing semantic status treatments where the shared conversation renderer requires them.",
+      "Do retain visible focus, current-Space conversation boundaries, and explicit settings labels.",
+      "Do keep mobile header, suggestion-dismiss, attachment, voice, send, and stop controls at 44px square.",
+      "Do describe activity, permissions, working states, and failures truthfully."
     ],
     "donts": [
-      "**Don't** introduce marketing styling, decorative glows, or a new identity into the profile editor.",
-      "**Don't** make selected app checkboxes a new colored accent.",
-      "**Don't** treat suppressed keyboard focus as a reusable design decision.",
-      "**Don't** present synthetic browser captures as native or live-account validation."
+      "Don’t restore a centered hero, roster responsibility subtitles, runtime marketing text, or persistent mode/model/context controls.",
+      "Don’t add Marketplace to this Agents surface or infer a product-wide removal.",
+      "Don’t turn the activity tile into a simulated live computer stream.",
+      "Don’t treat synthetic component captures as native-shell, voice, backend, or permission-enforcement verification."
     ]
   }
 }

@@ -1,0 +1,64 @@
+{
+  "published": true,
+  "featured_rank": 2,
+  "version": "0.4.0",
+  "overview": "Convert chosen images, audio, and video into new copies using Misty\u2019s isolated media converter.",
+  "status": "available",
+  "capabilities": [
+    "Convert batches of chosen image, audio, or video files",
+    "Choose format and quality; preserve original files",
+    "Cancel pending conversions and save copies with collision-safe names"
+  ],
+  "where_it_appears": ["Workspace app tab from Files"],
+  "permissions": [
+    "Read media chosen in the native picker",
+    "Save new copies in a folder chosen for writing",
+    "Convert chosen media in a restricted native process"
+  ],
+  "getting_started": [
+    "Install FFmpeg on your Mac. Isolated converters for other platforms are in development.",
+    "Open Quick Convert and choose media files and an output folder.",
+    "Choose a format and quality, then convert. Completed copies are kept when cancellation is requested."
+  ],
+  "changelog": [
+    "v0.4.0 - Replaced legacy command jobs with explicit file grants and Host-owned restricted media conversion on macOS.",
+    "v0.3.0 - Moved Quick Convert into the workspace app tab with resumable job status.",
+    "v0.2.0 - Added secure conversion jobs, quality and destination controls, cancellation, and output reveal.",
+    "v0.1.0 - Initial plugin template for media conversion workflows."
+  ],
+  "links": [
+    {
+      "label": "Documentation",
+      "url": "https://mistysys.com/docs"
+    }
+  ],
+  "actions": [
+    {
+      "label": "Install",
+      "kind": "primary"
+    }
+  ],
+  "verified": true,
+  "included_tools": [],
+  "launcher": {
+    "views": ["Files"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
+  "install": {
+    "root": "private",
+    "artifacts": [
+      {
+        "platform": "macos-aarch64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/quick_convert-macos-aarch64.zip"
+      },
+      {
+        "platform": "macos-x86_64",
+        "url": "https://github.com/misty-org/misty-extensions/releases/download/v0.4.0/quick_convert-macos-x86_64.zip"
+      }
+    ]
+  },
+  "logo_path": "https://raw.githubusercontent.com/misty-org/misty-extensions/main/extensions/quick_convert/assets/logo.svg",
+  "runtime_capabilities": ["files.read", "files.write", "media.convert"]
+}

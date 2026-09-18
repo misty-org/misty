@@ -1,3 +1,4 @@
+import { readInvocationStream } from "./invocationStream";
 import {
   apiRequest,
   apiRequestCredentials,
@@ -122,16 +123,16 @@ export const aiSurfaceApi = {
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
-  activity: (spaceId: string,agentId?:string) => apiRequest<{entries: import("@/features/misty/activity").MistyActivityEntry[]}>(`/ai/activity?${new URLSearchParams({space_id:spaceId,...(agentId?{agent_id:agentId}:{})})}`),
-    conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
+  activity: (spaceId: string, agentId?: string) =>
+    apiRequest<{ entries: import("@/features/misty/activity").MistyActivityEntry[] }>(
+      `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
+    ),
+  conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
   conversation: (conversationId: string) =>
     apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
   updatePreference: (
     surfaceId: string,
-    input: Pick<
-      AiSurfacePreferenceRecord,
-      "proactive_enabled" | "saved_actions"
-    >,
+    input: Pick<AiSurfacePreferenceRecord, "proactive_enabled" | "saved_actions">,
   ) =>
     apiRequest<{ preference: AiSurfacePreferenceRecord }>(
       `/ai/preferences/${encodeURIComponent(surfaceId)}`,
@@ -265,41 +266,19 @@ async function streamAiInvocation(
   const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken()]);
   const headers = new Headers({ Accept: "text/event-stream" });
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await httpRequest(`${base}${eventsUrl}`, {
-    method: "GET",
-    credentials: apiRequestCredentials(),
-    headers,
+  await readInvocationStream(
+    (lastEventId) => {
+      if (lastEventId) headers.set("Last-Event-ID", lastEventId);
+      return httpRequest(`${base}${eventsUrl}`, {
+        method: "GET",
+        credentials: apiRequestCredentials(),
+        headers,
+        signal,
+      });
+    },
     signal,
-  });
-  if (!response.ok || !response.body) {
-    throw new Error(`Misty could not open the response stream (${response.status}).`);
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (!signal.aborted) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    buffer += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const data = block
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart())
-        .join("\n");
-      if (data) {
-        try {
-          handlers.onEvent(JSON.parse(data) as AiInvocationEvent);
-        } catch {
-          handlers.onError(new Error("Misty returned an invalid stream event."));
-        }
-      }
-      boundary = buffer.indexOf("\n\n");
-    }
-  }
+    handlers,
+  );
 }
 
 function toServerInvocation(input: AiInvocationRequest) {
@@ -322,7 +301,10 @@ function toServerInvocation(input: AiInvocationRequest) {
         }
       : undefined,
     attachment_ids: input.attachmentIds,
-    agent_id:input.agentId,task_id:input.taskId,execution_mode:input.executionMode,window_label:input.windowLabel,
+    agent_id: input.agentId,
+    task_id: input.taskId,
+    execution_mode: input.executionMode,
+    window_label: input.windowLabel,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

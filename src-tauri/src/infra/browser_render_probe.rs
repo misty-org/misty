@@ -51,7 +51,7 @@ async fn measure(view: &Webview, fixture: bool) -> Result<Value, String> {
 pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String> {
     let url = Url::parse(&origin)
         .map_err(|e| e.to_string())?
-        .join("/scripts/browser-render-fixture.html")
+        .join("/cli/tasks/browser-render-fixture.html")
         .map_err(|e| e.to_string())?;
     if !matches!(url.host_str(), Some("localhost" | "127.0.0.1")) {
         return Err("Loopback fixture required".into());

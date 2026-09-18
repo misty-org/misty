@@ -2,16 +2,16 @@ import {
   appSourceAliases,
   appSourceDependencies,
   appSourceRoot,
-} from "./scripts/app-source-paths.mjs";
-import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "./scripts/app-env.mjs";
-import { localAppsDirectory } from "./scripts/local-apps-directory.mjs";
-import { createDesktopAppPreparation } from "./scripts/prepare-desktop-apps.mjs";
+} from "./cli/tasks/app-source-paths.ts";
+import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "./cli/tasks/app-env.ts";
+import { localAppsDirectory } from "./cli/tasks/local-apps-directory.ts";
+import { createDesktopAppPreparation } from "./cli/tasks/prepare-desktop-apps.ts";
 import { defineConfig, type Plugin, type ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
-import { publicSdkDevelopmentUpdates } from "./scripts/vite-public-sdk.mjs";
-import { materialIconProjection, copyMaterialIcons } from "./scripts/material-icon-assets.mjs";
+import { publicSdkDevelopmentUpdates } from "./cli/tasks/vite-public-sdk.ts";
+import { materialIconProjection, copyMaterialIcons } from "./cli/tasks/material-icon-assets.ts";
 import {
   createReadStream,
   existsSync,
@@ -24,7 +24,7 @@ import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import {
   officialAppDevelopmentPath,
   officialAppCatalogRequiresAssets,
-} from "./scripts/official-app-development-paths.mjs";
+} from "./cli/tasks/official-app-development-paths.ts";
 
 // Resolve through Node so the static icon copy works wherever npm hoists the
 // package.
@@ -270,12 +270,12 @@ export default defineConfig(({ command, mode }) => {
   const localOfficialAppsEnabled = command === "serve" && (mode !== "desktop" || !!appsDirectory);
   const officialAppsCatalog = officialAppDevelopmentPath(
     appsDirectory
-      ? resolve(appsDirectory, "apps/catalog.json")
+      ? resolve(appsDirectory, "catalog.json")
       : localOfficialAppsEnabled
         ? env.MISTY_OFFICIAL_APPS_CATALOG
         : undefined,
     process.cwd(),
-    "apps/catalog.json",
+    "catalog.json",
   );
   const officialAppsRequireAssets =
     !appsDirectory &&
@@ -404,7 +404,7 @@ export default defineConfig(({ command, mode }) => {
     cacheDir: resolve(process.cwd(), "node_modules/.vite", `misty-${mode}`),
     optimizeDeps: {
       // Scan the real app (including its lazy imports), not standalone HTML
-      // probes in scripts/. A probe-only unresolved import aborts Vite's scan;
+      // probes in cli/tasks/. A probe-only unresolved import aborts Vite's scan;
       // opening Explorer then discovers dependencies late and reloads the host.
       entries: ["index.html"],
       // Local SDK snapshots change during development without a version bump.
@@ -417,7 +417,7 @@ export default defineConfig(({ command, mode }) => {
     resolve: {
       alias: {
         ...appSourceAliases(process.cwd()),
-        "@misty/browser-view": resolve(appSourceRoot(process.cwd()), "apps/browser/workspace/SDKBrowserView.tsx"),
+        "@misty/browser-view": resolve(appSourceRoot(process.cwd()), "browser/workspace/SDKBrowserView.tsx"),
         "@/features/apps/TrustedAppSurface": new URL(
           mode === "mobile" || mode === "android"
             ? "./src/features/apps/TrustedAppSurface.mobile.tsx"
@@ -444,7 +444,7 @@ export default defineConfig(({ command, mode }) => {
         allow: [
           process.cwd(),
           appSourceRoot(process.cwd()),
-          resolve(process.cwd(), "../misty-sdk"),
+          resolve(process.cwd(), "."),
         ],
       },
       host: tauriDevHost ?? "127.0.0.1",

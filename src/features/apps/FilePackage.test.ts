@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   resolvePath: vi.fn(async (path: string) => path),
   historyClose: vi.fn(),
 }));
-vi.mock("../../../../misty-apps/apps/files/workspace/sdkFilesWorkspace", () => ({
+vi.mock("../../.././apps/files/workspace/sdkFilesWorkspace", () => ({
   createSdkFilesWorkspace: () => ({
     ready: Promise.resolve(),
     close: mocks.close,
@@ -30,19 +30,19 @@ vi.mock("../../../../misty-apps/apps/files/workspace/sdkFilesWorkspace", () => (
     },
   }),
 }));
-vi.mock("../../../../misty-apps/apps/files/workspace/sdkFilesServices", () => ({
+vi.mock("../../.././apps/files/workspace/sdkFilesServices", () => ({
   createSdkFilesServices: async () => ({
     close: mocks.servicesClose,
     resolvePath: mocks.resolvePath,
   }),
 }));
-vi.mock("../../../../misty-apps/apps/files/workspace/sdkFilesTransferHistory", () => ({
+vi.mock("../../.././apps/files/workspace/sdkFilesTransferHistory", () => ({
   createSdkFilesTransferHistory: () => ({
     register: async () => mocks.detach,
     close: mocks.historyClose,
   }),
 }));
-vi.mock("../../../../misty-apps/apps/files/workspace/SdkFilesWorkspaceView", () => ({
+vi.mock("../../.././apps/files/workspace/SdkFilesWorkspaceView", () => ({
   SdkFilesWorkspaceView: () => {
     const [text, setText] = useState("");
     useEffect(() => {
@@ -55,10 +55,10 @@ vi.mock("../../../../misty-apps/apps/files/workspace/SdkFilesWorkspaceView", () 
     });
   },
 }));
-vi.mock("../../../../misty-apps/apps/files/workspace/SdkFilesTransfersView", () => ({
+vi.mock("../../.././apps/files/workspace/SdkFilesTransfersView", () => ({
   SdkFilesTransfersView: () => createElement("div", null, "Package transfers"),
 }));
-import files from "../../../../misty-apps/apps/files/index";
+import files from "../../.././apps/files/index";
 const context: MistyComponentContext = {
   instanceId: "files-view",
   route: "/apps/files",

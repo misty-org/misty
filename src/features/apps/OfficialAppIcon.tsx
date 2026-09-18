@@ -1,6 +1,6 @@
 import { appIcon, appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
-import { BrandIcon } from "../../../../misty-apps/apps/shared/BrandIcon";
-import { brandIconAsset } from "../../../../misty-apps/apps/shared/brandIcons";
+import { BrandIcon } from "../../.././apps/shared/BrandIcon";
+import { brandIconAsset } from "../../.././apps/shared/brandIcons";
 
 export function OfficialAppIcon(props: { appId: string; size?: number }) {
   const Icon = appIcon(props.appId) ?? appIcons.code;

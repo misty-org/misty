@@ -5,13 +5,13 @@ import { useNavigationName, sectionNameKey, itemNameKey } from "@/features/navig
 import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
 import { useNavigatorResume } from "./useNavigatorResume";
 import { useNavigatorOrder } from "./useNavigatorOrder";
-import { WebsiteBrandIcon } from "../../../../../misty-apps/apps/shared/WebsiteBrandIcon";
+import { WebsiteBrandIcon } from "../../../.././apps/shared/WebsiteBrandIcon";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../../../misty-apps/apps/shared/websiteIntegrations";
-import { ProviderBrandIcon } from "../../../../../misty-apps/apps/shared/ProviderBrandIcon";
-import { providers, providerFromRoute } from "../../../../../misty-apps/apps/shared/providers";
+} from "../../../.././apps/shared/websiteIntegrations";
+import { ProviderBrandIcon } from "../../../.././apps/shared/ProviderBrandIcon";
+import { providers, providerFromRoute } from "../../../.././apps/shared/providers";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,
@@ -46,6 +46,7 @@ import {
   NavigationTreeItem,
   navigationMenuGroupClass,
   navigationTreeContinuationClass,
+  cn,
 } from "@/shared/ui";
 import {
   WorkspaceAppIcon,
@@ -201,7 +202,11 @@ export function DownloadedAppNavigator(props: {
                   data-misty-window-drag-block="true"
                   aria-label={`${label} source: ${source?.label ?? "Choose integration"}`}
                   title={`Switch ${label} source`}
-                  className="mr-1 flex h-[22px] min-w-0 max-w-[50%] shrink-0 items-center gap-1 rounded-full bg-charcoal-hover px-2 text-[13px] font-medium text-cream outline-none cursor-pointer transition-colors duration-150 hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card motion-reduce:transition-none [&_svg]:!size-3.5 [&_img]:!size-3.5"
+                  className={cn(
+                    "mr-1 flex h-[22px] min-w-0 max-w-[50%] shrink-0 items-center gap-1 rounded-full bg-charcoal-hover px-2 text-[13px] font-medium text-cream outline-none cursor-pointer transition duration-150 hover:bg-charcoal-card focus-visible:bg-charcoal-card focus-visible:ring-1 focus-visible:ring-cream-muted active:bg-charcoal-bg data-[state=open]:bg-charcoal-card motion-reduce:transition-none [&_svg]:!size-3.5 [&_img]:!size-3.5",
+                    !source &&
+                      "opacity-0 pointer-events-none group-hover/app-row:opacity-100 group-hover/app-row:pointer-events-auto group-focus-within/app-row:opacity-100 group-focus-within/app-row:pointer-events-auto data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto [@media(hover:none)]:opacity-100 [@media(hover:none)]:pointer-events-auto",
+                  )}
                 >
                   {source ? (
                     <DestinationIcon appId={props.appId} item={source} />

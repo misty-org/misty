@@ -3,15 +3,15 @@
  * Copyright (c) 2026 Paul Bakaus
  * SPDX-License-Identifier: Apache-2.0
  *
- * GENERATED -- do not edit. Source: cli/engine/browser/injected/index.mjs
- * Rebuild: node scripts/build-browser-detector.js
+ * GENERATED -- do not edit. Source: cli/engine/browser/injected/index.ts
+ * Rebuild: node cli/tasks/build-browser-detector.js
  *
  * Usage: <script src="detect-antipatterns-browser.js"></script>
  * Re-scan: window.impeccableScan()
  */
 (function () {
 if (typeof window === 'undefined') return;
-// --- cli/engine/shared/constants.mjs ---
+// --- cli/engine/shared/constants.ts ---
 // ─── Section 1: Constants ───────────────────────────────────────────────────
 
 const SAFE_TAGS = new Set([
@@ -108,7 +108,7 @@ const KNOWN_SERIF_FONTS = new Set([
   'freight display', 'freight text',
 ]);
 
-// --- cli/engine/registry/antipatterns.mjs ---
+// --- cli/engine/registry/antipatterns.ts ---
 const ANTIPATTERNS = [
   // ── AI slop: tells that something was AI-generated ──
   {
@@ -667,7 +667,7 @@ const ANTIPATTERNS = [
   },
 ];
 
-// --- cli/engine/shared/color.mjs ---
+// --- cli/engine/shared/color.ts ---
 // ─── Section 2: Color Utilities ─────────────────────────────────────────────
 
 function isNeutralColor(color) {
@@ -1240,7 +1240,7 @@ function isNoPaintColorValue(value) {
   return v === 'transparent' || v === 'none' || v === 'initial' || v === 'inherit' || v === 'unset' || v === 'revert' || v === 'revert-layer';
 }
 
-// --- cli/engine/shared/fonts.mjs ---
+// --- cli/engine/shared/fonts.ts ---
 const GOOGLE_FONTS_URL_RE = /fonts\.googleapis\.com\/css2?\?[^"'\s)<>]*/gi;
 
 function normalizeGoogleFontFamilyParam(value) {
@@ -1270,7 +1270,7 @@ function extractGoogleFontFamilies(text) {
   return families;
 }
 
-// --- cli/engine/rules/checks.mjs ---
+// --- cli/engine/rules/checks.ts ---
 const DETECTOR_IS_BROWSER = typeof window !== 'undefined';
 
 // ─── Section 3: Pure Detection ──────────────────────────────────────────────
@@ -3882,7 +3882,7 @@ function checkNumberedSectionLabelsDOM() {
 }
 
 // Em-dash overuse (ADVISORY) — pure logic shared by the browser DOM check.
-// Mirrors the regex/static-HTML analyzer in engines/regex/detect-text.mjs:
+// Mirrors the regex/static-HTML analyzer in engines/regex/detect-text.ts:
 // two gates (absolute floor + density) so a long article using a few dashes is
 // left alone while a short, dash-per-clause page is flagged. Operates on
 // already-rendered text, so no HTML-entity decoding is needed (the browser has
@@ -3940,7 +3940,7 @@ function checkElementGlowDOM(el) {
   // glow against a background the visitor never sees. checkGlow still runs
   // with a null surface: the zero-offset chromatic halo tell holds on ANY
   // background, and the static loop already passes the unresolved walk's
-  // null color straight through (detect-html.mjs uses resolveBackground).
+  // null color straight through (detect-html.ts uses resolveBackground).
   let parentBg = parentBgInfo.color;
   if (!parentBg && !parentBgInfo.unresolved) {
     // Gradient background — sample its colors to determine if it's dark.
@@ -4882,7 +4882,7 @@ function checkElementColors(el, style, tag, window, customPropMap, hasAnchorInhe
 }
 
 // Static-engine adapter for hover-state contrast. Relies on the static
-// cascade's hover pass (css-cascade.mjs) exposing a per-element hover style
+// cascade's hover pass (css-cascade.ts) exposing a per-element hover style
 // via window.getHoverStyle — present only when a :hover rule changed the
 // element's color or background-color relative to its resting state.
 function checkElementHoverContrast(el, style, tag, window) {
@@ -5003,7 +5003,7 @@ function checkElementHeroEyebrow(el, style, tag, window, customPropMap) {
     siblingFontWeight: fontWeightRaw || '',
     siblingColor: colorRaw || '',
     // Static cascade marks elements matched by a ::before/::after rule
-    // whose geometry is a short chromatic dash (css-cascade.mjs).
+    // whose geometry is a short chromatic dash (css-cascade.ts).
     siblingHasAccentDashPseudo: typeof window.hasAccentDashPseudo === 'function'
       ? window.hasAccentDashPseudo(sibling)
       : false,
@@ -6656,7 +6656,7 @@ function checkFirstViewportColumnOverflowDOM() {
   return findings;
 }
 
-// --- cli/engine/browser/injected/index.mjs ---
+// --- cli/engine/browser/injected/index.ts ---
 const IS_BROWSER = typeof window !== 'undefined';
 
 // ─── Section 7: Browser UI (IS_BROWSER only) ────────────────────────────────
@@ -6670,7 +6670,7 @@ if (IS_BROWSER) {
 
   // Kinpaku gold — pinned to the site's brand token (see
   // site/styles/kinpaku-tokens.css --ks-kinpaku). Keep this in sync with
-  // the picker's C.brand in skill/scripts/live-browser.js and the kit's
+  // the picker's C.brand in skill/cli/tasks/live-browser.js and the kit's
   // picker section in site/styles/kinpaku-kit.css.
   //
   // One color across both light and dark host pages. The outline is a

@@ -1,3 +1,0 @@
-[submodule "vendor/misty-apps"]
-	path = vendor/misty-apps
-	url = https://github.com/misty-org/misty-apps.git

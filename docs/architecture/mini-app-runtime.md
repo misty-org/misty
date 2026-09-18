@@ -119,7 +119,7 @@ Storage Report now uses these SDK methods directly, asks the user to choose its 
 
 ### Native workflow validation
 
-`src-tauri/examples/mini_app_workflow.rs` loads the actual built Storage Report bundle in a separate native App view, using `scripts/mini-app-workflow.html` for the real Host permission controls. It creates a temporary folder containing two files (eleven bytes), temporary package/profile directories, and no account session. Build the extension package in `misty-apps`, start Vite on port 5173, then run `cargo run --manifest-path src-tauri/Cargo.toml --example mini_app_workflow`. Add `-- --overlay` to exercise the macOS overlay title bar.
+`src-tauri/examples/mini_app_workflow.rs` loads the actual built Storage Report bundle in a separate native App view, using `cli/tasks/mini-app-workflow.html` for the real Host permission controls. It creates a temporary folder containing two files (eleven bytes), temporary package/profile directories, and no account session. Build the extension package in `misty-apps`, start Vite on port 5173, then run `cargo run --manifest-path src-tauri/Cargo.toml --example mini_app_workflow`. Add `-- --overlay` to exercise the macOS overlay title bar.
 
 The macOS interactive check passed: explicit host approval, native folder selection, two-file/eleven-byte result, revoke followed by a rejected rescan, denial without a picker, suppressed repeat prompting after denial, and fresh registration/no inherited grants on reopen. Rust tests additionally cover symlink and pathname replacement, cross-instance jobs, and cancellation.
 

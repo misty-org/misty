@@ -9,17 +9,17 @@ import {
 import { usePointerReorder, reorderIds } from "@/shared/hooks/usePointerReorder";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { ReactNode } from "react";
-import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
-import { brandIconAsset } from "../../../../../misty-apps/apps/shared/brandIcons";
+import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
+import { brandIconAsset } from "../../../.././apps/shared/brandIcons";
 import { DestinationIcon } from "./DownloadedAppNavigator";
 import type { NavigatorAppId } from "@/features/workspace";
-import { ProviderBrandIcon } from "../../../../../misty-apps/apps/shared/ProviderBrandIcon";
+import { ProviderBrandIcon } from "../../../.././apps/shared/ProviderBrandIcon";
 import {
   websiteIntegrations,
   type WebsiteIntegrationId,
-} from "../../../../../misty-apps/apps/shared/websiteIntegrations";
-import { WebsiteBrandIcon } from "../../../../../misty-apps/apps/shared/WebsiteBrandIcon";
-import { providers, providerFromRoute } from "../../../../../misty-apps/apps/shared/providers";
+} from "../../../.././apps/shared/websiteIntegrations";
+import { WebsiteBrandIcon } from "../../../.././apps/shared/WebsiteBrandIcon";
+import { providers, providerFromRoute } from "../../../.././apps/shared/providers";
 import { appIconStrokeWidth } from "@/shared/ui/app-icons";
 import {
   parseBrowserTabState,

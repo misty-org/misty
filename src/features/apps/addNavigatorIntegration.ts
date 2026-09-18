@@ -9,7 +9,7 @@ import { isTrustedHostApp } from "./trustedHostApps";
 import {
   integrationIds,
   type WebsiteAppId,
-} from "../../../../misty-apps/apps/shared/websiteIntegrations";
+} from "../../.././apps/shared/websiteIntegrations";
 
 /** Persist website sources in the same scoped storage used by the app directory. */
 export async function addNavigatorIntegration(

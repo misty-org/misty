@@ -123,7 +123,7 @@ use infra::misty::{
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 use infra::ssh_terminal::{
     terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
 };
@@ -135,7 +135,7 @@ use platform::mini_app::permissions::peer::{space_peer_local_identity,space_peer
 use infra::terminal_service::{
     terminal_service_call, terminal_service_close, terminal_service_create, terminal_service_request,
 };
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 use infra::terminal::{
     terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
@@ -398,7 +398,7 @@ pub fn run() {
                     uninstall_plugin,
                     get_misty_process_status,
                     open_external_url,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_create,
                     #[cfg(target_os = "macos")]
                     terminal_service_create,
@@ -426,19 +426,19 @@ pub fn run() {
                     terminal_service_close,
                     #[cfg(target_os = "macos")]
                     terminal_service_request,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_write,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_resize,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_interrupt,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_kill,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_environments,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_preflight,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_trust_host,
                     #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_start,

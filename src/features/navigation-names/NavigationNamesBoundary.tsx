@@ -7,6 +7,23 @@ import { refreshNavigationNames, useNavigationNames } from "./store";
 export function NavigationNamesBoundary({
   userId,
   children,
+  enabled = true,
+}: {
+  userId: string;
+  children: ReactNode;
+  enabled?: boolean;
+}) {
+  // Authentication must survive account-scope resets so pending sign-ins and
+  // session-expiry messages are not discarded by the preferences loader.
+  if (!enabled) return <>{children}</>;
+  return (
+    <AccountNavigationNamesBoundary userId={userId}>{children}</AccountNavigationNamesBoundary>
+  );
+}
+
+function AccountNavigationNamesBoundary({
+  userId,
+  children,
 }: {
   userId: string;
   children: ReactNode;

@@ -1,6 +1,5 @@
 import * as React from "react";
-import { Button } from "./button";
-import type { ButtonProps } from "./model/interfaces/button";
+import { Button, type ButtonProps } from "./button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";
 import { cn } from "./utils";
 

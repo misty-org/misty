@@ -19891,11 +19891,11 @@
       ]
     },
     "quick_convert": {
-      "entry": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+      "entry": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
-        "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
-        "../misty-apps/src/shared/pluginChrome.tsx"
+        "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+        "./apps/src/plugins/quickConvert/convertMedia.ts",
+        "./apps/src/shared/pluginChrome.tsx"
       ],
       "calls": [
         {
@@ -19904,7 +19904,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.media.convertStart",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 19,
           "arguments": []
         },
@@ -19914,7 +19914,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.media.convertStatus",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 22,
           "arguments": []
         },
@@ -19924,7 +19924,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.media.convertCollect",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 28,
           "arguments": []
         },
@@ -19934,7 +19934,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.commitCopy",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 31,
           "arguments": []
         },
@@ -19944,7 +19944,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.media.convertCancel",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 39,
           "arguments": []
         },
@@ -19954,7 +19954,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.media.convertClose",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 40,
           "arguments": []
         },
@@ -19964,7 +19964,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.discardCopy",
-          "file": "../misty-apps/src/plugins/quickConvert/convertMedia.ts",
+          "file": "./apps/src/plugins/quickConvert/convertMedia.ts",
           "line": 42,
           "arguments": []
         },
@@ -19974,7 +19974,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.media.status",
-          "file": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+          "file": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
           "line": 36,
           "arguments": []
         },
@@ -19984,7 +19984,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickDirectory",
-          "file": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+          "file": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
           "line": 48,
           "arguments": []
         },
@@ -19994,7 +19994,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.release",
-          "file": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+          "file": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
           "line": 48,
           "arguments": []
         },
@@ -20004,7 +20004,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickMany",
-          "file": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+          "file": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
           "line": 49,
           "arguments": []
         },
@@ -20014,17 +20014,17 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.files.release",
-          "file": "../misty-apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
+          "file": "./apps/src/plugins/quickConvert/QuickConvertPlugin.tsx",
           "line": 49,
           "arguments": []
         }
       ]
     },
     "themes": {
-      "entry": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+      "entry": "./apps/src/plugins/themes/ThemesPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
-        "../misty-apps/src/shared/pluginChrome.tsx"
+        "./apps/src/plugins/themes/ThemesPlugin.tsx",
+        "./apps/src/shared/pluginChrome.tsx"
       ],
       "calls": [
         {
@@ -20033,7 +20033,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.appearance.snapshot",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 45,
           "arguments": []
         },
@@ -20043,7 +20043,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.appearance.revert",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 81,
           "arguments": []
         },
@@ -20053,7 +20053,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.appearance.apply",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 83,
           "arguments": [
             "activePreset"
@@ -20065,7 +20065,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.appearance.preview",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 84,
           "arguments": []
         },
@@ -20075,7 +20075,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.appearance.preset",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 93,
           "arguments": []
         },
@@ -20085,7 +20085,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "request",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 45,
           "arguments": []
         },
@@ -20095,7 +20095,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "request",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 80,
           "arguments": []
         },
@@ -20105,18 +20105,18 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "request",
-          "file": "../misty-apps/src/plugins/themes/ThemesPlugin.tsx",
+          "file": "./apps/src/plugins/themes/ThemesPlugin.tsx",
           "line": 93,
           "arguments": []
         }
       ]
     },
     "storage_report": {
-      "entry": "../misty-apps/src/plugins/storageReport/StorageReportPlugin.tsx",
+      "entry": "./apps/src/plugins/storageReport/StorageReportPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/storageReport/StorageReportPlugin.tsx",
-        "../misty-apps/src/shared/pluginChrome.tsx",
-        "../misty-apps/src/shared/useFolderScan.ts"
+        "./apps/src/plugins/storageReport/StorageReportPlugin.tsx",
+        "./apps/src/shared/pluginChrome.tsx",
+        "./apps/src/shared/useFolderScan.ts"
       ],
       "calls": [
         {
@@ -20125,7 +20125,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.files.scanStatus",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 43,
           "arguments": []
         },
@@ -20135,7 +20135,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickDirectory",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 67,
           "arguments": []
         },
@@ -20145,7 +20145,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.scanClose",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 70,
           "arguments": []
         },
@@ -20155,7 +20155,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.scanClose",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 89,
           "arguments": []
         },
@@ -20165,7 +20165,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.scanStart",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 91,
           "arguments": []
         },
@@ -20175,7 +20175,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.scanClose",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 93,
           "arguments": []
         },
@@ -20185,18 +20185,18 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.scanCancel",
-          "file": "../misty-apps/src/shared/useFolderScan.ts",
+          "file": "./apps/src/shared/useFolderScan.ts",
           "line": 112,
           "arguments": []
         }
       ]
     },
     "image_optimizer": {
-      "entry": "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+      "entry": "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
-        "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
-        "../misty-apps/src/shared/pluginChrome.tsx"
+        "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+        "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
+        "./apps/src/shared/pluginChrome.tsx"
       ],
       "calls": [
         {
@@ -20205,7 +20205,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickDirectory",
-          "file": "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+          "file": "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
           "line": 31,
           "arguments": []
         },
@@ -20215,7 +20215,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.release",
-          "file": "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+          "file": "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
           "line": 31,
           "arguments": []
         },
@@ -20225,7 +20225,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickMany",
-          "file": "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+          "file": "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
           "line": 32,
           "arguments": []
         },
@@ -20235,7 +20235,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.files.release",
-          "file": "../misty-apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
+          "file": "./apps/src/plugins/imageOptimizer/ImageOptimizerPlugin.tsx",
           "line": 32,
           "arguments": []
         },
@@ -20245,7 +20245,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.readBytes",
-          "file": "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
+          "file": "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
           "line": 32,
           "arguments": [
             "offset",
@@ -20258,7 +20258,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.createCopy",
-          "file": "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
+          "file": "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
           "line": 43,
           "arguments": [
             "name"
@@ -20270,7 +20270,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.appendCopy",
-          "file": "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
+          "file": "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
           "line": 46,
           "arguments": [
             "await output.slice(offset, offset + CHUNK).arrayBuffer()"
@@ -20282,7 +20282,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.commitCopy",
-          "file": "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
+          "file": "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
           "line": 49,
           "arguments": []
         },
@@ -20292,17 +20292,17 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.files.discardCopy",
-          "file": "../misty-apps/src/plugins/imageOptimizer/optimizeImages.ts",
+          "file": "./apps/src/plugins/imageOptimizer/optimizeImages.ts",
           "line": 57,
           "arguments": []
         }
       ]
     },
     "backups": {
-      "entry": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+      "entry": "./apps/src/plugins/backups/BackupsPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
-        "../misty-apps/src/shared/pluginChrome.tsx"
+        "./apps/src/plugins/backups/BackupsPlugin.tsx",
+        "./apps/src/shared/pluginChrome.tsx"
       ],
       "calls": [
         {
@@ -20311,7 +20311,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.backups.status",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 55,
           "arguments": []
         },
@@ -20321,7 +20321,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.backups.jobCancel",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 72,
           "arguments": []
         },
@@ -20331,7 +20331,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.release",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 79,
           "arguments": []
         },
@@ -20341,7 +20341,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.release",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 81,
           "arguments": []
         },
@@ -20351,7 +20351,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.backups.jobStatus",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 87,
           "arguments": []
         },
@@ -20361,7 +20361,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.backups.jobClose",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 111,
           "arguments": []
         },
@@ -20371,7 +20371,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.pickDirectory",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 117,
           "arguments": []
         },
@@ -20381,7 +20381,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.backups.repositoryOpen",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 126,
           "arguments": []
         },
@@ -20391,7 +20391,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.release",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 154,
           "arguments": []
         },
@@ -20401,7 +20401,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.release",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 173,
           "arguments": []
         },
@@ -20411,7 +20411,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.backups.snapshotsStart",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 178,
           "arguments": []
         },
@@ -20421,7 +20421,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.backups.restoreStart",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 193,
           "arguments": [
             "snapshot",
@@ -20434,7 +20434,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.release",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 199,
           "arguments": []
         },
@@ -20444,7 +20444,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.backups.jobCancel",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 204,
           "arguments": []
         },
@@ -20454,7 +20454,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.backups.backupStart",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 321,
           "arguments": [
             "sources.map((source) => source.handle)"
@@ -20466,17 +20466,17 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.backups.checkStart",
-          "file": "../misty-apps/src/plugins/backups/BackupsPlugin.tsx",
+          "file": "./apps/src/plugins/backups/BackupsPlugin.tsx",
           "line": 336,
           "arguments": []
         }
       ]
     },
     "ytdlp": {
-      "entry": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+      "entry": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
       "files": [
-        "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
-        "../misty-apps/src/shared/pluginChrome.tsx"
+        "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+        "./apps/src/shared/pluginChrome.tsx"
       ],
       "calls": [
         {
@@ -20485,7 +20485,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.downloads.status",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 66,
           "arguments": []
         },
@@ -20495,7 +20495,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.downloads.jobCancel",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 84,
           "arguments": []
         },
@@ -20505,7 +20505,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.files.release",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 86,
           "arguments": []
         },
@@ -20515,7 +20515,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.downloads.jobStatus",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 100,
           "arguments": []
         },
@@ -20525,7 +20525,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.downloads.jobClose",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 113,
           "arguments": []
         },
@@ -20535,7 +20535,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.downloads.inspectStart",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 126,
           "arguments": [
             "playlist"
@@ -20547,7 +20547,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.pickDirectory",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 140,
           "arguments": []
         },
@@ -20557,7 +20557,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current.files.release",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 142,
           "arguments": []
         },
@@ -20567,7 +20567,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current!.downloads.downloadStart",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 150,
           "arguments": []
         },
@@ -20577,7 +20577,7 @@
           "dynamic": true,
           "resolvedMethods": [],
           "callee": "sdk.current?.downloads.jobCancel",
-          "file": "../misty-apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
+          "file": "./apps/src/plugins/ytdlp/YtdlpPlugin.tsx",
           "line": 288,
           "arguments": []
         }

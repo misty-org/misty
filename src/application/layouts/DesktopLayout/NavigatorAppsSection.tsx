@@ -14,6 +14,7 @@ import {
   navigatorFocusRingClass,
   navigatorHierarchyIslandClass,
   navigatorHierarchyActionClass,
+  navigatorIslandIdentityLayoutClass,
 } from "./styles";
 
 export function NavigatorAppsSection(props: { accountId: string; children: ReactNode }) {
@@ -61,7 +62,7 @@ export function NavigatorAppsSection(props: { accountId: string; children: React
         role="group"
         aria-label="Apps controls"
       >
-        <h2 className="flex h-8 min-w-0 flex-1 items-center gap-2.5 px-1.25 text-sm font-semibold tracking-[-0.015em] text-cream">
+        <h2 className={cn(navigatorIslandIdentityLayoutClass, "flex-1 text-sm font-semibold tracking-[-0.015em] text-cream")}>
           <span className="grid size-6 shrink-0 place-items-center">
             <LayoutGrid className="size-5" strokeWidth={1.75} aria-hidden="true" />
           </span>

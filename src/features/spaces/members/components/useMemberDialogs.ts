@@ -1,4 +1,4 @@
-import type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
+import type { MemberAction } from "./SpaceMembers";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import type { SpaceMembersState } from "./useSpaceMembers";

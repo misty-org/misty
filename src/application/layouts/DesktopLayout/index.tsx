@@ -385,7 +385,7 @@ export function DesktopLayout(props: {
     />
   );
   return (
-    <NavigationNamesBoundary userId={user?.id ?? ""}>
+    <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <main
         className={cn(
           frameClass,

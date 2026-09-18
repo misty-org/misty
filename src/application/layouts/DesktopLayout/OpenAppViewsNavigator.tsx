@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { NavigationTreeItem } from "@/shared/ui";
-import { useWorkspaceStore, WorkspaceAppIcon } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace";
 import { allLayoutViews, activeLayoutView } from "@/features/workspace/layoutTabs";
 import { currentVirtualWindows } from "@/features/workspace/virtualWindows";
+import { Folder, SquareTerminal } from "lucide-react";
 
 /** Focus live views by identity so two projects with the same app route stay distinct. */
 export function OpenAppViewsNavigator({ appId }: { appId: "code" | "terminal" }) {
@@ -16,30 +17,46 @@ export function OpenAppViewsNavigator({ appId }: { appId: "code" | "terminal" })
     ),
   );
   const activeId = useWorkspaceStore((state) => activeLayoutView(state.layout)?.id);
-  if (!views.length)
+
+  const displayViews = views.filter((view) => {
+    if (appId === "code" && views.length === 1 && (!view.title || view.title === "Code")) {
+      return false;
+    }
+    return true;
+  });
+
+  if (!displayViews.length)
     return (
       <p className="px-5 py-2 text-xs text-cream-muted">
         {appId === "code" ? "No open workspaces." : "No open sessions."}
       </p>
     );
+
+  const IconComponent = appId === "code" ? Folder : SquareTerminal;
+
   return (
     <div
       role="group"
       aria-label={`${appId === "code" ? "Code" : "Terminal"} destinations`}
       className="grid gap-1"
     >
-      {views.map((view, index) => (
-        <NavigationTreeItem
-          key={view.id}
-          icon={<WorkspaceAppIcon appId={appId} size="nav" />}
-          label={view.title || (appId === "code" ? "Workspace" : "Terminal")}
-          selected={activeId === view.id}
-          last={index === views.length - 1}
-          onClick={() => {
-            if (useWorkspaceStore.getState().focusTab(view.id)) navigate(view.route);
-          }}
-        />
-      ))}
+      {displayViews.map((view, index) => {
+        const rawTitle = view.title || (appId === "code" ? "Workspace" : "Terminal");
+        const label = appId === "terminal" ? rawTitle.replace(/^Terminal · /, "") : rawTitle;
+
+        return (
+          <NavigationTreeItem
+            key={view.id}
+            icon={<IconComponent size={16} className="text-cream-muted" />}
+            label={label}
+            selected={activeId === view.id}
+            last={index === displayViews.length - 1}
+            onClick={() => {
+              if (useWorkspaceStore.getState().focusTab(view.id)) navigate(view.route);
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
   cn,
 } from "@/shared/ui";
-import mistyCompanion from "@/shared/assets/mist-orb-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { Cable, Loader2, MessageSquarePlus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

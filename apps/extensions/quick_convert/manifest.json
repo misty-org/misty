@@ -1,0 +1,39 @@
+{
+  "schema_version": 3,
+  "id": "quick_convert",
+  "name": "Quick Convert",
+  "version": "0.4.0",
+  "description": "Convert chosen image, audio, and video files through Misty’s restricted media service.",
+  "author": "Misty",
+  "enabled": true,
+  "platforms": ["web"],
+  "runtime": {
+    "type": "web",
+    "entry": "web/index.html?plugin=quick_convert"
+  },
+  "launcher": {
+    "views": ["Files"],
+    "show_in_launcher": true,
+    "requires_selected_file": false,
+    "open_mode": "tab"
+  },
+  "plugin": {
+    "runtime": "web",
+    "entry": "web/index.html?plugin=quick_convert"
+  },
+  "runtime_capabilities": ["files.read", "files.write", "media.convert"],
+  "tools": [],
+  "panels": [
+    {
+      "id": "quick-convert.panel",
+      "title": "Quick Convert",
+      "window_type": "panel",
+      "default_width": 520,
+      "default_height": 420,
+      "entry": "web/index.html?plugin=quick_convert",
+      "launcher": {
+        "views": ["Files"]
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { BrandIcon } from "../../../../misty-apps/apps/shared/BrandIcon";
+import { BrandIcon } from "../../.././apps/shared/BrandIcon";
 
 export type MailProviderType = "google" | "microsoft";
 

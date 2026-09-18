@@ -48,6 +48,7 @@ import { useAppThemeStore } from "@/features/settings";
 import type { WorkspaceTab } from "@/features/workspace/model";
 import { decodeNativeAppValue } from "./nativeAppWire";
 import { loadDesktopApp } from "./desktopAppLoader";
+import { localDesktopComponentUrl } from "./localDesktopApp";
 import { executeAppCapability } from "./appCapabilityGateway";
 import { isNativeDeviceMethod, useNativeAppPermissions } from "./useNativeAppPermissions";
 import { mountAppComponent } from "./rpc/component";
@@ -259,7 +260,7 @@ function ComponentInstance(props: Props) {
     };
     const terminal = createTerminalRpc(
       scope,
-      supportsPackagedNativeServices()
+      supportsPackagedNativeServices() && !localDesktopComponentUrl(props.app)
         ? createPackagedTerminalBackend(nativeRpcBackend, {
             instance: deviceInstance,
             authorize: () => executeDevice("terminal.authorize", {}),

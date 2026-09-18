@@ -89,7 +89,7 @@ mod tests {
         let mut child = Command::new("node")
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../scripts/tauri-shell-plugins.test.mjs"
+                "/../cli/tasks/tauri-shell-plugins.fixture.ts"
             ))
             .stdin(Stdio::piped())
             .spawn()

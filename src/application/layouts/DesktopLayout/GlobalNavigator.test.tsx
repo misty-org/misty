@@ -163,7 +163,7 @@ describe("GlobalNavigator Space tools", () => {
     expect(profileBar?.className).toContain("shrink-0");
     expect(profileBar?.className).toContain("mb-2");
     expect(profileBar?.firstElementChild?.className).toContain("rounded-xl");
-    expect(profileBar?.firstElementChild?.className).toContain("bg-charcoal-card");
+    expect(profileBar?.firstElementChild?.className).toContain("bg-charcoal-hover");
     expect(
       container
         .querySelector(

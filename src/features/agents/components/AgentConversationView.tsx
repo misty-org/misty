@@ -7,7 +7,7 @@ import { AgentsError as SystemErrorActivity } from "@/features/agents/agentsRunt
 
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
-import mistyCompanion from "@/shared/assets/mist-orb-expression-cycle.webp";
+import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { Button, cn } from "@/shared/ui";
 import {
   AlertCircle,
@@ -50,7 +50,7 @@ export function AgentConversationView(props: {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
+    <div className="agent-transcript mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
       <div className="space-y-7">
         {props.conversation.messages.map((message, index) => {
           const previousUserPrompt = [...props.conversation!.messages.slice(0, index)]

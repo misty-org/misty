@@ -30,6 +30,7 @@ async function fixture(
   appId: "browser" | "chat" | "inbox" | "journal" | "planner" | "library" | "music" | "media" = "browser",
   socialProvider: MistyBrowserProvider["id"] = "instagram",
   initialUrl?: string,
+  accountId = "personal",
 ) {
   vi.stubGlobal("crypto", webcrypto);
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
@@ -79,7 +80,7 @@ async function fixture(
         : providerId === "jira"
           ? "https://team.atlassian.net/jira/your-work"
           : mistyBrowserProviders[providerId].url),
-    ...(appId === "browser" ? {} : { provider: { id: providerId, accountId: "personal" } }),
+    ...(appId === "browser" ? {} : { provider: { id: providerId, accountId } }),
     bounds: { x: 0, y: 50, width: 500, height: 300 },
     nativeLiveResize: false,
   });
@@ -382,6 +383,22 @@ it("scopes cleanup to an owning app's derived profile and closes its live views"
   await expect(f.backend.navigate(f.id, "https://docs.google.com/document/")).rejects.toMatchObject(
     { code: "resource_denied" },
   );
+});
+
+it("shares Gmail and Drive storage and removes Drive without signing Gmail out", async () => {
+  const gmail = await fixture("inbox", "google", undefined, "default-google");
+  const drive = await fixture("library", "google-drive", undefined, "default-google-drive");
+  const requests = invoke.mock.calls
+    .filter(([command]) => command === "browser_webview_create")
+    .map(([, args]) => (args as { request: { profileId: string } }).request);
+  expect(requests[requests.length - 1].profileId).toBe(requests[requests.length - 2].profileId);
+  invoke.mockClear();
+  await drive.backend.removeAccount!({ id: "google-drive", accountId: "default-google-drive" });
+  expect(invoke.mock.calls.some(([command]) => command === "browser_profile_remove")).toBe(false);
+  await expect(drive.backend.navigate(drive.id, mistyBrowserProviders["google-drive"].url))
+    .rejects.toMatchObject({ code: "resource_denied" });
+  await gmail.backend.navigate(gmail.id, mistyBrowserProviders.google.url);
+  expect(invoke).toHaveBeenCalledWith("browser_webview_navigate", expect.anything());
 });
 
 it("targets page zoom at the owned native view without changing host layout", async () => {

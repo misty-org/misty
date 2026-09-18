@@ -32,7 +32,7 @@ fn main() {
     } else {
         "sdk-terminal-probe.html"
     };
-    let mut url = url::Url::parse(&format!("http://127.0.0.1:5173/scripts/{page}")).unwrap();
+    let mut url = url::Url::parse(&format!("http://127.0.0.1:5173/cli/tasks/{page}")).unwrap();
     url.query_pairs_mut()
         .append_pair("fixture", fixture.path().to_str().unwrap())
         .append_pair("nonce", &nonce);

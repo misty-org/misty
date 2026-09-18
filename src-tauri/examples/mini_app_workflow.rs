@@ -51,7 +51,7 @@ fn main() {
         "storage_report"
     };
     let built = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../misty-apps/dist/plugins")
+        .join(".././apps/dist/plugins")
         .join(plugin);
     copy_tree(&built, package.path());
     let fixture = tempfile::Builder::new()
@@ -72,7 +72,7 @@ fn main() {
         "misty-extension://localhost/private/{}/web/index.html?hosted=1&plugin={plugin}",
         package.path().file_name().unwrap().to_str().unwrap()
     );
-    let mut url = url::Url::parse("http://127.0.0.1:5173/scripts/mini-app-workflow.html").unwrap();
+    let mut url = url::Url::parse("http://127.0.0.1:5173/cli/tasks/mini-app-workflow.html").unwrap();
     url.query_pairs_mut()
         .append_pair("source", &source)
         .append_pair(

@@ -246,7 +246,7 @@ export function GlobalNavigator(props: {
       >
         <div className={navigatorHierarchyIslandClass} data-navigator-server-row="true">
           <NavigatorServerMenu onSettingsClick={props.onSettingsClick} />
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-0.5">
             <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
             <ActivityMenu className={navigatorHierarchyActionClass} />
           </div>

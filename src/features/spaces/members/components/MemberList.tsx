@@ -1,6 +1,6 @@
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
-import type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
+import type { MemberAction } from "./SpaceMembers";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
