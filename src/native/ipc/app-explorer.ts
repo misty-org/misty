@@ -21,7 +21,6 @@ interface AppEnvironmentSnapshot {
   tmpDir: string;
   settingsPath: string;
   mistyConfigPath: string;
-  workspacesPath: string;
   commandsPath: string;
   mountPath: string;
   configExists: boolean;

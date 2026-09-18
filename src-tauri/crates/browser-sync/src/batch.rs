@@ -4,11 +4,13 @@
 //! is the difference between the queued state and the server's, so edits that
 //! cancel out never leave the machine.
 //!
-//! The server sends the timings (`batch_policy`, already scaled by the
-//! account's sync frequency); the defaults here apply until it does. Values
-//! from the server are clamped: a bad policy can slow sync down, never stop it.
+//! The server sends the base timings (`batch_policy`); the defaults here apply until
+//! it does. This device's own sync frequency scales them (see `set_frequency`), so the
+//! choice never leaves the device. Values from the server are clamped: a bad policy can
+//! slow sync down, never stop it.
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    sync::atomic::{AtomicU8, Ordering},
     time::{Duration, Instant},
 };
 
@@ -19,6 +21,56 @@ use serde::Deserialize;
 const CONTENDED_FOR: Duration = Duration::from_secs(30);
 /// Longest a server may hold back a queue after rejecting it for rate.
 pub const MAX_HOLD: Duration = Duration::from_secs(300);
+
+/// How eagerly this device sends its changes. It is a setting of this device alone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Frequency {
+    /// Sends sooner and in smaller bursts.
+    Live,
+    Balanced,
+    /// Waits longer and sends bigger bursts.
+    Saver,
+}
+
+static FREQUENCY: AtomicU8 = AtomicU8::new(1);
+
+impl Frequency {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "live" => Some(Self::Live),
+            "balanced" => Some(Self::Balanced),
+            "saver" => Some(Self::Saver),
+            _ => None,
+        }
+    }
+
+    /// Multiplies quiet time, longest wait and burst size.
+    fn scale(self) -> (f64, f64, f64) {
+        match self {
+            Self::Live => (0.25, 0.2, 0.5),
+            Self::Balanced => (1.0, 1.0, 1.0),
+            Self::Saver => (4.0, 6.0, 2.0),
+        }
+    }
+}
+
+/// Sets this device's sync frequency; an unknown name is ignored. It takes effect for
+/// edits already queued, since every queue is judged against it when it is checked.
+pub fn set_frequency(name: &str) -> bool {
+    let Some(frequency) = Frequency::parse(name) else {
+        return false;
+    };
+    FREQUENCY.store(frequency as u8, Ordering::Relaxed);
+    true
+}
+
+fn frequency() -> Frequency {
+    match FREQUENCY.load(Ordering::Relaxed) {
+        0 => Frequency::Live,
+        2 => Frequency::Saver,
+        _ => Frequency::Balanced,
+    }
+}
 
 /// A stream of outgoing changes with its own timing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,6 +102,19 @@ impl LanePolicy {
             max_wait: Duration::from_millis(max_wait),
             max_edits,
         }
+    }
+
+    /// This lane under `frequency`, kept inside what the server also accepts.
+    fn scaled(self, frequency: Frequency) -> Self {
+        let (quiet, wait, edits) = frequency.scale();
+        let quiet_ms = ((self.quiet.as_millis() as f64 * quiet) as u64).clamp(100, 60_000);
+        Self::ms(
+            quiet_ms,
+            ((self.max_wait.as_millis() as f64 * wait) as u64)
+                .clamp(250, 300_000)
+                .max(quiet_ms),
+            ((self.max_edits as f64 * edits) as usize).clamp(1, 1_000),
+        )
     }
 
     fn from_wire(wire: &WireLane) -> Self {
@@ -259,12 +324,14 @@ impl Batcher {
     }
 
     fn lane_policy(&self, target: &str, lane: Lane, now: Instant) -> LanePolicy {
+        let frequency = frequency();
         match lane {
+            // Another machine is editing the same workspace: near-live, never scaled.
             Lane::Workspace | Lane::Slots if self.contended(target, now) => self.policy.contended,
-            Lane::Workspace => self.policy.workspace,
-            Lane::Slots => self.policy.slots,
-            Lane::Collections => self.policy.collections,
-            Lane::History => self.policy.history,
+            Lane::Workspace => self.policy.workspace.scaled(frequency),
+            Lane::Slots => self.policy.slots.scaled(frequency),
+            Lane::Collections => self.policy.collections.scaled(frequency),
+            Lane::History => self.policy.history.scaled(frequency),
         }
     }
 
@@ -389,5 +456,26 @@ mod tests {
         };
         assert!(!b.set_policy(older));
         assert_eq!(b.policy(), &policy);
+    }
+
+    #[test]
+    fn a_devices_frequency_scales_a_lane_within_the_accepted_range() {
+        let base = LanePolicy::ms(1_000, 5_000, 50);
+        assert_eq!(base.scaled(Frequency::Balanced), base);
+        assert_eq!(base.scaled(Frequency::Live), LanePolicy::ms(250, 1_000, 25));
+        assert_eq!(base.scaled(Frequency::Saver), LanePolicy::ms(4_000, 30_000, 100));
+        // Scaling never leaves what clients accept, nor makes the wait shorter than the quiet.
+        let tiny = LanePolicy::ms(100, 250, 1);
+        assert_eq!(tiny.scaled(Frequency::Live), LanePolicy::ms(100, 250, 1));
+        let huge = LanePolicy::ms(60_000, 300_000, 1_000);
+        assert_eq!(huge.scaled(Frequency::Saver), LanePolicy::ms(60_000, 300_000, 1_000));
+    }
+
+    #[test]
+    fn only_known_frequencies_parse() {
+        assert_eq!(Frequency::parse("live"), Some(Frequency::Live));
+        assert_eq!(Frequency::parse("saver"), Some(Frequency::Saver));
+        assert_eq!(Frequency::parse("balanced"), Some(Frequency::Balanced));
+        assert_eq!(Frequency::parse("turbo"), None);
     }
 }

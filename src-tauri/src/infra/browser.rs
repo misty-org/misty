@@ -17,6 +17,11 @@ use tauri::{
 };
 use url::Url;
 
+#[path = "browser_first_paint.rs"]
+mod first_paint;
+use first_paint::{
+    hold_until_first_paint, is_held_id, is_held_view, release_first_paint, PARKED_POSITION,
+};
 #[path = "browser_native_input.rs"]
 mod native_input;
 
@@ -838,56 +843,16 @@ fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     position_macos_webview(webview, true)
 }
 
-/// Views created but not yet painted. They stay parked offscreen so Misty's
-/// own canvas shows instead of WebView2's blank surface, like a browser that
-/// holds the previous frame until the new page paints.
-#[cfg(windows)]
-fn held_views() -> &'static Mutex<HashSet<String>> {
-    static HELD: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    HELD.get_or_init(Default::default)
-}
-
-#[cfg(windows)]
-fn hold_until_first_paint(app: &AppHandle, id: &str) {
-    if let Ok(mut held) = held_views().lock() {
-        held.insert(id.to_owned());
-    }
-    let app = app.clone();
-    let id = id.to_owned();
-    // A page that never paints must still appear.
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(1500));
-        release_first_paint(&app, &id);
-    });
-}
-
-/// Lets a held view appear. Safe to call for any view, any number of times.
-pub(super) fn release_first_paint(app: &AppHandle, id: &str) {
-    #[cfg(windows)]
-    {
-        let was_held = held_views()
-            .lock()
-            .map(|mut held| held.remove(id))
-            .unwrap_or(false);
-        if was_held {
-            let _ = app.emit_to(
-                browser_owner_label(app, id),
-                "misty://browser-reveal",
-                json!({ "id": id }),
-            );
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = (app, id);
+/// Whether the page exists but is still parked for its first paint. The
+/// frontend keeps the previous page up until this turns false.
+#[tauri::command]
+pub fn browser_webview_held(request: BrowserWebviewIdRequest) -> bool {
+    is_held_id(&request.id)
 }
 
 #[cfg(windows)]
 fn present_macos_webview(webview: &Webview) -> Result<(), String> {
-    let held = webview
-        .label()
-        .strip_prefix("misty-browser-")
-        .is_some_and(|id| held_views().lock().is_ok_and(|held| held.contains(id)));
-    if held {
+    if is_held_view(webview) {
         return park_windows_webview(webview);
     }
     position_windows_webview(
@@ -964,11 +929,22 @@ pub(super) fn browser_data_directory(
         std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
         return Ok(path);
     }
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| error.to_string())?;
-    let path = base.join(super::browser_profile::relative_data_directory(profile)?);
+    let home = super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let path = super::browser_profile::webview_home(&home, profile)?;
+    #[cfg(target_os = "macos")]
+    {
+        // WebKit picks the store's folder; the profile's `webview` links to it.
+        let library = dirs::home_dir()
+            .ok_or("The home folder is unavailable.")?
+            .join("Library");
+        super::browser_profile::link_webview_data(
+            &home,
+            &library,
+            &app.config().identifier,
+            profile,
+        )?;
+    }
+    #[cfg(not(target_os = "macos"))]
     std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
     Ok(path)
 }
@@ -1005,6 +981,13 @@ fn set_webview_bounds_if_changed(
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
+    // A view still waiting for its first paint takes its size but stays parked,
+    // so no caller can pull the blank surface on screen early.
+    let position = if is_held_view(webview) {
+        PARKED_POSITION
+    } else {
+        position
+    };
     let scale = webview
         .window()
         .scale_factor()
@@ -1057,6 +1040,17 @@ pub async fn browser_webview_create(
     state: State<'_, BrowserSessionState>,
     mut request: BrowserWebviewCreateRequest,
 ) -> Result<(), String> {
+    let create_started = std::time::Instant::now();
+    let trace_create = |step: &str| {
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "[browser-create] {} +{}ms {step}",
+                request.id,
+                create_started.elapsed().as_millis()
+            );
+        }
+    };
+    trace_create("start");
     // Private tabs never restore a synced session or bind an account profile.
     let profile_lease = if request.private {
         super::browser_sync::browser_profile_lease(Some(&app), None, None).await?
@@ -1071,6 +1065,7 @@ pub async fn browser_webview_create(
         )
         .await?
     };
+    trace_create("lease acquired");
     request.profile_id = if request.private {
         None
     } else {
@@ -1337,9 +1332,25 @@ pub async fn browser_webview_create(
             if preview_only { return false; }
             handle_download_event(&download_app, &download_id, event)
         });
-    let webview = window
-        .add_child(builder, position, size)
-        .map_err(|error| error.to_string())?;
+    // On Windows a page waits offscreen from the moment it exists: the steps
+    // below take long enough for its blank surface to show over the app.
+    #[cfg(windows)]
+    let initial_position = if preview_only {
+        position
+    } else {
+        hold_until_first_paint(&app, &request.id);
+        PARKED_POSITION
+    };
+    #[cfg(not(windows))]
+    let initial_position = position;
+    trace_create("creating the native webview");
+    let webview = match window.add_child(builder, initial_position, size) {
+        Ok(webview) => webview,
+        Err(error) => {
+            release_first_paint(&app, &request.id);
+            return Err(error.to_string());
+        }
+    };
     if !preview_only {
         super::extensions::native::register(&webview, &request.id, request.private, &request.url);
     }
@@ -1377,10 +1388,7 @@ pub async fn browser_webview_create(
     apply_shortcuts(&webview, &state)?;
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
-    #[cfg(windows)]
-    if !preview_only {
-        hold_until_first_paint(&app, &request.id);
-    }
+    trace_create("created and presented");
     present_macos_webview(&webview)
 }
 

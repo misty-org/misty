@@ -1,27 +1,33 @@
-//! Native credential files, with a separate Keychain-backed account login store.
-//! On Windows every file is sealed to the signed-in user with DPAPI and the
-//! credential directory admits only its owner and SYSTEM.
+//! Misty's credential store. Every secret (account logins, device keys, API keys, the
+//! vault secret) is a row in `misty.db`, encrypted with a single master key. Release
+//! builds keep that key in the operating system's keychain under the service
+//! `com.misty.auth`; debug builds keep it in a private file, so rebuilding never asks
+//! the keychain for anything. Nothing else holds a credential on disk.
 pub mod account;
+mod master_key;
+mod secrets;
 #[cfg(windows)]
 mod windows;
-use sha2::{Digest, Sha256};
+
 use std::{
-    fs,
-    io::{self, Read, Write},
+    fs, io,
     path::{Path, PathBuf},
 };
 
+pub use secrets::{delete, load, store};
+
+/// The keychain service that holds the master key.
+pub const KEYCHAIN_SERVICE: &str = master_key::SERVICE;
+
 static OVERRIDE_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-// Mobile shells select their private app-data directory before using the store.
+/// Selects the directory that holds `misty.db` (mobile shells and tests use their own).
 pub fn configure_root(path: PathBuf) -> io::Result<()> {
-    credential_directory(&path)?;
+    data_directory(&path)?;
     OVERRIDE_ROOT
         .set(path)
         .map_err(|_| io::Error::other("Credential root already configured"))
 }
-
-const MAX_BYTES: u64 = 4 * 1024 * 1024;
 
 /// Windows: gives a folder of private data a DACL that admits only its
 /// owner and SYSTEM (the counterpart of mode 0700). A no-op when it has one.
@@ -49,30 +55,36 @@ pub fn is_private_file(path: &Path) -> bool {
     windows::is_restricted(path)
 }
 
-pub fn root() -> io::Result<PathBuf> {
+/// `~/.misty/.local/data`, or the configured root.
+pub fn data_dir() -> io::Result<PathBuf> {
     if let Some(root) = OVERRIDE_ROOT.get() {
-        credential_directory(root)?;
+        data_directory(root)?;
         return Ok(root.clone());
     }
     let home = dirs::home_dir().ok_or_else(|| io::Error::other("Home directory unavailable"))?;
     let directory = home.join(".misty");
     private_directory(&directory)?;
-    let directory = directory.join(".auth");
-    credential_directory(&directory)?;
+    let directory = directory.join(".local");
+    private_directory(&directory)?;
+    let directory = directory.join("data");
+    data_directory(&directory)?;
     Ok(directory)
 }
 
-/// A directory that holds credential files: private, and on Windows locked to
-/// its owner. Only leaf directories get the Windows DACL, because replacing it
-/// propagates to every file below.
-fn credential_directory(path: &Path) -> io::Result<()> {
+/// The path of Misty's database.
+pub fn database_path() -> io::Result<PathBuf> {
+    Ok(data_dir()?.join("misty.db"))
+}
+
+/// A directory that holds secrets: private, and on Windows locked to its owner.
+fn data_directory(path: &Path) -> io::Result<()> {
     private_directory(path)?;
     #[cfg(windows)]
     windows::restrict_directory(path)?;
     Ok(())
 }
 
-fn private_directory(path: &Path) -> io::Result<()> {
+pub(crate) fn private_directory(path: &Path) -> io::Result<()> {
     #[cfg_attr(not(unix), allow(unused_mut))]
     let mut builder = fs::DirBuilder::new();
     #[cfg(unix)]
@@ -104,191 +116,52 @@ fn private_directory(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-pub fn file_name(service: &str, account: &str, profile: Option<&str>) -> String {
-    let mut digest = Sha256::new();
-    for part in [profile.unwrap_or("default"), service, account] {
-        // Length prefixes prevent ambiguous service/account boundaries.
-        digest.update((part.len() as u64).to_be_bytes());
-        digest.update(part.as_bytes());
-    }
-    format!("{}.secret", hex::encode(digest.finalize()))
-}
-
-pub fn path(service: &str, account: &str) -> io::Result<PathBuf> {
-    let profile = std::env::var("MISTY_PROFILE")
+/// The profile that scopes a secret: the development profile, else "default".
+pub(crate) fn profile() -> String {
+    std::env::var("MISTY_PROFILE")
         .or_else(|_| std::env::var("MISTY_DESKTOP_PROFILE"))
-        .ok();
-    Ok(root()?.join(file_name(service, account, profile.as_deref())))
+        .unwrap_or_else(|_| "default".to_owned())
 }
 
-pub fn load(service: &str, account: &str) -> io::Result<Option<String>> {
-    read_private_file(&path(service, account)?)
+const LAYOUT_TABLE: &str =
+    "CREATE TABLE IF NOT EXISTS layout (id INTEGER PRIMARY KEY CHECK (id = 1), version INTEGER NOT NULL)";
+
+fn layout_connection(home: &Path) -> io::Result<rusqlite::Connection> {
+    let data = home.join(".local").join("data");
+    fs::create_dir_all(&data)?;
+    let connection = rusqlite::Connection::open(data.join("misty.db")).map_err(io::Error::other)?;
+    connection
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(io::Error::other)?;
+    connection.execute_batch(LAYOUT_TABLE).map_err(io::Error::other)?;
+    Ok(connection)
 }
 
-pub fn read_private_file(path: &Path) -> io::Result<Option<String>> {
-    let mut options = fs::OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+/// The layout version the Misty home at `home` was last brought to, if it has been.
+pub fn layout_version(home: &Path) -> io::Result<Option<u32>> {
+    if !home.join(".local").join("data").join("misty.db").is_file() {
+        return Ok(None);
     }
-    let file = match options.open(path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error),
-    };
-    let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.len() > MAX_BYTES {
-        return Err(io::Error::other("Invalid credential file"));
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        if metadata.uid() != unsafe { libc::geteuid() } || metadata.nlink() != 1 {
-            return Err(io::Error::other(
-                "Credential file must belong exclusively to this user",
-            ));
-        }
-        file.set_permissions(fs::Permissions::from_mode(0o600))?;
-    }
-    let mut bytes = zeroize::Zeroizing::new(Vec::new());
-    file.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_BYTES {
-        return Err(io::Error::other("Credential file too large"));
-    }
-    #[cfg(windows)]
-    if let Some(sealed) = bytes.strip_prefix(windows::SEALED_PREFIX) {
-        let plaintext = windows::open(sealed)?;
-        return utf8(&plaintext).map(Some);
-    }
-    let value = utf8(&bytes)?;
-    // A plaintext file from a build before sealing: seal it in place.
-    #[cfg(windows)]
-    write_private_file(path, &value)?;
-    Ok(Some(value))
+    let connection = layout_connection(home)?;
+    connection
+        .query_row("SELECT version FROM layout WHERE id = 1", [], |row| {
+            row.get::<_, u32>(0)
+        })
+        .map(Some)
+        .or_else(|error| match error {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(io::Error::other(other)),
+        })
 }
 
-fn utf8(bytes: &[u8]) -> io::Result<String> {
-    std::str::from_utf8(bytes)
-        .map(str::to_owned)
-        .map_err(|_| io::Error::other("Credential file is not valid text"))
-}
-
-pub fn store(service: &str, account: &str, value: &str) -> io::Result<()> {
-    write_private_file(&path(service, account)?, value)
-}
-
-pub fn write_private_file(path: &Path, value: &str) -> io::Result<()> {
-    if value.len() as u64 > MAX_BYTES {
-        return Err(io::Error::other("Credential file too large"));
-    }
-    let parent = path
-        .parent()
-        .ok_or_else(|| io::Error::other("Missing credential directory"))?;
-    credential_directory(parent)?;
-    let mut file = tempfile::NamedTempFile::new_in(parent)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        file.as_file()
-            .set_permissions(fs::Permissions::from_mode(0o600))?;
-    }
-    #[cfg(windows)]
-    file.write_all(&windows::seal(value.as_bytes())?)?;
-    #[cfg(not(windows))]
-    file.write_all(value.as_bytes())?;
-    file.as_file().sync_all()?;
-    file.persist(path).map_err(|error| error.error)?;
-    #[cfg(unix)]
-    fs::File::open(parent)?.sync_all()?;
-    Ok(())
-}
-
-pub fn delete(service: &str, account: &str) -> io::Result<()> {
-    match fs::remove_file(path(service, account)?) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn names_separate_profiles_services_and_accounts() {
-        let name = file_name("service", "account", None);
-        assert_ne!(name, file_name("service", "account", Some("work")));
-        assert_ne!(name, file_name("other", "account", None));
-        assert_ne!(name, file_name("service", "other", None));
-        assert!(!file_name("../../", "../", None).contains('/'));
-    }
-    #[test]
-    fn atomic_replacement_and_private_permissions() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("credential");
-        assert_eq!(read_private_file(&path).unwrap(), None);
-        write_private_file(&path, "first").unwrap();
-        write_private_file(&path, "second").unwrap();
-        assert_eq!(read_private_file(&path).unwrap().as_deref(), Some("second"));
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            assert_eq!(
-                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
-                0o600
-            );
-            assert_eq!(
-                fs::metadata(temp.path()).unwrap().permissions().mode() & 0o777,
-                0o700
-            );
-        }
-    }
-    #[cfg(windows)]
-    #[test]
-    fn windows_files_are_sealed_and_plaintext_files_migrate() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("credential");
-        write_private_file(&path, "secret-token").unwrap();
-        let raw = fs::read(&path).unwrap();
-        assert!(raw.starts_with(windows::SEALED_PREFIX));
-        assert!(!raw.windows(12).any(|window| window == b"secret-token"));
-        assert_eq!(read_private_file(&path).unwrap().as_deref(), Some("secret-token"));
-
-        let legacy = temp.path().join("legacy");
-        fs::write(&legacy, "old-token").unwrap();
-        assert_eq!(read_private_file(&legacy).unwrap().as_deref(), Some("old-token"));
-        assert!(fs::read(&legacy).unwrap().starts_with(windows::SEALED_PREFIX));
-        assert_eq!(read_private_file(&legacy).unwrap().as_deref(), Some("old-token"));
-    }
-    #[cfg(windows)]
-    #[test]
-    fn windows_refuses_tampered_files() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("credential");
-        write_private_file(&path, "secret-token").unwrap();
-        let mut raw = fs::read(&path).unwrap();
-        let last = raw.len() - 1;
-        raw[last] ^= 1;
-        fs::write(&path, raw).unwrap();
-        assert!(read_private_file(&path).is_err());
-    }
-    #[cfg(unix)]
-    #[test]
-    fn refuses_symlink_reads_and_symlink_directories() {
-        use std::os::unix::fs::symlink;
-        let temp = tempfile::tempdir().unwrap();
-        let target = temp.path().join("target");
-        fs::write(&target, "untouched").unwrap();
-        let link = temp.path().join("link");
-        symlink(&target, &link).unwrap();
-        assert!(read_private_file(&link).is_err());
-        // Atomic writes replace a link, never follow it into another file.
-        write_private_file(&link, "credential").unwrap();
-        assert_eq!(fs::read_to_string(&target).unwrap(), "untouched");
-        let directory_link = temp.path().join("directory-link");
-        symlink(temp.path(), &directory_link).unwrap();
-        assert!(write_private_file(&directory_link.join("secret"), "x").is_err());
-    }
+/// Records the layout version of the Misty home at `home`.
+pub fn set_layout_version(home: &Path, version: u32) -> io::Result<()> {
+    layout_connection(home)?
+        .execute(
+            "INSERT INTO layout (id, version) VALUES (1, ?1)
+             ON CONFLICT (id) DO UPDATE SET version = excluded.version",
+            [version],
+        )
+        .map(|_| ())
+        .map_err(io::Error::other)
 }

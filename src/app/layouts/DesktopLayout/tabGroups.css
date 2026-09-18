@@ -71,15 +71,48 @@
   outline: 2px solid var(--color-cream);
   outline-offset: 2px;
 }
+/* Vertical: the label chip hugs its text, and the members sit indented under it on one
+   continuous rounded rail in the group's color, running through the gaps between rows. */
 [data-tab-position="left"] .misty-tab-group-header,
 [data-tab-position="right"] .misty-tab-group-header {
-  margin-top: 6px;
+  margin: 10px 0 3px 2px;
+  max-width: calc(100% - 4px);
+  align-self: flex-start;
+}
+[data-tab-position="left"] .misty-tab-group-label,
+[data-tab-position="right"] .misty-tab-group-label {
+  height: 24px;
   max-width: 100%;
 }
 [data-tab-position="left"] .misty-tab-group-member,
 [data-tab-position="right"] .misty-tab-group-member {
-  border-left: 2px solid var(--tab-group-color);
+  position: relative;
   box-shadow: none;
-  margin-left: 8px;
-  width: calc(100% - 8px);
+  margin-left: 14px;
+  width: calc(100% - 14px);
+}
+[data-tab-position="left"] .misty-tab-group-member::before,
+[data-tab-position="right"] .misty-tab-group-member::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--tab-group-color);
+  pointer-events: none;
+}
+[data-tab-position="left"] .misty-tab-group-header + .misty-tab-group-member::before,
+[data-tab-position="right"] .misty-tab-group-header + .misty-tab-group-member::before {
+  top: 2px;
+  border-radius: 1px 1px 0 0;
+}
+[data-tab-position="left"] .misty-tab-group-member:not(:has(+ .misty-tab-group-member))::before,
+[data-tab-position="right"] .misty-tab-group-member:not(:has(+ .misty-tab-group-member))::before {
+  bottom: 2px;
+  border-radius: 0 0 1px 1px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-tab-group-member:not(:has(+ .misty-tab-group-member)) {
+  margin-bottom: 6px;
 }

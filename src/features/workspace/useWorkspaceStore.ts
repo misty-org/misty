@@ -7,7 +7,11 @@ import {
 } from "./tabGroups";
 import { pinnedTabActions, type PinnedTabActions } from "./pinnedTabs";
 import { browserProfileSlice, scopeTarget, type BrowserProfileStore } from "./browserProfiles";
-import { validDockingLayout, type DockingLayout } from "@/features/app-shell/dockingLayout";
+import {
+  normalizeDockingLayout,
+  validDockingLayout,
+  type DockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import {
   initialBookmarkNavigation,
   type BookmarkNavigationState,
@@ -157,10 +161,10 @@ export interface WorkspaceStore
   swapPanes: (firstPaneId: string, secondPaneId: string) => boolean;
   movePane: (paneId: string, direction: DockSplitDirection, targetPaneId?: string) => boolean;
   setWindowDockingLayout: (layout: DockingLayout) => void;
-  createWindow: (title?: string) => WorkspaceWindow;
+  createWindow: (title?: string, color?: WorkspaceWindow["color"]) => WorkspaceWindow;
   switchWindow: (windowId: string) => boolean;
   closeWindow: (windowId: string) => boolean;
-  reopenClosedWindow: () => WorkspaceWindow | null;
+  reopenClosedWindow: (windowId?: string) => WorkspaceWindow | null;
   extractPaneToWindow: (paneId: string) => WorkspaceWindow | null;
   renameWindow: (windowId: string, title: string) => void;
   fillEmptyPanes: () => void;
@@ -828,18 +832,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               window.id === state.activeWindowId
                 ? {
                     ...window,
-                    dockingLayout: {
-                      navigation: dockingLayout.navigation,
-                      tabs: dockingLayout.tabs,
-                    },
+                    dockingLayout: normalizeDockingLayout(dockingLayout),
                   }
                 : window,
             ),
           },
         }));
       },
-      createWindow: (title) => {
-        const { window, update } = addWindow(get(), title);
+      createWindow: (title, color) => {
+        const { window, update } = addWindow(get(), title, color);
         set(update);
         return window;
       },
@@ -859,8 +860,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         set(update);
         return true;
       },
-      reopenClosedWindow: () => {
-        const result = reopenRememberedWindow(get());
+      reopenClosedWindow: (windowId) => {
+        const result = reopenRememberedWindow(get(), windowId);
         if (!result) return null;
         set(result.update);
         return result.window;

@@ -9,7 +9,6 @@ use crate::infra::{
     agents::AgentService, commands::CommandService, devices::DeviceService,
     environment::AppEnvironmentService, explorer::ExplorerService,
     explorer_library::ExplorerLibraryService, settings::SettingsService,
-    workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
@@ -22,7 +21,6 @@ pub struct MistyRuntime {
     #[cfg(desktop)]
     pub cloud_clipboard: CloudClipboard,
     pub explorer: ExplorerService,
-    pub workspaces: WorkspaceService,
     pub agents: AgentService,
     /// Code projects: file tools, sandboxed commands, undo and previews.
     pub code: Arc<misty_agent_code::CodeService>,
@@ -69,10 +67,10 @@ impl MistyRuntime {
             misty_agent_code::CodeService::new(environment.agent_code_dir(), dirs::home_dir())
                 .with_protected(vec![environment.misty_dir()]),
         );
-        let workspaces = WorkspaceService::new(environment.clone());
 
         Self {
             navigation_names: crate::infra::navigation_names::NavigationNamesService::new(
+                environment.store(),
                 environment.config_dir().join("navigation.json"),
             ),
             environment,
@@ -83,7 +81,6 @@ impl MistyRuntime {
             #[cfg(desktop)]
             cloud_clipboard,
             explorer,
-            workspaces,
             agents,
             code,
         }

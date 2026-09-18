@@ -14,6 +14,7 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { browserLibrary } from "../../library/native";
 import type { OmniboxDeps } from "./providers";
+import type { SearchSuggestion } from "./providers/deps";
 import { prepareBookmarks } from "./providers/bookmarks";
 
 type BookmarkRecords = ReturnType<typeof useWorkspaceStore.getState>["bookmarks"];
@@ -39,7 +40,7 @@ export const liveOmniboxDeps: OmniboxDeps = {
   searchUrl: browserSearchUrl,
   searchSuggestionsEnabled: () => hasTauriInternals() && browserSearchSuggestionsEnabled(),
   fetchSearchSuggestions: (engine, text) =>
-    invoke<string[]>("browser_search_suggest", { request: { engine, text } }),
+    invoke<SearchSuggestion[]>("browser_search_suggest", { request: { engine, text } }),
   historySuggestions: (request) =>
     hasTauriInternals() ? browserLibrary.historySuggestions(request) : Promise.resolve([]),
   recentVisits: (request) =>

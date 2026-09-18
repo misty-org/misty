@@ -24,6 +24,12 @@ aside[data-misty-panel] .agents-body {
   --agents-canvas: var(--misty-panel-bg);
 }
 
+/* The chat column keeps a 360px floor in the Agents page; here the panel's own minimum
+   width governs, so the column never outgrows the panel and clips its right edge. */
+aside[data-misty-panel] .agents-chat {
+  min-width: 0;
+}
+
 /* The hairline is the resize handle: drag it, or focus it and use the arrow keys.
    It brightens while hovered, focused or dragged. */
 .misty-panel-resizer {

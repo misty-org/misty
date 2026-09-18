@@ -31,7 +31,9 @@ export function ExtensionInstallRequest() {
 function RemoveRequest() {
   const id = useExtensionsStore((s) => s.removeRequest);
   const [busy, setBusy] = useState(false);
-  const removing = id ? (installations().find((item) => item.id === id && item.installed) ?? null) : null;
+  const removing = id
+    ? (installations().find((item) => item.id === id && item.installed) ?? null)
+    : null;
   const close = () => useExtensionsStore.setState({ removeRequest: null });
   return (
     <UninstallDialog
@@ -43,7 +45,9 @@ function RemoveRequest() {
         void updateInstallation(item.id, { installed: false, enabled: false })
           .then(close)
           .catch((error: unknown) =>
-            useExtensionsStore.setState({ error: error instanceof Error ? error.message : String(error) }),
+            useExtensionsStore.setState({
+              error: error instanceof Error ? error.message : String(error),
+            }),
           )
           .finally(() => setBusy(false));
       }}

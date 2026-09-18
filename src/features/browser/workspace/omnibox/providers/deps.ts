@@ -1,5 +1,8 @@
 import type { BrowserHistorySuggestion } from "../../../library/native";
 
+/** A suggested search, or a site the engine named (its URL comes from the engine, not a guess). */
+export type SearchSuggestion = string | { text: string; url: string };
+
 /**
  * Everything providers read from the rest of Misty. The address bar wires the
  * real sources (workspace store, browser library, settings); tests pass fakes.
@@ -9,7 +12,7 @@ export interface OmniboxDeps {
   searchUrl(text: string): string;
   /** The person opted in to sending typed text to their search engine. */
   searchSuggestionsEnabled(): boolean;
-  fetchSearchSuggestions(engine: string, text: string): Promise<string[]>;
+  fetchSearchSuggestions(engine: string, text: string): Promise<SearchSuggestion[]>;
   /** Durable history for a profile; empty text returns top pages. */
   historySuggestions(request: {
     profileId?: string;

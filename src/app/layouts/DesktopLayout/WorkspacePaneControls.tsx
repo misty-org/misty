@@ -1,28 +1,12 @@
 import { liftPanePresentation } from "@/features/workspace/paneDragPresentation";
 import { useLayoutEffect, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ArrowUpToLine,
-  Move,
-  LayoutPanelTop,
-  X,
-} from "lucide-react";
+import { Move, X } from "lucide-react";
 import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/workspace";
 import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
-import {
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  IconButton,
-  MenuItem,
-  MenuTrigger,
-  Portal,
-} from "@/shared/ui";
+import { cn, IconButton, Portal } from "@/shared/ui";
+
+/** How long the pointer must rest before the pane controls fade out. */
+const CONTROLS_IDLE_MS = 1500;
 
 export function WorkspacePaneControls({
   pane,
@@ -45,7 +29,6 @@ export function WorkspacePaneControls({
   const anchor = useRef<HTMLSpanElement>(null);
   const [bounds, setBounds] = useState({ top: 0, right: 0 });
   const [hovered, setHovered] = useState(false);
-  const [open, setOpen] = useState(false);
   useLayoutEffect(() => {
     const paneElement = anchor.current?.closest<HTMLElement>("[data-workspace-pane]");
     if (!paneElement) return;
@@ -60,18 +43,26 @@ export function WorkspacePaneControls({
         previous.top === top && previous.right === right ? previous : { top, right },
       );
     };
+    // Shows while the pointer moves over the pane (or its tray strip), then fades once
+    // the pointer has been still for a moment.
+    let idle: number | undefined;
     const move = (event: PointerEvent) => {
       const rect = paneElement.getBoundingClientRect();
-      setHovered(
+      const inside =
         rect.width > 0 &&
-          rect.height > 0 &&
-          event.clientX >= rect.right - 112 &&
-          event.clientX <= rect.right + 4 &&
-          event.clientY >= rect.top - 20 &&
-          event.clientY <= rect.top + 44,
-      );
+        rect.height > 0 &&
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right + 4 &&
+        event.clientY >= rect.top - 20 &&
+        event.clientY <= rect.bottom;
+      window.clearTimeout(idle);
+      setHovered(inside);
+      if (inside) idle = window.setTimeout(() => setHovered(false), CONTROLS_IDLE_MS);
     };
-    const leave = () => setHovered(false);
+    const leave = () => {
+      window.clearTimeout(idle);
+      setHovered(false);
+    };
     update();
     const observer = new ResizeObserver(update);
     for (let element: HTMLElement | null = paneElement; element; element = element.parentElement)
@@ -85,6 +76,7 @@ export function WorkspacePaneControls({
     };
     window.addEventListener("scroll", scrolled, true);
     return () => {
+      window.clearTimeout(idle);
       observer.disconnect();
       window.removeEventListener("pointermove", move);
       window.removeEventListener("blur", leave);
@@ -99,7 +91,7 @@ export function WorkspacePaneControls({
       <Portal>
         <div
           style={bounds}
-          data-visible={hovered || open}
+          data-visible={hovered}
           className={cn(
             "pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5",
             "rounded-md border border-charcoal-border bg-charcoal-card p-0.5",
@@ -123,46 +115,6 @@ export function WorkspacePaneControls({
           >
             <Move className="size-3.5" size={14} />
           </IconButton>
-          <DropdownMenu open={open} onOpenChange={setOpen}>
-            <MenuTrigger
-              iconOnly
-              size="xs"
-              label="Arrange pane"
-              title="Arrange pane"
-              icon={<LayoutPanelTop className="size-3.5" size={14} />}
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Move pane to workspace edge</DropdownMenuLabel>
-              {(
-                [
-                  ["left", "Push left", ArrowLeftToLine],
-                  ["right", "Push right", ArrowRightToLine],
-                  ["up", "Push above", ArrowUpToLine],
-                  ["down", "Push below", ArrowDownToLine],
-                ] as const
-              ).map(([direction, label, Icon]) => (
-                <MenuItem
-                  key={direction}
-                  icon={<Icon />}
-                  label={label}
-                  onSelect={() => useWorkspaceStore.getState().movePane(pane.id, direction)}
-                />
-              ))}
-              <DropdownMenuSeparator />
-              {panes.map((target, index) =>
-                target.id === pane.id ? null : (
-                  <MenuItem
-                    key={target.id}
-                    icon={<ArrowLeftRight />}
-                    label={`Swap with pane ${index + 1}: ${
-                      target.views.find((tab) => tab.id === target.activeViewId)?.title ?? "Empty"
-                    }`}
-                    onSelect={() => useWorkspaceStore.getState().swapPanes(pane.id, target.id)}
-                  />
-                ),
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
           <IconButton
             size="xs"
             tooltip={false}

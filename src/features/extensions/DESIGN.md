@@ -52,7 +52,7 @@ Two places, nothing else:
 Account intent and actual local runtime state are distinct. The Enabled switch is the
 account's intent; its helper line says what this device is doing. A failed or
 unsupported runtime is never represented as running. Extension artwork keeps its
-official colors. All preferences use the server-backed account settings system.
+official colors. All preferences use the device settings system.
 
 Installed extensions sync as `extensions.installations`. Firefox IDs are stored as
 numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32

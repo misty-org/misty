@@ -23,12 +23,6 @@ export function ExtensionPermissionRequest() {
     setError("");
     try {
       if (allowed && extension) {
-        await extensionsNative.approve(
-          extension.guid,
-          request.permissions ?? [],
-          request.hosts ?? [],
-          false,
-        );
         await updateInstallation(extension.id, {
           permissions: [...new Set([...extension.permissions, ...(request.permissions ?? [])])],
           hosts: [...new Set([...extension.hosts, ...(request.hosts ?? [])])],

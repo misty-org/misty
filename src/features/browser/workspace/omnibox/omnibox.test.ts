@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mergeMatches } from "./controller";
 import { createOmniboxProviders, type OmniboxDeps } from "./providers";
+import type { SearchSuggestion } from "./providers/deps";
 import type { OmniboxInput, OmniboxMatch } from "./types";
 import { inlineCompletion, strippedUrl } from "./urlText";
 
@@ -201,7 +202,7 @@ describe("before typing", () => {
 });
 
 describe("search suggestions", () => {
-  const enabled = (fetched: string[], calls: string[] = []) =>
+  const enabled = (fetched: SearchSuggestion[], calls: string[] = []) =>
     deps({
       searchSuggestionsEnabled: () => true,
       fetchSearchSuggestions: async (engine, text) => {

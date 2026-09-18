@@ -8,6 +8,8 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
+use super::store::Store;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -39,7 +41,8 @@ struct TrustFile {
 }
 
 pub struct TrustState {
-    path: PathBuf,
+    store: Store,
+    key: String,
     file: TrustFile,
     list: Option<DeviceList>,
 }
@@ -51,7 +54,7 @@ fn state() -> &'static Mutex<Option<TrustState>> {
     STATE.get_or_init(|| Mutex::new(None))
 }
 
-/// Where trust files live; set once at startup.
+/// The folder that holds `misty.db`, where trust records live; set once at startup.
 pub fn set_storage_root(path: PathBuf) {
     let _ = ROOT.set(path);
 }
@@ -84,12 +87,21 @@ pub fn open(deployment: &str, account_id: &str, local_device_id: &str) -> ApiRes
     let name = hex::encode(Sha256::digest(
         format!("{deployment}\n{account_id}\n{local_device_id}").as_bytes(),
     ));
-    let path = root
-        .join("device-trust")
-        .join(format!("{}.json", &name[..32]));
-    let mut file: TrustFile = std::fs::read(&path)
+    let store = Store::at(root.join("misty.db"));
+    let key = name[..32].to_owned();
+    let mut file: TrustFile = store
+        .connect()
         .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .and_then(|connection| {
+            connection
+                .query_row(
+                    "SELECT document FROM device_trust WHERE key = ?1",
+                    [&key],
+                    |row| row.get::<_, String>(0),
+                )
+                .ok()
+        })
+        .and_then(|document| serde_json::from_str(&document).ok())
         .unwrap_or_default();
     if file.deployment != deployment
         || file.account_id != account_id
@@ -110,7 +122,12 @@ pub fn open(deployment: &str, account_id: &str, local_device_id: &str) -> ApiRes
         }
         _ => None,
     };
-    *guard = Some(TrustState { path, file, list });
+    *guard = Some(TrustState {
+        store,
+        key,
+        file,
+        list,
+    });
     Ok(())
 }
 
@@ -130,12 +147,19 @@ fn with_state<T>(apply: impl FnOnce(&mut TrustState) -> ApiResult<T>) -> ApiResu
 
 impl TrustState {
     fn save(&self) -> ApiResult<()> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let temporary = self.path.with_extension("json.tmp");
-        std::fs::write(&temporary, serde_json::to_vec(&self.file)?)?;
-        std::fs::rename(&temporary, &self.path)?;
+        let document = serde_json::to_string(&self.file)?;
+        let connection = self.store.connect().map_err(|error| {
+            ApiError::Message(format!("Device trust could not be saved: {error}"))
+        })?;
+        connection
+            .execute(
+                "INSERT INTO device_trust (key, document) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET document = excluded.document",
+                rusqlite::params![self.key, document],
+            )
+            .map_err(|error| {
+                ApiError::Message(format!("Device trust could not be saved: {error}"))
+            })?;
         Ok(())
     }
 }

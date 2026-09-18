@@ -77,9 +77,7 @@ export function InstallReviewDialog({
               : "Misty downloads the extension from its store and checks its signature before you review it."}
           </DialogDescription>
         </DialogHeader>
-        {!review && !failure && (
-          <SkeletonList label="Extension access" rows={3} lines={1} />
-        )}
+        {!review && !failure && <SkeletonList label="Extension access" rows={3} lines={1} />}
         {!review && failure && (
           <>
             <p role="alert" className="text-sm">
@@ -162,8 +160,7 @@ export function UninstallDialog({
         <DialogHeader>
           <DialogTitle>Remove {removing?.name}?</DialogTitle>
           <DialogDescription>
-            This removes the extension and its synced settings from your Misty account and connected
-            devices.
+            This removes the extension and its saved settings from this device.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

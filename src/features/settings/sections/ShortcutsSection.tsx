@@ -2,7 +2,7 @@ import { isReservedShortcut, shortcutFromEvent } from "@/features/shortcuts";
 import type { ReassignShortcutRequest, UpdateShortcutRequest } from "@/native/ipc";
 import { Button, Input, SkeletonList } from "@/shared/ui";
 import { Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as SettingsRow,
@@ -88,9 +88,9 @@ export function ShortcutsSection(props: SettingsContentProps) {
     await props.onShortcutChange(request);
   };
 
-  const record = (event: React.KeyboardEvent<HTMLButtonElement>, target: CaptureTarget) => {
-    event.preventDefault();
-    event.stopPropagation();
+  const record = (event: KeyboardEvent, target: CaptureTarget) => {
+    // A modifier on its own is the start of a chord, not a mistake.
+    if (["Meta", "Control", "Alt", "Shift"].includes(event.key)) return;
     if (event.key === "Escape") {
       stopCapture();
       return;
@@ -99,7 +99,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
       void updateBinding({ ...target, value: null });
       return;
     }
-    const value = shortcutFromEvent(event.nativeEvent);
+    const value = shortcutFromEvent(event);
     if (!value) {
       setCaptureError("Add a non-modifier key to finish the shortcut.");
       return;
@@ -124,6 +124,27 @@ export function ShortcutsSection(props: SettingsContentProps) {
     }
     void updateBinding({ ...target, value });
   };
+
+  // Listen on the window while a shortcut is being recorded. A button does not
+  // take focus when clicked in every webview, and Settings closes on Escape from
+  // the window, so recording must see each key first and keep it to itself.
+  const recordRef = useRef(record);
+  recordRef.current = record;
+  const conflictOpen = useRef(false);
+  conflictOpen.current = pendingConflict !== null;
+  useEffect(() => {
+    if (!capture) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      // With a conflict showing, only Escape is recording's: Tab and Enter must
+      // still reach the Reassign and Cancel buttons.
+      if (conflictOpen.current && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      recordRef.current(event, capture);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [capture]);
 
   const categories = useMemo(
     () => groupShortcutsByCategory(definitions).map(([name]) => name),
@@ -261,7 +282,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
                 problem={problemFor(definition.id)}
                 disabled={props.working}
                 onBegin={beginCapture}
-                onKeyDown={record}
                 onClear={(target) => void updateBinding({ ...target, value: null })}
                 onRestore={() => void props.onResetShortcuts({ commandId: definition.id })}
               />

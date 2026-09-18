@@ -80,12 +80,30 @@ function withKnownFavicons(matches: OmniboxMatch[]): OmniboxMatch[] {
     if (origin && !known.has(origin)) known.set(origin, match.faviconUrl!);
   }
   return matches.map((match) => {
-    if (match.faviconUrl || !["url", "history", "bookmark", "tab"].includes(match.kind))
+    if (match.faviconUrl) return match;
+    if (match.kind === "search") {
+      // A typed word that names a known site ("leetcode") borrows that site's icon.
+      const word = match.title.trim().toLowerCase();
+      for (const [origin, faviconUrl] of known) {
+        if (siteName(origin) === word) return { ...match, faviconUrl };
+      }
       return match;
+    }
+    if (!["url", "history", "bookmark", "tab"].includes(match.kind)) return match;
     const origin = originOf(match.target.url);
     const faviconUrl = origin ? known.get(origin) : undefined;
     return faviconUrl ? { ...match, faviconUrl } : match;
   });
+}
+
+/** `https://www.leetcode.com` -> `leetcode`: the host's name without "www" and the suffix. */
+function siteName(origin: string): string {
+  try {
+    const parts = new URL(origin).hostname.replace(/^www\./, "").split(".");
+    return parts.length > 1 ? parts[parts.length - 2] : parts[0];
+  } catch {
+    return "";
+  }
 }
 
 /**

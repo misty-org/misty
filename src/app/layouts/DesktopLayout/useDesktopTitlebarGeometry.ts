@@ -1,6 +1,7 @@
 import { isAuthPath } from "@/features/app-shell";
 import type { useWindowDockingLayout } from "@/features/workspace";
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
 import { dockingGeometry } from "./dockingGeometry";
 import { standaloneWorkspaceRouteTitle } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
@@ -11,20 +12,11 @@ export function useDesktopTitlebarGeometry(options: {
   shellRef: RefObject<HTMLElement | null>;
   pathname: string;
   docking: ReturnType<typeof useWindowDockingLayout>;
-  navigatorAutoHide: boolean;
   focusMode: boolean;
   shouldShowWindowsControls: boolean;
   appZoom: number;
 }) {
-  const {
-    shellRef,
-    pathname,
-    docking,
-    navigatorAutoHide,
-    focusMode,
-    shouldShowWindowsControls,
-    appZoom,
-  } = options;
+  const { shellRef, pathname, docking, focusMode, shouldShowWindowsControls, appZoom } = options;
   const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
     appZoom,
     shouldShowWindowsControls
@@ -34,11 +26,7 @@ export function useDesktopTitlebarGeometry(options: {
   const isAuthRoute = isAuthPath(pathname);
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(pathname);
   const sharedTitlebar =
-    !isAuthRoute &&
-    !standaloneRouteTitle &&
-    !focusMode &&
-    docking.tabs === "top" &&
-    !(docking.navigation === "top" && !navigatorAutoHide);
+    !isAuthRoute && !standaloneRouteTitle && !focusMode && docking.tabs === "top";
   const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
   const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
@@ -51,10 +39,12 @@ export function useDesktopTitlebarGeometry(options: {
     if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
   }, [isAuthRoute, shouldShowWindowsControls]);
-  const tabsFollowNavigator = docking.navigation === "left" && !navigatorAutoHide;
+  const sideTabsWidth = useSidebarWidthStore((state) => state.width);
   const geometry = dockingGeometry({
+    sideTabsWidth,
     ...docking,
-    autoHide: navigatorAutoHide,
+    // The tab strip carries the navigation; no rail takes room.
+    autoHide: true,
     shareTopBand: !isAuthRoute && !standaloneRouteTitle && !focusMode,
     chromeLeft: titlebarNavigationGeometry.left,
     chromeRight: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
@@ -62,7 +52,7 @@ export function useDesktopTitlebarGeometry(options: {
   const topTabInsets = geometry.titlebarInsets;
   useMergedTitlebar(
     shellRef,
-    `${docking.navigation}:${docking.tabs}:${navigatorAutoHide}:${focusMode}`,
+    `${docking.navigation}:${docking.tabs}:${focusMode}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
     shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
@@ -74,7 +64,6 @@ export function useDesktopTitlebarGeometry(options: {
     sharedTitlebar,
     windowsTitlebarControlsRef,
     titlebarNavigationGeometry,
-    tabsFollowNavigator,
     geometry,
     topTabInsets,
   };

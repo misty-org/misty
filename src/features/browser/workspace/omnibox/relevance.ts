@@ -18,6 +18,8 @@ export const relevance = {
   substring: 650,
   openTabPrefix: 950,
   suggestion: 800,
+  /** A site the engine itself named: above plain suggestions, below what was typed. */
+  suggestedSite: 1250,
   topPage: 600,
   action: 1000,
   contentTitlePrefix: 900,

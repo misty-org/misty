@@ -25,3 +25,43 @@
   width: 18px;
   height: 18px;
 }
+
+/* Inside the sidebar the toolbar's buttons are the compact size so nav and tools share a row. */
+[data-browser-toolbar][data-sidebar] [data-icon-size="sm"] {
+  width: 28px;
+  height: 28px;
+}
+[data-browser-toolbar][data-sidebar] [data-icon-size="sm"] > svg:not(.absolute) {
+  width: 18px;
+  height: 18px;
+}
+[data-browser-toolbar][data-sidebar] [data-icon-size="sm"] > svg.size-4 {
+  width: 16px;
+  height: 16px;
+}
+
+/* The sidebar's address field is a filled pill, like Zen's: no outline, a quiet lift on focus. */
+[data-browser-toolbar][data-sidebar] input {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.07);
+}
+[data-browser-toolbar][data-sidebar] input:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+[data-browser-toolbar][data-sidebar] input:focus {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+/* Open as a search panel, the field is the panel's top row, not a filled pill. */
+[data-browser-toolbar][data-sidebar] form[data-panel] input,
+[data-browser-toolbar][data-sidebar] form[data-panel] input:hover,
+[data-browser-toolbar][data-sidebar] form[data-panel] input:focus {
+  background: transparent;
+}
+
+/* Zen's address text: the site, brighter and a touch heavier. */
+[data-browser-toolbar][data-sidebar] input {
+  color: var(--color-cream, inherit);
+  font-weight: 500;
+}

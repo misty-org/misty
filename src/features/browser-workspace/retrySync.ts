@@ -4,7 +4,6 @@ import {
   readApiSessionGeneration,
 } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
-import { useSettingsProfiles } from "@/features/settings/sync";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { retryWorkspaceRecovery } from "@/features/workspace/useWorkspaceRecoveryRetry";
 import { flushNativeSync, lockNativeSync, unlockNativeSync, vaultAvailability } from "./native";
@@ -12,14 +11,14 @@ import { useBrowserSyncStore } from "./store";
 import type { SyncActionKind } from "./syncStatus";
 export type RetrySyncResult = "complete" | "credentials" | "setup" | "sign-in" | "stale" | "sent";
 const attempts = new Map<string, Promise<RetrySyncResult>>();
-/** Every user-initiated sync recovery enters here, including settings-only retries. */
+/** Every user-initiated sync recovery enters here. `webOnly` skips the native workspace. */
 export function retrySync(
   accountId: string,
   action: SyncActionKind = "retry",
-  settingsOnly = false,
+  webOnly = false,
 ): Promise<RetrySyncResult> {
   const generation = readApiSessionGeneration();
-  const key = `${generation}:${accountId}:${settingsOnly ? "settings" : "workspace"}`;
+  const key = `${generation}:${accountId}:${webOnly ? "web" : "workspace"}`;
   const pending = attempts.get(key);
   if (pending) return pending;
   const valid = () => !isApiSessionTransitioning() && generation === readApiSessionGeneration();
@@ -29,12 +28,12 @@ export function retrySync(
     if (action === "setup") return "setup";
     const state = useBrowserSyncStore.getState();
     const session = state.session?.account_id === accountId ? state.session : null;
-    if (action === "sync-now" && session && !settingsOnly) {
+    if (action === "sync-now" && session && !webOnly) {
       await flushNativeSync(session.session_id);
       return "sent";
     }
     if (
-      !settingsOnly &&
+      !webOnly &&
       (action === "reenroll" ||
         state.reenroll === accountId ||
         (state.issue ?? session?.status.issue) === "sync_device_forbidden")
@@ -45,21 +44,11 @@ export function retrySync(
       return "credentials";
     }
     const recovery = useWorkspaceRecoveryState.getState();
-    if (!settingsOnly && recovery.accountId === accountId && (!recovery.ready || recovery.issue))
+    if (!webOnly && recovery.accountId === accountId && (!recovery.ready || recovery.issue))
       await retryWorkspaceRecovery(accountId, valid);
     if (!valid()) return "stale";
-    const prefs = useSettingsProfiles.getState();
-    if (prefs.accountId === accountId && prefs.ready) {
-      try {
-        await prefs.refresh();
-      } catch (error) {
-        // The preferences store retains its error for the shared status selector.
-        // An account-settings outage must not prevent native workspace recovery.
-        if (settingsOnly) throw error;
-      }
-    }
     if (!valid()) return "stale";
-    if (settingsOnly) return "complete";
+    if (webOnly) return "complete";
     await readApiAuthToken();
     if (!valid()) return "stale";
     const account = { apiBase: await resolveApiBase(), accountId };

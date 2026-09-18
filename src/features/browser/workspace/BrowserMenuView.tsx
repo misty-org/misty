@@ -19,6 +19,7 @@ import {
   ExternalLink,
   FileDown,
   MoreVertical,
+  SlidersHorizontal,
   BookOpenText,
   Languages,
   PictureInPicture2,
@@ -54,6 +55,14 @@ export interface BrowserMenuViewProps {
   canOpenExternal?: boolean;
   label?: string;
   overlayReason?: string;
+  /** Favorites and Bookmarks, as panels beside the History row. */
+  library?: ReactNode;
+  /** Rows closing the menu, under Settings: sync and the profile. */
+  account?: ReactNode;
+  /** Rows above the browser's own, such as the sidebar's bookmark, Misty and extensions. */
+  lead?: ReactNode;
+  /** The trigger is a tools icon, as in the vertical-tabs sidebar's address field. */
+  toolsIcon?: boolean;
   /** Page tools that used to sit in the toolbar; they lead the More tools submenu. */
   tools?: ReactNode;
   /** Installing and opening site apps; omitted where the menu has no page. */
@@ -94,7 +103,13 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         iconOnly
         label={props.label ?? "Browser menu"}
         title="More"
-        icon={<MoreVertical {...toolbarIconProps} />}
+        icon={
+          props.toolsIcon ? (
+            <SlidersHorizontal {...toolbarIconProps} />
+          ) : (
+            <MoreVertical {...toolbarIconProps} />
+          )
+        }
       />
       <DropdownMenuContent
         align="end"
@@ -102,6 +117,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         className="max-h-[var(--radix-dropdown-menu-content-available-height)]"
         data-browser-menu
       >
+        {props.lead}
         {commands ? (
           <>
             <Item
@@ -134,6 +150,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               reopenClosedView={commands.reopenClosedTab}
               clearBrowsingData={commands.clearBrowsingData}
             />
+            {props.library}
             <Item
               icon={<Download />}
               label="Downloads"
@@ -230,8 +247,14 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             <Item
               icon={<Settings2 />}
               label="Settings"
-              onSelect={() => commands.openPage("settings")}
+              onSelect={() =>
+                // Settings is a modal over the page, not a tab of its own.
+                window.dispatchEvent(
+                  new CustomEvent("misty:open-settings", { detail: { section: "browser" } }),
+                )
+              }
             />
+            {props.account}
           </>
         ) : null}
       </DropdownMenuContent>

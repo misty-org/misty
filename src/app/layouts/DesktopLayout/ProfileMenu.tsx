@@ -24,8 +24,11 @@ function Initials(props: { children: string }) {
   );
 }
 
-/** The profile button's menu: account actions, and a submenu to switch saved accounts. */
-export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
+/** The profile menu's rows: account actions, and a submenu to switch saved accounts. */
+export function ProfileMenuItems(props: {
+  onClose: () => void;
+  onOpenAccountSettings: () => void;
+}) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
@@ -79,7 +82,7 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
   };
 
   return (
-    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
+    <>
       <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
         {email || "Not signed in"}
       </DropdownMenuLabel>
@@ -152,6 +155,15 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
           <MenuItem icon={<LogOut />} label="Log out" disabled={transitioning} onSelect={signOut} />
         </>
       )}
+    </>
+  );
+}
+
+/** The profile button's menu. */
+export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
+  return (
+    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
+      <ProfileMenuItems {...props} />
     </DropdownMenuContent>
   );
 }

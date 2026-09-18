@@ -21,6 +21,33 @@ export function shouldSuppressWindowDrag(target: EventTarget | null) {
   return Boolean(element?.closest(WINDOW_DRAG_SUPPRESS_SELECTOR));
 }
 
+const PAGE_INTERACTIVE_SELECTOR = [
+  "summary",
+  "label",
+  "video",
+  "audio",
+  "canvas",
+  "iframe",
+  "[role='link']",
+  "[role='textbox']",
+  "[role='menuitem']",
+  "[role='tab']",
+  "[contenteditable]:not([contenteditable='false'])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
+/**
+ * The top tenth of the window (at most 72px) moves it from empty space on any page, as the same
+ * edge of a native browser page does: links, controls, fields and anything draggable keep
+ * their presses.
+ */
+export function isTopEdgeDragPress(event: { clientY: number; target: EventTarget | null }) {
+  if (event.clientY > Math.min(72, window.innerHeight * 0.1)) return false;
+  if (shouldSuppressWindowDrag(event.target)) return false;
+  const element = event.target instanceof Element ? event.target : null;
+  return !element?.closest(PAGE_INTERACTIVE_SELECTOR);
+}
+
 export function windowRectsMatch(actual: WindowRect, expected: WindowRect, tolerance = 4) {
   return (
     Math.abs(actual.x - expected.x) <= tolerance &&

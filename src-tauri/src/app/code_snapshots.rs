@@ -51,7 +51,7 @@ pub async fn code_project_snapshot(
     let project = state.agents.project(scope_id).await?;
     let directory = crate::infra::paths::misty_home_dir()
         .ok_or_else(|| ApiError::Message("Misty's data folder isn't available.".into()))?
-        .join(".cache")
+        .join("cache")
         .join("agent-snapshots");
     tokio::task::spawn_blocking(move || write_snapshot(&project.root, &directory, &run_id))
         .await

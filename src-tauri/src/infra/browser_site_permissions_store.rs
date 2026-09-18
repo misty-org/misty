@@ -1,5 +1,5 @@
-//! Where site permission choices live: persistent profiles in user defaults,
-//! private sessions on their own website-data store.
+//! Where site permission choices live: persistent profiles in `misty.db`, private
+//! sessions on their own website-data store.
 use super::Permissions;
 use kiri::engine::StoreScope as PermissionScope;
 use objc2_foundation::{NSString, NSUserDefaults};
@@ -95,19 +95,15 @@ pub(super) unsafe fn update_scope(
 }
 
 pub(super) fn read_store() -> PermissionStore {
-    NSUserDefaults::standardUserDefaults()
-        .stringForKey(&NSString::from_str(PREFERENCES_KEY))
-        .and_then(|raw| serde_json::from_str(&raw.to_string()).ok())
-        .unwrap_or_default()
+    // Choices an earlier build kept in the macOS preferences move into the database once.
+    super::db::import_earlier_once(|| {
+        NSUserDefaults::standardUserDefaults()
+            .stringForKey(&NSString::from_str(PREFERENCES_KEY))
+            .map(|raw| raw.to_string())
+    });
+    super::db::read_all()
 }
 
 pub(super) fn write_store(store: &PermissionStore) -> Result<(), String> {
-    let data = serde_json::to_string(store).map_err(|error| error.to_string())?;
-    unsafe {
-        NSUserDefaults::standardUserDefaults().setObject_forKey(
-            Some(&NSString::from_str(&data)),
-            &NSString::from_str(PREFERENCES_KEY),
-        );
-    }
-    Ok(())
+    super::db::write_all(store)
 }

@@ -50,7 +50,11 @@ function workspaceRecords(windows: WorkspaceWindow[], profileId: string): Shared
     records.push(record);
   };
   windows.forEach((window, order) => {
-    add({ kind: "window", id: window.id, fields: { title: window.title, order } });
+    add({
+      kind: "window",
+      id: window.id,
+      fields: { title: window.title, order, color: window.color ?? null },
+    });
     layoutTabs(window.layout).forEach((tab, order) => {
       add({
         kind: "tab",

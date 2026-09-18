@@ -11,12 +11,11 @@ const options = [
 ];
 const edit = vi.fn(async (id: string, value: string) => {
   useSettingsProfiles.setState((store) => ({
-    state: editPreference(store.state!, id, value, crypto.randomUUID()),
+    state: editPreference(store.state!, id, value),
   }));
 });
 beforeEach(() => {
   useSettingsProfiles.setState({
-    accountId: "first",
     ready: true,
     state: initialProfileState({}),
     edit,
@@ -58,7 +57,7 @@ it("moves a tab without selecting it, persists across remounts, and isolates acc
     />,
   );
   expect(tabNames()).toEqual(["All", "Drawings", "Notes"]);
-  act(() => useSettingsProfiles.setState({ accountId: "second", state: initialProfileState({}) }));
+  act(() => useSettingsProfiles.setState({ state: initialProfileState({}) }));
   expect(tabNames()).toEqual(["All", "Notes", "Drawings"]);
 });
 it("keeps new and temporarily hidden tabs without duplicates", () => {

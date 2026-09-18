@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { dockLeaves } from "@/features/workspace/dockTree";
@@ -95,7 +95,7 @@ it("fades only the edges with tabs outside the visible scroll area", () => {
   expect(list.style.getPropertyValue("--tab-fade-end")).toBe("0px");
 });
 
-it("shows only close for a single pane and only a dropdown for multiple panes", async () => {
+it("always shows a single close button, with no pane dropdown, even for a split tab", () => {
   const title = paneViewLabel(dockLeaves(useWorkspaceStore.getState().layout.root)[0].views[0]);
   mount();
   expect(screen.getByRole("button", { name: `Close tab ${title}` })).toBeTruthy();
@@ -105,31 +105,19 @@ it("shows only close for a single pane and only a dropdown for multiple panes", 
       .getState()
       .splitPane(useWorkspaceStore.getState().layout.focusedPaneId, "right");
   });
-  expect(screen.queryByRole("button", { name: `Close tab ${title}` })).toBeNull();
-  fireEvent.pointerDown(screen.getByRole("button", { name: `Show panes in ${title}` }), {
-    button: 0,
-    ctrlKey: false,
-    pointerType: "mouse",
-  });
-  const closes = await screen.findAllByRole("menuitem", { name: `Close pane ${title}` });
-  expect(closes).toHaveLength(2);
-  fireEvent.click(closes[1]);
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: `Close tab ${title}` })).toBeTruthy(),
-  );
-  expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
+  expect(screen.getByRole("button", { name: `Close tab ${title}` })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: `Show panes in ${title}` })).toBeNull();
 });
 
 it.each(["left", "right"] as const)(
-  "uses the shared New tab control after the tabs and supports vertical keys on the %s",
+  "keeps New Tab pinned first in the list and supports vertical keys on the %s",
   (position) => {
     useWorkspaceStore.getState().newTab();
     mount(position);
     const list = screen.getByRole("tablist");
-    const newTab = screen.getByRole("button", { name: "New tab" });
+    const newTab = screen.getByRole("button", { name: "New Tab" });
     expect(list.getAttribute("aria-orientation")).toBe("vertical");
-    expect(list.contains(newTab)).toBe(true);
-    expect(list.lastElementChild).toBe(newTab);
+    expect(list.firstElementChild).toBe(newTab);
     const tabs = screen.getAllByRole("tab");
     fireEvent.keyDown(tabs[1], { key: "ArrowUp" });
     expect(tabs[0].getAttribute("aria-selected")).toBe("true");

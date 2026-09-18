@@ -15,6 +15,14 @@ pub struct BrowserFindRequest {
     pub query: String,
     /// "next", "previous" or "clear".
     pub direction: String,
+    #[serde(default)]
+    pub highlight_all: bool,
+    #[serde(default)]
+    pub match_case: bool,
+    #[serde(default)]
+    pub match_diacritics: bool,
+    #[serde(default)]
+    pub whole_words: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -101,6 +109,16 @@ pub async fn browser_webview_find(
         .replace(
             "__MISTY_FIND_DIRECTION__",
             &serde_json::to_string(direction).map_err(|e| e.to_string())?,
+        )
+        .replace(
+            "__MISTY_FIND_OPTIONS__",
+            &json!({
+                "highlightAll": request.highlight_all,
+                "matchCase": request.match_case,
+                "matchDiacritics": request.match_diacritics,
+                "wholeWords": request.whole_words,
+            })
+            .to_string(),
         );
     let value = eval_json(&webview, script).await?;
     Ok(serde_json::from_str::<Option<BrowserFindResult>>(&value)

@@ -2,8 +2,8 @@ use super::*;
 
 #[test]
 fn stored_windows_paths_lose_the_verbatim_prefix() {
-    let connection = Connection::open_in_memory().unwrap();
-    ensure_schema(&connection).unwrap();
+    let mut connection = Connection::open_in_memory().unwrap();
+    crate::infra::store::migrate(&mut connection).unwrap();
     for (id, path) in [
         ("a", r"\\?\C:\Users\me\Site"),
         ("b", r"\\?\UNC\server\share\Site"),
@@ -16,7 +16,7 @@ fn stored_windows_paths_lose_the_verbatim_prefix() {
             )
             .unwrap();
     }
-    ensure_schema(&connection).unwrap();
+    strip_verbatim_prefixes(&connection).unwrap();
     let path = |id: &str| -> String {
         connection
             .query_row(
@@ -29,6 +29,46 @@ fn stored_windows_paths_lose_the_verbatim_prefix() {
     assert_eq!(path("a"), r"C:\Users\me\Site");
     assert_eq!(path("b"), r"\\server\share\Site");
     assert_eq!(path("c"), r"D:\Plain");
+}
+
+#[test]
+fn shared_folders_and_the_device_id_import_once_from_an_earlier_database() {
+    let directory = tempfile::tempdir().unwrap();
+    let legacy = directory.path().join("data.db");
+    {
+        let old = Connection::open(&legacy).unwrap();
+        // An older build: no project columns.
+        old.execute_batch(
+            "CREATE TABLE local_agent_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE local_agent_scopes (id TEXT PRIMARY KEY, device_id TEXT NOT NULL,
+                 display_name TEXT NOT NULL, local_path TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
+             INSERT INTO local_agent_settings VALUES ('device_id','device_old');
+             INSERT INTO local_agent_scopes VALUES ('s1','device_old','Docs','/tmp/docs','t');",
+        )
+        .unwrap();
+    }
+    let store = Store::at(directory.path().join("misty.db"));
+    import_legacy(&store, &legacy).unwrap();
+    let connection = store.connect().unwrap();
+    assert_eq!(device_id(&connection).unwrap(), "device_old");
+    let (access, installs): (String, i64) = connection
+        .query_row(
+            "SELECT access, allow_installs FROM local_agent_scopes WHERE id='s1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((access.as_str(), installs), ("read", 0));
+    // A folder removed afterwards does not come back.
+    connection.execute("DELETE FROM local_agent_scopes", []).unwrap();
+    drop(connection);
+    import_legacy(&store, &legacy).unwrap();
+    let remaining: i64 = store
+        .connect()
+        .unwrap()
+        .query_row("SELECT COUNT(*) FROM local_agent_scopes", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(remaining, 0);
 }
 
 #[tokio::test]

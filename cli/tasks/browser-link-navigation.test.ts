@@ -67,7 +67,7 @@ test('pointer focus reports over native messaging without navigating the page', 
   Object.defineProperty(window, 'location', { get() { throw new Error('Focus must not touch page navigation'); } });
   runInNewContext(rendered(false), {
     window, Map, URL,
-    document: { addEventListener: (type, fn) => { listeners[type] = fn; } },
+    document: { addEventListener: (type, fn) => { const was = listeners[type]; listeners[type] = was ? (event) => { was(event); fn(event); } : fn; } },
   });
   listeners.pointerdown({ isTrusted: true });
   listeners.pointerdown({ isTrusted: false });
@@ -87,7 +87,7 @@ test('companion pointer tracking reports over native messaging without interrupt
   Object.defineProperty(window, 'location', { get() { throw new Error('Pointer tracking must not navigate'); } });
   runInNewContext(script, {
     window, Map, URL, URLSearchParams,
-    document: { addEventListener: (type, fn) => { listeners[type] = fn; } },
+    document: { addEventListener: (type, fn) => { const was = listeners[type]; listeners[type] = was ? (event) => { was(event); fn(event); } : fn; } },
     performance: { now: () => 100 },
     requestAnimationFrame: fn => { frames.push(fn); return frames.length; },
     cancelAnimationFrame: () => {},

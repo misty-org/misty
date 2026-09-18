@@ -1,9 +1,9 @@
-import { Star } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { useBookmarkLibrary } from "@/features/bookmarks/library";
 import { IconButton, toolbarIconProps } from "@/shared/ui";
 import { useShortcutTitle } from "@/features/shortcuts";
 
-/** Shows whether this page is bookmarked and opens the bookmark dialog. */
+/** The bookmark button: filled when this page is bookmarked; opens the bookmark dialog. */
 export function BrowserBookmarkStar(props: { url: string; onBookmark: () => void }) {
   const { bookmarks } = useBookmarkLibrary();
   const saved = bookmarks.some((bookmark) => bookmark.url === props.url);
@@ -19,7 +19,7 @@ export function BrowserBookmarkStar(props: { url: string; onBookmark: () => void
       className={saved ? "text-cream-bright" : undefined}
       onClick={props.onBookmark}
     >
-      <Star {...toolbarIconProps} size={16} fill={saved ? "currentColor" : "none"} />
+      <Bookmark {...toolbarIconProps} size={16} fill={saved ? "currentColor" : "none"} />
     </IconButton>
   );
 }

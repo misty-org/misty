@@ -11,9 +11,8 @@ import type { NavigateFunction } from "react-router-dom";
 export function useDesktopShortcuts(options: {
   navigate: NavigateFunction;
   openSettingsOverlay: () => void;
-  toggleNavigatorAutoHide: () => void;
 }) {
-  const { navigate, openSettingsOverlay, toggleNavigatorAutoHide } = options;
+  const { navigate, openSettingsOverlay } = options;
   const openLauncher = useCallback((commandsOnly = false) => {
     const launcher = useGlobalSearchStore.getState();
     if (commandsOnly) {
@@ -40,7 +39,6 @@ export function useDesktopShortcuts(options: {
     "misty.contextual_companion",
     useCallback(() => useMistyPanelStore.getState().toggle(), []),
   );
-  useShortcutHandler("app.toggle_navigator", toggleNavigatorAutoHide);
   useShortcutHandler(
     "navigation.refresh",
     useCallback(() => window.dispatchEvent(new Event("misty:refresh-focused-tool")), []),

@@ -74,8 +74,8 @@ const palettes: Record<ResolvedAppTheme, BaseThemeTokens> = {
 // Browser tab chrome keeps its own slightly lifted tones in each mode.
 const tabChrome: Record<ResolvedAppTheme, Record<string, string>> = {
   dark: {
-    "--workspace-tab-surface-top": "#222222",
-    "--workspace-tab-surface": "#1C1C1C",
+    "--workspace-tab-surface-top": "#1C1C1C",
+    "--workspace-tab-surface": "#171717",
     "--workspace-tab-text": "#C5C5C5",
     "--workspace-tab-muted": "#ABABAB",
   },

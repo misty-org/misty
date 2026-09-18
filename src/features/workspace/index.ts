@@ -14,3 +14,4 @@ export * from "./WorkspaceAppIcon";
 export * from "./workspaceDefaultView";
 export * from "./workspaceViewOperations";
 export * from "./WorkspaceViewRouteScope";
+export * from "./windowColors";

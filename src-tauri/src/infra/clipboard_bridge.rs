@@ -7,9 +7,8 @@
 #![cfg(all(desktop, any(unix, windows)))]
 
 use std::{
-    collections::HashSet,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use rand::RngCore;
@@ -21,6 +20,10 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
 use crate::app::runtime::MistyRuntime;
+use super::store::Store;
+#[path = "clipboard_bridge_approvals.rs"]
+mod approvals;
+use approvals::Approvals;
 
 const MAX_LINE: usize = 64 * 1024;
 
@@ -47,70 +50,10 @@ struct Response {
     error: Option<String>,
 }
 
-/// Approved Kura installs, by the SHA-256 of their token. Stored beside the
-/// app's other settings with owner-only permissions.
-struct Approvals {
-    path: PathBuf,
-    hashes: Mutex<HashSet<String>>,
-    /// One consent prompt at a time.
-    asking: tokio::sync::Mutex<()>,
-}
-
-impl Approvals {
-    fn load(path: PathBuf) -> Self {
-        let hashes = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
-            .unwrap_or_default()
-            .into_iter()
-            .collect();
-        Self {
-            path,
-            hashes: Mutex::new(hashes),
-            asking: tokio::sync::Mutex::new(()),
-        }
-    }
-
-    fn allows(&self, token: &str) -> bool {
-        !token.is_empty()
-            && self
-                .hashes
-                .lock()
-                .is_ok_and(|hashes| hashes.contains(&hash(token)))
-    }
-
-    fn approve(&self) -> std::io::Result<String> {
-        let mut bytes = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut bytes);
-        let token = hex::encode(bytes);
-        let mut hashes = self
-            .hashes
-            .lock()
-            .map_err(|_| std::io::Error::other("approvals"))?;
-        hashes.insert(hash(&token));
-        let list: Vec<&String> = hashes.iter().collect();
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&self.path, serde_json::to_vec(&list)?)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600))?;
-        }
-        #[cfg(windows)]
-        misty_credential_store::restrict_private_file(&self.path)?;
-        Ok(token)
-    }
-}
-
-fn hash(token: &str) -> String {
-    hex::encode(Sha256::digest(token.as_bytes()))
-}
 
 /// Starts listening on this platform's user-only channel.
-pub fn start(app: AppHandle, config_dir: PathBuf) {
-    let approvals = Arc::new(Approvals::load(config_dir.join("kura-bridge.json")));
+pub fn start(app: AppHandle, store: Store, config_dir: PathBuf) {
+    let approvals = Arc::new(Approvals::load(store, config_dir.join("kura-bridge.json")));
     #[cfg(unix)]
     unix::listen(app, approvals);
     #[cfg(windows)]

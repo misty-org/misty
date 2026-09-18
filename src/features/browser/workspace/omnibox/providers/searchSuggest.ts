@@ -1,6 +1,6 @@
 import { relevance } from "../relevance";
 import type { OmniboxProvider } from "../types";
-import { directWebUrl } from "../urlText";
+import { describeUrl, directWebUrl } from "../urlText";
 import { wait, type OmniboxDeps } from "./deps";
 
 /** Waits for a pause in typing before asking the search engine. */
@@ -28,15 +28,30 @@ export function searchSuggestProvider(deps: OmniboxDeps): OmniboxProvider {
       await wait(DEBOUNCE_MS, signal);
       const engine = deps.searchEngine();
       const suggestions = await deps.fetchSearchSuggestions(engine.id, text).catch(() => []);
-      return suggestions.map((suggestion, index) => ({
-        id: `search:${suggestion.toLowerCase()}`,
-        kind: "suggestion" as const,
-        title: suggestion,
-        detail: "",
-        target: { type: "navigate" as const, url: deps.searchUrl(suggestion) },
-        relevance: relevance.suggestion - index,
-        allowedToBeDefault: false,
-      }));
+      return suggestions.map((suggestion, index) => {
+        if (typeof suggestion === "string")
+          return {
+            id: `search:${suggestion.toLowerCase()}`,
+            kind: "suggestion" as const,
+            title: suggestion,
+            detail: "",
+            target: { type: "navigate" as const, url: deps.searchUrl(suggestion) },
+            relevance: relevance.suggestion - index,
+            allowedToBeDefault: false,
+          };
+        // A site the engine named: its icon is fetched from that exact address.
+        const described = describeUrl(suggestion.url);
+        return {
+          id: `url:${suggestion.url}`,
+          kind: "url" as const,
+          title: suggestion.text,
+          detail: described?.detail ?? "",
+          target: { type: "navigate" as const, url: suggestion.url },
+          relevance: relevance.suggestedSite,
+          allowedToBeDefault: false,
+          faviconUrl: described?.faviconUrl,
+        };
+      });
     },
   };
 }

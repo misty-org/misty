@@ -90,28 +90,12 @@ export interface SyncStatusInput {
     notRestored?: unknown[];
   };
   vault?: { local: boolean; remote: boolean | null } | null;
-  preferences?: {
-    accountId: string;
-    ready: boolean;
-    syncing: boolean;
-    error: string | null;
-    pending: number;
-    synced?: boolean;
-  };
-  scope?: "all" | "settings";
 }
-/** One ordering and one set of copy for settings, popup and account preferences. */
+/** One ordering and one set of copy for the workspace sync status in settings and the popup. */
 export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
   if (!input.accountId)
-    return attention(
-      "Sign in to sync",
-      "Sign in to Misty to sync this workspace and your settings.",
-      "sign-in",
-    );
-  const prefs = input.preferences?.accountId === input.accountId ? input.preferences : null;
-  const settingsOnly = input.scope === "settings" || input.desktop === false;
-  const recovery =
-    !settingsOnly && input.recovery?.accountId === input.accountId ? input.recovery : null;
+    return attention("Sign in to sync", "Sign in to Misty to sync this workspace.", "sign-in");
+  const recovery = input.recovery?.accountId === input.accountId ? input.recovery : null;
   // Local saving reports per item (the popup lists them), never one blanket failure.
   if (recovery?.issue)
     return attention(
@@ -125,27 +109,20 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
     );
   if (input.operationError) return attention("Sync needs attention", input.operationError);
   const session = input.session?.account_id === input.accountId ? input.session : null;
-  if (!settingsOnly) {
-    if (input.reenroll) return syncIssues.sync_device_forbidden;
-    const issue = (input.session && !session ? null : input.issue) ?? session?.status.issue;
-    if (issue && !input.locked) return syncIssueStatus(issue);
-    if (session?.browser_profile_issue)
-      return attention(
-        "Website sign-ins need attention",
-        "Misty could not finish syncing website sign-ins. Your workspace remains available.",
-      );
-  }
+  if (input.reenroll) return syncIssues.sync_device_forbidden;
+  const issue = (input.session && !session ? null : input.issue) ?? session?.status.issue;
+  if (issue && !input.locked) return syncIssueStatus(issue);
+  if (session?.browser_profile_issue)
+    return attention(
+      "Website sign-ins need attention",
+      "Misty could not finish syncing website sign-ins. Your workspace remains available.",
+    );
   if (recovery?.notRestored?.length)
     return neutral(
       "Some tabs were not restored",
       "Everything else is back. Their saved copies are kept and listed below.",
     );
-  if (prefs?.error)
-    return attention(
-      "Settings need attention",
-      "Your settings could not be saved to the server. Retry sync to send pending changes.",
-    );
-  if (!settingsOnly) {
+  {
     if (recovery && !recovery.ready)
       return neutral(
         "Restoring workspace",
@@ -185,35 +162,11 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
         "Connecting to sync. Device availability will update when connected.",
       );
   }
-  if (input.online === false)
-    return attention(
-      "Settings are waiting to sync",
-      "Connect to the internet to save pending settings to the server.",
-    );
-  if (prefs?.pending || prefs?.syncing)
-    return neutral(
-      "Settings are syncing",
-      prefs.pending
-        ? `${prefs.pending} ${prefs.pending === 1 ? "change is" : "changes are"} waiting to be saved to the server.`
-        : "Saving your settings to the server.",
-    );
-  if (prefs && (!prefs.ready || prefs.synced === false))
-    return neutral("Loading settings", "Reading your account’s settings from the server.");
-  if (settingsOnly)
-    return prefs?.ready
-      ? {
-          tone: "healthy",
-          title: "Settings are up to date",
-          detail: "Your settings are saved to your account and apply across devices.",
-          action: null,
-        }
-      : neutral("Loading settings", "Reading your account’s settings from the server.");
   if (session?.full_sync === false)
     return {
       tone: "neutral",
       title: "Independent workspace",
-      detail:
-        "This device’s tabs and website sign-ins stay here. Account settings still sync across devices.",
+      detail: "This device’s tabs and website sign-ins stay here.",
       action: null,
     };
   if (
@@ -234,7 +187,7 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
       ...neutral("Syncing", "Recent changes are sent together in a few seconds."),
       action: actions["sync-now"],
     };
-  if (!settingsOnly && recovery?.saves?.pending.length)
+  if (recovery?.saves?.pending.length)
     return neutral(
       "Saving on this device",
       "Some changes are kept in an encrypted pending file until local storage accepts them.",
@@ -260,8 +213,8 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
     title: "Up to date",
     detail:
       session?.supports_cookie_handoff === false
-        ? "Your workspace and account settings are synced. Website sign-in sync is not supported on this device."
-        : "Your workspace and account settings are synced. Website sign-ins are up to date.",
+        ? "Your workspace is synced. Website sign-in sync is not supported on this device."
+        : "Your workspace is synced. Website sign-ins are up to date.",
     action: null,
   };
 }

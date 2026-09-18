@@ -23,6 +23,10 @@ export function BrowserMenu(props: {
   url: string;
   commands?: BrowserPageCommands;
   tools?: ReactNode;
+  lead?: ReactNode;
+  toolsIcon?: boolean;
+  library?: ReactNode;
+  account?: ReactNode;
 }) {
   const runtimeId = browserRuntimeId(props.tab);
   const privateTab = Boolean(parseBrowserViewState(props.tab.state).private);

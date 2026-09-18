@@ -125,31 +125,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "app.appearance.navigator_auto_hide",
-    "label": "Auto-hide navigation",
-    "page": "layout",
-    "section": "appearance",
-    "key": "navigator_auto_hide",
-    "default": false,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.navigation.hidden",
-    "label": "Hidden navigation destinations",
-    "page": "layout",
-    "section": "appearance",
-    "key": "navigator_hidden_json",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"],
-    "keywords": ["navigation", "rail", "sidebar", "hide", "show"]
-  },
-  {
     "id": "app.appearance.dim_inactive_panes",
     "label": "Dim inactive panes",
     "page": "appearance",
@@ -289,20 +264,6 @@
     "default": true,
     "owner": "account",
     "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.tabSleepMinutes",
-    "label": "Sleep inactive tabs",
-    "keywords": ["memory", "unload", "discard", "performance", "sleep"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_tab_sleep_minutes",
-    "default": 30,
-    "owner": "account",
-    "type": "number",
-    "min": 0,
-    "max": 1440,
     "platforms": ["desktop"]
   },
   {
@@ -555,43 +516,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "agents.web_search",
-    "label": "Search the web",
-    "keywords": ["internet", "research", "browse"],
-    "page": "agents-defaults",
-    "section": "agent",
-    "key": "web_search",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "agents.web_search_engine",
-    "label": "Search engine",
-    "keywords": ["web search", "parallel", "perplexity", "exa"],
-    "page": "agents-defaults",
-    "section": "agent",
-    "key": "web_search_engine",
-    "default": "parallel",
-    "owner": "account",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["parallel", "perplexity", "exa"]
-  },
-  {
-    "id": "agents.offer_search_apps",
-    "label": "Offer search apps",
-    "keywords": ["exa", "tavily", "serpapi", "connect", "apps"],
-    "page": "agents-defaults",
-    "section": "agent",
-    "key": "offer_search_apps",
-    "default": false,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "agents.panel_side",
     "label": "Misty panel side",
     "page": "agents-defaults",
@@ -687,19 +611,6 @@
     "default": "",
     "type": "string",
     "owner": "account",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "collections.tabs.navigator",
-    "label": "Navigation tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "navigator_tab_order",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
     "platforms": ["desktop"]
   },
   {

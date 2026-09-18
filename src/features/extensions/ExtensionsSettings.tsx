@@ -32,7 +32,6 @@ const stores: { store: ExtensionStore; description: string }[] = [
  */
 export function ExtensionsSettings() {
   const profile = useSettingsProfiles((s) => s.state);
-  const signedIn = useSettingsProfiles((s) => Boolean(s.accountId));
   const runtime = useExtensionsStore();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -66,11 +65,7 @@ export function ExtensionsSettings() {
       )}
       <DesktopSettingsSection
         title="Extensions"
-        description={
-          signedIn
-            ? "Open an extension's page on its store and choose Add to Misty. Extensions sync to your account, and each device asks before giving one access."
-            : "Sign in to add extensions and sync them across your devices."
-        }
+        description="Open an extension's page on its store and choose Add to Misty. Extensions stay on this device."
       >
         {stores.map(({ store, description }) => (
           <DesktopSettingsRow key={store} label={storeNames[store]} description={description}>

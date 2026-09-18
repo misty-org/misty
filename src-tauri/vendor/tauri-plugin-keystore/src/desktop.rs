@@ -11,6 +11,8 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     Ok(Keystore(app.clone()))
 }
 
+/// The renderer's door to Misty's credential store (encrypted rows in `misty.db`).
+/// Despite the name, it never talks to an operating-system keychain itself.
 pub struct Keystore<R: Runtime>(AppHandle<R>);
 impl<R: Runtime> Keystore<R> {
     pub fn store(&self, payload: StoreRequest) -> crate::Result<()> {
@@ -18,56 +20,11 @@ impl<R: Runtime> Keystore<R> {
         Ok(())
     }
     pub fn retrieve(&self, payload: RetrieveRequest) -> crate::Result<RetrieveResponse> {
-        #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
-        let mut value = misty_credential_store::load(&payload.service, &payload.user)?;
-        // Import the prior macOS debug file. Production Keychain items are left
-        // untouched; this plugin never requests access to them.
-        #[cfg(target_os = "macos")]
-        if value.is_none() && payload.service == TOKEN_SERVICE && payload.user == TOKEN_USER {
-            use tauri::Manager;
-            let profile = std::env::var("MISTY_PROFILE")
-                .or_else(|_| std::env::var("MISTY_DESKTOP_PROFILE"))
-                .ok();
-            let profile = profile
-                .as_deref()
-                .and_then(normalize_profile)
-                .unwrap_or_else(|| "default".to_owned());
-            let legacy = self
-                .0
-                .path()
-                .app_local_data_dir()
-                .map_err(|error| std::io::Error::other(error.to_string()))?
-                .join("development-credentials")
-                .join(format!("account-session-{profile}.json"));
-            if let Some(saved) = misty_credential_store::read_private_file(&legacy)? {
-                misty_credential_store::store(TOKEN_SERVICE, TOKEN_USER, &saved)?;
-                std::fs::remove_file(legacy)?;
-                value = Some(saved);
-            }
-        }
+        let value = misty_credential_store::load(&payload.service, &payload.user)?;
         Ok(RetrieveResponse { value })
     }
     pub fn remove(&self, payload: RemoveRequest) -> crate::Result<()> {
-        // Import first so removing a session cannot resurrect a legacy file.
-        self.retrieve(RetrieveRequest {
-            service: payload.service.clone(),
-            user: payload.user.clone(),
-        })?;
         misty_credential_store::delete(&payload.service, &payload.user)?;
         Ok(())
     }
-}
-#[cfg(target_os = "macos")]
-fn normalize_profile(profile: &str) -> Option<String> {
-    let profile = profile.trim().to_ascii_lowercase();
-    if profile.is_empty()
-        || profile.len() > 32
-        || !profile.as_bytes()[0].is_ascii_alphanumeric()
-        || !profile
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || c == b'-')
-    {
-        return None;
-    }
-    Some(profile)
 }

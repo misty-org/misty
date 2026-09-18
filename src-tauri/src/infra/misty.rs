@@ -142,11 +142,10 @@ struct GithubReleaseAsset {
     browser_download_url: String,
 }
 
-/// The account this device last signed in with. The server owns the account;
-/// this only lets the app show who is signed in and whether the license was
-/// verified recently, so it is one small private file rather than a database
-/// (a database folder that cannot be read must never be able to freeze
-/// sign-in).
+/// The account this device last signed in with. The server owns the account; this only
+/// lets the app show who is signed in and whether the license was verified recently.
+/// It lives in `misty.db` with everything else (sign-in already depends on that
+/// database, since the account's tokens are in it).
 #[derive(Default, Serialize, Deserialize)]
 struct StoredSession {
     user: Option<CurrentUser>,
@@ -155,36 +154,39 @@ struct StoredSession {
 
 static SESSION_LOCK: Mutex<()> = Mutex::new(());
 
-fn session_path() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join("session.json"))
+fn session_store() -> Result<super::store::Store, String> {
+    misty_home_dir()
+        .map(|home| super::store::Store::at(home.join(".local").join("data").join("misty.db")))
 }
 
 fn read_session() -> StoredSession {
-    // A missing or damaged file is a signed-out device, never an error.
-    session_path()
+    // A missing or damaged record is a signed-out device, never an error.
+    session_store()
         .ok()
-        .and_then(|path| fs::read(path).ok())
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .and_then(|store| store.connect().ok())
+        .and_then(|connection| {
+            connection
+                .query_row("SELECT document FROM session WHERE id = 1", [], |row| {
+                    row.get::<_, String>(0)
+                })
+                .ok()
+        })
+        .and_then(|document| serde_json::from_str(&document).ok())
         .unwrap_or_default()
 }
 
 fn write_session(session: &StoredSession) -> Result<(), String> {
-    let path = session_path()?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Could not create the Misty folder: {error}"))?;
-    }
-    let bytes = serde_json::to_vec_pretty(session).map_err(|error| error.to_string())?;
-    let staging = path.with_extension("json.tmp");
-    fs::write(&staging, bytes)
-        .map_err(|error| format!("Could not save the Misty session: {error}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&staging, fs::Permissions::from_mode(0o600))
-            .map_err(|error| format!("Could not secure the Misty session: {error}"))?;
-    }
-    fs::rename(&staging, &path)
+    let document = serde_json::to_string(session).map_err(|error| error.to_string())?;
+    let connection = session_store()?
+        .connect()
+        .map_err(|error| format!("Could not open the Misty database: {error}"))?;
+    connection
+        .execute(
+            "INSERT INTO session (id, document) VALUES (1, ?1)
+             ON CONFLICT (id) DO UPDATE SET document = excluded.document",
+            [document],
+        )
+        .map(|_| ())
         .map_err(|error| format!("Could not save the Misty session: {error}"))
 }
 
@@ -443,7 +445,7 @@ fn legacy_misty_bin_dir() -> Result<PathBuf, String> {
 }
 
 fn misty_db_path() -> Result<PathBuf, String> {
-    misty_home_dir().map(|home| home.join("db").join("data.db"))
+    misty_home_dir().map(|home| home.join(".local").join("data").join("misty.db"))
 }
 
 fn installed_version_path(home: &Path) -> PathBuf {

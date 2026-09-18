@@ -1,6 +1,8 @@
 :root {
-  /* Fixed logical pixels keep the same thickness at every viewport size. */
-  --misty-scrollbar-size: 8px;
+  /* Fixed logical pixels keep the same thickness at every viewport size. The thumb is a pill
+     inset by --misty-scrollbar-inset inside this track, so no scrollbar touches an edge. */
+  --misty-scrollbar-size: 12px;
+  --misty-scrollbar-inset: 3px;
 }
 
 @layer base {
@@ -24,17 +26,38 @@
     height: var(--misty-scrollbar-size);
   }
 
+  /* No painted track: the scroller's own surface shows, so a rounded panel never shows a
+     differently colored strip. The thumb's transparent border keeps the pill off every edge,
+     including the ends, where a corner would otherwise clip it. */
   ::-webkit-scrollbar-track,
   ::-webkit-scrollbar-corner {
-    background: var(--misty-theme-bg, transparent);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
+    border: var(--misty-scrollbar-inset) solid transparent;
     border-radius: 999px;
-    background: var(--misty-theme-active, #737373);
+    background-color: var(--misty-theme-active, #737373);
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--misty-theme-text-muted, #999);
+    background-color: var(--misty-theme-text-muted, #999);
+  }
+}
+
+/* A scrollbar that floats inside its pane: no track, a full pill thumb inset from the edge
+   so a rounded panel corner never clips it. Pair with vertical margin on the scroller. */
+@layer components {
+  .misty-scrollbar-floating::-webkit-scrollbar {
+    width: 16px;
+  }
+  .misty-scrollbar-floating::-webkit-scrollbar-track,
+  .misty-scrollbar-floating::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .misty-scrollbar-floating::-webkit-scrollbar-thumb {
+    border: 4px solid transparent;
+    background-clip: padding-box;
   }
 }

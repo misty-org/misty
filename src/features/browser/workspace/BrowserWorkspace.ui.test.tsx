@@ -143,7 +143,7 @@ describe("BrowserWorkspace", () => {
     expect(workspace).not.toBeNull();
     // Three rows: the toolbar, an optional bar, then the page.
     expect((workspace as HTMLElement | null)?.style.gridTemplateRows).toMatch(
-      /^\d+px auto minmax\(0(px)?,\s?1fr\)$/,
+      /^\d+px minmax\(0(px)?,\s?1fr\) auto$/,
     );
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
@@ -277,8 +277,12 @@ describe("BrowserWorkspace", () => {
       ).toBe(true);
     }
     expect(menuItems.some((item) => item.startsWith("Reload"))).toBe(false);
-    // Bookmarks live in search (!bookmarks); the star and Cmd+D still save a page.
-    expect(menuItems.some((item) => item.startsWith("Bookmarks"))).toBe(false);
+    // Horizontal tabs keep Favorites and Bookmarks here, as panels that open to the side.
+    for (const label of ["Favorites", "Bookmarks"])
+      expect(
+        menuItems.some((item) => item.startsWith(label)),
+        label,
+      ).toBe(true);
   });
   it("waits for native sibling order before mounting browser popups", async () => {
     (

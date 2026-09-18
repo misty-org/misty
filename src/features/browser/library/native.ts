@@ -98,10 +98,24 @@ export interface BrowserMediaInfo {
   canNext: boolean;
 }
 
+export interface BrowserFindOptions {
+  highlightAll: boolean;
+  matchCase: boolean;
+  matchDiacritics: boolean;
+  wholeWords: boolean;
+}
+
 export const browserPageTools = {
   stop: (id: string) => invoke<void>("browser_webview_stop", { request: { id } }),
-  find: (id: string, query: string, direction: "next" | "previous" | "clear") =>
-    invoke<BrowserFindResult>("browser_webview_find", { request: { id, query, direction } }),
+  find: (
+    id: string,
+    query: string,
+    direction: "next" | "previous" | "clear",
+    options: Partial<BrowserFindOptions> = {},
+  ) =>
+    invoke<BrowserFindResult>("browser_webview_find", {
+      request: { id, query, direction, ...options },
+    }),
   print: (id: string) => invoke<void>("browser_webview_print", { request: { id } }),
   savePage: (id: string, path: string) =>
     invoke<void>("browser_webview_save_page", { request: { id, path } }),

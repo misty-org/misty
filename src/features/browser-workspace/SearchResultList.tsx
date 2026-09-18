@@ -77,7 +77,8 @@ function WebBangIcon({ home }: { home: string }) {
   } catch {
     // No usable home page.
   }
-  if (!src || failed) return <Globe2 size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
+  if (!src || failed)
+    return <Globe2 size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
   return (
     <img
       src={src}
@@ -258,7 +259,7 @@ export function SearchResultList(props: {
       ref={list}
       role="listbox"
       aria-label="Search results"
-      className="max-h-[520px] space-y-0.5 overflow-y-auto p-1.5"
+      className="max-h-[360px] space-y-0.5 overflow-y-auto p-1.5"
     >
       {props.items.map((item, index) => {
         const previous = props.items[index - 1];

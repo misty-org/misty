@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 const widthKey = "misty:misty-panel-width";
 export const MISTY_PANEL_WIDTH = 400;
-export const MISTY_PANEL_MIN_WIDTH = 320;
+export const MISTY_PANEL_MIN_WIDTH = 360;
 export const MISTY_PANEL_MAX_WIDTH = 720;
 
 const clampMistyPanelWidth = (width: number) =>

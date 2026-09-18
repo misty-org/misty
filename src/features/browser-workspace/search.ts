@@ -3,19 +3,30 @@ import { browserSearchUrl } from "@/features/workspace/browserSearchEngine";
 import { resolveDirectAddress } from "./address";
 import type { SearchScope } from "./bangs/types";
 
+/** Where the panel opens when the address bar summons it, instead of the page's top. */
+export type SearchAnchor = {
+  left: number;
+  top: number;
+  width: number;
+  /** Takes the chosen address, so the current tab navigates rather than a new one opening. */
+  openUrl(url: string): void;
+};
+
 export const useBrowserSearchStore = create<{
   open: boolean;
   /** The scope the dialog opened in, such as open tabs; null for the address search. */
   scope: SearchScope | null;
-  show(scope?: SearchScope): void;
+  anchor: SearchAnchor | null;
+  show(scope?: SearchScope, anchor?: SearchAnchor): void;
   close(): void;
   toggle(): void;
 }>((set) => ({
   open: false,
   scope: null,
-  show: (scope) => set({ open: true, scope: scope ?? null }),
-  close: () => set({ open: false, scope: null }),
-  toggle: () => set((state) => ({ open: !state.open, scope: null })),
+  anchor: null,
+  show: (scope, anchor) => set({ open: true, scope: scope ?? null, anchor: anchor ?? null }),
+  close: () => set({ open: false, scope: null, anchor: null }),
+  toggle: () => set((state) => ({ open: !state.open, scope: null, anchor: null })),
 }));
 
 /** Enter submits the typed URL, or the phrase to the person's search engine.

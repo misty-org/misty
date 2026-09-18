@@ -35,16 +35,12 @@ async fn activate(
             review,
         });
     }
-    // Synced settings may name an extension, or access, that nobody approved
-    // on this device; see approvals.rs.
-    let approved = approvals::covers(app, account, installation);
     let mut review = selected_package(&package_root, false)
         .ok()
         .and_then(|path| read_review(&path).ok());
     if review.is_none() {
         let prepared = prepare(app, account, &id).await?;
-        if !approved
-            || prepared.entry.guid != installation.guid
+        if prepared.entry.guid != installation.guid
             || prepared.blocked
             || prepared
                 .permissions
@@ -65,22 +61,6 @@ async fn activate(
             });
         }
         review = Some(commit(app, &prepared.token).await?);
-    }
-    if !approved {
-        native::request(json!({"operation":"unload","account":account,"id":id})).await?;
-        service().lock().await.loaded.remove(&id);
-        sync::forget(account, &id);
-        if let Ok(mut origins) = origins().write() {
-            origins.remove(&uuid_for(&format!("{account}:{}", installation.guid)));
-        }
-        return Ok(InstalledState {
-            new_tab: None,
-            id,
-            status: "needs-review".into(),
-            version: review.as_ref().map(|value| value.entry.version.clone()),
-            detail: Some("Review this extension's access before it runs on this device.".into()),
-            review,
-        });
     }
     let review = review.ok_or("The installed package is missing.")?;
     let current = selected_package(&package_root, false)?;
@@ -200,7 +180,6 @@ pub async fn extensions_reconcile(
     }
     #[cfg(target_os="macos")]
     drop(profile);
-    if !account.is_empty() { approvals::seed_existing(&app, &account, &installations)?; }
     let absent = { let state=service().lock().await; state.desired.values().filter(|old|!installations.iter().any(|new|new.id==old.id)).cloned().collect::<Vec<_>>() };
     for old in absent {
         native::request(json!({"operation":"unload","account":account,"id":old.id})).await?;

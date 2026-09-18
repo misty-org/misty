@@ -4,14 +4,13 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    fs::{self, File, OpenOptions},
-    io::Write,
+    fs::{self, File},
     path::{Component, Path, PathBuf},
 };
 
 mod platform;
 use platform::{
-    absent, child, fingerprint, make_folder, open_root, private, refused_scope, remove_folder,
+    absent, child, fingerprint, make_folder, open_root, refused_scope, remove_folder,
     rename_exclusive, sync_folder,
 };
 use uuid::Uuid;
@@ -121,38 +120,82 @@ struct Grant {
     snapshot: Snapshot,
     revoked: bool,
 }
-/// Serialized by the native command host. A manifest is journaled before every effect.
+/// Serialized by the native command host. A manifest is journaled before every effect: each
+/// save is its own committed transaction (WAL, `synchronous=FULL`), so it is on disk when
+/// the call returns and the effect only happens after.
 pub struct Organizer {
-    journal: PathBuf,
+    database: PathBuf,
     grants: HashMap<String, Grant>,
 }
+const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS agent_file_grants (
+        id TEXT PRIMARY KEY, document TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS agent_file_manifests (
+        id TEXT PRIMARY KEY, document TEXT NOT NULL, saved_at INTEGER NOT NULL);";
 impl Organizer {
-    pub fn new(journal: PathBuf) -> Result<Self> {
-        fs::create_dir_all(&journal).map_err(err)?;
-        let mut grants = HashMap::new();
-        for entry in fs::read_dir(&journal).map_err(err)? {
-            let path = entry.map_err(err)?.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("grant") {
-                let grant: Grant =
-                    serde_json::from_slice(&fs::read(path).map_err(err)?).map_err(err)?;
-                grants.insert(grant.snapshot.grant_id.clone(), grant);
-            }
-        }
-        Ok(Self { journal, grants })
-    }
-    fn save<T: Serialize>(&self, id: &str, extension: &str, value: &T) -> Result<()> {
-        Uuid::parse_str(id).map_err(err)?;
-        let path = self.journal.join(format!("{id}.{extension}"));
-        let temporary = self.journal.join(format!("{}.tmp", Uuid::new_v4()));
-        let mut options = OpenOptions::new();
-        options.write(true).create_new(true);
-        private(&mut options);
-        let mut file = options.open(&temporary).map_err(err)?;
-        file.write_all(&serde_json::to_vec(value).map_err(err)?)
+    fn connect(database: &Path) -> Result<rusqlite::Connection> {
+        let connection = rusqlite::Connection::open(database).map_err(err)?;
+        connection
+            .busy_timeout(std::time::Duration::from_secs(5))
             .map_err(err)?;
-        file.sync_all().map_err(err)?;
-        fs::rename(&temporary, &path).map_err(err)?;
-        sync_folder(&open_root(&self.journal)?)
+        connection
+            .execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")
+            .map_err(err)?;
+        connection.execute_batch(SCHEMA).map_err(err)?;
+        Ok(connection)
+    }
+    /// `database` is the SQLite file the journal lives in (Misty's `misty.db`).
+    pub fn new(database: PathBuf) -> Result<Self> {
+        if let Some(parent) = database.parent() {
+            fs::create_dir_all(parent).map_err(err)?;
+        }
+        let connection = Self::connect(&database)?;
+        let mut grants = HashMap::new();
+        let mut statement = connection
+            .prepare("SELECT document FROM agent_file_grants")
+            .map_err(err)?;
+        for document in statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(err)?
+        {
+            let grant: Grant = serde_json::from_str(&document.map_err(err)?).map_err(err)?;
+            grants.insert(grant.snapshot.grant_id.clone(), grant);
+        }
+        drop(statement);
+        drop(connection);
+        Ok(Self { database, grants })
+    }
+    fn save<T: Serialize>(&self, id: &str, kind: &str, value: &T) -> Result<()> {
+        Uuid::parse_str(id).map_err(err)?;
+        let document = serde_json::to_string(value).map_err(err)?;
+        let connection = Self::connect(&self.database)?;
+        let saved = if kind == "grant" {
+            connection.execute(
+                "INSERT INTO agent_file_grants (id, document) VALUES (?1, ?2)
+                 ON CONFLICT (id) DO UPDATE SET document = excluded.document",
+                rusqlite::params![id, document],
+            )
+        } else {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |elapsed| elapsed.as_millis() as i64);
+            connection.execute(
+                "INSERT INTO agent_file_manifests (id, document, saved_at) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (id) DO UPDATE SET document = excluded.document, saved_at = excluded.saved_at",
+                rusqlite::params![id, document, now],
+            )
+        };
+        saved.map(|_| ()).map_err(err)
+    }
+    fn manifest_document(&self, id: &str) -> Result<Option<String>> {
+        use rusqlite::OptionalExtension;
+        Self::connect(&self.database)?
+            .query_row(
+                "SELECT document FROM agent_file_manifests WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(err)
     }
     /// This may only be called with the result of a user-operated native folder picker.
     pub fn grant(&mut self, account: &str, path: &Path) -> Result<Snapshot> {
@@ -217,7 +260,7 @@ impl Organizer {
     ) -> Result<Manifest> {
         Uuid::parse_str(plan_id).map_err(err)?;
         let (grant, root) = self.scope(account, grant_id)?;
-        if self.journal.join(format!("{plan_id}.manifest")).exists() {
+        if self.manifest_document(plan_id)?.is_some() {
             let existing = self.manifest(account, plan_id)?;
             if existing.grant_id != grant_id || existing.steps != steps {
                 return Err("Plan identity was reused with different operations".into());
@@ -297,32 +340,26 @@ impl Organizer {
         Ok(manifest)
     }
     pub fn history(&self, account: &str) -> Result<Vec<Manifest>> {
-        let mut paths = fs::read_dir(&self.journal)
-            .map_err(err)?
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("manifest"))
-            .collect::<Vec<_>>();
-        paths.sort_by_key(|entry| {
-            std::cmp::Reverse(entry.metadata().and_then(|m| m.modified()).ok())
-        });
-        Ok(paths
+        let ids: Vec<String> = {
+            let connection = Self::connect(&self.database)?;
+            let mut statement = connection
+                .prepare("SELECT id FROM agent_file_manifests ORDER BY saved_at DESC")
+                .map_err(err)?;
+            let rows = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(err)?;
+            rows.collect::<std::result::Result<_, _>>().map_err(err)?
+        };
+        Ok(ids
             .into_iter()
-            .filter_map(|entry| {
-                entry
-                    .path()
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .and_then(|id| self.manifest(account, id).ok())
-            })
+            .filter_map(|id| self.manifest(account, &id).ok())
             .take(20)
             .collect())
     }
     pub fn manifest(&self, account: &str, id: &str) -> Result<Manifest> {
         Uuid::parse_str(id).map_err(err)?;
-        let manifest: Manifest = serde_json::from_slice(
-            &fs::read(self.journal.join(format!("{id}.manifest"))).map_err(err)?,
-        )
-        .map_err(err)?;
+        let document = self.manifest_document(id)?.ok_or("Unknown plan")?;
+        let manifest: Manifest = serde_json::from_str(&document).map_err(err)?;
         // Reading a receipt remains possible after revocation; execution does not.
         if !self
             .grants

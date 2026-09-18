@@ -1,4 +1,9 @@
-import { useDockingLayoutStore, validDockingLayout } from "@/features/app-shell/dockingLayout";
+import { useMemo } from "react";
+import {
+  normalizeDockingLayout,
+  useDockingLayoutStore,
+  validDockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 
 /** Keep the shell and Settings on the same window, including after a scope switch. */
@@ -10,5 +15,10 @@ export function useWindowDockingLayout() {
       )?.dockingLayout,
   );
   const initialLayout = useDockingLayoutStore((state) => state.initialLayout);
-  return validDockingLayout(layout) ? layout : initialLayout;
+  const chosen = validDockingLayout(layout) ? layout : initialLayout;
+  return useMemo(
+    () => normalizeDockingLayout(chosen),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chosen.navigation, chosen.tabs],
+  );
 }

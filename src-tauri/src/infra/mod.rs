@@ -91,7 +91,6 @@ pub mod system_dependencies;
 pub mod tray;
 #[cfg(windows)]
 pub(crate) mod webview2;
-pub mod workspaces;
 
 mod browser_profile;
 
@@ -166,5 +165,6 @@ pub mod browser_site_style;
 pub mod browser_night_light;
 
 pub mod settings_profile_store;
+pub mod store;
 
 pub mod agent_files;

@@ -5,7 +5,6 @@ const base: SyncStatusInput = {
   accountId: "a",
   session: syncSession(),
   recovery: { accountId: "a", ready: true, issue: null },
-  preferences: { accountId: "a", ready: true, syncing: false, pending: 0, error: null },
 };
 describe("one sync status selector", () => {
   it.each(Object.keys(syncIssues))("maps %s to human copy and exactly one action", (code) => {
@@ -68,21 +67,12 @@ describe("one sync status selector", () => {
       selectSyncStatus({ ...base, recovery: { accountId: "a", ready: false, issue: null } }).title,
     ).toBe("Restoring workspace");
   });
-  it("does not hide preference failures behind healthy workspace sync", () => {
-    expect(
-      selectSyncStatus({ ...base, preferences: { ...base.preferences!, error: "server" } }).title,
-    ).toBe("Settings need attention");
-    expect(
-      selectSyncStatus({ ...base, preferences: { ...base.preferences!, pending: 2 } }).detail,
-    ).toContain("2 changes");
-  });
   it("ignores status and recovery from another account", () => {
     expect(
       selectSyncStatus({
         ...base,
         session: syncSession({ account_id: "b" }),
         recovery: { accountId: "b", ready: false, issue: "disk" },
-        preferences: { ...base.preferences!, accountId: "b", error: "error" },
       }),
     ).toMatchObject({ title: "Sync is locked", action: { kind: "unlock" } });
   });
@@ -99,13 +89,11 @@ describe("one sync status selector", () => {
       selectSyncStatus({ ...base, session: null, vault: { remote: true, local: true } }).detail,
     ).toContain("saved device key");
   });
-  it("keeps account settings separate from independent workspace mode", () => {
-    expect(
-      selectSyncStatus({ ...base, session: syncSession({ full_sync: false }) }).detail,
-    ).toContain("Account settings still sync");
-    expect(
-      selectSyncStatus({ ...base, scope: "settings", issue: "sync_device_forbidden" }).title,
-    ).toBe("Settings are up to date");
+  it("describes an independent workspace as staying on this device", () => {
+    const status = selectSyncStatus({ ...base, session: syncSession({ full_sync: false }) });
+    expect(status.title).toBe("Independent workspace");
+    expect(status.detail).toContain("stay here");
+    expect(status.detail).not.toMatch(/settings/i);
   });
   it("explains unsupported sign-ins without treating them as broken", () => {
     expect(
@@ -125,15 +113,6 @@ describe("one sync status selector", () => {
     expect(selectSyncStatus({ ...base, reenroll: true }).action?.kind).toBe("reenroll");
     expect(selectSyncStatus({ ...base, accountId: "" }).action?.kind).toBe("sign-in");
   });
-});
-
-it("does not report settings as synced before the account record has loaded", () => {
-  expect(
-    selectSyncStatus({ ...base, preferences: { ...base.preferences!, ready: false } }).title,
-  ).toBe("Loading settings");
-  expect(
-    selectSyncStatus({ ...base, preferences: { ...base.preferences!, synced: false } }).title,
-  ).toBe("Loading settings");
 });
 
 it("offers Sync now while batched workspace edits wait to be sent", () => {

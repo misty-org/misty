@@ -14,7 +14,7 @@ import { cn, IconButton } from "@/shared/ui";
  * pane's content area, under its toolbar; opened by shortcut it lands in the focused
  * browser pane and stays there while focus moves between panes.
  */
-function useBrowserMistyPanel(tabId: string) {
+export function useBrowserMistyPanel(tabId: string) {
   const paneId = useWorkspaceStore(
     (state) => dockLeaves(state.layout.root).find((pane) => pane.activeViewId === tabId)?.id,
   );

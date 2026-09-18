@@ -83,13 +83,12 @@ describe("AppearanceSection app zoom", () => {
     expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.21);
   });
 
-  it("offers Reset only while zoom differs from its default, and resets the account value", () => {
+  it("offers Reset only while zoom differs from its default, and resets the value", () => {
     const edit = vi.fn(async () => {});
     useSettingsProfiles.setState({
       ready: true,
-      syncing: false,
       edit,
-      state: { version: 2, profile: null, seed: { "app.zoom": 2 }, outbox: [] },
+      state: { version: 3, values: { "app.zoom": 2 } },
     });
     const view = render(
       <SettingsPageScope.Provider value={{ page: "appearance", owner: "account" }}>

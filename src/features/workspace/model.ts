@@ -1,3 +1,4 @@
+import type { WindowColor } from "./windowColors";
 import type { MistyTabGroup } from "./tabGroups";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import { browserHomeUrl } from "./browserHome";
@@ -187,6 +188,8 @@ export interface WorkspaceTab {
 }
 
 export interface WorkspaceWindow {
+  /** The color that tints this window's chrome; unset on windows made before colors. */
+  color?: WindowColor;
   dockingLayout?: DockingLayout;
   id: string;
   title: string;

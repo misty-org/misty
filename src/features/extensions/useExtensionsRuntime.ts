@@ -61,9 +61,9 @@ export function useExtensionsRuntime() {
   const [runtimeGeneration, setRuntimeGeneration] = useState(0);
   const { user } = useAuth();
   const account = user?.id ?? "";
-  const profile = useSettingsProfiles((s) => (account && s.accountId === account ? s.state : null));
-  const profilesReady = useSettingsProfiles((s) => s.ready && s.accountId === account);
-  const profilesError = useSettingsProfiles((s) => (s.accountId === account ? s.error : null));
+  const profile = useSettingsProfiles((s) => s.state);
+  const profilesReady = useSettingsProfiles((s) => s.ready);
+  const profilesError = useSettingsProfiles((s) => s.error);
   const raw = profile ? String(resolveSetting(profile, "extensions.installations").value) : "[]";
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
@@ -86,7 +86,7 @@ export function useExtensionsRuntime() {
         useExtensionsStore.setState({
           ready: true,
           supported: false,
-          error: `Extensions could not load account settings: ${profilesError}`,
+          error: `Extensions could not load settings: ${profilesError}`,
         });
       return;
     }

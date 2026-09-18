@@ -1,6 +1,5 @@
-//! Windows protection for credential files: DPAPI seals every file to the
-//! signed-in Windows user, and the credential directories carry a protected
-//! DACL that admits only their owner and SYSTEM.
+//! Windows protection for private folders and files: a protected DACL that admits
+//! only the owner and SYSTEM (the counterpart of mode 0700 and 0600).
 use std::{io, path::Path, ptr};
 use windows_sys::Win32::{
     Foundation::{LocalFree, ERROR_SUCCESS},
@@ -10,96 +9,14 @@ use windows_sys::Win32::{
             ConvertStringSecurityDescriptorToSecurityDescriptorW, GetNamedSecurityInfoW,
             SetNamedSecurityInfoW, SDDL_REVISION_1, SE_FILE_OBJECT,
         },
-        Cryptography::{
-            CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
-        },
         GetSecurityDescriptorDacl, ACL, DACL_SECURITY_INFORMATION,
         PROTECTED_DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
     },
 };
-use zeroize::Zeroizing;
 
-/// Marks a sealed file; anything else is a plaintext file from an older build.
-pub(crate) const SEALED_PREFIX: &[u8] = b"MISTY-DPAPI-1\n";
-/// Binds sealed files to this store, so another DPAPI user of the same
-/// account cannot be tricked into unsealing them.
-const ENTROPY: &[u8] = b"misty.credential-store.v1";
 /// Full control for the directory's owner and SYSTEM, inherited by every file,
 /// and nothing inherited from the parent.
 const PRIVATE_DACL: &str = "D:P(A;OICI;FA;;;OW)(A;OICI;FA;;;SY)";
-
-fn blob(bytes: &[u8]) -> CRYPT_INTEGER_BLOB {
-    CRYPT_INTEGER_BLOB {
-        cbData: bytes.len() as u32,
-        pbData: bytes.as_ptr().cast_mut(),
-    }
-}
-
-/// Copies a blob that DPAPI allocated and frees it.
-unsafe fn take(output: CRYPT_INTEGER_BLOB) -> Zeroizing<Vec<u8>> {
-    let bytes = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-    std::ptr::write_bytes(output.pbData, 0, output.cbData as usize);
-    LocalFree(output.pbData.cast());
-    Zeroizing::new(bytes)
-}
-
-pub(crate) fn seal(plaintext: &[u8]) -> io::Result<Vec<u8>> {
-    let input = blob(plaintext);
-    let entropy = blob(ENTROPY);
-    let mut output = CRYPT_INTEGER_BLOB {
-        cbData: 0,
-        pbData: ptr::null_mut(),
-    };
-    // SAFETY: every pointer refers to a live buffer for the duration of the call.
-    let ok = unsafe {
-        CryptProtectData(
-            &input,
-            ptr::null(),
-            &entropy,
-            ptr::null(),
-            ptr::null(),
-            CRYPTPROTECT_UI_FORBIDDEN,
-            &mut output,
-        )
-    };
-    if ok == 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: DPAPI returned an allocation that `take` copies and frees once.
-    let sealed = unsafe { take(output) };
-    let mut file = Vec::with_capacity(SEALED_PREFIX.len() + sealed.len());
-    file.extend_from_slice(SEALED_PREFIX);
-    file.extend_from_slice(&sealed);
-    Ok(file)
-}
-
-pub(crate) fn open(sealed: &[u8]) -> io::Result<Zeroizing<Vec<u8>>> {
-    let input = blob(sealed);
-    let entropy = blob(ENTROPY);
-    let mut output = CRYPT_INTEGER_BLOB {
-        cbData: 0,
-        pbData: ptr::null_mut(),
-    };
-    // SAFETY: every pointer refers to a live buffer for the duration of the call.
-    let ok = unsafe {
-        CryptUnprotectData(
-            &input,
-            ptr::null_mut(),
-            &entropy,
-            ptr::null(),
-            ptr::null(),
-            CRYPTPROTECT_UI_FORBIDDEN,
-            &mut output,
-        )
-    };
-    if ok == 0 {
-        return Err(io::Error::other(
-            "Credential file could not be unsealed for this Windows user",
-        ));
-    }
-    // SAFETY: DPAPI returned an allocation that `take` copies and frees once.
-    Ok(unsafe { take(output) })
-}
 
 /// Whether the directory already carries exactly the private DACL. Setting
 /// it again would recompute every file below, so callers skip that.
@@ -223,7 +140,10 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         assert!(!is_restricted(folder.path()));
         restrict_directory(folder.path()).unwrap();
-        assert!(is_restricted(folder.path()), "the DACL reads back as written");
+        assert!(
+            is_restricted(folder.path()),
+            "the DACL reads back as written"
+        );
         restrict_directory(folder.path()).unwrap();
     }
 }

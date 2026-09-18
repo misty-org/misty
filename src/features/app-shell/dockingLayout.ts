@@ -14,6 +14,26 @@ export interface SavedDockingLayout extends DockingLayout {
 }
 export const defaultDockingLayout: DockingLayout = { navigation: "left", tabs: "top" };
 export const isSideDock = (position: DockPosition) => position === "left" || position === "right";
+export type TabOrientation = "horizontal" | "vertical";
+export const tabOrientation = (layout: DockingLayout): TabOrientation =>
+  isSideDock(layout.tabs) ? "vertical" : "horizontal";
+/**
+ * Tab orientation is the one layout choice. Navigation always sits on a side, and never on
+ * the tabs' edge: vertical tabs put it on the opposite side, horizontal tabs sit on top.
+ */
+export function normalizeDockingLayout(layout: DockingLayout): DockingLayout {
+  if (isSideDock(layout.tabs))
+    return { tabs: layout.tabs, navigation: layout.tabs === "left" ? "right" : "left" };
+  return { tabs: "top", navigation: isSideDock(layout.navigation) ? layout.navigation : "left" };
+}
+export function layoutForOrientation(
+  orientation: TabOrientation,
+  current: DockingLayout,
+): DockingLayout {
+  const tabs =
+    orientation === "vertical" ? (isSideDock(current.tabs) ? current.tabs : "left") : "top";
+  return normalizeDockingLayout({ navigation: current.navigation, tabs });
+}
 const isPosition = (value: unknown): value is DockPosition =>
   dockPositions.includes(value as DockPosition);
 export function validDockingLayout(value: unknown): value is DockingLayout {

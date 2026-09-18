@@ -125,13 +125,12 @@ async function mounted() {
 }
 beforeEach(() => {
   useSettingsProfiles.setState({
-    accountId: "account",
     state: initialProfileState({}),
     ready: true,
   });
   registerProfileWriter(async (id, value) => {
     useSettingsProfiles.setState(({ state }) => ({
-      state: editPreference(state!, id, value, crypto.randomUUID()),
+      state: editPreference(state!, id, value),
     }));
   });
   vi.clearAllMocks();

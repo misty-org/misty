@@ -2,6 +2,8 @@ import { DockDropPreview } from "./DockDropPreview";
 import { StablePaneLayout } from "@/features/workspace/StablePaneLayout";
 import { useWorkspacePagePreview } from "@/features/workspace/useWorkspacePagePreview";
 import { panePlacement } from "@/features/workspace/panePlacement";
+import { isSideDock } from "@/features/app-shell/dockingLayout";
+import { PaneToolbarFallback } from "./PaneToolbarFallback";
 import { WorkspacePaneControls } from "./WorkspacePaneControls";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { browserRuntimeId } from "@/features/webviews/browserRuntime";
@@ -14,6 +16,7 @@ import {
   dockLeaves,
   dockWidgetRegistry,
   maxWorkspacePanels,
+  useWindowDockingLayout,
   useWorkspaceStore,
   WorkspaceViewTitleProvider,
   type DockSplitDirection,
@@ -350,13 +353,18 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
     props.onDockView(tabId, pane.id, zone);
   };
 
+  // With horizontal tabs the browser toolbar is always there: a page that isn't a browser page
+  // gets a resting one, so Spaces, the profile and the address bar stay reachable.
+  const horizontalTabs = !isSideDock(useWindowDockingLayout().tabs);
+  const showToolbarFallback =
+    horizontalTabs && Boolean(activeTab) && activeTab?.surfaceId !== "browser";
   return (
     <section
       ref={sectionRef}
       className={cn(
-        "group/pane relative grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]",
-        "overflow-hidden bg-charcoal-bg focus:outline-none focus-visible:ring-2",
-        "focus-visible:ring-inset focus-visible:ring-cream-muted/50",
+        "group/pane relative grid h-full min-h-0 min-w-0",
+        showToolbarFallback ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]",
+        "overflow-hidden bg-charcoal-bg focus:outline-none",
       )}
       data-workspace-pane={pane.id}
       onDragOver={dragOver}
@@ -383,6 +391,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       >
         <span className="truncate">{activeTab?.title || "New tab"}</span>
       </header>
+      {showToolbarFallback ? <PaneToolbarFallback /> : null}
       <div className="min-h-0 min-w-0 overflow-hidden">
         {activeTab ? (
           mountedTabs.map((mountedTab) => {
