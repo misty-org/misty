@@ -57,7 +57,7 @@ turn off Low Power Mode and avoid competing performance tests.
 ```sh
 MISTY_SDK_PROBE_BROWSER_RENDERING=1 \
 MISTY_SDK_PROBE_TIMEOUT_SECONDS=120 \
-node scripts/sdk-package-probe-run.mjs browser ../misty-apps
+node cli/tasks/sdk-package-probe-run.ts browser ./apps
 ```
 
 Optionally add `MISTY_BROWSER_RENDER_WEBSITE=http://localhost:5174/` to compare a

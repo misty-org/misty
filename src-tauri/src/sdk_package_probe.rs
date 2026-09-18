@@ -352,7 +352,7 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
         origin.scheme() == "http" && matches!(origin.host_str(), Some("127.0.0.1" | "localhost")),
         "The probe requires a loopback development server"
     );
-    let mut url = origin.join(&format!("/scripts/{page}")).unwrap();
+    let mut url = origin.join(&format!("/cli/tasks/{page}")).unwrap();
     url.query_pairs_mut()
         .append_pair("fixture", fixture.path().to_str().unwrap())
         .append_pair("nonce", &nonce)

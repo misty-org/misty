@@ -1,10 +1,12 @@
 import { act } from "react";
+import type * as DeploymentApi from "@/api/deployment/api";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
+  resumeAccount: vi.fn(),
 }));
 
 vi.mock("@/features/auth", () => ({
@@ -26,11 +28,13 @@ vi.mock("@/features/spaces", () => ({
 }));
 
 vi.mock("@/features/workspace", () => ({
-  useWorkspaceStore: (selector: (state: {
-    canNavigatePane: (delta: number) => boolean;
-    navigatePane: (delta: number) => { route: string } | null;
-    openSurface: () => void;
-  }) => unknown) =>
+  useWorkspaceStore: (
+    selector: (state: {
+      canNavigatePane: (delta: number) => boolean;
+      navigatePane: (delta: number) => { route: string } | null;
+      openSurface: () => void;
+    }) => unknown,
+  ) =>
     selector({
       canNavigatePane: () => false,
       navigatePane: () => null,
@@ -93,8 +97,18 @@ vi.mock("@/features/shortcuts", () => ({
   registerShortcutHandler: vi.fn(() => () => undefined),
 }));
 
-vi.mock("@/features/navigation-names/NavigationNamesBoundary", () => ({
-  NavigationNamesBoundary: (props: { children: React.ReactNode }) => <>{props.children}</>,
+vi.mock("@/api/deployment/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof DeploymentApi>()),
+  resolveApiBase: async () => "https://api.example.test/v1",
+}));
+
+vi.mock("@/features/auth/AuthContext", () => ({
+  useAuth: () => ({
+    user: mocks.user,
+    accounts: [{ id: "saved-account", name: "Test Account", email: "test@example.test" }],
+    transitioning: false,
+    resumeAccount: mocks.resumeAccount,
+  }),
 }));
 
 vi.mock("@/features/tour", () => ({
@@ -126,6 +140,10 @@ vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
 
 import { DesktopLayout } from "./index";
+import SignIn from "@/features/auth/SignInPage";
+import { SavedAccountSessionUnavailableError } from "@/features/auth/sessionErrors";
+import { notifyAccountScopeReset } from "@/features/auth/store/accountEvents";
+import { useNavigationNames } from "@/features/navigation-names/store";
 
 describe("DesktopLayout on Auth Routes", () => {
   let container: HTMLDivElement;
@@ -140,6 +158,7 @@ describe("DesktopLayout on Auth Routes", () => {
     root = createRoot(container);
     mocks.user = null;
     vi.clearAllMocks();
+    useNavigationNames.setState({ account: "", ready: false, names: {}, error: null });
   });
 
   afterEach(async () => {
@@ -149,14 +168,87 @@ describe("DesktopLayout on Auth Routes", () => {
     container.remove();
   });
 
+  it.each([
+    [
+      new SavedAccountSessionUnavailableError(),
+      "Your saved sign-in for test@example.test is no longer available",
+    ],
+    [new Error("Connection interrupted"), "Could not resume this account. Connection interrupted"],
+  ])("keeps the picker mounted during account resets and displays %s", async (error, message) => {
+    let rejectResume!: (error: Error) => void;
+    mocks.resumeAccount.mockImplementationOnce(() => {
+      notifyAccountScopeReset();
+      return new Promise<void>((_resolve, reject) => {
+        rejectResume = reject;
+      });
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <Routes>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+              <Route path="/signin" element={<SignIn />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("test@example.test"))!
+        .click();
+    });
+    expect(container.textContent).toContain("Signing in…");
+    await act(async () => rejectResume(error));
+    expect(container.textContent).toContain(message);
+    if (error instanceof SavedAccountSessionUnavailableError) {
+      expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(
+        "test@example.test",
+      );
+      expect(container.querySelector('input[type="password"]')).not.toBeNull();
+    }
+  });
+
+  it("opens the workspace after a saved account resumes across a scope reset", async () => {
+    let resolveResume!: () => void;
+    mocks.resumeAccount.mockImplementationOnce(() => {
+      notifyAccountScopeReset();
+      return new Promise<void>((resolve) => {
+        resolveResume = resolve;
+      });
+    });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <Routes>
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
+              <Route path="/signin" element={<SignIn />} />
+            </Route>
+            <Route path="/spaces" element={<div>Account workspace</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("test@example.test"))!
+        .click();
+    });
+    expect(container.textContent).toContain("Signing in…");
+    await act(async () => {
+      mocks.user = { id: "saved-account", email: "test@example.test" };
+      resolveResume();
+    });
+    expect(container.textContent).toBe("Account workspace");
+    expect(mocks.resumeAccount).toHaveBeenCalledOnce();
+  });
+
   it("suppresses the sidebar navigator and renders Outlet directly on /signin", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
           <Routes>
-            <Route
-              element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}
-            >
+            <Route element={<DesktopLayout getRouteId={() => "signin" as any} navItems={[]} />}>
               <Route path="/signin" element={<div data-testid="auth-outlet">Sign In Screen</div>} />
             </Route>
           </Routes>
@@ -179,10 +271,11 @@ describe("DesktopLayout on Auth Routes", () => {
       root.render(
         <MemoryRouter initialEntries={["/register"]}>
           <Routes>
-            <Route
-              element={<DesktopLayout getRouteId={() => "register" as any} navItems={[]} />}
-            >
-              <Route path="/register" element={<div data-testid="auth-outlet">Register Screen</div>} />
+            <Route element={<DesktopLayout getRouteId={() => "register" as any} navItems={[]} />}>
+              <Route
+                path="/register"
+                element={<div data-testid="auth-outlet">Register Screen</div>}
+              />
             </Route>
           </Routes>
         </MemoryRouter>,

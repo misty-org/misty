@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { ProviderBrandIcon } from "../../../../misty-apps/apps/shared/ProviderBrandIcon";
-import { providers, type ProviderId } from "../../../../misty-apps/apps/shared/providers";
-import "../../../../misty-apps/apps/shared/providers.css";
+import { ProviderBrandIcon } from "../../.././apps/shared/ProviderBrandIcon";
+import { providers, type ProviderId } from "../../.././apps/shared/providers";
+import "../../.././apps/shared/providers.css";
 
 /** Platforms without embedded websites open the same providers externally. */
 export default function EmbeddedInbox() {

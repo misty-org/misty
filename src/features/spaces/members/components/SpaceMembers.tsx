@@ -1,4 +1,6 @@
-export type { MemberAction } from "@/api/spaces/dto/types/components/SpaceMembers";
+import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+
+export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
 import { SystemErrorActivity } from "@/features/activity";
 import { useAuth } from "@/features/auth";

@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   SidebarDeviceGroup,
   sidebarStyles,
-} from "../../../../../misty-apps/apps/files/workspace/explorer/components/ExplorerSidebarSupport";
+} from "../../../.././apps/files/workspace/explorer/components/ExplorerSidebarSupport";
 
 afterEach(cleanup);
 

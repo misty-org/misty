@@ -71,13 +71,13 @@ pub mod settings;
 mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 pub mod ssh_terminal;
 pub mod storage;
 pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]

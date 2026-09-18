@@ -1,0 +1,27 @@
+name: Workspace checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: npm
+      - uses: dtolnay/rust-toolchain@1.91.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- setup
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- sdk check
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- check tasks
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- check cli
+      - run: npm run typecheck
+      - run: npm run build:desktop
+      - run: cargo run --manifest-path cli/Cargo.toml --locked -- apps build planner --desktop-only

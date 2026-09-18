@@ -13,16 +13,16 @@ export {
   type ExtensionCatalogLink,
   type ExtensionIncludedTool,
   type ExtensionPresentation,
-} from "../../../vendor/misty-apps/interface/catalog";
+} from "../../../apps/interface/catalog";
 export {
   ExtensionArtwork,
   ExtensionVerifiedBadge,
   type ExtensionArtworkSize,
   type ExtensionArtworkStyle,
-} from "../../../vendor/misty-apps/interface/react";
+} from "../../../apps/interface/react";
 export {
   StoreSurface,
   type StoreSection,
   type StoreSurfaceEntry,
   type StoreSurfaceProps,
-} from "../../../vendor/misty-apps/interface/store";
+} from "../../../apps/interface/store";

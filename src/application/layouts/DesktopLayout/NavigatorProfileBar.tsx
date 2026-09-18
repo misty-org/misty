@@ -5,7 +5,7 @@ import { HelpMenu } from "./HelpMenu";
 import { ProfileNavButton } from "./NavRail";
 import {
   navigatorFloatingIslandClass,
-  navigatorFocusRingClass,
+  navigatorHierarchyTriggerClass,
   navigatorIslandActionClass,
 } from "./styles";
 
@@ -19,7 +19,7 @@ export function NavigatorProfileBar(props: {
 }) {
   return (
     <div
-      className="relative z-20 mx-2 mb-2 mt-1 shrink-0"
+      className="relative z-20 mx-3 mb-2 mt-1 shrink-0"
       data-navigator-profile-bar="fixed"
       data-misty-window-drag-block="true"
       onPointerDown={(event) => event.stopPropagation()}
@@ -30,13 +30,11 @@ export function NavigatorProfileBar(props: {
           open={props.profileOpen}
           onClick={props.onProfileClick}
           className={cn(
-            "group/profile relative flex min-w-0 items-center rounded-lg border-0 bg-transparent",
-            "text-sm text-cream no-underline outline-none transition-colors",
-            "misty-navigator-row-target h-9 flex-1 justify-start gap-2 px-1.5 hover:bg-charcoal-active",
-            navigatorFocusRingClass,
-            props.profileOpen && "bg-charcoal-active",
+            navigatorHierarchyTriggerClass,
+            "group/profile relative flex-1 justify-start text-sm font-semibold tracking-[-0.015em] hover:bg-charcoal-active focus-visible:bg-charcoal-active",
+            props.profileOpen && "bg-charcoal-active text-cream-bright",
           )}
-          avatarClassName="size-7 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
+          avatarClassName="size-6 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
           showAccountName
         />
         <TooltipProvider delayDuration={450}>

@@ -34,12 +34,21 @@ import {
   syncBrowserWebview,
 } from "@/features/webviews/browserRuntime";
 import { nativeRpcBackend } from "./nativeBackend";
+import {
+  providerAccountProfile,
+  rememberProviderAccount,
+  sharedProviderAccount,
+  unlinkProviderAccount,
+} from "./providerAccounts";
 import { browserProfileId, constrainBrowserBounds, providerOAuthCallback } from "./browserIdentity";
 import { AppRpcError, type AppRpcScope } from "./session";
 import type { BrowserRpcBackend } from "./browser";
 
 // Account removal spans workspace panes, while authority remains with each owning backend.
-const profileViews = new Map<string, Set<() => Promise<void>>>();
+const profileViews = new Map<
+  string,
+  Set<{ provider?: MistyBrowserProvider; close: () => Promise<void> }>
+>();
 const removingProfiles = new Set<string>();
 export { browserProfileId, constrainBrowserBounds, providerOAuthCallback } from "./browserIdentity";
 export function createBrowserRpcBackend(
@@ -190,7 +199,7 @@ export function createBrowserRpcBackend(
       scope.assert("browser.navigate");
       if (!providerBelongsToApp(scope.identity.appId, provider.id))
         throw new AppRpcError("provider_denied", "This provider does not belong to this App.");
-      const profileId = await browserProfileId(
+      const profileId = await providerAccountProfile(
         serverBase,
         scope.identity.accountId,
         scope.identity.appId,
@@ -201,9 +210,23 @@ export function createBrowserRpcBackend(
         throw new AppRpcError("account_busy", "This website account is already being removed.");
       removingProfiles.add(profileId);
       try {
-        await Promise.all([...(profileViews.get(profileId) ?? [])].map((close) => close()));
-        await nativeRpcBackend.invoke("browser_profile_remove", { profileId });
-        forgetProviderProfile(profileId);
+        const shared = sharedProviderAccount(provider);
+        await Promise.all(
+          [...(profileViews.get(profileId) ?? [])]
+            .filter(
+              (view) =>
+                !shared ||
+                (view.provider?.id === provider.id &&
+                  view.provider.accountId === provider.accountId),
+            )
+            .map((view) => view.close()),
+        );
+        scope.assert("browser.navigate");
+        if (!shared) {
+          await nativeRpcBackend.invoke("browser_profile_remove", { profileId });
+          forgetProviderProfile(profileId);
+        }
+        unlinkProviderAccount(profileId, provider);
       } finally {
         removingProfiles.delete(profileId);
       }
@@ -249,7 +272,7 @@ export function createBrowserRpcBackend(
         inherited.serverBase === serverBase
           ? inherited.profileId
           : provider
-            ? await browserProfileId(
+            ? await providerAccountProfile(
                 serverBase,
                 scope.identity.accountId,
                 scope.identity.appId,
@@ -263,6 +286,7 @@ export function createBrowserRpcBackend(
       scope.assert();
       if (removingProfiles.has(profileId))
         throw new AppRpcError("account_busy", "This website account is being removed.");
+      if (provider) rememberProviderAccount(profileId, provider);
       if (
         inherited?.popupInstanceKey &&
         inherited.ownerAccountId === scope.identity.accountId &&
@@ -283,8 +307,8 @@ export function createBrowserRpcBackend(
             serverBase,
           })
         : () => {};
-      const closeProfileView = () => this.close(input.id);
-      const peers = profileViews.get(profileId) ?? new Set<() => Promise<void>>();
+      const closeProfileView = { provider, close: () => this.close(input.id) };
+      const peers = profileViews.get(profileId) ?? new Set<typeof closeProfileView>();
       peers.add(closeProfileView);
       profileViews.set(profileId, peers);
       const release = () => {

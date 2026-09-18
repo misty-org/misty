@@ -60,3 +60,21 @@ it("uses structured SSH requests and rejects unknown native commands", async () 
   await expect(f.backend.invoke("constructor")).rejects.toThrow("Unknown terminal");
   expect(f.invoke).toHaveBeenCalledOnce();
 });
+it("falls back to host terminal_create when packaged service fails", async () => {
+  const f = fixture();
+  f.invoke.mockImplementation(async (cmd) => {
+    if (cmd === "terminal_service_create") throw new Error("Processor verification failed.");
+    if (cmd === "terminal_create") return "host-session-123";
+    return null;
+  });
+  const id = await f.backend.invoke("terminal_create", { request: {} });
+  expect(id).toBe("host-session-123");
+  expect(f.invoke).toHaveBeenCalledWith("terminal_service_create", expect.anything());
+  expect(f.invoke).toHaveBeenCalledWith("terminal_create", expect.anything());
+
+  await f.backend.invoke("terminal_write", { sessionId: "host-session-123", data: "ls\n" });
+  expect(f.invoke).toHaveBeenLastCalledWith("terminal_write", { sessionId: "host-session-123", data: "ls\n" });
+
+  await f.backend.invoke("terminal_kill", { sessionId: "host-session-123" });
+  expect(f.invoke).toHaveBeenLastCalledWith("terminal_kill", { sessionId: "host-session-123" });
+});

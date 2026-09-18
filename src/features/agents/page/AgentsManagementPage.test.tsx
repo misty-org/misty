@@ -30,7 +30,7 @@ describe("Agents conversation page", () => {
     document.body.innerHTML = "";
   });
 
-  it("presents the native agent roster without another composer", async () => {
+  it("presents a conversation composer beside the native agent roster", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -43,7 +43,7 @@ describe("Agents conversation page", () => {
     );
 
     expect(container.textContent).toContain("Misty");
-    expect(container.querySelector('[aria-label="Message Misty"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Message Misty"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Your agents"]')).not.toBeNull();
     expect(container.textContent).not.toContain("Definitions");
     expect(container.textContent).not.toContain("Edit Scout");
@@ -83,9 +83,12 @@ describe("Agents conversation page", () => {
       ),
     );
 
-    const activityButton = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === "Activity",
+    await act(async () =>
+      (container.querySelector('[aria-label="Agent details"]') as HTMLButtonElement)?.click(),
     );
+    const activityButton = container.querySelector(
+      '[aria-label="View agent activity"]',
+    ) as HTMLButtonElement;
     await act(async () => activityButton?.click());
     const connectionButton = [...container.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Tool connections"),

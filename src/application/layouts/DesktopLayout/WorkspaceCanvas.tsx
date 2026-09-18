@@ -492,6 +492,15 @@ export function WorkspaceCanvas(props: {
     return () => window.removeEventListener("misty:focus-workspace-tab", focusRequestedTab);
   }, [openSelectedTab]);
 
+  // A lone Agents surface supplies its own compact titlebar. Keep workspace
+  // navigation when other tabs/panes/windows or Windows caption buttons need it.
+  const standaloneAgents =
+    leaves.length === 1 &&
+    allLayoutViews(layout).length === 1 &&
+    (leaves[0].tabs[0]?.surfaceId === "agents" || leaves[0].tabs[0]?.groupKey === "app:agents") &&
+    virtualWindows.length <= 1 &&
+    !props.windowsTitlebarControls;
+
   return (
     <div
       ref={windowTransitionRef}
@@ -500,34 +509,36 @@ export function WorkspaceCanvas(props: {
       data-workspace-scope={activeScopeKey}
       data-virtual-window={activeVirtualWindowId}
     >
-      <WorkspaceLayoutTabs
-        titlebarInsets={props.titlebarInsets}
-        windowsTitlebarControls={props.windowsTitlebarControls}
-        focusedPaneId={layout.focusedPaneId}
-        lastUsedTabByGroup={lastUsedTabByGroup}
-        onOpen={openTab}
-        onClose={closeWorkspaceTab}
-        onOpenNewTab={openNewTab}
-        onNewTab={() => openTab(useWorkspaceStore.getState().newLayoutTab())}
-        onCloseLayoutTab={(id) => {
-          if (useWorkspaceStore.getState().closeLayoutTab(id)) navigateToActiveLayoutTab();
-        }}
-        onMoveTab={moveTab}
-        onDockTab={dockTab}
-        onSplitPane={splitWorkspacePane}
-        onClosePane={(paneId) => {
-          closePane(paneId);
-          navigateToActiveLayoutTab();
-        }}
-        virtualWindows={virtualWindows}
-        activeVirtualWindowId={activeVirtualWindowId}
-        canReopenVirtualWindow={canReopenVirtualWindow}
-        onSelectVirtualWindow={selectVirtualWindow}
-        onCreateVirtualWindow={createWorkspaceVirtualWindow}
-        onCloseVirtualWindow={closeWorkspaceVirtualWindow}
-        onReopenVirtualWindow={reopenWorkspaceVirtualWindow}
-        onResizeSplit={updateSplitRatio}
-      />
+      {!standaloneAgents && (
+        <WorkspaceLayoutTabs
+          titlebarInsets={props.titlebarInsets}
+          windowsTitlebarControls={props.windowsTitlebarControls}
+          focusedPaneId={layout.focusedPaneId}
+          lastUsedTabByGroup={lastUsedTabByGroup}
+          onOpen={openTab}
+          onClose={closeWorkspaceTab}
+          onOpenNewTab={openNewTab}
+          onNewTab={() => openTab(useWorkspaceStore.getState().newLayoutTab())}
+          onCloseLayoutTab={(id) => {
+            if (useWorkspaceStore.getState().closeLayoutTab(id)) navigateToActiveLayoutTab();
+          }}
+          onMoveTab={moveTab}
+          onDockTab={dockTab}
+          onSplitPane={splitWorkspacePane}
+          onClosePane={(paneId) => {
+            closePane(paneId);
+            navigateToActiveLayoutTab();
+          }}
+          virtualWindows={virtualWindows}
+          activeVirtualWindowId={activeVirtualWindowId}
+          canReopenVirtualWindow={canReopenVirtualWindow}
+          onSelectVirtualWindow={selectVirtualWindow}
+          onCreateVirtualWindow={createWorkspaceVirtualWindow}
+          onCloseVirtualWindow={closeWorkspaceVirtualWindow}
+          onReopenVirtualWindow={reopenWorkspaceVirtualWindow}
+          onResizeSplit={updateSplitRatio}
+        />
+      )}
       {layoutTabs(layout).map((tab) => {
         const active = tab.id === layout.activeLayoutTabId;
         return (

@@ -22,7 +22,7 @@
 !template.env
 
 **/.venv
-scripts/.signing.env
+cli/tasks/.signing.env
 .windows-test/
 
 **/.cache/
@@ -194,3 +194,18 @@ node_modules/@misty/desktop
 # Screenshots used by the Discover app cards.
 !src/assets/discover/journal.png
 !src/assets/discover/library.webp
+
+# Consolidated workspace build products
+**/.build/
+**/*.tsbuildinfo
+/apps/public/official-apps/
+/apps/public/official-app-assets/
+!apps/**/*.svg
+!apps/**/*.png
+!apps/**/*.webp
+!examples/**/*.svg
+
+# Agent avatars and reduced-motion posters are source assets.
+!src/shared/assets/agents/*.webp
+!src/shared/assets/agents/*.png
+!src/shared/assets/agents/*.svg
