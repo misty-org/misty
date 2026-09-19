@@ -1,7 +1,13 @@
-import { Badge } from "./badge";
+import { Badge, type BadgeProps } from "./badge";
 import { cn } from "./utils";
-import type { StatusBadgeProps, StatusTone } from "@/shared/ui/model/types/status-badge";
-export type { StatusBadgeProps, StatusTone } from "@/shared/ui/model/types/status-badge";
+
+export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger";
+
+export type StatusBadgeProps = BadgeProps & {
+  dot?: boolean;
+  status?: StatusTone;
+};
+
 export { StatusBadge };
 
 const statusClasses: Record<StatusTone, string> = {

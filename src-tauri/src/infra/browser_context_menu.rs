@@ -41,7 +41,8 @@ pub(super) struct AvailabilityReceipt {
 }
 
 pub(super) fn publish_availability(webview: Webview, state: State<'_, BrowserSessionState>, request: AvailabilityRequest) -> Result<(), String> {
-    if webview.label() != "main" { return Err("Only Misty's trusted shell can publish action availability.".into()); }
+    if webview.label() != "main" && !webview.label().starts_with("misty-agent-") { return Err("Only Misty's trusted shell can publish action availability.".into()); }
+    if browser_owner_label(webview.app_handle(),&request.id)!=webview.window().label(){return Err("Browser belongs to another window".into())}
     if request.account.len() > 320 || request.account.is_empty() || request.capabilities.len() > 4 || request.origins.is_empty() || request.origins.len() > 32 ||
         request.capabilities.iter().any(|c| !["inbox.read", "inbox.draft", "inbox.send", "tasks.create"].contains(&c.as_str())) {
         return Err("Invalid browser action availability.".into());
@@ -148,17 +149,18 @@ fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
         available_suggestions(receipt, &context)
     };
     let actions = menu_actions(&context, task, reply);
-    let window = app.get_window("main").ok_or("Misty window is unavailable")?;
+    let owner=browser_owner_label(app,&context.id);
+    let window = app.get_window(&owner).ok_or("Misty window is unavailable")?;
     let cursor = window.cursor_position().map_err(|e| e.to_string())?;
     let origin = window.inner_position().map_err(|e| e.to_string())?;
     let size = window.inner_size().map_err(|e| e.to_string())?;
     // Fractions of the host client area survive renderer zoom and display scale.
     let x = ((cursor.x - origin.x as f64) / size.width.max(1) as f64).clamp(0.0, 1.0);
     let y = ((cursor.y - origin.y as f64) / size.height.max(1) as f64).clamp(0.0, 1.0);
-    *app.state::<BrowserSessionState>().context_menu.lock().map_err(|_| "Browser menu is unavailable")? = Some(PendingMenu {
+    app.state::<BrowserSessionState>().context_menu.lock().map_err(|_| "Browser menu is unavailable")?.insert(owner.clone(),PendingMenu {
         key: key.clone(), created: std::time::Instant::now(), context, actions: actions.clone(),
     });
-    app.emit_to("main", "misty://browser-context-menu", MenuPresentation { key, x, y, actions }).map_err(|e| e.to_string())
+    app.emit_to(&owner, "misty://browser-context-menu", MenuPresentation { key, x, y, actions }).map_err(|e| e.to_string())
 }
 
 fn menu_action_allowed(menu: &PendingMenu, key: &str, action: &str) -> bool {
@@ -167,13 +169,13 @@ fn menu_action_allowed(menu: &PendingMenu, key: &str, action: &str) -> bool {
 }
 
 pub(super) fn select(app: &AppHandle, webview: &Webview, key: &str, action: &str) -> Result<(), String> {
-    if webview.label() != "main" { return Err("Only Misty's trusted shell can select a browser action.".into()); }
+    if webview.label() != "main" && !webview.label().starts_with("misty-agent-") { return Err("Only Misty's trusted shell can select a browser action.".into()); }
     let state = app.state::<BrowserSessionState>();
     let mut context = {
         let mut pending = state.context_menu.lock().map_err(|_| "Browser menu is unavailable")?;
-        let menu = pending.as_ref().ok_or("The browser menu has closed.")?;
+        let menu = pending.get(webview.window().label()).ok_or("The browser menu has closed.")?;
         if !menu_action_allowed(menu, key, action) { return Err("The browser menu changed. Open it again.".into()); }
-        pending.take().unwrap().context
+        pending.remove(webview.window().label()).unwrap().context
     };
     let view = app.get_webview(&webview_label(&context.id)?).ok_or("The browser view has closed.")?;
     {
@@ -193,11 +195,11 @@ pub(super) fn select(app: &AppHandle, webview: &Webview, key: &str, action: &str
         "inspect" => view.open_devtools(),
         "ask" | "create-task" | "prepare-reply" | "task-and-reply" => {
             context.intent = action.into();
-            app.emit_to("main", "misty://browser-ask-context", context).map_err(|e| e.to_string())?;
+            app.emit_to(webview.window().label(), "misty://browser-ask-context", context).map_err(|e| e.to_string())?;
         }
         "open-link" | "open-image" => {
             let url = if action == "open-link" { context.page.link } else { context.page.image };
-            app.emit_to("main", "misty://browser-popup", json!({"sourceId": context.id, "url": url})).map_err(|e| e.to_string())?;
+            app.emit_to(webview.window().label(), "misty://browser-popup", json!({"sourceId": context.id, "url": url})).map_err(|e| e.to_string())?;
         }
         "copy-link" | "copy-image-link" => {
             let text = if action == "copy-link" { context.page.link } else { context.page.image };

@@ -2,7 +2,6 @@ import { deploymentStorageKey } from "@/api/deployment/api";
 import { ApiRequestError } from "@/api/client/errors";
 import { appsApi, type OfficialApp, type SpaceAppInstallation } from "@/api/apps";
 import { assertStableApiSession, readApiSessionGeneration } from "@/api/client";
-import { useSpacesStore } from "@/features/spaces/core";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -11,271 +10,159 @@ import { isNavigatorAppId, type NavigatorAppId } from "@/features/workspace/navi
 type Installation = SpaceAppInstallation;
 interface AppsState {
   accountId: string;
-  spaceId: string;
   catalog: OfficialApp[];
   installations: Installation[];
-  bySpace: Record<string, Installation[]>;
-  bySpaceErrors: Record<string, string>;
-  prefetchSpaceAccess: (retryFailed?: boolean) => Promise<void>;
   ready: boolean;
   loading: boolean;
   actionAppId: string;
   error: string;
-  selectSpace: (accountId: string, spaceId: string) => void;
-  load: (accountId: string, force?: boolean, spaceId?: string) => Promise<void>;
-  invalidate: (accountId: string, spaceId: string) => Promise<void>;
+  selectAccount: (accountId: string) => void;
+  load: (accountId: string, force?: boolean, legacySpaceId?: string) => Promise<void>;
+  invalidate: (accountId: string, legacySpaceId?: string) => Promise<void>;
   adoptOnboarding: (accountId: string, installations: Installation[]) => void;
   install: (app: OfficialApp) => Promise<void>;
-  setSpaceEnabled: (app: OfficialApp, spaceId: string, enabled: boolean) => Promise<void>;
+  uninstall: (appId: string) => Promise<void>;
   setPinned: (appId: string, pinned: boolean) => Promise<void>;
   reorder: (appIds: string[]) => Promise<void>;
-  uninstall: (appId: string) => Promise<void>;
   reset: () => void;
 }
 const emptyState = () => ({
   accountId: "",
-  spaceId: "",
   catalog: [] as OfficialApp[],
   installations: [] as Installation[],
-  bySpace: {} as Record<string, Installation[]>,
-  bySpaceErrors: {} as Record<string, string>,
   ready: false,
   loading: false,
   actionAppId: "",
   error: "",
 });
-export function canManageSpaceApps(spaceId: string): boolean {
-  const space = useSpacesStore.getState().spaces.find((item) => item.id === spaceId);
-  return !!space && (space.role === "owner" || space.permissions?.["apps.manage"] === true);
-}
-function pinKey(accountId: string, spaceId: string, appId: string) {
-  return deploymentStorageKey(`misty:space-app-pins:v1:${accountId}:${spaceId}:${appId}`);
-}
-function withPersonalPins(accountId: string, spaceId: string, apps: Installation[]) {
-  return apps.map((app) => ({
-    ...app,
-    pinned: localStorage.getItem(pinKey(accountId, spaceId, app.app_id)) !== "false",
-  }));
-}
+const pinKey = (accountId: string, appId: string) =>
+  deploymentStorageKey(`misty:personal-app-pins:v1:${accountId}:${appId}`);
 export const useAppsStore = create<AppsState>((set, get) => {
   let epoch = 0;
-  const requests = new Map<string, Promise<void>>();
-  let catalogRequest: ReturnType<typeof appsApi.catalog> | undefined;
-  const invalidations = new Map<string, Promise<void>>();
-  let cachedCatalog: Awaited<ReturnType<typeof appsApi.catalog>> | undefined;
-  let catalogLoadedAt: number | null = null;
+  let pending: Promise<void> | undefined;
+  let refresh: Promise<void> | undefined;
   let retryAfter = 0;
-  function loadCatalog() {
-    if (catalogLoadedAt !== null && Date.now() - catalogLoadedAt < 15_000)
-      return Promise.resolve(cachedCatalog!);
-    if (catalogRequest) return catalogRequest;
-    const ownEpoch = epoch;
-    const pending = appsApi
-      .catalog()
-      .then((result) => {
-        if (epoch === ownEpoch) {
-          cachedCatalog = result;
-          catalogLoadedAt = Date.now();
-        }
-        return result;
-      })
-      .finally(() => {
-        if (catalogRequest === pending) catalogRequest = undefined;
-      });
-    catalogRequest = pending;
-    return pending;
-  }
-  function assertIdentity(accountId: string, generation: number, ownEpoch: number) {
+  function identity(account: string, generation: number, revision: number) {
     assertStableApiSession(generation);
-    if (get().accountId !== accountId || epoch !== ownEpoch)
+    if (get().accountId !== account || epoch !== revision)
       throw new Error("The account changed. Try again.");
   }
-  function accept(spaceId: string, apps: Installation[]) {
-    const incoming = withPersonalPins(get().accountId, spaceId, apps);
-    const previous = get().bySpace[spaceId];
-    const installations =
-      JSON.stringify(previous) === JSON.stringify(incoming) ? previous! : incoming;
-    set((state) => ({
-      bySpace:
-        state.bySpace[spaceId] === installations
-          ? state.bySpace
-          : { ...state.bySpace, [spaceId]: installations },
-      bySpaceErrors: { ...state.bySpaceErrors, [spaceId]: "" },
-      ...(state.spaceId === spaceId
-        ? { installations, ready: true, loading: false, error: "" }
-        : {}),
+  function accept(apps: Installation[]) {
+    const incoming = apps.map((app) => ({
+      ...app,
+      pinned: localStorage.getItem(pinKey(get().accountId, app.app_id)) !== "false",
     }));
+    set({
+      installations:
+        JSON.stringify(incoming) === JSON.stringify(get().installations)
+          ? get().installations
+          : incoming,
+      ready: true,
+      loading: false,
+      error: "",
+    });
   }
-  async function change(
-    appId: string,
-    run: (spaceId: string) => Promise<unknown>,
-    targetSpaceId = get().spaceId,
-  ) {
+  async function change(appId: string, action: () => Promise<unknown>) {
     const { accountId } = get();
-    const spaceId = targetSpaceId;
-    if (!canManageSpaceApps(spaceId)) throw new Error("Ask a Space manager to change its apps.");
+    if (!accountId) throw new Error("Sign in to manage your apps.");
     if (get().actionAppId) throw new Error("Wait for the current app change to finish.");
-    const generation = readApiSessionGeneration(),
-      ownEpoch = epoch;
+    const revision = epoch,
+      generation = readApiSessionGeneration();
     set({ actionAppId: appId, error: "" });
     try {
-      await run(spaceId);
-      assertIdentity(accountId, generation, ownEpoch);
-      const result = await appsApi.installations(spaceId);
-      assertIdentity(accountId, generation, ownEpoch);
-      accept(spaceId, result.apps);
+      await action();
+      identity(accountId, generation, revision);
+      const result = await appsApi.installations();
+      identity(accountId, generation, revision);
+      accept(result.apps);
     } catch (error) {
-      if (get().accountId === accountId && ownEpoch === epoch) set({ error: errorText(error) });
+      if (epoch === revision) set({ error: errorText(error) });
       throw error;
     } finally {
-      if (get().accountId === accountId && ownEpoch === epoch) set({ actionAppId: "" });
+      if (epoch === revision) set({ actionAppId: "" });
     }
   }
   return {
     ...emptyState(),
-    selectSpace(accountId, spaceId) {
-      if (get().accountId !== accountId) {
-        epoch++;
-        requests.clear();
-        catalogRequest = undefined;
-        cachedCatalog = undefined;
-        invalidations.clear();
-        catalogLoadedAt = null;
-        retryAfter = 0;
-        set(emptyState());
+    selectAccount(accountId) {
+      if (accountId !== get().accountId) {
+        get().reset();
+        set({ accountId });
       }
-      const saved = get().bySpace[spaceId];
-      set({
-        accountId,
-        spaceId,
-        installations: saved ?? [],
-        ready: !!saved,
-        loading: false,
-        error: "",
-      });
-      void get().load(accountId, false, spaceId);
+      if (accountId) void get().load(accountId);
     },
-    async load(accountId, force = false, spaceId = get().spaceId) {
+    async load(accountId, force = false) {
       if (!accountId) return;
-      if (get().accountId !== accountId) {
-        epoch++;
-        requests.clear();
-        catalogRequest = undefined;
-        cachedCatalog = undefined;
-        invalidations.clear();
-        catalogLoadedAt = null;
-        retryAfter = 0;
-        set({ ...emptyState(), accountId, spaceId });
+      if (accountId !== get().accountId) {
+        get().reset();
+        set({ accountId });
       }
-      if (!force && get().bySpace[spaceId] && catalogLoadedAt !== null) return;
-      if (Date.now() < retryAfter) return;
-      const key = `${accountId}:${spaceId}`;
-      const pending = requests.get(key);
       if (pending) return pending;
-      const generation = readApiSessionGeneration(),
-        ownEpoch = epoch;
-      if (spaceId === get().spaceId) set({ loading: true });
-      const request: Promise<void> = (async () => {
+      if ((get().ready && !force) || Date.now() < retryAfter) return;
+      const revision = epoch,
+        generation = readApiSessionGeneration();
+      set({ loading: true, error: "" });
+      const operation = (async () => {
         try {
-          const [catalog, installations] = await Promise.all([
-            loadCatalog(),
-            spaceId
-              ? appsApi.installations(spaceId)
-              : Promise.resolve({ apps: [] as Installation[] }),
+          const [catalog, installed] = await Promise.all([
+            appsApi.catalog(),
+            appsApi.installations(),
           ]);
-          assertIdentity(accountId, generation, ownEpoch);
-          const incomingCatalog = catalog.apps.filter((app) => app.id !== "transfers");
-          if (JSON.stringify(get().catalog) !== JSON.stringify(incomingCatalog))
-            set({ catalog: incomingCatalog });
-          accept(spaceId, installations.apps);
+          identity(accountId, generation, revision);
+          set({
+            catalog: catalog.apps.filter((app) => app.id !== "transfers" && app.id !== "agents"),
+          });
+          accept(installed.apps);
         } catch (error) {
-          if (get().accountId === accountId && epoch === ownEpoch) {
-            set((state) => {
-              const bySpace = { ...state.bySpace };
-              const accessLost =
-                error instanceof ApiRequestError && [401, 403, 404].includes(error.status);
-              if (error instanceof ApiRequestError && error.status === 429)
-                retryAfter = Math.max(retryAfter, Date.now() + (error.retryAfterMs ?? 60_000));
-              if (accessLost) delete bySpace[spaceId];
-              const saved = accessLost ? [] : state.installations;
-              return {
-                bySpace,
-                bySpaceErrors: { ...state.bySpaceErrors, [spaceId]: errorText(error) },
-                ...(state.spaceId === spaceId
-                  ? {
-                      installations: saved,
-                      ready: bySpace[spaceId] !== undefined,
-                      loading: false,
-                      error: errorText(error),
-                    }
-                  : {}),
-              };
-            });
-          }
+          if (epoch !== revision) return;
+          const lost = error instanceof ApiRequestError && [401, 403, 404].includes(error.status);
+          if (error instanceof ApiRequestError && error.status === 429)
+            retryAfter = Date.now() + (error.retryAfterMs ?? 60000);
+          set({
+            loading: false,
+            error: errorText(error),
+            ...(lost ? { ready: false, installations: [] } : {}),
+          });
         } finally {
-          if (epoch === ownEpoch) requests.delete(key);
+          if (epoch === revision) pending = undefined;
         }
       })();
-      requests.set(key, request);
-      return request;
+      pending = operation;
+      return operation;
     },
-    async invalidate(accountId, spaceId) {
-      const key = `${accountId}:${spaceId}`;
-      const queued = invalidations.get(key);
-      if (queued) return queued;
-      const ownEpoch = epoch;
-      const pending = requests.get(key);
-      const refresh = (async () => {
+    async invalidate(accountId) {
+      if (refresh) return refresh;
+      const revision = epoch;
+      const operation = (async () => {
         if (pending) await pending;
-        if (epoch === ownEpoch && get().accountId === accountId)
-          await get().load(accountId, true, spaceId);
+        if (epoch === revision && get().accountId === accountId) await get().load(accountId, true);
       })().finally(() => {
-        if (invalidations.get(key) === refresh) invalidations.delete(key);
+        if (refresh === operation) refresh = undefined;
       });
-      invalidations.set(key, refresh);
-      return refresh;
+      refresh = operation;
+      return operation;
     },
-    async prefetchSpaceAccess(retryFailed = false) {
-      const { accountId } = get();
-      if (!accountId) return;
-      await Promise.all(
-        useSpacesStore.getState().spaces.map(({ id }) => {
-          if (get().bySpace[id] || (!retryFailed && get().bySpaceErrors[id])) return;
-          return get().load(accountId, false, id);
-        }),
-      );
+    adoptOnboarding(accountId, apps) {
+      if (accountId !== get().accountId) {
+        get().reset();
+        set({ accountId });
+      }
+      accept(apps);
     },
-    adoptOnboarding(accountId, installations) {
-      get().selectSpace(accountId, installations[0]?.space_id ?? "");
-      if (installations[0]) accept(installations[0].space_id, installations);
-    },
-    setSpaceEnabled: (app, spaceId, enabled) =>
-      change(
-        app.id,
-        (id) =>
-          enabled
-            ? appsApi.install(id, app.id, app.permission_version)
-            : appsApi.uninstall(id, app.id),
-        spaceId,
-      ),
-    install: (app) =>
-      change(app.id, (spaceId) => appsApi.install(spaceId, app.id, app.permission_version)),
-    uninstall: (appId) => change(appId, (spaceId) => appsApi.uninstall(spaceId, appId)),
-    reorder: (appIds) => change("order", (spaceId) => appsApi.reorder(spaceId, appIds)),
+    install: (app) => change(app.id, () => appsApi.install("", app.id, app.permission_version)),
+    uninstall: (id) => change(id, () => appsApi.uninstall("", id)),
+    reorder: (ids) => change("order", () => appsApi.reorder("", ids)),
     async setPinned(appId, pinned) {
-      const { accountId, spaceId, installations } = get();
-      if (!installations.some((app) => app.app_id === appId && app.state === "installed")) return;
-      localStorage.setItem(pinKey(accountId, spaceId, appId), String(pinned));
-      accept(spaceId, installations);
+      if (!get().installations.some((app) => app.app_id === appId && app.state === "installed"))
+        return;
+      localStorage.setItem(pinKey(get().accountId, appId), String(pinned));
+      accept(get().installations);
     },
     reset() {
       epoch++;
-      catalogRequest = undefined;
-      cachedCatalog = undefined;
-      invalidations.clear();
-      catalogLoadedAt = null;
+      pending = undefined;
+      refresh = undefined;
       retryAfter = 0;
-      requests.clear();
       set(emptyState());
     },
   };
@@ -306,4 +193,8 @@ export function navigatorAppIdForOfficialApp(appId: string): NavigatorAppId | nu
 }
 export function officialAppIdForNavigator(appId: NavigatorAppId): string {
   return appId === "social" ? "chat" : appId;
+}
+
+export function resetAppsAccountState(): void {
+  useAppsStore.getState().reset();
 }

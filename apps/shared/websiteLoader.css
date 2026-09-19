@@ -1,0 +1,23 @@
+.website-loader {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--color-cream-muted, #999);
+}
+.website-loader-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: website-loader-spin 800ms linear infinite;
+}
+@keyframes website-loader-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .website-loader-spinner { animation-duration: 1800ms; }
+}

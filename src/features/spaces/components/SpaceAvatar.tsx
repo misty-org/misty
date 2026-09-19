@@ -2,19 +2,28 @@ import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, cn } from "@/shared/ui";
 
-export function SpaceAvatar({ space, className }: { space: Space; className?: string }) {
+export function SpaceAvatar({
+  space,
+  className,
+  fallbackClassName,
+}: {
+  space: Space;
+  className?: string;
+  fallbackClassName?: string;
+}) {
   const initials = spaceInitials(space.name);
 
   return (
     <Avatar
-      className={cn("shrink-0 rounded-full", className)}
+      className={cn("shrink-0 rounded-[25%]", className)}
       aria-label={`${space.name} default profile picture`}
     >
       <AvatarFallback
         className={cn(
-          "rounded-full text-[10px] font-bold",
+          "rounded-[inherit] text-[10px] font-bold",
           avatarColorClass(space.id),
           avatarInkClass,
+          fallbackClassName,
         )}
       >
         {initials}

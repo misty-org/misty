@@ -33,26 +33,13 @@ pub(super) trait Vault {
 pub(super) struct OsVault;
 impl Vault for OsVault {
     fn load(&self, key: &str) -> Result<Option<String>, String> {
-        match keyring::Entry::new(SERVICE, key)
-            .map_err(|_| "The OS credential vault is unavailable.")?
-            .get_password()
-        {
-            Ok(value) => Ok(Some(value)),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(_) => Err("Could not read this repository's OS credential.".into()),
-        }
+        crate::infra::credential_store::load(SERVICE, key).map_err(|error| error.to_string())
     }
     fn store(&self, key: &str, value: &str) -> Result<(), String> {
-        keyring::Entry::new(SERVICE, key)
-            .map_err(|_| "The OS credential vault is unavailable.")?
-            .set_password(value)
-            .map_err(|_| "Could not save this repository's OS credential.".into())
+        crate::infra::credential_store::store(SERVICE, key, value).map_err(|error| error.to_string())
     }
     fn delete(&self, key: &str) -> Result<(), String> {
-        keyring::Entry::new(SERVICE, key)
-            .map_err(|_| "The OS credential vault is unavailable.")?
-            .delete_credential()
-            .map_err(|_| "Could not remove the unused repository credential.".into())
+        crate::infra::credential_store::delete(SERVICE, key).map_err(|error| error.to_string())
     }
 }
 fn valid_owner(value: &str) -> bool {

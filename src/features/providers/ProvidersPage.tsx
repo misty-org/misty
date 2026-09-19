@@ -285,7 +285,7 @@ const ProvidersPane = memo(function ProvidersPane(props: { workspaceId: string }
             />
           ) : null}
           <p className="text-xs text-cream-muted">
-            Credentials stay in your system keychain and can be removed at any time.
+            Credentials are stored locally by Misty and can be removed at any time.
           </p>
         </div>
       </section>

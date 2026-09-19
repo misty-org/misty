@@ -2,8 +2,8 @@ import { apiRequest, readApiSessionGeneration } from "@/api/client";
 import { transferLibraryObject } from "@/api/spaces/library-upload";
 import type { MistyImageAttachment } from "./types";
 
-const accepted = new Set(["image/jpeg", "image/png", "image/webp"]);
-export const maxMistyImageBytes = 10 * 1024 * 1024;
+import { validateMistyImage, maxMistyImageBytes } from "./mistyImageValues";
+export { validateMistyImage, maxMistyImageBytes };
 
 interface Transfer {
   url: string;
@@ -22,12 +22,6 @@ interface AttachmentResponse {
   preview_url: string;
 }
 
-export function validateMistyImage(file: File) {
-  if (!accepted.has(file.type)) throw new Error(`${file.name} must be a JPEG, PNG, or WebP image.`);
-  if (file.size > maxMistyImageBytes) throw new Error(`${file.name} is larger than 10 MB.`);
-  if (!file.size) throw new Error(`${file.name} is empty.`);
-}
-
 export async function uploadMistyImage(
   file: File,
   input: {
@@ -39,8 +33,26 @@ export async function uploadMistyImage(
   validateMistyImage(file);
   const originalBytes = await file.arrayBuffer();
   const originalHash = await sha256(originalBytes);
-  const decoded = await decodeImage(file);
-  const rendition = await modelRendition(decoded, file.name);
+  if (input.scope === "visual_query" && !file.type.startsWith("image/"))
+    throw new Error("Visual search requires an image.");
+  const decoded = file.type.startsWith("image/")
+    ? await decodeImage(file)
+    : { width: 1, height: 1 };
+  let rendition: { file: File; width: number; height: number };
+  if ("image" in decoded) rendition = await modelRendition(decoded, file.name);
+  else if (file.type === "application/pdf") rendition = { file, width: 1, height: 1 };
+  else {
+    let text: string;
+    if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const { extractMistyDocumentText } = await import("./mistyDocumentText");
+      text = extractMistyDocumentText(originalBytes);
+    } else text = await file.text();
+    const renditionFile = new File([text], file.name + ".txt", { type: "text/plain" });
+    if (!text.trim()) throw new Error("This document has no readable text.");
+    if (renditionFile.size > 1024 * 1024)
+      throw new Error("This document contains more than 1 MB of text. Attach a smaller section.");
+    rendition = { file: renditionFile, width: 1, height: 1 };
+  }
   const modelBytes = await rendition.file.arrayBuffer();
   const modelHash = await sha256(modelBytes);
   const initiated = await apiRequest<{

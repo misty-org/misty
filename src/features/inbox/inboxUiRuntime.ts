@@ -7,6 +7,7 @@ export interface InboxUiRuntime {
   Picker: ComponentType<InboxAttachmentPickerProps>;
   openLink(url: string): Promise<unknown>;
   report(options: {
+    intent?: "background" | "user-action";
     error: unknown;
     scope: string;
     title: string;

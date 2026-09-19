@@ -2,7 +2,7 @@ import type { OfficialApp, SpaceAppInstallation } from "@/api/apps";
 import { officialAppNeedsReview } from "./appInstallationStatus";
 
 export function discoverAppName(app: OfficialApp) {
-  return app.id === "chat" ? "Social" : app.name;
+  return app.id === "chat" ? "Social" : app.id === "library" ? "Storage" : app.name;
 }
 
 export function discoverAppAction(

@@ -1,7 +1,7 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { MistyAppSDK, MistyBrowserEvent, MistyComponentContext } from "@misty/sdk";
-import { SDKBrowserView } from "../../../../../misty-apps/apps/browser/workspace/SDKBrowserView";
+import { SDKBrowserView } from "../../../.././apps/browser/workspace/SDKBrowserView";
 
 afterEach(() => {
   cleanup();
@@ -121,6 +121,18 @@ it("sleeps between layout changes, coalesces notifications, and releases observe
     view.handle,
     expect.objectContaining({
       bounds: { x: 80, y: 60, width: 650, height: 400 },
+    }),
+  );
+
+  // Split layout writes can move a native host without changing its own size.
+  browser.layout.mockClear();
+  rect = new DOMRect(180, 90, 650, 400);
+  act(() => window.dispatchEvent(new Event("misty:workspace-geometry-changed")));
+  await drain();
+  expect(browser.layout).toHaveBeenCalledExactlyOnceWith(
+    view.handle,
+    expect.objectContaining({
+      bounds: { x: 180, y: 90, width: 650, height: 400 },
     }),
   );
 

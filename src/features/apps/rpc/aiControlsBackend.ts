@@ -68,6 +68,7 @@ export function createAiControlsBackend(
           accountId: scope.identity.accountId,
           spaceId: scope.identity.spaceId,
           prompt: input.prompt,
+          agentId:input.agentId,
           conversationId: input.conversationId,
         });
         return;
@@ -81,9 +82,11 @@ export function createAiControlsBackend(
       await openMisty({
         accountId: scope.identity.accountId,
         spaceId: scope.identity.spaceId,
+        conversationId:input.conversationId,
         paneId: owner.paneId,
         surfaceId: owner.surface.surfaceId,
         prompt: input.prompt,
+          agentId:input.agentId,
         selection,
         context: owner.surface.getContext().map(mistyContextRef),
       });

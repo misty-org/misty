@@ -53,8 +53,8 @@ export interface PairingView {
 const refreshIntervalMs = 30_000;
 
 export function useConnectedDevices() {
-  const spaceId = useAppsStore(state => state.spaceId);
-  const installation = useAppsStore(state => state.bySpace[state.spaceId]?.find(app => app.app_id === "files"));
+  const spaceId = "personal";
+  const installation = useAppsStore(state => state.installations.find(app => app.app_id === "files"));
   const accountId = useAppsStore(state => state.accountId);
   const packaged = hasTauriInternals() && platform() === "macos";
   const [deviceInstance, setDeviceInstance] = useState("");
@@ -68,7 +68,7 @@ export function useConnectedDevices() {
       let detach = () => {};
       try {
         setServiceError("");
-        if (!spaceId || installation?.state !== "installed") throw new Error("Add Files to this Space to connect devices.");
+        if (installation?.state !== "installed" || installation.consent_required) throw new Error("Install Files and review its permissions to connect devices.");
         await withNativeDocumentService("files", spaceId, instance => new Promise<void>(resolve => {
           if (controller.signal.aborted) { resolve(); return; }
           setDeviceInstance(instance);

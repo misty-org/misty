@@ -23,6 +23,10 @@ export async function executeGlobalSearch(
     set({ results: [], searching: false, enriched: false, error: null, requestId });
     return;
   }
+  set({ results: [], searching: true, requestId });
+  // Local matches are available immediately; refresh installation metadata in
+  // the background instead of putting account/network work on every keystroke.
+  if (get().requestId !== requestId || get().accountId !== accountId) return;
   const filters = get().filters;
   const local = searchDocuments(buildLocalIndex(accountId), trimmed, 24).filter((result) =>
     searchResultMatchesFilters(result, filters),
@@ -77,7 +81,11 @@ export async function executeGlobalVisualSearch(
   if (!accountId || !attachmentId) return;
   set({ searching: true, error: null, requestId, results: [] });
   try {
-    const response = await globalMistyApi.visualSearch(attachmentId, query);
+    const { assertMistyAvailable, currentMistySpace } =
+      await import("@/features/misty/availability");
+    const spaceId = currentMistySpace();
+    await assertMistyAvailable(accountId, spaceId);
+    const response = await globalMistyApi.visualSearch(attachmentId, query, 40, spaceId);
     if (get().accountId !== accountId || get().requestId !== requestId) return;
     const results = response.hits.filter((document) =>
       searchResultMatchesFilters(document, get().filters),

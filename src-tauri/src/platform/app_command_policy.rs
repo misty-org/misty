@@ -3,6 +3,7 @@
 pub fn allows(label: &str, command: &str) -> bool {
     match label {
         "main" | "misty-bot-pet" => true,
+        _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => true,
         _ => label.starts_with("misty-mini-app-") && command == "mini_app_rpc",
     }
 }
@@ -21,6 +22,12 @@ mod tests {
                 "mini_app_open",
                 "mini_app_reply",
                 "save_authenticated_user",
+                "auth_cookie_restore",
+                "auth_cookie_capture",
+                "auth_cookie_forget",
+                "auth_http_start",
+                "auth_http_read",
+                "auth_http_cancel",
             ] {
                 assert!(!allows(label, command), "{label}: {command}");
             }

@@ -1,4 +1,3 @@
-import { SpaceAppsSettings } from "@/features/apps/SpaceAppsSettings";
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SystemErrorActivity } from "@/features/activity";
 import { SpaceMembers } from "@/features/spaces/members";
@@ -29,12 +28,11 @@ import { canManageSpaceLifecycle, preferredDefaultSpace } from "../defaultSpace"
 import { useSpacesStore } from "../store/useSpacesStore";
 import { defaultSpaceRoute } from "../store/useSpacesTabsStore";
 
-type SpaceSettingsSection = "general" | "members" | "apps";
+type SpaceSettingsSection = "general" | "members";
 
 const settingsItems: readonly DesktopSettingsNavEntry<SpaceSettingsSection>[] = [
   { id: "general", label: "General", icon: Settings2 },
   { id: "members", label: "Members", icon: UsersRound },
-  { id: "apps", label: "Manage apps", icon: Settings2 },
 ];
 
 export function SpaceSettings({ spaceId, section }: { spaceId: string; section: string }) {
@@ -278,7 +276,6 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
             </div>
           ) : null}
 
-          {activeSection === "apps" ? <SpaceAppsSettings spaceId={spaceId} /> : null}
           {activeSection === "members" ? <SpaceMembers embedded spaceId={spaceId} /> : null}
         </DesktopSettingsFrame>
 

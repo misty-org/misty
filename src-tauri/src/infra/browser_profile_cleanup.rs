@@ -10,7 +10,10 @@ pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), Str
         sessions.iter().filter(|(_, session)| session.profile_id.as_deref() == Some(&profile_id)).map(|(id, _)| id.clone()).collect::<Vec<_>>()
     };
     for id in ids { browser_webview_close(app.clone(), app.state::<BrowserSessionState>(), BrowserWebviewIdRequest { id })?; }
+    #[cfg(target_os="macos")]
     super::super::browser_macos::remove_browser_data_store(&app, identifier).await?;
+    #[cfg(not(target_os="macos"))]
+    let _=identifier;
     let directory = browser_data_directory(&app, Some(&profile_id))?;
     std::fs::remove_dir_all(directory).map_err(|error| error.to_string())?;
     Ok(())

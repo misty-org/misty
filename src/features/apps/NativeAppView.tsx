@@ -1,3 +1,4 @@
+import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { resolveApiBase, readDeploymentScope } from "@/api/deployment/api";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -57,7 +58,11 @@ export function NativeAppView(props: NativeAppViewProps) {
     requestEmbeddedBrowserSuspension(permissions.active, reason);
     return () => requestEmbeddedBrowserSuspension(false, reason);
   }, [permissions.active]);
-  const ownerKey = JSON.stringify([readDeploymentScope(), props.owner?.accountId ?? null, props.owner?.spaceId ?? null]);
+  const ownerKey = JSON.stringify([
+    readDeploymentScope(),
+    props.owner?.accountId ?? null,
+    props.owner?.spaceId ?? null,
+  ]);
   const scopeKey = JSON.stringify(props.scopeLimit?.slice().sort() ?? null);
 
   useEffect(() => {
@@ -290,7 +295,7 @@ export function NativeAppView(props: NativeAppViewProps) {
       className="relative flex h-full min-h-[240px] w-full flex-col"
       data-misty-native-app={props.title}
     >
-      {native && instance ? (
+      {native && instance && ready ? (
         <div className="flex shrink-0 justify-end border-b border-cream/10 px-2 py-1">
           <Button
             variant="ghost"
@@ -315,7 +320,7 @@ export function NativeAppView(props: NativeAppViewProps) {
             <button onClick={() => setAttempt((value) => value + 1)}>Try again</button>
           </div>
         ) : !ready ? (
-          <div role="status">Opening {props.title}…</div>
+          <LoadingScreen className="absolute inset-0" label={`Opening ${props.title}`} />
         ) : null}
       </div>
     </div>

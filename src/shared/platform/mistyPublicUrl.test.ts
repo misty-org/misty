@@ -13,4 +13,13 @@ describe("normalizeMistyPublicUrl", () => {
       "https://mistysys.com",
     );
   });
+
+  it("respects custom fallback when provided", () => {
+    expect(normalizeMistyPublicUrl(undefined, "http://localhost:5174")).toBe(
+      "http://localhost:5174",
+    );
+    expect(normalizeMistyPublicUrl("javascript:alert(1)", "http://localhost:5174")).toBe(
+      "http://localhost:5174",
+    );
+  });
 });

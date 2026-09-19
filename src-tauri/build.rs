@@ -7,6 +7,33 @@ fn main() {
     expose_public_app_configuration();
     require_desktop_app_signing_key_for_release();
     build_ios_browser_adapter();
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+        // Objective-C availability checks need Clang's runtime when targeting
+        // older macOS versions. Rust links with -nodefaultlibs, so the driver
+        // does not add it automatically (debug builds on newer SDKs can hide this).
+        let runtime = cc::Build::new()
+            .get_compiler()
+            .to_command()
+            .arg("--print-runtime-dir")
+            .output()
+            .expect("could not locate the macOS Clang runtime");
+        assert!(runtime.status.success(), "could not locate the macOS Clang runtime");
+        let runtime_dir = String::from_utf8(runtime.stdout).expect("invalid Clang runtime path");
+        println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
+        println!("cargo:rustc-link-lib=static=clang_rt.osx");
+        println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
+        cc::Build::new()
+            .file("native/macos/MistyContext.m")
+            .file("native/macos/MistyFolderBookmarks.m")
+            .flag("-fobjc-arc")
+            .flag("-fblocks")
+            .compile("misty_context");
+        println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
+        for framework in ["AppKit", "Carbon", "CoreGraphics", "Security"] {
+            println!("cargo:rustc-link-lib=framework={framework}");
+        }
+    }
     tauri_build::build();
 }
 

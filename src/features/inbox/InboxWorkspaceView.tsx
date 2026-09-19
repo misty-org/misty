@@ -147,6 +147,7 @@ export function InboxWorkspaceView(props: {
       const account = inbox.accounts.find((candidate) => candidate.connection_id === connectionId);
       const label = account?.display_name || account?.email || "Email account";
       reportSystemError({
+        intent: "background",
         accountId: user?.id,
         scope: `inbox:${connectionId}`,
         title: `${label} could not refresh`,
@@ -159,6 +160,7 @@ export function InboxWorkspaceView(props: {
   useEffect(() => {
     if (inbox.error) {
       reportSystemError({
+        intent: "background",
         accountId: user?.id,
         scope: "inbox",
         title: "Inbox needs attention",
@@ -168,6 +170,7 @@ export function InboxWorkspaceView(props: {
     }
     if (connections.error) {
       reportSystemError({
+        intent: "background",
         accountId: user?.id,
         scope: "inbox:connections",
         title: "Email connection needs attention",

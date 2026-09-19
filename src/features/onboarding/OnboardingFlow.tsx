@@ -3,9 +3,8 @@ import { useSpacesStore } from "@/features/spaces/core";
 import { spacesApi } from "@/api/spaces/api";
 import { useCreateSpaceDialog } from "@/features/spaces/creation";
 import { CreateSpaceNameStep, CreateSpaceTemplateStep } from "@/features/spaces/creation";
-import { SpaceAppSelection } from "@/features/spaces/creation";
 import { Button } from "@/shared/ui";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { accountNeedsOnboarding, clearAccountCreating } from "./onboardingState";
 import { trackOnboardingCompleted } from "@/telemetry/lifecycle";
@@ -13,7 +12,8 @@ export function OnboardingFlow() {
   const { user } = useAuth();
   const spaces = useSpacesStore((state) => state.spaces);
   const ready = useSpacesStore((state) => state.snapshotReady);
-  const visible = accountNeedsOnboarding(user?.id, ready, spaces);
+  const [skipped, setSkipped] = useState(false);
+  const visible = !skipped && accountNeedsOnboarding(user?.id, ready, spaces);
   const dialog = useCreateSpaceDialog({
     clearError: () => useSpacesStore.getState().clearError(),
     createSpace: async (input) => {
@@ -40,7 +40,8 @@ export function OnboardingFlow() {
       <form className="mx-auto max-w-xl px-6 py-10" onSubmit={(event) => void dialog.submit(event)}>
         <h1 className="text-2xl font-semibold">Create your first Space</h1>
         <p className="mt-2 text-sm text-cream-muted">
-          Choose a place and the tools for what you want to do.
+          Create a shared place for Chat, Journal, Planner, and Library. You can also start with
+          personal apps.
         </p>
         {dialog.step === 0 ? (
           <CreateSpaceNameStep name={dialog.name} onName={dialog.setName} />
@@ -51,11 +52,6 @@ export function OnboardingFlow() {
               templateId={dialog.templateId}
               onTemplate={dialog.setTemplateId}
             />
-            <SpaceAppSelection
-              catalog={dialog.catalog}
-              selected={dialog.selectedApps}
-              onChange={dialog.setSelectedApps}
-            />
           </>
         )}
         {(dialog.loadError || dialog.createError) && (
@@ -64,6 +60,17 @@ export function OnboardingFlow() {
           </p>
         )}
         <div className="mt-6 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={dialog.creating}
+            onClick={() => {
+              if (user?.id) clearAccountCreating(user.id);
+              setSkipped(true);
+            }}
+          >
+            Skip for now
+          </Button>
           {dialog.step > 0 && (
             <Button
               type="button"
@@ -79,10 +86,7 @@ export function OnboardingFlow() {
               Continue
             </Button>
           ) : (
-            <Button
-              type="submit"
-              disabled={dialog.creating || !dialog.selectionValid || !!dialog.loadError}
-            >
+            <Button type="submit" disabled={dialog.creating || !!dialog.loadError}>
               {dialog.creating ? "Creating…" : "Create Space"}
             </Button>
           )}

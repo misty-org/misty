@@ -1,7 +1,11 @@
-import { useAppRouteMemoryStore } from "@/features/app-shell";
 import { apiSessionInvalidEvent } from "@/api/client/session";
 import { useSetupStore } from "@/features/installer";
 import { removeSpaceReferenceCache } from "@/features/spaces";
+import {
+  removeAccountWorkspace,
+  restoreAccountWorkspace,
+  saveAccountWorkspace,
+} from "@/features/workspace";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { mobileCachePurgeAccount } from "@/native/mobile-cache";
 import { analytics } from "@/telemetry/client";
@@ -34,6 +38,7 @@ import {
 } from "./authSession";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { restoreSavedSession, tryRestoreSavedSession } from "./sessionRecovery";
+import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import { accountFetchMe } from "./store/useAccountStore";
 import {
   activateAccountSession,
@@ -88,12 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useSetupStore((state) => state.signOut);
   const saveAuthenticatedUser = useSetupStore((state) => state.saveAuthenticatedUser);
   const nativeUser = useSetupStore((state) => state.status?.current_user ?? null);
+  const verifiedAccountId = useUserStore((state) => state.me?.id);
   const navigate = useNavigate();
   const [user, setUserState] = useState<AuthUser | null>(() => readInitialUser());
   const [accounts, setAccounts] = useState<SavedAccountSession[]>(() => listSavedAccountSessions());
   const [transitioning, setTransitioning] = useState(false);
   const [telemetryIdentity] = useState(() => new TelemetryIdentityManager(analytics));
-  const startupValidationStarted = useRef(false);
+  const startupValidationCompleted = useRef(false);
   const accountOperationActive = useRef(false);
   const activeUser = user ?? nativeUser;
 
@@ -116,11 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // silently jumping to another saved account. Every account stays listed.
   const deactivateToChooser = useCallback(async () => {
     const accountId = activeUser?.id ?? "";
+    if (accountId) saveAccountWorkspace(accountId);
     await deactivateActiveAccount();
     await signOut();
     if (isNativeMobileBuild && accountId) await removeSavedAccountSession(accountId);
-    useAppRouteMemoryStore.getState().resetAppRoute();
-    useUserStore.getState().clear();
+    resetAccountScopedState(accountId);
     setUserState(null);
     setAccounts(listSavedAccountSessions());
     navigate("/signin", { replace: true });
@@ -128,7 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUser = useCallback(
     (nextUser: AuthUser | null) => {
-      if ((activeUser?.id ?? null) !== (nextUser?.id ?? null)) resetAccountScopedState();
+      const currentAccountId = activeUser?.id ?? "";
+      if (currentAccountId !== (nextUser?.id ?? null)) {
+        if (currentAccountId) saveAccountWorkspace(currentAccountId);
+        resetAccountScopedState(currentAccountId);
+        if (nextUser?.id) restoreAccountWorkspace(nextUser.id);
+      }
       setUserState(nextUser);
       setAccounts(listSavedAccountSessions());
     },
@@ -143,8 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousMe = useUserStore.getState().me;
       let accountReady = false;
       beginAccountOperation();
-      resetAccountScopedState();
       try {
+        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        resetAccountScopedState(previousAccountId);
         const saved = await activateAccountSession(accountId);
         const me = await accountFetchMe();
         assertAccountIdentity(me, saved.id);
@@ -154,14 +166,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // previous token without leaving the two account identities crossed.
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
         accountReady = true;
+        if (window.location.pathname.startsWith("/spaces/")) {
+          navigate("/spaces", { replace: true });
+        }
       } catch (error) {
         if (isInvalidAccountSessionError(error)) await clearAccountAuthToken();
         const restoredPreviousAccount = await tryRestoreSavedSession(previousAccountId);
         if (restoredPreviousAccount) {
+          if (previousAccountId) restoreAccountWorkspace(previousAccountId);
           if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
           if (previousUser?.id === previousAccountId) setUserState(previousUser);
           accountReady = true;
@@ -173,10 +190,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState();
+        if (accountReady) refreshAuthenticatedAccountState(accountId);
       }
     },
-    [activeUser, beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
+    [activeUser, beginAccountOperation, finishAccountOperation, navigate, saveAuthenticatedUser],
   );
 
   const authenticateAccount = useCallback(
@@ -188,8 +205,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let authenticated: AuthUser | null = null;
       let accountReady = false;
       beginAccountOperation();
-      resetAccountScopedState();
       try {
+        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        resetAccountScopedState(previousAccountId);
         authenticated = await request();
         const me = await accountFetchMe();
         assertAccountIdentity(me, authenticated.id);
@@ -199,10 +217,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
         accountReady = true;
+        if (window.location.pathname.startsWith("/spaces/")) {
+          navigate("/spaces", { replace: true });
+        }
         return nextUser;
       } catch (error) {
         // A 401 from /me after login means the newly stored token is invalid.
@@ -217,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (previousUser && previousLicense) {
               await saveAuthenticatedUser(previousUser, previousLicense);
             }
+            if (previousAccountId) restoreAccountWorkspace(previousAccountId);
             if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
             if (previousUser?.id === previousAccountId) setUserState(previousUser);
             restoredPreviousAccount = true;
@@ -235,10 +258,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState();
+        if (accountReady) refreshAuthenticatedAccountState(authenticated?.id);
       }
     },
-    [activeUser, beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
+    [activeUser, beginAccountOperation, finishAccountOperation, navigate, saveAuthenticatedUser],
   );
 
   const refreshUser = useCallback(async (): Promise<AuthUser | null> => {
@@ -263,9 +286,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [activeUser]);
 
   useEffect(() => {
-    setAnalyticsAuthenticationState(Boolean(activeUser));
-    telemetryIdentity.sync(activeUser);
-  }, [activeUser, telemetryIdentity]);
+    // Saved display metadata is not proof that the new server cookies work.
+    // Wait for /me before issuing authenticated telemetry requests.
+    const verifiedUser = activeUser?.id === verifiedAccountId ? activeUser : null;
+    setAnalyticsAuthenticationState(Boolean(verifiedUser));
+    telemetryIdentity.sync(verifiedUser);
+  }, [activeUser, verifiedAccountId, telemetryIdentity]);
 
   useEffect(() => {
     if (shouldPersistAuthUser) {
@@ -286,8 +312,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [activeUser]);
 
   useEffect(() => {
-    if (!activeUser || startupValidationStarted.current) return;
-    startupValidationStarted.current = true;
+    if (!activeUser || startupValidationCompleted.current || accountOperationActive.current) return;
     let canceled = false;
     const validationGeneration = readAccountSessionGeneration();
     void (async () => {
@@ -295,6 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await accountFetchMe();
         if (canceled || readAccountSessionGeneration() !== validationGeneration) return;
         assertAccountIdentity(me, activeUser.id);
+        startupValidationCompleted.current = true;
         useUserStore.getState().setMe(me);
         setUserState((current) => ({
           ...(current ?? activeUser),
@@ -315,9 +341,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        startupValidationCompleted.current = true;
         beginAccountOperation();
-        resetAccountScopedState();
         try {
+          resetAccountScopedState();
           // The restored account's token is no longer valid. Rather than silently
           // switching to a different saved account, send the user to the chooser
           // where they can pick another account or re-sign-in to this one.
@@ -343,13 +370,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!activeUser) return;
     let canceled = false;
+    let validating = false;
     const handleInvalidSession = () => {
-      if (canceled || accountOperationActive.current) return;
-      beginAccountOperation();
-      resetAccountScopedState();
-      void deactivateToChooser().finally(() => {
-        if (!canceled) finishAccountOperation();
-      });
+      if (canceled || validating || accountOperationActive.current) return;
+      validating = true;
+      const generation = readAccountSessionGeneration();
+      // A delayed or resource-specific 401 is not proof that the current
+      // account is signed out. Coalesce failures and validate before changing
+      // identity or navigating; /me can itself emit this event.
+      void (async () => {
+        try {
+          const me = await accountFetchMe();
+          if (canceled || readAccountSessionGeneration() !== generation) return;
+          assertAccountIdentity(me, activeUser.id);
+        } catch (error) {
+          if (
+            canceled ||
+            accountOperationActive.current ||
+            readAccountSessionGeneration() !== generation ||
+            !isInvalidAccountSessionError(error)
+          )
+            return;
+          beginAccountOperation();
+          try {
+            await deactivateToChooser();
+          } finally {
+            // Deactivation cleans up this effect; still release the transition.
+            finishAccountOperation();
+          }
+        } finally {
+          validating = false;
+        }
+      })().catch(() => undefined);
     };
     window.addEventListener(apiSessionInvalidEvent, handleInvalidSession);
     return () => {
@@ -365,17 +417,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     if (accountOperationActive.current) return;
     const previousUser = activeUser;
+    const previousAccountId = previousUser?.id ?? "";
     const previousMe = useUserStore.getState().me;
     beginAccountOperation();
-    resetAccountScopedState();
     try {
+      if (previousAccountId) saveAccountWorkspace(previousAccountId);
+      resetAccountScopedState(previousAccountId);
       await deactivateToChooser();
     } catch (error) {
       if (previousUser) {
         await restoreSavedSession(previousUser.id);
+        if (previousAccountId) restoreAccountWorkspace(previousAccountId);
         if (previousMe?.id === previousUser.id) useUserStore.getState().setMe(previousMe);
         setUserState(previousUser);
-        refreshAuthenticatedAccountState();
+        refreshAuthenticatedAccountState(previousUser.id);
       }
       setAccounts(listSavedAccountSessions());
       throw error;
@@ -389,37 +444,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // the chooser can send the person to re-sign-in.
   const resumeAccount = useCallback(
     async (accountId: string) => {
-      if (accountOperationActive.current) return;
       beginAccountOperation();
-      resetAccountScopedState();
+      const previousAccountId = activeUser?.id ?? "";
       let accountReady = false;
       try {
+        if (previousAccountId) saveAccountWorkspace(previousAccountId);
+        resetAccountScopedState(previousAccountId);
         const saved = await activateAccountSession(accountId);
         const me = await accountFetchMe();
         assertAccountIdentity(me, saved.id);
         const nextUser = authUserFromMe(me, saved);
         await updateSavedAccountSession(nextUser);
         await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
         setAccounts(listSavedAccountSessions());
         accountReady = true;
+        if (window.location.pathname.startsWith("/spaces/")) {
+          navigate("/spaces", { replace: true });
+        }
       } catch (error) {
-        // Leave the account listed; its token is stale, so the caller re-signs-in.
+        // Keep the account listed so transient failures can be retried. Only
+        // confirmed invalid sessions should send the chooser to password entry.
         await deactivateActiveAccount().catch(() => undefined);
         setAccounts(listSavedAccountSessions());
-        throw error;
+        throw isInvalidAccountSessionError(error)
+          ? new SavedAccountSessionUnavailableError()
+          : error;
       } finally {
         finishAccountOperation();
-        if (accountReady) refreshAuthenticatedAccountState();
+        if (accountReady) refreshAuthenticatedAccountState(accountId);
       }
     },
-    [beginAccountOperation, finishAccountOperation, saveAuthenticatedUser],
+    [
+      activeUser?.id,
+      beginAccountOperation,
+      finishAccountOperation,
+      navigate,
+      saveAuthenticatedUser,
+    ],
   );
 
   const removeAccount = useCallback(async (accountId: string) => {
     await removeSavedAccountSession(accountId);
     await removeSpaceReferenceCache(accountId);
+    removeAccountWorkspace(accountId);
     if (isNativeMobileBuild) await mobileCachePurgeAccount(accountId);
     setAccounts(listSavedAccountSessions());
   }, []);

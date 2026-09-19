@@ -1,25 +1,25 @@
 import { cn } from "./utils";
 
 export const navigationTreeGroupClass =
-  "grid [--navigation-tree-gap:0.125rem] gap-[var(--navigation-tree-gap)]";
+  "grid [--navigation-tree-gap:0.25rem] gap-[var(--navigation-tree-gap)]";
 export const navigationTreeRowClass =
-  "group/tree-row relative ml-[27px] mr-2 flex h-7 items-center border-0 p-0 text-[13px]";
-// Parent icon center: 10px header padding + half its 18px icon = 19px.
-// The child row starts at 27px; its branch sits 8px to the left.
+  "group/tree-row relative ml-[calc(18px_+_var(--navigation-primary-icon-slot,18px)/2)] mr-2 flex h-7 items-center border-0 p-0 text-[13px]";
+// The branch follows the parent icon's center: 10px inset + half its slot.
+// Child rows start 8px farther right so the branch joins that centerline.
 export const navigationPrimaryRowLayoutClass =
   "grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2.5";
 export const navigationTreeBranchClass = "-left-2";
 // Anchor to the expanded grid row, outside the animated content's clipping box,
 // so the rail can cross the gap before the next sibling.
 export const navigationTreeContinuationClass =
-  "pointer-events-none absolute left-[19px] row-start-2 row-end-3 top-0 -bottom-[var(--navigation-tree-gap,0.25rem)] w-px bg-cream-muted/40";
+  "pointer-events-none absolute left-[calc(10px_+_var(--navigation-primary-icon-slot,18px)/2)] row-start-2 row-end-3 top-0 -bottom-[var(--navigation-tree-gap,0.25rem)] w-px bg-cream-muted/40";
 export const navigationTreeContentInsetClass = "px-2";
 // Keep hover feedback paint-only. Transitioning the surface underneath filtered
 // brand marks makes WebKit/Chromium repeatedly rasterize them, which looks like
 // the glyph is shifting even though its layout box never moves.
-export const navigationTreeSurfaceClass = `ml-1 grid h-full min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md ${navigationTreeContentInsetClass} group-hover/tree-row:bg-charcoal-card group-aria-[current=page]/tree-row:bg-charcoal-active group-data-[selected=true]/tree-row:bg-charcoal-active`;
+export const navigationTreeSurfaceClass = `grid h-full min-w-0 flex-1 grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md pl-1.5 pr-2 group-hover/tree-row:bg-charcoal-card group-aria-[current=page]/tree-row:bg-charcoal-active group-data-[selected=true]/tree-row:bg-charcoal-active`;
 export const navigationTreeIconClass =
-  "pointer-events-none grid size-5 shrink-0 place-items-center [transform:translateZ(0)] [backface-visibility:hidden] [&_svg]:!size-[18px] [&_svg]:overflow-visible [&_img]:!size-[18px]";
+  "pointer-events-none grid size-5 shrink-0 place-items-center [transform:translateZ(0)] [backface-visibility:hidden] [&_[data-app-icon]]:!size-5 [&_[data-app-icon]_svg]:!size-[18px] [&_svg]:!size-[18px] [&_svg]:overflow-visible [&_img]:!size-[18px]";
 export const navigationTreeItemIconClass = "block !size-5 shrink-0 overflow-visible";
 export const navigationDisclosureLabelClass = "flex min-w-0 items-center gap-1";
 export const navigationDisclosureChevronClass = "shrink-0";

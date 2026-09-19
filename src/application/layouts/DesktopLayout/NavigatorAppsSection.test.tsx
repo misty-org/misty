@@ -36,6 +36,8 @@ describe("NavigatorAppsSection", () => {
       installations: appIds.map((app_id, pin_rank) => ({
         app_id,
         state: "installed" as const,
+        space_id: "space-a",
+        authority_generation: 1,
         installed_version: "1.0.0",
         permission_version: 1,
         granted_scopes: [],
@@ -74,17 +76,23 @@ describe("NavigatorAppsSection", () => {
     const search = document.body.querySelector<HTMLInputElement>('input[aria-label="Search apps"]');
     expect(search).not.toBeNull();
     expect(
-      document.body.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.textContent,
+      document.body.querySelector<HTMLButtonElement>('button[aria-checked="true"]')?.textContent,
     ).toContain("Inbox");
     expect(document.body.querySelector('[data-app-icon="home"]')).toBeNull();
 
-    const browser = [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
-      (button) => button.textContent?.includes("BrowserBrowse the web in Misty"),
+    const choices = [...document.body.querySelectorAll('[role="checkbox"]')].map((button) =>
+      button.textContent?.trim(),
     );
-    expect(browser?.getAttribute("aria-pressed")).toBe("false");
-    await act(async () => browser?.click());
+    expect(choices).toContain("Browser");
+    expect(choices).toContain("Files");
+    expect(choices).not.toContain("Agents");
+    const terminal = [...document.body.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent?.trim() === "Terminal",
+    );
+    expect(terminal?.getAttribute("aria-checked")).toBe("false");
+    await act(async () => terminal?.click());
     expect(
-      useAppsStore.getState().installations.find((item) => item.app_id === "browser")?.pinned,
+      useAppsStore.getState().installations.find((item) => item.app_id === "terminal")?.pinned,
     ).toBe(true);
 
     await act(async () => {
@@ -96,9 +104,11 @@ describe("NavigatorAppsSection", () => {
         search.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
-    expect(document.body.textContent).toContain("terminal app");
+    expect(document.body.textContent).toContain("Terminal");
     expect(document.body.textContent).not.toContain("Browse the web in Misty");
-    expect(document.body.querySelector('a[href="/discover"]')?.textContent).toBe("Browse apps");
+    expect(document.body.querySelector('a[href="/discover"]')?.textContent).toBe(
+      "Browse more apps",
+    );
   });
 
   it("always shows its apps beneath a plain heading and keeps Add app available", async () => {

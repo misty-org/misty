@@ -36,13 +36,13 @@ it("adds to the app's scoped storage without replacing an existing service", asy
   await addNavigatorIntegration("account", "planner", "todoist");
   expect(localStorage.getItem(key)).toBe(saved);
 });
-it("refuses a workspace change while resolving the storage scope", async () => {
+it("refuses an account change while resolving the storage scope", async () => {
   fixture.resolve.mockImplementationOnce(async () => {
-    fixture.store = { ...fixture.store, spaceId: "another-space" };
+    fixture.store = { ...fixture.store, accountId: "another-account" };
     return "https://misty.test";
   });
   await expect(addNavigatorIntegration("account", "planner", "todoist")).rejects.toThrow(
-    "workspace changed",
+    "account changed",
   );
   expect(localStorage.length).toBe(0);
 });

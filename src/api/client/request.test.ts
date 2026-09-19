@@ -5,6 +5,7 @@ const session = vi.hoisted(() => ({ transitioning: false, generation: 0 }));
 
 vi.mock("@/api/deployment/api", () => ({
   resolveApiBase: vi.fn(async () => "https://misty.example/api"),
+  resolveHostedApiBase: () => "https://misty.example/api",
 }));
 
 import { apiRequest } from "./request";
@@ -17,7 +18,7 @@ beforeEach(() => {
   configureApiSession({
     isTransitioning: () => session.transitioning,
     readGeneration: () => session.generation,
-    readToken: async () => "account-token",
+    readToken: async () => null,
   });
   setSpaceReferenceOnly(false);
 });
@@ -42,7 +43,7 @@ describe("apiRequest", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://misty.example/api/agents");
     expect(init?.credentials).toBe("include");
-    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer account-token");
+    expect(new Headers(init?.headers).get("Authorization")).toBeNull();
     expect(new Headers(init?.headers).get("Content-Type")).toBe("application/json");
     expect(new Headers(init?.headers).get("X-Request-ID")).toMatch(/^desktop_/);
   });
@@ -102,8 +103,8 @@ describe("apiRequest", () => {
   });
 
   it("invalidates the active account when an authenticated request returns 401", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ code: "not_authenticated" }), { status: 401 }),
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify({ code: "not_authenticated" }), { status: 401 }),
     );
     const invalidSession = vi.fn();
     window.addEventListener("misty:account-session-invalid", invalidSession);
@@ -115,6 +116,29 @@ describe("apiRequest", () => {
 
     expect(invalidSession).toHaveBeenCalledOnce();
     window.removeEventListener("misty:account-session-invalid", invalidSession);
+  });
+
+  it("deduplicates concurrent identical GET requests into a single network call", async () => {
+    let callCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      callCount++;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return new Response(JSON.stringify({ apps: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    const [res1, res2, res3] = await Promise.all([
+      apiRequest<{ apps: unknown[] }>("/spaces/space_1/apps"),
+      apiRequest<{ apps: unknown[] }>("/spaces/space_1/apps"),
+      apiRequest<{ apps: unknown[] }>("/spaces/space_1/apps"),
+    ]);
+
+    expect(callCount).toBe(1);
+    expect(res1).toEqual({ apps: [] });
+    expect(res2).toEqual({ apps: [] });
+    expect(res3).toEqual({ apps: [] });
   });
 });
 

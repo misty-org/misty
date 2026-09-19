@@ -1,5 +1,5 @@
-import { appSourceAliases, appSourceDependencies } from "./scripts/app-source-paths.mjs";
-import { loadAppEnv, publicAppEnv } from "./scripts/app-env.mjs";
+import { appSourceAliases, appSourceDependencies } from "./cli/tasks/app-source-paths.ts";
+import { loadAppEnv, publicAppEnv } from "./cli/tasks/app-env.ts";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { createHash } from "node:crypto";
@@ -7,10 +7,11 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import { transform } from "esbuild";
-import { componentFrameworkGlobals, officialAppComponentFactory } from "./scripts/official-app-component-factory.mjs";
-import { officialAppSDKBoundary } from "./scripts/official-app-sdk-boundary.mjs";
-import { excalidrawPackageFonts } from "./scripts/excalidraw-package-fonts.mjs";
-import { excalidrawSdkInterop } from "./scripts/excalidraw-sdk-interop.mjs";
+import { componentFrameworkGlobals, officialAppComponentFactory } from "./cli/tasks/official-app-component-factory.ts";
+import { officialAppSDKBoundary } from "./cli/tasks/official-app-sdk-boundary.ts";
+import { excalidrawPackageFonts } from "./cli/tasks/excalidraw-package-fonts.ts";
+import { excalidrawSdkInterop } from "./cli/tasks/excalidraw-sdk-interop.ts";
+import { materialIconProjection, packageMaterialIcons } from "./cli/tasks/material-icon-assets.ts";
 
 const env = loadAppEnv(process.cwd());
 const appId = env.MISTY_OFFICIAL_APP_ID?.trim().toLowerCase() ?? "";
@@ -27,15 +28,40 @@ const supportedApps = new Set([
   "browser",
   "code",
   "terminal",
+  "music",
+  "media",
 ]);
 
 if (!supportedApps.has(appId)) throw new Error(`Unsupported official app: ${appId || "(missing)"}`);
 if (!outputDirectory) throw new Error("MISTY_OFFICIAL_APP_OUT_DIR is required.");
 
 const source = resolve(process.cwd(), "src");
-const appsRoot = resolve(env.MISTY_APPS_ROOT || resolve(process.cwd(), "../misty-apps"));
+const appsRoot = resolve(resolve(process.cwd(), "./apps"));
 const mobile = platform === "mobile";
 const spaceApp = new Set(["chat", "journal", "planner", "library"]).has(appId);
+
+// PDF workers must remain real package assets. Inlining a worker as a data URL
+// makes pdf.js import it through a blob, which the desktop CSP correctly blocks.
+function packagePdfWorker(): Plugin {
+  return {
+    name: "misty-package-pdf-worker",
+    enforce: "pre",
+    resolveId(id) {
+      if (id === "pdfjs-dist/build/pdf.worker.min.mjs?url") return "\0misty-pdf-worker-url";
+    },
+    async load(id) {
+      if (id !== "\0misty-pdf-worker-url") return;
+      const reference = this.emitFile({
+        type: "asset", name: "pdf.worker.min.mjs",
+        source: await readFile(resolve(process.cwd(), "node_modules/pdfjs-dist/build/pdf.worker.min.mjs")),
+      });
+      return `export default import.meta.ROLLUP_FILE_URL_${reference};`;
+    },
+    resolveFileUrl({ relativePath }) {
+      return `new URL(${JSON.stringify(relativePath)}, import.meta.url).href`;
+    },
+  };
+}
 
 function packageSizeReport(): Plugin {
   return {
@@ -125,6 +151,8 @@ export default defineConfig({
   envDir: false,
   define: {
     ...publicAppEnv(env),
+    "import.meta.env.MISTY_PACKAGED_ICONS": JSON.stringify(!mobile),
+    "import.meta.env.MISTY_PACKAGE_BASE_URL": "MistyComponentAssetBase",
     "import.meta.env.MISTY_OFFICIAL_APP_ID": JSON.stringify(appId),
     // Official apps execute as browser scripts inside the Misty WebView. Some
     // CommonJS dependencies (notably React) branch on this exact expression;
@@ -132,12 +160,12 @@ export default defineConfig({
     // before it can register its Misty entry point.
     "process.env.NODE_ENV": JSON.stringify("production"),
   },
-  plugins: [appSourceDependencies(process.cwd(), appsRoot), officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
+  plugins: [...(!mobile ? [packagePdfWorker()] : []), materialIconProjection(), ...(!mobile ? [packageMaterialIcons()] : []), appSourceDependencies(process.cwd(), appsRoot), officialAppSDKBoundary(), ...(appId === "journal" && !mobile ? [excalidrawSdkInterop(), excalidrawPackageFonts({assetDirectory: resolve(outputDirectory, "../optional-assets")})] : []), react(), tailwindcss(), packageSizeReport(), ...(!mobile ? [officialAppComponentFactory(appId, {framework:true, runtime:appId === "journal"})] : []), compactExecutablePackage(), appDocument()],
   resolve: {
     alias: [
       ...Object.entries(appSourceAliases(process.cwd(), appsRoot)).map(([find, replacement]) => ({ find, replacement })),
       { find: "@", replacement: source },
-      { find: "@misty/browser-view", replacement: resolve(appsRoot, "apps/browser/workspace/SDKBrowserView.tsx") },
+      { find: "@misty/browser-view", replacement: resolve(appsRoot, "browser/workspace/SDKBrowserView.tsx") },
       { find: "@misty/legacy-social", replacement: resolve(source, "features/apps/package/SDKSocialApp.tsx") },
       { find: "@misty/legacy-inbox", replacement: resolve(source, "features/apps/package/SDKInboxApp.tsx") },
     ],
@@ -149,7 +177,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     cssCodeSplit: false,
     lib: {
-      entry: (!mobile || !["chat", "inbox"].includes(appId)) ? resolve(appsRoot, `apps/${appId}/index.tsx`) : resolve(source, `features/apps/package/entries/${appId}.tsx`),
+      entry: (!mobile || !["chat", "inbox"].includes(appId)) ? resolve(appsRoot, `${appId}/index.tsx`) : resolve(source, `features/apps/package/entries/${appId}.tsx`),
       formats: mobile ? ["es"] : ["iife"],
       name: "MistyComponentBundle",
       fileName: () => "app.js",

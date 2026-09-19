@@ -1,6 +1,7 @@
 @config "../../tailwind.config.js";
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./overflow-fade.css";
 
 /* Semantic charcoal/cream palette. Utilities resolve through these variables
    so the Themes extension can preview and persist one coherent app palette. */
@@ -56,6 +57,11 @@
 
   --color-cream: var(--misty-theme-text);
   --color-cream-bright: var(--misty-theme-text-bright);
+  --color-cream-action-hover: color-mix(
+    in srgb,
+    var(--misty-theme-text-bright) 85%,
+    var(--misty-theme-bg)
+  );
   --color-cream-muted: var(--misty-theme-text-muted);
   --color-notification-red: var(--misty-theme-danger);
 

@@ -1,11 +1,11 @@
-import type { SpaceChatMessagesProps } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
+import type { SpaceChatMessagesProps } from "./ChatMessages";
 import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
 import type { MessageSpan } from "@/api/spaces/dto/types/types";
 import { avatarColorClass, avatarInkClass, robotAvatarClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, AvatarImage, Badge, cn } from "@/shared/ui";
 import { Bot, CircleAlert } from "lucide-react";
 import { Fragment, type FormEvent } from "react";
-import { BrandIcon } from "../../../../../../misty-apps/apps/shared/BrandIcon";
+import { BrandIcon } from "../../../../.././apps/shared/BrandIcon";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";

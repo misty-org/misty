@@ -2,8 +2,8 @@ import { isNavigatorAppId, WorkspaceAppIcon } from "@/features/workspace";
 import { Puzzle } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
-import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
-import { brandIconAsset } from "../../../../../misty-apps/apps/shared/brandIcons";
+import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
+import { brandIconAsset } from "../../../.././apps/shared/brandIcons";
 
 type MarketplaceCatalogIconProps = {
   pluginId?: string;

@@ -51,7 +51,7 @@ async fn measure(view: &Webview, fixture: bool) -> Result<Value, String> {
 pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String> {
     let url = Url::parse(&origin)
         .map_err(|e| e.to_string())?
-        .join("/scripts/browser-render-fixture.html")
+        .join("/cli/tasks/browser-render-fixture.html")
         .map_err(|e| e.to_string())?;
     if !matches!(url.host_str(), Some("localhost" | "127.0.0.1")) {
         return Err("Loopback fixture required".into());
@@ -88,7 +88,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
     };
     plain.close().map_err(|e| e.to_string())?;
     let request: BrowserWebviewCreateRequest = serde_json::from_value(json!({"id":"render-production", "url":url.as_str(), "scopeId":"render-probe", "x":0, "y":60, "width":1000, "height":500, "nativeLiveResize":true})).map_err(|e|e.to_string())?;
-    browser_webview_create(app.clone(), app.state::<BrowserSessionState>(), request).await?;
+    browser_webview_create(app.get_webview("main").ok_or("Missing main view")?,app.clone(), app.state::<BrowserSessionState>(), request).await?;
     let production = app
         .get_webview("misty-browser-render-production")
         .ok_or("Missing production view")?;

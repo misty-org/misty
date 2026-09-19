@@ -34,6 +34,7 @@ import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { minimumForWorkspaceTabs } from "./WorkspaceDockTree";
 import { TabIcon } from "./WorkspaceTabGroupButton";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
+import { navigatorMotionClass } from "./styles";
 import {
   dockActionClass,
   WindowsWorkspaceTitlebarControls,
@@ -122,7 +123,10 @@ export function WorkspaceLayoutTabs(
   return (
     <header
       ref={ref}
-      className="flex h-[38px] shrink-0 items-center border-b border-charcoal-border bg-charcoal-workspace px-2"
+      className={cn(
+        "flex h-[38px] min-w-0 shrink-0 items-center border-b border-charcoal-border bg-charcoal-workspace px-2",
+        props.titlebarInsets?.animate && cn("transition-[padding]", navigatorMotionClass),
+      )}
       style={{
         paddingLeft: 8 + (props.titlebarInsets?.left ?? 0),
         paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
@@ -299,7 +303,7 @@ export function WorkspaceLayoutTabs(
               title="Split right"
               onClick={() => props.onSplitPane(pane.id, "right")}
             >
-              <PanelRightDashed size={18} />
+              <PanelRightDashed size={16} />
             </button>
             <button
               type="button"
@@ -309,20 +313,10 @@ export function WorkspaceLayoutTabs(
               title="Split down"
               onClick={() => props.onSplitPane(pane.id, "down")}
             >
-              <PanelBottomDashed size={18} />
+              <PanelBottomDashed size={16} />
             </button>
           </>
         ) : null}
-        <WorkspaceWindowMenu
-          titlebar
-          windows={props.virtualWindows}
-          activeWindowId={props.activeVirtualWindowId}
-          canReopen={props.canReopenVirtualWindow}
-          onSelect={props.onSelectVirtualWindow}
-          onCreate={props.onCreateVirtualWindow}
-          onClose={props.onCloseVirtualWindow}
-          onReopen={props.onReopenVirtualWindow}
-        />
         <button
           type="button"
           disabled={dockLeaves(layout.root).length <= 1}
@@ -331,8 +325,19 @@ export function WorkspaceLayoutTabs(
           title="Close pane"
           onClick={() => props.onClosePane(pane.id)}
         >
-          <ClosePaneIcon size={18} />
+          <ClosePaneIcon size={16} />
         </button>
+        {!props.windowsTitlebarControls ? (
+          <WorkspaceWindowMenu
+            windows={props.virtualWindows}
+            activeWindowId={props.activeVirtualWindowId}
+            canReopen={props.canReopenVirtualWindow}
+            onSelect={props.onSelectVirtualWindow}
+            onCreate={props.onCreateVirtualWindow}
+            onClose={props.onCloseVirtualWindow}
+            onReopen={props.onReopenVirtualWindow}
+          />
+        ) : null}
       </div>
       <WindowsWorkspaceTitlebarControls
         enabled={Boolean(props.windowsTitlebarControls)}

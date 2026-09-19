@@ -1,3 +1,8 @@
+import {
+  createAppNavigationRegistration,
+  useAppNavigationStore,
+} from "@/features/apps/appNavigation";
+import { createAppRpcScope } from "@/features/apps/rpc/session";
 import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { resetInboxAccountState, useInboxStore } from "@/features/inbox";
@@ -44,6 +49,7 @@ describe("GlobalNavigator disclosures", () => {
     });
     useWorkspaceStore.getState().reset();
     seedNavigatorApps();
+    useAppNavigationStore.setState({ entries: [], providerCache: [] });
     resetInboxAccountState();
     useNavigatorAppsStore.setState({
       appIdsByAccount: {},
@@ -155,7 +161,34 @@ describe("GlobalNavigator disclosures", () => {
     expect(useInboxStore.getState().selectedProvider).toBe("");
   });
 
-  it("shows Chat and Automations as destinations under Agents", async () => {
+  it("keeps native Agents navigation independent of legacy SDK registration", async () => {
+    const scope = createAppRpcScope({
+      identity: {
+        appId: "agents",
+        accountId: "account-1",
+        spaceId: "space-1",
+        instanceId: "agents-tab",
+      },
+      scopes: ["navigation.write"],
+      expiresAt: "2099-01-01T00:00:00Z",
+      isCurrentAccount: () => true,
+    });
+    createAppNavigationRegistration(scope).setItems([
+      { id: "activity", label: "Current agent activity", route: "/apps/agents" },
+    ]);
+    await renderNavigator("/discover");
+    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
+      "/apps/agents",
+    );
+    expect(container.textContent).not.toContain("Current agent activity");
+    await act(async () => scope.close());
+    expect(container.querySelector('a[aria-label="Agents"]')?.getAttribute("href")).toBe(
+      "/apps/agents",
+    );
+    useAppNavigationStore.setState({ entries: [], providerCache: [] });
+  });
+
+  it("shows the current Agents Activity destination without a mounted app", async () => {
     useWorkspaceStore.setState({
       layout: {
         focusedPaneId: "pane-1",
@@ -183,31 +216,10 @@ describe("GlobalNavigator disclosures", () => {
 
     await renderNavigator("/apps/agents?view=automations");
 
-    const trigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Agents"][data-navigator-disclosure-trigger="true"]',
-    );
-    expect(trigger?.getAttribute("aria-expanded")).toBe("true");
-
-    const items = [
-      ...container.querySelectorAll<HTMLAnchorElement>(
-        '[role="group"][aria-label="Agents destinations"] a',
-      ),
-    ];
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["Chat", "Automations"]);
-    expect(items.map((item) => item.getAttribute("href"))).toEqual([
-      "/apps/agents",
-      "/apps/agents?view=automations",
-    ]);
-    expect(
-      items
-        .find((item) => item.textContent?.trim() === "Chat")
-        ?.querySelector(".lucide-bot-message-square"),
-    ).not.toBeNull();
-    expect(
-      items
-        .find((item) => item.textContent?.trim() === "Automations")
-        ?.getAttribute("aria-current"),
-    ).toBe("page");
+    const link = container.querySelector('a[aria-label="Agents"]');
+    expect(link?.getAttribute("href")).toBe("/apps/agents");
+    expect(link?.getAttribute("aria-current")).toBe("page");
+    expect(container.querySelector('[aria-label="Agents destinations"]')).toBeNull();
   });
 
   it("opens Planner destinations and highlights only the active section", async () => {
@@ -492,7 +504,9 @@ describe("GlobalNavigator disclosures", () => {
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     const triggerClasses = trigger?.className.split(/\s+/) ?? [];
     expect(triggerClasses).toContain("box-border");
-    expect(triggerClasses).toContain("grid-cols-[18px_minmax(0,1fr)]");
+    expect(triggerClasses).toContain(
+      "grid-cols-[var(--navigation-primary-icon-slot,18px)_minmax(0,1fr)]",
+    );
     expect(triggerClasses).not.toContain("hover:bg-charcoal-active");
     expect(triggerClasses).not.toContain("hover:text-cream");
 
@@ -503,7 +517,7 @@ describe("GlobalNavigator disclosures", () => {
     expect(items[1]?.getAttribute("aria-current")).toBe("page");
     expect(featureIconNames(destinations)).toEqual(["explorer", "transfers"]);
     expect(destinations?.className).toContain("gap-[var(--navigation-tree-gap)]");
-    expect(items.every((item) => item.className.includes("h-8"))).toBe(true);
+    expect(items.every((item) => item.className.includes("h-7"))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-branch="true"]'))).toBe(true);
     expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
     expect(

@@ -35,7 +35,6 @@ export type AccountHandoffPath =
 export interface LoginResponse {
   id?: string;
   user_id?: string;
-  token?: string;
   name: string;
   username: string;
   email: string;

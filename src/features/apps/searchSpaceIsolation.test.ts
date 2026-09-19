@@ -6,9 +6,9 @@ vi.mock("@/features/files/explorer",()=>({
  queryIndexedExplorerSearch:f.query,querySemanticExplorerSearch:vi.fn().mockResolvedValue([]),semanticQueryMinimumCharacters:100,
  semanticSearchDebounceMs:10,useExplorerStore:{getState:()=>({})}
 }));
-vi.mock("@/features/files/native",()=>({searchCancelScan:vi.fn(),searchGetStatus:vi.fn(),searchInit:vi.fn(),searchStartScan:vi.fn()}));
+vi.mock("@/native/filesystem",()=>({searchCancelScan:vi.fn(),searchGetStatus:vi.fn(),searchInit:vi.fn(),searchStartScan:vi.fn()}));
 vi.mock("@/features/settings",()=>({selectSearchMaintenancePreferences:vi.fn(),useSettingsStore:{getState:()=>({})}}));
-import {useSearchStore} from "../../../../misty-apps/apps/files/workspace/search/store/useSearchStore";
+import {useSearchStore} from "../../.././apps/files/workspace/search/store/useSearchStore";
 it("clears retained results and rejects a late query after changing Space",async()=>{
  let resolve!:(results:any[])=>void;
  f.query.mockImplementation(()=>new Promise(done=>{resolve=done;}));

@@ -1,0 +1,11 @@
+/official-apps/*
+  Content-Security-Policy: default-src 'self'; connect-src https://api.mistysys.com https://dev-api.mistysys.com; script-src 'self'; style-src 'self'; img-src 'self' data: https:; frame-ancestors https://app.mistysys.com https://dev-app.mistysys.com tauri: http://tauri.localhost
+  Access-Control-Allow-Origin: *
+  Cross-Origin-Resource-Policy: cross-origin
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+
+/official-apps/*/desktop.zip
+  Content-Disposition: attachment
+  Content-Type: application/zip
+  Cross-Origin-Resource-Policy: cross-origin

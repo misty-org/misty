@@ -79,7 +79,7 @@ export function SpaceSocial({
     store,
   });
   const access = useSpaceChatPermissions(spaceId, conversationId, scope.activeConversation?.kind);
-  useWorkspaceTabTitle(workspaceTabId, `${spaceName} Social`);
+  useWorkspaceTabTitle(workspaceTabId, `${spaceName} ${provider === "misty" ? "Chat" : "Social"}`);
   const {
     accountId: connectionsAccountId,
     connections: accountConnections,
@@ -110,7 +110,6 @@ export function SpaceSocial({
     accountConnections.some(
       (connection) => normalizeSocialProvider(connection.provider) === provider,
     );
-
 
   useEffect(() => {
     if (conversationId || !resolvesProviderLanding || !landingConversation) return;
@@ -170,9 +169,7 @@ export function SpaceSocial({
     openPicker,
   });
   const mentionNames = useMemo(
-    () => [
-      ...scope.members.map((member) => member.name),
-    ],
+    () => [...scope.members.map((member) => member.name)],
     [scope.members],
   );
 

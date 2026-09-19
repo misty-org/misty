@@ -1,0 +1,48 @@
+name: Promote prepared beta
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Prepared Misty beta tag
+        required: true
+        type: string
+      phase:
+        description: Publish immutable assets first, then feeds after verification
+        required: true
+        type: choice
+        options: [assets, feeds]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: misty-apps-promotion
+  cancel-in-progress: false
+jobs:
+  site:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+      - name: Verify and stage the prepared site without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_PHASE: ${{ inputs.phase }}
+        run: node ../cli/tasks/apps/promote-beta.ts
+        working-directory: apps
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/dist
+  deploy:
+    needs: site
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

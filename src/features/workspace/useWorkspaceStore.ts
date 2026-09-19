@@ -103,7 +103,7 @@ export interface WorkspaceStore extends VirtualWorkspaceState {
   renameLayoutTab: (id: string, title: string) => void;
   reorderLayoutTabs: (ids: string[]) => void;
   setScope: (scopeKey: WorkspaceScopeKey) => void;
-  adoptDefaultScope: (scopeKey: WorkspaceScopeKey) => void;
+  adoptDefaultScope: (scopeKey: WorkspaceScopeKey, validScopes?: Set<string>) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceTab;
   addSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceTab;
   openBrowserTab: (request?: {
@@ -159,8 +159,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const update = switchWorkspaceScope(get(), scopeKey);
         if (update) set(update);
       },
-      adoptDefaultScope: (scopeKey) => {
-        const update = adoptDefaultWorkspaceScope(get(), scopeKey);
+      adoptDefaultScope: (scopeKey, validScopes) => {
+        const update = adoptDefaultWorkspaceScope(get(), scopeKey, validScopes);
         if (update) set(update);
       },
       openSurface: (request) => {
@@ -263,10 +263,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           surfaceId: "official-app",
           groupKey: "app:browser",
           title: browserTabTitle(url),
-          route: officialAppRoute(
-            "browser",
-            get().activeScopeKey.startsWith("space:") ? get().activeScopeKey.slice(6) : undefined,
-          ),
+          route: officialAppRoute("browser"),
           state: createBrowserTabState(url),
           instancePolicy: "multiple",
           forceNew: true,
@@ -891,3 +888,10 @@ function mapDockLeafForView(
   const pane = dockLeaves(root).find((pane) => pane.tabs.some((view) => view.id === viewId));
   return pane ? mapDockLeaf(root, pane.id, update) : root;
 }
+
+export {
+  saveAccountWorkspace,
+  restoreAccountWorkspace,
+  removeAccountWorkspace,
+  resetWorkspaceAccountState,
+} from "./workspaceAccountState";
