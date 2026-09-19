@@ -113,7 +113,7 @@ func (s *SpacesService) executeConversationalSDKTool(ctx context.Context, run *d
 	reference.Approval = func(ctx context.Context, callID, effectID, name, hash, signature, hook, summary string, review db.ProtectedSDKApproval) (*db.AgentToolApproval, bool, error) {
 		approval, allowed, err := s.database.RequireCreatorToolApproval(ctx, run, callID, name, "consequential", hash, signature, hook, summary, review)
 		if err == nil && !allowed && approval.State == "pending" {
-			s.projectLinkedAIInvocationApproval(ctx, run, name)
+			s.projectLinkedAIInvocationApproval(ctx, run, name, approval)
 		}
 		return approval, allowed, err
 	}

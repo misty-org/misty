@@ -67,9 +67,26 @@ func (s *SpacesService) projectLinkedAIInvocationEvent(ctx context.Context, run 
 	}
 }
 
-func (s *SpacesService) projectLinkedAIInvocationApproval(ctx context.Context, run *db.SpaceRun, toolName string) {
+func (s *SpacesService) projectLinkedAIInvocationApproval(ctx context.Context, run *db.SpaceRun, toolName string, approval ...*db.AgentToolApproval) {
 	if _, id := s.restoreLinkedAIInvocation(ctx, run); id != "" {
-		s.aiInvocations.append(id, aiInvocationEvent{Type: "assistant.status", Phase: "approval", Text: "Waiting for your approval to use " + strings.ReplaceAll(toolName, ".", " ") + "."})
+		summary := "Waiting for your approval to use " + strings.ReplaceAll(toolName, ".", " ") + "."
+		approvalID := ""
+		if len(approval) > 0 && approval[0] != nil {
+			approvalID = approval[0].ID
+			if approval[0].Summary != "" {
+				summary = approval[0].Summary
+			}
+		}
+		s.aiInvocations.append(id, aiInvocationEvent{
+			Type:       "assistant.status",
+			Phase:      "approval",
+			Text:       summary,
+			RunID:      run.ID,
+			ToolName:   toolName,
+			Summary:    summary,
+			ID:         approvalID,
+			ArtifactID: approvalID,
+		})
 	}
 }
 
