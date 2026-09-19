@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Button,
 } from "@/shared/ui";
 import { AgentSearchDialog } from "./components/AgentSearchDialog";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -180,7 +181,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
           data-misty-window-titlebar-region="true"
         >
           <h1 className="sr-only">Agents</h1>
-          <button
+          <Button variant="ghost" size="icon-sm"
             className="agent-icon-button"
             aria-label="New chat"
             title="New chat"
@@ -198,12 +199,12 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
             }
           >
             <Plus size={20} />
-          </button>
+          </Button>
         </header>
-        <button className="agents-search" onClick={() => setSearchOpen(true)} aria-label="Search">
+        <Button variant="ghost" className="agents-search" onClick={() => setSearchOpen(true)} aria-label="Search">
           <Search size={17} />
           <span>Search</span>
-        </button>
+        </Button>
         <div className="agents-roster-list">
           {loading && !agents.length ? (
             <p className="agents-list-note" role="status">
@@ -211,7 +212,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
             </p>
           ) : (
             agents.map((agent) => (
-              <button
+              <Button variant="ghost"
                 key={agent.id}
                 className="agent-roster-row"
                 aria-pressed={profile?.id === agent.id && selected !== "new" && !newChat}
@@ -220,19 +221,19 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
               >
                 <AgentAvatar agent={agent} />
                 <span className="agent-roster-copy">{agent.name}</span>
-              </button>
+              </Button>
             ))
           )}
           {!loading && !agents.length && !error && (
-            <button className="agents-list-note" onClick={create}>
+            <Button variant="ghost" className="agents-list-note" onClick={create}>
               Create your first agent
-            </button>
+            </Button>
           )}
         </div>
         <footer className="agents-roster-footer">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="agent-account" aria-label="Account and agent options">
+              <Button variant="ghost" className="agent-account" aria-label="Account and agent options">
                 <span className="agent-account-avatar">
                   {(user?.name || "M")
                     .split(" ")
@@ -241,7 +242,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                     .join("")}
                 </span>
                 <span>{user?.name || "My account"}</span>
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="top" align="start" className="agent-options-menu">
               <DropdownMenuItem onSelect={showActivity}>
@@ -272,10 +273,10 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
               You have unsaved changes or an unsent message. Keep editing, or discard them to
               switch.
             </p>
-            <button className={button} onClick={() => setPendingChange(undefined)}>
+            <Button variant="ghost" className={button} onClick={() => setPendingChange(undefined)}>
               Keep editing
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               className={button}
               onClick={() => {
                 pendingChange();
@@ -284,15 +285,15 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
               }}
             >
               Discard and switch
-            </button>
+            </Button>
           </div>
         )}
         {error && (
           <div role="alert" className="agents-notice">
             <p>{error}</p>
-            <button className={button} onClick={() => void load(user?.id ?? "")}>
+            <Button variant="ghost" className={button} onClick={() => void load(user?.id ?? "")}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
         <header
@@ -300,13 +301,13 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
           data-tauri-drag-region
           data-misty-window-titlebar-region="true"
         >
-          <button
+          <Button variant="ghost" size="icon-sm"
             className="agent-icon-button agents-mobile-back"
             aria-label="Show agents"
             onClick={() => setMobileList(true)}
           >
             <ArrowLeft size={20} />
-          </button>
+          </Button>
           {newChat ? (
             <>
               <label className="agent-recipient-input">
@@ -319,17 +320,17 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                   onChange={(e) => setRecipientSearch(e.target.value)}
                 />
               </label>
-              <button
+              <Button variant="ghost" size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Close new chat"
                 onClick={() => setNewChat(false)}
               >
                 <X size={18} />
-              </button>
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button variant="ghost"
                 className="agent-heading-identity"
                 aria-label="View conversation details"
                 onClick={() =>
@@ -348,12 +349,12 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                       ? "New agent"
                       : profile?.name || "Misty"}
                 </h2>
-              </button>
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="agent-icon-button" aria-label="Conversation actions">
+                  <Button variant="ghost" size="icon-sm" className="agent-icon-button" aria-label="Conversation actions">
                     <MoreHorizontal size={19} />
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="agent-options-menu">
                   <DropdownMenuItem
@@ -392,7 +393,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <button
+              <Button variant="ghost" size="icon-sm"
                 className="agent-icon-button"
                 aria-label={panelOpen ? "Close details" : "Agent details"}
                 title="Agent details"
@@ -400,26 +401,26 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                 onClick={() => (panelOpen ? closePanel() : change(() => setDetails(true), false))}
               >
                 <Monitor size={19} />
-              </button>
+              </Button>
             </>
           )}
         </header>
         {newChat ? (
           <div className="agent-new-chat">
             <div className="agent-recipient-results">
-              <button onClick={create}>
+              <Button variant="ghost" onClick={create}>
                 <Plus size={20} />
                 Create new agent
-              </button>
+              </Button>
               {agents
                 .filter((a) =>
                   a.name.toLocaleLowerCase().includes(recipientSearch.trim().toLocaleLowerCase()),
                 )
                 .map((a) => (
-                  <button key={a.id} onClick={() => select(a.id, true)}>
+                  <Button variant="ghost" key={a.id} onClick={() => select(a.id, true)}>
                     <AgentAvatar agent={a} />
                     {a.name}
-                  </button>
+                  </Button>
                 ))}
             </div>
           </div>
@@ -450,7 +451,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
         >
           <header>
             {settings || history ? (
-              <button
+              <Button variant="ghost" size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Back to details"
                 onClick={() =>
@@ -462,15 +463,15 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                 }
               >
                 <ArrowLeft size={18} />
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button variant="ghost" size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Agent settings"
                 onClick={showSettings}
               >
                 <Settings size={18} />
-              </button>
+              </Button>
             )}
             <h3>
               {settings
@@ -481,14 +482,14 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                   ? "History"
                   : ""}
             </h3>
-            <button
+            <Button variant="ghost" size="icon-sm"
               className="agent-icon-button"
               aria-label="Close settings"
               disabled={editorStatus.busy}
               onClick={closePanel}
             >
               <ChevronsRight size={20} />
-            </button>
+            </Button>
           </header>
           {settings ? (
             <div className="agent-settings-content">
@@ -591,7 +592,7 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
                   )
                   .map((c) => (
-                    <button
+                    <Button variant="ghost"
                       key={c.id}
                       aria-pressed={c.id === activeConversationId}
                       disabled={working}
@@ -610,26 +611,26 @@ export default function NativeAgentsPage({ spaceId: requestedSpaceId }: { spaceI
                           day: "numeric",
                         })}
                       </time>
-                    </button>
+                    </Button>
                   ))
               )}
             </div>
           ) : (
             <div className="agent-details-content">
-              <button
+              <Button variant="ghost"
                 className="agent-workspace-preview"
                 onClick={showActivity}
                 aria-label="View agent activity"
               >
                 <Monitor size={25} />
-              </button>
+              </Button>
               <p className="agent-preview-caption">{profile?.name || "Misty"}'s activity</p>
               <div className="agent-details-routines">
                 <p>View ongoing work, scheduled tasks, and approvals.</p>
-                <button onClick={showActivity}>
+                <Button variant="ghost" onClick={showActivity}>
                   Open activity
                   <ChevronRight size={16} />
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -816,7 +817,7 @@ function AgentEditor({
       }}
     >
       <div className="agent-settings-avatar">
-        <button
+        <Button variant="ghost"
           type="button"
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
@@ -827,7 +828,7 @@ function AgentEditor({
             }
             large
           />
-        </button>
+        </Button>
       </div>
       {avatarEditing && (
         <div className="agent-avatar-picker">
@@ -844,7 +845,7 @@ function AgentEditor({
                     system_managed: profile?.system_managed ?? false,
                   }).id === variant.id;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={variant.id}
                     type="button"
                     aria-label={`${variant.name}, ${variant.expression}`}
@@ -857,7 +858,7 @@ function AgentEditor({
                     <AgentCloudImage variant={variant} />
                     <span>{variant.name}</span>
                     <small>{variant.expression}</small>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -1004,7 +1005,7 @@ function AgentEditor({
                           onChange={(e) => setMemoryDraft(e.target.value)}
                         />
                         <div className="mt-2 flex gap-2">
-                          <button
+                          <Button variant="ghost"
                             type="button"
                             className={button}
                             disabled={!memoryDraft.trim()}
@@ -1025,14 +1026,14 @@ function AgentEditor({
                             }}
                           >
                             Save preference
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="ghost"
                             type="button"
                             className={button}
                             onClick={() => setEditingMemory(undefined)}
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       </label>
                     ) : (
@@ -1042,7 +1043,7 @@ function AgentEditor({
                       {memory.space_id ? "This Space" : "All Spaces"}
                     </span>
                   </div>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     className={button}
                     onClick={() => {
@@ -1051,8 +1052,8 @@ function AgentEditor({
                     }}
                   >
                     Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
                     className={button}
                     onClick={() => {
@@ -1065,12 +1066,12 @@ function AgentEditor({
                     }}
                   >
                     Forget
-                  </button>
+                  </Button>
                 </div>
               ))}
-              <button type="button" className="text-sm underline" onClick={() => void talk()}>
+              <Button variant="ghost" type="button" className="text-sm underline" onClick={() => void talk()}>
                 Ask this agent to change a preference
-              </button>
+              </Button>
             </section>
           )}
         </div>
@@ -1081,15 +1082,15 @@ function AgentEditor({
         </p>
       )}
       <div className="flex flex-wrap gap-3 border-t border-charcoal-border pt-4">
-        <button
+        <Button variant="ghost"
           className={`${button} bg-charcoal-active`}
           disabled={busy || !ready || !draft.name.trim()}
           type="submit"
         >
           {busy ? "Saving…" : profile ? "Save changes" : "Create agent"}
-        </button>
+        </Button>
         {profile && !profile.system_managed && (
-          <button
+          <Button variant="ghost"
             type="button"
             className={`${button} ml-auto`}
             disabled={busy}
@@ -1097,7 +1098,7 @@ function AgentEditor({
           >
             <Trash2 size={15} className="mr-1 inline" />
             Delete agent
-          </button>
+          </Button>
         )}
       </div>
       {confirmDelete && (
@@ -1106,10 +1107,10 @@ function AgentEditor({
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.
           </p>
-          <button type="button" className={button} onClick={() => setConfirmDelete(false)}>
+          <Button variant="ghost" type="button" className={button} onClick={() => setConfirmDelete(false)}>
             Keep agent
-          </button>{" "}
-          <button
+          </Button>{" "}
+          <Button variant="ghost"
             type="button"
             className={button}
             disabled={busy}
@@ -1123,7 +1124,7 @@ function AgentEditor({
             }}
           >
             Delete agent
-          </button>
+          </Button>
         </div>
       )}
     </form>

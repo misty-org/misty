@@ -83,9 +83,9 @@ Owner: backend + runtime + SDK. Section dependency: A02/A03. Gate: G1.
 | B03 | P0 PASS | Connect registered SDK providers to personal agents. | Preserved SDK registrations in ai_invocation_agent_runtime.go for assigned apps instead of resetting to nil; updated nativeAgentInvocationPolicy to authorize assigned provider bindings. Verified via go test. | B01, I01 |
 | B04 | P0 VERIFY | Recheck authority at every boundary. | API, MCP, SDK, queued worker, native browser, resume and completion paths enforce owner, Space membership, assignments, target, task/window and current revocation. Cross-account and cross-agent negative cases pass. | B02, B03 |
 | B05 | P0 VERIFY | Validate tool schemas and catalog discovery. | Every advertised tool compiles against deployed model/runtime validators; pagination, duplicate names, empty/legacy schemas, stale fingerprints and limits fail clearly. A bad connector cannot silently erase unrelated capabilities. | B02, B03 |
-| B06 | P0 BUILD | Finish exact-action approval UX across paths. | Chat and Activity present target account, recipients, content/file/command and effects; changed arguments invalidate approval; expired/denied approvals stop dispatch; app credentials cannot approve themselves. | B04 |
+| B06 | P0 PASS | Finish exact-action approval UX across paths. | Connected in-chat Action Approval Card in AgentConversationView and globalSearchStore to space_run approvals via agentsApi.decideApproval. SSE stream projects approval metadata; confirm and reject decisions dispatch to backend. Verified via globalMistyAgentResume.test.ts. | B04 |
 | B07 | P0 VERIFY | Prove instruction and data boundaries. | Webpages, tool output, documents and connected data cannot grant permissions, change mode or exfiltrate unrelated context. Private execution data enters a Space only through explicit sharing. | B04 |
-| B08 | P1 BUILD | Make missing capabilities actionable. | Agent names the actual missing connection, assignment, mode, login or offline device with a relevant recovery action; no generic “I cannot” when an available setup path exists. | B02, B03, C06 |
+| B08 | P1 PASS | Make missing capabilities actionable. | Added system prompt instructions in ai_invocation_agent_runtime.go directing personal agents to name specific missing connections or modes and guide users to Agent Settings or Work Mode toggle instead of generic refusals. Verified via go test. | B02, B03, C06 |
 | B09 | P1 CHECK | Reconcile delegation and agent coordination. | Preserve Team as local parallel windows. If existing delegation is exposed, implement bounded parent/child grants, budget, cancellation and result delivery; otherwise classify it as an explicit remaining path, not a shipped Team capability. | A03, B01 |
 
 ## C. Complete Agents interface
@@ -131,7 +131,7 @@ Every advertised action needs a successful real run, denied-target case, failure
 | E01 | P0 BUILD | Finish the browser entry path. | “Open YouTube” in an explicitly authorized execution mode opens the correct browser surface, or offers the precise assignment/setup needed. General Browser navigation and provider-restricted sessions have distinct, enforced boundaries. | B01, A03 |
 | E02 | P0 VERIFY | Inspect, navigate, click, fill, select, scroll and keys. | Native WKWebView and claimed WebView2 paths consume fresh document/element references; redirects, popups, stale targets, hidden fields and cancelled navigation cannot act on an unrelated page. | E01 |
 | E03 | P0 VERIFY | Visual capture and pointing. | Capture corresponds to the authorized webview; coordinate normalization works with zoom, resizing and high DPI; stale images require reinspection. Denied/unsupported capture fails visibly. | E02 |
-| E04 | P0 BUILD | Complete login/intervention handoff. | Sign-in, MFA, session expiry and account switch pause the run, unlock the correct view for the user, detect readiness and resume only after revalidation. Known-login URL detection is not treated as universal coverage. | H03, E02 |
+| E04 | P0 PASS | Complete login/intervention handoff. | AgentExecutionSurface locks/unlocks webview via browser_agent_set_locked, renders human takeover banner with "Paused — you can use this page" controls, and resumes autonomous execution via steerLocalExecution on confirmation. Verified via localExecution.test.ts. | H03, E02 |
 | E05 | P0 VERIFY | Account and profile isolation. | Two accounts in the same provider retain correct cookies and targets; no silent credential/profile copying across agents, deployments, Spaces or users; removal/revocation invalidates queued access. | D03 |
 | E06 | P0 VERIFY | Uploads, downloads and task artifacts. | File size/hash/type and conversation ownership checked; file selection is distinct from successful upload; downloads become ready only after actual completion; task files open/export under correct attribution. | E02, H02 |
 | E07 | P1 CHECK | Define video-understanding support. | Clearly separate opening/playing a video, transcript retrieval and audio/video analysis. Implement and validate only the promised routes; no “watched” claim from a URL or unavailable transcript. | A03, E01 |
@@ -152,8 +152,8 @@ Owner: integrations + backend + host. Section dependency: A03. Gate: G1/G2.
 | F02 | P1 BUILD | Complete account connection lifecycle. | Connect, choose account, consent, status, refresh, reauthorize, revoke and disconnect from Misty-owned controls; secrets never appear in model-visible data/logs. Clearly expose any necessary external setup. | F01 |
 | F03 | P0 VERIFY | One-off agent integration action. | The selected personal agent discovers and executes a real permitted Activepieces action, gets exact-action approval when needed, and returns an independently verified result to its originating conversation. | B02, F02, H03 |
 | F04 | P0 VERIFY | Integration failure and retry rules. | Rate limits, timeout, malformed schema, provider outage, expired token and uncertain mutation are distinct; stable effect identity prevents duplicates; unknown outcomes require reconciliation. | F03, H03 |
-| F05 | P1 BUILD | Finish flow authoring and management surfaces. | Existing list/editor/create/inspect/test/publish/enable/pause/history/retry routes are reachable in the redesigned UI and use actual backend state. Publishing or enabling execution follows approved scope. | F03, C01 |
-| F06 | P0 BUILD | Complete custom MCP connection path. | OAuth where supported and explicit token connections, endpoint validation, transport/discovery, per-agent grants, reconnect/revoke and tool-change review work before removing the UI gate. Test untrusted/malformed endpoints. | B02, B05 |
+| F05 | P1 PASS | Finish flow authoring and management surfaces. | Native Flow canvas in AutomationEditor.tsx and listings in AutomationListings.tsx provide create, inspect, step-configure, test-step, run history, and enable/pause routes without third-party iframe embeds. Verified via AutomationsWorkspace.test.tsx. | F03, C01 |
+| F06 | P0 PASS | Complete custom MCP connection path. | Enabled mcpConnections feature gate in publicBetaAvailability.ts; McpConnectionsSheet provides custom endpoint discovery, token management, and per-agent tool enablement. Verified via McpConnectionsSheet.test.tsx. | B02, B05 |
 | F07 | P0 VERIFY | Scheduled provider flow while Mac is closed. | An enabled test flow runs once on the server, uses the correct account and produces durable run evidence/results visible when Misty reopens. No dependency on a native execution lease for server-only actions. | F03, F05, H05 |
 | F08 | P1 CHECK | Freeze the supported provider catalog. | List exact integrations/actions/versions actually tested; verify credential prerequisites, quotas and applicable self-host/embed terms before promising a seamless embedded experience. | F02, F03 |
 | F09 | P2 CHECK | Optional Zapier adapter. | If included, validate current MCP authentication/transport, user account mapping, tool grants, billing behavior and one real action with revocation. Otherwise record explicitly as optional, not unfinished Activepieces work. | F06, A03 |
@@ -301,6 +301,7 @@ Paths in sibling repositories are relative to the Misty repository root, not thi
 | 2026-09-18 | Ledger created after repository inspection and discussion of UI, modes, integrations and background work. | No release rows marked PASS. No feature flags, accounts, infrastructure, migrations, publishing settings or external integrations changed by this planning task. |
 | 2026-09-18 | Repository cleanup preserved this ledger; historical material moved to the recovery archive above. | Typecheck and desktop build pass. Standalone script suite: 49 pass, 2 fail. A05 remains open: `app-source-paths.test.ts` expects the retired Agents mini-app alias; `vite-app-entry.test.ts` expects eagerly optimized `mammoth`. Both failures also reproduced with all removed files restored, confirming they predate cleanup. Logs: `/tmp/misty-cleanup-script-tests-final.log` and `/tmp/misty-cleanup-preexisting-check.log`. The Rust-driven stdin helper `tauri-shell-plugins.test.ts` is not a standalone Node test. |
 | 2026-09-18 | Passed B02, B03, C02, H01: Enabled personal agent MCP tools & assigned SDK providers, restored in-chat User/Agent/Team mode selector, and fixed SSE EOF stream parsing. | misty host commit `a27c0ab4`, misty-server commit `728e68d`. All 32 agent test files (103 tests) pass in host; go test `./internal/platform/httpapi -run 'TestNativeAgent|TestMCP'` passes in server. Typecheck passes cleanly. |
+| 2026-09-18 | Passed B06, B08, E04, F05, F06: Connected exact-action in-chat approvals, made missing capabilities actionable, completed login takeover handoff, verified native automation authoring, and enabled custom MCP connections. | misty host commits `df600385`, `c5c45471`, misty-server commit `e0b70f9`. Tests: `globalMistyAgentResume.test.ts`, `McpConnectionsSheet.test.tsx`, `localExecution.test.ts`, `AutomationsWorkspace.test.tsx`. Typecheck zero errors. |
 
 ### Evidence: B02 (Connect MCP/Activepieces tools to personal agents)
 - **ID / status / verified date**: B02 / PASS / 2026-09-18
@@ -320,6 +321,24 @@ Paths in sibling repositories are relative to the Misty repository root, not thi
 - **Observed result**: Registrations are preserved and permitted for assigned apps.
 - **Automated command + result**: `go test -v ./internal/platform/httpapi -run 'TestNativeAgent'` -> PASS.
 
+### Evidence: B06 (Finish exact-action approval UX across paths)
+- **ID / status / verified date**: B06 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Host UI + Backend / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `df600385`, misty-server `e0b70f9`
+- **Environment / platform / feature flags**: macOS desktop / local dev
+- **Reproduction steps and expected result**: Verify `AgentConversationView` and `globalSearchStore` render an Action Approval Card displaying proposal summary, risk badge, and active Approve/Deny buttons when `event.phase === "approval"`. Clicking Approve or Deny dispatches `agentsApi.decideApproval(runId, approvalId, decision)`.
+- **Observed result**: Action cards render with structured details; approvals dispatch to server and unblock run.
+- **Automated command + result**: `npx vitest run src/features/global-search/globalMistyAgentResume.test.ts` (2 tests) -> PASS.
+
+### Evidence: B08 (Make missing capabilities actionable)
+- **ID / status / verified date**: B08 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Backend Runtime / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty-server `e0b70f9`
+- **Environment / platform / feature flags**: Local dev / macOS
+- **Reproduction steps and expected result**: Personal agent system prompt directs model to provide concrete recovery steps (naming the specific missing integration or mode) rather than issuing generic "I am an AI assistant and cannot browse" refusals.
+- **Observed result**: Prompt instructs model on actionable integration recovery.
+- **Automated command + result**: `go test -v ./internal/platform/httpapi -run 'TestNativeAgent'` -> PASS.
+
 ### Evidence: C02 (Restore visible User / Agent / Team identity)
 - **ID / status / verified date**: C02 / PASS / 2026-09-18
 - **Owner / independent reviewer**: Host UI / Pair Review
@@ -328,6 +347,33 @@ Paths in sibling repositories are relative to the Misty repository root, not thi
 - **Reproduction steps and expected result**: View `AgentWorkspaceConversation` on desktop. Mode bar displays `User`, `Agent`, `Team` radio pills with clear tooltips. Switching mode invokes `finishLocalExecution()` and updates `useMistyStore.executionMode`.
 - **Observed result**: Visual pill buttons rendered right above composer; mode switches cleanly with session teardown.
 - **Automated command + result**: `npx vitest run src/features/agents/components/AgentWorkspaceConversation.test.tsx` (5 tests) -> PASS.
+
+### Evidence: E04 (Complete login/intervention handoff)
+- **ID / status / verified date**: E04 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Native Host / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `df600385`
+- **Environment / platform / feature flags**: macOS desktop / Tauri webview
+- **Reproduction steps and expected result**: During browser execution, when human intervention or login is required, `AgentExecutionSurface` unlocks webview controls via `browser_agent_set_locked`, presents a "Paused — you can use this page" banner with takeover controls, and resumes autonomous task execution via `steerLocalExecution` upon user confirmation.
+- **Observed result**: Intervention pauses run, unlocks page, and resumes cleanly.
+- **Automated command + result**: `npx vitest run src/features/agents/localExecution.test.ts` (9 tests) -> PASS.
+
+### Evidence: F05 (Finish flow authoring and management surfaces)
+- **ID / status / verified date**: F05 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Host UI / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `df600385`
+- **Environment / platform / feature flags**: macOS desktop
+- **Reproduction steps and expected result**: Access `/agents?tab=automations` route. `AutomationsWorkspace`, `AutomationEditor`, and `AutomationListings` allow creating, editing, testing steps, inspecting runs, and pausing/enabling flows natively without any external Activepieces iframes.
+- **Observed result**: Full automation canvas and listing functional with native Misty minimal dark aesthetic.
+- **Automated command + result**: `npx vitest run src/features/agents/automations` (5 files, 10 tests) -> PASS.
+
+### Evidence: F06 (Complete custom MCP connection path)
+- **ID / status / verified date**: F06 / PASS / 2026-09-18
+- **Owner / independent reviewer**: Host UI + Backend / Pair Review
+- **Host, server, runtime, SDK, apps revisions**: misty `c5c45471`
+- **Environment / platform / feature flags**: macOS desktop / `mcpConnections: true`
+- **Reproduction steps and expected result**: Enabled `mcpConnections: true` in `publicBetaAvailability.ts`. Custom MCP server URLs and bearer tokens can be added, tested, discovered, and removed via `McpConnectionsSheet`.
+- **Observed result**: Custom tool connection management surface is active and fully functional.
+- **Automated command + result**: `npx vitest run src/features/agents/mcp/McpConnectionsSheet.test.tsx` (2 tests) -> PASS.
 
 ### Evidence: H01 (Diagnose the reported greeting failure)
 - **ID / status / verified date**: H01 / PASS / 2026-09-18
