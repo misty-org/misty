@@ -68,8 +68,8 @@ export const ChromeTabStrip = memo(function ChromeTabStrip(props: ChromeTabStrip
   }, [props, registerTabDropTarget]);
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
-    const tabs = reorder.ref.current;
-    if (!tabs || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    const tabs = event.currentTarget;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
     tabs.scrollLeft += event.deltaY;
     event.preventDefault();
   };

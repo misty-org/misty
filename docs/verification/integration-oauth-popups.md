@@ -26,7 +26,7 @@ Main-window readiness accepts the invoking `Webview` rather than requiring a sin
 Run the native fixture from the host repository:
 
 ```sh
-MISTY_SDK_PROBE_OAUTH_POPUPS=1 MISTY_SDK_PROBE_TIMEOUT_SECONDS=120 node scripts/sdk-package-probe-run.mjs chat ../misty-apps
+MISTY_SDK_PROBE_OAUTH_POPUPS=1 MISTY_SDK_PROBE_TIMEOUT_SECONDS=120 node cli/tasks/sdk-package-probe-run.ts chat ./apps
 ```
 
 The runner uses temporary installation and profile roots; this fixture uses synthetic loopback pages and does not access real provider credentials. Passing it verifies popup mechanics, not successful login to live X, Messenger, or their identity providers. Native changes require restarting the rebuilt desktop app.

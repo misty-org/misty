@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    "apps.ts",
+    "catalog.ts",
+    "mobile-sdk.ts",
+    "sdk.ts",
+    "react.tsx",
+    "styles.css",
+    "store.tsx",
+    "store.css"
+  ]
+}

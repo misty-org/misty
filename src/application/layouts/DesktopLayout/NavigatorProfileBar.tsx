@@ -1,21 +1,15 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, cn } from "@/shared/ui";
 import { Settings } from "lucide-react";
 import type { RefObject } from "react";
-import { ActivityMenu } from "./ActivityMenu";
+import { HelpMenu } from "./HelpMenu";
 import { ProfileNavButton } from "./NavRail";
 import {
   navigatorFloatingIslandClass,
-  navigatorFocusRingClass,
+  navigatorHierarchyTriggerClass,
   navigatorIslandActionClass,
 } from "./styles";
 
-/**
- * The account dock, floating over the navigator's scrolling body.
- *
- * It sits on top of the rail rather than in the column flow so the Spaces and
- * Tools lists can scroll the full height behind it and it never scrolls away.
- * The navigation list reserves room for it with its own bottom padding.
- */
+/** Fixed account island below the navigation scroll area. */
 export function NavigatorProfileBar(props: {
   profileAnchorRef: RefObject<HTMLButtonElement | null>;
   profileOpen: boolean;
@@ -25,8 +19,8 @@ export function NavigatorProfileBar(props: {
 }) {
   return (
     <div
-      className="absolute inset-x-2 bottom-2 z-20"
-      data-navigator-profile-bar="floating"
+      className="relative z-20 mx-3 mb-2 mt-1 shrink-0"
+      data-navigator-profile-bar="fixed"
       data-misty-window-drag-block="true"
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -36,16 +30,13 @@ export function NavigatorProfileBar(props: {
           open={props.profileOpen}
           onClick={props.onProfileClick}
           className={cn(
-            "group/profile relative flex min-w-0 items-center rounded-lg border-0 bg-transparent",
-            "text-sm text-cream no-underline outline-none transition-colors",
-            "misty-navigator-row-target h-9 flex-1 justify-start gap-2 px-1.5 hover:bg-charcoal-active",
-            navigatorFocusRingClass,
-            props.profileOpen && "bg-charcoal-active",
+            navigatorHierarchyTriggerClass,
+            "group/profile relative flex-1 justify-start text-sm font-semibold tracking-[-0.015em] hover:bg-charcoal-active focus-visible:bg-charcoal-active",
+            props.profileOpen && "bg-charcoal-active text-cream-bright",
           )}
-          avatarClassName="size-7 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
+          avatarClassName="size-6 border-0 bg-transparent ring-0 group-hover/profile:ring-0"
           showAccountName
         />
-        <ActivityMenu className={cn(navigatorIslandActionClass)} />
         <TooltipProvider delayDuration={450}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -64,6 +55,7 @@ export function NavigatorProfileBar(props: {
             <TooltipContent>Settings</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <HelpMenu className={navigatorIslandActionClass} />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import type { MistyFilePhotoEditor } from "@misty/sdk";
-import type { PreviewErrorComponent } from "@/features/files/explorer/components/globalPreview/PreviewRuntime";
+import type { PreviewErrorComponent } from "@/features/file-ui";
 import { FilePreviewMount, FilePreviewRenderersContext } from "./FilePdfPreview";
 export type PhotoEditorProps = MistyFilePhotoEditor;
 export function PhotoEditorView({

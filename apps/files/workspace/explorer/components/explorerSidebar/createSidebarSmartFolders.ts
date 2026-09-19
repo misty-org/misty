@@ -1,0 +1,109 @@
+import type { SavedSearch } from "@/native/contracts";
+import { errorText } from "@/shared/lib/format";
+import { useEffect, useState } from "react";
+import type { ExplorerSidebarProps } from "../../model/interfaces/components/ExplorerSidebar";
+import type { SmartFolderDraft } from "../../model/interfaces/components/ExplorerSidebarSupport";
+import type { SmartFolderDialogState } from "../../model/types/components/ExplorerSidebarSupport";
+import {
+  createSmartFolderDialogState,
+  smartFolderId,
+  smartFolderMatchMode,
+  smartFolderQueryFromRules,
+  smartFolderRulesWithMode,
+  sortSavedSearches,
+} from "../ExplorerSidebarSupport";
+
+export interface SidebarSmartFolderServices {
+  snapshot(): Promise<{ searches: SavedSearch[] }>;
+  save(search: SavedSearch): Promise<{ searches: SavedSearch[] }>;
+  delete(id: string): Promise<{ searches: SavedSearch[] }>;
+  openSearch(path: string, query: string): Promise<void>;
+}
+export function createSidebarSmartFolders(services: SidebarSmartFolderServices) {
+  /** The sidebar's saved-search list and the dialog that edits it. */
+  return function useSidebarSmartFolders(sidebar: ExplorerSidebarProps) {
+    const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+    const [smartFolderDialog, setSmartFolderDialog] = useState<SmartFolderDialogState>(null);
+    const [smartFolderError, setSmartFolderError] = useState<string | null>(null);
+    const [smartFoldersLoading, setSmartFoldersLoading] = useState(false);
+
+    useEffect(() => {
+      let disposed = false;
+      setSmartFoldersLoading(true);
+      void services
+        .snapshot()
+        .then((snapshot) => {
+          if (disposed) return;
+          setSavedSearches(sortSavedSearches(snapshot.searches));
+          setSmartFolderError(null);
+        })
+        .catch((error) => {
+          if (!disposed) setSmartFolderError(errorText(error));
+        })
+        .finally(() => {
+          if (!disposed) setSmartFoldersLoading(false);
+        });
+      return () => {
+        disposed = true;
+      };
+    }, []);
+
+    const openSmartFolderDialog = (search?: SavedSearch) => {
+      setSmartFolderError(null);
+      setSmartFolderDialog(createSmartFolderDialogState(search));
+    };
+
+    const saveSmartFolder = async (draft: SmartFolderDraft) => {
+      const name = draft.name.trim();
+      if (!name) return;
+      const search: SavedSearch = {
+        id: draft.id || smartFolderId(),
+        name,
+        query: draft.query.trim() || smartFolderQueryFromRules(draft.rules, draft.matchMode),
+        rules: smartFolderRulesWithMode(draft.rules, draft.matchMode),
+        updatedAtMs: Date.now(),
+      };
+      try {
+        const snapshot = await services.save(search);
+        setSavedSearches(sortSavedSearches(snapshot.searches));
+        setSmartFolderDialog(null);
+        setSmartFolderError(null);
+      } catch (error) {
+        setSmartFolderError(errorText(error));
+      }
+    };
+
+    const deleteSmartFolder = async (id: string) => {
+      try {
+        const snapshot = await services.delete(id);
+        setSavedSearches(sortSavedSearches(snapshot.searches));
+        setSmartFolderDialog(null);
+        setSmartFolderError(null);
+      } catch (error) {
+        setSmartFolderError(errorText(error));
+      }
+    };
+
+    const runSmartFolder = async (search: SavedSearch) => {
+      const query =
+        search.query.trim() ||
+        smartFolderQueryFromRules(search.rules, smartFolderMatchMode(search.rules));
+      if (!query) return;
+      await services.openSearch(sidebar.activePath || sidebar.homePath, query);
+    };
+
+    return {
+      savedSearches,
+      setSavedSearches,
+      smartFolderDialog,
+      setSmartFolderDialog,
+      smartFolderError,
+      setSmartFolderError,
+      smartFoldersLoading,
+      openSmartFolderDialog,
+      saveSmartFolder,
+      deleteSmartFolder,
+      runSmartFolder,
+    };
+  };
+}

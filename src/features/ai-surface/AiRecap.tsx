@@ -1,4 +1,4 @@
-import { CalendarClock, Lightbulb, X } from "lucide-react";
+import { CalendarClock, X } from "lucide-react";
 import type { AiRecapRecord } from "./api";
 import { useAiSurfaceStore } from "./store";
 import type { AiSurfaceAdapter } from "./types";
@@ -69,60 +69,5 @@ export function AiRecapCard({ recap }: { recap: AiRecapRecord }) {
         </div>
       ) : null}
     </section>
-  );
-}
-
-export function AiProactiveNudge({
-  accountId,
-  paneId,
-  adapter,
-  reason,
-  onDismiss,
-  onOpen,
-  onSnooze,
-}: {
-  accountId: string;
-  paneId: string;
-  adapter: AiSurfaceAdapter;
-  reason: string;
-  onDismiss: () => void;
-  onOpen: () => void;
-  onSnooze: () => void;
-}) {
-  const setPrompt = useAiSurfaceStore((state) => state.setPrompt);
-  const action = adapter.getSuggestedActions?.()[0];
-  if (!action || !accountId) return null;
-  return (
-    <aside className="misty-ai-proactive-nudge" aria-label="Misty suggestion">
-      <Lightbulb className="size-3.5 shrink-0 text-sage-fg" aria-hidden />
-      <button
-        type="button"
-        className="min-w-0 flex-1 text-left"
-        onClick={() => {
-          setPrompt(accountId, paneId, action.prompt);
-          onOpen();
-        }}
-      >
-        <span className="block truncate text-xs font-medium text-cream hover:text-cream-bright">
-          Review “{action.label}”
-        </span>
-        <span className="mt-0.5 block truncate text-[10px] text-cream-muted">{reason}</span>
-      </button>
-      <button
-        type="button"
-        className="rounded px-1.5 py-1 text-[10px] text-cream-muted hover:bg-charcoal-card hover:text-cream"
-        onClick={onSnooze}
-      >
-        Snooze
-      </button>
-      <button
-        type="button"
-        className="rounded p-0.5 text-cream-muted hover:text-cream"
-        aria-label="Dismiss Misty suggestion"
-        onClick={onDismiss}
-      >
-        <X className="size-3" />
-      </button>
-    </aside>
   );
 }

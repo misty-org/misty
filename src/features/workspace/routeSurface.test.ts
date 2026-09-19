@@ -6,8 +6,14 @@ describe("workspace deep links", () => {
     expect(workspaceSurfaceFromRoute("/settings")).toBeNull();
   });
 
-  it("keeps legacy global Home outside the app workspace", () => {
-    expect(workspaceSurfaceFromRoute("/home")).toBeNull();
+  it("opens global Home without binding its route to a Space", () => {
+    expect(workspaceSurfaceFromRoute("/home")).toMatchObject({
+      surfaceId: "home",
+      groupKey: "tool:home",
+      route: "/home",
+      instancePolicy: "single",
+    });
+    expect(workspaceSurfaceFromRoute("/home")?.scopeKey).toBeUndefined();
   });
 
   it("opens Home inside its Space scope", () => {
@@ -19,24 +25,24 @@ describe("workspace deep links", () => {
     });
   });
 
-  it("redirects legacy Space tools into App-owned tabs", () => {
+  it("opens collaborative tools as built-in Space tabs", () => {
     expect(workspaceSurfaceFromRoute("/spaces/product%20launch/planner")).toMatchObject({
-      surfaceId: "official-app",
-      groupKey: "app:planner",
+      surfaceId: "space",
+      groupKey: "space:product launch:planner",
       title: "Planner",
-      route: "/apps/planner?space=product+launch",
+      route: "/spaces/product%20launch/planner/tasks/board",
     });
   });
 
-  it("keeps Social separate and maps legacy Chat routes into its group", () => {
+  it("groups Chat routes within their Space", () => {
     expect(workspaceSurfaceFromRoute("/spaces/family/social")).toMatchObject({
-      groupKey: "app:chat",
-      title: "Social",
-      route: "/apps/social?space=family",
+      groupKey: "space:family:social",
+      title: "Chat",
+      route: "/spaces/family/social/misty",
     });
     expect(workspaceSurfaceFromRoute("/spaces/family/chat")).toMatchObject({
-      groupKey: "app:chat",
-      title: "Social",
+      groupKey: "space:family:social",
+      title: "Chat",
     });
   });
 
@@ -45,18 +51,18 @@ describe("workspace deep links", () => {
 
     expect(workspaceSurfaceFromRoute(route)).toMatchObject({
       groupKey: "app:chat",
-      route: "/apps/social?space=family&provider=messenger",
+      route: "/apps/social?provider=messenger&space=family",
     });
   });
 
   it("matches nested routes only within the same Space tool tab", () => {
     const tab = {
-      surfaceId: "official-app" as const,
-      groupKey: "app:journal" as const,
+      surfaceId: "space" as const,
+      groupKey: "space:product launch:journal" as const,
     };
 
     expect(workspaceTabMatchesRoute(tab, "/apps/journal?space=product%20launch")).toBe(true);
-    expect(workspaceTabMatchesRoute(tab, "/apps/journal/drawings/one")).toBe(true);
+    expect(workspaceTabMatchesRoute(tab, "/spaces/product%20launch/drawings/one")).toBe(true);
     expect(workspaceTabMatchesRoute(tab, "/apps/planner?space=product%20launch")).toBe(false);
   });
 
@@ -118,22 +124,29 @@ describe("workspace deep links", () => {
     });
   });
 
-  it("opens every acquired built-in through the App runtime", () => {
+  it("keeps personal apps in the App runtime and restores shared links to Spaces", () => {
     expect(workspaceSurfaceFromRoute("/apps/files")).toMatchObject({
       surfaceId: "official-app",
       groupKey: "app:files",
       route: "/apps/files",
     });
     expect(workspaceSurfaceFromRoute("/apps/social?space=family")).toMatchObject({
-      surfaceId: "official-app",
-      groupKey: "app:chat",
-      title: "Social",
+      surfaceId: "space",
+      groupKey: "space:family:social",
+      title: "Chat",
     });
     expect(workspaceSurfaceFromRoute("/apps/planner?space=family")).toMatchObject({
-      surfaceId: "official-app",
-      groupKey: "app:planner",
-      route: "/apps/planner?space=family",
+      surfaceId: "space",
+      groupKey: "space:family:planner",
+      route: "/spaces/family/planner/tasks/board",
     });
+  });
+
+  it("does not change the selected Space when a personal app carries its saved context", () => {
+    expect(workspaceSurfaceFromRoute("/apps/browser?space=family")?.scopeKey).toBeUndefined();
+    expect(
+      workspaceSurfaceFromRoute("/apps/planner?provider=notion&space=family")?.scopeKey,
+    ).toBeUndefined();
   });
 
   it("canonicalizes legacy Code routes into the Code App", () => {
@@ -144,4 +157,9 @@ describe("workspace deep links", () => {
       instancePolicy: "multiple",
     });
   });
+});
+
+it("distinguishes personal Storage from the shared Space Library", () => {
+  expect(workspaceSurfaceFromRoute("/apps/library?provider=google-drive")?.title).toBe("Storage");
+  expect(workspaceSurfaceFromRoute("/spaces/family/library")?.title).toBe("Library");
 });

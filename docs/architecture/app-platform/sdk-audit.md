@@ -2,7 +2,7 @@
 
 Conservative symbol reachability from ten official app entries and six catalog extensions, including lazy imports. Referenced stores/objects include all of their methods. Dynamic calls are retained for manual classification; this is an inventory, not proof of runtime coverage.
 
-Regenerate with `node scripts/audit-app-sdk.mjs`.
+Regenerate with `node cli/tasks/audit-app-sdk.ts`.
 
 | App | Catalog desktop runtime | Reachable source files | Native commands | Event call sites | Server/network call sites |
 | --- | --- | ---: | ---: | ---: | ---: |

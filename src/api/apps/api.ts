@@ -1,3 +1,4 @@
+import { officialAppPresentation } from "./appPresentation";
 import { appSessionRequests as requestSession } from "./sessionRequests";
 import { matchingDevelopmentApp } from "./developmentRelease";
 import type { SpaceAppInstallation as SharedSpaceAppInstallation } from "@misty/sdk";
@@ -18,6 +19,8 @@ export const OFFICIAL_APP_IDS = new Set([
   "code",
   "terminal",
   "transfers",
+  "music",
+  "media",
 ]);
 
 export interface OfficialApp {
@@ -61,7 +64,6 @@ export interface OfficialApp {
 
 export interface SpaceAppInstallation extends Pick<
   SharedSpaceAppInstallation,
-  | "space_id"
   | "app_id"
   | "state"
   | "installed_version"
@@ -73,6 +75,8 @@ export interface SpaceAppInstallation extends Pick<
   | "uninstalled_at"
   | "updated_at"
 > {
+  space_id?: string; // Legacy provenance only; never installation authority.
+  consent_required?: boolean;
   release_metadata?: OfficialApp;
   /** A local presentation preference; it never grants access. */
   pinned?: boolean;
@@ -204,8 +208,13 @@ export function finishOnboarding(
 
 export async function loadOfficialAppCatalog(
   localDevelopmentCatalog = import.meta.env.DEV && !!import.meta.env.VITE_MISTY_APPS_DIRECTORY,
+  signal?: AbortSignal,
 ): Promise<OfficialAppCatalogResponse> {
-  const serverCatalog = await appRequest<OfficialAppCatalogResponse>("/apps");
+  const serverCatalog = await appRequest<OfficialAppCatalogResponse>(
+    "/apps",
+    signal ? { signal } : undefined,
+  );
+  serverCatalog.apps = serverCatalog.apps.map(officialAppPresentation);
   if (!localDevelopmentCatalog) return serverCatalog;
 
   try {
@@ -213,6 +222,7 @@ export async function loadOfficialAppCatalog(
       cache: "no-store",
       credentials: "omit",
       headers: { Accept: "application/json" },
+      signal,
     });
     if (!response.ok) return serverCatalog;
     const localCatalog = (await response.json()) as OfficialAppCatalogResponse;
@@ -242,8 +252,11 @@ export async function localAppComponentReady(url: URL): Promise<boolean> {
 
 export const appsApi = {
   catalog: loadOfficialAppCatalog,
-  installations: (spaceId: string) =>
-    appRequest<{ apps: SpaceAppInstallation[] }>(spaceAppsPath(spaceId)),
+  installations: (spaceId = "", signal?: AbortSignal) =>
+    appRequest<{ apps: SpaceAppInstallation[] }>(
+      spaceAppsPath(spaceId),
+      signal ? { signal } : undefined,
+    ),
   install: (spaceId: string, appId: string, permissionVersion: number) =>
     appRequest<SpaceAppInstallation>(`${spaceAppsPath(spaceId)}/${encodeURIComponent(appId)}`, {
       method: "PUT",
@@ -259,7 +272,7 @@ export const appsApi = {
       method: "DELETE",
     }),
   createSession: (appId: string, spaceId = "", authorityGeneration?: number) =>
-    requestSession(appId, spaceId, authorityGeneration, () =>
+    requestSession(appId, "", authorityGeneration, () =>
       appRequest<OfficialAppSession>(
         `${spaceAppsPath(spaceId)}/${encodeURIComponent(appId)}/sessions`,
         { method: "POST", body: JSON.stringify({}) },
@@ -268,7 +281,7 @@ export const appsApi = {
   finishOnboarding,
 };
 
-function spaceAppsPath(spaceId: string) {
-  if (!spaceId) throw new Error("Choose a Space to use its apps.");
-  return `/spaces/${encodeURIComponent(spaceId)}/apps`;
+// Keep the argument during source compatibility migration; it cannot select authority.
+function spaceAppsPath(_spaceId: string) {
+  return "/me/apps";
 }

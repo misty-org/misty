@@ -12,9 +12,12 @@ import { canonicalSpaceRoute } from "./spaceRouteNormalization";
 export { default, SpacesIndexRedirect } from "./components/SpacesShell";
 
 export function SpaceDetail() {
-  const { spaceId = "", section = "home", studioKind = "" } = useParams();
+  const { spaceId = "", section: routeSection, studioKind: routeKind } = useParams();
   const { user } = useAuth();
   const location = useLocation();
+  const parts = location.pathname.split("/").filter(Boolean);
+  const section = routeSection ?? parts[2] ?? "home";
+  const studioKind = routeKind ?? parts[3] ?? "";
   const currentRoute = `${location.pathname}${location.search}${location.hash}`;
   const canonicalRoute = canonicalSpaceRoute(currentRoute);
   const { spaces, loadSpace } = useSpacesStore(

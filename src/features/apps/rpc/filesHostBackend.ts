@@ -1,3 +1,4 @@
+import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import { createSpacePeerTransfers } from "../spacePeerTransfers";
 import { createSharedSpacePeerBridge } from "../sharedSpacePeerBridge";
@@ -235,6 +236,13 @@ export function createFilesHostBackend(
     async manage(kind) {
       scope.assert();
       options.navigate(kind === "remote" ? "/providers" : "/settings?section=devices");
+    },
+    async previewUrl(handle) {
+      await options.native("files.stat", { handle });
+      const owned = await file<{ path: string; kind: string }>("resolve", { handle });
+      scope.assert("files.read");
+      if (owned.kind !== "file") throw new Error("Choose a file to preview.");
+      return safeTauriAssetUrl(owned.path);
     },
     async preview(handle, maxDimension, name) {
       await options.native("files.stat", { handle });

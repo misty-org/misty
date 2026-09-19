@@ -26,6 +26,11 @@ export function getAppliedAppZoom(): number {
   return appliedAppZoom;
 }
 
+/** Native child bounds must use physical renderer scale, not the displayed UI percentage. */
+export function getAppliedAppRenderScale(): number {
+  return appZoomRenderScale(appliedAppZoom);
+}
+
 /**
  * Sets the zoom from outside the keyboard shortcuts — currently the Appearance
  * settings row. Both paths write the same storage key and announce the result

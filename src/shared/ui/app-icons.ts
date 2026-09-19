@@ -1,8 +1,9 @@
 import {
   ArrowLeftRight,
+  Package,
   BookOpenText,
   Bot,
-  CheckSquare2,
+  ListTodo,
   Code2,
   FolderOpen,
   Globe2,
@@ -12,6 +13,8 @@ import {
   Notebook,
   SquareTerminal,
   Compass,
+  Music,
+  Film,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,19 +26,23 @@ export const appIcons = {
   journal: Notebook,
   files: FolderOpen,
   agents: Bot,
-  planner: CheckSquare2,
-  library: BookOpenText,
+  planner: ListTodo,
+  library: Package,
   browser: Globe2,
   code: Code2,
   terminal: SquareTerminal,
   transfers: ArrowLeftRight,
   marketplace: Compass,
+  music: Music,
+  media: Film,
 } satisfies Record<string, LucideIcon>;
 
 export const appIconStrokeWidth = 2;
 
 /** Catalog IDs retain `chat`; workspace routes and navigation use `social`. */
-export function appIcon(appId: string): LucideIcon | undefined {
+export function appIcon(appId: string, context: "app" | "space" = "app"): LucideIcon | undefined {
+  // Storage retains the legacy catalog ID `library`; Space Library is a native tool.
+  if (appId === "library" && context === "space") return BookOpenText;
   const id = appId === "chat" ? "social" : appId;
   return Object.prototype.hasOwnProperty.call(appIcons, id)
     ? appIcons[id as keyof typeof appIcons]

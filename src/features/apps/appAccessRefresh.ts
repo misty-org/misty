@@ -1,10 +1,10 @@
 import { useAppsStore } from "./useAppsStore";
 
-// One authority refresh per Space, regardless of how many app views are mounted.
+// One authority refresh per account, regardless of how many app views are mounted.
 const refreshes = new Map<string, { users: number; release(): void }>();
 const refreshMs = 15_000;
-export function retainAppAccessRefresh(accountId: string, spaceId: string): () => void {
-  const key = JSON.stringify([accountId, spaceId]);
+export function retainAppAccessRefresh(accountId: string, spaceId = ""): () => void {
+  const key = JSON.stringify([accountId]);
   let entry = refreshes.get(key);
   if (!entry) {
     let lastRefresh = Date.now();

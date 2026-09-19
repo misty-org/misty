@@ -1,4 +1,4 @@
-import layout from "../../../scripts/app-source-layout.json";
+import layout from "../../../cli/tasks/app-source-layout.json";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 
@@ -6,7 +6,7 @@ export const repositoryRoot = process.cwd();
 
 const appRoots = Object.entries(layout).map(([source, target]) => ({
   logical: `src/${source}`,
-  physical: resolve(repositoryRoot, "../misty-apps/apps", target),
+  physical: resolve(repositoryRoot, "./apps", target),
 }));
 
 export function sourcePath(path: string): string {

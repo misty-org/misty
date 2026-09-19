@@ -1,5 +1,5 @@
 import { RenderErrorBoundary } from "@/application/layouts/RenderErrorBoundary";
-import { AuthProvider } from "@/features/auth";
+import { AuthProvider, useAuth } from "@/features/auth";
 import { PointerDragProvider } from "@/features/dnd";
 import { useSetupStore } from "@/features/installer";
 import { useDocumentAppAppearance } from "@/features/settings";
@@ -66,13 +66,18 @@ export function RootLayout(props: {
         <ShortcutRuntime />
         <RenderErrorBoundary>
           <PointerDragProvider>
-            <Outlet />
+            <AuthenticatedTreeOutlet />
           </PointerDragProvider>
         </RenderErrorBoundary>
       </AuthProvider>
       <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />
     </>
   );
+}
+
+function AuthenticatedTreeOutlet() {
+  const { user } = useAuth();
+  return <Outlet key={user?.id ?? "anonymous"} />;
 }
 
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {

@@ -1,16 +1,9 @@
 import type { OfficialApp } from "@/api/apps";
-import libraryImage from "@/assets/discover/library.webp";
 import journalImage from "@/assets/discover/journal.png";
 import { OfficialAppIcon } from "@/features/apps/OfficialAppIcon";
 import { ArrowUpRight } from "lucide-react";
 
 const previews = [
-  {
-    id: "library",
-    image: libraryImage,
-    description: "Keep your project resources together.",
-    alt: "Library’s grid of shared project resources",
-  },
   {
     id: "journal",
     image: journalImage,

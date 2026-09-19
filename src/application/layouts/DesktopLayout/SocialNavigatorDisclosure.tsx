@@ -1,6 +1,6 @@
 import { InstagramBrandIcon, MessengerBrandIcon, XBrandIcon } from "@/features/spaces";
 import { MistyBrandIcon } from "@/features/workspace/MistyBrandIcon";
-import { BrandIcon } from "../../../../../misty-apps/apps/shared/BrandIcon";
+import { BrandIcon } from "../../../.././apps/shared/BrandIcon";
 import { NavigatorToolDisclosure } from "./NavigatorToolDisclosure";
 
 type SocialDestinationId = "misty" | "instagram" | "discord" | "messenger" | "x";

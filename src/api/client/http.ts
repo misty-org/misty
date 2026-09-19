@@ -1,13 +1,103 @@
-/** The single browser-network primitive used by domain services. */
+import type { AccountRequestInit } from "./native-account-fetch";
+import { cookieSessionFetch } from "./cookie-session";
+const TRANSIENT_NETWORK_PATTERNS = [
+  "load failed",
+  "failed to fetch",
+  "networkerror",
+  "network request failed",
+  "connection was lost",
+];
+
+export function isTransientNetworkError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return TRANSIENT_NETWORK_PATTERNS.some((pattern) => msg.includes(pattern));
+}
+
+export function isAbortError(error: unknown): boolean {
+  if (error instanceof Error && error.name === "AbortError") return true;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name: unknown }).name === "AbortError"
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export async function httpRequest(
   input: RequestInfo | URL,
-  init: RequestInit = {},
+  init: AccountRequestInit = {},
 ): Promise<Response> {
-  try {
-    return await fetch(input, init);
-  } catch (error) {
-    throw new HttpRequestError(input.toString(), error);
+  const method = (init.method || "GET").toUpperCase();
+  const isIdempotent = method === "GET" || method === "HEAD" || method === "OPTIONS";
+  const maxAttempts = isIdempotent ? 3 : 1;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (init.signal?.aborted) {
+      const abortErr = new Error("Request was aborted");
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
+
+    try {
+      const response = await cookieSessionFetch(input, init);
+      if (
+        isIdempotent &&
+        attempt < maxAttempts &&
+        [502, 503, 504].includes(response.status) &&
+        !init.signal?.aborted
+      ) {
+        await response.body?.cancel();
+        await backoffDelay(attempt, init.signal);
+        continue;
+      }
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (isAbortError(error) || init.signal?.aborted) {
+        const abortErr = error instanceof Error ? error : new Error("Request was aborted");
+        abortErr.name = "AbortError";
+        throw abortErr;
+      }
+
+      if (isIdempotent && isTransientNetworkError(error) && attempt < maxAttempts) {
+        await backoffDelay(attempt, init.signal);
+        continue;
+      }
+      break;
+    }
   }
+
+  throw new HttpRequestError(input.toString(), lastError);
+}
+
+function backoffDelay(attempt: number, signal?: AbortSignal | null): Promise<void> {
+  const base = attempt === 1 ? 150 : 350;
+  const jitter = Math.floor(Math.random() * 50);
+  const delay = base + jitter;
+
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      const abortErr = new Error("Request was aborted");
+      abortErr.name = "AbortError";
+      reject(abortErr);
+      return;
+    }
+    const timer = setTimeout(resolve, delay);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(timer);
+        const abortErr = new Error("Request was aborted");
+        abortErr.name = "AbortError";
+        reject(abortErr);
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
 }
 
 export async function httpBlob(input: RequestInfo | URL, init?: RequestInit): Promise<Blob> {

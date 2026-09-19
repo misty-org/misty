@@ -13,8 +13,42 @@ import {
 
 export type ApiRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
+export function clearInFlightApiRequests(): void {
+  inFlightGetRequests.clear();
+}
+
 /** Authenticated request primitive for every Misty server domain. */
 export async function apiRequest<T = void>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method || "GET").toUpperCase();
+  const canDeduplicate = method === "GET" && !init.body && !init.signal;
+
+  if (canDeduplicate) {
+    const generation = readApiSessionGeneration();
+    const dedupKey = `${generation}:${path}`;
+    const inFlight = inFlightGetRequests.get(dedupKey);
+    if (inFlight) {
+      return inFlight as Promise<T>;
+    }
+
+    const promise = (async () => {
+      const { response, accountGeneration } = await authenticatedResponse(path, init);
+      if (response.status === 204) return undefined as T;
+
+      const result = (await response.json()) as T;
+      assertStableApiSession(accountGeneration);
+      return result;
+    })().finally(() => {
+      if (inFlightGetRequests.get(dedupKey) === promise) {
+        inFlightGetRequests.delete(dedupKey);
+      }
+    });
+
+    inFlightGetRequests.set(dedupKey, promise);
+    return promise;
+  }
+
   const { response, accountGeneration } = await authenticatedResponse(path, init);
   if (response.status === 204) return undefined as T;
 
@@ -63,7 +97,8 @@ async function authenticatedResponse(
   if (!response.ok) {
     const text = await response.text();
     assertStableApiSession(accountGeneration);
-    if (response.status === 401 && token) notifyApiSessionInvalid();
+    if (response.status === 401 && !token && apiRequestCredentials() !== "omit")
+      notifyApiSessionInvalid();
     const decoded = decodeApiError(text);
     throw new ApiRequestError(
       decoded.message,

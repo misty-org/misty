@@ -1,3 +1,4 @@
+import { Notification } from "@/shared/ui/notification";
 import type { OfficialApp, OfficialAppSession } from "@/api/apps";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import type { AuthUser } from "@/features/auth/authSession";
@@ -37,7 +38,11 @@ export function OfficialAppPackageHost(props: MiniAppRuntimeProps) {
 function NativePackageInstance(props: MiniAppRuntimeProps) {
   const protocolInstance = useRef(`misty-app-${crypto.randomUUID()}`);
   const theme = useAppThemeStore((state) => state.resolvedTheme);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{
+    message: string;
+    tone: "neutral" | "success" | "error";
+    id: number;
+  } | null>(null);
   const source = useMemo(
     () => appDocumentUrl(props.source, props.app.id, protocolInstance.current).href,
     [props.source, props.app.id],
@@ -107,14 +112,25 @@ function NativePackageInstance(props: MiniAppRuntimeProps) {
               tab: props.tab,
               platform: "desktop",
               navigate: props.onNavigate,
-              showToast: (text) => setNotice(text),
+              showToast: (message, tone) => setNotice({ message, tone, id: Date.now() }),
             },
             message.method,
             message.params,
           );
         }}
       />
-      {notice ? <div role="status">{notice}</div> : null}
+      {notice ? (
+        <Notification
+          key={notice.id}
+          title={props.app.name}
+          tone={notice.tone}
+          active={props.active !== false}
+          duration={notice.tone === "error" ? 0 : 6000}
+          onDismiss={() => setNotice(null)}
+        >
+          {notice.message}
+        </Notification>
+      ) : null}
     </div>
   );
 }

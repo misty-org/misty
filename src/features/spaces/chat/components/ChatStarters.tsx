@@ -1,4 +1,4 @@
-import type { SpaceChatStarter } from "@/api/spaces/dto/interfaces/components/SpaceChatMessages";
+import type { SpaceChatStarter } from "./ChatMessages";
 
 const dotClass = "motion-safe:animate-bounce";
 

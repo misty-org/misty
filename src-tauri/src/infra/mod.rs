@@ -1,3 +1,4 @@
+pub mod agent_workspace;
 #[cfg(desktop)]
 pub mod browser_agent_control;
 #[cfg(desktop)]
@@ -42,7 +43,7 @@ pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 pub mod file_sync;
-pub mod keychain;
+pub mod credentials;
 mod macos_privacy;
 pub mod mail_cache;
 #[cfg(desktop)]
@@ -70,13 +71,13 @@ pub mod settings;
 mod settings_migration;
 pub mod smart_library;
 mod smart_library_ingestion;
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 pub mod ssh_terminal;
 pub mod storage;
 pub mod storage_runtime;
 #[cfg(desktop)]
 pub mod system_dependencies;
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 pub mod terminal;
 pub mod transfers;
 #[cfg(desktop)]
@@ -109,3 +110,10 @@ pub(crate) mod space_peer_files;
 pub(crate) mod terminal_service;
 
 pub mod misty_context;
+
+pub mod auth_cookies;
+
+pub mod auth_http;
+
+#[cfg(windows)]
+mod browser_capture_windows;

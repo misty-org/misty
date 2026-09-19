@@ -1,8 +1,8 @@
 import { cn } from "@/shared/ui";
-import { appIcon, appIcons, appIconStrokeWidth } from "@/shared/ui/app-icons";
+import { appIcon, appIconStrokeWidth } from "@/shared/ui/app-icons";
 import type { WorkspaceToolId } from "./useRecentToolsStore";
 
-type WorkspaceAppIconSize = "picker" | "nav" | "marketplace";
+type WorkspaceAppIconSize = "picker" | "nav" | "marketplace" | "tree";
 
 export { appIcon as workspaceAppIcon };
 
@@ -13,6 +13,7 @@ export function workspaceAppIconColorClass(_appId: WorkspaceToolId): string {
 
 const sizeDetails: Record<WorkspaceAppIconSize, { tileClass: string; iconSize: number }> = {
   picker: { tileClass: "size-5", iconSize: 15 },
+  tree: { tileClass: "size-5", iconSize: 18 },
   nav: { tileClass: "size-7", iconSize: 20 },
   marketplace: { tileClass: "size-10", iconSize: 22 },
 };
@@ -21,10 +22,11 @@ export function WorkspaceAppIcon(props: {
   appId: WorkspaceToolId;
   size?: WorkspaceAppIconSize;
   className?: string;
+  context?: "app" | "space";
 }) {
   const size = props.size ?? "nav";
   const sizing = sizeDetails[size];
-  const Icon = appIcons[props.appId];
+  const Icon = appIcon(props.appId, props.context)!;
 
   return (
     <span
@@ -38,7 +40,7 @@ export function WorkspaceAppIcon(props: {
       data-app-icon={props.appId}
     >
       <Icon
-        className={size === "nav" ? "!size-5" : undefined}
+        className={size === "nav" || size === "tree" ? "!size-5" : undefined}
         size={sizing.iconSize}
         strokeWidth={appIconStrokeWidth}
       />

@@ -28,8 +28,8 @@ import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { appOwnedRoute } from "../appCapabilityGateway";
 import { officialAppSlug } from "../appRoute";
 
-import { browserRuntimeIdForTabId } from "@/features/browser/browserRuntime";
-import { openBrowserPopup } from "@/features/browser/openBrowserPopup";
+import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
+import { openBrowserPopup } from "@/features/webviews/openBrowserPopup";
 
 const workspaceRevisions = new Map<string, { users: number; value: number; content: string }>();
 
@@ -200,7 +200,12 @@ export function createAppUiBackend(scope: AppRpcScope): AppUiBackend {
     },
     openWorkspace({ route, placement = "tab", state: appState, title, sidebarVisible }) {
       const { state, pane } = ownedPane();
-      const request = workspaceSurfaceFromRoute(route);
+      const normalizedRoute = appOwnedRoute(
+        route,
+        officialAppSlug(scope.identity.appId),
+        scope.identity.spaceId,
+      );
+      const request = workspaceSurfaceFromRoute(normalizedRoute);
       if (
         !request ||
         request.groupKey !== `app:${scope.identity.appId}` ||

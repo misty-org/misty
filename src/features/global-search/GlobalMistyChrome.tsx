@@ -6,7 +6,6 @@ import type { KeyboardEvent, PointerEvent, RefObject } from "react";
 import { ConversationMenu } from "./GlobalMistyPanelContent";
 import { MistyComposer } from "./MistyComposer";
 import { MistyModelPicker } from "./MistyModelPicker";
-import { SearchAskToggle } from "./GlobalMistySupport";
 import type { GlobalAiConversation, GlobalAiMode, MistyImageAttachment } from "./types";
 
 type VoiceRecorder = ReturnType<typeof useAiVoiceRecorder>;
@@ -54,7 +53,7 @@ export function GlobalMistyComposerBar(props: {
         value={props.query}
         onChange={props.onQuery}
         mode={props.mode}
-        onModeChange={props.conversationActive ? undefined : props.onModeChange}
+        onModeChange={undefined}
         textareaRef={props.textareaRef}
         attachments={props.attachments}
         maxAttachments={props.mode === "search" ? 1 : 10}
@@ -70,7 +69,7 @@ export function GlobalMistyComposerBar(props: {
           props.conversationActive ? "m-3" : "rounded-none border-x-0 border-t-0 shadow-none",
         )}
         onError={props.onError}
-        modelControl={
+        modelControl={props.mode !== "search" &&
           <MistyModelPicker
             conversationId={props.activeConversationId}
             modelId={props.conversation?.modelId}
@@ -79,7 +78,7 @@ export function GlobalMistyComposerBar(props: {
             onChange={props.onModelChange}
           />
         }
-        voiceControl={<ComposerVoiceControls voice={props.voice} />}
+        voiceControl={props.mode !== "search" && <ComposerVoiceControls voice={props.voice} />}
         trailingControl={
           props.conversationActive ? undefined : (
             <div className="flex items-center gap-0.5">
@@ -89,8 +88,8 @@ export function GlobalMistyComposerBar(props: {
                   variant="ghost"
                   size="icon"
                   className="size-7 rounded-lg text-cream-muted"
-                  aria-label="Switch to Misty pet"
-                  title="Switch to Misty pet"
+                  aria-label="Collapse Misty"
+                  title="Collapse Misty"
                   onClick={props.onSwitchToPet}
                 >
                   <img
@@ -181,12 +180,12 @@ export function GlobalMistyVoiceIsland(props: {
         )}
         aria-label={
           props.onSwitchToPet
-            ? "Switch to Misty pet"
+            ? "Collapse Misty"
             : props.voice.recording
               ? "Stop voice recording"
               : "Start voice recording"
         }
-        title={props.onSwitchToPet ? "Switch to Misty pet" : undefined}
+        title={props.onSwitchToPet ? "Collapse Misty" : undefined}
         disabled={props.onSwitchToPet ? false : props.voice.requesting || props.voice.transcribing}
         onClick={
           props.onSwitchToPet ??
@@ -215,7 +214,7 @@ export function GlobalMistyVoiceIsland(props: {
         onDelete={props.onDelete}
         onRename={props.onRename}
       />
-      <SearchAskToggle mode={props.mode} compact onChange={props.onModeChange} />
+      <span className="px-2 text-sm font-medium">Misty</span>
       <Button
         type="button"
         variant="ghost"

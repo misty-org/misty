@@ -6,7 +6,7 @@ export function officialAppNeedsReview(
 ): boolean {
   return Boolean(
     installation?.state === "installed" &&
-    (installation.installed_version !== app.version ||
+    (installation.consent_required || installation.installed_version !== app.version ||
       installation.permission_version !== app.permission_version ||
       (app.scopes ?? []).some((scope) => !installation.granted_scopes.includes(scope))),
   );
@@ -17,7 +17,7 @@ export function officialAppNeedsConsent(
   installation?: SpaceAppInstallation,
 ): boolean {
   return (
-    installation?.state !== "installed" ||
+    installation?.state !== "installed" || installation.consent_required === true ||
     app.scopes.some((scope) => !installation.granted_scopes.includes(scope))
   );
 }

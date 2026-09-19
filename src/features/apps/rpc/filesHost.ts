@@ -32,6 +32,7 @@ export interface FilesHostBackend {
   native(method: string, params?: unknown): Promise<unknown>;
   file<T>(operation: string, params: Record<string, unknown>): Promise<T>;
   manage(kind: "remote" | "device"): Promise<void>;
+  previewUrl?(handle: string): Promise<string>;
   preview(handle: string, dimension: number, name?: string): Promise<ArrayBuffer>;
   drag(handles: string[], mode: "copy" | "move"): Promise<{ dropped: boolean }>;
   bookmarks(): Record<string, FilesSourceBookmark>;
@@ -230,8 +231,9 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
       case "files.index":
         value = await backend.native(method, p);
         break;
+      case "files.sources.resolveLocation":
       case "files.sources.restoreLocation": {
-        const saved = backend.legacyLocation?.();
+        const saved = method === "files.sources.resolveLocation" ? rpcString(p.path, 4096) : backend.legacyLocation?.();
         if (!saved) {
           value = null;
           break;
@@ -309,6 +311,10 @@ export function createFilesHostRpc(scope: AppRpcScope, backend: FilesHostBackend
       }
       case "files.sources.manage":
         await backend.manage(p.kind as "remote" | "device");
+        break;
+      case "files.previewUrl":
+        if (!backend.previewUrl) throw new AppRpcError("unsupported_method", "Media preview is unavailable.");
+        value = await backend.previewUrl(rpcString(p.handle, 256));
         break;
       case "files.previewImage":
         value = await backend.preview(

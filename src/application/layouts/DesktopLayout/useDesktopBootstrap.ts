@@ -1,7 +1,7 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useMediaSearchStore } from "@/features/files/search/store/useMediaSearchStore";
-import { useSearchStore } from "@/features/files/search/store/useSearchStore";
+import { useMediaSearchStore } from "@/features/global-search/indexing/useMediaSearchStore";
+import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
 import { useProvidersStore } from "@/features/providers";
 import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
 import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
@@ -65,12 +65,12 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
       searchMaintenanceRunningRef.current = true;
       try {
         if (searchMaintenancePreferences.automaticFileDiscoveryEnabled) {
-          const search = useSearchStore.getState();
+          const search = useSearchIndexStore.getState();
           await search.initialize();
-          const status = useSearchStore.getState().status;
+          const status = useSearchIndexStore.getState().status;
           const stale = !status?.lastScanTimeMs || Date.now() - status.lastScanTimeMs >= intervalMs;
           if (!status?.scanInProgress && stale) {
-            await useSearchStore.getState().startScan(app?.environment.homeDir || "");
+            await useSearchIndexStore.getState().startScan(app?.environment.homeDir || "");
           }
         }
       } finally {

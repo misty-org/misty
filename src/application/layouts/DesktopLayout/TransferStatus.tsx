@@ -1,4 +1,4 @@
-import { useExplorerStore } from "@/features/files/explorer/store/useExplorerStore";
+import { useActivityStore } from "@/features/activity/useActivityStore";
 import { useSetupStore } from "@/features/installer";
 import { useTransfersStore } from "@/features/transfers/store/useTransfersStore";
 import type { TransferRecord } from "@/native/contracts";
@@ -9,7 +9,8 @@ import {
   advanceTransferCompletionTracker,
   emptyTransferCompletionTracker,
 } from "../transferCompletionNotifications";
-import { workStatusPopupClass, workStatusPulseClass, workStatusToastDurationMs } from "./styles";
+import { workStatusToastDurationMs } from "./styles";
+import { Notification } from "@/shared/ui/notification";
 
 const activeWorkStatuses = new Set<TransferRecord["status"]>(["queued", "pending", "in_progress"]);
 const emptyTransferRows: TransferRecord[] = [];
@@ -57,17 +58,12 @@ export const WorkStatusPopup = memo(function WorkStatusPopup() {
   if (!visibleSummary) return null;
 
   return (
-    <aside className={workStatusPopupClass} role="status" aria-live="polite">
-      <span className={workStatusPulseClass} />
-      <span className="min-w-0">
-        <strong className="block truncate text-[13px] font-semibold leading-tight">
-          {visibleSummary.title}
-        </strong>
-        <span className="block truncate text-xs leading-tight text-cream-muted">
-          {visibleSummary.detail}
-        </span>
-      </span>
-    </aside>
+    <Notification
+      key={`${visibleSummary.title}:${visibleSummary.detail}`}
+      title={visibleSummary.title}
+    >
+      {visibleSummary.detail}
+    </Notification>
   );
 });
 
@@ -91,7 +87,15 @@ export const TransferCompletionNotifier = memo(function TransferCompletionNotifi
       transferNotificationStatuses,
     );
     trackerRef.current = advanced.tracker;
-    const pushNotification = useExplorerStore.getState().pushNotification;
+    const pushNotification = (title: string, level: string, _duration: number) => {
+      useActivityStore
+        .getState()
+        .ingestLocal({
+          title,
+          kind: level === "success" ? "completion" : "failure",
+          appId: "files",
+        });
+    };
     for (const row of advanced.changed) {
       if (row.status === "completed") {
         pushNotification(`Transfer finished: ${transferNotificationTitle(row)}`, "success", 4200);

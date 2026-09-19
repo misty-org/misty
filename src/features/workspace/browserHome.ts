@@ -30,7 +30,15 @@ export function normalizeBrowserHomeUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return defaultBrowserHomeUrl;
   if (trimmed === blankBrowserUrl) return blankBrowserUrl;
-  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+  let candidate: string;
+  if (hasScheme) {
+    candidate = trimmed;
+  } else if (/^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:[/?#]|$)/i.test(trimmed)) {
+    candidate = `http://${trimmed}`;
+  } else {
+    candidate = `https://${trimmed}`;
+  }
   try {
     const parsed = new URL(candidate);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return defaultBrowserHomeUrl;

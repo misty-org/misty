@@ -493,11 +493,8 @@ async function reloadThreads(
   const request = generations.nextContentGeneration();
   const generation = generations.accountGeneration();
   const targets = scopedAccounts(get());
-  set({
-    loading: true,
-    accountErrors: {},
-    accountErrorCodes: {},
-  });
+  // Keep reconnect-required errors visible; changing folders cannot repair OAuth.
+  set({ loading: true });
   await Promise.all(
     targets.map(async (account) => {
       const folderId = folderIdForAccount(get(), account.connection_id);

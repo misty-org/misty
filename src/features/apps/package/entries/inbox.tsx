@@ -1,1 +1,1 @@
-export { default } from "../../../../../../misty-apps/apps/inbox";
+export { default } from "../../../../.././apps/inbox";

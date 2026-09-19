@@ -11,6 +11,7 @@ mod domain;
 mod error;
 mod infra;
 mod platform;
+mod shell_plugins;
 mod telemetry;
 
 #[cfg(all(debug_assertions, target_os = "macos"))]
@@ -122,7 +123,7 @@ use infra::misty::{
 use infra::misty_template::{
     build_misty_template, install_misty_template, misty_template_status, restart_misty_app,
 };
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 use infra::ssh_terminal::{
     terminal_ssh_environments, terminal_ssh_preflight, terminal_ssh_trust_host,
 };
@@ -134,7 +135,7 @@ use platform::mini_app::permissions::peer::{space_peer_local_identity,space_peer
 use infra::terminal_service::{
     terminal_service_call, terminal_service_close, terminal_service_create, terminal_service_request,
 };
-#[cfg(all(desktop, not(target_os = "macos")))]
+#[cfg(desktop)]
 use infra::terminal::{
     terminal_create, terminal_interrupt, terminal_kill, terminal_resize, terminal_write,
 };
@@ -180,8 +181,8 @@ pub fn run() {
         .plugin(tauri_plugin_document_tree::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_notification::init()))
+        .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
             #[cfg(any(target_os = "ios", target_os = "android"))]
@@ -212,6 +213,7 @@ pub fn run() {
             app.manage(runtime);
             #[cfg(any(desktop, target_os = "ios"))]
             app.manage(BrowserSessionState::default());
+            app.manage(infra::agent_workspace::AgentWorkspaceState::default());
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -247,9 +249,10 @@ pub fn run() {
     });
 
     builder
-        .on_window_event(|window, event| {
+        .on_window_event(|_window, _event| {
             #[cfg(all(desktop, not(target_os = "macos")))]
             {
+                let (window, event) = (_window, _event);
                 if window.label() != "main" {
                     return;
                 }
@@ -271,26 +274,19 @@ pub fn run() {
                     size: tauri::Size::Physical(*size),
                 });
             }
-            #[cfg(target_os = "macos")]
-            {
-                if window.label() != "main" {
-                    return;
-                }
-                if let tauri::WindowEvent::Resized(_) = event {
-                    if let Ok(ns_window) = window.ns_window() {
-                        unsafe {
-                            let ns_window = ns_window as cocoa::base::id;
-                            platform::plugins::mac_rounded_corners::position_traffic_lights(
-                                ns_window, -4.0, 0.0,
-                            );
-                        }
-                    }
-                }
-            }
+            // macOS owns live window layout. Traffic lights are positioned
+            // during window setup; rewriting their frames on every resize
+            // competes with AppKit and makes the titlebar controls jitter.
         })
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
+                    crate::infra::auth_cookies::auth_cookie_capture,
+                    crate::infra::auth_cookies::auth_cookie_restore,
+                    crate::infra::auth_cookies::auth_cookie_forget,
+                    crate::infra::auth_http::auth_http_start,
+                    crate::infra::auth_http::auth_http_read,
+                    crate::infra::auth_http::auth_http_cancel,
                     crate::infra::misty_context::misty_workspace_focused,
                     crate::infra::misty_context::misty_screen_status,
                     crate::infra::misty_context::misty_screen_capture,
@@ -402,7 +398,7 @@ pub fn run() {
                     uninstall_plugin,
                     get_misty_process_status,
                     open_external_url,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_create,
                     #[cfg(target_os = "macos")]
                     terminal_service_create,
@@ -430,19 +426,19 @@ pub fn run() {
                     terminal_service_close,
                     #[cfg(target_os = "macos")]
                     terminal_service_request,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_write,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_resize,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_interrupt,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_kill,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_environments,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_preflight,
-                    #[cfg(all(desktop, not(target_os = "macos")))]
+                    #[cfg(desktop)]
                     terminal_ssh_trust_host,
                     #[cfg(all(desktop, not(target_os = "macos")))]
                     code_lsp_start,
@@ -452,6 +448,18 @@ pub fn run() {
                     code_lsp_stop,
                     #[cfg(any(desktop, target_os = "ios"))]
                     browser_webview_create,
+                    infra::agent_workspace::agent_window_open,
+                    infra::agent_workspace::agent_window_take_task,
+                    infra::agent_workspace::agent_window_ack_task,
+                    infra::agent_workspace::agent_foreground_queue,
+                    infra::agent_workspace::agent_workspace_acquire,
+                    infra::agent_workspace::agent_workspace_release,
+                    infra::agent_workspace::agent_workspace_bind_scope,
+                    #[cfg(desktop)]
+                    infra::browser::browser_runtime_for_scope,
+                    #[cfg(desktop)]
+                    infra::browser::browser_agent_set_locked,
+                    infra::agent_workspace::agent_browser_session_id,
                     #[cfg(target_os = "macos")]
                     crate::infra::browser::browser_context_menu_availability,
                     #[cfg(target_os = "macos")]

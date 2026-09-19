@@ -56,7 +56,7 @@ export default tseslint.config(
       "backlog/**",
       "docs/**",
       "public/**",
-      "scripts/**",
+      "cli/tasks/**",
       "service/**",
       "*.config.js",
       "*.config.ts",

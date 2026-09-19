@@ -5,7 +5,7 @@ import {
   Folders,
   Heart,
   Images,
-  ListTodo,
+  CheckSquare2,
   NotebookPen,
   Pencil,
   Route,
@@ -28,7 +28,7 @@ function destinationIcon(Icon: LucideIcon, feature: string) {
 
 export const NotesDestinationIcon = destinationIcon(NotebookPen, "notes");
 export const DrawingsDestinationIcon = destinationIcon(Pencil, "drawings");
-export const TasksDestinationIcon = destinationIcon(ListTodo, "tasks");
+export const TasksDestinationIcon = destinationIcon(CheckSquare2, "tasks");
 export const AgendaDestinationIcon = destinationIcon(CalendarDays, "agenda");
 export const RoadmapsDestinationIcon = destinationIcon(Route, "roadmaps");
 export const ExplorerDestinationIcon = destinationIcon(FolderOpen, "explorer");

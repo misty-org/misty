@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getAppliedAppZoom } from "@/shared/hooks/useAppZoom";
-import { physicalToClientPoint } from "@/features/files/explorer/drag/geometry";
+import { physicalToClientPoint } from "@/shared/lib/dragGeometry";
 import type { MistyFileDropEvent, MistyFileTransferStatus } from "@misty/sdk";
 import type { AppRpcScope } from "./session";
 

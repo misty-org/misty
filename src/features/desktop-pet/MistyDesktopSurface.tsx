@@ -1,11 +1,14 @@
+import { useAppsStore } from "@/features/apps/useAppsStore";
+import { acceptMistyHandoff, type MistyHandoff } from "@/features/misty/handoff";
 import { AuthProvider, useAuth } from "@/features/auth";
-import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
-import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
+import { GlobalMisty } from "@/features/global-search";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import { ShortcutRuntime } from "@/features/shortcuts";
 import { useSpacesStore } from "@/features/spaces";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { LogicalPosition, LogicalSize } from "@tauri-apps/api/dpi";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { availableMonitors, currentMonitor, primaryMonitor } from "@tauri-apps/api/window";
 import {
   useCallback,
@@ -80,6 +83,13 @@ export function MistyDesktopSurfaceRoot({
 
 function MistyDesktopPet() {
   const { user } = useAuth();
+  useEffect(() => {
+    useMistyStore.getState().setAccount(user?.id ?? "");
+    if (user?.id) {
+      void useSpacesStore.getState().load({ accountId: user.id });
+      void useAppsStore.getState().load(user.id);
+    }
+  }, [user?.id]);
   const [expanded, setExpanded] = useState(false);
   const [petHidden, setPetHidden] = useState(false);
   const expandedRef = useRef(false);
@@ -98,7 +108,7 @@ function MistyDesktopPet() {
       geometryAnimationRef.current += 1;
       ignoreMovesUntilRef.current = Date.now() + 180;
       ignoreResizesUntilRef.current = Date.now() + 240;
-      const current = getCurrentWebviewWindow();
+      const current = getCurrentWindow();
       await current.setPosition(new LogicalPosition(position.x, position.y));
       await current.setSize(new LogicalSize(size.width, size.height));
     },
@@ -109,7 +119,7 @@ function MistyDesktopPet() {
     if (!expandedRef.current || hiddenRef.current) return;
     expandedRef.current = false;
     if (!hasTauriInternals()) return;
-    const current = getCurrentWebviewWindow();
+    const current = getCurrentWindow();
     const [monitors, primary] = await Promise.all([availableMonitors(), primaryMonitor()]);
     const position = safePetPosition(
       petPositionRef.current ?? readSavedPetPosition(),
@@ -138,7 +148,7 @@ function MistyDesktopPet() {
   );
 
   const requestCollapse = useCallback(() => {
-    const search = useGlobalSearchStore.getState();
+    const search = useMistyStore.getState();
     if (search.panel !== "closed") {
       search.closePanel();
       scheduleCollapse();
@@ -150,7 +160,7 @@ function MistyDesktopPet() {
   const resizePanel = useCallback(
     async (showContent: boolean) => {
       if (!expandedRef.current || !hasTauriInternals()) return;
-      const current = getCurrentWebviewWindow();
+      const current = getCurrentWindow();
       const [physicalPosition, physicalSize, currentDisplay, primary] = await Promise.all([
         current.outerPosition(),
         current.outerSize(),
@@ -215,12 +225,13 @@ function MistyDesktopPet() {
     if (expandedRef.current || !hasTauriInternals()) return;
     hiddenRef.current = false;
     window.clearTimeout(collapseTimerRef.current);
-    if (user?.id) useGlobalSearchStore.getState().setAccount(user.id);
+    if (user?.id) useMistyStore.getState().setAccount(user.id);
+    useMistyStore.getState().setMode("ask");
     expandedRef.current = true;
     setPetHidden(true);
     await afterDelay(petFadeDurationMs);
     if (hiddenRef.current) return;
-    const current = getCurrentWebviewWindow();
+    const current = getCurrentWindow();
     const [physicalPosition, physicalSize, currentDisplay, primary] = await Promise.all([
       current.outerPosition(),
       current.outerSize(),
@@ -233,7 +244,7 @@ function MistyDesktopPet() {
     const size = physicalSize.toLogical(scaleFactor);
     petPositionRef.current = { x: position.x, y: position.y };
     savePetPosition(petPositionRef.current);
-    const searchState = useGlobalSearchStore.getState();
+    const searchState = useMistyStore.getState();
     const opensWithContent =
       searchState.mode !== "search" ||
       Boolean(searchState.query.trim() || searchState.results.length);
@@ -287,18 +298,17 @@ function MistyDesktopPet() {
     if (expandedRef.current) requestCollapse();
     else void expand();
   }, [expand, requestCollapse]);
-  useShortcutHandler("search.toggle", togglePanel);
 
   const hidePet = useCallback(async () => {
     hiddenRef.current = true;
     window.clearTimeout(collapseTimerRef.current);
     geometryAnimationRef.current += 1;
-    const search = useGlobalSearchStore.getState();
+    const search = useMistyStore.getState();
     if (search.panel !== "closed") search.closePanel();
     expandedRef.current = false;
     setExpanded(false);
     if (!hasTauriInternals()) return;
-    await getCurrentWebviewWindow().hide();
+    await getCurrentWindow().hide();
   }, []);
 
   const openPetContextMenu = useCallback(
@@ -309,12 +319,12 @@ function MistyDesktopPet() {
       const { Menu } = await import("@tauri-apps/api/menu");
       const menu = await Menu.new({
         items: [
-          { text: "Open Misty Search", action: () => void expand() },
+          { text: "Open Misty", action: () => void expand() },
           { text: "Hide Misty", action: () => void hidePet() },
         ],
       });
       try {
-        await menu.popup(undefined, getCurrentWebviewWindow());
+        await menu.popup(undefined, getCurrentWindow());
       } finally {
         await menu.close();
       }
@@ -324,7 +334,7 @@ function MistyDesktopPet() {
 
   useEffect(() => {
     if (!hasTauriInternals()) return;
-    const current = getCurrentWebviewWindow();
+    const current = getCurrentWindow();
     void current.setAlwaysOnTop(true);
     void Promise.all([availableMonitors(), primaryMonitor()]).then(([monitors, primary]) => {
       const saved = safePetPosition(readSavedPetPosition(), monitors, primary);
@@ -337,6 +347,7 @@ function MistyDesktopPet() {
     let settleMoveTimer: number | undefined;
     let removeMove: (() => void) | undefined;
     let removeResize: (() => void) | undefined;
+    let removeHandoff: (() => void) | undefined;
     let removeToggle: (() => void) | undefined;
     void current
       .onMoved(() => {
@@ -388,18 +399,65 @@ function MistyDesktopPet() {
       .then((remove) => {
         removeToggle = remove;
       });
+    let removeActiveSpace: (() => void) | undefined;
+    let handoffDisposed = false;
+    void current
+      .listen<{ accountId: string; spaceId: string }>("misty://active-space", ({ payload }) => {
+        const state = useMistyStore.getState();
+        if (
+          state.accountId !== payload.accountId ||
+          state.working ||
+          !payload.spaceId ||
+          state.selectedSpaceId === payload.spaceId
+        )
+          return;
+        useMistyStore.setState({
+          selectedSpaceId: payload.spaceId,
+          activeConversationId: "",
+          targets: [],
+          context: [],
+          handoff: undefined,
+        });
+      })
+      .then((remove) => {
+        if (handoffDisposed) remove();
+        else removeActiveSpace = remove;
+      });
+    void current
+      .listen<MistyHandoff>("misty://handoff", async ({ payload }) => {
+        let error: string | undefined;
+        try {
+          await acceptMistyHandoff(payload);
+          expand();
+        } catch (reason) {
+          error = String(reason);
+          useMistyStore.setState({ error });
+        }
+        if (payload.requestId)
+          await current.emitTo("main", "misty://handoff-result", {
+            requestId: payload.requestId,
+            error,
+          });
+      })
+      .then((remove) => {
+        if (handoffDisposed) remove();
+        else removeHandoff = remove;
+      });
     return () => {
+      handoffDisposed = true;
+      removeHandoff?.();
+      removeActiveSpace?.();
       window.clearTimeout(settleMoveTimer);
       window.clearTimeout(collapseTimerRef.current);
       removeMove?.();
       removeResize?.();
       removeToggle?.();
     };
-  }, [togglePanel]);
+  }, [togglePanel, expand]);
 
   useEffect(() => {
     if (!expanded || !user?.id) return;
-    const search = useGlobalSearchStore.getState();
+    const search = useMistyStore.getState();
     search.setAccount(user.id);
     search.openPanel();
     void useSpacesStore.getState().load({ accountId: user.id });
@@ -419,7 +477,7 @@ function MistyDesktopPet() {
     )
       return;
     start.dragging = true;
-    void getCurrentWebviewWindow().startDragging();
+    void getCurrentWindow().startDragging();
   };
   const onPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
@@ -434,7 +492,7 @@ function MistyDesktopPet() {
         <button
           type="button"
           className="misty-desktop-pet"
-          aria-label="Open Misty Search"
+          aria-label="Open Misty"
           title="Drag Misty anywhere · Click to open"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -470,6 +528,7 @@ function MistyDesktopPet() {
   };
   return (
     <GlobalMisty
+      controller="misty"
       accountId={user.id}
       currentPath="/"
       activePaneId=""
@@ -479,7 +538,7 @@ function MistyDesktopPet() {
       suspendBrowserWebviews={false}
       showShadow={false}
       onRequestDrag={() => {
-        void getCurrentWebviewWindow().startDragging();
+        void getCurrentWindow().startDragging();
       }}
       onSwitchToPet={requestCollapse}
       onContentVisibilityChange={handleContentVisibilityChange}

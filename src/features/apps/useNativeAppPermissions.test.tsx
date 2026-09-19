@@ -263,3 +263,89 @@ it("shows remembered consent for identified apps and skips a prompt for restored
   expect(reopened.queryByRole("dialog")).toBeNull();
   expect(mocks.invoke.mock.calls.filter(([command]) => command === "mini_app_permission_decide")).toHaveLength(1);
 });
+
+it("concurrent requests for the same capability coalesce and both succeed upon approval", async () => {
+  function DualHarness() {
+    const permissions = useNativeAppPermissions("Example");
+    const [result1, setResult1] = useState("");
+    const [result2, setResult2] = useState("");
+    return (
+      <>
+        <button
+          onClick={() => {
+            void permissions
+              .execute("instance", "clipboard.readText", {})
+              .then((v) => setResult1(JSON.stringify(v)), (e) => setResult1(String(e)));
+            void permissions
+              .execute("instance", "clipboard.readText", {})
+              .then((v) => setResult2(JSON.stringify(v)), (e) => setResult2(String(e)));
+          }}
+        >
+          Read both
+        </button>
+        <output data-testid="r1">{result1}</output>
+        <output data-testid="r2">{result2}</output>
+        {permissions.controls}
+      </>
+    );
+  }
+  const view = render(<DualHarness />);
+  fireEvent.click(view.getByText("Read both"));
+  await view.findByText("Allow for this session");
+  fireEvent.click(view.getByText("Allow for this session"));
+  await waitFor(() => {
+    expect(view.getByTestId("r1").textContent).toContain("App-visible clipboard");
+    expect(view.getByTestId("r2").textContent).toContain("App-visible clipboard");
+  });
+  expect(mocks.invoke).not.toHaveBeenCalledWith("mini_app_permission_decide", expect.objectContaining({ allowed: false }));
+});
+
+it("concurrent requests for different capabilities queue and present sequentially", async () => {
+  mocks.invoke.mockImplementation(async (command, args) => {
+    if (command === "mini_app_permission_status") {
+      const cap = args.method === "clipboard.readText" ? "clipboard.read" : "terminal.execute";
+      return { appId: "example", capability: cap, granted: mocks.granted };
+    }
+    if (command === "mini_app_permission_decide") {
+      return;
+    }
+    if (command === "mini_app_permission_list") return [];
+    if (command === "mini_app_device_call") {
+      return { ok: true };
+    }
+  });
+  function MultiCapabilityHarness() {
+    const permissions = useNativeAppPermissions("Example");
+    const [r1, setR1] = useState("");
+    const [r2, setR2] = useState("");
+    return (
+      <>
+        <button
+          onClick={() => {
+            void permissions
+              .execute("instance", "clipboard.readText", {})
+              .then((v) => setR1(JSON.stringify(v)), (e) => setR1(String(e)));
+            void permissions
+              .execute("instance", "terminal.authorize", {})
+              .then((v) => setR2(JSON.stringify(v)), (e) => setR2(String(e)));
+          }}
+        >
+          Request multi
+        </button>
+        <output data-testid="out1">{r1}</output>
+        <output data-testid="out2">{r2}</output>
+        {permissions.controls}
+      </>
+    );
+  }
+  const view = render(<MultiCapabilityHarness />);
+  fireEvent.click(view.getByText("Request multi"));
+  await view.findByText(/read text or images from your clipboard/i);
+  fireEvent.click(view.getByText("Allow for this session"));
+  await view.findByText(/run commands on this computer/i);
+  fireEvent.click(view.getByText("Allow for this session"));
+  await waitFor(() => {
+    expect(view.getByTestId("out1").textContent).toContain("ok");
+    expect(view.getByTestId("out2").textContent).toContain("ok");
+  });
+});

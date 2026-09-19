@@ -7,7 +7,10 @@
   touch-action: none;
 }
 [data-reorder-list] [data-reorder-handle] {
-  cursor: grab;
+  cursor: pointer;
+}
+[data-reorder-list] [data-reorder-handle]:active {
+  cursor: grabbing;
 }
 [data-reorder-dragging="true"] {
   opacity: 0.5;
@@ -43,7 +46,7 @@ html[data-pointer-dragging="true"] * {
 .pointer-pane-title {
   max-width: min(320px, calc(100vw - 16px));
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
   padding: 6px 10px;
   border: 1px solid var(--color-charcoal-border, #262626);

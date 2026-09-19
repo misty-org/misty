@@ -1,6 +1,5 @@
 import { useAuth } from "@/features/auth";
 import { officialAppRoute, useAppsStore } from "@/features/apps";
-import { preferredDefaultSpace, useSpacesStore } from "@/features/spaces";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -11,7 +10,6 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const spaces = useSpacesStore((state) => state.spaces);
   const catalog = useAppsStore((state) => state.catalog);
   const installations = useAppsStore((state) => state.installations);
   const loading = useAppsStore((state) => state.loading);
@@ -22,7 +20,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   const add = useAppsStore((state) => state.install);
   const remove = useAppsStore((state) => state.uninstall);
   const [embeddedAppId, setEmbeddedAppId] = useState("");
-  const activeSpace = preferredDefaultSpace(spaces);
+  const [embeddedReview, setEmbeddedReview] = useState(false);
   const requestedAppId = searchParams.get("app") ?? "";
 
   useEffect(() => {
@@ -31,17 +29,21 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
 
   // A Discover pane keeps its local selection independent of other workspace tabs.
   useEffect(() => {
-    if (embedded && requestedAppId) setEmbeddedAppId(requestedAppId);
-  }, [embedded, requestedAppId, location.key]);
+    if (embedded && requestedAppId) {
+      setEmbeddedAppId(requestedAppId);
+      setEmbeddedReview(searchParams.get("review") === "permissions");
+    }
+  }, [embedded, requestedAppId, location.key, searchParams]);
 
   const selectApp = (id: string) => {
     if (embedded) {
       setEmbeddedAppId(id);
-      return;
+      setEmbeddedReview(false);
     }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
+        next.delete("review");
         if (id) next.set("app", id);
         else next.delete("app");
         return next;
@@ -53,7 +55,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
       <DiscoverBrowser
-        catalog={catalog}
+        catalog={catalog.filter(app=>app.id!=="agents")}
         installations={installations}
         loading={loading}
         ready={ready}
@@ -61,6 +63,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
         actionAppId={actionAppId}
         mobile={isNativeMobileBuild}
         selectedAppId={embedded ? embeddedAppId : requestedAppId}
+        reviewPermissions={embedded ? embeddedReview : searchParams.get("review") === "permissions"}
         requestKey={location.key}
         requestedSection={searchParams.get("section") === "installed" ? "installed" : undefined}
         onSelect={selectApp}
@@ -68,7 +71,7 @@ export function DiscoverPage({ embedded = false }: { embedded?: boolean }) {
           if (user?.id) void load(user.id, true);
         }}
         onInstall={add}
-        onOpen={(app) => navigate(officialAppRoute(app.id, activeSpace?.id, user?.id ?? ""))}
+        onOpen={(app) => navigate(officialAppRoute(app.id, undefined, user?.id ?? ""))}
         onRemove={(app) => remove(app.id)}
       />
     </>

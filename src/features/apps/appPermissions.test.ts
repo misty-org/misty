@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import catalog from "../../../../misty-apps/apps/catalog.json";
+import catalog from "../../.././apps/catalog.json";
 import {
   appPermissionGroups,
   appPermissionLabel,

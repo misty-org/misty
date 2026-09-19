@@ -1,4 +1,4 @@
-import { PlatformPanel } from "../../../../../misty-apps/apps/shared/PlatformPanel";
+import { PlatformPanel } from "../../../.././apps/shared/PlatformPanel";
 import type { ProviderWorkflow, ProviderWorkflowOption } from "@/native/contracts";
 import { SystemErrorActivity } from "@/features/activity";
 import { iconAssets } from "@/shared/assets/icons";

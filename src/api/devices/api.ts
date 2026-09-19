@@ -22,9 +22,8 @@ export interface SpaceDevicePresenceInput {
   protocolVersion: "misty-device/2";
   connectionHint: "unknown" | "direct" | "relay";
 }
-const spaceDevicePath = (deviceId: string, spaceId: string) => {
-  if (!spaceId.trim()) throw new Error("A Space is required for peer access.");
-  return `${devicePath(deviceId)}/spaces/${encodeURIComponent(spaceId)}`;
+const spaceDevicePath = (deviceId: string, _spaceId: string) => {
+  return `${devicePath(deviceId)}/apps/files`;
 };
 
 export const devicesApi = {

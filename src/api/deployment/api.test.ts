@@ -116,6 +116,8 @@ describe("self-hosted deployment routing", () => {
     expect(String(requestUrl)).toContain("/billing/self-host-entitlement");
     expect(init?.body).toBeUndefined();
     expect(JSON.stringify(init)).not.toContain("misty.example.com");
-    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer hosted-session");
+    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+    expect(init?.credentials).toBe("include");
+    expect(new Headers(init?.headers).get("X-Misty-CSRF")).toBe("1");
   });
 });

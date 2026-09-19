@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { PlatformPanel } from "../../../../../misty-apps/apps/shared/PlatformPanel";
-import { PlatformDirectory } from "../../../../../misty-apps/apps/shared/PlatformDirectory";
-import "../../../../../misty-apps/apps/shared/providers.css";
+import { PlatformPanel } from "../../../.././apps/shared/PlatformPanel";
+import { PlatformDirectory } from "../../../.././apps/shared/PlatformDirectory";
+import "../../../.././apps/shared/providers.css";
 import { Button } from "@/shared/ui";
 import { useProvidersStore } from "../store";
 import { ProviderLogo } from "./ProviderLogo";

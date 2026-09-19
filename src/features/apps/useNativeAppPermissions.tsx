@@ -131,7 +131,6 @@ function description(capability: string) {
 
 export function useNativeAppPermissions(title: string) {
   const [prompt, setPrompt] = useState<Prompt | null>(null);
-  const pending = useRef<Prompt | null>(null);
   const [manage, setManage] = useState(false);
   const [grants, setGrants] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -164,41 +163,117 @@ export function useNativeAppPermissions(title: string) {
       alive.current = false;
       disposed = true;
       unlisten?.();
-      pending.current?.resolve(false);
-      pending.current = null;
+      if (currentPrompt.current) {
+        for (const res of currentPrompt.current.resolvers) res(false);
+        currentPrompt.current = null;
+      }
+      for (const item of promptQueue.current) {
+        for (const res of item.resolvers) res(false);
+      }
+      promptQueue.current = [];
+      setPrompt(null);
       recording.current?.abort();
       revertExtensionThemePreview(owner.current);
     };
   }, []);
+  interface PendingPromptItem {
+    status: PermissionStatus;
+    resolvers: Set<(allowed: boolean) => void>;
+  }
+  const currentPrompt = useRef<PendingPromptItem | null>(null);
+  const promptQueue = useRef<PendingPromptItem[]>([]);
+
+  const processNextPrompt = () => {
+    if (!alive.current) return;
+    while (promptQueue.current.length > 0) {
+      const next = promptQueue.current.shift()!;
+      if (next.resolvers.size === 0) continue;
+      currentPrompt.current = next;
+      setPrompt({
+        ...next.status,
+        resolve: (allowed: boolean) => decide(allowed),
+      });
+      return;
+    }
+    currentPrompt.current = null;
+    setPrompt(null);
+  };
+
   const ask = (status: PermissionStatus, signal?: AbortSignal) =>
     new Promise<boolean>((resolve) => {
-      if (!alive.current || pending.current || signal?.aborted) {
+      if (!alive.current || signal?.aborted) {
         resolve(false);
         return;
       }
-      const cancel = () => {
-        if (pending.current === next) {
-          pending.current = null;
-          setPrompt(null);
-        }
-        next.resolve(false);
+      // If the capability is currently prompting, coalesce onto the active prompt
+      if (currentPrompt.current && currentPrompt.current.status.capability === status.capability) {
+        const item = currentPrompt.current;
+        const onAbort = () => {
+          item.resolvers.delete(resolve);
+          resolve(false);
+          if (item.resolvers.size === 0 && currentPrompt.current === item) {
+            processNextPrompt();
+          }
+        };
+        item.resolvers.add(resolve);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        return;
+      }
+      // If the capability is already queued, coalesce onto the queued item
+      const queued = promptQueue.current.find((q) => q.status.capability === status.capability);
+      if (queued) {
+        const onAbort = () => {
+          queued.resolvers.delete(resolve);
+          resolve(false);
+        };
+        queued.resolvers.add(resolve);
+        signal?.addEventListener("abort", onAbort, { once: true });
+        return;
+      }
+      // If nothing is currently prompting, display immediately
+      if (!currentPrompt.current) {
+        const item: PendingPromptItem = {
+          status,
+          resolvers: new Set([resolve]),
+        };
+        currentPrompt.current = item;
+        const onAbort = () => {
+          item.resolvers.delete(resolve);
+          resolve(false);
+          if (item.resolvers.size === 0 && currentPrompt.current === item) {
+            processNextPrompt();
+          }
+        };
+        signal?.addEventListener("abort", onAbort, { once: true });
+        setPrompt({
+          ...status,
+          resolve: (allowed: boolean) => decide(allowed),
+        });
+        return;
+      }
+      // Otherwise enqueue behind the current prompt
+      const item: PendingPromptItem = {
+        status,
+        resolvers: new Set([resolve]),
       };
-      const next = {
-        ...status,
-        resolve: (allowed: boolean) => {
-          signal?.removeEventListener("abort", cancel);
-          resolve(allowed);
-        },
+      const onAbort = () => {
+        item.resolvers.delete(resolve);
+        resolve(false);
       };
-      pending.current = next;
-      setPrompt(next);
-      signal?.addEventListener("abort", cancel, { once: true });
+      signal?.addEventListener("abort", onAbort, { once: true });
+      promptQueue.current.push(item);
     });
+
   const decide = (allowed: boolean) => {
-    const current = pending.current;
-    pending.current = null;
+    const current = currentPrompt.current;
+    currentPrompt.current = null;
     setPrompt(null);
-    current?.resolve(allowed);
+    if (current) {
+      for (const res of current.resolvers) {
+        res(allowed);
+      }
+    }
+    processNextPrompt();
   };
   const refresh = async (instance: string) => {
     const result = await invoke<string[]>("mini_app_permission_list", { instance });
@@ -257,7 +332,7 @@ export function useNativeAppPermissions(title: string) {
     if (!status.granted) {
       const allowed = await ask(status, signal);
       if (!allowed || !alive.current) {
-        if (alive.current)
+        if (alive.current && !signal?.aborted)
           await invoke("mini_app_permission_decide", {
             instance,
             capability: status.capability,
@@ -331,8 +406,18 @@ export function useNativeAppPermissions(title: string) {
     execute,
     open,
     reset: () => {
-      pending.current?.resolve(false);
-      pending.current = null;
+      if (currentPrompt.current) {
+        for (const res of currentPrompt.current.resolvers) {
+          res(false);
+        }
+        currentPrompt.current = null;
+      }
+      for (const item of promptQueue.current) {
+        for (const res of item.resolvers) {
+          res(false);
+        }
+      }
+      promptQueue.current = [];
       recording.current?.abort();
       revertExtensionThemePreview(owner.current);
       owner.current = "";
@@ -357,7 +442,7 @@ export function useNativeAppPermissions(title: string) {
             <DialogDescription>
               App: {prompt?.appId}.{" "}
               {prompt?.remembered
-                ? "Your approval is remembered for this app in this account and Space."
+                ? "Your approval is remembered for this app for your account on this device."
                 : "Access lasts until you close this app."}{" "}
               You can revoke it from App permissions at any time.
             </DialogDescription>

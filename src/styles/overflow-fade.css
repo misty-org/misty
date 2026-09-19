@@ -1,0 +1,41 @@
+/* Non-inheriting so a truncated row never masks its icons or child labels twice. */
+@property --misty-overflow-fade {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* Preserve existing Tailwind call sites and descendant variants. */
+@utility truncate {
+  --misty-overflow-fade: 1;
+  text-overflow: clip !important;
+}
+
+@utility text-ellipsis {
+  --misty-overflow-fade: 1;
+  text-overflow: clip !important;
+}
+
+@utility line-clamp-1 {
+  --misty-overflow-fade: 1;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  white-space: nowrap;
+  text-overflow: clip !important;
+}
+
+.pointer-pane-title,
+.misty-input-agent {
+  --misty-overflow-fade: 1;
+  text-overflow: clip;
+}
+
+[data-overflow-fade="right"] {
+  -webkit-mask-image: linear-gradient(to right, black max(0px, calc(100% - 18px)), transparent);
+  mask-image: linear-gradient(to right, black max(0px, calc(100% - 18px)), transparent);
+}
+
+[data-overflow-fade="left"] {
+  -webkit-mask-image: linear-gradient(to left, black max(0px, calc(100% - 18px)), transparent);
+  mask-image: linear-gradient(to left, black max(0px, calc(100% - 18px)), transparent);
+}

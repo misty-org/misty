@@ -1,6 +1,6 @@
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -63,10 +63,12 @@ const mocks = vi.hoisted(() => {
     spacesLoad,
     agentRefresh,
     activeAccountId: accountA.id,
+    generation: 0,
     readActiveSavedAccountSession: vi.fn(),
     activateAccountSession: vi.fn(),
     accountFetchMe: vi.fn(),
     clearAccountAuthToken: vi.fn().mockResolvedValue(null),
+    deactivateActiveAccount: vi.fn().mockResolvedValue(undefined),
     updateSavedAccountSession: vi.fn(),
     setAccountSessionTransitioning: vi.fn(),
     removeSavedAccountSession: vi.fn().mockResolvedValue(true),
@@ -83,19 +85,33 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/shared/platform/buildTarget", () => ({ isNativeMobileBuild: false }));
 vi.mock("./store/useAccountStore", () => ({
   accountFetchMe: mocks.accountFetchMe,
-  isAccountUnauthorizedError: () => false,
+  isAccountUnauthorizedError: (error: { status?: number }) => error?.status === 401,
 }));
 vi.mock("./store/useAuthTokenStore", () => ({
   activateAccountSession: mocks.activateAccountSession,
   clearAccountAuthToken: mocks.clearAccountAuthToken,
+  deactivateActiveAccount: mocks.deactivateActiveAccount,
   listSavedAccountSessions: () => [mocks.accountA, mocks.accountB],
   readActiveSavedAccountSession: mocks.readActiveSavedAccountSession,
-  readAccountSessionGeneration: () => 0,
+  readAccountSessionGeneration: () => mocks.generation,
   removeSavedAccountSession: mocks.removeSavedAccountSession,
   setAccountSessionTransitioning: mocks.setAccountSessionTransitioning,
   updateSavedAccountSession: mocks.updateSavedAccountSession,
 }));
 vi.mock("./store/useUserStore", () => ({ useUserStore: mocks.useUserStore }));
+vi.mock("@/features/installer", () => {
+  const state = {
+    signOut: mocks.signOut,
+    saveAuthenticatedUser: mocks.saveAuthenticatedUser,
+    status: { current_user: null, current_license: null },
+  };
+  return {
+    useSetupStore: Object.assign(
+      (selector: (value: Record<string, unknown>) => unknown) => selector(state),
+      { getState: () => state },
+    ),
+  };
+});
 vi.mock("@/features/app-shell", () => {
   const state = {
     signOut: mocks.signOut,
@@ -107,6 +123,9 @@ vi.mock("@/features/app-shell", () => {
       (selector: (value: Record<string, unknown>) => unknown) => selector(state),
       { getState: () => state },
     ),
+    useAppRouteMemoryStore: Object.assign(vi.fn(), {
+      getState: () => ({ resetAppRoute: vi.fn(), lastAppRoute: "/home" }),
+    }),
   };
 });
 vi.mock("@/features/files/explorer", () => ({
@@ -143,6 +162,7 @@ vi.mock("@/telemetry/identity", () => ({
 }));
 
 import { AuthProvider, useAuth, type AuthContextValue } from "./AuthContext";
+import SignIn from "./SignInPage";
 
 describe("AuthProvider account switching", () => {
   let container: HTMLDivElement;
@@ -172,6 +192,7 @@ describe("AuthProvider account switching", () => {
     localStorage.clear();
     localStorage.setItem("misty_user", JSON.stringify(mocks.accountA));
     mocks.activeAccountId = mocks.accountA.id;
+    mocks.generation = 0;
     mocks.readActiveSavedAccountSession.mockReset().mockReturnValue(mocks.accountA);
     mocks.userState.me = mocks.meA;
     mocks.activateAccountSession.mockReset().mockImplementation(async (accountId: string) => {
@@ -187,6 +208,8 @@ describe("AuthProvider account switching", () => {
       if (account.id === mocks.accountB.id) throw new Error("keystore update failed");
     });
     mocks.clearAccountAuthToken.mockClear();
+    mocks.deactivateActiveAccount.mockClear();
+    mocks.signOut.mockClear();
     mocks.setAccountSessionTransitioning.mockClear();
     mocks.saveAuthenticatedUser.mockClear();
     mocks.userStore.setMe.mockClear();
@@ -365,5 +388,276 @@ describe("AuthProvider account switching", () => {
 
     expect(auth?.user?.id).toBe(mocks.accountA.id);
     expect(mocks.accountFetchMe).toHaveBeenCalled();
+  });
+
+  it("clears an expired legacy identity during StrictMode startup and releases the transition", async () => {
+    mocks.accountFetchMe.mockRejectedValue(
+      Object.assign(new Error("not authenticated"), { status: 401 }),
+    );
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    await act(async () => {
+      root!.render(
+        <StrictMode>
+          <MemoryRouter>
+            <AuthProvider>
+              <Probe />
+            </AuthProvider>
+          </MemoryRouter>
+        </StrictMode>,
+      );
+    });
+    expect(mocks.deactivateActiveAccount).toHaveBeenCalledOnce();
+    expect(mocks.signOut).toHaveBeenCalledOnce();
+    expect(auth?.user).toBeNull();
+    expect(auth?.transitioning).toBe(false);
+    expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
+  });
+
+  it("releases the transition after an expired-cookie event changes the visible account", async () => {
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+    });
+    mocks.accountFetchMe.mockRejectedValue(Object.assign(new Error("expired"), { status: 401 }));
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("misty:account-session-invalid"));
+    });
+    expect(mocks.deactivateActiveAccount).toHaveBeenCalledOnce();
+    expect(auth?.user).toBeNull();
+    expect(auth?.transitioning).toBe(false);
+    expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
+  });
+
+  it.each(["valid", "offline", "account changed"])(
+    "keeps the account active after a stale 401 when validation is %s",
+    async (outcome) => {
+      function Probe() {
+        auth = useAuth();
+        return null;
+      }
+      await act(async () => {
+        root!.render(
+          <MemoryRouter>
+            <AuthProvider>
+              <Probe />
+            </AuthProvider>
+          </MemoryRouter>,
+        );
+      });
+      let resolve!: (value: typeof mocks.meA) => void;
+      let reject!: (error: Error) => void;
+      mocks.accountFetchMe.mockReset().mockImplementation(
+        () =>
+          new Promise((yes, no) => {
+            resolve = yes;
+            reject = no;
+          }),
+      );
+      await act(async () => {
+        for (let i = 0; i < 3; i++)
+          window.dispatchEvent(new CustomEvent("misty:account-session-invalid"));
+      });
+      expect(mocks.accountFetchMe).toHaveBeenCalledOnce();
+      expect(auth?.transitioning).toBe(false);
+      await act(async () => {
+        if (outcome === "valid") resolve(mocks.meA);
+        else {
+          if (outcome === "account changed") mocks.generation++;
+          reject(Object.assign(new Error(outcome), { status: outcome === "offline" ? 503 : 401 }));
+        }
+      });
+      expect(mocks.deactivateActiveAccount).not.toHaveBeenCalled();
+      expect(mocks.signOut).not.toHaveBeenCalled();
+      expect(auth?.user?.id).toBe(mocks.accountA.id);
+    },
+  );
+
+  it.each(["switch", "authenticate", "resume", "logout"])(
+    "releases the account transition when %s preparation throws",
+    async (operation) => {
+      function Probe() {
+        auth = useAuth();
+        return null;
+      }
+      await act(async () => {
+        root!.render(
+          <MemoryRouter>
+            <AuthProvider>
+              <Probe />
+            </AuthProvider>
+          </MemoryRouter>,
+        );
+      });
+      mocks.resetSpacesAccountState.mockImplementationOnce(() => {
+        throw new Error("Account state reset failed");
+      });
+      await act(async () => {
+        const attempt =
+          operation === "switch"
+            ? auth!.switchAccount(mocks.accountB.id)
+            : operation === "authenticate"
+              ? auth!.authenticateAccount(async () => mocks.accountB)
+              : operation === "resume"
+                ? auth!.resumeAccount(mocks.accountA.id)
+                : auth!.logout();
+        await expect(attempt).rejects.toThrow("Account state reset failed");
+      });
+      expect(auth?.transitioning).toBe(false);
+      expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
+      await act(async () => {
+        await auth!.resumeAccount(mocks.accountA.id);
+      });
+      expect(auth?.user?.id).toBe(mocks.accountA.id);
+    },
+  );
+
+  it("rejects a second resume while restoration is pending instead of reporting success", async () => {
+    localStorage.clear();
+    mocks.readActiveSavedAccountSession.mockReturnValue(null);
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+    });
+    let release!: (account: typeof mocks.accountA) => void;
+    mocks.activateAccountSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = auth!.resumeAccount(mocks.accountA.id);
+    });
+    await expect(auth!.resumeAccount(mocks.accountB.id)).rejects.toThrow("already in progress");
+    expect(mocks.activateAccountSession).toHaveBeenCalledOnce();
+    await act(async () => {
+      release(mocks.accountA);
+      await pending;
+    });
+    expect(auth?.user?.id).toBe(mocks.accountA.id);
+    expect(auth?.transitioning).toBe(false);
+  });
+
+  it("resumes a saved account from the chooser through identity remount and protected navigation", async () => {
+    localStorage.clear();
+    mocks.readActiveSavedAccountSession.mockReturnValue(null);
+    function AccountOutlet() {
+      auth = useAuth();
+      return <Outlet key={auth.user?.id ?? "anonymous"} />;
+    }
+    function Workspace() {
+      const current = useAuth();
+      return current.user ? (
+        <div>Workspace for {current.user.id}</div>
+      ) : (
+        <Navigate to="/signin" replace />
+      );
+    }
+    await act(async () => {
+      root!.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <AuthProvider>
+            <Routes>
+              <Route element={<AccountOutlet />}>
+                <Route path="/signin" element={<SignIn />} />
+                <Route path="/spaces" element={<Workspace />} />
+              </Route>
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+    });
+    const accountButton = () =>
+      [...container.querySelectorAll("button")].find((button) =>
+        button.textContent?.includes(mocks.accountA.email),
+      )!;
+    mocks.resetSpacesAccountState.mockImplementationOnce(() => {
+      throw new Error("Account state reset failed");
+    });
+    await act(async () => {
+      accountButton().click();
+    });
+    expect(container.textContent).toContain(
+      "Could not resume this account. Account state reset failed",
+    );
+    expect(container.textContent).toContain("Choose an account");
+    expect(auth?.transitioning).toBe(false);
+    let release!: (account: typeof mocks.accountA) => void;
+    mocks.activateAccountSession.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    await act(async () => {
+      accountButton().click();
+    });
+    expect(container.textContent).toContain("Signing in…");
+    expect(accountButton().disabled).toBe(true);
+    await act(async () => {
+      release(mocks.accountA);
+    });
+    expect(container.textContent).toBe("Workspace for account-a");
+    expect(auth?.transitioning).toBe(false);
+    expect(mocks.saveAuthenticatedUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: mocks.accountA.id }),
+      expect.anything(),
+    );
+  });
+
+  it("swaps over active account identity and force-reloads spaces on successful switch", async () => {
+    mocks.updateSavedAccountSession.mockReset().mockResolvedValue(undefined);
+
+    function Probe() {
+      auth = useAuth();
+      return null;
+    }
+
+    await act(async () => {
+      root!.render(
+        <MemoryRouter>
+          <AuthProvider>
+            <Probe />
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+      await Promise.resolve();
+    });
+
+    expect(auth?.user?.id).toBe(mocks.accountA.id);
+
+    await act(async () => {
+      await auth!.switchAccount(mocks.accountB.id);
+    });
+
+    expect(auth?.user?.id).toBe(mocks.accountB.id);
+    expect(mocks.userState.me?.id).toBe(mocks.accountB.id);
+    expect(mocks.saveAuthenticatedUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: mocks.accountB.id }),
+      expect.anything(),
+    );
+    expect(mocks.spacesLoad).toHaveBeenCalledWith({ force: true, accountId: mocks.accountB.id });
   });
 });

@@ -1,3 +1,6 @@
+import { SavedAccountSessionUnavailableError } from "../sessionErrors";
+import { restoreAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
+import { resolveApiBase, resolveHostedApiBase } from "@/api/deployment/api";
 import { configureApiSession } from "@/api/client/session";
 import {
   deploymentStorageKey,
@@ -7,7 +10,6 @@ import {
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
-import { invoke } from "@tauri-apps/api/core";
 import type {
   SavedAccountSession,
   SecureAccountSession,
@@ -21,19 +23,19 @@ export type {
 
 const desktopTokenService = "com.impierce.identity-wallet";
 const desktopTokenUser = "tester";
-const tokenStoredMarkerKey = "misty:account-auth-token:keychain-present";
+const tokenStoredMarkerKey = "misty:account-auth-token:file-present";
 const accountIndexKey = "misty:account-sessions";
 const activeAccountKey = "misty:active-account-id";
 const legacyUserKey = "misty_user";
 
 let cachedToken: string | null | undefined;
 let cachedVault: SecureAccountVault | undefined;
+let vaultReadPromise: Promise<SecureAccountVault> | undefined;
 // A cold start can fan out several authenticated requests before the first
 // secure-store read finishes. On iOS each concurrent read can present its own
 // system authentication sheet, so every caller must share one retrieval.
 let tokenReadPromise: Promise<string | null> | undefined;
-// The most recent payload written to the OS keystore. Writing to the keychain
-// can prompt the user on macOS, and the app persists the vault on nearly every
+// The most recent payload written to the native credential store. The app persists the vault on nearly every
 // auth state change (login, /me refresh, effect re-runs), so we skip redundant
 // writes whose serialized content is identical to what is already stored.
 let lastPersistedPayload: string | undefined;
@@ -99,9 +101,10 @@ export async function readAccountAuthToken(): Promise<string | null> {
       ? (cachedToken ?? null)
       : null;
   }
-  if (cachedToken !== undefined) return cachedToken;
-
+  // The handle can be loaded before the native cookie restore finishes. Every
+  // caller must wait for that restore before issuing authenticated requests.
   if (tokenReadPromise) return tokenReadPromise;
+  if (cachedToken !== undefined) return cachedToken;
   tokenReadPromise = loadAccountAuthToken();
   try {
     return await tokenReadPromise;
@@ -111,12 +114,15 @@ export async function readAccountAuthToken(): Promise<string | null> {
 }
 
 async function loadAccountAuthToken(): Promise<string | null> {
+  const generation = accountSessionGeneration;
   try {
     if (isNativeMobileBuild) {
       const token = await retrieve(desktopTokenService, desktopTokenUser);
+      if (generation !== accountSessionGeneration) return cachedToken ?? null;
       if (cachedToken === undefined) cachedToken = token;
     } else {
       const vault = await loadSecureVault();
+      if (generation !== accountSessionGeneration) return cachedToken ?? null;
       const active = selectActiveSession(vault);
       if (cachedToken === undefined) cachedToken = active?.token ?? null;
       if (active && vault.activeAccountId !== vaultAccountId(active.account.id)) {
@@ -127,7 +133,7 @@ async function loadAccountAuthToken(): Promise<string | null> {
     writeTokenStoredMarker(Boolean(cachedToken));
     await syncManagedAiToken(cachedToken ?? "");
   } catch (error) {
-    if (cachedToken === undefined) cachedToken = null;
+    if (generation === accountSessionGeneration) cachedToken = null;
     writeTokenStoredMarker(false);
     recordTokenDebugEvent({
       level: "error",
@@ -136,7 +142,7 @@ async function loadAccountAuthToken(): Promise<string | null> {
       detail: errorDetail(error),
     });
   }
-  return cachedToken;
+  return cachedToken ?? null;
 }
 
 /** Reads a preserved Misty Hosted session specifically for entitlement minting.
@@ -147,12 +153,12 @@ export async function readHostedAccountAuthToken(): Promise<string | null> {
   if (readDeploymentScope() === "hosted") return readAccountAuthToken();
   if (isNativeMobileBuild) return null;
   const vault = await loadSecureVault();
-  return (
-    vault.sessions
-      .filter((session) => sessionDeploymentScope(session) === "hosted")
-      .sort((left, right) => right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0]
-      ?.token ?? null
-  );
+  const hosted = vault.sessions
+    .filter((session) => sessionDeploymentScope(session) === "hosted")
+    .sort((left, right) => right.account.lastUsedAt.localeCompare(left.account.lastUsedAt))[0];
+  if (!hosted) return null;
+  if (!(await restoreAccountCookies(resolveHostedApiBase(), hosted.account.id))) return null;
+  return hosted.token;
 }
 
 export function listSavedAccountSessions(): SavedAccountSession[] {
@@ -208,15 +214,19 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
       currentDeploymentSessions(vault).map((item) => item.account),
       activeAccountId,
     );
-    throw new Error("That saved Misty session is no longer available.");
+    throw new SavedAccountSessionUnavailableError(
+      "That saved Misty session is no longer available.",
+    );
   }
 
+  // Restore first: an unavailable cookie record must not activate a handle
+  // whose requests would still use the previous account's cookies.
+  await syncManagedAiToken(session.token);
   session.account = { ...session.account, lastUsedAt: new Date().toISOString() };
   vault.activeAccountId = vaultAccountId(accountId);
   if (cachedToken !== session.token) accountSessionGeneration += 1;
   cachedToken = session.token;
   await persistSecureVault(vault);
-  await syncManagedAiToken(session.token);
   return session.account;
 }
 
@@ -239,6 +249,7 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
   try {
     const vault = await loadSecureVault();
     const activeId = readActiveAccountId();
+    if (activeId) await forgetAccountCookies(await resolveApiBase(), activeId);
     vault.sessions = vault.sessions.filter(
       (item) => !isCurrentDeploymentSession(item) || item.account.id !== activeId,
     );
@@ -306,6 +317,7 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     ) {
       throw new Error("The active Misty session cannot be removed as a background account.");
     }
+    await forgetAccountCookies(await resolveApiBase(), accountId);
     const sessions = vault.sessions.filter(
       (item) => !isCurrentDeploymentSession(item) || item.account.id !== accountId,
     );
@@ -321,11 +333,19 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
 
 async function loadSecureVault(): Promise<SecureAccountVault> {
   if (cachedVault) return cachedVault;
+  if (vaultReadPromise) return vaultReadPromise;
+  vaultReadPromise = readSecureVault().finally(() => {
+    vaultReadPromise = undefined;
+  });
+  return vaultReadPromise;
+}
+
+async function readSecureVault(): Promise<SecureAccountVault> {
   let raw: string | null = null;
   try {
     raw = await retrieve(desktopTokenService, desktopTokenUser);
   } catch {
-    // A missing Keychain item is a normal signed-out state.
+    // A missing credential file is a normal signed-out state.
   }
 
   const parsed = parseSecureVault(raw);
@@ -334,7 +354,7 @@ async function loadSecureVault(): Promise<SecureAccountVault> {
     await persistSecureVault(parsed.vault);
   } else if (parsed.vault.sessions.length > 0) {
     // Record what the keystore already holds so an unchanged re-persist on the
-    // common cold-start path is skipped (avoids a needless macOS prompt).
+    // common cold-start path is skipped.
     lastPersistedPayload = JSON.stringify(parsed.vault);
   }
   return parsed.vault;
@@ -345,7 +365,9 @@ function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migr
     try {
       const value = JSON.parse(raw) as Partial<SecureAccountVault>;
       if (value.version === 1 && Array.isArray(value.sessions)) {
-        const sessions = value.sessions.filter(isSecureAccountSession);
+        const sessions = value.sessions
+          .filter(isSecureAccountSession)
+          .filter((session) => session.token.startsWith("cookie-session:"));
         return {
           vault: { version: 1, activeAccountId: String(value.activeAccountId ?? ""), sessions },
           migrated: false,
@@ -357,7 +379,7 @@ function parseSecureVault(raw: string | null): { vault: SecureAccountVault; migr
   }
 
   const legacyAccount = readLegacyAccount();
-  if (raw && legacyAccount) {
+  if (raw?.startsWith("cookie-session:") && legacyAccount) {
     const account = { ...legacyAccount, lastUsedAt: new Date().toISOString() };
     return {
       vault: {
@@ -385,9 +407,7 @@ async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
     return;
   }
   const payload = JSON.stringify(vault);
-  // Skip the keystore write when nothing changed. Each write can trigger a
-  // macOS Keychain prompt, and callers persist the vault far more often than
-  // its contents actually change.
+  // Avoid redundant atomic file writes when the account metadata is unchanged.
   if (payload !== lastPersistedPayload) {
     await store(payload);
     lastPersistedPayload = payload;
@@ -436,7 +456,7 @@ function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: str
     if (activeAccountId) localStorage.setItem(activeKey, activeAccountId);
     else localStorage.removeItem(activeKey);
   } catch {
-    // Account display metadata is best-effort; tokens remain in the OS keystore.
+    // Account display metadata is best-effort; tokens remain in the native credential store.
   }
 }
 
@@ -523,13 +543,15 @@ function recordRemoveError(error: unknown): void {
   });
 }
 
+// The saved "token" is now a non-secret account handle. Actual JWT cookies
+// are persisted and restored entirely by native code.
 async function syncManagedAiToken(token: string): Promise<void> {
   if (!hasTauriInternals()) return;
-  try {
-    await invoke("automations_set_managed_ai_auth", { token });
-  } catch {
-    // Compatibility with native builds predating managed AI automation.
-  }
+  const accountId = token.startsWith("cookie-session:")
+    ? token.slice("cookie-session:".length)
+    : null;
+  const restored = await restoreAccountCookies(await resolveApiBase(), accountId);
+  if (accountId && !restored) throw new SavedAccountSessionUnavailableError();
 }
 
 function writeTokenStoredMarker(value: boolean): void {
@@ -570,5 +592,8 @@ function tokenDebugEnabled(): boolean {
 configureApiSession({
   isTransitioning: isAccountSessionTransitioning,
   readGeneration: readAccountSessionGeneration,
-  readToken: readAccountAuthToken,
+  readToken: async () => {
+    await readAccountAuthToken();
+    return null;
+  },
 });
