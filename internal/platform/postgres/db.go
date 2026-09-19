@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
@@ -19,7 +20,9 @@ import (
 var migrationFiles embed.FS
 
 type Database struct {
-	Conn *sql.DB
+	Conn     *sql.DB
+	eventsMu sync.Mutex
+	events   *accountEventHub
 }
 
 func (db *Database) GetDSN() string {
@@ -161,6 +164,12 @@ func TestingLatestMigrationVersion() (int64, error) {
 }
 
 func (db *Database) Stop() {
+	db.eventsMu.Lock()
+	if db.events != nil {
+		_ = db.events.listener.Close()
+		db.events = nil
+	}
+	db.eventsMu.Unlock()
 	if db.Conn != nil {
 		db.Conn.Close()
 	}

@@ -299,6 +299,7 @@ func (s *Server) mountAIRoutes(prefix string, aiService *api.AIService) {
 }
 
 func (s *Server) mountMistyRoutes(prefix string, aiService *api.AIService) {
+	s.Router.Get(prefix+"/misty/events", aiService.AccountEvents())
 	s.Router.Post(prefix+"/misty/agent-followup", aiService.AgentFollowup())
 	s.Router.Post(prefix+"/misty/agent-execution", aiService.AgentExecutionLease())
 	s.Router.Delete(prefix+"/misty/agent-execution/{taskID}", aiService.AgentExecutionLease())
