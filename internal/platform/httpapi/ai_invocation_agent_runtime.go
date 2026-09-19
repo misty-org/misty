@@ -233,6 +233,7 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 	system := aiInvocationSystemPrompt(body.SurfaceID)
 	if personalIdentity != nil {
 		system += "\n\nPersonal agent: " + personalIdentity.Name + "\nResponsibility: " + personalIdentity.Role + "\nInstructions: " + personalIdentity.Instructions + "\nExecution mode: " + body.ExecutionMode + ". Work only through available assigned-app tools. Understand the outcome, gather context, clarify necessary ambiguity, act, inspect, and verify. Use the conversation to resolve references and corrections. Report complete, partial, blocked, or uncertain results accurately. Never silently expand assignments. Agent setup and explicit memory changes are permitted in User mode. Do not schedule work or hand it to other agents."
+		system += "\n\nActionable capabilities: If the user requests an action requiring an app, account connection, or tool that is not currently assigned or connected, do not give a generic refusal. Clearly name the required service or connection and instruct the user to assign or connect it in Agent Settings. If a write action is requested while in User mode, explain that User mode is read-only and guide the user to toggle to Agent or Team mode via the mode selector."
 	}
 
 	if len(registrations) > 0 {
