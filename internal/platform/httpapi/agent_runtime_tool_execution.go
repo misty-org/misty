@@ -145,7 +145,7 @@ func (s *SpacesService) executePersonalAgentRuntimeTool(ctx context.Context, run
 			if approval.State == "denied" || approval.State == "expired" {
 				return agentRuntimeToolOutcome{Result: TestingMustAPIRawJSON(map[string]any{"denied": true, "reason": "creator_denied", "approval_id": approval.ID})}, nil
 			}
-			s.projectLinkedAIInvocationApproval(ctx, run, call.Name)
+			s.projectLinkedAIInvocationApproval(ctx, run, call.Name, approval)
 			return agentRuntimeToolOutcome{Approval: approval}, nil
 		}
 	}
