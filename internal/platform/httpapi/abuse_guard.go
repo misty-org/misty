@@ -277,6 +277,7 @@ func (g *AbuseGuard) Middleware(next http.Handler) http.Handler {
 }
 
 func writeAbuseRejection(w http.ResponseWriter, retryAfter time.Duration, message string) {
+	w.Header().Set("X-Misty-RateLimit-Scope", "origin")
 	seconds := retryAfterSeconds(retryAfter)
 	w.Header().Set("Retry-After", strconv.Itoa(seconds))
 	http.Error(w, message, http.StatusTooManyRequests)
