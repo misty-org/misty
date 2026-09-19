@@ -243,7 +243,15 @@ export type AiInvocationState =
 
 export type AiInvocationEvent =
   | { id: string; type: "invocation.started"; state: AiInvocationState }
-  | { id: string; type: "assistant.status"; text?: string; phase?: string }
+  | {
+      id: string;
+      type: "assistant.status";
+      text?: string;
+      phase?: string;
+      runId?: string;
+      summary?: string;
+      toolName?: string;
+    }
   | { id: string; type: "response.delta"; delta: string }
   | { id: string; type: "assistant.message"; text: string; summary: string }
   | { id: string; type: "citation"; citation: AiCitation }

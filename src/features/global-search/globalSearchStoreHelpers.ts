@@ -108,9 +108,28 @@ export function applyGlobalInvocationEvent(
     return;
   }
   if (event.type === "assistant.status") {
+    const isApproval = event.phase === "approval" || event.phase === "awaiting_approval";
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
+    let action = current?.action;
+    if (isApproval && event.id) {
+      action = {
+        id: `proposal-${event.id}`,
+        title: "Review this action",
+        summary: event.text || event.summary || "This action requires your confirmation.",
+        prompt: event.text || "",
+        risk: "write",
+        state: "awaiting_approval",
+        requiresConfirmation: true,
+        runId: event.runId,
+        approvalId: event.id,
+      };
+    }
     patchConversationMessage(set, get, conversationId, messageId, {
       activity: event.text || event.phase,
       state: "pending",
+      ...(action ? { action } : {}),
     });
     return;
   }

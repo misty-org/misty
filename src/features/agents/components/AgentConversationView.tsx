@@ -228,6 +228,11 @@ function AgentActionStatus(props: {
               {status.label}
             </span>
           </div>
+          {proposal.summary ? (
+            <p className="mb-0 mt-1 text-[12px] leading-relaxed text-cream">
+              {proposal.summary}
+            </p>
+          ) : null}
           {proposal.error ? (
             <SystemErrorActivity
               error={proposal.error}
