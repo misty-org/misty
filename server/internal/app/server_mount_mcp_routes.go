@@ -14,6 +14,10 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Get(prefix+"/me/app-requests/{requestID}", spaces.AppRequestControl())
 	s.Router.Post(prefix+"/me/app-requests/{requestID}", spaces.AppRequestControl())
 	s.Router.Post(prefix+"/me/app-requests/{requestID}/link", spaces.AppRequestLink())
+	// Remembered approvals: listed and revoked in Settings › Agents › Permissions.
+	s.Router.Get(prefix+"/me/agent-grants", spaces.AgentGrants())
+	s.Router.Delete(prefix+"/me/agent-grants", spaces.AgentGrants())
+	s.Router.Delete(prefix+"/me/agent-grants/{grantID}", spaces.AgentGrant())
 	s.Router.Post(prefix+"/me/screen-model/{jobID}", spaces.ScreenModel())
 	s.Router.Post(prefix+"/me/companion/refine-point/{invocationID}", spaces.CompanionRefinePoint())
 	// Collaboration: Plan/Act mode, agent questions, plans and goals.

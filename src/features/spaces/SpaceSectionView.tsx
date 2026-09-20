@@ -1,5 +1,4 @@
 import { useAuth } from "@/features/auth";
-import { SpaceOverview } from "./SpaceOverview";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -71,7 +70,8 @@ export function SpaceSectionView(props: {
   studioKind?: string;
   workspaceTabId?: string;
 }) {
-  const { spaceId, section, studioKind = "" } = props;
+  const { spaceId, studioKind = "" } = props;
+  const section = props.section === "home" ? "social" : props.section;
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -157,9 +157,7 @@ export function SpaceSectionView(props: {
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {section === "home" ? (
-          <SpaceOverview key={`home:${spaceId}`} space={space} />
-        ) : section === "settings" ? (
+        {section === "settings" ? (
           <SpaceSettings
             key={`settings:${spaceId}:${studioKind}`}
             spaceId={spaceId}

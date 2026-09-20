@@ -7,7 +7,7 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub struct BrowserPictureInPictureRequest {
     pub id: String,
-    /// "toggle", "enter" (only a playing video) or "exit".
+    /// "toggle", "enter" (only a playing video), "exit", or "refresh" (repaint returned videos).
     pub mode: String,
 }
 
@@ -18,6 +18,19 @@ const PICTURE_IN_PICTURE_SCRIPT: &str = r#"(() => {
   const mode = __MODE__;
   const videos = [...document.querySelectorAll("video")];
   const webkitActive = videos.find((v) => v.webkitPresentationMode === "picture-in-picture");
+  // A video that has just come back from picture in picture can be left without its picture, a
+  // blurred frame, until the page repaints it. Taking each one out of the layout for a moment
+  // and putting it back makes the page draw it again.
+  if (mode === "refresh") {
+    videos.forEach((v) => {
+      if (v.webkitPresentationMode === "picture-in-picture") return;
+      const display = v.style.display;
+      v.style.display = "none";
+      void v.offsetHeight;
+      v.style.display = display;
+    });
+    return "refreshed";
+  }
   if (document.pictureInPictureElement || webkitActive) {
     if (mode === "enter") return "active";
     if (webkitActive) webkitActive.webkitSetPresentationMode("inline");
@@ -53,7 +66,7 @@ pub async fn browser_webview_picture_in_picture(
     request: BrowserPictureInPictureRequest,
 ) -> Result<(), String> {
     let mode = match request.mode.as_str() {
-        "toggle" | "enter" | "exit" => request.mode.as_str(),
+        "toggle" | "enter" | "exit" | "refresh" => request.mode.as_str(),
         _ => return Err("Unknown picture-in-picture mode.".into()),
     };
     let webview = running_webview(&app, &request.id)?;

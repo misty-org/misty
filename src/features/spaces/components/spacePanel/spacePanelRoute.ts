@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 
 const validSections = new Set([
-  "home",
   "social",
   "chat",
   "planner",
@@ -37,8 +36,8 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const location = useLocation();
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const defaultJournalSection = "notes";
-  const requestedSection = routeParts[2] ?? "home";
+  const defaultSection = "social";
+  const requestedSection = routeParts[2] ?? defaultSection;
   const routeSection =
     requestedSection === "files"
       ? "library"
@@ -61,7 +60,7 @@ export function useSpacePanelRoute(): SpacePanelRoute {
 
   return {
     activeSpaceId: routeParts[0] === "spaces" ? decodeRouteSegment(routeParts[1] ?? "") : "",
-    section: validSections.has(routeSection) ? routeSection : defaultJournalSection,
+    section: validSections.has(routeSection) ? routeSection : defaultSection,
     plannerSection,
     taskView:
       routeSection === "planner" && ["board", "list"].includes(canonicalTaskView || legacyTaskView)

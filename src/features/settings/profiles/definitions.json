@@ -255,18 +255,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.autoPictureInPicture",
-    "label": "Picture in picture when switching tabs",
-    "keywords": ["pip", "video", "floating", "mini player"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_auto_picture_in_picture",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.autoArchiveHours",
     "label": "Archive idle tabs",
     "keywords": ["archive", "auto close", "clean up", "tabs"],
@@ -442,11 +430,11 @@
     "page": "spaces-defaults",
     "section": "spaces",
     "key": "opening_tool",
-    "default": "home",
+    "default": "chat",
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["home", "chat", "journal", "planner", "library"]
+    "enum": ["chat", "journal", "planner", "library"]
   },
   {
     "id": "spaces.agenda.tasks",

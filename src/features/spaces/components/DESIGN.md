@@ -30,7 +30,7 @@ Inherit application and shared navigation typography. The Space heading uses 14p
 
 ## Layout
 
-The sidebar uses the shared `WorkspaceSidebar` width (224px) and padding (8px), with independent vertical scrolling. Section links are 32px tall and retain a 44px minimum target for coarse pointers. The Space's name and menu come first, followed by a vertical labeled list: All, Chat, Planner, Journal, and Library, filtered by permissions. Switching Spaces happens in the global navigator, never in a second Spaces list here. Chat retains its conversations: channels, direct messages, then connected accounts ([SpaceChatSidebar.tsx](../chat/sidebar/SpaceChatSidebar.tsx)). Other tools show recent content from the current Space. Journal exposes distinct Pins, Notes, and Drawings destinations without a duplicate Recent entry. Members and Usage remain below. The rail remains visible at every window width. Root Chat and Planner open collection entry pages; deep conversations and editors retain their existing layouts.
+The sidebar uses the shared `WorkspaceSidebar` width (224px) and padding (8px), with independent vertical scrolling. Section links are 32px tall and retain a 44px minimum target for coarse pointers. The Space's name and menu come first, followed by a vertical labeled list: Chat, Planner, Journal, and Library, filtered by permissions. Switching Spaces happens in the global navigator, never in a second Spaces list here. Chat retains its conversations: channels, direct messages, then connected accounts ([SpaceChatSidebar.tsx](../chat/sidebar/SpaceChatSidebar.tsx)). Other tools show recent content from the current Space. Journal exposes distinct Pins, Notes, and Drawings destinations without a duplicate Recent entry. Members and Usage remain below. The rail remains visible at every window width. Root Chat and Planner open collection entry pages; deep conversations and editors retain their existing layouts.
 
 **The Named-Space Rule.** Global icon navigation and named Space navigation coexist. The global navigator's auto-hide setting does not hide Space section or management labels.
 
@@ -45,7 +45,7 @@ Retain shared navigation rows, buttons, icon sizing, and focus treatment. Icons 
 ## Components
 
 - **Header:** Names the active Space; the "…" menu holds Leave or Delete. Creating Spaces lives in the global Space stack.
-- **Tool navigation:** Visible labels and Lucide icons, with All opening the overview. Preserve permission filtering, activity badges, `aria-current`, and remembered Planner/Journal destinations. Modified activation retains normal link behavior. Section navigation updates only its owning tab, including split layouts.
+- **Tool navigation:** Visible labels and Lucide icons. Chat is the default Space destination; legacy `/home` routes open Chat. Preserve permission filtering, activity badges, `aria-current`, and remembered Planner/Journal destinations. Modified activation retains normal link behavior. Section navigation updates only its owning tab, including split layouts.
 - **Management:** `SpaceWorkspaceRail` explicitly uses named Members and Usage controls. Their popovers remain reachable through full-width ghost buttons with icons and visible labels. The component's compact variant is not the presentation chosen for this sidebar.
 - **Errors:** Keep the current view and show the local alert when a section cannot preload, allowing a retry.
 

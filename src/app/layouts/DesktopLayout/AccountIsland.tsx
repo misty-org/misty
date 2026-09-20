@@ -1,5 +1,5 @@
 import { Settings } from "lucide-react";
-import { DropdownMenu, DropdownMenuTrigger, IconButton, TooltipHint } from "@/shared/ui";
+import { DropdownMenu, DropdownMenuTrigger, IconButton, toolbarIconProps, TooltipHint } from "@/shared/ui";
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -46,7 +46,7 @@ export function AccountIsland(props: {
         aria-pressed={props.settingsOpen}
         onClick={props.onSettingsClick}
       >
-        <Settings className="size-4" aria-hidden="true" />
+        <Settings {...toolbarIconProps} />
       </IconButton>
     </div>
   );

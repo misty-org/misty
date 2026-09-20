@@ -147,7 +147,7 @@ describe("workspace virtual windows", () => {
     );
   });
 
-  it("extracts a complete panel and its tabs into a new virtual window", () => {
+  it("extracts a complete pane and its tabs into a new virtual window", () => {
     const firstPane = useWorkspaceStore.getState().layout.focusedPaneId;
     const secondPane = useWorkspaceStore.getState().splitPane(firstPane, "right")!;
     const code = useWorkspaceStore.getState().openSurface({
@@ -190,7 +190,7 @@ describe("workspace virtual windows", () => {
     );
   });
 
-  it("caps each virtual window at four panels", () => {
+  it("caps each virtual window at four panes", () => {
     const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
     const third = useWorkspaceStore.getState().splitPane(second, "down")!;
@@ -199,7 +199,7 @@ describe("workspace virtual windows", () => {
     expect(useWorkspaceStore.getState().splitPane(fourth, "down")).toBeNull();
   });
 
-  it("migrates oversized saved layouts into four panels without dropping real tabs", () => {
+  it("migrates oversized saved layouts into four panes without dropping real tabs", () => {
     const createTestTab = (id: string) => ({
       id,
       surfaceId: "agents" as const,

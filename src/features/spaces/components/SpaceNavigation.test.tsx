@@ -38,7 +38,6 @@ describe("SpaceSectionNavigation", () => {
 
     const links = [...container.querySelectorAll("a")];
     expect(links.map((link) => link.textContent?.trim())).toEqual([
-      "All",
       "Chat",
       "Planner",
       "Journal",
@@ -74,7 +73,7 @@ describe("SpaceSectionNavigation", () => {
     });
 
     const labels = [...container.querySelectorAll("a")].map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["All", "Journal", "Library"]);
+    expect(labels).toEqual(["Journal", "Library"]);
   });
 
   it("keeps Space management out of the section menu", async () => {
@@ -134,7 +133,6 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "All",
       "Chat",
       "Journal",
     ]);
@@ -164,7 +162,6 @@ describe("SpaceSectionNavigation", () => {
     });
 
     expect([...container.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-      "All",
       "Chat",
       "Planner",
       "Journal",

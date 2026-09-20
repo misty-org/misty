@@ -19,18 +19,14 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
       `${layout.navigation === "left" ? size : 0}px minmax(0, 1fr) ${layout.navigation === "right" ? size : 0}px`,
     );
     expect(geometry.frame.gridTemplateRows).toBe(
-      `${layout.navigation === "top" ? size : 38}px 0px minmax(0, 1fr) ${layout.navigation === "bottom" ? size : 0}px`,
+      `${layout.navigation === "top" ? size : layout.tabs === "top" ? dockingMetrics.tabStrip : 38}px 0px minmax(0, 1fr) ${layout.navigation === "bottom" ? size : 0}px`,
     );
-    for (const edge of dockPositions) {
-      const panel = layout.tabs === "left" || layout.tabs === "right";
+    for (const edge of dockPositions)
       expect(geometry.frame[`--pane-seam-${edge}`]).toBe(
-        panel
-          ? `${dockingMetrics.panelMargin}px`
-          : edge === layout.tabs || (!autoHide && edge === layout.navigation)
-            ? "1px"
-            : "0px",
+        (layout.tabs === "top" || layout.tabs === "bottom") && edge === layout.tabs
+          ? "1px"
+          : `${dockingMetrics.paneMargin}px`,
       );
-    }
     expect(geometry.floating[layout.navigation]).toBe(0);
     if (layout.tabs === "top") {
       // Tabs never occupy native traffic lights, even with hidden navigation.
@@ -41,18 +37,14 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
     } else expect(geometry.titlebarInsets).toBeUndefined();
   });
 });
-it("preserves the reference seam and mirrors it with the chrome", () => {
-  expect(dockingGeometry({ navigation: "left", tabs: "top" }).frame["--pane-corner-top-left"]).toBe(
-    "12px",
-  );
-  expect(
-    dockingGeometry({ navigation: "right", tabs: "bottom" }).frame["--pane-corner-bottom-right"],
-  ).toBe("12px");
-  expect(
-    dockingGeometry({ navigation: "top", tabs: "bottom" }).frame["--pane-corner-top-left"],
-  ).toBe("0px");
+it("hangs a horizontal strip's tabs from the page's top seam", () => {
+  const frame = dockingGeometry({ navigation: "left", tabs: "top" }).frame;
+  expect(frame["--pane-seam-top"]).toBe("1px");
+  expect(frame["--pane-seam-left"]).toBe("8px");
+  expect(frame["--pane-corner-top-left"]).toBe("12px");
+  expect(frame["--pane-corner-bottom-right"]).toBe("20px");
 });
-it("makes the page a rounded panel with an even margin beside vertical tabs", () => {
+it("makes the page a rounded pane with an even margin beside vertical tabs", () => {
   const frame = dockingGeometry({ navigation: "left", tabs: "left" }).frame;
   for (const edge of dockPositions) expect(frame[`--pane-seam-${edge}`]).toBe("8px");
   expect(frame["--pane-corner-bottom-right"]).toBe("20px");

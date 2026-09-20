@@ -226,4 +226,4 @@ export interface OpenWorkspaceSurfaceRequest {
   syncExistingRoute?: boolean;
   paneId?: string;
 }
-export const maxWorkspacePanels = 4;
+export const maxWorkspacePanes = 4;

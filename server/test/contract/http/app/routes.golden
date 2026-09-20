@@ -12,6 +12,8 @@ DELETE /api/ai/memories/{memoryID}
 DELETE /api/ai/smart-library/folders/{folderID}
 DELETE /api/connections/{connectionID}
 DELETE /api/integrations/apps/connections/{accountID}
+DELETE /api/me/agent-grants
+DELETE /api/me/agent-grants/{grantID}
 DELETE /api/me/space-templates/{templateID}
 DELETE /api/misty/agent-execution/{taskID}
 DELETE /api/misty/agents/{agentID}
@@ -51,6 +53,8 @@ DELETE /api/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 DELETE /api/spaces/{spaceID}/tasks/{taskID}
 DELETE /connections/{connectionID}
 DELETE /integrations/apps/connections/{accountID}
+DELETE /me/agent-grants
+DELETE /me/agent-grants/{grantID}
 DELETE /me/space-templates/{templateID}
 DELETE /misty/agent-execution/{taskID}
 DELETE /misty/agents/{agentID}
@@ -96,6 +100,8 @@ DELETE /v1/ai/memories/{memoryID}
 DELETE /v1/ai/smart-library/folders/{folderID}
 DELETE /v1/connections/{connectionID}
 DELETE /v1/integrations/apps/connections/{accountID}
+DELETE /v1/me/agent-grants
+DELETE /v1/me/agent-grants/{grantID}
 DELETE /v1/me/space-templates/{templateID}
 DELETE /v1/misty/agent-execution/{taskID}
 DELETE /v1/misty/agents/{agentID}
@@ -200,6 +206,7 @@ GET /api/instance
 GET /api/integrations/apps
 GET /api/integrations/apps/catalog
 GET /api/me
+GET /api/me/agent-grants
 GET /api/me/agent-interventions
 GET /api/me/agent-requests
 GET /api/me/app-requests/{requestID}
@@ -220,7 +227,6 @@ GET /api/oauth/connections/{provider}/callback
 GET /api/realtime
 GET /api/search/global
 GET /api/search/spaces
-GET /api/settings/preferences
 GET /api/space-invitations/{token}
 GET /api/space-templates
 GET /api/spaces
@@ -302,6 +308,7 @@ GET /instance
 GET /integrations/apps
 GET /integrations/apps/catalog
 GET /me
+GET /me/agent-grants
 GET /me/agent-interventions
 GET /me/agent-requests
 GET /me/app-requests/{requestID}
@@ -322,7 +329,6 @@ GET /oauth/connections/{provider}/callback
 GET /realtime
 GET /search/global
 GET /search/spaces
-GET /settings/preferences
 GET /space-invitations/{token}
 GET /space-templates
 GET /spaces
@@ -428,6 +434,7 @@ GET /v1/instance
 GET /v1/integrations/apps
 GET /v1/integrations/apps/catalog
 GET /v1/me
+GET /v1/me/agent-grants
 GET /v1/me/agent-interventions
 GET /v1/me/agent-requests
 GET /v1/me/app-requests/{requestID}
@@ -448,7 +455,6 @@ GET /v1/oauth/connections/{provider}/callback
 GET /v1/realtime
 GET /v1/search/global
 GET /v1/search/spaces
-GET /v1/settings/preferences
 GET /v1/space-invitations/{token}
 GET /v1/space-templates
 GET /v1/spaces
@@ -514,7 +520,6 @@ GET /v1/sync/ws
 PATCH /api/me/agent-goals/{goalID}
 PATCH /api/misty/conversation-folders/{folderID}
 PATCH /api/misty/conversations/{conversationID}
-PATCH /api/settings/preferences
 PATCH /api/spaces/{spaceID}
 PATCH /api/spaces/{spaceID}/calendar/events/{eventID}
 PATCH /api/spaces/{spaceID}/conversations/{conversationID}
@@ -540,7 +545,6 @@ PATCH /api/spaces/{spaceID}/tasks/{taskID}
 PATCH /me/agent-goals/{goalID}
 PATCH /misty/conversation-folders/{folderID}
 PATCH /misty/conversations/{conversationID}
-PATCH /settings/preferences
 PATCH /spaces/{spaceID}
 PATCH /spaces/{spaceID}/calendar/events/{eventID}
 PATCH /spaces/{spaceID}/conversations/{conversationID}
@@ -566,7 +570,6 @@ PATCH /spaces/{spaceID}/tasks/{taskID}
 PATCH /v1/me/agent-goals/{goalID}
 PATCH /v1/misty/conversation-folders/{folderID}
 PATCH /v1/misty/conversations/{conversationID}
-PATCH /v1/settings/preferences
 PATCH /v1/spaces/{spaceID}
 PATCH /v1/spaces/{spaceID}/calendar/events/{eventID}
 PATCH /v1/spaces/{spaceID}/conversations/{conversationID}
@@ -699,7 +702,6 @@ POST /api/provider-callbacks/google/calendar
 POST /api/realtime/tickets
 POST /api/register
 POST /api/search/global/visual
-POST /api/settings/preferences
 POST /api/space-invitations/{token}
 POST /api/spaces
 POST /api/spaces/{spaceID}/attachments/{attachmentID}/promote
@@ -821,7 +823,6 @@ POST /provider-callbacks/google/calendar
 POST /realtime/tickets
 POST /register
 POST /search/global/visual
-POST /settings/preferences
 POST /space-invitations/{token}
 POST /spaces
 POST /spaces/{spaceID}/attachments/{attachmentID}/promote
@@ -962,7 +963,6 @@ POST /v1/provider-callbacks/google/calendar
 POST /v1/realtime/tickets
 POST /v1/register
 POST /v1/search/global/visual
-POST /v1/settings/preferences
 POST /v1/space-invitations/{token}
 POST /v1/spaces
 POST /v1/spaces/{spaceID}/attachments/{attachmentID}/promote

@@ -127,7 +127,7 @@ export function WorkspacePaneControls({
           data-visible={hovered}
           className={cn(
             "pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5",
-            "rounded-md border border-charcoal-border bg-charcoal-card p-0.5",
+            "rounded-md border border-charcoal-border bg-transparent p-0.5",
             "opacity-0 transition-opacity data-[visible=true]:pointer-events-auto",
             "data-[visible=true]:opacity-100 hover:pointer-events-auto",
             "hover:opacity-100 has-[:focus-visible]:pointer-events-auto",

@@ -25,13 +25,16 @@ type AgentProfileInput struct {
 	// SpaceID is the Space the agent lives in. Empty keeps the current Space,
 	// or the personal Space for a new agent.
 	SpaceID string `json:"space_id,omitempty"`
-	Version         int64           `json:"version,omitempty"`
+	// DefaultRunMode is how new chats with this agent start: ask or auto.
+	// Empty keeps the current default, or Ask for a new agent.
+	DefaultRunMode string `json:"default_run_mode,omitempty"`
+	Version        int64  `json:"version,omitempty"`
 }
 
 func (db *Database) PersonalAgents(ctx context.Context, userID string) ([]AskIdentity, error) {
 	items := []AskIdentity{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE owner_user_id=$1 AND deleted_at IS NULL ORDER BY system_managed DESC,created_at,id`, userID)
+		rows, err := tx.QueryContext(ctx, `SELECT `+personalAgentColumns+` FROM misty_ask_identities WHERE owner_user_id=$1 AND runner='misty' AND deleted_at IS NULL ORDER BY system_managed DESC,created_at,id`, userID)
 		if err != nil {
 			return err
 		}
@@ -52,6 +55,10 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 	input.Name = strings.TrimSpace(input.Name)
 	input.Role = strings.TrimSpace(input.Role)
 	input.SpaceID = strings.TrimSpace(input.SpaceID)
+	input.DefaultRunMode = strings.TrimSpace(input.DefaultRunMode)
+	if input.DefaultRunMode != "" && input.DefaultRunMode != "ask" && input.DefaultRunMode != "auto" {
+		return nil, ErrSpaceInvalid
+	}
 	if input.Name == "" || len([]rune(input.Name)) > 80 || len([]rune(input.Role)) > 160 || len(input.Description) > 8000 || len(input.Instructions) > 64000 || len(input.Icon) > 128 || len(input.ModelID) > 200 || len(input.ReasoningEffort) > 32 {
 		return nil, ErrSpaceInvalid
 	}
@@ -75,7 +82,7 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 		if id == "" {
 			id = "personal_" + uuid.NewString()
 			// An empty Space lets the database place the agent in the personal Space.
-			if err := scanPersonalAgent(tx.QueryRowContext(ctx, `INSERT INTO misty_ask_identities(id,owner_user_id,name,role,description,instructions,icon,avatar,model_mode,model_id,reasoning_effort,enabled,system_managed,default_run_mode,voice_id,space_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,'ask','alloy',NULLIF($13,'')) RETURNING `+personalAgentColumns, id, userID, input.Name, input.Role, input.Description, input.Instructions, input.Icon, input.Avatar, input.ModelMode, input.ModelID, input.ReasoningEffort, input.Enabled, input.SpaceID), out); err != nil {
+			if err := scanPersonalAgent(tx.QueryRowContext(ctx, `INSERT INTO misty_ask_identities(id,owner_user_id,name,role,description,instructions,icon,avatar,model_mode,model_id,reasoning_effort,enabled,system_managed,default_run_mode,voice_id,space_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,FALSE,COALESCE(NULLIF($14,''),'ask'),'alloy',NULLIF($13,'')) RETURNING `+personalAgentColumns, id, userID, input.Name, input.Role, input.Description, input.Instructions, input.Icon, input.Avatar, input.ModelMode, input.ModelID, input.ReasoningEffort, input.Enabled, input.SpaceID, input.DefaultRunMode), out); err != nil {
 				return err
 			}
 		} else {
@@ -94,7 +101,7 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 				return ErrSpaceInvalid
 			}
 			// A moved agent's past artifacts stay in the Space they were saved to.
-			if err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE misty_ask_identities SET name=$3,role=$4,description=$5,instructions=$6,icon=$7,avatar=$8,model_mode=$9,model_id=$10,reasoning_effort=$11,enabled=$12,space_id=COALESCE(NULLIF($13,''),space_id),version=version+1,updated_at=NOW() WHERE id=$1 AND owner_user_id=$2 RETURNING `+personalAgentColumns, id, userID, input.Name, input.Role, input.Description, input.Instructions, input.Icon, input.Avatar, input.ModelMode, input.ModelID, input.ReasoningEffort, input.Enabled, input.SpaceID), out); err != nil {
+			if err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE misty_ask_identities SET name=$3,role=$4,description=$5,instructions=$6,icon=$7,avatar=$8,model_mode=$9,model_id=$10,reasoning_effort=$11,enabled=$12,space_id=COALESCE(NULLIF($13,''),space_id),default_run_mode=COALESCE(NULLIF($14,''),default_run_mode),version=version+1,updated_at=NOW() WHERE id=$1 AND owner_user_id=$2 RETURNING `+personalAgentColumns, id, userID, input.Name, input.Role, input.Description, input.Instructions, input.Icon, input.Avatar, input.ModelMode, input.ModelID, input.ReasoningEffort, input.Enabled, input.SpaceID, input.DefaultRunMode), out); err != nil {
 				return err
 			}
 			if !input.Enabled {

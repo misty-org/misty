@@ -277,8 +277,8 @@ export function spacesTabsSessionKey(accountId: string, spaceId: string): string
 export function defaultSpaceRoute(spaceId: string): string {
   const preferences = useSettingsStore.getState().settings?.document.spaces as
     Record<string, unknown> | undefined;
-  const tool = String(preferences?.opening_tool ?? "home");
-  const route = ["home", "chat", "journal", "planner", "library"].includes(tool) ? tool : "home";
+  const tool = String(preferences?.opening_tool ?? "chat");
+  const route = ["chat", "journal", "planner", "library"].includes(tool) ? tool : "chat";
   return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
 
@@ -292,8 +292,9 @@ function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
     const pathParts = parsed.pathname.split("/");
     if (spaceId && pathParts[2] && decodeURIComponent(pathParts[2]) !== spaceId) return fallback;
     if (pathParts[1] === "spaces" && pathParts[2] && !pathParts[3]) {
-      pathParts[3] = "home";
+      pathParts[3] = "chat";
     }
+    if (pathParts[1] === "spaces" && pathParts[3] === "home") pathParts[3] = "chat";
     if (pathParts[1] === "spaces" && pathParts[3] === "tasks") pathParts[3] = "planner";
     if (pathParts[1] === "spaces" && pathParts[3] === "planner") {
       if (!pathParts[4]) pathParts.push("tasks", "board");

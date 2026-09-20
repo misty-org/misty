@@ -33,6 +33,7 @@ type aiInvocationInput struct {
 	AgentID               string                      `json:"agent_id,omitempty"`
 	ExecutionMode         string                      `json:"execution_mode,omitempty"`
 	CollaborationMode     string                      `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
+	PermissionMode        string                      `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
 	WindowLabel           string                      `json:"window_label,omitempty"`
 	Mode                  string                      `json:"mode"`
 	SurfaceID             string                      `json:"surface_id"`

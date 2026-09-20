@@ -69,6 +69,7 @@ use infra::browser::{
     browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
     browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
     browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
+    browser_webviews_hide_except,
     browser_webviews_park_all, browser_webviews_set_overlay_active,
     browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble, BrowserSessionState,
 };
@@ -183,6 +184,8 @@ pub fn run() {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
+            #[cfg(target_os = "macos")]
+            platform::plugins::mac_pip_observer::install(app.handle());
             // Debug-only: the browser benchmark runs its tasks in Misty's own
             // tabs when asked to; see browser_eval_bridge.rs.
             #[cfg(all(desktop, debug_assertions))]
@@ -641,6 +644,8 @@ pub fn run() {
                     browser_webview_hide,
                     #[cfg(desktop)]
                     browser_webviews_hide_all,
+                    #[cfg(desktop)]
+                    browser_webviews_hide_except,
                     #[cfg(desktop)]
                     browser_webviews_park_all,
                     #[cfg(desktop)]

@@ -2,7 +2,7 @@
   "src-tauri/src/app/commands.rs": 2397,
   "src-tauri/src/domain/explorer.rs": 621,
   "src-tauri/src/infra/agent_workspace.rs": 549,
-  "src-tauri/src/infra/browser.rs": 3482,
+  "src-tauri/src/infra/browser.rs": 3502,
   "src-tauri/src/infra/browser_cookie_store.rs": 521,
   "src-tauri/src/infra/browser_macos.rs": 601,
   "src-tauri/src/infra/browser_sync/device_signin.rs": 724,
@@ -26,5 +26,6 @@
   "src/features/spaces/SpaceAgenda.test.tsx": 572,
   "src/features/webviews/browserRuntime.ts": 785,
   "src/features/workspace/useWorkspaceStore.test.ts": 680,
-  "src/features/workspace/useWorkspaceStore.ts": 995
+  "src/features/workspace/useWorkspaceStore.ts": 995,
+  "src-tauri/src/infra/browser_scripts.rs": 570
 }

@@ -57,9 +57,9 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 		return result, appsError(err)
 	}
 	var approval *db.AgentAppRequest
-	if kind.NeedsApproval() {
+	if kind != composio.KindRead {
 		var waiting json.RawMessage
-		if approval, waiting, err = s.appsApproval(bounded, invocation, info, call); err != nil || waiting != nil {
+		if approval, waiting, err = s.appsApproval(bounded, invocation, info, call, kind); err != nil || waiting != nil {
 			return waiting, err
 		}
 	}

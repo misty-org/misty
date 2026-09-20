@@ -79,6 +79,9 @@ type Invocation struct {
 	// inside the tool handler. The descriptor still advertises the real policy;
 	// the handler remains responsible for enforcing it before any external write.
 	DelegatedApproval bool
+	// PermissionMode is the run's Ask or Auto, frozen when the run was admitted.
+	// Empty follows the agent's default.
+	PermissionMode string
 }
 
 type Handler func(context.Context, Invocation, serveragent.ToolRequest) (json.RawMessage, error)

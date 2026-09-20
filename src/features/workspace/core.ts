@@ -1,4 +1,4 @@
-// Core shell contract. Keep desktop-only multi-panel widgets out of this
+// Core shell contract. Keep desktop-only multi-pane widgets out of this
 // surface so account routes do not pull them into their bundles.
 export * from "./dockRegistry";
 export * from "./dockTree";

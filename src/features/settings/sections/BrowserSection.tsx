@@ -19,7 +19,6 @@ import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
 import { parseSiteZoomLevels } from "@/features/webviews/siteZoom";
 import { parseSiteStyles } from "@/features/webviews/siteStyles";
-import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 
 const archiveOptions = [
   { value: "0", label: "Never" },
@@ -151,25 +150,6 @@ export function BrowserSection(
                 }
               />
             </SettingsRow>
-            {pictureInPictureSupported() && (
-              <SettingsRow
-                label="Picture in picture when switching tabs"
-                description="A video playing with sound keeps going in a floating window when you switch away from its tab."
-              >
-                <SwitchControl
-                  checked={booleanSetting(
-                    props.document,
-                    "general",
-                    "browser_auto_picture_in_picture",
-                    true,
-                  )}
-                  disabled={props.working}
-                  onChange={(value) =>
-                    props.onSettingChange("general", "browser_auto_picture_in_picture", value)
-                  }
-                />
-              </SettingsRow>
-            )}
             <SettingsRow
               label="Mouse gestures"
               description="Hold the right button and drag left to go back, right to go forward or up to reload."

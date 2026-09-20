@@ -65,6 +65,7 @@ func (s *SpacesService) resolveAssignedTaskToolbox(ctx context.Context, run *db.
 	invocation := agenttools.Invocation{
 		UserID: run.RequestingMemberID, SpaceID: run.SpaceID, AgentID: run.AgentID, RunID: run.ID,
 		Source: "task_assignment", Trigger: "task_assignment", DelegatedApproval: true,
+		PermissionMode: serveragent.NormalizePermissionMode(run.EffectiveRunMode),
 	}
 	manifest, err := toolbox.Resolve(ctx, invocation, requested, authorizePersonalAgentTaskTool(s.database))
 	return toolbox, invocation, manifest, err

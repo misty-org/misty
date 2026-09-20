@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { dockLeaves, useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
+  AvatarShuffleStack,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -62,16 +63,29 @@ export function SpacesMenuButton({
         <DropdownMenu>
           <MenuTrigger
             iconOnly={!labeled}
+            className={
+              labeled
+                ? "!h-[var(--shell-tab-height,36px)] max-w-full rounded-full bg-cream/[0.07] pl-1 pr-2.5 hover:bg-cream/[0.12]"
+                : undefined
+            }
             size={toolbar ? undefined : "xs"}
             label="Spaces"
             title={shown ? `Spaces: ${shown.name}` : "Spaces"}
             value={labeled && shown ? shown.name : undefined}
             icon={
               labeled && shown ? (
-                <SpaceAvatar
-                  space={shown}
-                  className="size-5 rounded-md"
-                  fallbackClassName="text-[9px] font-semibold"
+                <AvatarShuffleStack
+                  activeId={shown.id}
+                  items={spaces.map((space) => ({
+                    id: space.id,
+                    node: (
+                      <SpaceAvatar
+                        space={space}
+                        className="size-5 rounded-full"
+                        fallbackClassName="text-[9px] font-semibold"
+                      />
+                    ),
+                  }))}
                 />
               ) : toolbar ? (
                 <PanelsTopLeft {...toolbarIconProps} />

@@ -49,7 +49,6 @@ import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
 import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
-import { configureAutoPictureInPicture } from "@/features/webviews/pictureInPictureSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { invoke } from "@/native/invoke";
@@ -287,9 +286,6 @@ function applySettingsSideEffects(
   );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
-  configureAutoPictureInPicture(
-    settingsBoolean(document, "general", "browser_auto_picture_in_picture", true),
-  );
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
   );

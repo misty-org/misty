@@ -36,8 +36,8 @@ vi.mock("./AccountIsland", () => ({ AccountIsland: () => null }));
 vi.mock("./WorkspaceStripDock", () => ({
   BrowserMenuAccountItems: () => null,
   BrowserProfileButton: () => null,
+  AppLauncherButton: () => null,
   StripDownloads: () => null,
-  StripShortcuts: () => null,
 }));
 vi.mock("./WorkspaceCanvas", () => ({
   WorkspaceCanvas: (props: { titlebarInsets?: { left: number } }) => (

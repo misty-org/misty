@@ -38,12 +38,17 @@ export function WorkspaceCanvas(props: {
   windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
-  stripShortcuts?: ReactNode;
   stripFootEnd?: ReactNode;
   /** The vertical sidebar's closing row: the account, sync and settings, inside its panel. */
   stripAccount?: ReactNode;
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
-  browserChrome?: { spaces: ReactNode; profile: ReactNode; accountItems: ReactNode };
+  browserChrome?: {
+    spaces: ReactNode;
+    agents: ReactNode;
+    sync: ReactNode;
+    profile: ReactNode;
+    accountItems: ReactNode;
+  };
 }) {
   const legacyNames = useNavigationNames((state) => state.names);
   const legacyNamesReady = useNavigationNames((state) => state.ready);
@@ -349,7 +354,7 @@ export function WorkspaceCanvas(props: {
       <WindowMenuSlotContext.Provider value={windowMenuSlot}>
         <div
           ref={windowTransitionRef}
-          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-border ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
+          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
           data-workspace-panes={leaves.length}
           data-workspace-scope={activeScopeKey}
           data-virtual-window={activeVirtualWindowId}
@@ -383,9 +388,9 @@ export function WorkspaceCanvas(props: {
                   onCloseWindow={closeWorkspaceVirtualWindow}
                   onReopenWindow={reopenWorkspaceVirtualWindow}
                   onResizeSplit={updateSplitRatio}
-                  shortcuts={props.stripShortcuts}
                   account={props.stripAccount}
                   footEnd={props.stripFootEnd}
+                  cluster={props.browserChrome?.spaces}
                 />
               </SidebarDrawer>
             ) : (
@@ -414,9 +419,16 @@ export function WorkspaceCanvas(props: {
                 onCloseWindow={closeWorkspaceVirtualWindow}
                 onReopenWindow={reopenWorkspaceVirtualWindow}
                 onResizeSplit={updateSplitRatio}
-                shortcuts={props.stripShortcuts}
                 account={props.stripAccount}
                 footEnd={props.stripFootEnd}
+                cluster={
+                  props.browserChrome ? (
+<>
+                      {props.browserChrome.spaces}
+                      {props.browserChrome.agents}
+                    </>
+                  ) : undefined
+                }
               />
             ))}
           <WorkspaceTabPanels

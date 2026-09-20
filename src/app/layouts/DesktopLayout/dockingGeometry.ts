@@ -7,20 +7,25 @@ import {
 
 export const dockingMetrics = {
   titlebar: 38,
-  tabStrip: 38,
-  /** Gap between a horizontal tab strip's outer edge and its connected tabs. */
-  tabInset: 3,
+  /** The tab strip: the window's 8px top margin, then the 36px tabs. */
+  tabStrip: 44,
+  /** Gap above a horizontal strip's tabs: the same 8px margin the page keeps on its other edges. */
+  tabInset: 8,
   /** How far a connected tab's curve flares out past its sides; mirrors `--tab-shoulder`. */
-  tabShoulder: 14,
+  tabShoulder: 12,
+  /** Clear space between the window buttons and where the first tab's curve starts. */
+  tabLead: 8,
+  /** Top inset shared by vertical tabs and their native window controls. */
+  sideTabInset: 5,
   /** The retired navigation rail: its tracks stay at zero, but the layout model still names them. */
   rail: 62,
   horizontalRail: 44,
   sideTabs: 280,
   gap: 8,
   tab: 28,
-  /** Chrome margin around the page when vertical tabs make it a panel. */
-  panelMargin: 8,
-  panelRadius: 12,
+  /** Chrome margin around the page, which is always a rounded pane. */
+  paneMargin: 8,
+  paneRadius: 12,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };
 type ShellStyle = CSSProperties & Record<`--${string}`, string | number>;
@@ -51,7 +56,6 @@ export function dockingGeometry({
   const size = autoHide ? 0 : thickness;
   const topTabs = shareTopBand && tabs === "top";
   const shared = topTabs && !(position === "top" && !autoHide);
-  const edges = new Set<DockPosition>([tabs, ...(!autoHide ? [position] : [])]);
   const frame: ShellStyle = {
     // Keep the same track topology on every edge, including auto-hide.
     gridTemplateColumns: `${position === "left" ? size : 0}px minmax(0, 1fr) ${position === "right" ? size : 0}px`,
@@ -60,31 +64,26 @@ export function dockingGeometry({
     "--shell-side-tabs": `${sideTabsWidth}px`,
     "--shell-tab-strip-height": `${dockingMetrics.tabStrip}px`,
     "--shell-tab-inset": `${dockingMetrics.tabInset}px`,
+    "--shell-side-tab-inset": `${dockingMetrics.sideTabInset}px`,
     "--shell-tab-height": `${dockingMetrics.tab}px`,
     "--shell-gap": `${gap}px`,
     "--shell-motion-duration": `${dockingMotion.duration}ms`,
     "--shell-motion-easing": dockingMotion.easing,
   };
-  // A vertical tab sidebar makes the page a panel: an even margin of window chrome on every
-  // edge, with the page's own rounded corners inside it. Horizontal strips keep the thin seam
-  // their connected tabs hang from.
-  const panel = tabs === "left" || tabs === "right";
-  frame["--pane-frame"] = panel ? `${dockingMetrics.panelMargin}px` : "0px";
-  frame["--pane-seam-color"] = panel ? "transparent" : "var(--color-charcoal-border)";
+  // The page is always a pane: an even margin of window chrome on every edge, with the page's
+  // own rounded corners inside it. The one edge a horizontal tab strip sits on has no margin:
+  // the strip's connected tabs hang from the page's outline there, which is a 1px seam.
+  const attached = tabs === "top" || tabs === "bottom" ? tabs : null;
+  const { paneMargin, paneRadius } = dockingMetrics;
+  frame["--pane-frame"] = `${paneMargin}px`;
+  frame["--pane-seam-color"] = "transparent";
   for (const edge of ["top", "right", "bottom", "left"] as const)
-    frame[`--pane-seam-${edge}`] = panel
-      ? `${dockingMetrics.panelMargin}px`
-      : edges.has(edge)
-        ? "1px"
-        : "0px";
-  // A panel's corner is the margin plus the page's own radius, so the page curve sits inside it.
+    frame[`--pane-seam-${edge}`] = edge === attached ? "1px" : `${paneMargin}px`;
+  // A pane's corner is the margin plus the page's own radius, so the page curve sits inside it.
   for (const y of ["top", "bottom"] as const)
     for (const x of ["left", "right"] as const)
-      frame[`--pane-corner-${y}-${x}`] = panel
-        ? `${dockingMetrics.panelMargin + dockingMetrics.panelRadius}px`
-        : edges.has(y) && edges.has(x)
-          ? "12px"
-          : "0px";
+      frame[`--pane-corner-${y}-${x}`] =
+        y === attached ? `${paneRadius}px` : `${paneMargin + paneRadius}px`;
   // Native window buttons sit on the left (or the right on Windows), so a right rail with
   // nothing above it reaches the window's top edge.
   const railFlush = side && position === "right" && chromeRight === 0;

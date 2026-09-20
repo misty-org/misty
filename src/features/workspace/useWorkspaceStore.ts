@@ -100,7 +100,7 @@ import { browserNewTabUrl } from "./browserHome";
 import {
   browserViewTitle,
   createBrowserViewState,
-  maxWorkspacePanels,
+  maxWorkspacePanes,
   parseBrowserViewState,
   sanitizeBrowserTitle,
 } from "./model";
@@ -635,7 +635,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (closed.tab) layout = appendTab(current.layout, closed.tab);
         else {
           const owner = layoutTabs(current.layout).find((tab) => tab.id === closed.tabId);
-          if (owner && dockLeaves(owner.root).length < maxWorkspacePanels) {
+          if (owner && dockLeaves(owner.root).length < maxWorkspacePanes) {
             const restored = restoreClosedWorkspaceItem(owner, closed, closed.view);
             const updated = {
               ...owner,
@@ -696,7 +696,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const moving = sourcePane?.views.find((view) => view.id === tabIds[0]);
         if (!source || !targetTab || !target || !moving || !sourcePane || sourcePane.id === paneId)
           return false;
-        if (zone !== "center" && dockLeaves(targetTab.root).length >= maxWorkspacePanels)
+        if (zone !== "center" && dockLeaves(targetTab.root).length >= maxWorkspacePanes)
           return false;
         const same = source.id === targetTab.id;
         let sourceRoot = source.root;
@@ -785,7 +785,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               ?.id ?? null
           );
         }
-        if (dockLeaves(current.layout.root).length >= maxWorkspacePanels) return null;
+        if (dockLeaves(current.layout.root).length >= maxWorkspacePanes) return null;
         const pane = findDockLeaf(current.layout.root, paneId);
         if (!pane) return null;
         const leaf = createDockLeaf([createBlankWorkspaceView(current.activeScopeKey)]);

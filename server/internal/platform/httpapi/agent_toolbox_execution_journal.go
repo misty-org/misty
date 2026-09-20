@@ -16,6 +16,13 @@ import (
 
 func agentToolboxExecutionJournal(database *db.Database) agenttools.ExecutionMiddleware {
 	return func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor, request serveragent.ToolRequest, next agenttools.Handler) (json.RawMessage, error) {
+		// Ask pauses before every change, ahead of the journal so a declined
+		// change never records an effect.
+		if gate := permissionGateFrom(ctx); gate != nil {
+			if waiting, err := gate(ctx, invocation, descriptor, request.Arguments); err != nil || waiting != nil {
+				return waiting, err
+			}
+		}
 		boundedNext := func() (json.RawMessage, error) {
 			executionCtx, cancel, err := boundedAgentExecutionContext(ctx, database, invocation.UserID, invocation.RunID)
 			if err != nil {

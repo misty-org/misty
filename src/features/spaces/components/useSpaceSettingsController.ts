@@ -34,7 +34,7 @@ export function useSpaceSettingsController(spaceId: string) {
   const locationState = location.state as {
     spaceSettingsReturnTo?: string;
   } | null;
-  const fallbackReturnPath = `/spaces/${encodedSpaceId}/home`;
+  const fallbackReturnPath = defaultSpaceRoute(spaceId);
   const closeSettings = () => {
     const destination = locationState?.spaceSettingsReturnTo;
     navigate(

@@ -54,7 +54,7 @@ func (s *SpacesService) scheduleToolRegistrations() []agenttools.Registration {
 		"inputs":      map[string]any{"type": "object", "description": "Values for the workflow's inputs on every scheduled run."},
 		"enabled":     map[string]any{"type": "boolean"},
 	}, []string{"workflow_id", "timezone", "rules"})
-	remove.Name, remove.Risk, remove.AuditEvent = "workflows.unschedule", serveragent.RiskWrite, "workflow.schedule.deleted"
+	remove.Name, remove.Risk, remove.AuditEvent = workflowUnscheduleTool, serveragent.RiskWrite, "workflow.schedule.deleted"
 	remove.Description = "Remove a workflow's schedule so it runs only when started. Use only when the user asked; to stop it for now, set enabled false with workflows_schedule instead."
 	remove.InputSchema = agentToolSchema(map[string]any{"workflow_id": workflowID}, []string{"workflow_id"})
 	return []agenttools.Registration{
@@ -62,6 +62,9 @@ func (s *SpacesService) scheduleToolRegistrations() []agenttools.Registration {
 		{Descriptor: remove, Handler: s.executeWorkflowUnschedule},
 	}
 }
+
+// workflowUnscheduleTool removes a schedule; it pauses unless remembered in Auto.
+const workflowUnscheduleTool = "workflows.unschedule"
 
 const invalidScheduleMessage = "give a workflow_id from methods_list, an IANA timezone and rules: times as HH:MM for every frequency except hourly, dates for once, weekdays for weekly, month_days or nth_weekdays for monthly and yearly, months for yearly; and a value for every required workflow input"
 
@@ -100,7 +103,9 @@ func (s *SpacesService) executeWorkflowUnschedule(ctx context.Context, invocatio
 	if _, err := s.database.WorkflowScheduleByMethod(ctx, invocation.UserID, id); err != nil {
 		return nil, serveragent.ErrInvalidRequest("workflow " + id + " has no schedule")
 	}
-	approval, waiting, err := s.confirmAgentAction(ctx, invocation, "misty.workflows.unschedule", id, "Remove the schedule for “"+method.Definition.Title+"”", "It will run only when started.")
+	need := grantNeed{action: serveragent.GrantScheduleRemove, scopeKind: serveragent.ScopeSchedule, scopeID: id,
+		label: "remove the schedule for “" + method.Definition.Title + "”"}
+	approval, waiting, err := s.confirmAgentAction(ctx, invocation, need, "misty.workflows.unschedule", id, "Remove the schedule for “"+method.Definition.Title+"”", "It will run only when started.")
 	if err != nil || waiting != nil {
 		return waiting, err
 	}

@@ -6,6 +6,10 @@ import { createContext, useContext, type ReactNode } from "react";
  */
 export type BrowserChromeSlot = {
   spaces: ReactNode;
+  /** The agents pill, beside Spaces. */
+  agents: ReactNode;
+  /** The sync status button. */
+  sync: ReactNode;
   /** The profile button, beside Spaces. */
   profile: ReactNode;
   accountItems: ReactNode;

@@ -1,55 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  browserPageTools,
-  useBrowserMediaStore,
-  type BrowserMediaInfo,
-} from "@/features/browser/library";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { useEffect, useMemo } from "react";
+import { browserPageTools, useBrowserMediaStore } from "@/features/browser/library";
 import { browserRuntimeIdForTabId } from "@/features/webviews/browserRuntime";
 import { workspaceTabsById } from "@/features/workspace/layoutTabs";
 import type { WorkspaceView } from "@/features/workspace/model";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 
-const refreshMs = 750;
-
-/** Browser tabs playing sound, or paused from the player, across every window. */
+/**
+ * Browser tabs with a player: those playing sound, and those that have played sound and still hold
+ * media, paused from the card or from anywhere else. A closed player stays gone until the tab plays
+ * sound again.
+ */
 export function usePlayingViews(): WorkspaceView[] {
   const audible = useBrowserMediaStore((state) => state.audible);
   const paused = useBrowserMediaStore((state) => state.paused);
+  const heard = useBrowserMediaStore((state) => state.heard);
+  const info = useBrowserMediaStore((state) => state.info);
+  const dismissed = useBrowserMediaStore((state) => state.dismissed);
   // The windows object is stable between edits; a fresh map per render is not.
   const windowsByScope = useWorkspaceStore((state) => state.windowsByScope);
   return useMemo(
     () =>
       [...workspaceTabsById({ windowsByScope }).values()].filter(
-        (view) => view.surfaceId === "browser" && (audible[view.id] || paused[view.id]),
+        (view) =>
+          view.surfaceId === "browser" &&
+          !dismissed[view.id] &&
+          (audible[view.id] || paused[view.id] || (heard[view.id] && info[view.id]?.hasMedia)),
       ),
-    [windowsByScope, audible, paused],
+    [windowsByScope, audible, paused, heard, info, dismissed],
   );
 }
 
-/** Each playing page's own media details, refreshed while the player is open. */
+/**
+ * Each playing page's own media details. Pages push them as they change, so this only reads what
+ * they last said. A page that has said nothing yet is asked once, when it first appears; nothing
+ * asks again on a timer.
+ */
 export function useMediaInfo(views: WorkspaceView[], open: boolean) {
-  const [info, setInfo] = useState<Record<string, BrowserMediaInfo>>({});
+  const info = useBrowserMediaStore((state) => state.info);
   const ids = views.map((view) => view.id).join(" ");
   useEffect(() => {
     if (!open) return;
     let current = true;
-    const refresh = () =>
-      ids
-        .split(" ")
-        .filter(Boolean)
-        .forEach((tabId) => {
-          const runtimeId = browserRuntimeIdForTabId(tabId);
-          if (!runtimeId) return;
-          void browserPageTools
-            .mediaInfo(runtimeId)
-            .then((next) => current && setInfo((previous) => ({ ...previous, [tabId]: next })))
-            .catch(() => undefined);
-        });
-    refresh();
-    const interval = setInterval(refresh, refreshMs);
+    ids
+      .split(" ")
+      .filter(Boolean)
+      .forEach((tabId) => {
+        if (useBrowserMediaStore.getState().info[tabId]) return;
+        const runtimeId = browserRuntimeIdForTabId(tabId);
+        if (!runtimeId) return;
+        void browserPageTools
+          .mediaInfo(runtimeId)
+          .then((next) => current && useBrowserMediaStore.getState().setInfo(tabId, next))
+          .catch(() => undefined);
+      });
     return () => {
       current = false;
-      clearInterval(interval);
     };
   }, [ids, open]);
   return info;
@@ -77,15 +84,30 @@ export function actOnMedia(
 export function closeMedia(view: WorkspaceView) {
   const runtimeId = browserRuntimeIdForTabId(view.id);
   if (!runtimeId) return;
+  useBrowserMediaStore.getState().dismiss(view.id);
   void browserPageTools
     .mediaAction(runtimeId, "pause")
     .catch(() => undefined)
     .finally(() => useBrowserMediaStore.getState().setPaused(view.id, false));
 }
 
-/** Picture in picture for the tab's video, where the engine allows it. */
-export function togglePictureInPicture(view: WorkspaceView) {
+/**
+ * Picture in picture for the tab's video, where the engine allows it. A video that is already
+ * floating goes back into its page, and the page's tab comes forward to receive it.
+ */
+export function togglePictureInPicture(view: WorkspaceView, floating = false) {
   const runtimeId = browserRuntimeIdForTabId(view.id);
   if (!runtimeId) return;
-  void browserPageTools.pictureInPicture(runtimeId, "toggle").catch(() => undefined);
+  void browserPageTools
+    .pictureInPicture(runtimeId, floating ? "exit" : "toggle")
+    .catch(() => undefined);
+  if (floating && hasTauriInternals())
+    void getCurrentWindow()
+      .unminimize()
+      .then(() => getCurrentWindow().setFocus())
+      .catch(() => undefined);
+  if (floating && useWorkspaceStore.getState().focusView(view.id))
+    window.dispatchEvent(
+      new CustomEvent("misty:focus-workspace-tab", { detail: { tabId: view.id } }),
+    );
 }

@@ -1,6 +1,7 @@
 import type { WorkspaceView } from "@/features/workspace";
 import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
+import { checkBrowserOverlayTransparency } from "./browserOverlayGuard";
 import { browserProfileFor } from "./browserProfileResolver";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
 import {
@@ -401,7 +402,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
   // the child, otherwise that late completion can cover Home or another tool.
   if (!desiredVisibleRuntimeIds.has(id)) {
     visibleRuntimeIds.delete(id);
-    await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
+    await invoke("browser_webview_hide", { request: hideRequest(id) }).catch(() => undefined);
     return;
   }
   visibleRuntimeIds.add(id);
@@ -412,6 +413,35 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     : false;
   markBrowserPerf(id, held ? "held for first paint" : "presented");
   if (!held) completeHandoff(id);
+  scheduleStrayPageSweep();
+}
+
+let strayPageSweepTimer = 0;
+
+/**
+ * Hides any tab page this window has on screen but no longer wants there. A page whose tab lost
+ * track of it (its runtime id changed, or the renderer reloaded) is otherwise never hidden again
+ * and covers the page that replaced it. Waits out switch handoffs, layout moves and in-flight
+ * work, and spares pages parked for picture in picture.
+ */
+function scheduleStrayPageSweep(): void {
+  if (typeof window === "undefined") return;
+  window.clearTimeout(strayPageSweepTimer);
+  strayPageSweepTimer = window.setTimeout(() => {
+    void (async () => {
+      await Promise.all(
+        [...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)),
+      );
+      if (hasPendingHandoff() || isBrowserLayoutMoving() || desiredVisibleRuntimeIds.size === 0) {
+        if (desiredVisibleRuntimeIds.size > 0) scheduleStrayPageSweep();
+        return;
+      }
+      const keep = [...new Set([...desiredVisibleRuntimeIds, ...keepLiveRuntimeIds])];
+      await invoke<void>("browser_webviews_hide_except", { request: { keep } }).catch(
+        () => undefined,
+      );
+    })();
+  }, 400);
 }
 
 /** Whether a native page already exists for this tab, so showing it is only a reconcile. */
@@ -575,6 +605,7 @@ function setBrowserOverlayActive(active: boolean): void {
   browserOverlayActive = active;
   if (typeof document !== "undefined") {
     document.documentElement.toggleAttribute("data-browser-overlay-active", active);
+    if (active) checkBrowserOverlayTransparency();
   }
   browserOverlayQueue = browserOverlayQueue
     .catch(() => undefined)
@@ -593,6 +624,17 @@ export async function browserOverlayReady(): Promise<void> {
  * about to take its place, so a switch never shows an empty frame between
  * them. The old page leaves as soon as the new one is presented.
  */
+/** Pages floating a video in picture in picture: parked out of sight when their tab leaves, not
+ * hidden, so the floating window's back-to-tab button still has a page to return to. */
+const keepLiveRuntimeIds = new Set<string>();
+
+export function setBrowserRuntimeKeepLive(runtimeId: string, keepLive: boolean): void {
+  if (keepLive) keepLiveRuntimeIds.add(runtimeId);
+  else keepLiveRuntimeIds.delete(runtimeId);
+}
+
+const hideRequest = (id: string) => ({ id, keepLive: keepLiveRuntimeIds.has(id) });
+
 export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
   const id = registerBrowserRuntime(tab);
   desiredVisibleRuntimeIds.delete(id);
@@ -608,7 +650,7 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise
         if (desiredVisibleRuntimeIds.has(id)) return resolve();
         void enqueue(id, async () => {
           if (desiredVisibleRuntimeIds.has(id)) return;
-          await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
+          await invoke("browser_webview_hide", { request: hideRequest(id) }).catch(() => undefined);
         }).then(resolve);
       });
     });
@@ -618,7 +660,7 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise
   // flight even when the frontend has not marked this runtime visible yet.
   // The native command safely no-ops when no child exists.
   return enqueue(id, async () => {
-    await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
+    await invoke("browser_webview_hide", { request: hideRequest(id) }).catch(() => undefined);
   });
 }
 

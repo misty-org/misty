@@ -230,7 +230,7 @@ func executeToolInSpace(ctx context.Context, database *db.Database, toolbox *age
 	target := agenttools.Invocation{
 		UserID: invocation.UserID, SpaceID: space.ID, AgentID: invocation.AgentID, RunID: invocation.RunID,
 		Source: "space_conversation", Trigger: "message", OriginalInput: invocation.OriginalInput,
-		ConversationScopeKind: db.ConversationScopeEveryone,
+		ConversationScopeKind: db.ConversationScopeEveryone, PermissionMode: invocation.PermissionMode,
 	}
 	call := globalSpaceCall{spaceID: space.ID, sessionID: invocation.SessionID}
 	return executeSpaceAgentToolbox(context.WithValue(ctx, globalSpaceCallKey{}, call), toolbox, target, database, request)

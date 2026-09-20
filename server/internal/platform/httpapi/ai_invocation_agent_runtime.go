@@ -88,7 +88,7 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		"space_name": prepared.spaceName, "space_kind": prepared.spaceKind,
 		"timezone": prepared.timezone, "current_time": prepared.currentTime.Format(time.RFC3339),
 		"members": prepared.members, "model_id": agentRoute.Model, "reasoning_effort": agentRoute.Reasoning, "vision_model_id": visionRoute.Model,
-		"run_mode": "full", "system": prepared.system, "prompt": prepared.prompt,
+		"run_mode": prepared.body.PermissionMode, "system": prepared.system, "prompt": prepared.prompt,
 		"attached_sources": []any{}, "file_warnings": "", "allowed_tools": prepared.allowedTools,
 		"model_turn_limit":      record.ModelTurnLimit,
 		"context_window_tokens": serveragent.ModelContextWindow(r.Context(), agentRoute.Model),

@@ -75,7 +75,7 @@ describe("desktop dock store", () => {
     ]);
   });
 
-  it("switches to another panel when closing the last tab of a panel in a multi-panel window", () => {
+  it("switches to another pane when closing the last tab of a pane in a multi-pane window", () => {
     const store = useWorkspaceStore.getState();
     const firstPane = dockLeaves(store.layout.root)[0];
     const secondPaneId = store.splitPane(firstPane.id, "right");
@@ -487,7 +487,7 @@ describe("desktop dock store", () => {
     expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "google.com" }]);
   });
 
-  it("opens a tool tab into an empty split panel", () => {
+  it("opens a tool tab into an empty split pane", () => {
     const first = useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
     const pane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     const newPaneId = useWorkspaceStore.getState().splitPane(pane.id, "right")!;

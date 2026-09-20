@@ -49,15 +49,12 @@ vi.mock("./chat/SpaceChat", async () => {
   };
 });
 vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
-vi.mock("./SpaceOverview", () => ({
-  SpaceOverview: ({ space }: { space: { id: string } }) => <div>All in {space.id}</div>,
-}));
 afterEach(() => {
   cleanup();
   state.spaces[0].permissions = {};
 });
 it.each([
-  ["home", "All"],
+  ["home", "Chat"],
   ["notes", "Notes"],
   ["drawings", "Drawings"],
   ["planner", "Planner"],

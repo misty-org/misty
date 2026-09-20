@@ -95,7 +95,7 @@ describe("Create a Space", () => {
         integration_providers: [],
       }),
     );
-    expect(mocks.navigate).toHaveBeenCalledWith("/spaces/space-new/home");
+    expect(mocks.navigate).toHaveBeenCalledWith("/spaces/space-new/chat");
   });
 
   it("names the Space after the template and invites picked people once it exists", async () => {

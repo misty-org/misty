@@ -111,6 +111,7 @@ function request(
 }
 
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
+  if (section === "home") return "social";
   if (section === "notes" || section === "drawings") return "journal";
   if (section === "chat" || section === "social") return "social";
   if (section === "planner" || section === "library") return section;

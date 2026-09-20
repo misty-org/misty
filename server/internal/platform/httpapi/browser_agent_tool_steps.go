@@ -48,7 +48,8 @@ func (s *SpacesService) browserToolConfig(ctx context.Context, invocation agentt
 	// The device refuses to act on these sites before any input is sent.
 	if settings, _, err := s.database.AISettings(ctx, invocation.UserID); err == nil {
 		configData["siteBlocks"] = map[string]any{"sensitive": settings.AgentBlockSensitive, "sites": settings.AgentBlockedSites}
-		configData["confirmKinds"] = browserConfirmKinds(settings)
+		configData["confirmKinds"] = browserConfirmKinds()
+		configData["grantSet"] = s.browserGrantSet(ctx, invocation)
 	}
 	return configData
 }
@@ -169,8 +170,9 @@ func (s *SpacesService) approveBrowserPageSteps(
 	return nil, s.useAgentActionApproval(ctx, invocation.UserID, approval)
 }
 
-// approveScreenAct asks before a consequential on-screen action. It returns the
-// waiting result while the approval is pending.
+// approveScreenAct pauses on-screen actions: every one in Ask, and in both
+// modes the consequential ones, which act on the whole screen and can never be
+// remembered. It returns the waiting result while the approval is pending.
 func (s *SpacesService) approveScreenAct(
 	ctx context.Context,
 	invocation agenttools.Invocation,
@@ -182,12 +184,11 @@ func (s *SpacesService) approveScreenAct(
 		AllowConsequential bool   `json:"allowConsequential"`
 	}
 	_ = json.Unmarshal(tool.Arguments, &act)
-	if !act.AllowConsequential {
-		return nil, nil
+	need := grantNeed{action: serveragent.ActionToolWrite}
+	if act.AllowConsequential {
+		need.action = serveragent.ActionScreenControl
 	}
-	// Sending, buying, deleting or changing access on screen follows the
-	// same "Ask before acting" approval card as app actions.
-	approval, waiting, err := s.confirmAgentAction(ctx, invocation, "screen.act:"+scopeID, act.Goal,
+	approval, waiting, err := s.confirmAgentAction(ctx, invocation, need, "screen.act:"+scopeID, act.Goal,
 		"On screen: "+truncateAgentRuntimeText(act.Goal, 180), act.Goal)
 	if err != nil {
 		return nil, err

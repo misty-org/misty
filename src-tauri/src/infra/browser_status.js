@@ -14,6 +14,32 @@
     postToHost = postToHost || bindHost();
     if (postToHost) postToHost('{"token":"' + statusToken + '","status":"stopped"}');
   };
+  // Single-page sites (YouTube and most apps) change the URL with the History API or the hash,
+  // which loads nothing, so the host would never hear of it. Report each change; the host reads
+  // the real URL from the view itself rather than trusting one from the page.
+  let reportedHref = String(location);
+  const reportLocation = () => {
+    const href = String(location);
+    if (href === reportedHref) return;
+    reportedHref = href;
+    postToHost = postToHost || bindHost();
+    if (postToHost) postToHost('{"token":"' + statusToken + '","status":"location"}');
+  };
+  const historyProto = window.History && History.prototype;
+  for (const name of ["pushState", "replaceState"]) {
+    const original = historyProto && historyProto[name];
+    if (typeof original !== "function") continue;
+    historyProto[name] = function (...args) {
+      const result = original.apply(this, args);
+      setTimeout(reportLocation, 0);
+      return result;
+    };
+  }
+  window.addEventListener("popstate", () => setTimeout(reportLocation, 0), true);
+  window.addEventListener("hashchange", reportLocation, true);
+  window.addEventListener("pageshow", () => {
+    reportedHref = String(location);
+  });
   let loading = /^https?:$/.test(location.protocol) && document.readyState !== "complete";
   let link = "";
   let host = null;
@@ -174,9 +200,21 @@
   }, true);
   document.addEventListener("fullscreenchange", render);
   window.addEventListener("blur", () => setLink(""));
+  // WebKit only reports a finished load when the navigation finishes cleanly; one that fails or
+  // is cancelled after its document committed (common on YouTube) never does, and the tab would
+  // spin forever. The document finishing is the same answer, so report it too.
+  const reportLoaded = () => {
+    postToHost = postToHost || bindHost();
+    if (postToHost) postToHost('{"token":"' + statusToken + '","status":"loaded"}');
+  };
   window.addEventListener("load", () => {
     loading = false;
     render();
+    reportLoaded();
+  });
+  // A page restored from the back/forward cache fires no load.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) reportLoaded();
   });
   window.addEventListener("pagehide", () => {
     link = "";

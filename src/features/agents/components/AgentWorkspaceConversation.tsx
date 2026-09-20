@@ -17,6 +17,7 @@ import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ConversationModelPicker } from "../models/ConversationModelPicker";
 import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
+import { ComposerOptions } from "./ComposerOptions";
 import { AgentModeToggle } from "../collaboration/AgentModeToggle";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
@@ -359,13 +360,23 @@ export function AgentWorkspaceConversation({
         <MistyComposer
           hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
-          // One toolbar under the text: Attach, the mode and the project on the left; the model,
-          // usage, voice and send on the right.
+          // One toolbar under the text: Attach and the options (mode, project, model, thinking) on
+          // the left; usage, voice and send on the right.
           leadingControl={
-            <>
-              <AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />
-              <AgentProjectMenu conversationId={conversation?.id} />
-            </>
+            <ComposerOptions
+              mode={<AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />}
+              project={<AgentProjectMenu conversationId={conversation?.id} />}
+              model={
+                <ConversationModelPicker
+                  conversation={conversation}
+                  disabled={state.working}
+                  onError={reportError}
+                />
+              }
+              reasoning={
+                <ConversationReasoningPicker conversation={conversation} disabled={state.working} />
+              }
+            />
           }
           layout="conversation"
           value={draft}
@@ -397,12 +408,6 @@ export function AgentWorkspaceConversation({
           busy={state.working && !draft.trim()}
           voiceControl={
             <>
-              <ConversationModelPicker
-                conversation={conversation}
-                disabled={state.working}
-                onError={reportError}
-              />
-              <ConversationReasoningPicker conversation={conversation} disabled={state.working} />
               {showControlBar && agent && (
                 <AgentUsageControl
                   draft={draft}

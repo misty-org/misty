@@ -100,6 +100,7 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 		OriginalInput:         string(run.Input),
 		DelegatedApproval:     true,
 		ConversationScopeKind: db.ConversationScopeEveryone,
+		PermissionMode:        serveragent.NormalizePermissionMode(run.EffectiveRunMode),
 	}
 	authorize := authorizeSpaceAgentTool(s.database)
 	if _, err := toolbox.Resolve(ctx, invocation, names, authorize); err != nil {
@@ -115,7 +116,7 @@ func (s *SpacesService) executePersonalAgentRuntimeTool(ctx context.Context, run
 	if call.Name == "browser.request_user_action" && !call.SupportsIntervention {
 		return agentRuntimeToolOutcome{}, db.ErrSpaceForbidden
 	}
-	ctx = withAgentExecutionRuntime(ctx, call.RuntimeRunID)
+	ctx = withPermissionGate(withAgentExecutionRuntime(ctx, call.RuntimeRunID), s.askGate)
 	toolbox, invocation, authorize, err := s.resolvePersonalAgentRuntimeToolbox(ctx, run)
 	if err != nil {
 		return agentRuntimeToolOutcome{}, err

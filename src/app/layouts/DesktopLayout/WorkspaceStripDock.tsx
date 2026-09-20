@@ -1,39 +1,130 @@
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Check, LayoutGrid, Plus, RefreshCw } from "lucide-react";
+import { useBrowserOverlayControl } from "@/features/browser";
 import { BrowserDownloadsButton } from "@/features/browser/workspace";
-import { SpacesMenuButton } from "@/features/spaces";
-import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
-import { MistyPanelSprite, useMistyPanelAgentName, useMistyPanelStore } from "@/features/agents";
-import { Button, DropdownMenu, DropdownMenuTrigger, MenuItem } from "@/shared/ui";
+import { SpacesLauncherList } from "@/features/spaces";
+import {
+  browserInternalUrl,
+  dockLeaves,
+  useWorkspaceStore,
+  workspaceSurfaceFromRoute,
+} from "@/features/workspace";
+import { AgentAvatar, MistyPanelSprite, useMistyPanelStore, usePersonalAgentsStore } from "@/features/agents";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  AvatarShuffleStack,
+  Button,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  MenuTrigger,
+  IconButton,
+  MenuItem,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  toolbarIconProps,
+} from "@/shared/ui";
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
-/** The selected agent, as its cloud and name (Misty by default): opens the side panel in the browser. */
-function MistyButton() {
-  const open = useMistyPanelStore((state) => state.open);
-  const name = useMistyPanelAgentName();
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      aria-pressed={open}
-      title={name}
-      className="min-w-0 gap-1.5"
-      onClick={() => useMistyPanelStore.getState().setOpen(!open, null)}
-    >
-      <MistyPanelSprite size={20} />
-      <span className="min-w-0 truncate">{name}</span>
-    </Button>
-  );
+/** The Space the focused view shows, or "" when it shows something else. */
+function useActiveSpaceId(): string {
+  return useWorkspaceStore((state) => {
+    const panes = dockLeaves(state.layout.root);
+    const pane = panes.find((p) => p.id === state.layout.focusedPaneId) ?? panes[0];
+    const view = pane?.views.find((item) => item.id === pane.activeViewId);
+    if (view?.surfaceId !== "space") return "";
+    const segment = view.route.split(/[?#]/)[0].split("/")[2] ?? "";
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      return "";
+    }
+  });
 }
 
-/** Spaces and Misty, named, in their own container at a sidebar's bottom-left. */
-export function StripShortcuts() {
+/**
+ * The app launcher, at a sidebar's bottom-right: one button that opens a panel beside the drawer
+ * with the user's Spaces and agents. Choosing a Space opens it; choosing an agent opens the Misty
+ * panel with that agent selected.
+ */
+export function AppLauncherButton() {
+  const overlay = useBrowserOverlayControl("app-launcher");
+  const navigate = useNavigate();
+  const agents = usePersonalAgentsStore((state) => state.agents);
+  const selectedAgentId = useMistyStore((state) => state.selectedAgentId);
+  const activeSpaceId = useActiveSpaceId();
+  const selected =
+    agents.find((agent) => agent.id === selectedAgentId) ??
+    agents.find((agent) => agent.system_managed);
+  const close = () => overlay.onOpenChange(false);
   return (
-    <div className="misty-sidebar-shortcuts" data-misty-window-drag-block="true">
-      <SpacesMenuButton labeled />
-      <MistyButton />
+    <div
+      className="flex shrink-0 items-center"
+      data-browser-toolbar
+      data-sidebar
+      data-misty-window-drag-block="true"
+    >
+      <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
+        <PopoverTrigger asChild>
+          <IconButton label="Apps" tooltip={false} aria-pressed={overlay.open}>
+            <LayoutGrid {...toolbarIconProps} />
+          </IconButton>
+        </PopoverTrigger>
+        <PopoverContent side="right" align="end" sideOffset={14} className="w-72 p-0">
+          <Command label="Spaces and agents">
+            <CommandList>
+              <SpacesLauncherList activeSpaceId={activeSpaceId} onChoose={close} />
+              <CommandSeparator />
+              <CommandGroup heading="Agents">
+                {agents.map((agent) => (
+                  <CommandItem
+                    key={agent.id}
+                    value={`agent:${agent.id}`}
+                    onSelect={() => {
+                      useMistyStore.setState({
+                        selectedAgentId: agent.id,
+                        activeConversationId: "",
+                      });
+                      useMistyPanelStore.getState().setOpen(true, null);
+                      close();
+                    }}
+                  >
+                    <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
+                      <AgentAvatar agent={agent} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+                    {agent.id === selected?.id ? <Check aria-label="Current agent" /> : null}
+                  </CommandItem>
+                ))}
+                <CommandItem
+                  value="new-agent"
+                  onSelect={() => {
+                    const surface = workspaceSurfaceFromRoute("/agents");
+                    if (surface)
+                      navigate(useWorkspaceStore.getState().openDestination(surface).route, {
+                        replace: true,
+                      });
+                    close();
+                  }}
+                >
+                  <Plus />
+                  New agent
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -63,6 +154,91 @@ export function StripDownloads() {
 /** The browser menu's closing row in horizontal tabs: Sync. The profile has its own button. */
 export function BrowserMenuAccountItems(props: { onSyncClick: () => void }) {
   return <MenuItem icon={<RefreshCw />} label="Sync" onSelect={props.onSyncClick} />;
+}
+
+/**
+ * The agents pill: the personal agents as a stack of avatars, the selected one in front and
+ * named beside it. Choosing an agent rotates it to the front and opens the Misty panel on it.
+ */
+export function AgentsMenuButton() {
+  const navigate = useNavigate();
+  const agents = usePersonalAgentsStore((state) => state.agents);
+  const selectedAgentId = useMistyStore((state) => state.selectedAgentId);
+  const paneId = useWorkspaceStore((state) => state.layout.focusedPaneId);
+  const selected =
+    agents.find((agent) => agent.id === selectedAgentId) ??
+    agents.find((agent) => agent.system_managed) ??
+    agents[0];
+  const pill =
+    "!h-[var(--shell-tab-height,36px)] max-w-full rounded-full bg-cream/[0.07] pl-1 pr-2.5 hover:bg-cream/[0.12]";
+  // Before the agents load, the pill still opens the Misty panel.
+  if (!selected)
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className={cn("gap-1.5", pill)}
+        onClick={() => useMistyPanelStore.getState().setOpen(true, paneId ?? null)}
+      >
+        <MistyPanelSprite size={20} />
+        Agents
+      </Button>
+    );
+  return (
+    <div className="flex min-w-0 items-center" data-misty-window-drag-block="true">
+      <DropdownMenu>
+        <MenuTrigger
+          label="Agents"
+          title={`Agents: ${selected.name}`}
+          value={selected.name}
+          className={pill}
+          icon={
+            <AvatarShuffleStack
+              activeId={selected.id}
+              items={agents.map((agent) => ({
+                id: agent.id,
+                node: (
+                  <span className="[&_.agent-avatar]:!size-5">
+                    <AgentAvatar agent={agent} />
+                  </span>
+                ),
+              }))}
+            />
+          }
+        />
+        <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-16px)]">
+          {agents.map((agent) => (
+            <DropdownMenuItem
+              key={agent.id}
+              onSelect={() => {
+                useMistyStore.setState({ selectedAgentId: agent.id, activeConversationId: "" });
+                useMistyPanelStore.getState().setOpen(true, paneId ?? null);
+              }}
+            >
+              <span className="size-5 shrink-0 [&_.agent-avatar]:!size-5">
+                <AgentAvatar agent={agent} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+              {agent.id === selected.id ? <Check className="size-4" aria-hidden="true" /> : null}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuItem
+            onSelect={() => {
+              const surface = workspaceSurfaceFromRoute("/agents");
+              if (surface)
+                navigate(useWorkspaceStore.getState().openDestination(surface).route, {
+                  replace: true,
+                });
+            }}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">New agent</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
 }
 
 /** The profile avatar beside Spaces in the browser toolbar, opening the profile menu. */
