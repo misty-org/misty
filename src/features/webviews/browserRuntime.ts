@@ -428,6 +428,11 @@ export function browserContentHash(value: string): string {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
+/** Whether a layout move holds the pages: they keep their place until it has settled. */
+export function isBrowserLayoutMoving(): boolean {
+  return browserWebviewSuspensions.has("docking-layout");
+}
+
 export function setBrowserWebviewsSuspended(suspended: boolean, reason = "default"): void {
   const wasSuspended = browserWebviewSuspensions.size > 0;
   if (suspended) browserOverlayResumeGeneration += 1;
@@ -457,7 +462,12 @@ export function setBrowserPointerGestureActive(active: boolean): void {
   }
 }
 
-export function setBrowserPointerTrackingEnabled(enabled: boolean): void {
+/** Callers pair each `true` with a later `false`; tracking stays on while any of them wants it. */
+let browserPointerTrackingUsers = 0;
+
+export function setBrowserPointerTrackingEnabled(requested: boolean): void {
+  browserPointerTrackingUsers = Math.max(0, browserPointerTrackingUsers + (requested ? 1 : -1));
+  const enabled = browserPointerTrackingUsers > 0;
   if (browserPointerTrackingEnabled === enabled) return;
   browserPointerTrackingEnabled = enabled;
   browserPointerTrackingQueue = browserPointerTrackingQueue

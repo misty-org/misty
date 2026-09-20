@@ -4,8 +4,8 @@ import { describeUrl, directWebUrl, guessedSiteFavicon } from "../urlText";
 import type { OmniboxDeps } from "./deps";
 
 /**
- * What the person typed, taken literally: the address it names, and a search
- * for the text. One of these is always allowed to be the default match.
+ * What the person typed, taken literally: the address it names or, when it is not an address,
+ * a search for the text. One of these is always allowed to be the default match.
  */
 export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
   return {
@@ -29,6 +29,9 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
           // Never turn an address-bar draft into a network request.
           faviconUrl: null,
         });
+        // An address is opened, not searched for: a second row repeating the same text as a
+        // web search only reads as a duplicate.
+        return matches;
       }
       matches.push({
         id: `search:${text.toLowerCase()}`,
@@ -37,7 +40,7 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
         // The search icon says what the row does; no "Search with" label.
         detail: "",
         target: { type: "navigate", url: deps.searchUrl(text) },
-        relevance: address ? relevance.typedSearchForAddress : relevance.typedSearch,
+        relevance: relevance.typedSearch,
         allowedToBeDefault: true,
         faviconUrl: input.private ? undefined : guessedSiteFavicon(text),
       });

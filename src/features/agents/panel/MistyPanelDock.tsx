@@ -19,6 +19,10 @@ import {
 // Matches the dock's width transition below; the closing panel unmounts after it.
 const slideMs = 240;
 
+/** The margin of window chrome between the page and the panel, as between the tab drawer and the
+ * page: each is its own rounded panel. */
+const panelGap = 8;
+
 const geometryChanged = () => window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
 
 /**
@@ -70,7 +74,7 @@ export function MistyPanelDock({ open, side }: { open: boolean; side: MistyPanel
       )}
       style={
         {
-          width: expanded ? width : 0,
+          width: expanded ? width + panelGap : 0,
           "--misty-panel-width": `${width}px`,
           // Set only while sliding: without a property list, a duration alone would
           // animate every width change, including each step of a drag.
@@ -82,8 +86,8 @@ export function MistyPanelDock({ open, side }: { open: boolean; side: MistyPanel
     >
       <div
         className={cn(
-          "flex h-full w-full overflow-hidden",
-          side === "left" ? "justify-end" : "justify-start",
+          "flex h-full w-full overflow-hidden bg-[var(--misty-window-chrome,var(--misty-theme-workspace))]",
+          side === "left" ? "justify-end pr-2" : "justify-start pl-2",
         )}
       >
         {panel}

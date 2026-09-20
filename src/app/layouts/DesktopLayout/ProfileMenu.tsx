@@ -102,7 +102,7 @@ export function ProfileMenuItems(props: {
             shortcut={<ExternalLink className="size-3.5" aria-hidden="true" />}
             onSelect={props.onOpenAccountSettings}
           />
-          <MenuSubmenu icon={<Gauge />} label="Usage" width="lg">
+          <MenuSubmenu icon={<Gauge />} label="Usage" width="xl">
             <div className="px-2 py-1.5">
               <AccountUsagePanel />
             </div>

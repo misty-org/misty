@@ -564,6 +564,19 @@ html:has(.agent-studio-resizer[data-dragging]) {
   margin-bottom: 0;
   padding-right: 10px;
 }
+/* The mode and project buttons yield to the row's width: the project's name truncates before it
+   can run under the model and usage controls at the other end. */
+.agent-studio .agent-conversation [data-slot="message-composer"] .agent-mode-toggle {
+  flex-shrink: 1;
+  min-width: 0;
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:first-child {
+  min-width: 0;
+}
 /* In a narrow composer (the Misty panel) the model and thinking pickers show only their
    icons; each keeps its name for assistive technology and in its menu. */
 @container agent-studio (max-width: 520px) {

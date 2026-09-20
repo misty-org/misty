@@ -22,7 +22,12 @@ import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
  * Appears while something is downloading or just finished, like Chrome's
  * downloads bubble. The full list lives at misty://downloads.
  */
-export function BrowserDownloadsButton(props: { suspensionReason: string; onShowAll: () => void }) {
+export function BrowserDownloadsButton(props: {
+  suspensionReason: string;
+  onShowAll: () => void;
+  /** Stays on screen when idle, and then opens the full list directly. */
+  alwaysVisible?: boolean;
+}) {
   const entries = useBrowserDownloadsStore((state) => state.entries);
   const lastFinishedAt = useBrowserDownloadsStore((state) => state.lastFinishedAt);
   const refresh = useBrowserDownloadsStore((state) => state.refresh);
@@ -38,7 +43,14 @@ export function BrowserDownloadsButton(props: { suspensionReason: string; onShow
   const recent = entries.filter(
     (entry) => now - (entry.finishedAt ?? entry.startedAt) < recentDownloadMs,
   );
-  if (!active.length && !recent.length && !overlay.open) return null;
+  if (!active.length && !recent.length && !overlay.open) {
+    if (!props.alwaysVisible) return null;
+    return (
+      <IconButton label="Downloads" tooltip={false} title="Downloads" onClick={props.onShowAll}>
+        <Download {...toolbarIconProps} />
+      </IconButton>
+    );
+  }
 
   const fractions = active.map(downloadProgressFraction);
   const known = fractions.filter((value): value is number => value !== null);

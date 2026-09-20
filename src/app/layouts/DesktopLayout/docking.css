@@ -22,7 +22,8 @@
 }
 .misty-docking-titlebar-drag-region {
   position: absolute;
-  inset: 0 auto 0 0;
+  /* Stops one row short of the bottom so the pane seam shows beneath it, edge to edge. */
+  inset: 0 auto 1px 0;
   max-width: 100%;
   /* Browser views make the shell transparent. Paint this otherwise empty
      corner so the native window backing cannot show beside the traffic lights. */
@@ -621,10 +622,10 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 34px
+/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 36px
    rounded rows with hover-only close buttons, and the window actions sit in a footer. */
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
-  --shell-tab-height: 34px;
+  --shell-tab-height: 36px;
   gap: 0;
   padding-bottom: 8px;
 }
@@ -654,7 +655,7 @@
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab-list {
-  gap: 2px;
+  gap: 4px;
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab {
@@ -752,8 +753,7 @@
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-new-tab-row:is(:hover, :focus-visible) {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)),
-    var(--misty-tab-well);
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)), var(--misty-tab-well);
   color: var(--workspace-tab-text, var(--color-cream));
 }
 
@@ -816,10 +816,6 @@
   min-height: 28px;
   padding-left: max(0px, calc(var(--window-chrome-left, 0px) - var(--shell-gap, 8px)));
 }
-.misty-workspace-tabs[data-window-chrome="true"] .misty-sidebar-head {
-  min-height: max(28px, var(--window-chrome-top, 0px));
-  margin-top: calc(-5px - var(--window-chrome-top, 0px));
-}
 
 .misty-docking-rail-cap {
   background: var(--misty-window-chrome, var(--misty-theme-workspace));
@@ -834,7 +830,7 @@
 /* The vertical sidebar's holder. Open it is a column; collapsed, its width animates to nothing
    and the panel waits off its edge, sliding over the page when revealed. */
 .misty-sidebar-drawer {
-  --sidebar-w: min(var(--shell-side-tabs, 240px), 35vw);
+  --sidebar-w: max(272px, min(var(--shell-side-tabs, 280px), 35vw));
   position: relative;
   flex: none;
   width: var(--sidebar-w);
@@ -938,7 +934,9 @@
   left: 0;
   z-index: 1;
   width: 100vw;
-  height: var(--pane-seam-top, 8px);
+  /* One row short of the page's margin, so the page's top outline, which sits in that last row,
+     is not painted over. */
+  height: calc(var(--pane-seam-top, 8px) - 1px);
   background: var(--misty-window-chrome, var(--misty-theme-workspace));
 }
 .misty-sidebar-drawer[data-side="right"] .misty-sidebar-drag-band {
@@ -946,12 +944,240 @@
   right: 0;
 }
 
-/* A vertical sidebar's bottom edge, above the account island floating over the window's corner:
-   Spaces and Agents. The sidebar's list leaves room for the island beneath it. */
+/* The vertical sidebar: a header band on the chrome, then a floating card. The band holds the
+   toggle, back/forward/reload and a Spaces/Agents container, centered on the traffic lights; the
+   card below holds the address field, favorites and tabs, inset by the page's outer margin and
+   stopping above the account island, which is its own panel. */
+.misty-sidebar-drawer-panel {
+  box-sizing: border-box;
+  padding: var(--pane-frame, 8px) 0 var(--pane-frame, 8px) var(--pane-frame, 8px);
+}
+.misty-sidebar-drawer[data-side="right"] .misty-sidebar-drawer-panel {
+  padding: var(--pane-frame, 8px) var(--pane-frame, 8px) var(--pane-frame, 8px) 0;
+}
+.misty-sidebar-drawer-panel > .misty-workspace-tabs {
+  padding: 0;
+  background: transparent;
+}
+.misty-sidebar-drawer-panel > .misty-workspace-tabs[data-window-chrome="true"] {
+  padding-top: 0;
+}
+.misty-sidebar-card .misty-sidebar-head {
+  box-sizing: border-box;
+  height: 40px;
+  min-height: 40px;
+  margin: 0;
+  /* The window buttons sit on this panel, centered on it (the shell lowers them 10pt); the row
+     starts where they end. */
+  padding: 0 0 0 max(0px, calc(var(--window-chrome-left, 0px) - var(--pane-frame, 8px) - 12px));
+  gap: 2px;
+}
+/* Back, forward and reload close the row on its right edge, opposite the sidebar toggle. */
+.misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav {
+  margin-left: auto;
+}
+/* The sidebar's bottom edge, above the account row: Spaces and Misty on the left, downloads on
+   the right. */
+/* Above favorites, in the sidebar's body. */
+.misty-sidebar-shortcut-row {
+  display: flex;
+  flex-shrink: 0;
+  margin: 0 0 8px;
+}
+/* As wide as the favorites container below it, its two buttons sharing the width. */
+.misty-sidebar-shortcuts {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.misty-sidebar-shortcuts > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  justify-content: center;
+}
 .misty-sidebar-foot {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  /* The card's own bottom padding closes it, so it matches the space on its sides. */
+  padding: 4px 0 0;
+}
+.misty-sidebar-card {
+  --misty-tab-well: var(--workspace-tab-surface);
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  flex-direction: column;
+  padding: 0 10px 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--workspace-tab-surface);
+}
+/* The account row is its own container beneath the sidebar's, with the same edge and fill. */
+.misty-sidebar-account {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
   gap: 2px;
-  padding: 6px 0 64px;
+  margin-top: 8px;
+  /* The avatar and the settings button are both 28px boxes with the same 10px inset from their
+     edges, so their centers sit on the same two columns as the downloads and sync buttons above. */
+  padding: 6px 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: var(--workspace-tab-surface);
+}
+.misty-sidebar-card .misty-sidebar-address,
+.misty-sidebar-card .misty-workspace-favorites-grid {
+  margin-bottom: 12px;
+}
+/* Revealed over the page, the card floats on its own shadow, with no backdrop of its own. */
+.misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-drawer-panel {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-card {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Beside a vertical sidebar the page is a rounded panel: a 1px gray outline hugs it from the
+   margin just outside, where the native page cannot cover it. */
+.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-pane-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2147483647;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 13px;
+  pointer-events: none;
+}
+/* The page's corners are curved, but its area is square: its background would show in the four
+   corners, notably the two beside the Misty panel, which no pane mask covers. Paint them in
+   the chrome color. */
+.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-pane-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  background:
+    radial-gradient(
+        circle at 100% 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top left / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 0 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top right / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 100% 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom left / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 0 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom right / 12px 12px no-repeat;
+}
+
+/* A vertical tab's speaker sits right after the favicon rather than at the row's end. The real
+   button floats over the row; a gap of its width keeps the favicon, speaker and title evenly
+   spaced, and exists only while the speaker is there. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  position: relative;
+}
+.misty-tab-audio-slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Row padding (8) + favicon (16) + flex gap (6) + gap margin (2), less the button's own 6. */
+  left: 26px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+.misty-tab-audio-gap {
+  display: none;
+  width: 12px;
+  margin-inline: 2px;
+  flex-shrink: 0;
+}
+.misty-workspace-tab:has(.misty-tab-audio-slot:not(:empty)) .misty-tab-audio-gap {
+  display: block;
+}
+
+/* Vertical tabs reserve no room for the close button: it appears at the row's right edge on
+   hover, and the title fades out before it instead of being cut short all the time. Anything
+   else at the row's end, such as the pane chips, rests at the edge and steps aside, clear of the
+   button's whole slot (6px in, 20px wide, and a gap), exactly when the button shows. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-tab-pane-chips {
+  margin-right: 6px;
+  transition: margin-right 120ms ease-out;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:is(:hover, :focus-within)
+  .misty-tab-pane-chips {
+  margin-right: 32px;
+}
+@media (pointer: coarse) {
+  .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+    .misty-tab-pane-chips {
+    margin-right: 32px;
+  }
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  position: relative;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab
+  .misty-workspace-tab-close {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  margin: 0;
+  transform: translateY(-50%);
+  border-radius: 6px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:is(:hover, :focus-within)
+  [data-text-overflowing="true"] {
+  /* The title makes way for the close button: it fades out and is gone before the button, so
+     the button needs no backing of its own and nothing shows through it. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 54px),
+    transparent calc(100% - 26px)
+  );
+  mask-image: linear-gradient(to right, black calc(100% - 54px), transparent calc(100% - 26px));
+}
+/* With the pane chips the title already ends before them, and they step clear of the close
+   button themselves, so the title keeps only a short fade at its own edge, and only when it
+   really is too long to fit. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab.misty-tab-has-chips:is(:hover, :focus-within)
+  [data-text-overflowing="true"] {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
 }

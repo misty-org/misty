@@ -1,13 +1,14 @@
 import { groupStyle, TabGroupTabMenu } from "./MistyTabGroups";
-import { BrowserViewAudioButton } from "@/features/browser/workspace";
 import { Renameable } from "@/features/navigation-names/Renameable";
 import { activeLayoutView, tabLabel } from "@/features/workspace/layoutTabs";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { WorkspaceTab, WorkspaceView } from "@/features/workspace/model";
 import type { MistyTabGroup } from "@/features/workspace/tabGroups";
 import { cn, IconButton, OverflowFadeText, Pressable } from "@/shared/ui";
-import { Blocks, X } from "lucide-react";
+import { Blocks, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RefObject } from "react";
+import { BrowserViewAudioButton } from "@/features/browser/workspace";
+import { TabAudioHover } from "./TabAudioHover";
 import { ConnectedTabShape } from "./ConnectedTabShape";
 import type { useTabHoverCards } from "./TabHoverCard";
 import { TabPageMenu } from "./PinnedTabMenu";
@@ -49,7 +50,9 @@ export function WorkspaceTabStripTab({
     label = tabLabel(tab),
     panes = dockLeaves(tab.root),
     pinned = Boolean(tab.pinnedUrl),
-    iconOnly = pinned && !vertical;
+    iconOnly = pinned && !vertical,
+    // Only the open tab's panes can be stepped through, and a pinned icon has no room for it.
+    rotatable = active && panes.length > 1 && !iconOnly;
   return (
     <Renameable
       menuItems={
@@ -81,6 +84,7 @@ export function WorkspaceTabStripTab({
         className={cn(
           group && "misty-tab-group-member",
           iconOnly && "misty-workspace-tab-pinned",
+          rotatable && "misty-tab-has-chips",
           "misty-workspace-tab group/tab flex items-center rounded-md border text-xs transition-colors",
           "duration-150 select-none focus-within:ring-1",
           "focus-within:ring-cream-muted/50",
@@ -98,7 +102,11 @@ export function WorkspaceTabStripTab({
           data-reorder-handle="true"
           className={cn(
             "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden",
-            iconOnly ? "justify-center px-0" : "justify-start pl-2 pr-1",
+            iconOnly
+              ? "justify-center px-0"
+              : vertical
+                ? "justify-start pl-2 pr-2"
+                : "justify-start pl-2 pr-1",
           )}
           onClick={() => onSelect(tab.id)}
           onKeyDown={(event) => {
@@ -127,6 +135,10 @@ export function WorkspaceTabStripTab({
             icon={Blocks}
             isActive={active}
           />
+          {!iconOnly && vertical ? (
+            // Room for the speaker, so the favicon, speaker and title are spaced evenly.
+            <span aria-hidden="true" className="misty-tab-audio-gap" />
+          ) : null}
           {iconOnly ? (
             <span className="sr-only">{label}, pinned</span>
           ) : (
@@ -134,13 +146,29 @@ export function WorkspaceTabStripTab({
               {label}
             </OverflowFadeText>
           )}
-          {panes.length > 1 ? (
+          {panes.length > 1 && !rotatable ? (
             <span aria-hidden="true" className="shrink-0 text-[10px] text-cream-muted tabular-nums">
               {panes.length}
             </span>
           ) : null}
         </Pressable>
-        {!iconOnly && <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />}
+        {rotatable ? (
+          <PaneRotateChips
+            panes={panes}
+            focusedPaneId={tab.focusedPaneId}
+            hoverOnly={!vertical}
+            onOpen={onOpen}
+          />
+        ) : null}
+        {!iconOnly &&
+          (vertical ? (
+            // Drawn over the row, just after the favicon, with room made for it beside the title.
+            <span className="misty-tab-audio-slot">
+              <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
+            </span>
+          ) : (
+            <TabAudioHover tabs={panes.flatMap((pane) => pane.views)} />
+          ))}
         {pinned ? null : (
           <IconButton
             size="xs"
@@ -148,7 +176,7 @@ export function WorkspaceTabStripTab({
             label={`Close tab ${label}`}
             title={
               panes.length > 1
-                ? `Close tab ${label} and its ${panes.length} panes`
+                ? `Close this pane of ${label}; the next pane takes over`
                 : `Close tab ${label}`
             }
             className="misty-workspace-tab-close mr-1"
@@ -159,5 +187,55 @@ export function WorkspaceTabStripTab({
         )}
       </div>
     </Renameable>
+  );
+}
+
+/**
+ * Previous and next pane, with where you are among them, as a small chip beside the tab's close
+ * button, never over it. Horizontal tabs are short, so there it shows only while the tab is hovered
+ * or focused, in place of the pane count.
+ */
+function PaneRotateChips({
+  panes,
+  focusedPaneId,
+  hoverOnly,
+  onOpen,
+}: {
+  panes: ReturnType<typeof dockLeaves>;
+  focusedPaneId: string;
+  hoverOnly: boolean;
+  onOpen(view: WorkspaceView): void;
+}) {
+  const index = Math.max(
+    0,
+    panes.findIndex((pane) => pane.id === focusedPaneId),
+  );
+  const step = (delta: number) => {
+    const pane = panes[(index + delta + panes.length) % panes.length];
+    if (!pane) return;
+    useWorkspaceStore.getState().focusPane(pane.id);
+    const view = pane.views.find((item) => item.id === pane.activeViewId) ?? pane.views[0];
+    if (view) onOpen(view);
+  };
+  return (
+    <span
+      role="group"
+      aria-label="Panes"
+      data-reorder-ignore="true"
+      className={cn(
+        "misty-tab-pane-chips",
+        hoverOnly && "hidden group-focus-within/tab:flex group-hover/tab:flex",
+      )}
+    >
+      <IconButton size="2xs" tooltip={false} label="Previous pane" onClick={() => step(-1)}>
+        <ChevronLeft className="size-3" aria-hidden="true" />
+      </IconButton>
+      <span aria-live="polite" className="text-[10px] tabular-nums">
+        {index + 1}/{panes.length}
+      </span>
+      <IconButton size="2xs" tooltip={false} label="Next pane" onClick={() => step(1)}>
+        <ChevronRight className="size-3" aria-hidden="true" />
+      </IconButton>
+    </span>
   );
 }

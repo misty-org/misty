@@ -20,7 +20,7 @@ export { MistyPanel, type MistyPanelSide } from "./panel/MistyPanel";
 export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { mistyPanelHost, useMistyPanelHost, useMistyPanelSide } from "./panel/mistyPanelHost";
 export { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./panel/mistyPanelStore";
-export { MistyPanelSprite } from "./panel/MistyPanelSprite";
+export { MistyPanelSprite, useMistyPanelAgentName } from "./panel/MistyPanelSprite";
 export { AgentTabAway, useTabAway } from "./dock/AgentTabAway";
 
 export type { AgentScope } from "./model/types";

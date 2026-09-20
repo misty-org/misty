@@ -129,8 +129,11 @@ export const browserPageTools = {
   mediaInfo: (id: string) =>
     invoke<BrowserMediaInfo>("browser_webview_media_info", { request: { id } }),
   /** Runs the page's own media control, falling back to its media element for play and pause. */
-  mediaAction: (id: string, action: "play" | "pause" | "previoustrack" | "nexttrack") =>
-    invoke<void>("browser_webview_media_action", { request: { id, action } }),
+  mediaAction: (
+    id: string,
+    action: "play" | "pause" | "previoustrack" | "nexttrack" | "seekto",
+    position?: number,
+  ) => invoke<void>("browser_webview_media_action", { request: { id, action, position } }),
   pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit") =>
     invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

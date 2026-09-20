@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import {
   browserRuntimeResumeEvent,
   hideBrowserWebview,
+  isBrowserLayoutMoving,
   isBrowserRuntimeCreated,
   requestBrowserWebviewLayout,
   syncBrowserWebview,
@@ -45,6 +46,9 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     const synchronize = () => {
       frame = 0;
       if (disposed) return;
+      // While the chrome slides to a new edge the page holds still, rather than chasing every
+      // frame of the motion through native calls. The layout's end re-measures every page.
+      if (isBrowserLayoutMoving()) return;
       const current = latest.current;
       if (current.offline) {
         if (!hiddenForInvalidBounds) {
@@ -225,13 +229,17 @@ const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"] as 
 function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, number, number] {
   const style = getComputedStyle(clip);
   const box = clip.getBoundingClientRect();
+  // A clip's border and padding both keep the page inside: a pane's seam is its padding, a
+  // page area's outline is its border.
+  const inset = (padding: string, border: string) =>
+    (parseFloat(padding) || 0) + (parseFloat(border) || 0);
   const pad = {
-    top: parseFloat(style.paddingTop) || 0,
-    right: parseFloat(style.paddingRight) || 0,
-    bottom: parseFloat(style.paddingBottom) || 0,
-    left: parseFloat(style.paddingLeft) || 0,
+    top: inset(style.paddingTop, style.borderTopWidth),
+    right: inset(style.paddingRight, style.borderRightWidth),
+    bottom: inset(style.paddingBottom, style.borderBottomWidth),
+    left: inset(style.paddingLeft, style.borderLeftWidth),
   };
-  // The page fills the clip's padding box: a pane's seam is its padding.
+  // The page fills the clip's content box.
   const edge = {
     top: box.top + pad.top,
     right: box.right - pad.right,
@@ -290,7 +298,6 @@ function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
 /** Whether some pane still shows a browser tab, as when switching between them. */
 function browserSurfaceStillActive(): boolean {
   return dockLeaves(useWorkspaceStore.getState().layout.root).some(
-    (pane) =>
-      pane.views.find((view) => view.id === pane.activeViewId)?.surfaceId === "browser",
+    (pane) => pane.views.find((view) => view.id === pane.activeViewId)?.surfaceId === "browser",
   );
 }

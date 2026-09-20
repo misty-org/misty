@@ -1,50 +1,61 @@
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { BrowserDownloadsButton } from "@/features/browser/workspace";
 import { SpacesMenuButton } from "@/features/spaces";
-import { dockLeaves, useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import { appIcons, DropdownMenu, DropdownMenuTrigger, IconButton, MenuItem } from "@/shared/ui";
+import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
+import { MistyPanelSprite, useMistyPanelAgentName, useMistyPanelStore } from "@/features/agents";
+import { Button, DropdownMenu, DropdownMenuTrigger, MenuItem } from "@/shared/ui";
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
-const { agents: AgentsIcon } = appIcons;
-
-/** Whether the focused view is the Agents surface, for the button's pressed state. */
-function useAgentsActive(): boolean {
-  return useWorkspaceStore((state) => {
-    const panes = dockLeaves(state.layout.root);
-    const pane = panes.find((p) => p.id === state.layout.focusedPaneId) ?? panes[0];
-    const view = pane?.views.find((item) => item.id === pane.activeViewId);
-    return view?.surfaceId === "agents" || view?.surfaceId === "scheduled";
-  });
-}
-
-function AgentsButton() {
-  const navigate = useNavigate();
-  const active = useAgentsActive();
+/** The selected agent, as its cloud and name (Misty by default): opens the side panel in the browser. */
+function MistyButton() {
+  const open = useMistyPanelStore((state) => state.open);
+  const name = useMistyPanelAgentName();
   return (
-    <IconButton
-      size="xs"
-      label="Agents"
-      tooltip={false}
-      aria-pressed={active}
-      onClick={() => {
-        const surface = workspaceSurfaceFromRoute("/agents");
-        if (surface)
-          navigate(useWorkspaceStore.getState().openDestination(surface).route, { replace: true });
-      }}
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-pressed={open}
+      title={name}
+      className="min-w-0 gap-1.5"
+      onClick={() => useMistyPanelStore.getState().setOpen(!open, null)}
     >
-      <AgentsIcon className="size-4" aria-hidden="true" />
-    </IconButton>
+      <MistyPanelSprite size={20} />
+      <span className="min-w-0 truncate">{name}</span>
+    </Button>
   );
 }
 
-/** Spaces and Agents, as single buttons in the tab strip. */
+/** Spaces and Misty, named, in their own container at a sidebar's bottom-left. */
 export function StripShortcuts() {
   return (
-    <div className="flex shrink-0 items-center gap-0.5" data-misty-window-drag-block="true">
-      <SpacesMenuButton />
-      <AgentsButton />
+    <div className="misty-sidebar-shortcuts" data-misty-window-drag-block="true">
+      <SpacesMenuButton labeled />
+      <MistyButton />
+    </div>
+  );
+}
+
+/** Downloads, at a sidebar's bottom-right: a progress ring while something downloads. */
+export function StripDownloads() {
+  return (
+    // Marked as sidebar chrome, so the button takes the same size and icon as the back and
+    // forward buttons in the header (28px, 18px glyph), not the toolbar's larger ones.
+    <div
+      className="flex shrink-0 items-center"
+      data-browser-toolbar
+      data-sidebar
+      data-misty-window-drag-block="true"
+    >
+      <BrowserDownloadsButton
+        alwaysVisible
+        suspensionReason="strip-downloads"
+        onShowAll={() =>
+          useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl("downloads") })
+        }
+      />
     </div>
   );
 }

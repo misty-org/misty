@@ -2,11 +2,24 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
 import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { setTrafficLightsVisible } from "@/native/runtime";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  enableModernWindowStyle,
+  setTrafficLightsVisible,
+  trafficLightOffsetDefault,
+} from "@/native/runtime";
 import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/webviews/browserRuntime";
+
+/** The sidebar header is 40pt tall inside the panel's 8pt margin, so the window buttons that sit
+ * on it drop to its centerline: 8 + 1 + 20 = 29pt, 10 below their usual 19. */
+const lightsDrop = 10;
+/** The first button's frame is 22pt from the window edge: 3pt right of the panel's content edge
+ * (8 + 1 + 10 = 19pt), because the circle sits inside its frame, so the circle's edge lines up
+ * with the address field's. */
+const lightsInset = 2;
 
 /** The reveal strip at the window edge, and how long the pointer may rest outside the drawer. */
 const edgeZone = 8;
@@ -89,6 +102,15 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
 
   // The window buttons belong to the left sidebar: they slide out and back in with it, and
   // the first state is applied without motion.
+  useEffect(() => {
+    if (props.side !== "left" || !hasTauriInternals()) return;
+    const nativeWindow = getCurrentWindow();
+    void enableModernWindowStyle(nativeWindow, { x: lightsInset, y: lightsDrop }).catch(
+      () => undefined,
+    );
+    return () =>
+      void enableModernWindowStyle(nativeWindow, trafficLightOffsetDefault).catch(() => undefined);
+  }, [props.side]);
   const lightsSettled = useRef(false);
   useEffect(() => {
     if (props.side !== "left" || !hasTauriInternals()) return;

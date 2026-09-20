@@ -50,7 +50,7 @@ export function WorkspaceTabPanels(props: {
         aria-hidden={!active}
         inert={!active}
       >
-        <div className="relative min-h-0 min-w-0 flex-1">
+        <div className="misty-pane-frame relative min-h-0 min-w-0 flex-1">
           {props.renderTree(tab, tab.id === layout.activeTabId)}
         </div>
         {tab.id === layout.activeTabId ? <WorkspaceMistyDock /> : null}

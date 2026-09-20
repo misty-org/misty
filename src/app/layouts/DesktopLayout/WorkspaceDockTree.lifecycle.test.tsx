@@ -9,6 +9,8 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 
+// The resting toolbar needs a router and the app chrome; this test is about pane lifecycle.
+vi.mock("./PaneToolbarFallback", () => ({ PaneToolbarFallback: () => null }));
 vi.mock("./WorkspaceSurface", () => ({
   EmptyWorkspacePane: () => <div data-empty-pane />,
   WorkspaceSurface: (props: { tab: WorkspaceView; active: boolean }) => (

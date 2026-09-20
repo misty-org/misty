@@ -8,8 +8,6 @@ import { strippedUrl, typedUrlText } from "./urlText";
 export const relevance = {
   typedUrl: 1200,
   typedSearch: 1300,
-  /** Searching still ranks high when the text looks like an address. */
-  typedSearchForAddress: 1150,
   /** A familiar page whose address starts with the typed text: completes inline, beating search. */
   inlineAddress: 1350,
   addressPrefix: 1050,
