@@ -184,6 +184,7 @@ pub(super) async fn dispatch(
             input: request.input.clone(),
             site_blocks: request.site_blocks.clone(),
             confirm_kinds: request.confirm_kinds.clone(),
+            grant_set: request.grant_set.clone(),
         };
         let encoded = std::ffi::CString::new(
             json!({"action": input, "viewport": observed["viewport"], "editable": observed["editable"]}).to_string(),
@@ -296,6 +297,7 @@ async fn dispatch_windows(
             input: request.input.clone(),
             site_blocks: request.site_blocks.clone(),
             confirm_kinds: request.confirm_kinds.clone(),
+            grant_set: request.grant_set.clone(),
         };
         std::sync::Arc::new(move || {
             authorize_native_input(&app, &view, &request, &expected_origin, generation)

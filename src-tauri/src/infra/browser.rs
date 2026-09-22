@@ -469,6 +469,10 @@ pub struct BrowserAgentExecuteRequest {
     /// config. Absent means the safe default: all of them.
     #[serde(default)]
     pub confirm_kinds: Option<Vec<String>>,
+    /// The run's Ask or Auto and the person's remembered page grants for this
+    /// agent, from the job's server config. Absent means nothing is remembered.
+    #[serde(default)]
+    pub grant_set: Option<action_confirm::GrantSet>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -3507,6 +3511,7 @@ pub(super) fn authorize_workspace_dispatch(
         input: json!({}),
         site_blocks: None,
         confirm_kinds: None,
+        grant_set: None,
     };
     validate_browser_grant(session, &request)?;
     Ok(())

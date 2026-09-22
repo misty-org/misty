@@ -165,3 +165,41 @@ func (s *SpacesService) rememberAppRequest(ctx context.Context, user, id string)
 	approved, _, err := s.database.RememberAgentAppRequest(ctx, user, id)
 	return approved, err
 }
+
+// AgentSiteGrant remembers a page approval the person gave in their device's
+// island: this agent may send, delete or publish on this exact site in Auto.
+// Payments are never remembered from the island, since the device cannot cap
+// them. POST /me/agent-grants/site {agent_id, kind, origin}.
+func (s *SpacesService) AgentSiteGrant() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.appsUser(w, r)
+		if !ok {
+			return
+		}
+		var body struct {
+			AgentID string `json:"agent_id"`
+			Kind    string `json:"kind"`
+			Origin  string `json:"origin"`
+		}
+		if decodeJSON(w, r, &body) != nil {
+			return
+		}
+		action := map[string]serveragent.GrantAction{"send": serveragent.GrantBrowserSend, "delete": serveragent.GrantBrowserDelete,
+			"publish": serveragent.GrantBrowserPublish}[body.Kind]
+		request := &db.AgentAppRequest{GrantAction: string(action), GrantScopeKind: string(serveragent.ScopeOrigin), GrantScopeID: strings.TrimSpace(body.Origin)}
+		if action == "" || s.validateGrantScope(r.Context(), user, request) != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_grant"})
+			return
+		}
+		agentID := strings.TrimSpace(body.AgentID)
+		if agentID == "" || agentID == "misty-unified" {
+			agentID, _ = s.database.ManagedMistyAgentID(r.Context(), user)
+		}
+		grant, err := s.database.CreateAgentGrant(r.Context(), user, agentID, request.GrantAction, request.GrantScopeKind, request.GrantScopeID)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"grant": newAgentGrantView(*grant)})
+	}
+}

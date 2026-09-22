@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/shared/ui";
-import { actionQuestionText, answerActionQuestion, useActionQuestions } from "./actionQuestions";
+import {
+  actionQuestionText,
+  actionQuestionVerb,
+  answerActionQuestion,
+  useActionQuestions,
+} from "./actionQuestions";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 
 /**
@@ -14,11 +19,17 @@ export function AgentActionQuestions() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   if (!questions.length) return null;
-  const answer = (id: string, allow: boolean) => {
+  const answer = (id: string, allow: boolean, remember = false) => {
     setBusy(id);
     setError("");
-    void answerActionQuestion(id, allow)
-      .catch(() => setError("That question already closed. Nothing was done."))
+    void answerActionQuestion(id, allow, remember)
+      .catch(() =>
+        setError(
+          remember
+            ? "Misty couldn’t remember that approval, so nothing was done. Try again."
+            : "That question already closed. Nothing was done.",
+        ),
+      )
       .finally(() => setBusy(""));
   };
   return (
@@ -45,16 +56,32 @@ export function AgentActionQuestions() {
                 disabled={busy === question.id}
                 onClick={() => answer(question.id, false)}
               >
-                Don’t allow
+                Deny
               </Button>
               <Button
                 size="sm"
                 disabled={busy === question.id}
                 onClick={() => answer(question.id, true)}
               >
-                Allow once
+                Accept and continue
               </Button>
+              {question.rememberable && question.origin ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy === question.id}
+                  onClick={() => answer(question.id, true, true)}
+                >
+                  Accept and remember
+                </Button>
+              ) : null}
             </div>
+            {question.rememberable && question.origin ? (
+              <p className="m-0 px-1 text-xs text-cream-muted">
+                Remember: {actionQuestionVerb(question)} on {question.origin}. Applies when the chat
+                is in Auto.
+              </p>
+            ) : null}
           </div>
         );
       })}

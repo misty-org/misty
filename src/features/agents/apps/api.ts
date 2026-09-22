@@ -28,7 +28,17 @@ export interface AppRequest {
   summary: string;
   state: "pending" | "connected" | "approved" | "used" | "declined" | "expired";
   expiresAt: string;
+  /** "Accept and remember" is offered; the label names the exact scope, written by the server. */
+  rememberable?: boolean;
+  rememberLabel?: string;
+  /** The run's Ask or Auto when it paused. */
+  permissionMode?: "ask" | "auto";
+  /** A remembered payment covers this merchant up to this amount per payment. */
+  paymentCap?: { max_amount_minor: number; currency: string };
 }
+
+/** The answer to an approval card: this time only, this time and from now on, or no. */
+export type AppRequestDecision = "continue" | "remember" | "deny";
 
 const requestPath = (id: string) => `/me/app-requests/${encodeURIComponent(id)}`;
 
@@ -50,7 +60,7 @@ export const appsApi = {
   request: (id: string) => apiRequest<{ request: AppRequest }>(requestPath(id)),
   requestLink: (id: string) =>
     apiRequest<{ url: string }>(`${requestPath(id)}/link`, { method: "POST" }),
-  decide: (id: string, decision: "approve" | "decline") =>
+  decide: (id: string, decision: AppRequestDecision) =>
     apiRequest<{ request: AppRequest }>(requestPath(id), {
       method: "POST",
       body: JSON.stringify({ decision }),

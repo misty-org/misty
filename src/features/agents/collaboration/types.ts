@@ -1,5 +1,12 @@
-/** Plan mode researches and proposes; Act mode does the work. */
+/** Plan mode researches and proposes; otherwise the agent does the work. */
 export type ConversationMode = "act" | "plan";
+
+/**
+ * Ask pauses before every action that changes something; Auto continues when a
+ * remembered approval covers the action. A chat follows its agent's default
+ * until it picks one.
+ */
+export type PermissionMode = "ask" | "auto";
 
 interface AgentQuestionOption {
   label: string;
@@ -102,6 +109,10 @@ export interface AgentPlanVersion {
 
 export interface ConversationCollaboration {
   mode: ConversationMode;
+  /** The chat's own Ask or Auto; empty follows the agent. */
+  permissionMode: PermissionMode | "";
+  /** The agent's default, used while the chat has none of its own. */
+  agentPermissionMode: PermissionMode;
   plan: AgentPlan | null;
   /** Every version of the plan, newest first. */
   planHistory: AgentPlanVersion[];

@@ -16,10 +16,11 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { ChoiceControl } from "../SettingsControls";
+import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
+import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AppActionsSection } from "./AppActionsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { InboundTasksSection } from "./InboundTasksSection";
@@ -85,8 +86,8 @@ export function AgentDefaultsSection() {
       <Section
         title="Conversations"
         description={
-          "Plan first: agents research and propose a plan you approve before they change " +
-          "anything. Switch any conversation with the Plan chip or Shift+Tab."
+          "In Plan, agents research and propose a plan you approve before they change " +
+          "anything. Turn Plan on or off in any chat with Shift+Tab."
         }
       >
         <CollaborationModeRow />
@@ -125,15 +126,11 @@ function CollaborationModeRow() {
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "act");
   return (
-    <Row label={d.label}>
-      <ChoiceControl
+    <Row label={d.label} description="New chats research and propose before changing anything.">
+      <SwitchControl
         disabled={store.working || !ready}
-        value={value}
-        onValueChange={(next) => void store.updateSetting(d.section, d.key, next)}
-        options={[
-          { value: "act", label: "Act" },
-          { value: "plan", label: "Plan first" },
-        ]}
+        checked={value === "plan"}
+        onChange={(plan) => void store.updateSetting(d.section, d.key, plan ? "plan" : "act")}
       />
     </Row>
   );
@@ -168,11 +165,13 @@ export function CompanionSection() {
 export function DevicesSection() {
   return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
 }
+/** Remembered approvals (server-owned), and on a desktop its project folders. */
 export function AgentPermissionsSection() {
-  return hasTauriInternals() ? (
-    <AgentScopeList />
-  ) : (
-    <NativeAvailability feature="Device permissions" />
+  return (
+    <>
+      <AgentGrantsSection />
+      {hasTauriInternals() ? <AgentScopeList /> : null}
+    </>
   );
 }
 function AgentScopeList() {

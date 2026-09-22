@@ -1,6 +1,6 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
 import { chatDeviceGrants } from "@/features/agents/deviceGrants";
-import { useCollaborationStore } from "@/features/agents/agentCollaboration";
+import { turnModes, useCollaborationStore } from "@/features/agents/agentCollaboration";
 import { awaitConversationTitle, openTurn, planDeepThinking } from "./conversationTurn";
 import { apiRequest } from "@/api/client";
 import {
@@ -491,17 +491,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
       );
     }
     const invocationContext = globalAiContext(requestContext);
-    // Plan or Act: a conversation's loaded mode, or the composer's choice for a
-    // conversation that has no messages yet. Unknown leaves the server's saved mode.
-    const collaboration = useCollaborationStore.getState();
     const startsConversation = !get()
       .conversations.find((c) => c.id === conversationId)
       ?.messages.some((message) => !isEcho(message));
-    const collaborationMode = collaboration.byConversation[conversationId]
-      ? collaboration.modeFor(conversationId)
-      : startsConversation
-        ? collaboration.draftMode
-        : undefined;
+    const { collaborationMode, permissionMode } = turnModes(conversationId, startsConversation);
     echo.settle(conversationId);
     // The server names a new conversation with a separate model call; until then its title is a skeleton.
     if (startsConversation && !companion?.continuation)
@@ -586,6 +579,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           thinkingMode:
             collaborationMode === "plan" && planDeepThinking() ? "deep" : requestedThinking,
           collaborationMode,
+          permissionMode,
           selection,
           capture,
           ...(conversationId.startsWith("local-")

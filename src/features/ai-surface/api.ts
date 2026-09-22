@@ -140,11 +140,6 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify({ location }),
     }),
-  updateAppActionsAsk: (change: { ask?: boolean; payments?: boolean }) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
-      method: "PUT",
-      body: JSON.stringify(change),
-    }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {
       method: "PUT",
@@ -293,6 +288,7 @@ function toServerInvocation(input: AiInvocationRequest) {
     companion_intent: input.companionIntent,
     model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
+    permission_mode: input.permissionMode,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,

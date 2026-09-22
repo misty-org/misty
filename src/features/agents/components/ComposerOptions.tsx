@@ -3,18 +3,22 @@ import { SlidersHorizontal } from "lucide-react";
 import { IconButton, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 
 /**
- * The composer's settings in one place: the mode, the project, the model and how hard it thinks.
- * They open from a single sliders button, so the toolbar keeps only the small, frequent controls
- * (attach, usage, voice, send) outside.
+ * The composer's settings in one place: Plan, Ask or Auto, the goal, the project (the only way
+ * to attach one), the model and how hard it thinks. They open from a single sliders button, so
+ * the toolbar keeps only the small, frequent controls (attach, usage, voice, send) outside.
  */
 export function ComposerOptions(props: {
-  mode: ReactNode;
+  plan: ReactNode;
+  permissions: ReactNode;
+  goal: ReactNode;
   project: ReactNode;
   model: ReactNode;
   reasoning: ReactNode;
 }) {
   const rows: [string, ReactNode][] = [
-    ["Mode", props.mode],
+    ["Plan", props.plan],
+    ["Permissions", props.permissions],
+    ["Goal", props.goal],
     ["Project", props.project],
     ["Model", props.model],
     ["Thinking", props.reasoning],
