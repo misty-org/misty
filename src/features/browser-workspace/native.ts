@@ -11,6 +11,7 @@ export interface NativeSyncView {
   profile_id: string;
   supports_cookie_handoff?: boolean;
   browser_profile_ready?: boolean;
+  browser_profile_issue?: string | null;
   status: {
     phase: "connecting" | "offline" | "catching_up" | "ready" | "attention" | "stopped";
     applied_sequence: number;

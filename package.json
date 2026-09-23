@@ -20,7 +20,7 @@
     "preview:mobile": "vite preview --mode mobile",
     "preview:web": "vite preview --mode web",
     "icons:ios": "node cli/tasks/generate-ios-app-icons.ts",
-    "tauri": "tauri",
+    "tauri": "node cli/tasks/tauri.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

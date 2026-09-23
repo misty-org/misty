@@ -58,8 +58,9 @@ export const NavigationSectionButton = forwardRef<
     icon: ReactNode;
     label: string;
     open: boolean;
+    showChevron?: boolean;
   }
->(({ icon, label, open, className, ...props }, ref) => (
+>(({ icon, label, open, showChevron = true, className, ...props }, ref) => (
   <button
     ref={ref}
     type="button"
@@ -79,7 +80,7 @@ export const NavigationSectionButton = forwardRef<
     <span className={cn(iconClass, navigationMenuPrimaryIconClass)}>{icon}</span>
     <span className="flex min-w-0 items-center gap-1">
       <span className="truncate">{label}</span>
-      <NavigationChevron open={open} />
+      {showChevron && <NavigationChevron open={open} />}
     </span>
   </button>
 ));

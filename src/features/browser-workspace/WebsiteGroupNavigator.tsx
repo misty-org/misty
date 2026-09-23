@@ -1,19 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Calendar,
-  Globe,
-  Library,
-  Mail,
-  MessagesSquare,
-  NotebookPen,
-  Plus,
-  ArrowUpRight,
-} from "lucide-react";
+import { SlidersHorizontal, Plus, ArrowUpRight } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { activeLayoutView, parseBrowserTabState, useWorkspaceStore } from "@/features/workspace";
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
   Collapsible,
   CollapsibleContent,
   NavigationSectionButton,
@@ -27,24 +29,17 @@ import {
   ContextMenuTrigger,
 } from "@/shared/ui";
 import type { SharedRecord } from "./model";
-import { WebsiteIntegrationPicker } from "./WebsiteIntegrationPicker";
+import { GroupIcon } from "./groupIcons";
+import { WebsiteGroupsManager } from "./WebsiteGroupsManager";
+import { SavedWebsiteIcon } from "./SavedWebsiteIcon";
+import { WebsiteSitePicker } from "./WebsiteSitePicker";
 import {
-  addWebsite,
   expandWebsiteGroup,
   openSavedWebsite,
   removeWebsite,
-  removeWebsiteGroup,
   reorderWebsiteGroups,
 } from "./navigation";
 
-const icons = {
-  mail: Mail,
-  messages: MessagesSquare,
-  notebook: NotebookPen,
-  calendar: Calendar,
-  library: Library,
-  globe: Globe,
-};
 const ordered = <T extends SharedRecord<"group"> | SharedRecord<"website">>(items: T[]) =>
   [...items].sort((a, b) => a.fields.order - b.fields.order || a.id.localeCompare(b.id));
 export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) {
@@ -58,14 +53,14 @@ export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) 
   );
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<string | undefined>();
+  const [configuring, setConfiguring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragged, setDragged] = useState<string | null>(null);
   const activeWebsite =
     activeTab?.surfaceId === "browser"
       ? parseBrowserTabState(activeTab.state).websiteId
       : undefined;
-  const openWebsite = (id: string, fresh = false) => {
+  const openWebsite = (id: string, fresh = true) => {
     try {
       const tab = openSavedWebsite(id, fresh);
       navigate(tab.route, { replace: true });
@@ -90,44 +85,67 @@ export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) 
       data-website-navigation="true"
       data-tour-target="website-groups"
     >
-      <div className="flex h-9 items-center justify-between px-2">
+      <div className="group/groups-header flex h-9 items-center justify-between px-2">
         <h2 className="text-xs font-medium text-cream-muted">Groups</h2>
-        <Popover
-          open={adding}
-          onOpenChange={(open) => {
-            setAdding(open);
-            if (!open) setEditingGroup(undefined);
-          }}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              variant="nav-action"
-              size="icon-sm"
-              aria-label="Add to groups"
-              title="Add to groups"
-              className="[@media(hover:none)]:size-11"
-            >
-              <Plus size={16} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="center"
-            sideOffset={12}
-            aria-label="Groups and integrations"
-            className="flex max-h-[min(520px,var(--radix-popover-content-available-height))] w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden p-0"
+        <div className="flex items-center opacity-0 group-hover/groups-header:opacity-100 group-focus-within/groups-header:opacity-100 [@media(hover:none)]:opacity-100">
+          <Popover
+            open={adding}
+            onOpenChange={(open) => {
+              setAdding(open);
+            }}
           >
-            <WebsiteIntegrationPicker
-              groups={ordered(groups)}
-              websites={websites}
-              initialGroupId={editingGroup}
-              onDone={() => {
-                setAdding(false);
-                setEditingGroup(undefined);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Add site"
+                title="Add site"
+                className="text-cream-muted [@media(hover:none)]:size-11"
+              >
+                <Plus className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="right"
+              align="center"
+              sideOffset={12}
+              aria-label="Sites"
+              className="flex max-h-[min(520px,var(--radix-popover-content-available-height))] w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden p-0"
+            >
+              <WebsiteSitePicker
+                groups={ordered(groups)}
+                websites={websites}
+                onDone={() => {
+                  setAdding(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          <Dialog open={configuring} onOpenChange={setConfiguring}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Configure groups"
+                title="Configure groups"
+                className="text-cream-muted"
+              >
+                <SlidersHorizontal className="size-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent
+              aria-describedby={undefined}
+              className="w-[600px] max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 sm:max-w-[600px]"
+            >
+              <div className="border-b border-charcoal-border px-4 py-3">
+                <DialogTitle className="text-sm font-medium">Groups</DialogTitle>
+              </div>
+              <div className="max-h-[75vh] overflow-y-auto">
+                <WebsiteGroupsManager />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       {ordered(groups)
         .filter((group) => !group.fields.hidden)
@@ -167,10 +185,6 @@ export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) 
               group={group}
               websites={ordered(websites.filter((website) => website.fields.group_id === group.id))}
               open={expanded[group.id] ?? false}
-              onEdit={() => {
-                setEditingGroup(group.id);
-                setAdding(true);
-              }}
               activeWebsite={activeWebsite}
               onOpen={openWebsite}
             />
@@ -194,66 +208,80 @@ function WebsiteGroupRow(props: {
   group: SharedRecord<"group">;
   websites: SharedRecord<"website">[];
   open: boolean;
-  onEdit(): void;
   activeWebsite?: string;
   onOpen(id: string, fresh?: boolean): void;
 }) {
   const { group, websites } = props;
-  const Icon = icons[group.fields.icon as keyof typeof icons] ?? Globe;
+  const [deleting, setDeleting] = useState<SharedRecord<"website"> | null>(null);
   return (
-    <Collapsible open={props.open} onOpenChange={(open) => expandWebsiteGroup(group.id, open)}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div className="group/app-row flex min-h-8 min-w-0 items-center rounded-md">
-            <NavigationSectionButton
-              icon={<Icon size={18} />}
-              label={group.fields.label}
-              open={props.open}
-              aria-label={group.fields.label}
-              aria-controls={`websites-${group.id}`}
-              className="min-w-0 flex-1 !w-auto"
-              title="Drag to reorder · Alt+Shift+↑/↓"
-              onClick={() => expandWebsiteGroup(group.id, !props.open)}
-            />
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onSelect={props.onEdit}>Edit group</ContextMenuItem>
-          <ContextMenuItem onSelect={() => removeWebsiteGroup(group.id)}>
-            Remove group
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
-      <CollapsibleContent id={`websites-${group.id}`}>
-        {websites.map((website, index) => (
-          <ContextMenu key={website.id}>
-            <ContextMenuTrigger asChild>
-              <div>
-                <NavigationTreeItem
-                  nested
-                  last={index === websites.length - 1}
-                  icon={<Globe size={14} />}
-                  label={website.fields.title}
-                  selected={props.activeWebsite === website.id}
-                  onClick={() => props.onOpen(website.id)}
-                />
-              </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem onSelect={() => props.onOpen(website.id, true)}>
-                Open in new tab
-              </ContextMenuItem>
-              <ContextMenuItem onSelect={() => removeWebsite(website.id)}>
-                Remove saved website
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        ))}
-        {!websites.length && (
-          <p className="ml-10 py-2 text-xs text-cream-muted">No integrations yet</p>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
+    <>
+      <AlertDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogTitle>Delete “{deleting?.fields.title}”?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes the saved site from this group. This cannot be undone.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleting) removeWebsite(deleting.id);
+                setDeleting(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Collapsible open={props.open} onOpenChange={(open) => expandWebsiteGroup(group.id, open)}>
+        <NavigationSectionButton
+          icon={<GroupIcon name={group.fields.icon} />}
+          label={group.fields.label}
+          open={props.open}
+          showChevron={false}
+          aria-label={group.fields.label}
+          aria-controls={`websites-${group.id}`}
+          className="min-w-0 !w-auto max-w-full hover:bg-transparent active:bg-transparent active:text-cream-bright"
+          title="Drag to reorder · Alt+Shift+↑/↓"
+          onClick={() => expandWebsiteGroup(group.id, !props.open)}
+        />
+        <CollapsibleContent id={`websites-${group.id}`}>
+          {websites.map((website, index) => (
+            <ContextMenu key={website.id}>
+              <ContextMenuTrigger asChild>
+                <div>
+                  <NavigationTreeItem
+                    nested
+                    last={index === websites.length - 1}
+                    icon={<SavedWebsiteIcon url={website.fields.url} />}
+                    label={website.fields.title}
+                    selected={props.activeWebsite === website.id}
+                    onClick={() => props.onOpen(website.id)}
+                  />
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => props.onOpen(website.id, true)}>
+                  Open in new tab
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => setDeleting(website)}>Remove site</ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ))}
+          {!websites.length && (
+            <p className="ml-[calc(20px_+_var(--navigation-primary-icon-slot,18px))] py-2 text-xs text-cream-muted/60">
+              No sites
+            </p>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </>
   );
 }
 function SavePageToGroup({
@@ -264,51 +292,34 @@ function SavePageToGroup({
   tab: ReturnType<typeof activeLayoutView>;
 }) {
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const page = tab?.surfaceId === "browser" ? parseBrowserTabState(tab.state) : null;
+  const websites = useWorkspaceStore((state) => state.savedWebsites);
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        setError(null);
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           size="sm"
-          disabled={!page || !groups.length}
+          disabled={!page}
           className="text-xs text-cream-muted"
           aria-label="Save current page to group"
         >
-          <ArrowUpRight size={14} />
-          Save to group
+          <ArrowUpRight size={14} /> Save to group
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="right" align="start" className="w-[260px] p-1">
-        {groups.map((group) => (
-          <Button
-            key={group.id}
-            variant="ghost"
-            className="w-full justify-start"
-            onClick={() => {
-              try {
-                if (!page) return;
-                addWebsite(group.id, tab?.title ?? "", page.url);
-                setOpen(false);
-              } catch (failure) {
-                setError(failure instanceof Error ? failure.message : String(failure));
-              }
-            }}
-          >
-            {group.fields.label}
-          </Button>
-        ))}
-        {error && (
-          <p role="alert" className="px-2 py-3 text-xs text-destructive">
-            {error}
-          </p>
+      <PopoverContent
+        side="right"
+        align="start"
+        aria-label="Add to group"
+        className="flex max-h-[min(520px,var(--radix-popover-content-available-height))] w-[360px] max-w-[calc(100vw-24px)] flex-col overflow-hidden p-0"
+      >
+        {page && (
+          <WebsiteSitePicker
+            groups={groups}
+            websites={websites}
+            initialSite={{ title: tab?.title || "Current site", url: page.url }}
+            onDone={() => setOpen(false)}
+          />
         )}
       </PopoverContent>
     </Popover>

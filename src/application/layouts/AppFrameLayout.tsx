@@ -5,6 +5,7 @@ import { readApiAuthToken } from "@/api/client/session";
 import { Button } from "@/shared/ui";
 import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
 import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
+import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui/loading-screen";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
 import { ActivityPanel } from "@/features/activity/ActivityPanel";
@@ -97,6 +98,7 @@ export function AppFrameLayout() {
         </Suspense>
       </BrowserSyncStartup>
       <BrowserSyncBridge accountId={user?.id ?? ""} />
+      <SpacesRealtimeBridge />
       <AgentExecutionSurface />
       <ActivityPanel />
       <UpdateNotices accountId={user?.id ?? ""} />

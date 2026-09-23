@@ -225,6 +225,24 @@ pub(crate) async fn read(webview: &Webview, profile_id: &str) -> Result<Vec<Cook
         .map_err(|_| CookieStoreError::Unavailable)?
 }
 
+/// Verify the native profile without requiring an idle about:blank document.
+/// Website storage lives on an HTTP(S) origin, including our inert import pages.
+/// Cookie replacement retains its separate, stricter preflight below.
+pub(crate) async fn verify_storage_profile(webview: &Webview, profile_id: &str) -> Result<()> {
+    let expected = expected_profile(webview.label(), profile_id)?;
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    webview
+        .with_webview(move |platform| unsafe {
+            let view: &WKWebView = &*platform.inner().cast();
+            let _ = sender.send(cookie_store(view, expected).map(|_| ()));
+        })
+        .map_err(|_| CookieStoreError::Unavailable)?;
+    tokio::time::timeout(TIMEOUT, receiver)
+        .await
+        .map_err(|_| CookieStoreError::Timeout)?
+        .map_err(|_| CookieStoreError::Unavailable)?
+}
+
 /// Check native representability for the complete target without changing any
 /// cookie. This catches engine expiry clamping before a partial restore begins.
 pub(crate) async fn preflight(

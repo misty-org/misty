@@ -5,4 +5,5 @@ import type { NativeSyncView } from "./native";
 export const useBrowserSyncStore = create<{
   session: NativeSyncView | null;
   issue: string | null;
-}>(() => ({ session: null, issue: null }));
+  connecting: boolean;
+}>(() => ({ session: null, issue: null, connecting: false }));

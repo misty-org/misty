@@ -13,6 +13,23 @@ misty setup
 misty desktop dev
 ```
 
+On macOS, desktop development signs the native executable with your Apple
+Development certificate on every native rebuild. This gives Keychain a stable
+application identity instead of an ad-hoc signature that changes after linking.
+Both `misty desktop dev` and `npm run tauri -- dev` use this launcher. Restart an
+already running dev command after changing the launcher. Vite-only hot reload
+does not restart or re-sign the native process.
+
+Create an Apple Development certificate through Xcode if one is not installed.
+If several certificates are available, set `MISTY_DEV_SIGNING_IDENTITY` to the
+exact certificate name or SHA-1 from `security find-identity -v -p codesigning`.
+Existing Keychain entries may request access once more when moving from the old
+ad-hoc build to this identity; select **Always Allow** to remember it. Recovery
+and sync use separate entries, so that transition can ask twice. The launcher
+does not change their access controls or move encryption keys out of Keychain.
+Release signing and mobile builds are unchanged. Direct `npx tauri dev` bypasses
+the Misty launcher; use the commands above for stable desktop dev signing.
+
 Start the website with:
 
 ```sh

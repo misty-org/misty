@@ -13,6 +13,7 @@ export function SpacesRealtimeBridge() {
   const connectRealtime = useSpacesStore((state) => state.connectRealtime);
   const disconnectRealtime = useSpacesStore((state) => state.disconnectRealtime);
   const loading = useSpacesStore((state) => state.loading);
+  const snapshotReady = useSpacesStore((state) => state.snapshotReady);
   const error = useSpacesStore((state) => state.error);
   const clearError = useSpacesStore((state) => state.clearError);
   const reportedErrorRef = useRef("");
@@ -41,8 +42,14 @@ export function SpacesRealtimeBridge() {
       reportedErrorRef.current = "";
       return;
     }
-    if (isAccountSwitchError(error) || isReconnectError(error)) {
+    if (isAccountSwitchError(error)) {
       clearError();
+      return;
+    }
+    if (isReconnectError(error)) {
+      // Until the first snapshot arrives, the surface needs this error to
+      // expose Retry instead of returning to an indefinite loading state.
+      if (snapshotReady) clearError();
       return;
     }
     if (!user || transitioning || loading || reportedErrorRef.current === error) return;
@@ -60,7 +67,7 @@ export function SpacesRealtimeBridge() {
       });
     }, 1_200);
     return () => window.clearTimeout(timeout);
-  }, [accountId, clearError, error, loading, transitioning, user]);
+  }, [accountId, clearError, error, loading, snapshotReady, transitioning, user]);
 
   return null;
 }

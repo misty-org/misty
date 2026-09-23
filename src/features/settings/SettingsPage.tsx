@@ -94,13 +94,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     Component: AccountSection,
   },
   {
-    id: "sync",
-    label: "Device sync",
-    icon: RefreshCw,
-    group: "preferences",
-    Component: BrowserSyncSettings,
-  },
-  {
     id: "appearance",
     label: "Appearance",
     icon: Eye,
@@ -134,6 +127,13 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     icon: MessageCircle,
     group: "agents",
     Component: MistySection,
+  },
+  {
+    id: "sync",
+    label: "Device sync",
+    icon: RefreshCw,
+    group: "system",
+    Component: BrowserSyncSettings,
   },
   {
     id: "extensions",

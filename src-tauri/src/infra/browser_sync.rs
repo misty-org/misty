@@ -396,6 +396,7 @@ pub struct SyncView {
     profile_id: String,
     supports_cookie_handoff: bool,
     browser_profile_ready: bool,
+    browser_profile_issue: Option<&'static str>,
     status: Status,
     presence: Vec<Presence>,
     workspace: WorkspaceView,
@@ -425,10 +426,8 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
         }
         Err(error) => return Err(issue(error)),
     }
-    let mut status = active.handle.status.borrow().clone();
-    if status.issue.is_none() {
-        status.issue = active.credential_issue;
-    }
+    // A local website-storage failure does not stop workspace transport.
+    let status = active.handle.status.borrow().clone();
     let profile = default_profile_id(&active.scope)?;
     let browser_profile_ready = match active.handle.browser_profile_binding(profile.clone()).await {
         Ok(binding) => match active.handle.browser_import_journal(profile).await {
@@ -439,6 +438,7 @@ async fn view(active: &mut Session) -> Result<SyncView, String> {
     };
     Ok(SyncView {
         browser_profile_ready,
+        browser_profile_issue: active.credential_issue,
         session_id: active.id.clone(),
         deployment: active.scope.deployment.clone(),
         account_id: active.scope.account_id.clone(),
@@ -595,6 +595,20 @@ async fn open_vault(
     let _lifecycle = browser_lifecycle().write().await;
     let mut current = session().lock().await;
     let api = account_api(&api_base, &account_id)?;
+    // Background retries can overlap a manual unlock. Reuse the worker that
+    // won that race instead of stopping it and reading the key a second time.
+    if !create
+        && password.is_none()
+        && secret.is_none()
+        && current.as_ref().is_some_and(|active| {
+            active.scope.deployment == api.deployment()
+                && active.scope.account_id == account_id
+                && !active.task.is_finished()
+                && active.credential_issue.is_none()
+        })
+    {
+        return view(current.as_mut().expect("live session exists")).await;
+    }
     stop(current.take()).await;
     let path = database_path(&app, &api.deployment(), &account_id)?;
     let database_lock = lock_database(&path)?;
