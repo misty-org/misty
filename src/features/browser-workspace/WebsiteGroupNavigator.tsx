@@ -135,12 +135,12 @@ export function WebsiteGroupNavigator({ onOpen }: { onOpen?: () => void } = {}) 
             </DialogTrigger>
             <DialogContent
               aria-describedby={undefined}
-              className="w-[600px] max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 sm:max-w-[600px]"
+              className="w-[820px] max-w-[calc(100vw-24px)] gap-0 overflow-hidden p-0 sm:max-w-[820px]"
             >
               <div className="border-b border-charcoal-border px-4 py-3">
                 <DialogTitle className="text-sm font-medium">Groups</DialogTitle>
               </div>
-              <div className="max-h-[75vh] overflow-y-auto">
+              <div className="max-h-[80vh] overflow-y-auto">
                 <WebsiteGroupsManager />
               </div>
             </DialogContent>

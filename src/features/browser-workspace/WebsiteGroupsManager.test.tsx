@@ -69,3 +69,23 @@ it("keeps groups and sites until deletion is confirmed", () => {
   click("Cancel");
   expect(useWorkspaceStore.getState().websiteGroups).toEqual(before);
 });
+
+it("shows predefined sites and adds them once to the selected group", () => {
+  render(<WebsiteGroupsManager />);
+  click("Social");
+  fill("Search available sites", "Gmail");
+  click("Add Gmail");
+  const saved = useWorkspaceStore.getState().savedWebsites;
+  expect(saved).toHaveLength(1);
+  expect(saved[0].fields.group_id).toBe("group:default:social");
+  expect((screen.getByRole("button", { name: "Gmail added" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
+});
+it("offers predefined groups when all groups have been removed", () => {
+  useWorkspaceStore.setState({ websiteGroups: [], savedWebsites: [] });
+  render(<WebsiteGroupsManager />);
+  click("Add Inbox group");
+  expect(useWorkspaceStore.getState().websiteGroups[0].fields.label).toBe("Inbox");
+  expect(screen.getByRole("button", { name: "Add Gmail" })).toBeTruthy();
+});
