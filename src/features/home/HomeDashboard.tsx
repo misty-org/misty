@@ -20,7 +20,7 @@ import {
   useWorkspaceStore,
   type WorkspaceToolId,
 } from "@/features/workspace";
-import { cn } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import { useMobileSurfaceChrome, useSurfacePresentation } from "@/shared/mobile";
 import { ArrowRight, CalendarDays, Clock3, Flame, UsersRound } from "lucide-react";
 import {
@@ -296,13 +296,13 @@ export function HomeDashboard({ spaceId, global = false }: HomeDashboardProps) {
                 </h2>
               </div>
               {activityState === "error" && (
-                <button
-                  type="button"
-                  className="text-xs text-cream-muted hover:text-cream-bright"
+                <Button
+                  variant="ghost"
+                  className="h-auto p-0 text-xs text-cream-muted hover:bg-transparent hover:text-cream-bright"
                   onClick={() => setActivityAttempt((value) => value + 1)}
                 >
                   Retry activity
-                </button>
+                </Button>
               )}
             </div>
 
@@ -388,13 +388,14 @@ function AgendaRows(props: {
           </p>
           <p className="mt-1 text-xs text-cream-muted">Check your connection and try again.</p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           className="rounded-lg bg-charcoal-active px-3 py-2 text-xs font-medium text-cream outline-none hover:text-cream-bright focus-visible:ring-2 focus-visible:ring-sage-fg/60"
           onClick={() => void props.onRetry()}
         >
           Try again
-        </button>
+        </Button>
       </div>
     ) : null;
   if (error && !props.entries.length) return error;

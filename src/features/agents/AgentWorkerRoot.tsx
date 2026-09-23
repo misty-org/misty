@@ -4,8 +4,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { useDocumentAppAppearance } from "@/features/settings";
-import { useAppsStore } from "@/features/apps/useAppsStore";
-import { useSpacesStore } from "@/features/spaces";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { GlobalMistySurface } from "@/features/global-search/GlobalMisty";
 import type { MistyImageAttachment } from "@/features/global-search/types";
@@ -77,8 +75,6 @@ function Worker() {
           setError(message);
           return;
         }
-        await useAppsStore.getState().load(user.id, false, task.spaceId);
-        await useSpacesStore.getState().load({ accountId: user.id });
         await usePersonalAgentsStore.getState().load(user.id);
         if (disposed) return;
         useMistyStore.getState().setAccount(user.id);
@@ -145,9 +141,9 @@ function Worker() {
         <GlobalMistySurface
           controller="misty"
           accountId={user.id}
-          currentPath="/apps/agents"
+          currentPath="/agents"
           activePaneId="agent-worker"
-          activePanePath="/apps/agents"
+          activePanePath="/agents"
           includeCurrentContext={false}
           allowCapture={false}
           suspendBrowserWebviews={false}

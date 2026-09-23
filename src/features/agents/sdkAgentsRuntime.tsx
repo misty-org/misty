@@ -21,8 +21,6 @@ export async function createSdkAgentsRuntime(
   const assert = () => {
     if (signal.aborted) throw new Error("This Agents view is closed.");
   };
-  const availableSpaces = await misty.agents.spaces();
-  const spaces = create(() => ({ spaces: availableSpaces, referenceOnly: false }));
   const workspace = create(() => ({
     activeScopeKey: identity.space?.id ? `space:${identity.space.id}` : "account",
   }));
@@ -65,7 +63,6 @@ export async function createSdkAgentsRuntime(
     automationsApi: domain("automationsApi", "automations"),
     mcpConnectionsApi: domain("mcpConnectionsApi", "mcp"),
     useAuth: (() => ({ user: identity.user, transitioning: false })) as AgentsRuntime["useAuth"],
-    useSpacesStore: spaces as unknown as AgentsRuntime["useSpacesStore"],
     useWorkspaceStore: workspace as unknown as AgentsRuntime["useWorkspaceStore"],
     useAccountAvatarUrl: (id, version) => {
       const [url, setUrl] = useState("");

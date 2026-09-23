@@ -256,22 +256,14 @@ export function ComposeDialogView(props: {
                 <span>To</span>
                 <div className="flex items-center gap-2">
                   {!showCc ? (
-                    <button
-                      type="button"
-                      className="text-[11px] text-cream-faint hover:text-cream"
-                      onClick={() => setShowCc(true)}
-                    >
+                    <Button variant="link" className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream" onClick={() => setShowCc(true)}>
                       Cc
-                    </button>
+                    </Button>
                   ) : null}
                   {!showBcc ? (
-                    <button
-                      type="button"
-                      className="text-[11px] text-cream-faint hover:text-cream"
-                      onClick={() => setShowBcc(true)}
-                    >
+                    <Button variant="link" className="h-auto p-0 text-[11px] text-cream-faint hover:text-cream" onClick={() => setShowBcc(true)}>
                       Bcc
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>

@@ -161,7 +161,7 @@ export interface GlobalAiConversation {
   createdAt: string;
   updatedAt: string;
   modelId?: string;
-  reasoningEffort?: "" | "low" | "medium" | "high";
+  reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   messages: GlobalAiMessage[];
   remote: boolean;
 }

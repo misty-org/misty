@@ -2,13 +2,13 @@ import { useActivityStore } from "@/features/activity";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import type { CurrentLicense } from "@/features/installer";
 import { resetConnectionsAccountState } from "@/features/integrations";
-import { resetSpacesAccountState, useSpacesStore } from "@/features/spaces";
+import { resetSpacesAccountState } from "@/features/spaces";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
 import { resetAppsAccountState } from "@/features/apps";
 import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
 import { resetProvidersAccountState } from "@/features/providers";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
-import { notifyAccountScopeReset } from "./store/accountEvents";
+import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
 import { isNativeMobileBuild } from "@/shared/platform/buildTarget";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
@@ -24,6 +24,7 @@ function scopedAuthUserStorageKey(): string {
 }
 
 export function resetAccountScopedState(previousAccountId?: string): void {
+  notifyAccountScopeWillReset();
   useUserStore.getState().clear();
   useActivityStore.getState().setAccount("");
   resetSpacesAccountState();
@@ -35,9 +36,6 @@ export function resetAccountScopedState(previousAccountId?: string): void {
   resetProvidersAccountState();
   resetAiSurfaceAccountState(previousAccountId);
   notifyAccountScopeReset();
-}
-export function refreshAuthenticatedAccountState(accountId?: string): void {
-  void useSpacesStore.getState().load({ force: true, accountId });
 }
 
 export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {
@@ -129,7 +127,7 @@ export interface AuthUser {
 
 export interface AuthContextValue {
   user: AuthUser | null;
-  setUser: (user: AuthUser | null) => void;
+  setUser: (user: AuthUser | null) => Promise<void>;
   accounts: SavedAccountSession[];
   transitioning: boolean;
   refreshUser: () => Promise<AuthUser | null>;

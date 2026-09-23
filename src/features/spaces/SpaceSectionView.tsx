@@ -17,10 +17,44 @@ const Drawings = lazy(() =>
 const Planner = lazy(() =>
   import("@/features/spaces/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
 );
-const Library = lazy(() =>
-  import("@/features/spaces/library/SpaceLibrary").then((m) => ({ default: m.SpaceLibrary })),
-);
-const Chat = lazy(() => import("./chat/SpaceChat").then((m) => ({ default: m.SpaceSocial })));
+// Configure host services before React renders the SDK-compatible implementations.
+// Their runtime hooks deliberately fail if an entry point skips this setup.
+async function loadLibrary() {
+  const { initializeHostLibraryRuntime } =
+    await import("@/features/spaces/library/hostLibraryRuntime");
+  initializeHostLibraryRuntime();
+  const { SpaceLibrary } = await import("@/features/spaces/library/SpaceLibrary");
+  return { default: SpaceLibrary };
+}
+const Library = lazy(loadLibrary);
+async function loadChat() {
+  const { initializeHostSocialRuntime } = await import("./chat/hostSocialRuntime");
+  initializeHostSocialRuntime();
+  const { SpaceSocial } = await import("./chat/SpaceChat");
+  return { default: SpaceSocial };
+}
+const Chat = lazy(loadChat);
+
+export async function preloadSpaceSection(section: string) {
+  switch (section) {
+    case "social":
+    case "chat":
+      await loadChat();
+      break;
+    case "planner":
+      await import("@/features/spaces/planner/SpacePlanner");
+      break;
+    case "notes":
+      await import("@/features/notes/SpaceNotes");
+      break;
+    case "drawings":
+      await import("@/features/drawings/SpaceDrawings");
+      break;
+    case "library":
+      await loadLibrary();
+      break;
+  }
+}
 
 /**
  * One Space section, rendered from props rather than the router.

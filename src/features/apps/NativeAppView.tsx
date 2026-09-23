@@ -317,7 +317,7 @@ export function NativeAppView(props: NativeAppViewProps) {
         ) : error ? (
           <div role="alert">
             <p>{error}</p>
-            <button onClick={() => setAttempt((value) => value + 1)}>Try again</button>
+            <Button variant="secondary" onClick={() => setAttempt((value) => value + 1)}>Try again</Button>
           </div>
         ) : !ready ? (
           <LoadingScreen className="absolute inset-0" label={`Opening ${props.title}`} />

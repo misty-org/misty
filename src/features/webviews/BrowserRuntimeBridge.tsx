@@ -280,12 +280,47 @@ export function BrowserRuntimeBridge() {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
+    const pageBackgrounds = new Map<string, string>();
+    let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
+    const restorePageBackgrounds = () => {
+      for (const [id, color] of pageBackgrounds) {
+        const tabId = browserTabIdForRuntime(id);
+        if (!tabId) {
+          pageBackgrounds.delete(id);
+          continue;
+        }
+        const host = document.querySelector<HTMLElement>(
+          `[data-browser-workspace-tab="${CSS.escape(tabId)}"] [data-browser-page-host]`,
+        );
+        if (host && host.dataset.mistyBrowserBackground !== color) {
+          host.dataset.mistyBrowserBackground = color;
+        }
+      }
+    };
+    // Native pages survive shell host remounts. Restore their last color when
+    // React recreates a host, even if the website itself hasn't changed color.
+    const backgroundHosts = new MutationObserver(() => {
+      clearTimeout(backgroundTimer);
+      backgroundTimer = setTimeout(restorePageBackgrounds, 120);
+    });
+    backgroundHosts.observe(document.body, { childList: true, subtree: true });
     const listeners = Promise.all([
+      listen<{ id: string; color: string }>("misty://browser-background", ({ payload }) => {
+        if (disposed || typeof payload.color !== "string" || !/^#[\da-f]{6}$/i.test(payload.color))
+          return;
+        pageBackgrounds.set(payload.id, payload.color);
+        restorePageBackgrounds();
+      }),
       listen<BrowserPageEvent>("misty://browser-page", ({ payload }) => {
         if (disposed) return;
         const tabId = browserTabIdForRuntime(payload.id);
         if (!tabId) return;
         if (payload.phase === "started") {
+          pageBackgrounds.delete(payload.id);
+          const host = document.querySelector<HTMLElement>(
+            `[data-browser-workspace-tab="${CSS.escape(tabId)}"] [data-browser-page-host]`,
+          );
+          if (host) delete host.dataset.mistyBrowserBackground;
           useBrowserRuntimeStore.getState().setCompatibilityIssue(tabId, null);
           useBrowserRuntimeStore.getState().setLoading(tabId, true);
         }
@@ -473,6 +508,8 @@ export function BrowserRuntimeBridge() {
     ]);
     return () => {
       disposed = true;
+      clearTimeout(backgroundTimer);
+      backgroundHosts.disconnect();
       void listeners.then((unlisten) => unlisten.forEach((stop) => stop()));
     };
   }, [navigate]);

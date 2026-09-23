@@ -1,3 +1,5 @@
+import { betaExecutionMode, visibleAutopilotAvailable } from "../betaModes";
+import { Button } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Square, X } from "lucide-react";
 import type { AgentProfile } from "@misty/contracts";
@@ -55,12 +57,23 @@ export function AgentWorkspaceConversation({
   const conversation = scoped.find((c) => c.id === state.activeConversationId);
 
   const reportError = (error: string) => useMistyStore.setState({ error: error || null });
-  const executionMode = state.executionMode ?? "user";
+  const currentAgentId = agent?.id ?? "misty";
+  const executionMode =
+    betaExecutionMode(state.executionModeByAgent?.[currentAgentId] ?? state.executionMode ?? "user");
   const isDesktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
 
   const handleModeChange = (mode: "user" | "agent" | "team") => {
+    if (visibleAutopilotAvailable() && mode !== "agent") return;
     void finishLocalExecution()
-      .then(() => useMistyStore.setState({ executionMode: mode }))
+      .then(() =>
+        useMistyStore.setState((prev) => ({
+          executionMode: mode,
+          executionModeByAgent: {
+            ...prev.executionModeByAgent,
+            [currentAgentId]: mode,
+          },
+        })),
+      )
       .catch((reason) => useMistyStore.setState({ error: String(reason) }));
   };
 
@@ -176,17 +189,17 @@ export function AgentWorkspaceConversation({
               <div className="agent-starters">
                 <div className="agent-starters-heading">
                   <h3>What can I take off your plate?</h3>
-                  <button
+                  <Button variant="ghost" size="icon-sm"
                     className="agent-icon-button"
                     aria-label="Dismiss suggestions"
                     onClick={() => setShowSuggestions(false)}
                   >
                     <X size={16} />
-                  </button>
+                  </Button>
                 </div>
                 <div className="agent-starter-options">
                   {suggestions.map(([label, prompt], index) => (
-                    <button
+                    <Button variant="ghost"
                       key={label}
                       disabled={!agent.enabled || state.working}
                       onClick={() => {
@@ -198,7 +211,7 @@ export function AgentWorkspaceConversation({
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{label}</span>
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <input
@@ -218,9 +231,9 @@ export function AgentWorkspaceConversation({
               </div>
             )}
             {!agent && (
-              <button className="agent-create-action" onClick={onCreate}>
+              <Button variant="ghost" className="agent-create-action" onClick={onCreate}>
                 Create an agent
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -229,13 +242,13 @@ export function AgentWorkspaceConversation({
         {state.error && (
           <div role="alert" className="agent-compose-error">
             <p>{state.error}</p>
-            <button
+            <Button variant="ghost" size="icon-sm"
               className="agent-icon-button"
               aria-label="Dismiss error"
               onClick={() => reportError("")}
             >
               <X size={16} />
-            </button>
+            </Button>
           </div>
         )}
         {agent && !agent.enabled && (
@@ -247,45 +260,45 @@ export function AgentWorkspaceConversation({
           <div className="agent-mode-bar">
             <span className="agent-mode-label">Mode</span>
             <div className="agent-mode-selector" role="radiogroup" aria-label="Work mode">
-              <button
-                type="button"
+              <Button variant="ghost"
+               
                 role="radio"
                 aria-checked={executionMode === "user"}
                 className={`agent-mode-pill ${executionMode === "user" ? "active" : ""}`}
-                disabled={state.working}
+                disabled={state.working || visibleAutopilotAvailable()}
                 onClick={() => handleModeChange("user")}
-                title="Discuss and draft — read-only apps"
+                title={visibleAutopilotAvailable() ? "Unavailable in this beta" : "Discuss and draft — read-only apps"}
               >
                 User
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="ghost"
+               
                 role="radio"
                 aria-checked={executionMode === "agent"}
                 className={`agent-mode-pill ${executionMode === "agent" ? "active" : ""}`}
                 disabled={state.working}
                 onClick={() => handleModeChange("agent")}
-                title="Work in this window — full browser and connected app actions"
+                title="Let the agent control Misty while you watch. Stop at any time."
               >
                 Agent
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button variant="ghost"
+               
                 role="radio"
                 aria-checked={executionMode === "team"}
                 className={`agent-mode-pill ${executionMode === "team" ? "active" : ""}`}
-                disabled={state.working}
+                disabled={state.working || visibleAutopilotAvailable()}
                 onClick={() => handleModeChange("team")}
-                title="Work in separate window — dedicated background worker"
+                title={visibleAutopilotAvailable() ? "Unavailable in this beta" : "Work in separate window — dedicated background worker"}
               >
                 Team
-              </button>
+              </Button>
             </div>
             <span className="agent-mode-description">
               {executionMode === "user"
                 ? "Discuss & draft"
                 : executionMode === "agent"
-                  ? "Work in this window (browser & apps)"
+                  ? "The agent controls Misty while you watch. Stop at any time."
                   : "Work in dedicated window"}
             </span>
           </div>
@@ -312,7 +325,7 @@ export function AgentWorkspaceConversation({
           disabled={!agent?.enabled || !accountId}
           busy={state.working}
           voiceControl={
-            <button
+            <Button variant="ghost"
               className="agent-voice-button"
               aria-label={voice.recording ? "Stop recording" : "Start voice input"}
               title={voice.recording ? "Stop recording" : "Voice input"}
@@ -326,11 +339,11 @@ export function AgentWorkspaceConversation({
               ) : (
                 <Mic size={18} />
               )}
-            </button>
+            </Button>
           }
           trailingControl={
             state.working ? (
-              <button
+              <Button variant="ghost" size="icon-sm"
                 className="agent-icon-button"
                 aria-label="Stop response"
                 onClick={() => {
@@ -341,7 +354,7 @@ export function AgentWorkspaceConversation({
                 }}
               >
                 <Square size={16} />
-              </button>
+              </Button>
             ) : undefined
           }
         />

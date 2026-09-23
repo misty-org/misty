@@ -288,9 +288,9 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
           <div className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-card px-4 text-sm text-cream-muted">
             <CircleAlert className="size-4 shrink-0" />
             <span className="min-w-0 flex-1 truncate">{message}</span>
-            <button className="size-11" onClick={() => setMessage("")} aria-label="Dismiss">
+            <Button variant="ghost" className="size-11" onClick={() => setMessage("")} aria-label="Dismiss">
               <X className="mx-auto size-4" />
-            </button>
+            </Button>
           </div>
         ) : null}
 
@@ -334,7 +334,7 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
           ) : (
             <div className="overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card">
               {(structure?.steps ?? []).map((step, index) => (
-                <button
+                <Button variant="ghost"
                   key={step.name}
                   className="flex min-h-16 w-full items-center gap-3 border-b border-charcoal-border px-4 text-left last:border-b-0"
                   onClick={() => {
@@ -362,7 +362,7 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
                   ) : (
                     <ChevronRight className="size-5 text-cream-muted" />
                   )}
-                </button>
+                </Button>
               ))}
               {!structure?.steps.length ? (
                 <div className="flex min-h-40 flex-col items-center justify-center px-6 text-center text-sm text-cream-muted">
@@ -437,13 +437,13 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
       data-misty-automation-editor
     >
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-charcoal-border px-4">
-        <button
+        <Button variant="ghost"
           className="flex size-8 items-center justify-center text-cream-muted hover:text-cream"
           onClick={props.onBack}
           aria-label="Back to automations"
         >
           <ArrowLeft className="size-[18px]" />
-        </button>
+        </Button>
         <Input
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -486,13 +486,13 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
       {message ? (
         <div className="flex min-h-9 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-card/45 px-5 text-[11px] text-cream-muted">
           <CircleAlert className="size-3.5" /> <span className="truncate">{message}</span>
-          <button
+          <Button variant="ghost"
             className="ml-auto hover:text-cream"
             onClick={() => setMessage("")}
             aria-label="Dismiss"
           >
             <X className="size-3.5" />
-          </button>
+          </Button>
         </div>
       ) : null}
 
@@ -542,7 +542,7 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
               <h3 className="m-0 text-sm font-semibold text-cream-bright">
                 {selected ? "Step settings" : needsTrigger ? "Choose a trigger" : "Add a step"}
               </h3>
-              <button
+              <Button variant="ghost"
                 className="ml-auto text-cream-muted hover:text-cream"
                 onClick={() => {
                   setSelectedStep("");
@@ -551,7 +551,7 @@ function AutomationEditorInner(props: Parameters<typeof AutomationEditor>[0]) {
                 aria-label="Close panel"
               >
                 <X className="size-4" />
-              </button>
+              </Button>
             </div>
             {selected ? (
               <StepSettings
@@ -661,7 +661,7 @@ function StepCatalog(props: {
           <p className="px-2 text-[10px] font-medium text-cream-muted">Results</p>
           <div className="mt-1 divide-y divide-charcoal-border">
             {props.results.map((item) => (
-              <button
+              <Button variant="ghost"
                 key={`${item.pieceName}:${item.componentName}`}
                 className="flex w-full items-center gap-3 px-2 py-2.5 text-left hover:bg-charcoal-hover"
                 onClick={() => props.onPick(item)}
@@ -677,7 +677,7 @@ function StepCatalog(props: {
                   </span>
                 </span>
                 <Plus className="size-3.5 text-cream-muted" />
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -688,14 +688,14 @@ function StepCatalog(props: {
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {starterCatalog.map((item) => (
-              <button
+              <Button variant="ghost"
                 key={item.value}
                 className="flex items-center gap-2.5 rounded-lg border border-charcoal-border bg-charcoal-bg/35 px-3 py-2.5 text-left text-xs text-cream hover:bg-charcoal-hover"
                 onClick={() => props.onStarter(item)}
               >
                 <AutomationIntegrationIcon value={item.value} />{" "}
                 <span className="truncate">{item.label}</span>
-              </button>
+              </Button>
             ))}
           </div>
           {!props.needsTrigger ? (
@@ -735,14 +735,14 @@ function UtilityButton(props: {
 }) {
   const Icon = props.icon;
   return (
-    <button
+    <Button variant="ghost"
       className="flex w-full items-center gap-3 px-2 py-2.5 text-left text-xs text-cream hover:bg-charcoal-hover"
       onClick={props.onClick}
     >
       <Icon className="size-4 text-cream-muted" />
       {props.label}
       <Plus className="ml-auto size-3.5 text-cream-muted" />
-    </button>
+    </Button>
   );
 }
 
@@ -833,7 +833,7 @@ function BottomPanel(props: {
         )}
       >
         {(["inputs", "outputs", "runs", "errors"] as const).map((tab) => (
-          <button
+          <Button variant="ghost"
             key={tab}
             className={cn(
               "h-full min-h-11 border-b px-2 text-xs capitalize",
@@ -845,7 +845,7 @@ function BottomPanel(props: {
           >
             {tab === "runs" ? "Run history" : tab}
             {tab === "errors" && errors.length ? ` ${errors.length}` : ""}
-          </button>
+          </Button>
         ))}
       </div>
       <div

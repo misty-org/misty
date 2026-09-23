@@ -99,6 +99,16 @@ describe("loadOfficialAppCatalog", () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([false, true])("excludes withdrawn apps from the catalog (local: %s)", async (local) => {
+    const apps = [serverApp, { ...serverApp, id: "code" }, { ...serverApp, id: "terminal" }];
+    vi.mocked(apiRequest).mockResolvedValue({ ...serverCatalog, apps });
+    vi.stubGlobal("fetch", vi.fn(async () => localResponse(apps)));
+
+    const result = await loadOfficialAppCatalog(local);
+
+    expect(result.apps.map((app) => app.id)).toEqual(["journal"]);
+  });
+
   it("uses the server's grants and matching local artifacts without changing protocol or metadata", async () => {
     const request = vi.fn(async () =>
       localResponse([{ ...localApp, name: "Local label", scopes: ["notes.write", "notes.read"] }]),

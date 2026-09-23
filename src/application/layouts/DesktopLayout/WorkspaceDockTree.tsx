@@ -1,4 +1,3 @@
-import { WorkspaceAppGallery } from "./WorkspaceAppGallery";
 import { StablePaneLayout } from "@/features/workspace/StablePaneLayout";
 import { panePlacement } from "@/features/workspace/panePlacement";
 import { WorkspacePaneControls } from "./WorkspacePaneControls";
@@ -32,7 +31,7 @@ import {
   PanelResizeHandle,
   type ImperativePanelGroupHandle,
 } from "react-resizable-panels";
-import { WorkspaceSurface } from "./WorkspaceSurface";
+import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import {
   AiPaneHost,
   type AiContextReference,
@@ -40,7 +39,6 @@ import {
   type AiSurfaceAdapter,
   type AiSurfaceId,
 } from "@/features/ai-surface/AiPaneHost";
-import { type NewTabOption } from "./WorkspaceNewTabMenu";
 import { useSpacesStore } from "@/features/spaces";
 import { type TabGroup } from "./WorkspaceTabGroupButton";
 
@@ -159,7 +157,6 @@ export interface WorkspaceDockTreeProps {
   lastUsedTabByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceTab) => void;
   onClose: (tab: WorkspaceTab, paneId: string) => void;
-  onOpenNewTab: (option: NewTabOption, paneId: string) => void;
   onMoveTab: (tabId: string, paneId: string, index?: number) => boolean;
   onDockTab: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
   onSplitPane: (paneId: string, direction: DockSplitDirection, tabId?: string) => string | null;
@@ -448,32 +445,34 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       }}
     >
       <div className="min-h-0 min-w-0 overflow-hidden">
-        {activeTab
-          ? mountedTabs.map((mountedTab) => {
-              const isActive = props.workspaceActive !== false && mountedTab.id === activeTab.id;
-              return (
-                <div
-                  key={mountedTab.id}
-                  className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
-                  aria-hidden={!isActive}
+        {activeTab ? (
+          mountedTabs.map((mountedTab) => {
+            const isActive = props.workspaceActive !== false && mountedTab.id === activeTab.id;
+            return (
+              <div
+                key={mountedTab.id}
+                className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
+                aria-hidden={!isActive}
+              >
+                <AiPaneHost
+                  paneId={pane.id}
+                  defaultAdapter={workspaceAiAdapter(mountedTab)}
+                  active={isActive}
                 >
-                  {mountedTab.placeholder ? (
-                    <WorkspaceAppGallery paneId={pane.id} onOpenNewTab={props.onOpenNewTab} />
-                  ) : (
-                    <AiPaneHost
-                      paneId={pane.id}
-                      defaultAdapter={workspaceAiAdapter(mountedTab)}
-                      active={isActive}
-                    >
-                      <WorkspaceTabTitleProvider tabId={mountedTab.id}>
-                        <WorkspaceSurface tab={mountedTab} active={isActive} />
-                      </WorkspaceTabTitleProvider>
-                    </AiPaneHost>
-                  )}
-                </div>
-              );
-            })
-          : null}
+                  <WorkspaceTabTitleProvider tabId={mountedTab.id}>
+                    <WorkspaceSurface tab={mountedTab} active={isActive} />
+                  </WorkspaceTabTitleProvider>
+                </AiPaneHost>
+              </div>
+            );
+          })
+        ) : (
+          <EmptyWorkspacePane
+            onOpen={() =>
+              props.onOpen(useWorkspaceStore.getState().openBrowserTab({ paneId: pane.id }))
+            }
+          />
+        )}
       </div>
       {dim > 0 ? (
         <div

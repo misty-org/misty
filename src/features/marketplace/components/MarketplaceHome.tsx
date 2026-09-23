@@ -87,16 +87,17 @@ export function MarketplaceHome({
             />
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            size="none"
             aria-label={`View ${featured.name} details`}
             className={cn(
-              "m-4 grid min-h-[200px] grid-cols-[minmax(0,1fr)_168px] overflow-hidden",
+              "m-4 grid min-h-[200px] h-auto grid-cols-[minmax(0,1fr)_168px] overflow-hidden",
               "rounded-lg border border-charcoal-border bg-charcoal-bg text-left outline-none",
               "transition-colors hover:border-charcoal-active focus-visible:border-charcoal-active",
               "max-[640px]:m-3 max-[640px]:grid-cols-1",
             )}
             onClick={() => onSelect(featured.id)}
-            type="button"
           >
             <div className="min-w-0 p-5">
               <p className="text-xs font-medium text-cream">Inside {featured.name}</p>
@@ -130,7 +131,7 @@ export function MarketplaceHome({
                 </span>
               ) : null}
             </div>
-          </button>
+          </Button>
         </section>
       ) : null}
 
@@ -196,14 +197,15 @@ function CategoryCard(props: {
 }) {
   const Icon = props.icon;
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="none"
       className={cn(
-        "group grid min-h-36 grid-cols-[48px_minmax(0,1fr)] gap-4 rounded-xl",
+        "group grid min-h-36 h-auto w-full grid-cols-[48px_minmax(0,1fr)] gap-4 rounded-xl",
         "border border-charcoal-border bg-charcoal-card p-5 text-left outline-none",
         "transition-colors hover:bg-charcoal-hover/45 focus-visible:border-charcoal-active",
       )}
       onClick={props.onClick}
-      type="button"
     >
       <span className="grid size-12 place-items-center rounded-lg border border-charcoal-border bg-charcoal-bg text-cream">
         <Icon aria-hidden="true" size={23} strokeWidth={1.8} />
@@ -224,7 +226,7 @@ function CategoryCard(props: {
           <ChevronRight aria-hidden="true" size={14} />
         </span>
       </span>
-    </button>
+    </Button>
   );
 }
 

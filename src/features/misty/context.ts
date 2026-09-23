@@ -7,7 +7,7 @@ import type { AiContextReference, AiSelectionSnapshot } from "@/features/ai-surf
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 
 export interface MistyContextTarget {
-  kind: "space" | "window" | "tab" | "pane" | "view";
+  kind: "workspace" | "window" | "tab" | "pane" | "view";
   spaceId: string;
   windowId?: string;
   tabId?: string;
@@ -26,9 +26,9 @@ export function contextOptions(
   spaceId: string,
 ): Array<{ label: string; target: MistyContextTarget }> {
   const state = useWorkspaceStore.getState();
-  if (state.activeScopeKey !== `space:${spaceId}`) return [];
+  if (spaceId || state.activeScopeKey !== "global") return [];
   const result: Array<{ label: string; target: MistyContextTarget }> = [
-    { label: "Entire Space", target: { kind: "space", spaceId } },
+    { label: "Entire workspace", target: { kind: "workspace", spaceId: "" } },
   ];
   for (const window of currentVirtualWindows(state)) {
     const base = { spaceId, windowId: window.id };
@@ -39,7 +39,7 @@ export function contextOptions(
         target: { ...base, kind: "tab", tabId: tab.id },
       });
       for (const pane of dockLeaves(tab.root)) {
-        const view = pane.tabs[0];
+        const view = pane.tabs.find((view) => view.id === pane.activeTabId) ?? pane.tabs[0];
         if (view)
           result.push({
             label: `${window.title} / ${tab.title || "Tab"} / ${view.title}`,
@@ -56,12 +56,19 @@ export function resolveMistyContext(
   targets: MistyContextTarget[] = [],
 ): MistyContextSnapshot {
   const state = useWorkspaceStore.getState();
-  if (targets.some((target) => target.spaceId !== spaceId))
-    throw new Error("Attach context from the selected Space.");
-  if (state.activeScopeKey !== `space:${spaceId}`) {
-    if (targets.length) throw new Error("Open the attached Space to refresh its context.");
+  if (spaceId || state.activeScopeKey !== "global") {
+    if (targets.length)
+      throw new Error("Start a new conversation to attach browser workspace context.");
+    // Preserve historical conversations without silently adding today's workspace.
     return { context: [] };
   }
+  if (
+    targets.some(
+      (target) =>
+        target.spaceId || !["workspace", "window", "tab", "pane", "view"].includes(target.kind),
+    )
+  )
+    throw new Error("Attach context from the current browser workspace.");
   const windows = currentVirtualWindows(state);
   const requested = targets.length
     ? targets
@@ -78,18 +85,6 @@ export function resolveMistyContext(
   let paneId: string | undefined;
   const visited = new Set<string>();
   for (const target of requested) {
-    if (target.kind === "space") {
-      context.push(
-        mistyContextRef({
-          kind: "space",
-          id: spaceId,
-          title: "Selected Space",
-          spaceId,
-          privacy: "shared",
-        }),
-      );
-      continue;
-    }
     const scopeStart = context.length;
     let found = false;
     for (const window of windows) {
@@ -97,7 +92,7 @@ export function resolveMistyContext(
       for (const tab of layoutTabs(window.layout)) {
         if (target.kind === "tab" && target.tabId && target.tabId !== tab.id) continue;
         for (const pane of dockLeaves(tab.root)) {
-          const view = pane.tabs[0]; // History snapshots are deliberately excluded.
+          const view = pane.tabs.find((view) => view.id === pane.activeTabId) ?? pane.tabs[0]; // History snapshots are deliberately excluded.
           if (
             !view ||
             (target.paneId && target.paneId !== pane.id) ||
@@ -128,23 +123,28 @@ export function resolveMistyContext(
             continue;
           }
           const refs = registration.adapter.getContext();
-          if (refs.some((ref) => ref.spaceId && ref.spaceId !== spaceId))
-            throw new Error("The app context belongs to another Space.");
+          if (refs.some((ref) => ref.spaceId))
+            throw new Error("The pane contains historical context. Open its current browser view.");
           context.push(...refs.map(mistyContextRef));
-          if (requested.length === 1 && target.kind !== "window" && target.kind !== "tab") {
+          if (requested.length === 1 && ["pane", "view"].includes(target.kind)) {
             selection = registration.adapter.getSelection?.() ?? undefined;
             paneId = pane.id;
           }
         }
       }
     }
-    if (found && (target.kind === "window" || target.kind === "tab")) {
+    if (found && ["workspace", "window", "tab"].includes(target.kind)) {
       const members = context.splice(scopeStart);
       context.push(
         mistyContextRef({
           kind: "workspace.scope",
-          id: target.tabId || target.windowId!,
-          title: target.kind === "tab" ? "Attached tab" : "Attached window",
+          id: target.tabId || target.windowId || "browser-workspace",
+          title:
+            target.kind === "workspace"
+              ? "Attached workspace"
+              : target.kind === "tab"
+                ? "Attached tab"
+                : "Attached window",
           spaceId,
           privacy: "device",
           metadata: {
@@ -155,7 +155,8 @@ export function resolveMistyContext(
         }),
       );
     }
-    if (!found) throw new Error("An attached context is closed. Remove it or reopen its source.");
+    if (!found && targets.length)
+      throw new Error("An attached context is closed. Remove it or reopen its source.");
   }
   if (context.length > 11)
     throw new Error("Attach at most 11 sources, or choose their containing tab or window.");

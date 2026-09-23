@@ -28,7 +28,6 @@ function mount() {
       lastUsedTabByGroup={{}}
       onOpen={vi.fn()}
       onClose={vi.fn()}
-      onOpenNewTab={vi.fn()}
       onMoveTab={vi.fn(() => true)}
       onDockTab={vi.fn(() => true)}
       onSplitPane={vi.fn(() => null)}
@@ -48,48 +47,42 @@ function mount() {
 }
 it("shows only close for a single pane and only a dropdown for multiple panes", async () => {
   mount();
-  expect(screen.getByRole("button", { name: "Close tab New Tab" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Show panes in New Tab" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Close tab Google" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Show panes in Google" })).toBeNull();
   act(() => {
     useWorkspaceStore
       .getState()
       .splitPane(useWorkspaceStore.getState().layout.focusedPaneId, "right");
   });
-  expect(screen.queryByRole("button", { name: "Close tab New Tab" })).toBeNull();
-  fireEvent.pointerDown(screen.getByRole("button", { name: "Show panes in New Tab" }), {
+  expect(screen.queryByRole("button", { name: "Close tab Google" })).toBeNull();
+  fireEvent.pointerDown(screen.getByRole("button", { name: "Show panes in Google" }), {
     button: 0,
     ctrlKey: false,
     pointerType: "mouse",
   });
-  const closes = await screen.findAllByRole("menuitem", { name: "Close pane New Tab" });
+  const closes = await screen.findAllByRole("menuitem", { name: "Close pane Google" });
   expect(closes).toHaveLength(2);
   fireEvent.click(closes[1]);
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Close tab New Tab" })).toBeTruthy(),
+    expect(screen.getByRole("button", { name: "Close tab Google" })).toBeTruthy(),
   );
   expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(1);
 });
 it("does not close a pane with unsaved work from the dropdown", async () => {
   const state = useWorkspaceStore.getState();
-  state.openSurface({
-    surfaceId: "official-app",
-    groupKey: "app:code",
-    title: "Code",
-    route: "/apps/code",
-  });
-  const code = dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0];
+  const browser = dockLeaves(useWorkspaceStore.getState().layout.root)[0].tabs[0];
   state.splitPane(useWorkspaceStore.getState().layout.focusedPaneId, "right");
   mount();
-  setAppUnsaved(code.id, true);
+  setAppUnsaved(browser.id, true);
   try {
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Show panes in New Tab" }), {
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Show panes in Google" }), {
       button: 0,
       ctrlKey: false,
       pointerType: "mouse",
     });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Close pane Code" }));
+    fireEvent.click((await screen.findAllByRole("menuitem", { name: "Close pane Google" }))[0]);
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(2);
   } finally {
-    setAppUnsaved(code.id, false);
+    setAppUnsaved(browser.id, false);
   }
 });

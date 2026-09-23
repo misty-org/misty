@@ -67,7 +67,7 @@ export const assistantApi = {
     ),
   updateConversationSettings: (
     conversationId: string,
-    settings: { model_id: string; reasoning_effort: "" | "low" | "medium" | "high" },
+    settings: { thinking_mode: "normal" | "deep" },
   ) =>
     apiRequest<{ id: string; model_id: string; reasoning_effort: string }>(
       `/misty/conversations/${encodeURIComponent(conversationId)}`,

@@ -185,13 +185,13 @@ function CollapsibleText({ text }: { text: string }) {
         {text}
       </p>
       {long ? (
-        <button
-          type="button"
+        <Button variant="ghost"
+         
           className="mt-2 text-xs font-medium text-cream-muted hover:text-cream"
           onClick={() => setExpanded((value) => !value)}
         >
           {expanded ? "Show less" : "Show more"}
-        </button>
+        </Button>
       ) : null}
     </>
   );
@@ -322,8 +322,8 @@ function MessageFeedback(props: {
 
 function FeedbackButton(props: { label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
+    <Button variant="ghost"
+     
       aria-label={props.label}
       title={props.label}
       onClick={props.onClick}
@@ -333,7 +333,7 @@ function FeedbackButton(props: { label: string; onClick: () => void; children: R
       )}
     >
       {props.children}
-    </button>
+    </Button>
   );
 }
 

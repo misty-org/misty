@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Button,
 } from "@/shared/ui";
 import { activityMuteKeys, isPendingRequest } from "./activityPolicy";
 import type { ActivityItem } from "./types";
@@ -53,33 +54,35 @@ export function ActivityRow({
           </p>
         </div>
         {item.target.kind !== "none" ? (
-          <button
-            type="button"
-            className="grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright focus-visible:outline focus-visible:outline-2 focus-visible:outline-cream-bright"
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="grid size-8 shrink-0 place-items-center rounded-md text-cream-muted hover:text-cream-bright"
             title="Open destination"
             aria-label={`Open destination for ${item.title}`}
             onClick={onOpen}
           >
             <ArrowUpRight size={14} />
-          </button>
+          </Button>
         ) : null}
         {!pending && !item.readAt ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-sm"
             className={actionClass}
             title="Mark read"
             aria-label={`Mark update read: ${item.title}`}
             onClick={onRead}
           >
             <Check size={15} aria-hidden="true" />
-          </button>
+          </Button>
         ) : null}
         {keys.length || (item.dismissible && pending) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className={actionClass} aria-label={`Options for ${source}`}>
+              <Button variant="ghost" size="icon-sm" className={actionClass} aria-label={`Options for ${source}`}>
                 <MoreHorizontal size={14} />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {keys.map((key) => (
@@ -95,10 +98,10 @@ export function ActivityRow({
           </DropdownMenu>
         ) : null}
       </div>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         onClick={onOpen}
-        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-charcoal-hover/50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+        className="flex h-auto w-full items-start gap-2 px-3 py-2 text-left hover:bg-charcoal-hover/50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
       >
         <span className="min-w-0 flex-1">
           <span className="mb-1 flex flex-wrap items-baseline gap-x-2 text-[11px] text-cream-muted">
@@ -118,19 +121,19 @@ export function ActivityRow({
             {item.title}
           </span>
         </span>
-      </button>
+      </Button>
       {item.body ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           title={expanded ? "Collapse details" : "Expand details"}
-          className="block w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
+          className="block h-auto w-full px-3 pb-2 text-left text-xs leading-4 text-cream-muted hover:text-cream focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cream-bright"
         >
           <span className={`${expanded ? "" : "line-clamp-1"} [overflow-wrap:anywhere]`}>
             {item.body}
           </span>
-        </button>
+        </Button>
       ) : null}
     </li>
   );

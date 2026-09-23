@@ -200,11 +200,11 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
             </legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {feedbackKinds.map((kind) => (
-                <button
+                <Button
+                  variant="ghost"
                   key={kind.id}
-                  type="button"
                   className={cn(
-                    "rounded-md border px-3 py-2.5 text-left text-xs transition",
+                    "rounded-md border px-3 py-2.5 text-left text-xs transition h-auto font-normal justify-start",
                     draft.kind === kind.id
                       ? "border-charcoal-active bg-charcoal-hover text-cream-bright"
                       : "border-charcoal-border bg-charcoal-bg text-cream-muted hover:text-cream",
@@ -213,7 +213,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
                   onClick={() => updateDraft("kind", kind.id)}
                 >
                   {kind.label}
-                </button>
+                </Button>
               ))}
             </div>
           </fieldset>
@@ -297,7 +297,6 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-charcoal-border pt-5">
             <Button
-              type="button"
               variant="outline"
               className={supportDisabledControlClass}
               disabled={Boolean(working)}
@@ -307,7 +306,6 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
               {working === "bundle" ? "Preparing…" : "Download diagnostics"}
             </Button>
             <Button
-              type="button"
               className={supportDisabledControlClass}
               disabled={!draft.summary.trim() || !draft.details.trim() || Boolean(working)}
               onClick={() => void openFeedbackTicket()}
@@ -358,7 +356,6 @@ function RecoveryAction(props: {
       </span>
       <Button
         className="min-w-32 max-[680px]:col-span-2 max-[680px]:w-full"
-        type="button"
         variant={props.emphasized ? "default" : "outline"}
         onClick={props.onClick}
       >

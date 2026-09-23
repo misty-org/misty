@@ -36,6 +36,7 @@ dependencies = [
  "cfg-if",
  "cipher",
  "cpufeatures 0.2.17",
+ "zeroize",
 ]
 
 [[package]]
@@ -50,6 +51,7 @@ dependencies = [
  "ctr",
  "ghash",
  "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -150,6 +152,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a3a1fd6f75306b68087b831f025c712524bcb19aad54e557b1129cfa0a2b207"
 dependencies = [
  "rustversion",
+]
+
+[[package]]
+name = "argon2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
+dependencies = [
+ "base64ct",
+ "blake2",
+ "cpufeatures 0.2.17",
+ "password-hash",
+ "zeroize",
 ]
 
 [[package]]
@@ -508,6 +523,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a7139abd3d9cebf8cd6f920a389cf3dc9576172e32f4563f188cae3c3eb019"
 dependencies = [
  "crunchy",
+]
+
+[[package]]
+name = "blake2"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
+dependencies = [
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -1537,6 +1561,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
  "block-buffer 0.12.1",
+ "const-oid 0.10.2",
  "crypto-common 0.2.2",
 ]
 
@@ -3974,6 +3999,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "misty-browser-sync"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "aes-gcm",
+ "argon2",
+ "base64 0.22.1",
+ "ed25519-dalek 2.2.0",
+ "futures-util",
+ "hkdf",
+ "rand 0.8.6",
+ "reqwest",
+ "rusqlite",
+ "rustls",
+ "rustls-native-certs",
+ "security-framework",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+ "uuid",
+ "windows-sys 0.59.0",
+ "zeroize",
+]
+
+[[package]]
 name = "misty-credential-store"
 version = "0.1.0"
 dependencies = [
@@ -4011,6 +4065,7 @@ dependencies = [
  "iroh",
  "jsonwebtoken",
  "libc",
+ "misty-browser-sync",
  "misty-credential-store",
  "notify",
  "objc",
@@ -4984,6 +5039,17 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link 0.2.1",
+]
+
+[[package]]
+name = "password-hash"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "346f04948ba92c43e8469c1ee6736c7563d71012b17d40745260fe106aac2166"
+dependencies = [
+ "base64ct",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -6322,6 +6388,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha1_smol"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7640,6 +7717,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17a073bfed563fa236697a068031408a93cd9522e08abf9933ead3e73411bd71"
+dependencies = [
+ "futures-util",
+ "log",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-pki-types",
+ "tokio",
+ "tokio-rustls",
+ "tungstenite",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7948,6 +8041,24 @@ name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
+
+[[package]]
+name = "tungstenite"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e48ac77174b19c110a50ab2128b24215ac9cb40e0e12e093fb602d175c569d22"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.10.2",
+ "rustls",
+ "rustls-pki-types",
+ "sha1",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "type1-encoding-parser"

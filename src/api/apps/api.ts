@@ -214,7 +214,11 @@ export async function loadOfficialAppCatalog(
     "/apps",
     signal ? { signal } : undefined,
   );
-  serverCatalog.apps = serverCatalog.apps.map(officialAppPresentation);
+  // Keep temporarily withdrawn apps out of every catalog surface, including
+  // local development connected to a server that still advertises them.
+  serverCatalog.apps = serverCatalog.apps
+    .filter((app) => app.id !== "code" && app.id !== "terminal")
+    .map(officialAppPresentation);
   if (!localDevelopmentCatalog) return serverCatalog;
 
   try {

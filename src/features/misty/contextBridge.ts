@@ -1,5 +1,3 @@
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { currentMistySpace } from "./availability";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -8,7 +6,7 @@ import {
   type MistyContextSnapshot,
   type MistyContextTarget,
 } from "./context";
-import { useAppsStore } from "@/features/apps/useAppsStore";
+import { useUserStore } from "@/features/auth/core";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiInvocationEvent } from "@/features/ai-surface/types";
 import { consumeInvocationEvent } from "@/features/ai-surface/storeRuntime";
@@ -26,7 +24,7 @@ type Request = {
   decision?: "accept" | "reject" | "refine";
 };
 async function handleContextRequest(request: Omit<Request, "id">): Promise<unknown> {
-  if (request.accountId !== useAppsStore.getState().accountId)
+  if (request.accountId !== useUserStore.getState().me?.id)
     throw new Error("The Misty account changed.");
   if (!request.event && !request.decision && !request.undoId)
     return request.options
@@ -89,79 +87,12 @@ export async function installMistyContextBridge() {
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const current = getCurrentWindow();
   if (current.label !== "main") return () => {};
-  const broadcastSpace = () =>
-    current.emitTo("misty-bot-pet", "misty://active-space", {
-      accountId: useAppsStore.getState().accountId,
-      spaceId: currentMistySpace(),
-    });
-  const removeSpace = useWorkspaceStore.subscribe((state, previous) => {
-    if (state.activeScopeKey !== previous.activeScopeKey) void broadcastSpace().catch(() => undefined);
+  return current.onFocusChanged(({ payload }) => {
+    if (payload) void invoke("misty_workspace_focused").catch(() => undefined);
   });
-  let removeFocus = () => {};
-  try {
-  removeFocus = await current.onFocusChanged(({ payload }) => {
-    if (payload) {
-      void invoke("misty_workspace_focused").catch(() => undefined);
-      void broadcastSpace().catch(() => undefined);
-    }
-  });
-  const removeRequest = await current.listen<Request>(
-    "misty://context-request",
-    async ({ payload: request }) => {
-      let value: unknown, error: string | undefined;
-      try {
-        value = await handleContextRequest(request);
-      } catch (reason) {
-        error = reason instanceof Error ? reason.message : "Context unavailable";
-      }
-      await current.emitTo("misty-bot-pet", "misty://context-result", {
-        id: request.id,
-        value,
-        error,
-      }).catch(() => undefined);
-    },
-  );
-  return () => {
-    removeSpace();
-    removeFocus();
-    removeRequest();
-  };
-  } catch (error) {
-    removeSpace();
-    removeFocus();
-    throw error;
-  }
 }
 export async function requestHostContext<T = MistyContextSnapshot>(
   input: Omit<Request, "id">,
 ): Promise<T> {
-  if (!hasTauriInternals()) return (await handleContextRequest(input)) as T;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
-  const current = getCurrentWindow();
-  if (current.label === "main") return (await handleContextRequest(input)) as T;
-  const id = crypto.randomUUID();
-  return new Promise<T>((resolve, reject) => {
-    let cleanup: (() => void) | undefined;
-    const timer = window.setTimeout(() => {
-      cleanup?.();
-      reject(new Error("The workspace did not respond. Open the main Misty window and retry."));
-    }, 5000);
-    void current
-      .listen<{ id: string; value: T; error?: string }>("misty://context-result", ({ payload }) => {
-        if (payload.id !== id) return;
-        clearTimeout(timer);
-        cleanup?.();
-        if (payload.error) reject(new Error(payload.error));
-        else resolve(payload.value);
-      })
-      .then((remove) => {
-        cleanup = remove;
-        return current.emitTo("main", "misty://context-request", { ...input, id });
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        cleanup?.();
-        reject(error);
-      });
-  });
+  return (await handleContextRequest(input)) as T;
 }

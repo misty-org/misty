@@ -1,3 +1,4 @@
+import { Button } from "@/shared/ui/button";
 import { useMemo, useRef, useState } from "react";
 import { OfficialAppDetails } from "./OfficialAppDetails";
 import { discoverAppAction, discoverAppName } from "./appDetailsModel";
@@ -32,9 +33,9 @@ export function MobileStorePage() {
             const action = discoverAppAction(app, byId.get(app.id), true);
             return (
               <li key={app.id} className="flex min-h-[76px] items-center gap-3 py-3">
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                <Button
+                  variant="ghost"
+                  className="h-auto flex min-w-0 flex-1 items-center gap-3 text-left p-0 hover:bg-transparent"
                   aria-label={`View ${discoverAppName(app)} details`}
                   onClick={(event) => {
                     returnFocus.current = event.currentTarget;
@@ -48,9 +49,9 @@ export function MobileStorePage() {
                     </span>
                     <span className="mt-1 block text-xs text-cream-muted">{app.description}</span>
                   </span>
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
                   className="discover-action"
                   disabled={!!actionAppId || action === "Unavailable"}
                   aria-label={`${action} ${discoverAppName(app)}`}
@@ -60,7 +61,7 @@ export function MobileStorePage() {
                   }}
                 >
                   {action}
-                </button>
+                </Button>
               </li>
             );
           })}

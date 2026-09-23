@@ -1,19 +1,11 @@
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
-import { resolveMentionedAgentSpaceId } from "@/features/agents/agentSpaceSelection";
-import { useAgentsSpaces as useSpacesStore } from "@/features/agents/agentsRuntime";
-
 import type { GlobalSearchState } from "./globalSearchState";
 
-export async function conversationForGlobalPrompt(get: () => GlobalSearchState, prompt: string) {
+/** New work is personal. Only an explicitly reopened conversation retains its
+ * historical server scope; prompt wording never changes that scope. */
+export async function conversationForGlobalPrompt(get: () => GlobalSearchState, _prompt: string) {
   const state = get();
-  const spaces = useSpacesStore.getState().spaces;
   const current = state.conversations.find((item) => item.id === state.activeConversationId);
-  const promptSpaceId = state.selectedAgentId ? "" : resolveMentionedAgentSpaceId(spaces, prompt);
-  const contextSpaces = [...new Set(state.context.map((item) => item.spaceId).filter(Boolean))];
-  if (contextSpaces.length > 1) throw new Error("Choose one Space for this request.");
-  const contextualSpaceId = contextSpaces[0] ?? "";
-  const targetSpaceId = promptSpaceId || contextualSpaceId || current?.spaceId || "";
-
   const defaultAgent = usePersonalAgentsStore
     .getState()
     .agents.find((agent) => agent.system_managed)?.id;
@@ -22,15 +14,10 @@ export async function conversationForGlobalPrompt(get: () => GlobalSearchState, 
     (current?.agentId
       ? current.agentId !== state.selectedAgentId
       : state.selectedAgentId !== defaultAgent);
-  if (
-    !current ||
-    differentAgent ||
-    (current.spaceId && targetSpaceId && current.spaceId !== targetSpaceId)
-  ) {
-    return state.newConversation(targetSpaceId || undefined);
-  }
-  if (!current.spaceId && targetSpaceId) {
-    await state.bindConversationSpace(current.id, targetSpaceId);
-  }
+  if (!current || differentAgent) return state.newConversation();
+  if (state.context.some((ref) => ref.spaceId && ref.spaceId !== current.spaceId))
+    throw new Error(
+      "Historical context belongs to another conversation. Reopen that conversation or remove the attachment.",
+    );
   return current.id;
 }

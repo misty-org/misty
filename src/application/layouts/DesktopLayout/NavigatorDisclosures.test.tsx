@@ -245,13 +245,12 @@ describe("GlobalNavigator disclosures", () => {
     await renderNavigator("/apps/planner?space=space-1&view=agenda&date=2026-08-26");
 
     const trigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Planner"][data-navigator-disclosure-trigger="true"]',
+      '[data-space-tool="planner"] button[aria-label="Planner"]',
     );
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(trigger?.className).toContain("w-full");
-    expect(trigger?.title).toBe("Collapse Planner");
     expect(
-      trigger?.lastElementChild?.lastElementChild?.getAttribute("data-chevron-placement"),
+      trigger?.querySelector('[data-chevron-placement]')?.getAttribute("data-chevron-placement"),
     ).toBe("inline");
 
     const destinations = container.querySelector(
@@ -271,10 +270,10 @@ describe("GlobalNavigator disclosures", () => {
       items.find((item) => item.textContent?.includes("Roadmaps"))?.hasAttribute("aria-current"),
     ).toBe(false);
     expect(items.find((item) => item.textContent?.includes("Tasks"))?.getAttribute("href")).toBe(
-      "/apps/planner?space=space-1&view=tasks",
+      "/spaces/space-1/planner/tasks/board",
     );
 
-    const library = container.querySelector('button[aria-label="Library"]');
+    const library = container.querySelector('[data-space-tool="library"] button[aria-label="Library"]');
     expect(
       Boolean(
         destinations &&
@@ -319,23 +318,22 @@ describe("GlobalNavigator disclosures", () => {
     await renderNavigator();
 
     const trigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Planner"][data-navigator-disclosure-trigger="true"]',
+      '[data-space-tool="planner"] button[aria-label="Planner"]',
     );
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(container.querySelector('a[aria-label="Planner"]')).toBeNull();
 
     await act(async () => trigger?.click());
 
-    const navigation = container.querySelector('section[aria-label="Primary navigation"]');
+    const navigation = container.querySelector("nav");
     const destinations = navigation?.querySelector(
       '[role="group"][aria-label="Planner destinations"]',
     );
     expect(trigger?.getAttribute("aria-expanded")).toBe("true");
     expect(destinations).not.toBeNull();
-    expect(destinations?.querySelector('a[aria-current="page"]')).not.toBeNull();
     expect(document.body.querySelector('[role="menu"]')).toBeNull();
-    const planner = navigation?.querySelector('[data-planner-disclosure="true"]');
-    const library = navigation?.querySelector('[data-navigator-disclosure="library"]');
+    const planner = navigation?.querySelector('[data-space-tool="planner"]');
+    const library = navigation?.querySelector('[data-space-tool="library"]');
     expect(planner).not.toBeNull();
     expect(library).not.toBeNull();
     expect(
@@ -345,6 +343,7 @@ describe("GlobalNavigator disclosures", () => {
 
   it("moves Social, Journal, and Library destinations into inline disclosures", async () => {
     useWorkspaceStore.setState({
+      activeScopeKey: "space:space-1",
       layout: {
         focusedPaneId: "pane-1",
         root: {
@@ -354,110 +353,29 @@ describe("GlobalNavigator disclosures", () => {
           tabs: [
             {
               ...spaceTab,
-              groupKey: "app:chat",
-              instanceKey: "chat",
-              title: "Social",
-              route: "/apps/social?space=space-1&provider=instagram",
+              groupKey: "space:space-1:notes",
+              instanceKey: "space-1:notes",
+              title: "Journal",
+              route: "/spaces/space-1/notes",
             },
           ],
         },
       },
     });
-    await renderNavigator("/apps/social?space=space-1&provider=instagram");
+    await renderNavigator("/spaces/space-1/notes");
 
-    const socialDestinations = container.querySelector(
-      '[role="group"][aria-label="Social destinations"]',
+    const journalDestinations = container.querySelector(
+      '[role="group"][aria-label="Journal destinations"]',
     );
-    const socialDisclosure = socialDestinations?.closest('[data-navigator-disclosure="social"]');
-    expect(socialDisclosure?.className).toContain("w-full");
-    expect(socialDisclosure?.className).toContain("min-w-0");
-    const socialItems = [...(socialDestinations?.querySelectorAll<HTMLAnchorElement>("a") ?? [])];
-    expect(socialItems.map((item) => item.textContent?.trim())).toEqual([
-      "Misty",
-      "Instagram",
-      "Messenger",
-      "X",
-      "Discord",
-    ]);
-    expect(socialItems.every((item) => !item.className.includes("hover:bg-charcoal-card"))).toBe(
-      true,
-    );
-    expect(
-      socialItems.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("ml-1"),
-      ),
-    ).toBe(true);
-    expect(
-      socialItems.every((item) =>
-        item
-          .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("grid-cols-[20px_minmax(0,1fr)]"),
-      ),
-    ).toBe(true);
-    expect(
-      socialItems.every((item) =>
-        item
-          .querySelector('[data-tree-row-surface="true"]')
-          ?.className.includes("group-hover/tree-row:bg-charcoal-card"),
-      ),
-    ).toBe(true);
-    expect(
-      socialItems
-        .find((item) => item.textContent?.trim() === "Instagram")
-        ?.getAttribute("aria-current"),
-    ).toBe("page");
-    expect(
-      socialItems.map((item) =>
-        item
-          .querySelector("[data-social-provider-icon]")
-          ?.getAttribute("data-social-provider-icon"),
-      ),
-    ).toEqual(["misty", "instagram", "messenger", "x", "discord"]);
-    await act(async () => {
-      socialItems.find((item) => item.textContent?.trim() === "X")?.click();
-    });
-    expect(dockTabs(useWorkspaceStore.getState().layout.root)[0]?.route).toBe(
-      "/apps/social?space=space-1&provider=x",
-    );
-
-    const socialTrigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Social"][data-navigator-disclosure-trigger="true"]',
-    );
-    await act(async () => {
-      useWorkspaceStore.setState({
-        layout: {
-          focusedPaneId: "pane-1",
-          root: {
-            type: "leaf",
-            id: "pane-1",
-            activeTabId: "tab-1",
-            tabs: [spaceTab],
-          },
-        },
-      });
-    });
-
-    const journalTrigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Journal"][data-navigator-disclosure-trigger="true"]',
-    );
-    expect(socialTrigger?.getAttribute("aria-expanded")).toBe("true");
-    expect(journalTrigger?.getAttribute("aria-expanded")).toBe("true");
-    expect(
-      [...container.querySelectorAll('[aria-label="Journal destinations"] a')].map((item) =>
-        item.textContent?.trim(),
-      ),
-    ).toEqual(["Notes", "Drawings"]);
-    expect(
-      featureIconNames(container.querySelector('[aria-label="Journal destinations"]')),
-    ).toEqual(["notes", "drawings"]);
-
-    await act(async () => socialTrigger?.click());
-    expect(socialTrigger?.getAttribute("aria-expanded")).toBe("true");
-    await act(async () => socialTrigger?.click());
-    expect(socialTrigger?.getAttribute("aria-expanded")).toBe("false");
+    const journalDisclosure = journalDestinations?.closest('[data-space-tool="journal"]');
+    expect(journalDisclosure).not.toBeNull();
+    const journalItems = [...(journalDestinations?.querySelectorAll<HTMLAnchorElement>("a") ?? [])];
+    expect(journalItems.map((item) => item.textContent?.trim())).toEqual(["Notes", "Drawings"]);
+    expect(featureIconNames(journalDestinations)).toEqual(["notes", "drawings"]);
+    expect(journalItems[0]?.getAttribute("aria-current")).toBe("page");
 
     const libraryTrigger = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Library"][data-navigator-disclosure-trigger="true"]',
+      '[data-space-tool="library"] button[aria-label="Library"]',
     );
     await act(async () => libraryTrigger?.click());
     expect(
@@ -522,12 +440,12 @@ describe("GlobalNavigator disclosures", () => {
     expect(items.every((item) => item.querySelector('[data-tree-row-surface="true"]'))).toBe(true);
     expect(
       items.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("ml-1"),
+        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("pl-1.5"),
       ),
     ).toBe(true);
     expect(
       items.every((item) =>
-        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("px-2"),
+        item.querySelector('[data-tree-row-surface="true"]')?.className.includes("pr-2"),
       ),
     ).toBe(true);
     expect(

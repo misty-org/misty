@@ -6,6 +6,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Button,
 } from "@/shared/ui";
 import {
   ArrowDownToLine,
@@ -29,14 +30,15 @@ export function WorkspacePaneMenu(props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           className={dockActionClass}
           aria-label="Arrange panel"
           title="Arrange panel"
         >
-          <MoreHorizontal size={14} />
-        </button>
+          <MoreHorizontal className="size-3.5" size={14} />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[210px]">
         <DropdownMenuLabel>Dock active tab</DropdownMenuLabel>

@@ -1,14 +1,9 @@
 import { useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { useSpacesStore } from "@/features/spaces";
 import { requestEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { useEffect } from "react";
 
-/**
- * Misty is account-backed, so mobile resumes by refreshing authoritative
- * server state. App-owned drafts and caches belong to each installed app;
- * the core shell deliberately does not retain copies after uninstall.
- */
+/** Refresh account requests when returning to the foreground. */
 export function MobileLifecycleBridge() {
   const { user } = useAuth();
   const accountId = user?.id ?? "";
@@ -16,10 +11,7 @@ export function MobileLifecycleBridge() {
   useEffect(() => {
     const refresh = async () => {
       if (!accountId || !navigator.onLine) return;
-      await Promise.allSettled([
-        useSpacesStore.getState().load({ force: true, accountId }),
-        useActivityStore.getState().refresh(),
-      ]);
+      await useActivityStore.getState().refresh();
     };
     const online = () => void refresh();
     const visibility = () => {

@@ -63,12 +63,12 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             const Icon = item.icon;
             const active = item.id === props.activeId;
             return (
-              <button
+              <Button
+                variant="ghost"
                 key={item.id}
-                type="button"
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm",
+                  "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-normal justify-start",
                   active
                     ? "bg-charcoal-active text-cream-bright"
                     : "text-cream-muted hover:bg-charcoal-hover active:bg-charcoal-hover",
@@ -77,7 +77,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {item.label}
-              </button>
+              </Button>
             );
           })}
         </nav>

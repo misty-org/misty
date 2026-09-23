@@ -322,14 +322,9 @@ export function ThreadList(props: {
             )}
           />
           {searchQuery ? (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="absolute right-2 grid size-4 place-items-center text-cream-faint hover:text-cream"
-              aria-label="Clear search"
-            >
+            <Button variant="ghost" size="icon-sm" onClick={handleClearSearch} className="absolute right-2 grid size-4 place-items-center text-cream-faint hover:text-cream" aria-label="Clear search">
               <X className="size-3" />
-            </button>
+            </Button>
           ) : null}
         </form>
 
@@ -365,70 +360,38 @@ export function ThreadList(props: {
       </Toolbar>
 
       <div className="flex items-center gap-1.5 border-b border-charcoal-border/50 bg-charcoal-workspace/60 px-4 py-1.5">
-        <button
-          type="button"
-          data-filter-chip="all"
-          onClick={() => {
-            setActiveFilter("all");
-            setCurrentPage(0);
-          }}
-          className={cn(
-            "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+        <Button variant="pill" size="pill" data-filter-chip="all" onClick={() => { setActiveFilter("all"); setCurrentPage(0); }} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
             activeFilter === "all"
               ? "bg-charcoal-card text-cream-bright shadow-sm"
               : "text-cream-faint hover:bg-charcoal-card/50 hover:text-cream",
           )}
         >
           All
-        </button>
-        <button
-          type="button"
-          data-filter-chip="unread"
-          onClick={() => {
-            setActiveFilter("unread");
-            setCurrentPage(0);
-          }}
-          className={cn(
-            "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+        </Button>
+        <Button variant="pill" size="pill" data-filter-chip="unread" onClick={() => { setActiveFilter("unread"); setCurrentPage(0); }} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
             activeFilter === "unread"
               ? "bg-charcoal-card text-cream-bright shadow-sm"
               : "text-cream-faint hover:bg-charcoal-card/50 hover:text-cream",
           )}
         >
           Unread
-        </button>
-        <button
-          type="button"
-          data-filter-chip="starred"
-          onClick={() => {
-            setActiveFilter("starred");
-            setCurrentPage(0);
-          }}
-          className={cn(
-            "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+        </Button>
+        <Button variant="pill" size="pill" data-filter-chip="starred" onClick={() => { setActiveFilter("starred"); setCurrentPage(0); }} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
             activeFilter === "starred"
               ? "bg-charcoal-card text-cream-bright shadow-sm"
               : "text-cream-faint hover:bg-charcoal-card/50 hover:text-cream",
           )}
         >
           Starred
-        </button>
-        <button
-          type="button"
-          data-filter-chip="attachments"
-          onClick={() => {
-            setActiveFilter("attachments");
-            setCurrentPage(0);
-          }}
-          className={cn(
-            "rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+        </Button>
+        <Button variant="pill" size="pill" data-filter-chip="attachments" onClick={() => { setActiveFilter("attachments"); setCurrentPage(0); }} className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors",
             activeFilter === "attachments"
               ? "bg-charcoal-card text-cream-bright shadow-sm"
               : "text-cream-faint hover:bg-charcoal-card/50 hover:text-cream",
           )}
         >
           Attachments
-        </button>
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

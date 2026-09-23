@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   resumeAccount: vi.fn(),
   removeAccount: vi.fn(),
   accountSignIn: vi.fn(),
-  clearAccountCreating: vi.fn(),
 }));
 
 let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
@@ -40,9 +39,6 @@ vi.mock("./store/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
 }));
 
-vi.mock("@/features/onboarding", () => ({
-  clearAccountCreating: mocks.clearAccountCreating,
-}));
 
 import SignIn from "./SignInPage";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
@@ -272,7 +268,6 @@ describe("SignInPage", () => {
 
     expect(mocks.authenticateAccount).toHaveBeenCalled();
     expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123");
-    expect(mocks.clearAccountCreating).toHaveBeenCalledWith("acc-2");
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });
 });

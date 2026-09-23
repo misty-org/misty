@@ -81,9 +81,8 @@ export async function executeGlobalVisualSearch(
   if (!accountId || !attachmentId) return;
   set({ searching: true, error: null, requestId, results: [] });
   try {
-    const { assertMistyAvailable, currentMistySpace } =
-      await import("@/features/misty/availability");
-    const spaceId = currentMistySpace();
+    const { assertMistyAvailable } = await import("@/features/misty/availability");
+    const spaceId = "";
     await assertMistyAvailable(accountId, spaceId);
     const response = await globalMistyApi.visualSearch(attachmentId, query, 40, spaceId);
     if (get().accountId !== accountId || get().requestId !== requestId) return;

@@ -1,7 +1,6 @@
 import { createFilesAiAdapter } from "../../createFilesAiAdapter";
 import {
   routes,
-  useAppRouteMemoryStore,
   useAppStore,
 } from "@/features/app-shell";
 import {
@@ -510,7 +509,7 @@ export const ExplorerWorkspace = memo(function ExplorerWorkspace(
       props.workspaceId ? null : (
         <ExplorerTray
           onToggleFileManagerMode={() =>
-            navigate(useAppRouteMemoryStore.getState().lastSpacesRoute)
+            navigate(routes.browser)
           }
           terminalEnabled={
             activeTabSupportsSidePanels &&

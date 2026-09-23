@@ -17,6 +17,7 @@ vi.mock("./globalMistyApi", async (importOriginal) => {
   };
 });
 
+import * as localExecution from "@/features/agents/localExecution";
 import { GlobalMisty } from "./GlobalMisty";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
@@ -32,6 +33,7 @@ describe("GlobalMisty", () => {
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     window.localStorage.clear();
+    localExecution.useLocalExecution.setState({ execution: null });
     useAiSurfaceStore.setState({ registrations: {} });
     useGlobalSearchStore.getState().setAccount("");
     container = document.createElement("div");
@@ -42,6 +44,8 @@ describe("GlobalMisty", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    localExecution.useLocalExecution.setState({ execution: null });
+    vi.restoreAllMocks();
   });
 
   it.each(["context", "selection"])(
@@ -84,8 +88,6 @@ describe("GlobalMisty", () => {
   );
 
   it("keeps one stable input while search results expand beneath it", async () => {
-    const requestDrag = vi.fn();
-    const switchToPet = vi.fn();
     const contentVisibilityChanged = vi.fn();
     await act(async () => {
       root.render(
@@ -95,8 +97,6 @@ describe("GlobalMisty", () => {
             currentPath="/home"
             activePaneId=""
             activePanePath=""
-            onRequestDrag={requestDrag}
-            onSwitchToPet={switchToPet}
             onContentVisibilityChange={contentVisibilityChanged}
           />
         </MemoryRouter>,
@@ -116,23 +116,7 @@ describe("GlobalMisty", () => {
     expect(container.querySelector('[aria-label="Search filters"]')).toBeNull();
     expect(contentVisibilityChanged).toHaveBeenLastCalledWith(false);
 
-    const dragHandle = container.querySelector<HTMLElement>("[data-misty-panel-drag-handle]");
-    expect(dragHandle?.className).toContain("opacity-100");
-    expect(dragHandle?.className).toContain("pointer-events-auto");
-    expect(dragHandle?.className).toContain("touch-none");
-    expect(dragHandle?.className).not.toContain("opacity-0");
-    await act(async () => {
-      dragHandle?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
-    });
-    expect(requestDrag).toHaveBeenCalledTimes(1);
-    const petSwitch = container.querySelector<HTMLButtonElement>('[aria-label="Collapse Misty"]');
-    expect(petSwitch).not.toBeNull();
-    await act(async () => petSwitch?.click());
-    expect(switchToPet).toHaveBeenCalledTimes(1);
-    await act(async () => {
-      input?.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 0 }));
-    });
-    expect(requestDrag).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("[data-misty-panel-drag-handle]")).toBeNull();
 
     await act(async () => {
       const valueSetter = Object.getOwnPropertyDescriptor(
@@ -212,40 +196,13 @@ describe("GlobalMisty", () => {
     expect(container.querySelector('[data-misty-composer="follow-up"]')).not.toBeNull();
     expect(container.textContent).toContain("Arcadia will be warm this afternoon.");
 
-    const panel = container.querySelector<HTMLElement>("[data-html2canvas-ignore]");
-    vi.spyOn(panel!, "getBoundingClientRect").mockReturnValue({
-      x: 100,
-      y: 50,
-      top: 50,
-      right: 900,
-      bottom: 700,
-      left: 100,
-      width: 800,
-      height: 650,
-      toJSON: () => ({}),
-    });
-    const dragHandle = container.querySelector<HTMLButtonElement>(
-      '[data-misty-voice-island] [aria-label="Move Misty window"]',
-    );
-    expect(dragHandle).not.toBeNull();
-    await act(async () => {
-      dragHandle?.dispatchEvent(
-        new MouseEvent("pointerdown", {
-          bubbles: true,
-          button: 0,
-          clientX: 500,
-          clientY: 100,
-        }),
-      );
-      window.dispatchEvent(
-        new MouseEvent("pointermove", {
-          bubbles: true,
-          clientX: 548,
-          clientY: 132,
-        }),
-      );
-    });
-    expect(panel?.style.translate).toBe("48px 32px");
+    expect(container.querySelector("[data-misty-top-controls]")).not.toBeNull();
+    expect(container.querySelector('[aria-label="Move Misty window"]')).toBeNull();
+    expect(
+      container
+        .querySelector("[data-misty-top-controls]")
+        ?.contains(container.querySelector("[data-global-misty-launcher-input]")),
+    ).toBe(true);
 
     const input = container.querySelector<HTMLTextAreaElement>(
       "[data-global-misty-launcher-input]",
@@ -270,5 +227,139 @@ describe("GlobalMisty", () => {
     });
 
     expect(useMistyStore.getState().panel).toBe("answer");
+  });
+  it("keeps both control bars available when task chat closes and accepts messages while working", async () => {
+    const followup = vi
+      .spyOn(localExecution, "routeLocalFollowup")
+      .mockResolvedValue("Message received.");
+    await act(async () => {
+      useMistyStore.setState({
+        accountId: "account-1",
+        panel: "closed",
+        working: true,
+        query: "",
+        conversations: [],
+      });
+      localExecution.useLocalExecution.setState({
+        execution: {
+          accountId: "account-1",
+          spaceId: "space-1",
+          agentId: "agent-1",
+          taskId: "task-1",
+          mode: "agent",
+          state: "running",
+          autopilot: true,
+          ready: false,
+          views: [],
+          context: [],
+          deviceContexts: [],
+        },
+      });
+      root.render(
+        <MemoryRouter>
+          <GlobalMisty
+            accountId="account-1"
+            currentPath="/home"
+            activePaneId=""
+            activePanePath=""
+          />
+        </MemoryRouter>,
+      );
+    });
+    expect(container.querySelector("[data-misty-top-controls]")).not.toBeNull();
+    expect(container.querySelector('[aria-label="Agent control"]')).not.toBeNull();
+    await act(async () => useMistyStore.getState().setQuery("Please check the saved result"));
+    const send = container.querySelector<HTMLButtonElement>('[aria-label="Send to Misty"]');
+    expect(send?.disabled).toBe(false);
+    await act(async () => send?.click());
+    expect(followup).toHaveBeenCalledWith("Please check the saved result");
+    expect(container.textContent).toContain("Message received.");
+    expect(container.querySelector('[aria-label="Agent control"]')).not.toBeNull();
+  });
+  it("closes Search when the agent overlay opens with a dedicated voice control", async () => {
+    await act(async () => {
+      useMistyStore.setState({
+        panel: "closed",
+        working: false,
+        executionMode: "agent",
+        selectedAgentId: "",
+        executionModeByAgent: {},
+      });
+      root.render(
+        <MemoryRouter>
+          <GlobalMisty
+            accountId="account-1"
+            currentPath="/home"
+            activePaneId=""
+            activePanePath=""
+          />
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => useGlobalSearchStore.getState().openPanel());
+    expect(useGlobalSearchStore.getState().panel).toBe("results");
+    await act(async () => useMistyStore.getState().openPanel());
+    expect(useGlobalSearchStore.getState().panel).toBe("closed");
+    expect(container.querySelector('[aria-label="Talk to Misty"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-misty-top-controls] header button[title="Switch agent"]'),
+    ).not.toBeNull();
+    await act(async () => useGlobalSearchStore.getState().activateLauncher());
+    expect(useGlobalSearchStore.getState().panel).toBe("closed");
+  });
+  it("keeps pending approval details in the upper surface even when the conversation is closed", async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <GlobalMisty
+            accountId="account-1"
+            currentPath="/home"
+            activePaneId=""
+            activePanePath=""
+          />
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      useMistyStore.setState({
+        panel: "closed",
+        working: false,
+        activeConversationId: "approval-conversation",
+        conversations: [
+          {
+            id: "approval-conversation",
+            title: "Review change",
+            createdAt: "2026-09-22",
+            updatedAt: "2026-09-22",
+            remote: false,
+            messages: [
+              {
+                id: "approval-message",
+                role: "assistant",
+                mode: "ask",
+                content: "",
+                createdAt: "2026-09-22",
+                action: {
+                  id: "proposal-1",
+                  prompt: "Create a note",
+                  risk: "write",
+                  title: "Create the note",
+                  summary: "Save a note in this Space.",
+                  state: "awaiting_approval",
+                  approvalId: "approval-1",
+                  requiresConfirmation: true,
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+    const review = container.querySelector('[aria-label="Pending agent approval"]');
+    expect(review?.textContent).toContain("Create the note");
+    expect(container.querySelector("[data-misty-top-controls]")?.contains(review)).toBe(true);
+    expect(container.querySelector('[aria-label="Agent control"]')?.contains(review)).not.toBe(
+      true,
+    );
   });
 });

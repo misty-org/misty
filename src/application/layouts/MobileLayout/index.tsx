@@ -3,16 +3,10 @@ import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
 import { ActivityBridge, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
-import { GlobalMisty, useGlobalSearchStore } from "@/features/global-search";
+import { GlobalMisty } from "@/features/global-search";
 import { SettingsWorkspace, useSettingsStore } from "@/features/settings";
-import {
-  canonicalSpaceRoute,
-  preferredDefaultSpace,
-  rememberedPlannerRoute,
-  socialProviderPath,
-  useSpacesStore,
-} from "@/features/spaces";
-import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
+import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import {
   dockLeaves,
   flattenWorkspaceTabs,
@@ -53,8 +47,6 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const spaces = useSpacesStore((state) => state.spaces);
-  const spacesReady = useSpacesStore((state) => state.snapshotReady);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const virtualWindowsByScope = useWorkspaceStore((state) => state.virtualWindowsByScope);
   const layout = useWorkspaceStore((state) => state.layout);
@@ -86,9 +78,7 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
   const [surfaceChrome, setSurfaceChrome] = useState<MobileSurfaceChromeConfig | null>(null);
   const { presentation, stageRef } = useMobileStagePresentation();
   const loadStarted = useRef(false);
-  const lastWorkspaceRoute = useRef("/spaces");
-  const activeSpace =
-    spaces.find((space) => `space:${space.id}` === activeScopeKey) ?? preferredDefaultSpace(spaces);
+  const lastWorkspaceRoute = useRef("/browser");
   const activeTab = useMemo(() => {
     const panes = dockLeaves(layout.root);
     const pane = panes.find((candidate) => candidate.id === layout.focusedPaneId) ?? panes[0];
@@ -105,29 +95,13 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
   }, [loadApp, loadSettings]);
 
   useEffect(() => {
-    if (location.pathname === "/") {
-      navigate("/home", { replace: true });
+    if (
+      ["/", "/home", "/new", "/discover"].includes(location.pathname) ||
+      location.pathname.startsWith("/spaces") ||
+      location.pathname.startsWith("/invite/")
+    ) {
+      navigate("/browser", { replace: true });
       return;
-    }
-    if (location.pathname === "/home") {
-      const space = activeSpace ?? preferredDefaultSpace(spaces);
-      if (space) navigate(`/spaces/${encodeURIComponent(space.id)}/home`, { replace: true });
-      else if (spacesReady) navigate("/spaces", { replace: true });
-      return;
-    }
-    if (location.pathname === "/spaces") {
-      const space = activeSpace ?? preferredDefaultSpace(spaces);
-      if (space && spacesReady)
-        navigate(`/spaces/${encodeURIComponent(space.id)}/home`, { replace: true });
-      return;
-    }
-    if (location.pathname.startsWith("/spaces/")) {
-      const route = `${location.pathname}${location.search}${location.hash}`;
-      const canonical = canonicalSpaceRoute(route);
-      if (canonical !== route) {
-        navigate(canonical, { replace: true });
-        return;
-      }
     }
     if (location.pathname.startsWith("/settings")) {
       setSettingsOpen(true);
@@ -139,15 +113,7 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
       const request = workspaceSurfaceFromRoute(lastWorkspaceRoute.current);
       if (request) useWorkspaceStore.getState().openSurface(request);
     }
-  }, [
-    location.hash,
-    location.pathname,
-    location.search,
-    navigate,
-    activeSpace,
-    spaces,
-    spacesReady,
-  ]);
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     requestEmbeddedBrowserSuspension(tabsOpen || settingsOpen, "mobile-shell-overlay");
@@ -244,20 +210,11 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
       navigate(tab.route);
       return;
     }
-    const path = activeSpace ? `/spaces/${encodeURIComponent(activeSpace.id)}/home` : "/home";
+    const path = "/browser";
     const request = workspaceSurfaceFromRoute(path);
     if (request) useWorkspaceStore.getState().openSurface(request);
     navigate(path);
-  }, [activeSpace, navigate]);
-
-  const selectSpace = useCallback(
-    (spaceId: string) => {
-      const path = `/spaces/${encodeURIComponent(spaceId)}/home`;
-      useWorkspaceStore.getState().setScope(`space:${spaceId}`);
-      openPath(path);
-    },
-    [openPath],
-  );
+  }, [navigate]);
 
   const openAccount = useCallback(() => {
     if (user) {
@@ -269,41 +226,14 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
     });
   }, [navigate, user]);
 
-  const openSearch = useCallback(() => {
-    useGlobalSearchStore.getState().togglePanel();
-    window.setTimeout(
-      () => document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
-      0,
-    );
-  }, []);
-
-  const spaceId = activeSpace?.id ?? "";
+  const openSearch = useCallback(() => useBrowserSearchStore.getState().show(), []);
   const core = [
-    {
-      id: "home",
-      label: "Home",
-      path: spaceId ? `/spaces/${encodeURIComponent(spaceId)}/home` : "/spaces",
-      icon: mobileNavigationIcons.home,
-    },
-    {
-      id: "chat",
-      label: "Chat",
-      path: spaceId ? socialProviderPath(spaceId, "misty") : "/spaces",
-      icon: mobileNavigationIcons.chat,
-    },
-    {
-      id: "planner",
-      label: "Planner",
-      path: spaceId ? rememberedPlannerRoute(user?.id ?? "", spaceId) : "/spaces",
-      icon: mobileNavigationIcons.planner,
-    },
+    { id: "home", label: "Home", path: "/browser", icon: mobileNavigationIcons.home },
+    { id: "files", label: "Files", path: "/files", icon: mobileNavigationIcons.files },
+    { id: "agents", label: "Agents", path: "/agents", icon: mobileNavigationIcons.agents },
   ];
   const more = [
-    { id: "inbox", label: "Inbox", path: "/inbox", icon: mobileNavigationIcons.inbox },
-    { id: "agents", label: "Agents", path: "/agents", icon: mobileNavigationIcons.agents },
-    { id: "browser", label: "Browser", path: "/browser", icon: mobileNavigationIcons.browser },
-    { id: "files", label: "Files", path: "/files", icon: mobileNavigationIcons.files },
-    { id: "activity", label: "Activity", path: "/activity", icon: mobileNavigationIcons.inbox },
+    { id: "activity", label: "Activity", path: "/activity", icon: mobileNavigationIcons.activity },
     { id: "settings", label: "Settings", path: "/settings", icon: mobileNavigationIcons.settings },
   ];
   const standalone = standaloneMobileRoute(location.pathname);
@@ -322,19 +252,6 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
       >
         {!authenticationRoute ? (
           <>
-            <div className="col-start-1 row-start-2 hidden min-h-0 min-[1024px]:flex">
-              <MobileNavigation
-                activePath={location.pathname}
-                activeSpaceId={spaceId}
-                spaces={spaces}
-                core={core}
-                more={more}
-                account={user ? { name: user.name || user.email, email: user.email } : null}
-                onAccount={openAccount}
-                onNavigate={openPath}
-                onSelectSpace={selectSpace}
-              />
-            </div>
             <div className="col-start-1 row-start-1 min-[1024px]:col-span-2">
               <MobileTopBar
                 title={
@@ -363,17 +280,15 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
           {standalone ? <Outlet /> : <MobileWorkspace />}
         </section>
         {!authenticationRoute ? (
-          <div className="col-start-1 row-start-3 min-[1024px]:hidden">
+          <div className="col-start-1 row-start-3 min-h-0 min-[1024px]:row-start-2">
             <MobileNavigation
               activePath={location.pathname}
-              activeSpaceId={spaceId}
-              spaces={spaces}
+
               core={core}
               more={more}
               account={user ? { name: user.name || user.email, email: user.email } : null}
               onAccount={openAccount}
               onNavigate={openPath}
-              onSelectSpace={selectSpace}
             />
           </div>
         ) : null}
@@ -420,7 +335,7 @@ export function MobileLayout(props: { getRouteId: (pathname: string) => AppTab }
         </Suspense>
         <MobileLifecycleBridge />
         <MobileNotificationBridge />
-        <SpacesRealtimeBridge />
+        <BrowserSearchDialog />
         <ActivityBridge />
       </main>
     </MobileSurfaceProvider>
@@ -432,8 +347,7 @@ function standaloneMobileRoute(pathname: string): boolean {
     pathname === "/activity" ||
     pathname === "/profile" ||
     pathname === "/signin" ||
-    pathname === "/register" ||
-    pathname.startsWith("/invite/")
+    pathname === "/register"
   );
 }
 
@@ -442,6 +356,5 @@ function standaloneTitle(pathname: string): string {
   if (pathname === "/profile") return "Profile";
   if (pathname === "/signin") return "Sign in";
   if (pathname === "/register") return "Create account";
-  if (pathname.startsWith("/invite/")) return "Join Space";
   return "Misty";
 }

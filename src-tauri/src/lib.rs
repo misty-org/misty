@@ -157,6 +157,9 @@ pub fn run() {
     // plugin or application service can initialize a second Misty runtime.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if !mac_rounded_corners::main_window_ready() {
+            return;
+        }
         if let Some(window) = app
             .get_webview_window("main")
             .or_else(|| app.webview_windows().into_values().next())
@@ -281,6 +284,21 @@ pub fn run() {
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
+                    crate::infra::browser_sync::browser_sync_availability,
+                    crate::infra::browser_sync::handoff::browser_sync_restore_credentials,
+                    crate::infra::browser_sync::handoff::browser_sync_capture_credentials,
+                    crate::infra::workspace_recovery::browser_recovery_open,
+                    crate::infra::workspace_recovery::browser_recovery_read,
+                    crate::infra::workspace_recovery::browser_recovery_write,
+                    crate::infra::workspace_recovery::browser_recovery_forget,
+                    crate::infra::browser_sync::browser_sync_generate_secret,
+                    crate::infra::browser_sync::browser_sync_setup,
+                    crate::infra::browser_sync::browser_sync_connect,
+                    crate::infra::browser_sync::browser_sync_state,
+                    crate::infra::browser_sync::browser_sync_edit,
+                    crate::infra::browser_sync::browser_sync_resume,
+                    crate::infra::browser_sync::browser_sync_lock,
+                    crate::infra::browser_sync::browser_sync_forget_key,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
                     crate::infra::auth_cookies::auth_cookie_forget,
@@ -290,6 +308,7 @@ pub fn run() {
                     crate::infra::misty_context::misty_workspace_focused,
                     crate::infra::misty_context::misty_screen_status,
                     crate::infra::misty_context::misty_screen_capture,
+                    crate::infra::workspace_autopilot::agent_workspace_context,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_open,
                     #[cfg(desktop)]
@@ -404,6 +423,7 @@ pub fn run() {
                     terminal_service_create,
                     #[cfg(target_os = "macos")]
                     mini_app_duplicate_file_grant,
+                    #[cfg(target_os = "macos")]
                     space_peer_start,
                     #[cfg(target_os = "macos")]
                     space_peer_local_identity,
@@ -419,6 +439,7 @@ pub fn run() {
                     space_peer_request,
                     #[cfg(target_os = "macos")]
                     space_peer_read,
+                    #[cfg(target_os = "macos")]
                     space_peer_prepare,
                     #[cfg(target_os = "macos")]
                     terminal_service_call,

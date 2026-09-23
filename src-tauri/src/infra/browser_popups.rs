@@ -10,8 +10,9 @@ pub(super) fn provider_popup(
     url: &Url,
     features: tauri::webview::NewWindowFeatures,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
+    let _lifecycle = super::super::browser_sync::popup_lifecycle_lease()?;
     let state = app.state::<BrowserSessionState>();
-    let (provider, profile, oauth_callback, origin_space_id) = {
+    let (provider, profile, logical_profile, oauth_callback, origin_space_id) = {
         let sessions = state.sessions.lock().ok()?;
         let source = sessions.get(source_id)?;
         let provider = source.profile_provider.clone();
@@ -24,6 +25,7 @@ pub(super) fn provider_popup(
         (
             provider,
             source.profile_id.clone(),
+            source.logical_profile_id.clone(),
             source.oauth_callback.clone(),
             source.origin_space_id.clone(),
         )
@@ -36,6 +38,7 @@ pub(super) fn provider_popup(
         features,
         provider,
         profile,
+        logical_profile,
         oauth_callback,
         origin_space_id,
     ).unwrap_or(NewWindowResponse::Deny))
@@ -49,6 +52,7 @@ fn create_popup(
     features: tauri::webview::NewWindowFeatures,
     provider: Option<String>,
     profile: Option<String>,
+    logical_profile: Option<String>,
     oauth_callback: Option<(
         super::super::browser_provider::OAuthCallback,
         std::time::Instant,
@@ -71,12 +75,25 @@ fn create_popup(
     let id = format!("tab-{key}");
     let label = webview_label(&id).ok()?;
     register_session(&state, &id, "").ok()?;
+    // Only the first popup from an outstanding, explicitly requested task
+    // download can return a receipt to that task. It receives no browser grants.
+    let agent_download_source = {
+        let mut sessions = state.sessions.lock().ok()?;
+        let source = sessions.get_mut(source_id)?;
+        let pending = source.pending_agent_download.as_mut();
+        pending.filter(|pending| pending.expires_at > Utc::now() && pending.popup_id.is_none())
+            .map(|pending| {
+                pending.popup_id = Some(id.clone());
+                source_id.to_owned()
+            })
+    };
     {
         let mut sessions = state.sessions.lock().ok()?;
         let session = sessions.get_mut(&id)?;
         session.profile_id = profile;
+        session.logical_profile_id = logical_profile;
         session.profile_provider = provider;
-        session.popup_parent = None;
+        session.popup_parent = agent_download_source.clone();
         session.provider_id = None;
         session.oauth_callback = oauth_callback;
         session.origin_space_id = origin_space_id;
@@ -90,6 +107,8 @@ fn create_popup(
     let title_id = id.clone();
     let download_app = app.clone();
     let download_id = id.clone();
+    let download_source = agent_download_source.clone();
+    let download_started = std::sync::atomic::AtomicBool::new(false);
     let popup_app = app.clone();
     let popup_id = id.clone();
     let builder = tauri::WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url.clone()))
@@ -158,6 +177,25 @@ fn create_popup(
             request_browser_compatibility(window.as_ref(), &title_app, &title_id);
         })
         .on_download(move |_window, event| {
+            if let Some(source_id) = download_source.as_deref() {
+                if matches!(&event, DownloadEvent::Requested { .. }) {
+                    let state = download_app.state::<BrowserSessionState>();
+                    let authority = state.sessions.lock().ok().and_then(|sessions| {
+                        let source = sessions.get(source_id)?;
+                        popup_download_authority(source, &download_id)
+                    });
+                    let Some((scope, agent, task)) = authority else { return false; };
+                    if super::super::agent_workspace::authorize_scope(&download_app, &scope, &agent, &task).is_err()
+                        || download_started.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                        return false;
+                    }
+                } else if !download_started.load(std::sync::atomic::Ordering::SeqCst) {
+                    return false;
+                }
+                // The source owns both the expected-download wait and verified
+                // file receipt. Never grant control of the auxiliary page.
+                return handle_download_event(&download_app, source_id, event);
+            }
             handle_download_event(&download_app, &download_id, event)
         })
         .on_new_window(move |url, features| {
@@ -191,23 +229,28 @@ fn create_popup(
             return None;
         }
     };
-    if focus_messages::install(app, window.as_ref(), &id).is_err() ||
+    if attachment_download::install(window.as_ref()).is_err() ||
+        focus_messages::install(app, window.as_ref(), &id).is_err() ||
         install_close_handler(app, window.as_ref(), &id).is_err() {
         let _ = window.destroy();
         return Some(NewWindowResponse::Deny);
     }
     state.pending_popups.lock().ok()?.insert(id.clone());
-    let _ = app.emit(
-        "misty://browser-popup",
-        BrowserPopupEvent {
-            source_id: source_id.to_owned(),
-            url: url.to_string(),
-            popup_instance_key: Some(key),
-        },
-    );
+    if agent_download_source.is_none() {
+        let _ = app.emit(
+            "misty://browser-popup",
+            BrowserPopupEvent {
+                source_id: source_id.to_owned(),
+                url: url.to_string(),
+                popup_instance_key: Some(key),
+            },
+        );
+    }
     let cleanup_app = app.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(30)).await;
+        // Export popups may spend time generating a file before it downloads.
+        // Keep the view alive through the source's bounded download wait.
+        tokio::time::sleep(Duration::from_secs(if agent_download_source.is_some() { 100 } else { 30 })).await;
         let state = cleanup_app.state::<BrowserSessionState>();
         let pending = state
             .pending_popups
