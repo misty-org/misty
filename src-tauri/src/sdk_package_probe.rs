@@ -91,6 +91,17 @@ fn sdk_probe_browser_count(
         .count())
 }
 
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn sdk_probe_sync_storage(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, ProbeState>,
+    nonce: String,
+) -> Result<String, String> {
+    if nonce != state.nonce { return Err("Invalid probe nonce".into()); }
+    crate::infra::browser_website_storage::probe(app).await
+}
+
 /// Native popup regression check. Loopback fixtures and disposable profile storage only.
 #[tauri::command]
 async fn sdk_probe_oauth_popups(
@@ -315,6 +326,7 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
     let app_id = std::env::var("MISTY_SDK_PROBE_APP").unwrap_or_else(|_| "terminal".into());
     let names_probe = std::env::var("MISTY_NAVIGATION_NAMES_PROBE").as_deref() == Ok("1");
     let page = match app_id.as_str() {
+        _ if std::env::var("MISTY_SDK_PROBE_SYNC_STORAGE").as_deref() == Ok("1") => "sdk-sync-storage-probe.html",
         _ if std::env::var("MISTY_SDK_PROBE_GMAIL_SIGNIN").as_deref() == Ok("1") => {
             "sdk-gmail-signin-probe.html"
         }
@@ -416,6 +428,8 @@ pub fn run(mut context: tauri::Context<tauri::Wry>) {
             mail_cache_write,
             mail_cache_remove,
             sdk_probe_complete,
+            #[cfg(target_os = "macos")]
+            sdk_probe_sync_storage,
             sdk_probe_log,
             crate::app::commands::app_snapshot,
             crate::app::commands::app_environment_snapshot,

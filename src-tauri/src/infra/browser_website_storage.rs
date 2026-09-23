@@ -20,8 +20,10 @@ async fn evaluate(
     if url.origin().ascii_serialization() != origin {
         return Err("Website navigated during sync".into());
     }
-    // This also checks the actual platform profile, not just renderer metadata.
-    super::browser_cookie_store::preflight(view, physical, vec![])
+    // Verify the real store without the about:blank-only cookie-import guard.
+    // WebView2 verifies its native profile inside evaluate_storage below.
+    #[cfg(target_os = "macos")]
+    super::browser_cookie_store::verify_storage_profile(view, physical)
         .await
         .map_err(|_| "Website profile could not be verified")?;
     let request = serde_json::to_string(&json!({"origin":origin, "write":write}))
@@ -343,4 +345,41 @@ async fn open_origin(view: &Webview, origin: &str) -> Result<(), String> {
         .map_err(|_| "Website storage preparation timed out")?
         .map_err(|_| "Website storage preparation was interrupted")?
         .map_err(str::to_owned)
+}
+
+/// Runs only in the debug SDK harness with freshly generated profile identities.
+/// Exercises the real WebKit storage adapter without user cookies or a server.
+#[cfg(all(debug_assertions, target_os = "macos"))]
+pub(crate) async fn probe(app: tauri::AppHandle) -> Result<String, String> {
+    let owner = app.get_webview("main").ok_or("Missing probe window")?;
+    let physical = uuid::Uuid::new_v4().simple().to_string().repeat(2);
+    let other = uuid::Uuid::new_v4().simple().to_string().repeat(2);
+    let origin = "https://sync-fixture.invalid";
+    let mut storage = WebsiteStorage::new(owner.clone(), physical.clone());
+    let view = storage.origin(origin, None).await?;
+    if super::browser_cookie_store::verify_storage_profile(view, &other).await.is_ok() {
+        return Err("Website storage accepted the wrong profile".into());
+    }
+    if super::browser_cookie_store::preflight(view, &physical, vec![]).await.is_ok() {
+        return Err("Cookie import accepted an origin document".into());
+    }
+    let written = evaluate(view, &physical, origin, Some(json!({
+        "local": {"sync-probe": "persisted"},
+        "session": {"sync-probe": "tab-only"},
+        "indexed": {"codec_version": 1, "databases": []}
+    }))).await?;
+    if written["local"]["sync-probe"] != "persisted" || written["session"]["sync-probe"] != "tab-only" {
+        return Err("Website storage round trip failed".into());
+    }
+    let observed = capture(&app, &physical, &[], Some((owner.clone(), vec![origin.into()]))).await?;
+    if !observed.iter().any(|observation| matches!(observation.area, Area::LocalStorage { .. }) && observation.payload["sync-probe"] == "persisted") {
+        return Err("Website capture did not read the stored origin data".into());
+    }
+    let mut isolated = WebsiteStorage::new(owner, other.clone());
+    let view = isolated.origin(origin, None).await?;
+    let empty = evaluate(view, &other, origin, None).await?;
+    if empty["local"].get("sync-probe").is_some() {
+        return Err("Website data leaked across profiles".into());
+    }
+    Ok("PASS: native website storage writes, reads and captures HTTP(S) origins; wrong profiles and cookie imports on nonblank pages remain rejected; separate profiles remain isolated.".into())
 }

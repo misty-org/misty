@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   },
   spaces: {
     loading: false,
+    snapshotReady: true,
     error: null as string | null,
     load: vi.fn(async () => undefined),
     loadInbox: vi.fn(async () => undefined),
