@@ -9,6 +9,7 @@ import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?in
 import { AnimatedEllipsis, Button, cn } from "@/shared/ui";
 import { CalendarClock, Flag, Inbox } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
+import { AgentMessageChecklist } from "../collaboration/AgentChecklist";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
 import { AnswerChanges } from "./changes/AnswerChanges";
@@ -240,6 +241,12 @@ function AgentMessageView(props: AgentMessageProps) {
         {props.steps?.map((step) => (
           <EarlierReply key={step.id} message={step} />
         ))}
+        <AgentMessageChecklist
+          conversationId={props.conversationId}
+          invocationId={message.invocationId}
+          running={message.state === "pending" || message.state === "streaming"}
+          hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
+        />
         {progress?.length ? <AgentProgress items={progress} /> : null}
         {message.subagents?.length ? <AgentSubagents subagents={message.subagents} /> : null}
         {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}

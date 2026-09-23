@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { collaborationApi } from "./api";
+import { upsertChecklist } from "./checklists";
 import type {
   AgentGoal,
   AgentPlan,
@@ -16,6 +17,7 @@ const empty = (): ConversationCollaboration => ({
   mode: "act",
   permissionMode: "",
   agentPermissionMode: "ask",
+  checklists: [],
   plan: null,
   planHistory: [],
   goal: null,
@@ -165,6 +167,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
             ...empty(),
             ...value,
             questionSets: value.questionSets ?? [],
+            checklists: value.checklists ?? [],
             planHistory: value.planHistory ?? [],
           };
           set((state) => ({
@@ -216,6 +219,10 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
             : { plan: event.plan, planHistory: withVersion(current.planHistory, event.plan) },
         );
       else if (event.type === "goal.updated") patch(conversationId, () => ({ goal: event.goal }));
+      else if (event.type === "checklist.updated")
+        patch(conversationId, (current) => ({
+          checklists: upsertChecklist(current.checklists, event.checklist),
+        }));
     },
     async answer(questionSet, answers) {
       const accountId = get().accountId;

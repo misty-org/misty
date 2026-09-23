@@ -58,9 +58,14 @@ func (s *SpacesService) ConversationCollaboration() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
+		checklists, err := s.database.ConversationChecklists(r.Context(), user, conversation)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
 		identity, _ := s.database.AgentConversationIdentity(r.Context(), user, conversation)
 		writeJSON(w, http.StatusOK, map[string]any{"mode": mode, "permissionMode": permission,
-			"agentPermissionMode": s.agentPermissionMode(r.Context(), user, identity.AgentID), "plan": plan, "planHistory": history, "goal": goal, "questionSets": questions, "runningInvocationId": running})
+			"agentPermissionMode": s.agentPermissionMode(r.Context(), user, identity.AgentID), "checklists": checklists, "plan": plan, "planHistory": history, "goal": goal, "questionSets": questions, "runningInvocationId": running})
 	}
 }
 

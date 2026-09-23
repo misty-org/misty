@@ -11,6 +11,7 @@ const conversation = (
   mode: "act",
   permissionMode: "",
   agentPermissionMode: "auto",
+  checklists: [],
   plan: null,
   planHistory: [],
   goal: null,

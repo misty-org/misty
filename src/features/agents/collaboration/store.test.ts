@@ -55,6 +55,7 @@ const loaded = (overrides: Partial<ConversationCollaboration> = {}): Conversatio
   mode: "act",
   permissionMode: "",
   agentPermissionMode: "ask",
+  checklists: [],
   plan: null,
   planHistory: [],
   goal: null,
