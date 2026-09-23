@@ -55,16 +55,29 @@ fn credential_files(engine: EngineId) -> &'static [&'static str] {
 /// Finds an executable on PATH and in the places installers commonly use,
 /// since a desktop app often starts with a shorter PATH than a terminal.
 pub fn locate(names: &[&str], home: Option<&Path>) -> Option<PathBuf> {
-    let mut dirs: Vec<PathBuf> = env::var_os("PATH").map(|path| env::split_paths(&path).collect()).unwrap_or_default();
+    let mut dirs: Vec<PathBuf> = env::var_os("PATH")
+        .map(|path| env::split_paths(&path).collect())
+        .unwrap_or_default();
     if let Some(home) = home {
-        for extra in [".local/bin", ".npm-global/bin", ".bun/bin", ".cargo/bin", ".claude/local", "bin"] {
+        for extra in [
+            ".local/bin",
+            ".npm-global/bin",
+            ".bun/bin",
+            ".cargo/bin",
+            ".claude/local",
+            "bin",
+        ] {
             dirs.push(home.join(extra));
         }
     }
     dirs.extend(["/opt/homebrew/bin", "/usr/local/bin"].map(PathBuf::from));
     for dir in dirs {
         for name in names {
-            for candidate in [dir.join(name), dir.join(format!("{name}.exe")), dir.join(format!("{name}.cmd"))] {
+            for candidate in [
+                dir.join(name),
+                dir.join(format!("{name}.exe")),
+                dir.join(format!("{name}.cmd")),
+            ] {
                 if candidate.is_file() {
                     return Some(candidate);
                 }
@@ -102,13 +115,20 @@ fn version_of(path: &Path) -> String {
     if let Some(mut stdout) = child.stdout.take() {
         let _ = stdout.read_to_string(&mut text);
     }
-    text.lines().next().map(|line| line.trim().chars().take(80).collect()).unwrap_or_default()
+    text.lines()
+        .next()
+        .map(|line| line.trim().chars().take(80).collect())
+        .unwrap_or_default()
 }
 
 pub fn detect(engine: EngineId, home: Option<&Path>) -> EngineStatus {
     let path = locate(executables(engine), home);
     let signed_in = path.is_some()
-        && home.is_some_and(|home| credential_files(engine).iter().any(|file| home.join(file).is_file()));
+        && home.is_some_and(|home| {
+            credential_files(engine)
+                .iter()
+                .any(|file| home.join(file).is_file())
+        });
     EngineStatus {
         engine: engine.as_str(),
         installed: path.is_some(),
@@ -120,5 +140,8 @@ pub fn detect(engine: EngineId, home: Option<&Path>) -> EngineStatus {
 /// Every engine's status on this device.
 pub fn detect_all() -> Vec<EngineStatus> {
     let home = dirs::home_dir();
-    EngineId::ALL.iter().map(|engine| detect(*engine, home.as_deref())).collect()
+    EngineId::ALL
+        .iter()
+        .map(|engine| detect(*engine, home.as_deref()))
+        .collect()
 }

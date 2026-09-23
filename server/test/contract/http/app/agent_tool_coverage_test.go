@@ -41,6 +41,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^POST /integrations/github/git$`, why: "the desktop's half of the git.push, git.pull and git.pull_request device tools: it moves commits the device checked against the project's grant and push switches"},
 	{pattern: `^\S+ /(connections|integrations/apps/connections|provider-callbacks|oauth)/`, why: "connecting an account needs the person to sign in"},
 	{pattern: `^\S+ /(me/app-requests|me/agent-interventions)/`, why: "a person's answer to an agent's card"},
+	{pattern: `^\S+ /me/coding/`, why: "the person's device reports its coding tools and mirrors a delegated run through these; agents start that run with code.delegate"},
 	{pattern: `^(DELETE /me/agent-grants(/\{grantID\})?|POST /me/agent-grants/site)$`,
 		why: "remembering or revoking an approval is the person's answer in the island or Settings; agents never widen or narrow their own grants"},
 	{pattern: `^\S+ /me/(agent-questions|agent-plans|agent-goals)/|^\S+ /me/conversations/\{conversationID\}/(mode|goal)$`,

@@ -26,14 +26,16 @@ type aiInvocationInput struct {
 	CompanionIntent string         `json:"companion_intent,omitempty"` // "teach": explain and point at the screens, no tools
 	// ModelOverride pins a new conversation's Thinking model with its first
 	// message; an existing conversation sets it with PATCH instead.
-	ModelOverride         string                      `json:"model_override,omitempty"`
-	DisplayCaptures       []aiDisplayCapture          `json:"display_captures,omitempty"`
-	ThinkingMode          string                      `json:"thinking_mode,omitempty"`
-	TaskID                string                      `json:"task_id,omitempty"`
-	AgentID               string                      `json:"agent_id,omitempty"`
-	ExecutionMode         string                      `json:"execution_mode,omitempty"`
-	CollaborationMode     string                      `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
-	PermissionMode        string                      `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
+	ModelOverride     string             `json:"model_override,omitempty"`
+	DisplayCaptures   []aiDisplayCapture `json:"display_captures,omitempty"`
+	ThinkingMode      string             `json:"thinking_mode,omitempty"`
+	TaskID            string             `json:"task_id,omitempty"`
+	AgentID           string             `json:"agent_id,omitempty"`
+	ExecutionMode     string             `json:"execution_mode,omitempty"`
+	CollaborationMode string             `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
+	PermissionMode    string             `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
+	// CodingProject is the attached project a delegated coding run works in.
+	CodingProject         string                      `json:"coding_project,omitempty"`
 	WindowLabel           string                      `json:"window_label,omitempty"`
 	Mode                  string                      `json:"mode"`
 	SurfaceID             string                      `json:"surface_id"`
@@ -155,7 +157,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		// Only the server links a run to a parent's notebook or delegation.
-		body.NotebookKey, body.DelegatedFrom = "", ""
+		body.NotebookKey, body.DelegatedFrom, body.CodingProject = "", "", ""
 		scheduled, ok := s.admitScheduledInvocation(w, r, userID, &body)
 		if !ok {
 			return

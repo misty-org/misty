@@ -29,7 +29,7 @@ pub(super) fn require_main(webview: &tauri::Webview) -> Result<(), String> {
 }
 
 /// Main or an agent's own window may sign its device requests.
-pub(super) fn require_device_window(webview: &tauri::Webview) -> Result<(), String> {
+pub(crate) fn require_device_window(webview: &tauri::Webview) -> Result<(), String> {
     let label = webview.label();
     if label != "main" && !label.starts_with("misty-agent-") {
         return Err("This window can't act for the device.".into());

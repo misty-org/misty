@@ -35,7 +35,7 @@ var selfGatedTools = map[string]bool{
 	appsExecuteTool: true, itemsDeleteTool: true, spacesManageTool: true, workflowUnscheduleTool: true,
 	screenActTool: true, "browser.steps": true, "browser.fill_form": true, "browser.skill": true,
 	// Delegation hands the same mode to the child, which asks for itself.
-	toolboxAgentsDelegateTasks: true, toolboxAgentsWait: true,
+	toolboxAgentsDelegateTasks: true, toolboxAgentsWait: true, codeDelegateTool: true, codeWaitTool: true,
 }
 
 // gatedByAsk reports whether a tool call needs the generic Ask pause.

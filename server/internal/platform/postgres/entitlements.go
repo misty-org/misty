@@ -16,6 +16,10 @@ type PlanEntitlements struct {
 	PersonalStorageLimitBytes       int64 `json:"personal_storage_limit_bytes"`
 	SpaceStorageLimitBytes          int64 `json:"space_storage_limit_bytes,omitempty"`
 	PersonalWeeklyHostedAIAllowance int64 `json:"personal_ai_limit"`
+	// WeeklyExternalCodingAllowance is the most of the weekly hosted
+	// allowance (in universal tokens) that coding through the person's own
+	// tools may use. Basic plans have none.
+	WeeklyExternalCodingAllowance int64 `json:"external_coding_allowance"`
 
 	// Compatibility fields retained for clients that have not yet adopted the
 	// explicit personal-vs-Space entitlement names. SpaceLimit now means owned
@@ -27,6 +31,10 @@ type PlanEntitlements struct {
 	UnlimitedCollaborators    bool  `json:"unlimited_collaborators"`
 	UnlimitedAgentDefinitions bool  `json:"unlimited_agent_definitions"`
 }
+
+// DevelopmentExternalCodingAllowance is the coding allowance without a billing
+// service. Production reads each plan's allowance from the billing service.
+const DevelopmentExternalCodingAllowance int64 = 20_000_000
 
 // Resource ceilings are customer-visible billing results. Production always
 // asks the billing service; development and tests without one receive these
@@ -41,6 +49,9 @@ func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time
 	}
 	limits := defaultEntitlements()
 	if !adapter.Enabled() {
+		// Without a billing service (development and tests) coding through
+		// the person's own tools has a finite allowance of its own.
+		limits.WeeklyExternalCodingAllowance = DevelopmentExternalCodingAllowance
 		return limits, nil
 	}
 	readCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -58,6 +69,10 @@ func entitlementsForUserTx(ctx context.Context, _ *sql.Tx, userID string, _ time
 	limits = *response.Entitlements
 	if limits.MaxOwnedSpaces < 0 || limits.PersonalStorageLimitBytes < 0 || limits.SpaceStorageLimitBytes < 0 || limits.PersonalStorageLimitBytes >= 9007199254740991 || limits.SpaceStorageLimitBytes >= 9007199254740991 {
 		return PlanEntitlements{}, billingadapter.ErrUnavailable
+	}
+	if limits.Plan == TierBasic || limits.WeeklyExternalCodingAllowance < 0 {
+		// Coding through the person's own tools is a paid feature.
+		limits.WeeklyExternalCodingAllowance = 0
 	}
 	limits.BillingAvailable = true
 	return limits, nil

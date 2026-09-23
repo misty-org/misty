@@ -41,6 +41,7 @@ import { PrivacySection } from "./sections/PrivacySection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { UsageSection } from "./sections/UsageSection";
+import { CodingToolsSection } from "./sections/CodingToolsSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
@@ -132,6 +133,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   ),
   page("agents", "agents-connections", "Connections", AgentConnectionsSection, "resource"),
   page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
+  page("agents", "agents-coding", "Coding tools", CodingToolsSection, "resource", true),
   page("agents", "agents-companion", "Companion", CompanionSection, "account"),
   page("sync", "sync", "Sync", BrowserSyncSettings),
   page("devices", "devices", "Devices", DevicesSection, "account"),

@@ -12,5 +12,7 @@ pub mod device_admission_commands;
 pub mod device_commands;
 #[cfg(desktop)]
 pub mod device_job_commands;
+#[cfg(desktop)]
+pub mod runner_commands;
 pub mod runtime;
 pub mod shortcut_commands;

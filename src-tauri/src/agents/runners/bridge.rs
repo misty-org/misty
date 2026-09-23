@@ -26,8 +26,12 @@ pub struct BridgeContext {
 pub enum Decision {
     Allow,
     /// Pause and ask the person through the server's approval card.
-    AskPerson { action: &'static str },
-    Deny { reason: String },
+    AskPerson {
+        action: &'static str,
+    },
+    Deny {
+        reason: String,
+    },
 }
 
 /// The grant action a kind of request needs, if any can cover it.
@@ -44,7 +48,8 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
     if let Some(path) = &request.path {
         if !inside(&context.project_root, path) {
             return Decision::Deny {
-                reason: "That path is outside the project Misty attached. Work only inside it.".into(),
+                reason: "That path is outside the project Misty attached. Work only inside it."
+                    .into(),
             };
         }
     }
@@ -58,7 +63,9 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
     }
     if !context.lease_valid {
         return Decision::Deny {
-            reason: "Misty's budget for this run is used up or expired. Stop and report what is left.".into(),
+            reason:
+                "Misty's budget for this run is used up or expired. Stop and report what is left."
+                    .into(),
         };
     }
     let action = grant_action(request.kind).unwrap_or("project.edit");
@@ -68,7 +75,11 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
     match request.kind {
         // Changes inside the attached project are implied by attaching it.
         ActionKind::Edit | ActionKind::Run => Decision::Allow,
-        ActionKind::Install | ActionKind::Push if context.grants.iter().any(|grant| grant == action) => Decision::Allow,
+        ActionKind::Install | ActionKind::Push
+            if context.grants.iter().any(|grant| grant == action) =>
+        {
+            Decision::Allow
+        }
         _ => Decision::AskPerson { action },
     }
 }
@@ -77,7 +88,11 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
 /// inside. `..` never climbs out; nothing touches the filesystem.
 pub fn inside(root: &Path, path: &str) -> bool {
     let candidate = Path::new(path);
-    let joined = if candidate.is_absolute() { candidate.to_path_buf() } else { root.join(candidate) };
+    let joined = if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        root.join(candidate)
+    };
     let mut resolved = PathBuf::new();
     for component in joined.components() {
         match component {
@@ -96,23 +111,45 @@ pub fn inside(root: &Path, path: &str) -> bool {
 /// Classifies a shell command by what it would do. Reads stay reads; anything
 /// unknown runs inside the project and needs the project's permission.
 pub fn classify_command(command: &str) -> ActionKind {
-    let words: Vec<&str> = command.split(|c: char| c.is_whitespace() || c == ';' || c == '&' || c == '|').filter(|w| !w.is_empty()).collect();
+    let words: Vec<&str> = command
+        .split(|c: char| c.is_whitespace() || c == ';' || c == '&' || c == '|')
+        .filter(|w| !w.is_empty())
+        .collect();
     let has = |pair: [&str; 2]| words.windows(2).any(|w| w[0] == pair[0] && w[1] == pair[1]);
     if has(["git", "push"]) {
         return ActionKind::Push;
     }
     let installs = [
-        ["npm", "install"], ["npm", "i"], ["npm", "add"], ["pnpm", "add"], ["pnpm", "install"], ["yarn", "add"],
-        ["pip", "install"], ["pip3", "install"], ["cargo", "add"], ["cargo", "install"], ["brew", "install"],
-        ["apt", "install"], ["apt-get", "install"], ["go", "get"], ["go", "install"], ["gem", "install"], ["uv", "add"],
+        ["npm", "install"],
+        ["npm", "i"],
+        ["npm", "add"],
+        ["pnpm", "add"],
+        ["pnpm", "install"],
+        ["yarn", "add"],
+        ["pip", "install"],
+        ["pip3", "install"],
+        ["cargo", "add"],
+        ["cargo", "install"],
+        ["brew", "install"],
+        ["apt", "install"],
+        ["apt-get", "install"],
+        ["go", "get"],
+        ["go", "install"],
+        ["gem", "install"],
+        ["uv", "add"],
     ];
     if installs.iter().any(|pair| has(*pair)) {
         return ActionKind::Install;
     }
-    if words.iter().any(|w| matches!(*w, "curl" | "wget" | "ssh" | "scp")) {
+    if words
+        .iter()
+        .any(|w| matches!(*w, "curl" | "wget" | "ssh" | "scp"))
+    {
         return ActionKind::Network;
     }
-    let reads = ["ls", "cat", "head", "tail", "grep", "rg", "find", "pwd", "wc", "diff", "echo"];
+    let reads = [
+        "ls", "cat", "head", "tail", "grep", "rg", "find", "pwd", "wc", "diff", "echo",
+    ];
     let git_reads = ["status", "diff", "log", "show", "branch"];
     match words.as_slice() {
         [] => ActionKind::Other,

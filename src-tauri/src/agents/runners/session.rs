@@ -25,7 +25,11 @@ pub trait SessionHost: Send + Sync {
     fn emit<'a>(&'a self, events: Vec<RunnerEvent>) -> BoxFuture<'a, ()>;
     /// Asks the person through the server's approval card and waits for the
     /// answer. A timeout or any failure is a no.
-    fn ask<'a>(&'a self, request: &'a PermissionRequest, action: &'static str) -> BoxFuture<'a, bool>;
+    fn ask<'a>(
+        &'a self,
+        request: &'a PermissionRequest,
+        action: &'static str,
+    ) -> BoxFuture<'a, bool>;
     /// Unix seconds now, so tests can drive lease expiry.
     fn now(&self) -> i64;
 }
@@ -52,7 +56,11 @@ pub async fn answer_permission(
             if host.ask(request, action).await {
                 (true, String::new())
             } else {
-                (false, "The person said no, or didn't answer. Don't try another way; report it.".to_owned())
+                (
+                    false,
+                    "The person said no, or didn't answer. Don't try another way; report it."
+                        .to_owned(),
+                )
             }
         }
     }
@@ -83,15 +91,21 @@ pub async fn run_turn(
         .spawn()
         .map_err(|_| RunnerError::Invalid("the coding tool could not start"))?;
     let mut stdin = child.stdin.take().ok_or(RunnerError::Invalid("no stdin"))?;
-    let stdout = child.stdout.take().ok_or(RunnerError::Invalid("no stdout"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or(RunnerError::Invalid("no stdout"))?;
     let mut lines = BufReader::new(stdout).lines();
     for line in protocol.initial_input() {
         let _ = stdin.write_all(format!("{line}\n").as_bytes()).await;
     }
-    let mut outcome = Outcome::Failed("The coding tool stopped without finishing.".into());
+    let mut canceled = false;
+    let mut finished = false;
+    let mut exhausted = false;
+    let mut failure: Option<String> = None;
     loop {
         let line = tokio::select! {
-            _ = &mut stop => { outcome = Outcome::Canceled; break; }
+            _ = &mut stop => { canceled = true; break; }
             line = lines.next_line() => line,
         };
         let Ok(Some(line)) = line else { break };
@@ -112,11 +126,11 @@ pub async fn run_turn(
                 }
                 RunnerEvent::Usage(usage) => {
                     if !meter.record(usage, host.now()) {
-                        outcome = Outcome::BudgetExhausted;
+                        exhausted = true;
                     }
                 }
                 RunnerEvent::Done { .. } => done = true,
-                RunnerEvent::Error { message } => outcome = Outcome::Failed(message.clone()),
+                RunnerEvent::Error { message } => failure = Some(message.clone()),
                 _ => {}
             }
             forward.push(event);
@@ -125,14 +139,22 @@ pub async fn run_turn(
             host.emit(forward).await;
         }
         if done {
-            if !matches!(outcome, Outcome::BudgetExhausted | Outcome::Failed(_)) {
-                outcome = Outcome::Finished;
-            }
+            finished = true;
             break;
         }
     }
     drop(stdin);
     let _ = child.start_kill();
     let _ = child.wait().await;
-    Ok(outcome)
+    Ok(if canceled {
+        Outcome::Canceled
+    } else if let Some(message) = failure {
+        Outcome::Failed(message)
+    } else if exhausted {
+        Outcome::BudgetExhausted
+    } else if finished {
+        Outcome::Finished
+    } else {
+        Outcome::Failed("The coding tool stopped without finishing.".into())
+    })
 }

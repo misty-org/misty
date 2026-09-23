@@ -216,7 +216,7 @@ export class DesktopAgentJobWorker {
         })();
       }, leaseHeartbeatMs);
       const output = await abortable(
-        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt),
+        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt, deviceId),
         controller.signal,
       );
       report = () =>
@@ -317,6 +317,7 @@ async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
   leaseExpiresAt: string | null | undefined,
+  deviceId: string,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
   // Every job carries the run grant the asking device signed. This device
@@ -389,6 +390,10 @@ async function executeWorkflowNodeOnDevice(
   }
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
+  }
+  if (job.operation === "code.delegate") {
+    // Coding through the person's own tool; the run reports on its own.
+    return (await import("./coding/codingRun")).startCodingRun(job, deviceId);
   }
   if (codeProjectOperations.has(job.operation)) {
     return runCodeProjectOperation(job, signal);

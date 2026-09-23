@@ -19,6 +19,13 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Delete(prefix+"/me/agent-grants", spaces.AgentGrants())
 	s.Router.Delete(prefix+"/me/agent-grants/{grantID}", spaces.AgentGrant())
 	s.Router.Post(prefix+"/me/agent-grants/site", spaces.AgentSiteGrant())
+	// Coding through the person's own tools: the device reports its tools, takes
+	// a budget lease per turn, mirrors the tool's events and asks for approvals.
+	s.Router.Put(prefix+"/me/coding/engines", spaces.CodingEnginesReport())
+	s.Router.Get(prefix+"/me/coding/allowance", spaces.CodingAllowance())
+	s.Router.Post(prefix+"/me/coding/{invocationID}/lease", spaces.CodingLease())
+	s.Router.Post(prefix+"/me/coding/{invocationID}/events", spaces.CodingEvents())
+	s.Router.Post(prefix+"/me/coding/{invocationID}/approvals", spaces.CodingApproval())
 	s.Router.Post(prefix+"/me/screen-model/{jobID}", spaces.ScreenModel())
 	s.Router.Post(prefix+"/me/companion/refine-point/{invocationID}", spaces.CompanionRefinePoint())
 	// Collaboration: Plan/Act mode, agent questions, plans and goals.

@@ -84,20 +84,38 @@ pub struct RateLimit {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RunnerEvent {
     /// The tool's session id, for resuming the conversation later.
-    Session { id: String },
-    Delta { text: String },
-    Thinking { text: String },
-    Message { text: String },
+    Session {
+        id: String,
+    },
+    Delta {
+        text: String,
+    },
+    Thinking {
+        text: String,
+    },
+    Message {
+        text: String,
+    },
     Usage(Usage),
-    Todos { items: Vec<TodoItem> },
+    Todos {
+        items: Vec<TodoItem>,
+    },
     /// The tool asks the person a question in words, not a permission.
-    Question { text: String },
+    Question {
+        text: String,
+    },
     PermissionRequest(PermissionRequest),
     /// A plan the tool proposes from a read-only launch.
-    PlanDraft { text: String },
+    PlanDraft {
+        text: String,
+    },
     RateLimit(RateLimit),
-    Done { stop_reason: String },
-    Error { message: String },
+    Done {
+        stop_reason: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 /// Maps a tool's step status onto pending, in_progress or done.
