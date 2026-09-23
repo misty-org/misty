@@ -458,7 +458,8 @@ func (s *BrowserSyncService) writeConnection(ctx context.Context, conn *websocke
 		case <-ctx.Done():
 			return
 		case <-expiry.C:
-			return // Obtain a fresh account-authenticated ticket periodically.
+			closeBrowserSyncForReconnect(conn)
+			return
 		case next := <-resume:
 			cursor = next
 			blocked = false
