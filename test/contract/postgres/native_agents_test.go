@@ -27,18 +27,17 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 		t.Fatal(err)
 	}
 	profile := AgentProfileInput{Name: "Communications", Role: "Manage launch communications", Instructions: "Use clear language", ModelMode: "automatic", Enabled: true}
-	invalid := profile
-	invalid.Assignment = &AgentAppAssignmentInput{SpaceID: space.ID, AppIDs: []string{"missing-app"}}
-	if _, err := database.SavePersonalAgent(ctx, owner.ID, "", invalid); err == nil {
-		t.Fatal("invalid assignment created an agent")
-	}
-	before, err := database.PersonalAgents(ctx, owner.ID)
-	if err != nil || len(before) != 1 {
-		t.Fatalf("half-configured agent survived: %d %v", len(before), err)
-	}
+	// Legacy model and assignment fields cannot override managed policy.
+	profile.ModelMode = "pinned"
+	profile.ModelID = "anthropic/legacy-model"
+	profile.ReasoningEffort = "low"
+	profile.Assignment = &AgentAppAssignmentInput{AppIDs: []string{"missing-app"}}
 	agent, err := database.SavePersonalAgent(ctx, owner.ID, "", profile)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if agent.ModelMode != "automatic" || agent.ModelID != "openai/gpt-6-astra" || agent.ReasoningEffort != "high" {
+		t.Fatalf("unmanaged model: %+v", agent)
 	}
 	if agent.SystemManaged || agent.ID == misty.ID {
 		t.Fatalf("invalid personal identity: %+v", agent)
@@ -47,14 +46,14 @@ func TestNativeAgentsPrivacyAssignmentsMemoryAndLeases(t *testing.T) {
 	if err != nil || len(assignments) != 0 {
 		t.Fatalf("new assignments: %v %v", assignments, err)
 	}
-	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"planner"}); err == nil {
-		t.Fatal("assigned uninstalled app")
+	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"planner"}); err != nil {
+		t.Fatal(err)
 	}
 	_, err = database.InstallUserApp(ctx, owner.ID, "planner", "1.0.0", 1, []string{"connections.read"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, []string{"planner"}); err != nil {
+	if err = database.SetAgentAppAssignments(ctx, owner.ID, agent.ID, space.ID, nil); err != nil {
 		t.Fatal(err)
 	}
 	assignments, err = database.AgentAppAssignments(ctx, owner.ID, agent.ID, secondSpace.ID)

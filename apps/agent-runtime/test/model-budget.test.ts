@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { modelTimeout } from "../src/model-budget.js";
+import { modelTimeout, modelTurnLimit } from "../src/model-budget.js";
 
 it("uses the smaller authoritative deadline and remaining allowance", () => {
   const now=Date.parse("2026-09-07T12:00:00Z");
@@ -12,5 +12,13 @@ it("does not replace missing or invalid new-budget responses with an unlimited m
   const now=Date.now();
   for (const value of [{}, { version: 1, active: false, remaining_ms: 10 }, { version: 1, active: true, remaining_ms: 1_800_001, deadline: new Date(now+2000).toISOString() }]) {
     expect(() => modelTimeout(value as never,now,now+5000)).toThrow("invalid_execution_budget");
+  }
+});
+
+it("rejects invalid turn budgets and preserves legacy default", () => {
+  expect(modelTurnLimit(undefined)).toBe(20);
+  expect(modelTurnLimit(120)).toBe(120);
+  for (const value of [0, -1, 121, 1.5, NaN, Infinity, null, "120"]) {
+    expect(() => modelTurnLimit(value as number)).toThrow("invalid_model_turn_limit");
   }
 });

@@ -25,7 +25,7 @@ func agentToolboxExecutionJournal(database *db.Database) agenttools.ExecutionMid
 		}
 		// MCP owns this journal with encrypted replay results. A redacted outer
 		// journal would lose the response on retries.
-		if strings.HasPrefix(descriptor.Name, "mcp.") {
+		if strings.HasPrefix(descriptor.Name, "mcp.") || descriptor.Name == "spaces.execute" {
 			return next(ctx, invocation, request)
 		}
 		if descriptor.Risk == serveragent.RiskRead && !strings.HasPrefix(descriptor.Name, "browser.") {
@@ -48,7 +48,15 @@ func agentToolboxExecutionJournal(database *db.Database) agenttools.ExecutionMid
 		}
 		// The logical call owns its effect identity. Changed arguments must
 		// conflict with that effect, never allocate another mutation.
-		identity := strings.Join([]string{invocation.UserID, invocation.RunID, invocation.SessionID, request.ID}, "\x00")
+		sessionID := invocation.SessionID
+		journalRequest := request.Arguments
+		if call, ok := ctx.Value(globalSpaceCallKey{}).(globalSpaceCall); ok {
+			// Routing clears the target session across spaces, but the original
+			// logical call must keep its identity when retried in any destination.
+			sessionID = call.sessionID
+			journalRequest = TestingMustAPIRawJSON(map[string]any{"space_id": call.spaceID, "arguments": request.Arguments})
+		}
+		identity := strings.Join([]string{invocation.UserID, invocation.RunID, sessionID, request.ID}, "\x00")
 		legacyIdentity := strings.Join([]string{invocation.UserID, spaceID, invocation.AgentID, invocation.AgentInstanceID, invocation.RunID, invocation.SessionID, invocation.Source, invocation.Trigger, descriptor.Name, request.ID, string(request.Arguments)}, "\x00")
 		legacyDigest := sha256.Sum256([]byte(legacyIdentity))
 		digest := sha256.Sum256([]byte(identity))
@@ -58,7 +66,7 @@ func agentToolboxExecutionJournal(database *db.Database) agenttools.ExecutionMid
 			LegacyIdempotencyKey: "toolbox:" + hex.EncodeToString(legacyDigest[:]),
 			UserID:               invocation.UserID, SpaceID: spaceID, AgentID: invocation.AgentID,
 			AgentInstanceID: invocation.AgentInstanceID, RunID: invocation.RunID, SessionID: invocation.SessionID, ToolName: descriptor.Name,
-			AuditEvent: descriptor.AuditEvent, Risk: descriptor.Risk, Source: invocation.Source, Request: request.Arguments,
+			AuditEvent: descriptor.AuditEvent, Risk: descriptor.Risk, Source: invocation.Source, Request: journalRequest,
 			RedactPayload: strings.HasPrefix(descriptor.Name, "mcp."),
 		}, func() (json.RawMessage, error) {
 			return boundedNext()

@@ -1,4 +1,6 @@
+import { modelTurnLimit } from "../src/model-budget.js";
 import { routineWaitAdapter } from "../src/routine-wait-adapter.js";
+import { requiresBrowserReinspection } from "../src/browser-reinspection.js";
 import { routineAgentAdapter, type RoutineAgentControl } from "../src/routine-agent-adapter.js";
 import type { RoutineAgentResult } from "../src/routine-agent.js";
 import type { LanguageModelUsage } from "ai";
@@ -139,21 +141,22 @@ function fallbackModels(primaryModel: string): string[] {
   );
 }
 
-export function stoppedAtModelTurnLimit(stepCount: number, finishReason: string): boolean {
-  return stepCount >= 20 && finishReason !== "stop";
+export function stoppedAtModelTurnLimit(stepCount: number, finishReason: string, limit = 20): boolean {
+  return stepCount >= limit && finishReason !== "stop";
 }
 
 export function unfinishedModelResult(
   aborted: boolean,
   stepCount: number,
   finishReason: string,
+  limit = 20,
 ): { code: string; message: string } | null {
   // WorkflowAgent can resolve an aborted stream with the last completed step's
   // finish reason. A normal return (or earlier text) is not completion evidence.
   if (aborted) {
     return { code: "agent_runtime_interrupted", message: "This run stopped before finishing. Review its completed work before starting another request." };
   }
-  if (stoppedAtModelTurnLimit(stepCount, finishReason)) {
+  if (stoppedAtModelTurnLimit(stepCount, finishReason, limit)) {
     return { code: "agent_model_turn_limit", message: "This run reached its model-turn limit before finishing. Review its completed work before starting another request." };
   }
   if (finishReason === "stop" && stepCount > 0) return null;
@@ -799,7 +802,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         execute: (value, options) =>
           execution.executeCapability(options.toolCallId, descriptor.name, value),
         toModelOutput: ({output}) => {
-          if (descriptor.name === "browser.visual" && output && typeof output === "object") {
+          if ((descriptor.name === "browser.visual" || descriptor.name === "browser.workspace.visual") && output && typeof output === "object") {
             const result = output as Record<string, unknown>;
             const image = result.image as {dataUrl?: string} | undefined;
             const match = image?.dataUrl?.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -842,7 +845,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       descriptor.name,
     ]),
   );
-  const activeToolKeys = () =>
+  let browserInspectionRequired = false;
+  const reinspectionFailures = new Set<string>();
+  const activeToolKeys = () => browserInspectionRequired
+    ? [keyForName.get("browser.inspect")!].filter(Boolean) as Array<keyof typeof tools>
+    :
     [
       "misty_discover_capabilities",
       ...[...selectedNames]
@@ -939,16 +946,33 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       const signature =
         tracked?.signature ??
         toolFailureSignature(canonicalName, toolCall.input);
+      const reinspect = keyForName.has("browser.inspect") && (
+        (success && requiresBrowserReinspection(canonicalName, event.output)) ||
+        (!success && toolExecutionOrder.reinspectionRequested && errorText(event.error).includes("browser_reinspection_required"))
+      );
       if (!confirmed) {
         // Stop queued calls from the same model response before releasing the
         // current turn. The outer stop condition runs only after all calls.
-        toolExecutionOrder.stop(errorMessage);
+        if (reinspect) {
+          toolExecutionOrder.requestReinspection();
+          browserInspectionRequired = true;
+          reinspectionFailures.add(signature);
+        } else {
+          toolExecutionOrder.stop(errorMessage);
+        }
         failedToolCalls.set(signature, {
           callId: toolCall.toolCallId,
           toolName: tracked?.canonicalName ?? canonicalName,
           error: errorMessage,
         });
       } else {
+        if (canonicalName === "browser.inspect" && browserInspectionRequired) {
+          // These proposals were rejected before dispatch. A fresh observation
+          // resolves their stale references; it does not confirm their effects.
+          for (const rejected of reinspectionFailures) failedToolCalls.delete(rejected);
+          reinspectionFailures.clear();
+          browserInspectionRequired = false;
+        }
         failedToolCalls.delete(signature);
         const completedName = tracked?.canonicalName ?? canonicalName;
         successfulToolCalls.add(completedName);
@@ -1002,7 +1026,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
             },
           ]
       : [{ role: "user", content: context.prompt }];
-    for (; modelTurn < 20; modelTurn++) {
+    for (; modelTurn < modelTurnLimit(context.model_turn_limit); modelTurn++) {
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       const current = await agent.stream({ messages, ...shared, timeout: modelTimeout(budget, Date.now(), legacyDeadline) });
       const steps = [...(result?.steps ?? []), ...current.steps];
@@ -1010,6 +1034,10 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       // WorkflowAgent returns the complete model transcript, including tool
       // results. Reinject our fixed system instructions once on the next call.
       messages = current.messages.filter((message) => message.role !== "system");
+      if (!streamAborted && toolExecutionOrder.resumeForReinspection()) {
+        messages.push({ role: "user", content: "The previous browser action was rejected before dispatch because its page inspection was stale. Inspect the current page now, then decide the next action using fresh references. Do not report that the rejected action succeeded." });
+        continue;
+      }
       if (streamAborted || toolExecutionOrder.stoppedReason || current.finishReason !== "tool-calls" || current.steps.length !== 1 || await stopOnRepeatedOrTerminalToolFailure({ steps })) break;
     }
     if (!result) throw new Error("empty_agent_response");
@@ -1034,7 +1062,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     });
     throw new FatalError(failure.message);
   }
-  const unfinished = unfinishedModelResult(streamAborted, result.steps.length, result.finishReason);
+  const unfinished = unfinishedModelResult(streamAborted, result.steps.length, result.finishReason, modelTurnLimit(context.model_turn_limit));
   // Existing tool failures below carry more useful details, unless the stream
   // itself was interrupted or exhausted its model budget.
   if (unfinished && (streamAborted || unfinished.code === "agent_model_turn_limit")) {

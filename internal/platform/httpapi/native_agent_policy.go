@@ -9,36 +9,16 @@ import (
 	"strings"
 )
 
-// App ownership is independent of language, role names, and model planning.
-func nativeAgentToolApp(name string) string {
-	switch strings.Split(name, ".")[0] {
-	case "tasks", "calendar", "roadmaps", "roadmap":
-		return "planner"
-	case "notes", "drawings":
-		return "journal"
-	case "library":
-		return "library"
-	case "messages", "space":
-		return "chat"
-	case "mail":
-		return "inbox"
-	case "files":
-		return "files"
-	case "terminal":
-		return "terminal"
-	case "code":
-		return "code"
-	}
-	return ""
-}
-
 func nativeAgentManagementTool(name string) bool {
 	return strings.HasPrefix(name, "agents.") || strings.HasPrefix(name, "memory.")
 }
 
-func nativeAgentToolAllowed(name, risk, mode string, apps map[string]bool) bool {
+func nativeAgentToolAllowed(name, risk, mode string, tools map[string]bool) bool {
+	if strings.HasPrefix(name, "browser.workspace.") {
+		return mode == "agent" && tools["browser"]
+	}
 	if strings.HasPrefix(name, "agents.") {
-		return risk == serveragent.RiskRead || mode == "user"
+		return true
 	}
 	if strings.HasPrefix(name, "memory.") {
 		return true
@@ -47,18 +27,15 @@ func nativeAgentToolAllowed(name, risk, mode string, apps map[string]bool) bool 
 		return false
 	}
 	if strings.HasPrefix(name, "mcp.") {
-		if risk != serveragent.RiskRead && mode == "user" {
-			return false
-		}
 		return true
 	}
-	if risk != serveragent.RiskRead && mode == "user" {
-		return false
+	if strings.HasPrefix(name, "browser.") {
+		return tools["browser"]
 	}
-	if app := nativeAgentToolApp(name); app != "" {
-		return apps[app]
+	if strings.HasPrefix(name, "files.") {
+		return tools["files"]
 	}
-	return name == "members.list" || name == "members.resolve" || name == "weather.current" || strings.HasPrefix(name, "browser.")
+	return name == "weather.current"
 }
 
 func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, bool, error) {
@@ -79,12 +56,23 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 	if err := database.ValidateNativeAgentExecution(ctx, record); err != nil {
 		return true, false, err
 	}
-	apps, err := database.AgentAppAssignments(ctx, record.UserID, body.AgentID, record.SpaceID)
+	visibleAutopilot := false
+	for _, target := range body.DeviceContexts {
+		var metadata map[string]any
+		_ = json.Unmarshal(target.Metadata, &metadata)
+		if metadata["workspace_control"] == true {
+			visibleAutopilot = true
+		}
+	}
+	if visibleAutopilot && descriptor.Risk != serveragent.RiskRead && descriptor.Name != "browser.workspace.interact" {
+		return true, false, nil
+	}
+	tools, err := database.AgentWorkspaceTools(ctx, record.UserID, body.AgentID)
 	if err != nil {
 		return true, false, err
 	}
 	allowed := map[string]bool{}
-	for _, id := range apps {
+	for _, id := range tools {
 		allowed[id] = true
 	}
 	if descriptor.ProviderBinding != nil {
@@ -103,6 +91,9 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 		}
 		return true, nativeAgentToolAllowed(descriptor.Name, descriptor.Risk, body.ExecutionMode, allowed), nil
 	}
+	if strings.HasPrefix(descriptor.Name, "browser.workspace.") && (body.ExecutionMode != "agent" || body.WindowLabel != "main" || body.TaskID == "") {
+		return true, false, nil
+	}
 	if strings.HasPrefix(descriptor.Name, "browser.") {
 		contexts, err := database.AIInvocationContexts(ctx, record.UserID, record.ID)
 		if err != nil {
@@ -113,7 +104,7 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 			var metadata struct {
 				AppID string `json:"app_id"`
 			}
-			if json.Unmarshal(item.Metadata, &metadata) == nil && allowed[metadata.AppID] {
+			if json.Unmarshal(item.Metadata, &metadata) == nil && metadata.AppID == "browser" && allowed["browser"] {
 				permitted = true
 			}
 		}
@@ -124,40 +115,22 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 	return true, nativeAgentToolAllowed(descriptor.Name, descriptor.Risk, body.ExecutionMode, allowed), nil
 }
 
-func nativeAgentContextApp(kind string) string {
-	switch kind {
-	case "note", "notes", "drawing":
-		return "journal"
-	case "task", "planner.task", "roadmap", "planner.roadmap":
-		return "planner"
-	case "space.chat":
-		return "chat"
-	case "library.item":
-		return "library"
-	case "mail.thread":
-		return "inbox"
-	}
-	return ""
-}
-
-func filterNativeAgentContext(refs []aiContextReference, apps []string) []aiContextReference {
-	allowed := map[string]bool{}
-	for _, id := range apps {
-		allowed[id] = true
+func filterNativeAgentContext(refs []aiContextReference, tools []string) []aiContextReference {
+	browser := false
+	for _, tool := range tools {
+		if tool == "browser" {
+			browser = true
+		}
 	}
 	result := []aiContextReference{}
 	for _, ref := range refs {
-		app := nativeAgentContextApp(ref.Kind)
-		if ref.Kind == "browser-tab" {
-			app, _ = ref.Metadata["app_id"].(string)
-		}
-		if app != "" && allowed[app] {
-			result = append(result, ref)
-			continue
-		}
-		// Space references identify the boundary; broad workspace retrieval is not an assignment.
-		if ref.Kind == "space" {
-			ref.Metadata = nil
+		switch ref.Kind {
+		case "browser-tab":
+			if browser && ref.Metadata["app_id"] == "browser" {
+				result = append(result, ref)
+			}
+		case "workspace-view", "workspace.scope":
+			// The context broker separately validates ownership and members.
 			result = append(result, ref)
 		}
 	}
@@ -180,7 +153,7 @@ func authorizeNativeAgentBrowserScope(ctx context.Context, database *db.Database
 	if body.AgentID == "" {
 		return nil
 	}
-	apps, err := database.AgentAppAssignments(ctx, record.UserID, body.AgentID, record.SpaceID)
+	tools, err := database.AgentWorkspaceTools(ctx, record.UserID, body.AgentID)
 	if err != nil {
 		return err
 	}
@@ -199,8 +172,8 @@ func authorizeNativeAgentBrowserScope(ctx context.Context, database *db.Database
 		if json.Unmarshal(item.Metadata, &metadata) != nil || metadata.WindowLabel != body.WindowLabel {
 			return db.ErrSpaceForbidden
 		}
-		for _, app := range apps {
-			if app == metadata.AppID {
+		for _, tool := range tools {
+			if tool == "browser" && metadata.AppID == "browser" {
 				return nil
 			}
 		}

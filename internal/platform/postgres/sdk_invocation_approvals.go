@@ -72,7 +72,7 @@ func (db *Database) DecideSDKToolApproval(ctx context.Context, userID, invocatio
 		if approval.State != "pending" && approval.State != state {
 			return ErrSpaceConflict
 		}
-		result, err := tx.ExecContext(ctx, `UPDATE agent_run_tool_approvals SET state=$2,decided_by_user_id=$3,decided_at=COALESCE(decided_at,NOW()) WHERE id=$1 AND expires_at>NOW() AND ($2<>'approved' OR (tool_name NOT LIKE 'sdk.%' AND tool_name NOT IN ('browser.click','browser.interact')) OR sdk_review_ciphertext IS NOT NULL)`, approvalID, state, userID)
+		result, err := tx.ExecContext(ctx, `UPDATE agent_run_tool_approvals SET state=$2,decided_by_user_id=$3,decided_at=COALESCE(decided_at,NOW()) WHERE id=$1 AND expires_at>NOW() AND ($2<>'approved' OR (tool_name NOT LIKE 'sdk.%' AND tool_name NOT IN ('browser.click','browser.interact','browser.workspace.interact')) OR sdk_review_ciphertext IS NOT NULL)`, approvalID, state, userID)
 		if err != nil {
 			return err
 		}

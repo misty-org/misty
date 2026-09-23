@@ -9,10 +9,6 @@ func (s *AIService) MistyActivity() http.HandlerFunc {
 			return
 		}
 		spaceID := r.URL.Query().Get("space_id")
-		if spaceID == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Select a Space."})
-			return
-		}
 		rows, err := s.database.MistyActivity(r.Context(), userID, spaceID, r.URL.Query().Get("agent_id"))
 		if err != nil {
 			writeSpaceError(w, err)

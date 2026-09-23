@@ -25,7 +25,7 @@ func persistSDKApprovalReviewTx(ctx context.Context, tx *sql.Tx, approval *Agent
 	if !strings.HasPrefix(approval.ToolName, "sdk.") && len(reviews) == 0 {
 		return nil
 	}
-	if !strings.HasPrefix(approval.ToolName, "sdk.") && approval.ToolName != "browser.click" && approval.ToolName != "browser.interact" {
+	if !strings.HasPrefix(approval.ToolName, "sdk.") && approval.ToolName != "browser.click" && approval.ToolName != "browser.interact" && approval.ToolName != "browser.workspace.interact" {
 		if len(reviews) != 0 {
 			return ErrSpaceInvalid
 		}

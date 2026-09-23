@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
+  limit: undefined as number | undefined,
   aborted: false,
   finishReason: "stop",
   steps: 1,
@@ -25,7 +26,7 @@ vi.mock("../src/control-plane.js", () => ({
   controlPlaneRequest: async (_identity: unknown, operation: string, body: Record<string, unknown>) => {
     if (operation === "context") return {
       model_id: "fixture/model", system: "", prompt: "Summarize this request",
-      allowed_tools: [], required_tools: [],
+      allowed_tools: [], required_tools: [], model_turn_limit: fixture.limit,
     };
     if (operation === "complete") fixture.completions.push(body);
     if (operation === "budget") {
@@ -68,6 +69,7 @@ import { runSpaceTaskAgent } from "../workflows/space-task-agent.js";
 import { ControlPlaneError } from "../src/control-plane-error.js";
 
 beforeEach(() => {
+  fixture.limit = undefined;
   fixture.aborted = false;
   fixture.finishReason = "stop";
   fixture.steps = 1;
@@ -141,4 +143,19 @@ describe("workflow completion evidence", () => {
     expect(fixture.timeoutValues).toHaveLength(1);
     expect(fixture.completions).toEqual([expect.objectContaining({ status: "failed", error_code: "agent_runtime_timeout" })]);
   });
+});
+
+it("completes beyond twenty turns only with a larger pinned budget", async () => {
+  fixture.limit = 120;
+  fixture.outcomes = [...Array(25).fill("tool-calls"), "stop"];
+  await runSpaceTaskAgent({ mistyRunId: "run-fixture", controlPlaneURL: "https://control.invalid" });
+  expect(fixture.modelNodes).toHaveLength(26);
+  expect(fixture.completions[0]).toMatchObject({ status: "success" });
+});
+it("still stops exactly at the foreground budget without claiming success", async () => {
+  fixture.limit = 120;
+  fixture.finishReason = "tool-calls";
+  await runSpaceTaskAgent({ mistyRunId: "run-fixture", controlPlaneURL: "https://control.invalid" });
+  expect(fixture.modelNodes).toHaveLength(120);
+  expect(fixture.completions[0]).toMatchObject({ status: "incomplete", error_code: "agent_model_turn_limit" });
 });

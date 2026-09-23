@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -55,7 +54,7 @@ type MCPExecutionAudit struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-const mcpAgentToolColumns = `a.id,c.id,c.name,c.provider,t.id,t.remote_name,t.stable_name,t.description,t.input_schema,t.schema_fingerprint,t.schema_status,t.disabled_reason,COALESCE(b.enabled,FALSE),c.endpoint_url,c.bearer_ciphertext,c.bearer_nonce,(c.status='active' AND c.revoked_at IS NULL AND (b.id IS NULL OR b.schema_fingerprint=t.schema_fingerprint))`
+const mcpAgentToolColumns = `a.id,c.id,c.name,c.provider,t.id,t.remote_name,t.stable_name,t.description,t.input_schema,t.schema_fingerprint,t.schema_status,t.disabled_reason,(c.status='active' AND c.revoked_at IS NULL AND t.schema_status='valid' AND t.removed_at IS NULL),c.endpoint_url,c.bearer_ciphertext,c.bearer_nonce,(c.status='active' AND c.revoked_at IS NULL)`
 
 func scanMCPAgentTool(row scanner, item *MCPAgentToolBinding) error {
 	return row.Scan(&item.AgentID, &item.ConnectionID, &item.ConnectionName, &item.ConnectionProvider, &item.RemoteToolID, &item.RemoteName, &item.StableName, &item.Description, &item.InputSchema, &item.SchemaFingerprint, &item.SchemaStatus, &item.DisabledReason, &item.Enabled, &item.EndpointURL, &item.BearerCipher, &item.BearerNonce, &item.ConnectionUp)
@@ -67,7 +66,7 @@ func (db *Database) PersonalAgentMCPTools(ctx context.Context, userID, agentID s
 	}
 	items := []MCPAgentToolBinding{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT `+mcpAgentToolColumns+` FROM misty_ask_identities a CROSS JOIN mcp_remote_connections c JOIN mcp_remote_tools t ON t.connection_id=c.id LEFT JOIN misty_ask_mcp_tools b ON b.agent_id=a.id AND b.remote_tool_id=t.id WHERE a.id=$1 AND a.owner_user_id=$2 AND a.deleted_at IS NULL AND c.owner_user_id=$2 AND c.revoked_at IS NULL AND t.removed_at IS NULL ORDER BY lower(c.name),t.remote_name`, agentID, userID)
+		rows, err := tx.QueryContext(ctx, `SELECT `+mcpAgentToolColumns+` FROM misty_ask_identities a CROSS JOIN mcp_remote_connections c JOIN mcp_remote_tools t ON t.connection_id=c.id WHERE a.id=$1 AND a.owner_user_id=$2 AND a.deleted_at IS NULL AND a.enabled AND c.owner_user_id=$2 AND c.revoked_at IS NULL AND t.removed_at IS NULL ORDER BY lower(c.name),t.remote_name`, agentID, userID)
 		if err != nil {
 			return err
 		}
@@ -85,51 +84,7 @@ func (db *Database) PersonalAgentMCPTools(ctx context.Context, userID, agentID s
 }
 
 func (db *Database) SetPersonalAgentMCPTools(ctx context.Context, userID, agentID string, selections []MCPAgentToolSelection) ([]MCPAgentToolBinding, error) {
-	seen := map[string]bool{}
-	for index := range selections {
-		selections[index].ConnectionID = strings.TrimSpace(selections[index].ConnectionID)
-		selections[index].RemoteName = strings.TrimSpace(selections[index].RemoteName)
-		key := selections[index].ConnectionID + "\x00" + selections[index].RemoteName
-		if selections[index].ConnectionID == "" || selections[index].RemoteName == "" || seen[key] {
-			return nil, ErrSpaceInvalid
-		}
-		seen[key] = true
-	}
-	err := db.TestingWithRLSContext(ctx, TestingServiceRLSSettings(), func(tx *sql.Tx) error {
-		var owner string
-		if err := tx.QueryRowContext(ctx, `SELECT owner_user_id FROM misty_ask_identities WHERE id=$1 AND deleted_at IS NULL`, agentID).Scan(&owner); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrPersonalAgentNotFound
-			}
-			return err
-		}
-		if owner != userID {
-			return ErrSpaceForbidden
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM misty_ask_mcp_tools WHERE agent_id=$1`, agentID); err != nil {
-			return err
-		}
-		for _, selection := range selections {
-			var connectionOwner, toolID, stableName, schemaStatus, schemaFingerprint string
-			var active bool
-			err := tx.QueryRowContext(ctx, `SELECT c.owner_user_id,t.id,t.stable_name,t.schema_status,t.schema_fingerprint,(c.status='active' AND c.revoked_at IS NULL AND t.removed_at IS NULL) FROM mcp_remote_connections c JOIN mcp_remote_tools t ON t.connection_id=c.id WHERE c.id=$1 AND t.remote_name=$2`, selection.ConnectionID, selection.RemoteName).Scan(&connectionOwner, &toolID, &stableName, &schemaStatus, &schemaFingerprint, &active)
-			if err != nil {
-				return ErrSpaceInvalid
-			}
-			if connectionOwner != userID {
-				return ErrSpaceForbidden
-			}
-			enabled := selection.Enabled && active && schemaStatus == "valid"
-			_, err = tx.ExecContext(ctx, `INSERT INTO misty_ask_mcp_tools(id,owner_user_id,agent_id,connection_id,remote_tool_id,stable_name,schema_fingerprint,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, "mcp_binding_"+uuid.NewString(), userID, agentID, selection.ConnectionID, toolID, stableName, schemaFingerprint, enabled)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
+	// Compatibility endpoint: tools follow account connections automatically.
 	return db.PersonalAgentMCPTools(ctx, userID, agentID)
 }
 
@@ -150,7 +105,7 @@ func (db *Database) EnabledPersonalAgentMCPTools(ctx context.Context, userID, ag
 func (db *Database) PersonalAgentMCPToolForExecution(ctx context.Context, userID, agentID, stableName string) (*MCPAgentToolBinding, error) {
 	item := &MCPAgentToolBinding{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		return scanMCPAgentTool(tx.QueryRowContext(ctx, `SELECT `+mcpAgentToolColumns+` FROM misty_ask_identities a JOIN misty_ask_mcp_tools b ON b.agent_id=a.id JOIN mcp_remote_connections c ON c.id=b.connection_id JOIN mcp_remote_tools t ON t.id=b.remote_tool_id AND t.connection_id=b.connection_id WHERE a.id=$1 AND a.owner_user_id=$2 AND a.deleted_at IS NULL AND b.owner_user_id=$2 AND b.enabled=TRUE AND b.stable_name=$3 AND b.schema_fingerprint=t.schema_fingerprint AND c.owner_user_id=$2 AND c.status='active' AND c.revoked_at IS NULL AND t.schema_status='valid' AND t.removed_at IS NULL`, agentID, userID, stableName), item)
+		return scanMCPAgentTool(tx.QueryRowContext(ctx, `SELECT `+mcpAgentToolColumns+` FROM misty_ask_identities a CROSS JOIN mcp_remote_connections c JOIN mcp_remote_tools t ON t.connection_id=c.id WHERE a.id=$1 AND a.owner_user_id=$2 AND a.deleted_at IS NULL AND a.enabled AND t.stable_name=$3 AND c.owner_user_id=$2 AND c.status='active' AND c.revoked_at IS NULL AND t.schema_status='valid' AND t.removed_at IS NULL`, agentID, userID, stableName), item)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound

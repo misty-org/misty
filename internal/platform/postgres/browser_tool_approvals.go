@@ -30,7 +30,7 @@ func (db *Database) BrowserToolApprovalTarget(ctx context.Context, userID, runID
 		return tx.QueryRowContext(ctx, `SELECT c.id,c.device_id,c.display_name,c.expires_at,j.output FROM ai_invocation_contexts c
    JOIN ai_invocations i ON i.id=c.invocation_id AND i.space_id=c.space_id
    JOIN trusted_devices d ON d.id=c.device_id AND d.user_id=$1 AND d.revoked_at IS NULL
-   JOIN LATERAL (SELECT output FROM workflow_device_node_jobs WHERE invocation_id=i.id AND ai_context_id=c.id AND operation='browser.inspect' AND state='completed' ORDER BY completed_at DESC,id DESC LIMIT 1) j ON true
+   JOIN LATERAL (SELECT output FROM workflow_device_node_jobs WHERE invocation_id=i.id AND ai_context_id=c.id AND operation IN ('browser.inspect','browser.visual','browser.workspace.visual') AND state='completed' ORDER BY completed_at DESC,id DESC LIMIT 1) j ON true
    WHERE c.user_id=$1 AND c.invocation_id=$2 AND c.opaque_ref=$3 AND c.state='attached' AND c.expires_at>NOW() AND c.capabilities ? $4`, userID, runID, scopeID, operation).Scan(&target.ContextID, &target.DeviceID, &target.Label, &target.ExpiresAt, &target.Snapshot)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
@@ -42,7 +42,7 @@ func (db *Database) BrowserToolApprovalTarget(ctx context.Context, userID, runID
 // RequireBrowserToolApproval shares the durable approval table/outbox with SDK
 // execution. The encrypted review is mandatory; it cannot be an opaque click.
 func (db *Database) RequireBrowserToolApproval(ctx context.Context, userID, runID, runtimeID, callID, operation, hash, hook, summary string, target BrowserApprovalTarget, review ProtectedSDKApproval) (*AgentToolApproval, bool, error) {
-	if (operation != "browser.click" && operation != "browser.interact") || callID == "" || len(callID) > 200 || hook == "" || len(hook) > 500 {
+	if (operation != "browser.click" && operation != "browser.interact" && operation != "browser.workspace.interact") || callID == "" || len(callID) > 200 || hook == "" || len(hook) > 500 {
 		return nil, false, ErrSpaceInvalid
 	}
 	result := &AgentToolApproval{}
@@ -89,7 +89,7 @@ func (db *Database) BrowserToolApprovalByCall(ctx context.Context, userID, runID
 	approval := &AgentToolApproval{}
 	review := &ProtectedSDKApproval{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
-		if err := scanAgentToolApproval(tx.QueryRowContext(ctx, `SELECT `+sdkApprovalColumns+` FROM agent_run_tool_approvals WHERE invocation_id=$1 AND owner_user_id=$2 AND tool_call_id=$3 AND tool_name IN ('browser.click','browser.interact')`, runID, userID, callID), approval); err != nil {
+		if err := scanAgentToolApproval(tx.QueryRowContext(ctx, `SELECT `+sdkApprovalColumns+` FROM agent_run_tool_approvals WHERE invocation_id=$1 AND owner_user_id=$2 AND tool_call_id=$3 AND tool_name IN ('browser.click','browser.interact','browser.workspace.interact')`, runID, userID, callID), approval); err != nil {
 			return err
 		}
 		return tx.QueryRowContext(ctx, `SELECT sdk_effect_id::text,sdk_review_digest,sdk_review_ciphertext FROM agent_run_tool_approvals WHERE id=$1 AND sdk_review_ciphertext IS NOT NULL`, approval.ID).Scan(&review.EffectID, &review.Digest, &review.Ciphertext)

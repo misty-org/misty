@@ -11,6 +11,7 @@ import (
 )
 
 type AIInvocationRecord struct {
+	ModelTurnLimit     int
 	DispatchRuntime    bool
 	ID                 string
 	UserID             string
@@ -78,16 +79,20 @@ func createAIInvocationRecordTx(ctx context.Context, tx *sql.Tx, record AIInvoca
 		if !enabled {
 			return ErrSpaceForbidden
 		}
+		modelTurnLimit, err := invocationModelTurnLimitTx(ctx, tx, record)
+		if err != nil {
+			return err
+		}
 		var inserted bool
-		err := tx.QueryRowContext(ctx, `
-			INSERT INTO ai_invocations(id,user_id,space_id,conversation_id,surface_id,mode,trigger_kind,state,idempotency_key,request_payload,expires_at)
-			VALUES($1,$2,NULLIF($3,''),NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11)
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO ai_invocations(id,user_id,space_id,conversation_id,surface_id,mode,trigger_kind,state,idempotency_key,request_payload,expires_at,model_turn_limit)
+			VALUES($1,$2,NULLIF($3,''),NULLIF($4,''),$5,$6,$7,$8,$9,$10,$11,$12)
 			ON CONFLICT(user_id,idempotency_key) DO UPDATE SET updated_at=ai_invocations.updated_at
 				RETURNING id,user_id,COALESCE(space_id,''),COALESCE(conversation_id,''),surface_id,mode,trigger_kind,state,idempotency_key,request_payload,
-					runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,(xmax=0)
-			`, record.ID, record.UserID, record.SpaceID, record.ConversationID, record.SurfaceID, record.Mode, record.Trigger, record.State, record.IdempotencyKey, record.RequestPayload, record.ExpiresAt).Scan(
+					runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,model_turn_limit,(xmax=0)
+			`, record.ID, record.UserID, record.SpaceID, record.ConversationID, record.SurfaceID, record.Mode, record.Trigger, record.State, record.IdempotencyKey, record.RequestPayload, record.ExpiresAt, modelTurnLimit).Scan(
 			&stored.ID, &stored.UserID, &stored.SpaceID, &stored.ConversationID, &stored.SurfaceID, &stored.Mode, &stored.Trigger, &stored.State, &stored.IdempotencyKey, &stored.RequestPayload,
-			&stored.RuntimeKind, &stored.RuntimeRunID, &stored.AgentRunID, &stored.RuntimeHeartbeatAt, &stored.ExpiresAt, &stored.CreatedAt, &stored.UpdatedAt, &inserted,
+			&stored.RuntimeKind, &stored.RuntimeRunID, &stored.AgentRunID, &stored.RuntimeHeartbeatAt, &stored.ExpiresAt, &stored.CreatedAt, &stored.UpdatedAt, &stored.ModelTurnLimit, &inserted,
 		)
 		created = inserted
 		if err == nil && created && record.SurfaceID != "sdk" && record.SurfaceID != "routine" {
@@ -113,10 +118,10 @@ func (db *Database) AIInvocationByID(ctx context.Context, userID, invocationID s
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `
 			SELECT id,user_id,COALESCE(space_id,''),COALESCE(conversation_id,''),surface_id,mode,trigger_kind,state,idempotency_key,request_payload,
-				runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at
+				runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,model_turn_limit
 			FROM ai_invocations WHERE id=$1 AND user_id=$2
 		`, invocationID, userID).Scan(&result.ID, &result.UserID, &result.SpaceID, &result.ConversationID, &result.SurfaceID, &result.Mode, &result.Trigger, &result.State, &result.IdempotencyKey, &result.RequestPayload,
-			&result.RuntimeKind, &result.RuntimeRunID, &result.AgentRunID, &result.RuntimeHeartbeatAt, &result.ExpiresAt, &result.CreatedAt, &result.UpdatedAt)
+			&result.RuntimeKind, &result.RuntimeRunID, &result.AgentRunID, &result.RuntimeHeartbeatAt, &result.ExpiresAt, &result.CreatedAt, &result.UpdatedAt, &result.ModelTurnLimit)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSpaceNotFound
@@ -156,9 +161,9 @@ func (db *Database) ActivateAIInvocationRuntime(ctx context.Context, invocationI
 			runtime_kind=$1,runtime_run_id=$2,runtime_heartbeat_at=NOW(),state='running',updated_at=NOW()
 			WHERE id=$3 AND state IN ('queued','running') AND (runtime_run_id='' OR runtime_run_id=$2)
 			RETURNING id,user_id,COALESCE(space_id,''),COALESCE(conversation_id,''),surface_id,mode,trigger_kind,state,idempotency_key,request_payload,
-				runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at`, runtimeKind, runtimeRunID, invocationID).Scan(
+				runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,model_turn_limit`, runtimeKind, runtimeRunID, invocationID).Scan(
 			&out.ID, &out.UserID, &out.SpaceID, &out.ConversationID, &out.SurfaceID, &out.Mode, &out.Trigger, &out.State, &out.IdempotencyKey, &out.RequestPayload,
-			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
+			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt, &out.ModelTurnLimit)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrSpaceConflict
@@ -172,10 +177,10 @@ func (db *Database) ValidateAIInvocationRuntime(ctx context.Context, invocationI
 	out := &AIInvocationRecord{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT id,user_id,COALESCE(space_id,''),COALESCE(conversation_id,''),surface_id,mode,trigger_kind,state,idempotency_key,request_payload,
-			runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at
+			runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,model_turn_limit
 			FROM ai_invocations WHERE id=$1 AND runtime_run_id=$2 AND state IN ('running','awaiting_approval','awaiting_device','awaiting_intervention','awaiting_timer')`, invocationID, runtimeRunID).Scan(
 			&out.ID, &out.UserID, &out.SpaceID, &out.ConversationID, &out.SurfaceID, &out.Mode, &out.Trigger, &out.State, &out.IdempotencyKey, &out.RequestPayload,
-			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
+			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt, &out.ModelTurnLimit)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrSpaceForbidden
@@ -190,10 +195,10 @@ func (db *Database) AIInvocationRuntimeRecord(ctx context.Context, invocationID,
 	out := &AIInvocationRecord{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		return tx.QueryRowContext(ctx, `SELECT id,user_id,COALESCE(space_id,''),COALESCE(conversation_id,''),surface_id,mode,trigger_kind,state,idempotency_key,request_payload,
-			runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at
+			runtime_kind,runtime_run_id,COALESCE(agent_run_id,''),runtime_heartbeat_at,expires_at,created_at,updated_at,model_turn_limit
 			FROM ai_invocations WHERE id=$1 AND runtime_run_id=$2`, invocationID, runtimeRunID).Scan(
 			&out.ID, &out.UserID, &out.SpaceID, &out.ConversationID, &out.SurfaceID, &out.Mode, &out.Trigger, &out.State, &out.IdempotencyKey, &out.RequestPayload,
-			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt)
+			&out.RuntimeKind, &out.RuntimeRunID, &out.AgentRunID, &out.RuntimeHeartbeatAt, &out.ExpiresAt, &out.CreatedAt, &out.UpdatedAt, &out.ModelTurnLimit)
 	})
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrSpaceForbidden

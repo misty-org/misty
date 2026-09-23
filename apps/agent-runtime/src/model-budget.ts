@@ -40,3 +40,10 @@ export function accumulateModelUsage(previous: LanguageModelUsage | undefined, n
     },
   };
 }
+
+// Older control planes omit this field and retain their 20-turn policy.
+export function modelTurnLimit(value: number | undefined): number {
+  if (value === undefined) return 20;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 120) throw new Error("invalid_model_turn_limit");
+  return value;
+}

@@ -147,3 +147,71 @@ func TestAgentModelTurnBudgetRevalidatesAppAuthority(t *testing.T) {
 		t.Fatalf("unbounded model identity: %v", err)
 	}
 }
+
+func TestForegroundAgentModelTurnBudget(t *testing.T) {
+	database, _, user, _ := sdkInvocationFixture(t)
+	ctx := t.Context()
+	space := createTestSpace(t, database, ctx, user, "Foreground budget")
+	agent, err := database.EnsureAskIdentity(ctx, user, serveragent.InitialSelectedModelID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease := AgentExecutionLease{AgentID: agent.ID, SpaceID: space.ID, TaskID: "budget-task", WindowLabel: "main"}
+	if err := database.AcquireAgentExecution(ctx, user, lease); err != nil {
+		t.Fatal(err)
+	}
+	var foreground AIInvocationRecord
+	for _, scenario := range []struct {
+		mode, surface string
+		limit         int
+	}{
+		{"agent", "global", 120}, {"user", "global", 20}, {"team", "global", 20}, {"agent", "sdk", 20}, {"agent", "routine", 20},
+	} {
+		payload, _ := json.Marshal(map[string]string{"agent_id": agent.ID, "execution_mode": scenario.mode, "task_id": lease.TaskID, "window_label": lease.WindowLabel})
+		run, _, err := database.CreateAIInvocationRecord(ctx, AIInvocationRecord{ID: "invocation_" + uuid.NewString(), UserID: user, SpaceID: space.ID, SurfaceID: scenario.surface, Mode: "quick", Trigger: "message", State: "queued", IdempotencyKey: uuid.NewString(), RequestPayload: payload, ExpiresAt: time.Now().Add(time.Hour)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if run.ModelTurnLimit != scenario.limit {
+			t.Fatalf("%+v: limit %d", scenario, run.ModelTurnLimit)
+		}
+		if scenario.limit == 120 {
+			foreground = run
+		}
+	}
+	runtime := uuid.NewString()
+	active, err := database.ActivateAIInvocationRuntime(ctx, foreground.ID, "vercel-workflow", runtime)
+	if err != nil || active.ModelTurnLimit != 120 {
+		t.Fatalf("activate: %+v %v", active, err)
+	}
+	validated, err := database.ValidateAIInvocationRuntime(ctx, foreground.ID, runtime)
+	if err != nil || validated.ModelTurnLimit != 120 {
+		t.Fatalf("context: %+v %v", validated, err)
+	}
+	for i := 1; i <= 120; i++ {
+		if err := database.ReserveAgentModelTurn(ctx, user, foreground.ID, runtime, fmt.Sprintf("model:%d", i)); err != nil {
+			t.Fatalf("turn %d: %v", i, err)
+		}
+	}
+	if err := database.ReserveAgentModelTurn(ctx, user, foreground.ID, runtime, "model:121"); !errors.Is(err, ErrAgentModelTurnLimit) {
+		t.Fatalf("exceeded limit: %v", err)
+	}
+	if err := database.ReserveAgentModelTurn(ctx, user, foreground.ID, runtime, "model:120"); err != nil {
+		t.Fatalf("replay: %v", err)
+	}
+	// Admission retries must not replace the pinned larger budget or its claims.
+	retry := foreground
+	retry.RequestPayload = json.RawMessage(`{}`)
+	stored, created, err := database.CreateAIInvocationRecord(ctx, retry)
+	if err != nil || created || stored.ModelTurnLimit != 120 {
+		t.Fatalf("retry changed budget: %+v %v %v", stored, created, err)
+	}
+	if err := database.ReleaseAgentExecution(ctx, user, lease.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	foreground.ID = "invocation_" + uuid.NewString()
+	foreground.IdempotencyKey = uuid.NewString()
+	if _, _, err := database.CreateAIInvocationRecord(ctx, foreground); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("missing lease admitted: %v", err)
+	}
+}

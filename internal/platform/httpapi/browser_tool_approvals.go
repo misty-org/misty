@@ -31,7 +31,7 @@ type browserApprovalReview struct {
 }
 
 func (s *SpacesService) requireAIInvocationBrowserApproval(ctx context.Context, access *mcpRuntimeAccess, call agentRuntimeToolCall) (*db.AgentToolApproval, bool, error) {
-	if access == nil || access.record == nil || access.prepared == nil || !agentToolNameAllowed(access.prepared.allowedTools, call.Name) || (call.Name != "browser.click" && call.Name != "browser.interact") {
+	if access == nil || access.record == nil || access.prepared == nil || !agentToolNameAllowed(access.prepared.allowedTools, call.Name) || (call.Name != "browser.click" && call.Name != "browser.interact" && call.Name != "browser.workspace.interact") {
 		return nil, false, db.ErrAppRuntimeForbidden
 	}
 	var descriptor agenttools.Descriptor
@@ -102,7 +102,7 @@ func (s *SpacesService) requireAIInvocationBrowserApproval(ctx context.Context, 
 		if json.Unmarshal(target.Snapshot, &page) != nil || page.URL == "" {
 			return nil, false, db.ErrSpaceInvalid
 		}
-		if call.Name == "browser.interact" && input.DocumentID != page.DocumentID {
+		if (call.Name == "browser.interact" || call.Name == "browser.workspace.interact") && input.DocumentID != page.DocumentID {
 			return nil, false, db.ErrSpaceConflict
 		}
 		ref := input.ElementRef
@@ -166,6 +166,9 @@ func nativeRoutineBrowserAction(body aiInvocationInput, name string, arguments j
 	}
 	if input.Consequential != nil && *input.Consequential {
 		return false
+	}
+	if name == "browser.workspace.interact" {
+		return body.ExecutionMode == "agent" && body.WindowLabel == "main" && input.Consequential != nil && !*input.Consequential && !(input.Action.Kind == "key" && input.Action.Key == "Enter")
 	}
 	if name == "browser.interact" {
 		switch input.Action.Kind {

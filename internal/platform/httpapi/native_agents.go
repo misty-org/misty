@@ -6,7 +6,6 @@ import (
 	agent "github.com/kannachi323/misty/server/internal/agents"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 	"net/http"
-	"strings"
 )
 
 func writePersonalAgentError(w http.ResponseWriter, err error) {
@@ -49,10 +48,6 @@ func (s *AIService) PersonalAgents() http.HandlerFunc {
 			http.Error(w, "invalid agent", http.StatusBadRequest)
 			return
 		}
-		if body.ModelMode == "pinned" && (!agent.FrontierModelAvailable(r.Context(), body.ModelID) || !agent.FrontierModelReasoningAvailable(r.Context(), body.ModelID, body.ReasoningEffort)) {
-			http.Error(w, "model unavailable", http.StatusBadRequest)
-			return
-		}
 		item, err := s.database.SavePersonalAgent(r.Context(), userID, "", body)
 		if err != nil {
 			writePersonalAgentError(w, err)
@@ -86,50 +81,12 @@ func (s *AIService) PersonalAgent() http.HandlerFunc {
 			http.Error(w, "invalid agent", http.StatusBadRequest)
 			return
 		}
-		if body.ModelMode == "pinned" && (!agent.FrontierModelAvailable(r.Context(), body.ModelID) || !agent.FrontierModelReasoningAvailable(r.Context(), body.ModelID, body.ReasoningEffort)) {
-			http.Error(w, "model unavailable", http.StatusBadRequest)
-			return
-		}
 		item, err := s.database.SavePersonalAgent(r.Context(), userID, id, body)
 		if err != nil {
 			writePersonalAgentError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, item)
-	}
-}
-
-func (s *AIService) AgentAppAssignments() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := s.requireUser(w, r)
-		if db.AppAuthorityFromContext(r.Context()) != nil {
-			http.Error(w, "Host-only agent management", http.StatusForbidden)
-			return
-		}
-		if !ok {
-			return
-		}
-		id := chi.URLParam(r, "agentID")
-		spaceID := strings.TrimSpace(chi.URLParam(r, "spaceID"))
-		if r.Method == http.MethodPut {
-			var body struct {
-				AppIDs []string `json:"app_ids"`
-			}
-			if err := decodeAIJSON(w, r, &body); err != nil {
-				http.Error(w, "invalid assignments", http.StatusBadRequest)
-				return
-			}
-			if err := s.database.SetAgentAppAssignments(r.Context(), userID, id, spaceID, body.AppIDs); err != nil {
-				writePersonalAgentError(w, err)
-				return
-			}
-		}
-		items, err := s.database.AgentAppAssignments(r.Context(), userID, id, spaceID)
-		if err != nil {
-			writePersonalAgentError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"agent_id": id, "space_id": spaceID, "app_ids": items})
 	}
 }
 

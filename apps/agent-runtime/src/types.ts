@@ -10,7 +10,7 @@ export interface SpaceTaskContext {
   current_time: string;
   members: Array<{ user_id: string; name: string; role: string }>;
   model_id: string;
-  reasoning_effort?: "low" | "medium" | "high" | "";
+  reasoning_effort?: "low" | "medium" | "high" | "xhigh" | "";
   run_mode: "ask" | "auto" | "full";
   system: string;
   prompt: string;
@@ -41,6 +41,7 @@ export interface SpaceTaskContext {
     content_hash: string;
   }>;
   file_warnings: string;
+  model_turn_limit?: number;
   allowed_tools: string[];
   /**
    * Write tools the control plane derived from the user's explicit request.

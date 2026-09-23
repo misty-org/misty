@@ -89,6 +89,12 @@ func spaceAgentToolboxWithBrowserProvidersAndExtra(database *db.Database, browse
 			return executeNativeAgentTool(ctx, database, i, r)
 		}})
 	}
+	for _, descriptor := range globalAgentSpaceDescriptors() {
+		registrations = append(registrations, agenttools.Registration{Descriptor: descriptor, Handler: func(ctx context.Context, i agenttools.Invocation, r serveragent.ToolRequest) (json.RawMessage, error) {
+			return executeGlobalAgentSpaceTool(ctx, database, i, r)
+		}})
+	}
+
 	if database != nil && len(browserTabs) > 0 {
 		browserHandler := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 			service := &SpacesService{database: database}

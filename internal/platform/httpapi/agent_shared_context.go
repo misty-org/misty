@@ -39,7 +39,7 @@ func buildAgentSharedSpaceContext(
 	}
 	sections := defaultSpaceContextSections
 	if agentID != "" {
-		apps, assignmentErr := database.AgentAppAssignments(ctx, userID, agentID, spaceID)
+		apps, assignmentErr := database.AgentWorkspaceTools(ctx, userID, agentID)
 		if assignmentErr != nil {
 			return agentSharedSpaceContext{}, assignmentErr
 		}
